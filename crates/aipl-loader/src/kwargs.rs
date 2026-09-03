@@ -14,6 +14,19 @@
 //! defaults are expanded recursively (memoized per function, with cycle
 //! detection — `fn a(x: i64 = b())` / `fn b(y: i64 = a())` is an error).
 //!
+//! A default may also read the parameters declared **before** it —
+//! `fn f(a: T, b: T = a)`. Splicing happens at the call site, where those
+//! parameters don't exist as names, so each read is materialized as a `let`
+//! binding of the parameter's name to the argument that call passes for it:
+//! `f(x)` becomes `f(x, { let a: T = x; a })`. Ordinary scoping then does the
+//! rest — a `let` inside the default shadows the parameter exactly as it did in
+//! the declaration, and a caller's own `a` is untouched. An argument a default
+//! reads is evaluated **once**: anything but a name or literal is hoisted into
+//! its own binding around the call, along with every argument before it so the
+//! left-to-right evaluation order the call site had is preserved. Only earlier
+//! parameters are in scope, so a forward or self reference is rejected here
+//! rather than silently resolving to something in the caller's scope.
+//!
 //! [`flatten`]: super::Loader::flatten
 
 use std::collections::{HashMap, HashSet};
@@ -63,6 +76,7 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
         spreads: 0,
         struct_fields,
         struct_spreads: 0,
+        kw_tmps: 0,
     };
 
     let items = program
@@ -116,12 +130,22 @@ struct FnKwInfo {
     /// argument count.
     positional: Vec<String>,
     kw: Vec<(String, Expr)>,
+    /// Every parameter in declaration order, paired with the annotation to put
+    /// on the call-site binding that stands in for it when a later default
+    /// reads it — the parameter's declared type, so a bare literal argument
+    /// flexes to a narrow width exactly as it would in argument position
+    /// (`fn f(a: u8, b: u8 = a)`, called `f(5)`). `None` where the type isn't a
+    /// runtime type yet — it mentions a type variable or `any`, and which type
+    /// that is isn't known until monomorphization, so the binding is left to
+    /// infer like the spread desugaring's generic case.
+    params: Vec<(String, Option<Type>)>,
 }
 
 impl FnKwInfo {
-    /// Split `sig`'s parameters into positional and keyword, enforcing the
-    /// declaration rule: once a parameter has a default, every later one must
-    /// too (keyword parameters come last).
+    /// Split `sig`'s parameters into positional and keyword, enforcing the two
+    /// declaration rules: once a parameter has a default, every later one must
+    /// too (keyword parameters come last), and a default may only read
+    /// parameters declared *before* it.
     fn from_sig(name: &str, sig: &Signature) -> Result<FnKwInfo, Error> {
         let mut kw: Vec<(String, Expr)> = Vec::new();
         let mut positional = Vec::new();
@@ -144,7 +168,46 @@ impl FnKwInfo {
                 }
             }
         }
-        Ok(FnKwInfo { positional, kw })
+        // A default is filled in at the call site from the arguments that call
+        // passes, so it can only read parameters already decided there: the
+        // ones declared before it. A reference to itself or to a later
+        // parameter has nothing to bind to — and left alone it would resolve to
+        // whatever the *caller* happens to have in scope under that name — so
+        // it is refused here, where the declaration is what the span points at.
+        for (i, p) in sig.params.iter().enumerate() {
+            let Some(d) = &p.default else { continue };
+            let free = aipl_syntax::free_idents(d);
+            let Some(later) = sig.params[i..].iter().find(|q| free.contains(&q.name)) else {
+                continue;
+            };
+            let relation = if later.name == p.name {
+                "itself".to_string()
+            } else {
+                format!("parameter {:?}, which is declared after it", later.name)
+            };
+            return Err(Error::at(
+                format!(
+                    "fn {:?}: the default for parameter {:?} reads {relation} — a default may \
+                     only read parameters declared before it",
+                    display(name),
+                    p.name
+                ),
+                d.span.clone(),
+            ));
+        }
+        let params = sig
+            .params
+            .iter()
+            .map(|p| {
+                let ann = (!aipl_syntax::mentions_typevar(&p.ty)).then(|| p.ty.clone());
+                (p.name.clone(), ann)
+            })
+            .collect();
+        Ok(FnKwInfo {
+            positional,
+            kw,
+            params,
+        })
     }
 }
 
@@ -189,6 +252,25 @@ struct Expander {
     /// Serial number for the binding `desugar_struct_spread` introduces when the
     /// spread operand isn't already a plain name.
     struct_spreads: usize,
+    /// Serial number for the bindings `expand_call_args` hoists arguments into
+    /// when a keyword parameter's default reads them.
+    kw_tmps: usize,
+}
+
+/// Whether `e` can be written into the call more than once for free: a name or
+/// a literal has no side effect and no evaluation cost worth a binding, so a
+/// default that reads it can mention it directly. Anything else is hoisted.
+fn mentionable(e: &Expr) -> bool {
+    matches!(
+        e.kind,
+        ExprKind::Ident(_)
+            | ExprKind::Num(_)
+            | ExprKind::Bool(_)
+            | ExprKind::Str(_)
+            | ExprKind::Char(_)
+            | ExprKind::Unit
+            | ExprKind::None
+    )
 }
 
 /// Whether this init is a `..base` struct spread rather than a named field.
@@ -460,15 +542,28 @@ impl Expander {
             )));
         }
         self.expanding.push(name.to_string());
-        // Defaults can't reference the function's parameters (they are checked
-        // in an empty environment), so no locals are in scope.
-        let expanded: Result<Vec<Expr>, Error> = self
+        // The parameters declared before a default are its locals, exactly as
+        // the whole parameter list is the body's: a name that is one refers to
+        // the parameter, so a call through a function-typed parameter never
+        // picks up the keyword machinery of a global of the same name.
+        let (defaults, param_names): (Vec<Expr>, Vec<String>) = self
             .fns
             .get(name)
-            .map(|info| info.kw.iter().map(|(_, d)| d.clone()).collect::<Vec<_>>())
-            .unwrap_or_default()
+            .map(|info| {
+                (
+                    info.kw.iter().map(|(_, d)| d.clone()).collect(),
+                    info.params.iter().map(|(n, _)| n.clone()).collect(),
+                )
+            })
+            .unwrap_or_default();
+        let npos = param_names.len() - defaults.len();
+        let expanded: Result<Vec<Expr>, Error> = defaults
             .iter()
-            .map(|d| self.expand_expr(d, &HashSet::new()))
+            .enumerate()
+            .map(|(i, d)| {
+                let locals: HashSet<String> = param_names[..npos + i].iter().cloned().collect();
+                self.expand_expr(d, &locals)
+            })
             .collect();
         self.expanding.pop();
         let expanded = expanded?;
@@ -480,12 +575,16 @@ impl Expander {
     /// keyword arguments against `name`'s keyword parameters and fill each
     /// omitted one from its (expanded) default. `args` has already been
     /// expanded recursively; `span` is the call's, for errors.
+    ///
+    /// Returns the positional arguments plus the bindings to wrap around the
+    /// call, outermost first — see [`Expander::fill_defaults`]. They are empty
+    /// unless a spliced default reads a parameter.
     fn expand_call_args(
         &mut self,
         name: &str,
         args: Vec<Expr>,
         span: &Span,
-    ) -> Result<Vec<Expr>, Error> {
+    ) -> Result<(Vec<Expr>, Vec<(String, Option<Type>, Expr)>), Error> {
         // Split the positional prefix from the keyword tail, rejecting a
         // positional argument after a keyword one.
         let mut positional: Vec<Expr> = Vec::new();
@@ -531,7 +630,7 @@ impl Expander {
                         kspan.clone(),
                     ));
                 }
-                return Ok(positional);
+                return Ok((positional, Vec::new()));
             }
         };
 
@@ -594,17 +693,99 @@ impl Expander {
             supplied[i] = Some(v);
         }
 
-        // Fill each omitted keyword parameter from its (expanded) default. The
-        // spliced expression keeps the default's own span, so an error inside
-        // it points at the declaration.
+        let params = info.params.clone();
         let defaults = self.expanded_defaults(name)?;
-        positional.extend(
-            supplied
-                .into_iter()
-                .zip(defaults)
-                .map(|(s, d)| s.unwrap_or(d)),
-        );
-        Ok(positional)
+        Ok(self.fill_defaults(&params, positional, supplied, defaults, span))
+    }
+
+    /// Build the final positional argument list: each supplied argument in
+    /// declaration order, with every omitted keyword parameter filled from its
+    /// (expanded) default. The spliced expression keeps the default's own span,
+    /// so an error inside it points at the declaration.
+    ///
+    /// A default may read the parameters declared before it. Those names don't
+    /// exist at the call site, so each read becomes a `let` of the parameter's
+    /// name around the default — `f(x)` with `fn f(a: T, b: T = a)` splices
+    /// `{ let a: T = x; a }`. Scoping then behaves as it did in the
+    /// declaration: a binder inside the default shadows the parameter, and the
+    /// caller's own `a`, if it has one, is untouched.
+    ///
+    /// An argument that gets read is mentioned more than once, so it is
+    /// evaluated **once**, into a binding wrapped around the call — as is every
+    /// argument before it, since hoisting only some of them would reorder the
+    /// side effects between them. A name or a literal needs no binding: it can
+    /// be mentioned again for free.
+    ///
+    /// Returns the arguments and those bindings, outermost first.
+    fn fill_defaults(
+        &mut self,
+        params: &[(String, Option<Type>)],
+        positional: Vec<Expr>,
+        supplied: Vec<Option<Expr>>,
+        defaults: Vec<Expr>,
+        span: &Span,
+    ) -> (Vec<Expr>, Vec<(String, Option<Type>, Expr)>) {
+        // Which parameters do the defaults actually spliced here read? A
+        // supplied keyword argument replaces its default outright, so that
+        // default's reads never happen and cost nothing.
+        let mut reads: HashSet<String> = HashSet::new();
+        for (s, d) in supplied.iter().zip(&defaults) {
+            if s.is_none() {
+                reads.extend(aipl_syntax::free_idents(d));
+            }
+        }
+        let last_read = params
+            .iter()
+            .rposition(|(n, _)| reads.contains(n))
+            .unwrap_or(0);
+        let no_reads = reads.is_empty();
+
+        let npos = positional.len();
+        let mut bindings: Vec<(String, Option<Type>, Expr)> = Vec::new();
+        // Parameter name -> the expression that reads its argument here.
+        let mut arg_of: HashMap<&str, Expr> = HashMap::new();
+        let mut out: Vec<Expr> = Vec::with_capacity(params.len());
+        for (i, (pname, pty)) in params.iter().enumerate() {
+            let arg = match positional.get(i) {
+                Some(a) => a.clone(),
+                None => match &supplied[i - npos] {
+                    Some(v) => v.clone(),
+                    None => {
+                        let d = &defaults[i - npos];
+                        let free = aipl_syntax::free_idents(d);
+                        params[..i].iter().rev().fold(d.clone(), |body, (n, ty)| {
+                            let Some(a) = arg_of.get(n.as_str()).filter(|_| free.contains(n))
+                            else {
+                                return body;
+                            };
+                            let bspan = body.span.clone();
+                            Expr::new(
+                                ExprKind::Let(
+                                    n.clone(),
+                                    ty.clone(),
+                                    Box::new(a.clone()),
+                                    Box::new(body),
+                                ),
+                                bspan,
+                            )
+                        })
+                    }
+                },
+            };
+            let arg = if no_reads || i > last_read || mentionable(&arg) {
+                arg
+            } else {
+                let tmp = format!("{}{}", aipl_syntax::KWARG_ARG_PREFIX, self.kw_tmps);
+                self.kw_tmps += 1;
+                bindings.push((tmp.clone(), pty.clone(), arg));
+                Expr::new(ExprKind::Ident(tmp), span.clone())
+            };
+            if reads.contains(pname) {
+                arg_of.insert(pname, arg.clone());
+            }
+            out.push(arg);
+        }
+        (out, bindings)
     }
 
     /// Structurally expand `e`: rewrite every call as [`expand_call_args`]
@@ -686,11 +867,20 @@ impl Expander {
                     }
                     ExprKind::Call(name.clone(), args, *method_style)
                 } else {
-                    ExprKind::Call(
-                        name.clone(),
-                        self.expand_call_args(name, args, &e.span)?,
-                        *method_style,
-                    )
+                    let (args, bindings) = self.expand_call_args(name, args, &e.span)?;
+                    let call = ExprKind::Call(name.clone(), args, *method_style);
+                    // An argument a spliced default reads is evaluated once,
+                    // into a binding wrapped around the call.
+                    bindings
+                        .into_iter()
+                        .rev()
+                        .fold(Expr::new(call, e.span.clone()), |body, (n, ty, v)| {
+                            Expr::new(
+                                ExprKind::Let(n, ty, Box::new(v), Box::new(body)),
+                                e.span.clone(),
+                            )
+                        })
+                        .kind
                 }
             }
             ExprKind::Construct(name, inits) => {

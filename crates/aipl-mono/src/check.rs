@@ -1261,12 +1261,20 @@ impl Cx<'_> {
             self.check_ty(rt, &type_var_names, &format!("fn {:?}", f.name))?;
         }
 
-        // Keyword-parameter defaults are checked like struct field defaults: in
-        // an empty environment (a default can't reference other parameters —
-        // it is spliced into *call sites*, where none are in scope). Effects
-        // are the function's own declared set: every caller must cover the
-        // callee's effects anyway, so a spliced default's effects are covered
-        // wherever it lands.
+        // Keyword-parameter defaults are checked in an environment holding the
+        // parameters declared *before* them — the ones a default may read
+        // (`fn f(a: T, b: T = a)`). It is spliced into *call sites*, where the
+        // loader binds each name it reads to the argument that call passes, so
+        // the declared type is what the default sees here and what the binding
+        // is annotated with there. The parameters from this one on are absent,
+        // which is what makes a forward or self reference an error; the loader
+        // reports it first, with a message about declaration order. Bindings
+        // are immutable even for a `mut self` receiver: a default is an
+        // expression evaluated at the call site, not part of the body.
+        //
+        // Effects are the function's own declared set: every caller must cover
+        // the callee's effects anyway, so a spliced default's effects are
+        // covered wherever it lands.
         //
         // A default whose parameter type mentions a type variable (`pad: T = 0`)
         // has no answer *here*: whether `0` is a `T` depends on the
@@ -1278,25 +1286,32 @@ impl Cx<'_> {
         // defaults have always deferred the same way, for the same reason (the
         // `s.is_generic()` skip in `check`); before this, the two disagreed and a
         // `T`-typed parameter default was simply unwritable.
+        let mut earlier: Env = HashMap::new();
         for p in &f.sig.params {
+            let pty = subst_typevars(&p.ty, &type_var_names);
             if let Some(default) = &p.default {
-                let dt = self.check_expr(default, &HashMap::new(), &f.sig.effects)?;
-                let pty = subst_typevars(&p.ty, &type_var_names);
-                if mentions_typevar(&pty) {
-                    continue;
+                let dt = self.check_expr(default, &earlier, &f.sig.effects)?;
+                if !mentions_typevar(&pty) {
+                    let dt = self.flex_int(default, &dt, &pty)?;
+                    expect(
+                        &dt,
+                        &pty,
+                        &format!(
+                            "default for fn {:?} parameter {:?}",
+                            display(&f.name),
+                            p.name
+                        ),
+                        default.span.clone(),
+                    )?;
                 }
-                let dt = self.flex_int(default, &dt, &pty)?;
-                expect(
-                    &dt,
-                    &pty,
-                    &format!(
-                        "default for fn {:?} parameter {:?}",
-                        display(&f.name),
-                        p.name
-                    ),
-                    default.span.clone(),
-                )?;
             }
+            earlier.insert(
+                p.name.clone(),
+                Binding {
+                    ty: pty,
+                    mutable: false,
+                },
+            );
         }
 
         // Generic bodies are checked abstractly: each type variable (a declared

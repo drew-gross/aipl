@@ -1,0 +1,56 @@
+import { equal as ==, print, to_str } from builtins;
+
+// Reading a parameter whose type is the function's own type variable works the
+// same way, minus one thing: the call-site binding the read becomes can't be
+// annotated, because `T` names no runtime type until the instantiation is
+// known. So it infers from the argument — which is the same argument the
+// parameter itself gets, so the two agree by construction.
+fn pair<T: any>(x: T, y: T = x) -> T[] { [x, y] }.test({
+    assert(pair(1) == [1, 1]);
+    assert(pair("a", y="b") == ["a", "b"]);
+})
+
+fn main() !prints {
+    print(to_str(pair(1)));
+    print(to_str(pair("a")));
+    print(to_str(pair("a", y="b")));
+}
+--- stdout ---
+[1, 1]
+["a", "a"]
+["a", "b"]
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 282
+instructions executed: 1029
+binary size: 4336
+  code: 2224
+  data: 139
+  metadata: 1973
+functions:
+  __to_str_i64$arr:
+    calls: 1
+    bytes: 708
+  __to_str_str$arr:
+    calls: 2
+    bytes: 812
+  aipl_array_dec:
+    calls: 3
+    bytes: (external)
+  aipl_array_new:
+    calls: 3
+    bytes: (external)
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 13
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 704

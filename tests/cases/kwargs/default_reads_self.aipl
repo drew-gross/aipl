@@ -1,0 +1,36 @@
+import { concat as +++, equal as ==, len, print } from builtins;
+
+// The receiver is just the first parameter, so a default reads it like any
+// other — which is what lets a width, a limit, or a separator default to
+// something derived from the value the method was called on.
+fn head(self: str, n: u64 = self.len()) -> str { self[..n] }.test({
+    assert("hello".head() == "hello");
+    assert("hello".head(n=2) == "he");
+})
+
+fn main() !prints {
+    print("hello".head());
+    print("hello".head(n=2));
+
+    // A receiver that isn't already a name is evaluated once, into the binding
+    // the default reads.
+    print(("he" +++ "llo").head());
+}
+--- stdout ---
+hello
+he
+hello
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 127
+instructions executed: 62
+binary size: 1312
+  code: 480
+  data: 1
+  metadata: 831
+functions:
+  main:
+    calls: 1
+    bytes: 480

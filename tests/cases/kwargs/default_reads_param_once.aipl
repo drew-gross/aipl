@@ -1,0 +1,48 @@
+import { print, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
+
+fn tick(label: str, n: i64) !prints -> i64 {
+    print(label);
+    n
+}
+
+// An argument a default reads is mentioned twice in the expanded call, so the
+// loader binds it to a temporary first: `noisy` runs once, not twice.
+fn scaled(n: i64, by: i64 = n * 10) -> i64 { n + by }
+
+// And the arguments *before* it are bound too, so hoisting doesn't reorder the
+// side effects between them: "a" still runs before "b".
+fn sum(a: i64, b: i64, c: i64 = b + 1) -> i64 { a + b + c }
+
+fn main() !prints {
+    print(to_str(scaled(tick("noisy", 3))));
+    print(to_str(sum(tick("a", 1), tick("b", 2))));
+}
+--- stdout ---
+noisy
+33
+a
+b
+6
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 35
+instructions executed: 90
+binary size: 1448
+  code: 504
+  data: 1
+  metadata: 943
+functions:
+  __to_str_i64:
+    calls: 2
+    bytes: 204
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 300

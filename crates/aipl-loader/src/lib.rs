@@ -788,27 +788,35 @@ fn rewrite_item(
                 // Generic type-var names are local type variables, not global
                 // items — leave them untouched when rewriting signature types.
                 type_vars: f.sig.type_vars.clone(),
-                params: f
-                    .sig
-                    .params
-                    .iter()
-                    .map(|p| Param {
-                        name: p.name.clone(),
-                        ty: rewrite_type(&p.ty, view, &f.sig.type_vars),
-                        mutable: p.mutable,
-                        variadic: p.variadic,
-                        // A keyword parameter's default is spliced into *call
-                        // sites* (possibly in other files), so its global
-                        // references must resolve through the declaring file's
-                        // view now. Defaults can't reference the function's
-                        // parameters (they're checked in an empty environment),
-                        // so no locals shadow anything here.
-                        default: p
-                            .default
-                            .as_ref()
-                            .map(|d| rewrite_expr(d, view, sc, &HashSet::new())),
-                    })
-                    .collect(),
+                params: {
+                    // A keyword parameter's default is spliced into *call
+                    // sites* (possibly in other files), so its global
+                    // references must resolve through the declaring file's
+                    // view now. The parameters declared *before* it are its
+                    // locals: a default may name one (`fn f(a: T, b: T = a)`),
+                    // and such a name refers to the parameter even when a
+                    // global of the same name is in view — the call site binds
+                    // it to that argument. Parameters from this one on are
+                    // deliberately *not* locals, so a forward or self
+                    // reference stays an ordinary name for
+                    // `kwargs::FnKwInfo::from_sig` to reject.
+                    let mut earlier: HashSet<String> = HashSet::new();
+                    let mut params = Vec::with_capacity(f.sig.params.len());
+                    for p in &f.sig.params {
+                        params.push(Param {
+                            name: p.name.clone(),
+                            ty: rewrite_type(&p.ty, view, &f.sig.type_vars),
+                            mutable: p.mutable,
+                            variadic: p.variadic,
+                            default: p
+                                .default
+                                .as_ref()
+                                .map(|d| rewrite_expr(d, view, sc, &earlier)),
+                        });
+                        earlier.insert(p.name.clone());
+                    }
+                    params
+                },
                 effects: f.sig.effects.clone(),
                 return_ty: f
                     .sig

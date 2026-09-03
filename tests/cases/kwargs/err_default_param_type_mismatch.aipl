@@ -1,0 +1,18 @@
+// A default is checked against its own parameter's type in an environment
+// holding the parameters before it, so reading one of the wrong type is caught
+// at the declaration rather than at every call site.
+fn f(a: str, b: i64 = a) -> i64 { b }
+
+fn main() -> i64 { f("x") }
+--- errors ---
+error: default for fn "f" parameter "b": expected i64, got str
+ --> ./tests/cases/kwargs/err_default_param_type_mismatch.aipl:4:23
+  |
+4 | fn f(a: str, b: i64 = a) -> i64 { b }
+  |                       ^
+
+error: fn "f" arg 1: expected i64, got str
+ --> ./tests/cases/kwargs/err_default_param_type_mismatch.aipl:4:23
+  |
+4 | fn f(a: str, b: i64 = a) -> i64 { b }
+  |                       ^

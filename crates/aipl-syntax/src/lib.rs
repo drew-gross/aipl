@@ -546,6 +546,12 @@ pub mod ast {
         /// not part of the function's type. The loader expands every call so
         /// each omitted keyword argument is filled from this default; after
         /// loading, the default is inert (calls are fully positional).
+        ///
+        /// The expression may read the parameters declared *before* it
+        /// (`fn f(a: T, b: T = a)`) — and only those, since the fill happens at
+        /// the call site, where the later parameters aren't decided yet. The
+        /// loader binds each name the default reads to the argument that call
+        /// passes for it; see `aipl-loader`'s `kwargs` module.
         pub default: Option<Expr>,
     }
 
@@ -2736,6 +2742,150 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
     }
 }
 
+/// The names `e` reads from the scope *around* it — every identifier and
+/// called-function name that isn't bound by a `let`/`mut`/`for`/lambda/match
+/// arm inside `e` itself.
+///
+/// Scope-aware, which is what separates it from a bare [`each_subexpr`] sweep:
+/// `{ let a = 1; a }` reads nothing, so a caller asking "does this expression
+/// mention the parameter `a`?" gets `false` rather than a false positive. The
+/// loader asks exactly that of a keyword parameter's default, where the answer
+/// decides whether a call-site argument has to be bound to a temporary.
+///
+/// A `Call`'s callee counts as a read: it may name a function-typed local
+/// rather than a global. A `Construct`'s type name does not — it names a
+/// struct, not a value.
+pub fn free_idents(e: &ast::Expr) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    collect_free(e, &mut Vec::new(), &mut out);
+    out
+}
+
+/// [`free_idents`]'s recursion. `bound` is the stack of names in scope at `e`,
+/// innermost last; a shadowing binder pushes and pops around its body.
+fn collect_free(
+    e: &ast::Expr,
+    bound: &mut Vec<String>,
+    out: &mut std::collections::HashSet<String>,
+) {
+    use ast::ExprKind as K;
+    // A name not shadowed by an enclosing binder is read from outside `e`.
+    fn read(n: &str, bound: &[String], out: &mut std::collections::HashSet<String>) {
+        if !bound.iter().any(|b| b == n) {
+            out.insert(n.to_string());
+        }
+    }
+    match &e.kind {
+        K::Ident(n) => read(n, bound, out),
+        K::Call(n, args, _) => {
+            read(n, bound, out);
+            for a in args {
+                collect_free(a, bound, out);
+            }
+        }
+        // `name` is in scope for the body only, never for the value.
+        K::Let(name, _, value, body) | K::LetMut(name, _, value, body) => {
+            collect_free(value, bound, out);
+            bound.push(name.clone());
+            collect_free(body, bound, out);
+            bound.pop();
+        }
+        K::For(var, iterable, body) => {
+            collect_free(iterable, bound, out);
+            bound.push(var.clone());
+            collect_free(body, bound, out);
+            bound.pop();
+        }
+        K::Lambda(params, body) => {
+            let depth = bound.len();
+            bound.extend(params.iter().map(|p| p.name.clone()));
+            collect_free(body, bound, out);
+            bound.truncate(depth);
+        }
+        K::Match(scrutinee, arms) => {
+            collect_free(scrutinee, bound, out);
+            for arm in arms {
+                let depth = bound.len();
+                bound.extend(arm.pattern.bindings());
+                collect_free(&arm.body, bound, out);
+                bound.truncate(depth);
+            }
+        }
+        _ => {
+            for child in children(e) {
+                collect_free(child, bound, out);
+            }
+        }
+    }
+}
+
+/// `e`'s immediate sub-expressions — the shared-shape half of
+/// [`collect_free`], whose own arms cover every node that *binds* a name.
+/// Mirrors [`each_subexpr_mut`].
+fn children(e: &ast::Expr) -> Vec<&ast::Expr> {
+    use ast::ExprKind as K;
+    match &e.kind {
+        K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {
+            vec![]
+        }
+        K::Shim(_, _, body) => vec![body],
+        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args) | K::TupleLit(args) => {
+            args.iter().collect()
+        }
+        K::Construct(_, inits) => inits.iter().map(|i| &i.value).collect(),
+        K::DictLit(pairs) => pairs.iter().flat_map(|(k, v)| [k, v]).collect(),
+        K::Binop(a, _, b)
+        | K::Seq(a, b)
+        | K::Index(a, b)
+        | K::Let(_, _, a, b)
+        | K::LetMut(_, _, a, b)
+        | K::For(_, a, b)
+        | K::While(a, b) => vec![a, b],
+        K::Assign(a, b, c) | K::If(a, b, c) => vec![a, b, c],
+        K::Neg(x)
+        | K::Not(x)
+        | K::Field(x, _)
+        | K::Try(x)
+        | K::Return(x)
+        | K::KwArg(_, x)
+        | K::Spread(x)
+        | K::Lambda(_, x) => vec![x],
+        K::Match(scrutinee, arms) => {
+            let mut v = vec![&**scrutinee];
+            v.extend(arms.iter().map(|a| &a.body));
+            v
+        }
+        K::Slice(a, b, c) => {
+            let mut v = vec![&**a, &**b];
+            if let Some(c) = c {
+                v.push(c);
+            }
+            v
+        }
+    }
+}
+
+/// Whether `t` mentions a generic type parameter — a declared `<T>` or the
+/// anonymous `any` — and so isn't a runtime type until monomorphization has
+/// substituted it. A binding cannot be annotated with one.
+pub fn mentions_typevar(t: &ast::Type) -> bool {
+    use ast::Type as T;
+    match t {
+        T::TypeVar(_) | T::Any => true,
+        T::Case(v) | T::Optional(v) | T::Array(v) | T::Set(v) => mentions_typevar(v),
+        T::Dict(k, v) | T::Result(k, v) => mentions_typevar(k) || mentions_typevar(v),
+        T::Fn(ps, r) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
+        T::Tuple(es) | T::Generic(_, es) => es.iter().any(mentions_typevar),
+        T::Unit
+        | T::Primitive(_)
+        | T::Named(_)
+        | T::NoneInner
+        | T::EmptyArrayArg
+        | T::NoneLiteralArg
+        | T::ConcatStr => false,
+    }
+}
+
 /// Prefix of the binding the loader synthesizes for a `..base` struct spread
 /// (`aipl-loader`'s `desugar_struct_spread`). It is the one thing that ties the
 /// two ends of that desugaring together: the loader emits the binding carrying
@@ -2744,6 +2894,14 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
 /// an internal `let`. Shared rather than spelled twice, because a silent
 /// mismatch would turn a good diagnostic back into a confusing one.
 pub const SPREAD_BASE_PREFIX: &str = "__spread_base$";
+
+/// Prefix of the binding the loader hoists a call-site argument into when a
+/// keyword parameter's default reads it (`aipl-loader`'s `expand_call_args`).
+/// The default is spliced in at the call site and mentions the argument once
+/// per read, so anything but a name or a literal is evaluated into one of these
+/// first — `f(g())` with `fn f(a: T, b: T = a)` must not call `g` twice. Same
+/// job as [`SPREAD_BASE_PREFIX`], for the same reason.
+pub const KWARG_ARG_PREFIX: &str = "__kwarg$";
 
 /// Prefix of the temporary a `let T { a, b } = value;` destructuring binds its
 /// scrutinee to (the parser's `StmtSpec::LetStruct` lowering). It plays the same

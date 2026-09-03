@@ -1,0 +1,11 @@
+// A default is filled in at the call site from the arguments that call passes,
+// so it can only read parameters already decided there — never itself.
+fn f(a: i64 = a) -> i64 { a }
+
+fn main() -> i64 { f() }
+--- errors ---
+error: fn "f": the default for parameter "a" reads itself — a default may only read parameters declared before it
+ --> ./tests/cases/kwargs/err_default_self_ref.aipl:3:15
+  |
+3 | fn f(a: i64 = a) -> i64 { a }
+  |               ^

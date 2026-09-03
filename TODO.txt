@@ -100,6 +100,7 @@ integer signedness problems:
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
 dev loop:
+  combined failure tests that are all testing failures of the same feature
   a_directory_argument_checks_the_tree_under_it is failing early and preventing more useful tests from failing
 
 self-hosting:
@@ -158,6 +159,7 @@ math:
   % should not abort. (what should it do? TBD)
 
 syntax:
+  allow default args to refer to each other (requires 1 to be set to break the cycle)
   add match (v) val if expr => r syntax
   destructuring with renames (let Foo { field as f, .. } = ...)
   allow passing int literals to u64 arguments
@@ -168,7 +170,6 @@ syntax:
   allow types to be defined in scopes (e.g. in tests to avoid leaking the test utilities)
   implement T+ for intersperse
   rethink how joining works for strings vs. non-strings. Or maybe add a monad bound?
-  support join(self: T[], sep: T+ = []) (defaults for positional args, can join with multiple)
   some(t) => if (cond) {val1} else {val2},none => val2 <--- to make this work better, allow the if to be on the left of the =>
   allow defining functions in functions so that test utils can live closer to where they are used
   map should take any container and return the same container (then replace map_ok)
@@ -292,7 +293,7 @@ design:
     the langauge should be incapable of aborting
 
 optimizations:
-  why is [..arr, val] slower than let v = arr; v.push(val)?
+  why is [..arr, val] slower than let v = arr; v.push(val)? turns out it's 2 calls (reserve + append) instead of 1, but the calls should be cheaper. Maybe there is more to do here, maybe not.
   using templates for string builder loops should be just as fast as concat (somehow? Maybe they desugar to concat? maybe only when it's "s = `{s}...`?)
   for (let c : s) still takes a runtime call per byte
   to_str allocates a buffer for short results instead of packing them inline.

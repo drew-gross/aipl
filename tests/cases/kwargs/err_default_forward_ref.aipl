@@ -1,0 +1,14 @@
+import { wrapping_add as + } from builtins;
+
+// `b` isn't decided when `a`'s default is spliced in, so `a`'s default can't
+// read it. Left alone the name would resolve to whatever the *caller* happens
+// to have in scope, which is why it is refused rather than deferred.
+fn f(a: i64 = b, b: i64 = 1) -> i64 { a + b }
+
+fn main() -> i64 { f() }
+--- errors ---
+error: fn "f": the default for parameter "a" reads parameter "b", which is declared after it — a default may only read parameters declared before it
+ --> ./tests/cases/kwargs/err_default_forward_ref.aipl:6:15
+  |
+6 | fn f(a: i64 = b, b: i64 = 1) -> i64 { a + b }
+  |               ^

@@ -1,0 +1,53 @@
+import { equal as ==, print, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
+
+// A keyword parameter's default may read the parameters declared before it —
+// positional ones and earlier keyword ones alike. `span` below defaults its
+// width to the distance it was given, and its label to that width, so one
+// argument decides all three.
+//
+// The fill happens at the call site, so only *earlier* parameters are readable:
+// by the time `hi`'s default is spliced in, `lo` has an argument and `step`
+// does not (see `err_default_forward_ref`).
+fn span(lo: i64, hi: i64 = lo + 10, step: i64 = hi - lo) -> str {
+    `{to_str(lo)}..{to_str(hi)} by {to_str(step)}`
+}.test({
+    assert(span(1) == "1..11 by 10");
+    assert(span(1, hi=4) == "1..4 by 3");
+    assert(span(1, hi=4, step=100) == "1..4 by 100");
+})
+
+fn main() !prints {
+    print(span(1));
+    print(span(1, hi=4));
+    print(span(1, hi=4, step=100));
+}
+--- stdout ---
+1..11 by 10
+1..4 by 3
+1..4 by 100
+--- performance ---
+allocations: 21
+deallocations: 21
+reallocations: 0
+bytes allocated: 1213
+instructions executed: 390
+binary size: 2216
+  code: 980
+  data: 1
+  metadata: 1235
+functions:
+  __to_str_i64:
+    calls: 9
+    bytes: 204
+  aipl_i64_len:
+    calls: 18
+    bytes: (external)
+  aipl_write_i64:
+    calls: 9
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 220
+  span:
+    calls: 3
+    bytes: 556
