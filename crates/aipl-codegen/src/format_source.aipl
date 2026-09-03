@@ -74,11 +74,11 @@ allocations: 1953
 deallocations: 1953
 reallocations: 30
 bytes allocated: 110170
-instructions executed: 348995
-binary size: 943832
-  code: 607792
+instructions executed: 361100
+binary size: 948160
+  code: 610496
   data: 1891
-  metadata: 334149
+  metadata: 335773
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -88,7 +88,7 @@ functions:
     bytes: 340
   __arr_drop___m13__TokenRule$__m12__AiplTok:
     calls: 4
-    bytes: 716
+    bytes: 740
   __arr_drop___m6__ImportEntry:
     calls: 0
     bytes: 148
@@ -112,7 +112,7 @@ functions:
     bytes: 340
   __arr_retain___m13__TokenRule$__m12__AiplTok:
     calls: 0
-    bytes: 716
+    bytes: 740
   __arr_retain___m6__ImportEntry:
     calls: 0
     bytes: 148
@@ -128,13 +128,13 @@ functions:
   __arr_retain___m7__Doc:
     calls: 30
     bytes: 116
-  __builtin_all$char$s0$lam77:
+  __builtin_all$char$s0$lam80:
     calls: 0
     bytes: 212
-  __builtin_any$__m7__Doc$lam94:
+  __builtin_any$__m7__Doc$lam97:
     calls: 0
     bytes: 32
-  __builtin_any$__m7__Doc$lam94$tail:
+  __builtin_any$__m7__Doc$lam97$tail:
     calls: 0
     bytes: 324
   __builtin_count_is_at_least$char$s0:
@@ -146,16 +146,16 @@ functions:
   __builtin_count_while$char$s0$lam45:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam61:
+  __builtin_count_while$char$s0$lam64:
     calls: 0
     bytes: 176
-  __builtin_count_while$char$s0$lam63:
+  __builtin_count_while$char$s0$lam66:
     calls: 12
     bytes: 184
-  __builtin_count_while$char$s0$lam74:
+  __builtin_count_while$char$s0$lam77:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam76:
+  __builtin_count_while$char$s0$lam79:
     calls: 0
     bytes: 172
   __builtin_drop_last$str:
@@ -238,13 +238,13 @@ functions:
     bytes: 1516
   __m13__lex_step$__m12__AiplTok:
     calls: 27
-    bytes: 22556
+    bytes: 24992
   __m13__nested_len:
     calls: 18
     bytes: 940
   __m13__step_result$__m12__AiplTok:
     calls: 816
-    bytes: 12568
+    bytes: 12788
   __m13__template_scan$__m12__AiplTok:
     calls: 0
     bytes: 2740

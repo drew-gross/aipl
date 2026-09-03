@@ -13,7 +13,6 @@ variant:
   allow variant constructors to have defaults, get rid of many in grammar.aipl (since Many can have default of 0)
   Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
-  allow variant constructors to have named args/defaults
 
 projects:
   make some projects in AIPL, probably organized where it's a folder in this repo that would otherwise work standalone (i.e. aipl bin is copied in)
@@ -215,7 +214,6 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 parser:
-  CharRun with cont="" to match exactly on char doesn't express intent well enough, we should add an api that expresses it directly
   CharRun should use defaults
   chage Far to use a set of expected
   Mk should accept fns that only need kids
@@ -296,6 +294,7 @@ design:
     it's safe to call an untrusted function that doesn't declare any effects
     the most readable implementation is also the fastest
     the langauge should be incapable of aborting
+    apis should express intent
 
 optimizations:
   same-branch folding (if (cond) { a } else { a } should drop the if) (applies after default propagation in e.g. join)

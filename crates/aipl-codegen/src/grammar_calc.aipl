@@ -63,7 +63,7 @@ import {
     failure_message,
     prod_names,
 } from "./grammar.aipl";
-import { Bare, CharRun, Int, LexResult, TokenRule, lex } from "./lexer.aipl";
+import { Bare, CharRun, Int, LexResult, OneChar, TokenRule, lex } from "./lexer.aipl";
 import { parse, parse_cst } from "./parse.aipl";
 
 // Two token kinds: digit runs, and every one-character operator or bracket. The
@@ -85,7 +85,7 @@ variant Calc = Lit(i64) | Neg(Calc) | Bin(str, Calc, Calc)
 fn calc_rules() -> TokenRule<CalcTok>[] {
     [
         TokenRule { matcher: CharRun(" \t\r\n", " \t\r\n"), emit: Bare(Punct), trivia: true },
-        TokenRule { matcher: CharRun("+-*/%^()", ""), emit: Bare(Punct) },
+        TokenRule { matcher: OneChar("+-*/%^()"), emit: Bare(Punct) },
         TokenRule { matcher: Int, emit: Bare(Num) },
     ]
 }
@@ -386,11 +386,11 @@ allocations: 8612
 deallocations: 8612
 reallocations: 746
 bytes allocated: 495290
-instructions executed: 1260032
-binary size: 196976
-  code: 124544
+instructions executed: 1258408
+binary size: 200872
+  code: 126960
   data: 4284
-  metadata: 68148
+  metadata: 69628
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -412,7 +412,7 @@ functions:
     bytes: 140
   __arr_drop___m3__TokenRule$CalcTok:
     calls: 41
-    bytes: 456
+    bytes: 484
   __arr_retain_Calc:
     calls: 407
     bytes: 116
@@ -433,32 +433,32 @@ functions:
     bytes: 140
   __arr_retain___m3__TokenRule$CalcTok:
     calls: 0
-    bytes: 456
+    bytes: 484
   __builtin_count_while$char$lam29:
-    calls: 234
+    calls: 132
     bytes: 220
-  __builtin_count_while$char$s0$lam34:
+  __builtin_count_while$char$s0$lam37:
     calls: 0
     bytes: 176
-  __builtin_count_while$char$s0$lam36:
+  __builtin_count_while$char$s0$lam39:
     calls: 104
     bytes: 184
-  __builtin_count_while$char$s0$lam46:
+  __builtin_count_while$char$s0$lam49:
     calls: 94
     bytes: 172
-  __builtin_find_if$__m2__Prec$lam74:
+  __builtin_find_if$__m2__Prec$lam77:
     calls: 102
     bytes: 688
   __builtin_int_parse:
     calls: 94
     bytes: 1028
-  __builtin_try_map$__m1__Cst$Calc$__m2__ParseError$lam45:
+  __builtin_try_map$__m1__Cst$Calc$__m2__ParseError$lam48:
     calls: 387
     bytes: 748
   __builtin_try_map$__m2__Production$CalcTok$Calc$__m2__Production$CalcTok$Calc$__m2__ParseError$lam15:
     calls: 40
     bytes: 972
-  __builtin_try_map$__m2__Rule$CalcTok$__m2__Rule<CalcTok>$__m2__ParseError$lam59:
+  __builtin_try_map$__m2__Rule$CalcTok$__m2__Rule<CalcTok>$__m2__ParseError$lam62:
     calls: 160
     bytes: 732
   __eq_Calc:
@@ -520,13 +520,13 @@ functions:
     bytes: 1500
   __m3__lex_step$CalcTok:
     calls: 338
-    bytes: 17864
+    bytes: 20052
   __m3__nested_len:
     calls: 0
     bytes: 940
   __m3__step_result$CalcTok:
     calls: 648
-    bytes: 5324
+    bytes: 5560
   __m3__template_scan$CalcTok:
     calls: 0
     bytes: 2740
@@ -712,7 +712,7 @@ functions:
     bytes: 976
   lex_calc:
     calls: 41
-    bytes: 2168
+    bytes: 2104
   lower_atom:
     calls: 105
     bytes: 1352

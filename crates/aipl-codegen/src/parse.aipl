@@ -80,7 +80,7 @@ import {
     name_index,
     prod_names,
 } from "./grammar.aipl";
-import { Bare, CharRun, LexResult, Of, ToEol, Token, TokenRule, lex } from "./lexer.aipl";
+import { Bare, CharRun, LexResult, Of, OneChar, ToEol, Token, TokenRule, lex } from "./lexer.aipl";
 
 // The furthest failure seen so far: the token position nothing could be matched
 // at, and the deduped labels of everything that *was* expected there.
@@ -800,7 +800,7 @@ fn tok_rules() -> TokenRule<Tok>[] {
         TokenRule { matcher: CharRun(" \t\n", " \t\n"), emit: Bare(Punct), skip: true },
         TokenRule { matcher: CharRun(alpha, alpha), emit: Of(Word) },
         TokenRule { matcher: CharRun(digit, digit), emit: Of(Num) },
-        TokenRule { matcher: CharRun("()[],;+*", ""), emit: Bare(Punct) },
+        TokenRule { matcher: OneChar("()[],;+*"), emit: Bare(Punct) },
     ]
 }
 
@@ -812,7 +812,7 @@ fn trivia_rules() -> TokenRule<Tok>[] {
         TokenRule { matcher: ToEol("//"), emit: Bare(Punct), trivia: true },
         TokenRule { matcher: CharRun(alpha, alpha), emit: Of(Word) },
         TokenRule { matcher: CharRun(digit, digit), emit: Of(Num) },
-        TokenRule { matcher: CharRun("()[],;+*", ""), emit: Bare(Punct) },
+        TokenRule { matcher: OneChar("()[],;+*"), emit: Bare(Punct) },
     ]
 }
 
@@ -872,11 +872,11 @@ allocations: 2902
 deallocations: 2902
 reallocations: 331
 bytes allocated: 177061
-instructions executed: 419975
-binary size: 299464
-  code: 183584
+instructions executed: 417952
+binary size: 303392
+  code: 186012
   data: 5924
-  metadata: 109956
+  metadata: 111456
 functions:
   __arr_drop_Node:
     calls: 11
@@ -901,7 +901,7 @@ functions:
     bytes: 168
   __arr_drop___m3__TokenRule$Tok:
     calls: 42
-    bytes: 544
+    bytes: 572
   __arr_retain_Node:
     calls: 10
     bytes: 116
@@ -925,26 +925,26 @@ functions:
     bytes: 168
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
-    bytes: 544
+    bytes: 572
   __builtin_count_while$char$lam28:
-    calls: 149
+    calls: 101
     bytes: 220
-  __builtin_count_while$char$s0$lam33:
+  __builtin_count_while$char$s0$lam36:
     calls: 2
     bytes: 176
-  __builtin_count_while$char$s0$lam35:
+  __builtin_count_while$char$s0$lam38:
     calls: 0
     bytes: 184
-  __builtin_find_if$__m2__Prec$lam72:
+  __builtin_find_if$__m2__Prec$lam75:
     calls: 11
     bytes: 688
-  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam57:
+  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam60:
     calls: 10
     bytes: 748
   __builtin_try_map$__m2__Production$Tok$Node$__m2__Production$Tok$Node$__m2__ParseError$lam17:
     calls: 43
     bytes: 972
-  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam42:
+  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam45:
     calls: 36
     bytes: 732
   __eq_Node:
@@ -1036,13 +1036,13 @@ functions:
     bytes: 1516
   __m3__lex_step$Tok:
     calls: 151
-    bytes: 19288
+    bytes: 21552
   __m3__nested_len:
     calls: 0
     bytes: 940
   __m3__step_result$Tok:
     calls: 388
-    bytes: 7448
+    bytes: 7680
   __m3__template_scan$Tok:
     calls: 0
     bytes: 2740
@@ -1201,7 +1201,7 @@ functions:
     bytes: 844
   tok_rules:
     calls: 40
-    bytes: 2380
+    bytes: 2320
   tok_text$Tok$Node:
     calls: 81
     bytes: 768
@@ -1210,4 +1210,4 @@ functions:
     bytes: 612
   trivia_rules:
     calls: 2
-    bytes: 2912
+    bytes: 2848

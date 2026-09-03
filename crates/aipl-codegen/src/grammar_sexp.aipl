@@ -53,7 +53,7 @@ import {
     many,
     prod_names,
 } from "./grammar.aipl";
-import { Bare, CharRun, LexResult, Of, ToEol, TokenRule, lex } from "./lexer.aipl";
+import { Bare, CharRun, LexResult, Of, OneChar, ToEol, TokenRule, lex } from "./lexer.aipl";
 import { parse, parse_cst } from "./parse.aipl";
 
 // The token kinds. One terminal class carrying its text, and one bare kind for
@@ -77,7 +77,7 @@ fn sexp_rules() -> TokenRule<SexpKind>[] {
         TokenRule { matcher: CharRun(space, space), emit: Bare(Punct), trivia: true },
         TokenRule { matcher: ToEol(";"), emit: Bare(Punct), trivia: true },
         TokenRule { matcher: CharRun(sym, sym), emit: Of(Atom) },
-        TokenRule { matcher: CharRun("()", ""), emit: Bare(Punct) },
+        TokenRule { matcher: OneChar("()"), emit: Bare(Punct) },
     ]
 }
 
@@ -283,11 +283,11 @@ allocations: 25393
 deallocations: 25393
 reallocations: 2339
 bytes allocated: 1244174
-instructions executed: 4248607
-binary size: 184288
-  code: 116880
+instructions executed: 4233698
+binary size: 188272
+  code: 119368
   data: 3556
-  metadata: 63852
+  metadata: 65348
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -309,7 +309,7 @@ functions:
     bytes: 140
   __arr_drop___m3__TokenRule$SexpKind:
     calls: 24
-    bytes: 516
+    bytes: 544
   __arr_retain_Sexp:
     calls: 873
     bytes: 116
@@ -330,26 +330,26 @@ functions:
     bytes: 140
   __arr_retain___m3__TokenRule$SexpKind:
     calls: 0
-    bytes: 516
+    bytes: 544
   __builtin_count_while$char$lam27:
-    calls: 930
+    calls: 77
     bytes: 220
-  __builtin_count_while$char$s0$lam32:
+  __builtin_count_while$char$s0$lam35:
     calls: 5
     bytes: 176
-  __builtin_count_while$char$s0$lam34:
+  __builtin_count_while$char$s0$lam37:
     calls: 0
     bytes: 184
-  __builtin_find_if$__m2__Prec$lam72:
+  __builtin_find_if$__m2__Prec$lam75:
     calls: 0
     bytes: 688
-  __builtin_try_map$__m1__Cst$Sexp$__m2__ParseError$lam43:
+  __builtin_try_map$__m1__Cst$Sexp$__m2__ParseError$lam46:
     calls: 867
     bytes: 748
   __builtin_try_map$__m2__Production$SexpKind$Sexp$__m2__Production$SexpKind$Sexp$__m2__ParseError$lam18:
     calls: 23
     bytes: 972
-  __builtin_try_map$__m2__Rule$SexpKind$__m2__Rule<SexpKind>$__m2__ParseError$lam57:
+  __builtin_try_map$__m2__Rule$SexpKind$__m2__Rule<SexpKind>$__m2__ParseError$lam60:
     calls: 46
     bytes: 732
   __eq_Sexp:
@@ -414,13 +414,13 @@ functions:
     bytes: 1516
   __m3__lex_step$SexpKind:
     calls: 936
-    bytes: 18744
+    bytes: 20992
   __m3__nested_len:
     calls: 0
     bytes: 940
   __m3__step_result$SexpKind:
     calls: 3585
-    bytes: 6624
+    bytes: 6856
   __m3__template_scan$SexpKind:
     calls: 0
     bytes: 2740
@@ -576,7 +576,7 @@ functions:
     bytes: 312
   lex_sexp:
     calls: 24
-    bytes: 3000
+    bytes: 2952
   lower_item:
     calls: 448
     bytes: 1044

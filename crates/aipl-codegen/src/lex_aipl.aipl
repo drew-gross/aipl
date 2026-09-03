@@ -641,11 +641,11 @@ allocations: 3664
 deallocations: 3664
 reallocations: 33
 bytes allocated: 323989
-instructions executed: 841681
-binary size: 246336
-  code: 170700
+instructions executed: 866188
+binary size: 250664
+  code: 173404
   data: 6364
-  metadata: 69272
+  metadata: 70896
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
@@ -655,7 +655,7 @@ functions:
     bytes: 340
   __arr_drop___m1__TokenRule$AiplTok:
     calls: 20
-    bytes: 716
+    bytes: 740
   __arr_retain___m1__StepResult$AiplTok:
     calls: 1
     bytes: 140
@@ -664,8 +664,8 @@ functions:
     bytes: 340
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
-    bytes: 716
-  __builtin_all$char$s0$lam38:
+    bytes: 740
+  __builtin_all$char$s0$lam41:
     calls: 4
     bytes: 212
   __builtin_count_while$char$lam27:
@@ -674,16 +674,16 @@ functions:
   __builtin_count_while$char$s0$lam16:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam32:
+  __builtin_count_while$char$s0$lam35:
     calls: 2
     bytes: 176
-  __builtin_count_while$char$s0$lam34:
+  __builtin_count_while$char$s0$lam37:
     calls: 28
     bytes: 184
-  __builtin_count_while$char$s0$lam35:
+  __builtin_count_while$char$s0$lam38:
     calls: 4
     bytes: 172
-  __builtin_count_while$char$s0$lam37:
+  __builtin_count_while$char$s0$lam40:
     calls: 2
     bytes: 172
   __builtin_int_parse:
@@ -766,13 +766,13 @@ functions:
     bytes: 1516
   __m1__lex_step$AiplTok:
     calls: 91
-    bytes: 22556
+    bytes: 24992
   __m1__nested_len:
     calls: 56
     bytes: 940
   __m1__step_result$AiplTok:
     calls: 1712
-    bytes: 12568
+    bytes: 12788
   __m1__template_scan$AiplTok:
     calls: 3
     bytes: 2740

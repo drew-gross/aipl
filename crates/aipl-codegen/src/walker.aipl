@@ -2794,11 +2794,11 @@ allocations: 19520
 deallocations: 19520
 reallocations: 1203
 bytes allocated: 1186399
-instructions executed: 3153083
-binary size: 3829016
-  code: 2366032
+instructions executed: 3203804
+binary size: 3833344
+  code: 2368736
   data: 24412
-  metadata: 1438572
+  metadata: 1440196
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2823,7 +2823,7 @@ functions:
     bytes: 340
   __arr_drop___m9__TokenRule$__m8__AiplTok:
     calls: 8
-    bytes: 716
+    bytes: 740
   __arr_retain_ImportEntry:
     calls: 30
     bytes: 148
@@ -2847,7 +2847,7 @@ functions:
     bytes: 340
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
-    bytes: 716
+    bytes: 740
   __builtin_all$char$s0$lam65:
     calls: 0
     bytes: 212
@@ -2869,13 +2869,13 @@ functions:
   __builtin_count_while$char$s0$lam64:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam80:
+  __builtin_count_while$char$s0$lam83:
     calls: 1
     bytes: 176
-  __builtin_count_while$char$s0$lam82:
+  __builtin_count_while$char$s0$lam85:
     calls: 50
     bytes: 184
-  __builtin_count_while$char$s0$lam87:
+  __builtin_count_while$char$s0$lam90:
     calls: 1
     bytes: 172
   __builtin_drop_last$str:
@@ -3012,13 +3012,13 @@ functions:
     bytes: 1516
   __m9__lex_step$__m8__AiplTok:
     calls: 131
-    bytes: 22556
+    bytes: 24992
   __m9__nested_len:
     calls: 84
     bytes: 940
   __m9__step_result$__m8__AiplTok:
     calls: 3454
-    bytes: 12568
+    bytes: 12788
   __m9__template_scan$__m8__AiplTok:
     calls: 0
     bytes: 2740

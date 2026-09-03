@@ -111,6 +111,11 @@ struct LexError { message: str, span: Span }
 //
 // - `CharRun(first, cont)`: a maximal run — a char in `first` opens the token,
 //   chars in `cont` extend it. Identifiers, digit runs, whitespace.
+// - `OneChar(chars)`: exactly one char, any of `chars`. Single-character
+//   punctuation, where one rule stands for a whole class of one-char tokens
+//   (`OneChar("()[],;")`) instead of an `Exact` rule apiece. It is the direct
+//   spelling of what a `CharRun` whose `cont` is empty degenerates to, and says
+//   so at the rule rather than leaving the reader to work it out.
 // - `Exact(spelling)`: the given spelling, verbatim. Punctuation and operators
 //   — one spelling per rule; when spellings share a prefix, order the rules
 //   longest first (`==` before `=`), since rule order is the priority mechanism
@@ -203,6 +208,7 @@ struct LexError { message: str, span: Span }
 // emit (see `lex_aipl.aipl`'s `char_lit_emit`).
 variant Matcher =
     | CharRun(str, str)
+    | OneChar(str)
     | Exact(str)
     | Keyword(str, str)
     | Delimited(str, str)
@@ -251,6 +257,14 @@ fn char_run_len(self: str, head: str, cont: str) -> u64 {
     } else {
         0
     }
+}
+
+// `OneChar`: 1 when `self` opens with a char in `chars`, else 0 —
+// `char_run_len`'s single-character counterpart, and the reason a rule never has
+// to spell that shape as a run with nothing to continue it. An empty set never
+// matches.
+fn one_char_len(self: str, chars: str) -> u64 {
+    if (self.first().is_some_and(|c| chars.contains(c))) { 1 } else { 0 }
 }
 
 // `Exact`: length of `spelling` when it prefixes `self`, else 0. An empty
@@ -447,7 +461,14 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
         Between(open, close) | Nested(open, close) => {
             StrVal(text[open.len()..text.len() - close.len()])
         },
-        CharRun(..) | Exact(..) | Keyword(..) | Template(..) | ToEol(..) | Float | Int => NoValue,
+        CharRun(..)
+        | OneChar(..)
+        | Exact(..)
+        | Keyword(..)
+        | Template(..)
+        | ToEol(..)
+        | Float
+        | Int => NoValue,
     }
 }
 
@@ -520,6 +541,7 @@ fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
     for (let r : rules) {
         let res = match (r.matcher) {
             CharRun(first, cont) => step_result(r, src, at, src[at..].char_run_len(first, cont))?,
+            OneChar(chars) => step_result(r, src, at, src[at..].one_char_len(chars))?,
             Exact(spelling) => step_result(r, src, at, src[at..].exact_len(spelling))?,
             Keyword(spelling, boundary) => step_result(
                 r,
@@ -1212,11 +1234,11 @@ allocations: 1399
 deallocations: 1399
 reallocations: 38
 bytes allocated: 81424
-instructions executed: 275047
-binary size: 1796064
-  code: 1199088
+instructions executed: 279295
+binary size: 1810992
+  code: 1208392
   data: 7268
-  metadata: 589708
+  metadata: 595332
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1226,7 +1248,7 @@ functions:
     bytes: 452
   __arr_drop_TokenRule$Kind:
     calls: 21
-    bytes: 824
+    bytes: 856
   __arr_retain_StepResult$Kind:
     calls: 9
     bytes: 140
@@ -1235,17 +1257,17 @@ functions:
     bytes: 452
   __arr_retain_TokenRule$Kind:
     calls: 0
-    bytes: 824
+    bytes: 856
   __builtin_count_while$char$lam27:
     calls: 60
     bytes: 220
-  __builtin_count_while$char$s0$lam32:
+  __builtin_count_while$char$s0$lam35:
     calls: 5
     bytes: 176
-  __builtin_count_while$char$s0$lam34:
+  __builtin_count_while$char$s0$lam37:
     calls: 49
     bytes: 184
-  __builtin_count_while$char$s0$lam49:
+  __builtin_count_while$char$s0$lam52:
     calls: 13
     bytes: 172
   __builtin_int_parse:
@@ -1320,12 +1342,12 @@ functions:
   __lambda_3:
     calls: 2
     bytes: 96
-  __lambda_37:
-    calls: 67
-    bytes: 140
   __lambda_4:
     calls: 0
     bytes: 128
+  __lambda_40:
+    calls: 67
+    bytes: 140
   __lambda_5:
     calls: 1
     bytes: 96
@@ -1346,7 +1368,7 @@ functions:
     bytes: 1108
   __test$lex:
     calls: 1
-    bytes: 1115608
+    bytes: 1122080
   __test_try_fail_LexError:
     calls: 0
     bytes: 84
@@ -1412,7 +1434,7 @@ functions:
     bytes: 1516
   lex_step$Kind:
     calls: 140
-    bytes: 24684
+    bytes: 27220
   main:
     calls: 1
     bytes: 100
@@ -1427,7 +1449,7 @@ functions:
     bytes: 3040
   step_result$Kind:
     calls: 405
-    bytes: 15780
+    bytes: 16012
   template_scan$Kind:
     calls: 16
     bytes: 2740
