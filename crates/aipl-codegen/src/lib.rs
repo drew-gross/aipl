@@ -722,14 +722,20 @@ extern "C" fn aipl_str_split(s: *const str24::Str, sep: *const str24::Str) -> *c
 }
 
 /// `join` under the wide ABI — the array half only; the streaming is
-/// `str24::join_from`. Borrows the array and the separator.
+/// `str24::join_from`. Borrows the array and all three separators (see
+/// `str24::gap_sep` for which one lands in which gap).
 #[no_mangle]
-extern "C" fn aipl_str_join(out: *mut str24::Str, arr: *const u8, sep: *const str24::Str) {
-    let sepv = unsafe { *sep };
+extern "C" fn aipl_str_join(
+    out: *mut str24::Str,
+    arr: *const u8,
+    sep: *const str24::Str,
+    final_sep: *const str24::Str,
+    only_sep: *const str24::Str,
+) {
     unsafe {
         let len = array_len_of(arr);
         let elems = arr_untag(arr).add(ARR_ELEMS_OFFSET) as *const str24::Str;
-        *out = str24::join_from(elems, len, sepv);
+        *out = str24::join_from(elems, len, *sep, *final_sep, *only_sep);
     }
 }
 
@@ -1595,27 +1601,46 @@ extern "C" fn aipl_arr_extend(
 /// moves as a single block copy.
 ///
 /// `drop_fn`/`retain_fn`/`elem_size` describe the *inner* element `T`, not the
-/// parts. Consumes (decs) both `parts` and `sep`, as `aipl_str_join` does.
-/// Mirrors `aipl_arr_join` in the linker runtime.
+/// parts. Consumes (decs) `parts` and all three separators, as `aipl_str_join`
+/// does. Which separator lands in which gap is `str24::gap_sep`'s rule, shared
+/// with the string half. Mirrors `aipl_arr_join` in the linker runtime.
 #[no_mangle]
 extern "C" fn aipl_arr_join(
     parts: *const u8,
     sep: *const u8,
+    final_sep: *const u8,
+    only_sep: *const u8,
     drop_fn: i64,
     retain_fn: i64,
     elem_size: i64,
 ) -> *const u8 {
     let parts_heap = aipl_arr_ensure_heap(parts);
-    let sep_heap = aipl_arr_ensure_heap(sep);
+    let seps = [
+        aipl_arr_ensure_heap(sep),
+        aipl_arr_ensure_heap(final_sep),
+        aipl_arr_ensure_heap(only_sep),
+    ];
     let n = if parts_heap.is_null() {
         0
     } else {
         unsafe { array_len_of(parts_heap) }
     };
-    let sep_len = if sep_heap.is_null() {
-        0
-    } else {
-        unsafe { array_len_of(sep_heap) }
+    // The separator heading the gap before part `i`, and its length — the
+    // array-side reading of `str24::gap_sep`.
+    let gap = |i: usize| -> (*const u8, usize) {
+        let s = if n == 2 {
+            seps[2]
+        } else if i == n - 1 {
+            seps[1]
+        } else {
+            seps[0]
+        };
+        let len = if s.is_null() {
+            0
+        } else {
+            unsafe { array_len_of(s) }
+        };
+        (s, len)
     };
     // A bit-packed `bool[]` has no byte-addressable elements to memcpy, so it
     // falls back to appending one bit at a time through the copying push. Rare
@@ -1624,8 +1649,9 @@ extern "C" fn aipl_arr_join(
         let mut out = aipl_array_new(0, drop_fn, ELEM_BITPACKED);
         for i in 0..n {
             if i > 0 {
+                let (s, sep_len) = gap(i);
                 for k in 0..sep_len {
-                    let bit = i64::from(aipl_arr_load_bit(sep_heap, k as i64) != 0);
+                    let bit = i64::from(aipl_arr_load_bit(s, k as i64) != 0);
                     out = aipl_array_push(
                         out,
                         &bit as *const i64 as *const u8,
@@ -1654,14 +1680,19 @@ extern "C" fn aipl_arr_join(
             aipl_array_dec(part);
         }
         aipl_array_dec(parts_heap);
-        aipl_array_dec(sep_heap);
+        for s in seps {
+            aipl_array_dec(s);
+        }
         return out;
     }
     let esz = elem_size.max(8) as usize;
     // Measure first — this is the whole point of the builtin being native.
-    let mut total = sep_len * n.saturating_sub(1);
+    let mut total = 0usize;
     let mut lens: Vec<(usize, *const u8)> = Vec::with_capacity(n);
     for i in 0..n {
+        if i > 0 {
+            total += gap(i).1;
+        }
         let part = unsafe { part_at(parts_heap, i) };
         let plen = if part.is_null() {
             0
@@ -1677,8 +1708,9 @@ extern "C" fn aipl_arr_join(
         let dst = out.add(ARR_ELEMS_OFFSET) as *mut u8;
         let mut pos = 0usize;
         for (i, (plen, part)) in lens.iter().enumerate() {
+            let (s, sep_len) = gap(i);
             if i > 0 && sep_len > 0 {
-                let from = sep_heap.add(ARR_ELEMS_OFFSET);
+                let from = s.add(ARR_ELEMS_OFFSET);
                 std::ptr::copy_nonoverlapping(from, dst.add(pos * esz), sep_len * esz);
                 pos += sep_len;
             }
@@ -1695,7 +1727,9 @@ extern "C" fn aipl_arr_join(
         aipl_array_dec(part);
     }
     aipl_array_dec(parts_heap);
-    aipl_array_dec(sep_heap);
+    for s in seps {
+        aipl_array_dec(s);
+    }
     out
 }
 
@@ -7388,14 +7422,16 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         // ---- a `str` back, through the out pointer ----
         "aipl_trim" | "aipl_str_reverse" | "aipl_str_sort" | "aipl_str_alloc"
         | "aipl_char_to_str" => (1, Ret::Str),
-        "aipl_concat" | "aipl_str_repeat" | "aipl_str_join" => (2, Ret::Str),
+        "aipl_concat" | "aipl_str_repeat" => (2, Ret::Str),
         "aipl_str_slice" => (3, Ret::Str),
+        // The parts plus `join`'s three separators.
+        "aipl_str_join" => (4, Ret::Str),
         // Joins `T[][]` into a `T[]` — an *array* back in a register, not a
         // `str`. It was labelled `Ret::Str` while every result was one word and
         // the two were indistinguishable; they no longer are, and a `Ret::Str`
         // here would have codegen prepend an out pointer for a value that comes
         // back in a register.
-        "aipl_arr_join" => (5, Ret::Word),
+        "aipl_arr_join" => (7, Ret::Word),
         other => panic!("unknown builtin import symbol {other:?}"),
     }
 }
@@ -15043,14 +15079,30 @@ fn compile_call_expr<M: Module>(
             // Native rather than an AIPL loop because the output length is known
             // before anything is written, so both paths allocate the result
             // exactly once instead of growing it.
-            if args.len() != 2 {
+            // The three separators are keyword parameters, so the loader has
+            // already filled every omitted one — `final_sep` and `only_sep`
+            // default to `sep`, which is how an ordinary join stays an ordinary
+            // join.
+            if args.len() != 4 {
                 return Err(Error::at(
-                    format!("\"join\" expects 1 argument, got {}", args.len() - 1),
+                    format!("\"join\" expects 1 argument, got {}", args.len() - 3),
                     span.clone(),
                 ));
             }
             let (parts, pt) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let (sep, st) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            let mut seps: Vec<(Value, ConcreteType)> = Vec::with_capacity(3);
+            for a in &args[1..] {
+                seps.push(compile_expr(module, builder, cx, scopes, a)?);
+            }
+            // The separator that gets to name `T` for an empty receiver, below.
+            // Normally all three are the same expression; when they differ, the
+            // first that isn't itself empty is the one with something to say.
+            let st = seps
+                .iter()
+                .map(|(_, t)| t)
+                .find(|t| !matches!(t, ConcreteType::Array(e) if is_none_inner(e)))
+                .unwrap_or(&seps[0].1)
+                .clone();
             // Both runtime entry points consume their arguments; the callers here
             // are borrowing, so each gets a compensating pre-inc.
             let inner = match &pt {
@@ -15107,20 +15159,28 @@ fn compile_call_expr<M: Module>(
                 // wrote. For an AIPL-bodied function `specialize_variadic`
                 // normalizes a bare element into a one-item sequence with a
                 // prologue; a *native* builtin has no body to prepend one to, so
-                // the wrapping happens here instead.
-                let sep = if matches!(st, ConcreteType::Primitive(Primitive::Char)) {
-                    let one = builder.ins().iconst(types::I64, 1);
-                    let buf = builtins.call(module, builder, "aipl_str_alloc", &[one]);
-                    builder.ins().istore8(MemFlagsData::trusted(), sep, buf, 0);
-                    scopes
-                        .last_mut()
-                        .expect("scope")
-                        .push(Tracked::new(buf, &ConcreteType::Primitive(Primitive::Str)));
-                    buf
-                } else {
-                    sep
-                };
-                let out = builtins.call(module, builder, "aipl_str_join", &[parts, sep]);
+                // the wrapping happens here instead — once per separator.
+                let mut vals: Vec<Value> = Vec::with_capacity(3);
+                for (sep, t) in &seps {
+                    vals.push(if matches!(t, ConcreteType::Primitive(Primitive::Char)) {
+                        let one = builder.ins().iconst(types::I64, 1);
+                        let buf = builtins.call(module, builder, "aipl_str_alloc", &[one]);
+                        builder.ins().istore8(MemFlagsData::trusted(), *sep, buf, 0);
+                        scopes
+                            .last_mut()
+                            .expect("scope")
+                            .push(Tracked::new(buf, &ConcreteType::Primitive(Primitive::Str)));
+                        buf
+                    } else {
+                        *sep
+                    });
+                }
+                let out = builtins.call(
+                    module,
+                    builder,
+                    "aipl_str_join",
+                    &[parts, vals[0], vals[1], vals[2]],
+                );
                 let out_ty = ConcreteType::Primitive(Primitive::Str);
                 scopes
                     .last_mut()
@@ -15151,43 +15211,48 @@ fn compile_call_expr<M: Module>(
                     .iconst(types::I64, runtime_elem_size(&elem, structs));
                 // See the str path: a native builtin gets no `specialize_variadic`
                 // prologue, so a bare element is wrapped into a one-item sequence
-                // here. An `Array` argument is already the sequence.
-                let sep = if matches!(st, ConcreteType::Array(_)) {
-                    emit_retain(builder, module, builtins, structs, sep, &out_ty);
-                    sep
-                } else {
-                    let slot = if is_composite(&elem, structs) {
+                // here — once per separator. An `Array` argument is already the
+                // sequence.
+                let mut vals: Vec<Value> = Vec::with_capacity(3);
+                for (sep, t) in &seps {
+                    let sep = *sep;
+                    vals.push(if matches!(t, ConcreteType::Array(_)) {
+                        emit_retain(builder, module, builtins, structs, sep, &out_ty);
                         sep
                     } else {
-                        let sl = builder.create_sized_stack_slot(StackSlotData::new(
-                            StackSlotKind::ExplicitSlot,
-                            8,
-                            3,
-                        ));
-                        builder.ins().stack_store(types::I64, sep, sl, 0);
-                        builder.ins().stack_addr(types::I64, sl, 0)
-                    };
-                    let zero = builder.ins().iconst(types::I64, 0);
-                    let empty =
-                        builtins.call(module, builder, "aipl_array_new", &[zero, drop_fn, esz]);
-                    let one = builtins.call(
-                        module,
-                        builder,
-                        "aipl_array_push",
-                        &[empty, slot, drop_fn, retain_fn, esz],
-                    );
-                    scopes
-                        .last_mut()
-                        .expect("scope")
-                        .push(Tracked::new(one, &out_ty));
-                    emit_retain(builder, module, builtins, structs, one, &out_ty);
-                    one
-                };
+                        let slot = if is_composite(&elem, structs) {
+                            sep
+                        } else {
+                            let sl = builder.create_sized_stack_slot(StackSlotData::new(
+                                StackSlotKind::ExplicitSlot,
+                                8,
+                                3,
+                            ));
+                            builder.ins().stack_store(types::I64, sep, sl, 0);
+                            builder.ins().stack_addr(types::I64, sl, 0)
+                        };
+                        let zero = builder.ins().iconst(types::I64, 0);
+                        let empty =
+                            builtins.call(module, builder, "aipl_array_new", &[zero, drop_fn, esz]);
+                        let one = builtins.call(
+                            module,
+                            builder,
+                            "aipl_array_push",
+                            &[empty, slot, drop_fn, retain_fn, esz],
+                        );
+                        scopes
+                            .last_mut()
+                            .expect("scope")
+                            .push(Tracked::new(one, &out_ty));
+                        emit_retain(builder, module, builtins, structs, one, &out_ty);
+                        one
+                    });
+                }
                 let out = builtins.call(
                     module,
                     builder,
                     "aipl_arr_join",
-                    &[parts, sep, drop_fn, retain_fn, esz],
+                    &[parts, vals[0], vals[1], vals[2], drop_fn, retain_fn, esz],
                 );
                 scopes
                     .last_mut()

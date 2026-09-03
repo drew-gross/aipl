@@ -407,15 +407,15 @@ fn msg_of(src: str) -> str { parse_json(src).map_ok(render_json).failure_message
 // tree assertion reads better as than a nested `CTree` literal.
 fn shown(src: str) -> str!ParseError { ok(json_cst(src)?.show(src, prod_names(json_grammar()))) }
 --- performance ---
-allocations: 11263
-deallocations: 11263
+allocations: 11266
+deallocations: 11266
 reallocations: 535
-bytes allocated: 815430
-instructions executed: 1687729
-binary size: 223024
-  code: 142276
+bytes allocated: 815351
+instructions executed: 1688137
+binary size: 220896
+  code: 140860
   data: 5228
-  metadata: 75520
+  metadata: 74808
 functions:
   __arr_drop_Json:
     calls: 125
@@ -500,19 +500,19 @@ functions:
     bytes: 944
   __m1__leaves:
     calls: 26
-    bytes: 764
+    bytes: 808
   __m1__show:
     calls: 32
-    bytes: 1592
+    bytes: 1652
   __m1__span:
     calls: 0
     bytes: 460
   __m1__token_leaves:
     calls: 253
-    bytes: 736
+    bytes: 784
   __m1__token_text:
     calls: 33
-    bytes: 420
+    bytes: 476
   __m2__failure_message:
     calls: 8
     bytes: 404
@@ -569,7 +569,7 @@ functions:
     bytes: 2780
   __m5__error_at$JsonTok$Json:
     calls: 7
-    bytes: 1640
+    bytes: 1748
   __m5__far_miss:
     calls: 317
     bytes: 940
@@ -603,9 +603,6 @@ functions:
   __m5__match_then$JsonTok$Json:
     calls: 235
     bytes: 1720
-  __m5__oxford:
-    calls: 7
-    bytes: 1900
   __m5__parse$JsonTok$Json:
     calls: 32
     bytes: 380
@@ -638,7 +635,7 @@ functions:
     bytes: 812
   __test$json_cst:
     calls: 1
-    bytes: 1936
+    bytes: 1992
   __test$parse_json:
     calls: 1
     bytes: 15720
@@ -661,7 +658,7 @@ functions:
     calls: 772
     bytes: (external)
   aipl_arr_inc:
-    calls: 27386
+    calls: 27626
     bytes: (external)
   aipl_arr_join:
     calls: 120
@@ -673,7 +670,7 @@ functions:
     calls: 225
     bytes: (external)
   aipl_array_dec:
-    calls: 34994
+    calls: 35234
     bytes: (external)
   aipl_array_new:
     calls: 5099
@@ -758,7 +755,7 @@ functions:
     bytes: 440
   render_json:
     calls: 50
-    bytes: 2088
+    bytes: 2200
   shown:
     calls: 4
     bytes: 492

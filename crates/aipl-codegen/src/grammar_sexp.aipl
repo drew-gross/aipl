@@ -279,15 +279,15 @@ fn msg_of(src: str) -> str { parse_sexp(src).map_ok(render_sexp).failure_message
 // tree assertion reads better as than a nested `CTree` literal.
 fn shown(src: str) -> str!ParseError { ok(sexp_cst(src)?.show(src, prod_names(sexp_grammar()))) }
 --- performance ---
-allocations: 25391
-deallocations: 25391
+allocations: 25393
+deallocations: 25393
 reallocations: 2339
-bytes allocated: 1244194
-instructions executed: 4242490
-binary size: 186480
-  code: 118356
+bytes allocated: 1244174
+instructions executed: 4248561
+binary size: 184288
+  code: 116880
   data: 3556
-  metadata: 64568
+  metadata: 63852
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -372,13 +372,13 @@ functions:
     bytes: 944
   __m1__leaves:
     calls: 14
-    bytes: 764
+    bytes: 808
   __m1__show:
     calls: 36
-    bytes: 1592
+    bytes: 1652
   __m1__token_leaves:
     calls: 74
-    bytes: 736
+    bytes: 784
   __m2__failure_message:
     calls: 5
     bytes: 404
@@ -432,7 +432,7 @@ functions:
     bytes: 2780
   __m5__error_at$SexpKind$Sexp:
     calls: 4
-    bytes: 1640
+    bytes: 1748
   __m5__far_miss:
     calls: 1712
     bytes: 940
@@ -466,9 +466,6 @@ functions:
   __m5__match_then$SexpKind$Sexp:
     calls: 854
     bytes: 1720
-  __m5__oxford:
-    calls: 4
-    bytes: 1900
   __m5__parse$SexpKind$Sexp:
     calls: 17
     bytes: 380
@@ -504,7 +501,7 @@ functions:
     bytes: 2992
   __test$sexp_cst:
     calls: 1
-    bytes: 2296
+    bytes: 2356
   __test_try_fail___m2__ParseError:
     calls: 0
     bytes: 84
@@ -521,7 +518,7 @@ functions:
     calls: 3610
     bytes: (external)
   aipl_arr_inc:
-    calls: 99161
+    calls: 99227
     bytes: (external)
   aipl_arr_join:
     calls: 33
@@ -533,7 +530,7 @@ functions:
     calls: 58
     bytes: (external)
   aipl_array_dec:
-    calls: 119613
+    calls: 119679
     bytes: (external)
   aipl_array_new:
     calls: 14814
@@ -582,7 +579,7 @@ functions:
     bytes: 3000
   lower_item:
     calls: 448
-    bytes: 996
+    bytes: 1044
   lower_list:
     calls: 419
     bytes: 268
@@ -594,7 +591,7 @@ functions:
     bytes: 444
   render_sexp:
     calls: 427
-    bytes: 676
+    bytes: 732
   sexp_cst:
     calls: 6
     bytes: 444

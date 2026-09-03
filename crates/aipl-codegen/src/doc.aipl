@@ -323,9 +323,9 @@ allocations: 288
 deallocations: 288
 reallocations: 16
 bytes allocated: 19609
-instructions executed: 21965
-binary size: 32648
-  code: 19620
+instructions executed: 22259
+binary size: 32944
+  code: 19916
   data: 689
   metadata: 12339
 functions:
@@ -355,7 +355,7 @@ functions:
     bytes: 208
   __m1__reindent_block:
     calls: 1
-    bytes: 3836
+    bytes: 4016
   __rec_drop_Doc:
     calls: 38
     bytes: 184
@@ -439,4 +439,4 @@ functions:
     bytes: 108
   print_doc:
     calls: 9
-    bytes: 4836
+    bytes: 4952

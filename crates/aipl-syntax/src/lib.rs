@@ -1937,13 +1937,20 @@ fn __builtin_print(self: str) !prints {}
 // Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
 fn __builtin_split(self: str, sep: str) -> str[] { [] }
 // Concatenate the parts with `sep` between consecutive elements.
-// Flatten a sequence of sequences, placing `sep` between consecutive parts:
-// `[[1,2],[3]].join(sep=0)` is `[1,2,0,3]`. Generic in the *element* type, so
-// the receiver is one level deeper than it looks — for `T = char` it reads
-// `str[] -> str` with a `char*` (i.e. `str`) separator, which is the string
-// join. `sep` is variadic (a sequence, one element, or an optional one) and
-// defaults to empty, so `xs.join()` concatenates; supplied, it is named.
-fn __builtin_join<T: any>(self: T[][], sep: T* = []) -> T[] { [] }
+// Flatten a sequence of sequences, placing a separator between consecutive
+// parts: `[[1,2],[3]].join(sep=0)` is `[1,2,0,3]`. Generic in the *element*
+// type, so the receiver is one level deeper than it looks — for `T = char` it
+// reads `str[] -> str` with a `char*` (i.e. `str`) separator, which is the
+// string join. Every separator is variadic (a sequence, one element, or an
+// optional one); `sep` defaults to empty, so `xs.join()` concatenates.
+//
+// `final_sep` goes in the last gap and `only_sep` in the sole gap of a two-part
+// join — the same gap seen two ways, since a list of two has no "rest" for `sep`
+// to appear in. Both default to `sep`, so an ordinary join is unaffected; naming
+// them is what writes an English list in one call:
+// `xs.join(sep=", ", final_sep=", or ", only_sep=" or ")` gives `"a"`,
+// `"a or b"`, `"a, b, or c"`.
+fn __builtin_join<T: any>(self: T[][], sep: T* = [], final_sep: T* = sep, only_sep: T* = sep) -> T[] { [] }
 
 // The file builtins return a Result; the `ok(..)` body coerces to the declared
 // `..!Error` (codegen builds the real ok/err).

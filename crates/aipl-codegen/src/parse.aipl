@@ -33,7 +33,6 @@ import {
     case_name,
     case_of,
     contains,
-    drop_last,
     equal as ==,
     extend,
     filter,
@@ -42,7 +41,6 @@ import {
     is_empty,
     is_nonempty,
     join,
-    last,
     len,
     less_than as <,
     less_than_or_equal as <=,
@@ -52,7 +50,6 @@ import {
     map,
     map_err,
     try_map,
-    value_or,
     value_or_err,
     wrapping_add as +,
     wrapping_increment as ++,
@@ -508,23 +505,6 @@ fn climb<K: variant, A: any>(
 
 // ---------- errors ----------
 
-// `a`, `a or b`, `a, b, or c` — the Oxford join the LR parser's
-// `friendly_syntax_error` renders its expected set with.
-fn oxford(items: str[]) -> str {
-    let n = items.len();
-    if (n == 0) {
-        return "";
-    };
-    let tail = items.last().value_or("");
-    if (n == 1) {
-        return tail;
-    };
-    if (n == 2) {
-        return `{items.first().value_or("")} or {tail}`;
-    };
-    `{items.drop_last().join(sep=", ")}, or {tail}`
-}
-
 // The error a furthest failure describes: what was expected there, and what was
 // found instead. The span is the offending token's (or the empty span at the end
 // of the source), which is what `caret_block.aipl` renders the underline from.
@@ -541,7 +521,11 @@ fn error_at<K: variant, A: any>(p: Parser<K, A>, far: Far) -> ParseError {
     if (far.expected.is_empty()) {
         return ParseError { message: `unexpected {found}`, span };
     };
-    ParseError { message: `expected {oxford(far.expected)}, found {found}`, span }
+
+    // `a`, `a or b`, `a, b, or c` — the Oxford list `join`'s two extra
+    // separators write directly.
+    let expected = far.expected.join(sep=", ", final_sep=", or ", only_sep=" or ");
+    ParseError { message: `expected {expected}, found {found}`, span }
 }
 
 // ---------- entry points ----------
@@ -884,15 +868,15 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2900
-deallocations: 2900
+allocations: 2902
+deallocations: 2902
 reallocations: 331
-bytes allocated: 177457
-instructions executed: 420498
-binary size: 301840
-  code: 185224
+bytes allocated: 177061
+instructions executed: 419920
+binary size: 299464
+  code: 183584
   data: 5924
-  metadata: 110692
+  metadata: 109956
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1007,16 +991,16 @@ functions:
     bytes: 96
   __m1__leaves:
     calls: 33
-    bytes: 764
+    bytes: 808
   __m1__show:
     calls: 117
-    bytes: 1592
+    bytes: 1652
   __m1__span:
     calls: 1
     bytes: 460
   __m1__text:
     calls: 7
-    bytes: 420
+    bytes: 476
   __m2__failure_message:
     calls: 16
     bytes: 404
@@ -1093,7 +1077,7 @@ functions:
     calls: 416
     bytes: (external)
   aipl_arr_inc:
-    calls: 8701
+    calls: 8721
     bytes: (external)
   aipl_arr_join:
     calls: 11
@@ -1104,11 +1088,8 @@ functions:
   aipl_arr_retain_ptr:
     calls: 25
     bytes: (external)
-  aipl_arr_slice:
-    calls: 2
-    bytes: (external)
   aipl_array_dec:
-    calls: 10809
+    calls: 10827
     bytes: (external)
   aipl_array_new:
     calls: 1347
@@ -1157,7 +1138,7 @@ functions:
     bytes: 2780
   error_at$Tok$Node:
     calls: 14
-    bytes: 1784
+    bytes: 1884
   far_miss:
     calls: 54
     bytes: 940
@@ -1197,9 +1178,6 @@ functions:
   match_then$Tok$Node:
     calls: 31
     bytes: 1720
-  oxford:
-    calls: 14
-    bytes: 1900
   parse$Tok$Node:
     calls: 3
     bytes: 380

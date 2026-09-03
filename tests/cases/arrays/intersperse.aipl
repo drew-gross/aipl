@@ -36,11 +36,11 @@ allocations: 21
 deallocations: 21
 reallocations: 20
 bytes allocated: 824
-instructions executed: 1702
-binary size: 5904
-  code: 3252
+instructions executed: 1716
+binary size: 5960
+  code: 3312
   data: 47
-  metadata: 2605
+  metadata: 2601
 functions:
   __builtin_intersperse$i64:
     calls: 3
@@ -80,4 +80,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1928
+    bytes: 1988

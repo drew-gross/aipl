@@ -2729,11 +2729,11 @@ allocations: 18914
 deallocations: 18914
 reallocations: 1158
 bytes allocated: 1141177
-instructions executed: 3056289
-binary size: 3667472
-  code: 2266936
+instructions executed: 3060055
+binary size: 3668136
+  code: 2267596
   data: 23596
-  metadata: 1376940
+  metadata: 1376944
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2905,19 +2905,19 @@ functions:
     bytes: 688
   __m1__print_doc:
     calls: 131
-    bytes: 4836
+    bytes: 4952
   __m2__reindent_block:
     calls: 0
-    bytes: 2724
+    bytes: 2832
   __m3__dedent:
     calls: 0
-    bytes: 1220
+    bytes: 1276
   __m8__char_lit_emit:
     calls: 0
     bytes: 1536
   __m8__dedent_segments:
     calls: 0
-    bytes: 216
+    bytes: 272
   __m8__int_lit:
     calls: 1
     bytes: 1224
@@ -3127,7 +3127,7 @@ functions:
     bytes: 1904
   for_stmt:
     calls: 2
-    bytes: 12868
+    bytes: 13016
   format_program:
     calls: 8
     bytes: 104924
@@ -3169,7 +3169,7 @@ functions:
     bytes: 1884
   let_stmt:
     calls: 3
-    bytes: 13992
+    bytes: 14056
   main:
     calls: 1
     bytes: 324
@@ -3205,7 +3205,7 @@ functions:
     bytes: 9728
   pattern:
     calls: 3
-    bytes: 8456
+    bytes: 8512
   pattern_alts:
     calls: 3
     bytes: 3252
@@ -3286,7 +3286,7 @@ functions:
     bytes: 6620
   struct_pattern:
     calls: 4
-    bytes: 6232
+    bytes: 6288
   take_comment:
     calls: 8
     bytes: 252

@@ -90,7 +90,6 @@ misc cleanup:
   having both min and minimum is kinda weird. Maybe combine somehow?
   min/max shouldn't allow mixed integer types
   split pub mod lint and pub mod ast into separate files
-  oxford -> replace with join(self: T[], sep: T* = [], final_sep: T* = sep) with supporting syntax
 
 join:
   join([]) errors now, should just propagate empty array probably?
@@ -293,6 +292,8 @@ design:
     the langauge should be incapable of aborting
 
 optimizations:
+  inline_small should discount instructions that are just forwarding args from caller to an internal function. Also maybe sort by instructions and inline smallest first?
+  monomorphize separately when arguments are defaults (so constants can be propagated)
   why is [..arr, val] slower than let v = arr; v.push(val)? turns out it's 2 calls (reserve + append) instead of 1, but the calls should be cheaper. Maybe there is more to do here, maybe not.
   using templates for string builder loops should be just as fast as concat (somehow? Maybe they desugar to concat? maybe only when it's "s = `{s}...`?)
   for (let c : s) still takes a runtime call per byte

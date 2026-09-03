@@ -1070,20 +1070,48 @@ pub(crate) fn for_each_split(s: Str, sep: Str, f: &mut impl FnMut(Str)) {
     f(s.slice(start, hay_len));
 }
 
-/// Concatenate `len` `str` values starting at `elems`, with `sep` between
-/// consecutive ones. Streams through a `Builder`, so a rope part copies its
-/// leaves without materializing. Borrows everything it reads.
+/// Which separator goes in the gap *before* part `i` of `len`, given the three
+/// `join` takes. `sep` is the ordinary one; `final_sep` goes in the last gap and
+/// `only_sep` in the sole gap of a two-part join, which is the same gap seen two
+/// ways — a list of two has no "rest" for `sep` to appear in, so `"a, b, or c"`
+/// and `"a or b"` need to name their gaps separately.
+///
+/// Both default to `sep` at the call site, so an ordinary `join` passes the same
+/// value three times and every gap is `sep`.
+pub(crate) fn gap_sep(i: usize, len: usize, sep: Str, final_sep: Str, only_sep: Str) -> Str {
+    if len == 2 {
+        only_sep
+    } else if i == len - 1 {
+        final_sep
+    } else {
+        sep
+    }
+}
+
+/// Concatenate `len` `str` values starting at `elems`, with a separator between
+/// consecutive ones — see [`gap_sep`] for which. Streams through a `Builder`, so
+/// a rope part copies its leaves without materializing. Borrows everything it
+/// reads.
 ///
 /// SAFETY: `elems` addresses `len` initialized, contiguous `Str` values.
-pub(crate) unsafe fn join_from(elems: *const Str, len: usize, sep: Str) -> Str {
-    let mut total = sep.len() * len.saturating_sub(1);
+pub(crate) unsafe fn join_from(
+    elems: *const Str,
+    len: usize,
+    sep: Str,
+    final_sep: Str,
+    only_sep: Str,
+) -> Str {
+    let mut total = 0;
     for i in 0..len {
+        if i > 0 {
+            total += gap_sep(i, len, sep, final_sep, only_sep).len();
+        }
         total += unsafe { core::ptr::read(elems.add(i)) }.len();
     }
     let mut b = Builder::with_capacity(total);
     for i in 0..len {
         if i > 0 {
-            for_each_chunk(sep, &mut |chunk| {
+            for_each_chunk(gap_sep(i, len, sep, final_sep, only_sep), &mut |chunk| {
                 b.push(chunk);
                 true
             });

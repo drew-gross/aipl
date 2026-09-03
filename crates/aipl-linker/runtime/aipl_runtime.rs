@@ -1823,14 +1823,20 @@ pub extern "C" fn aipl_str_split(s: *const str24::Str, sep: *const str24::Str) -
 }
 
 /// `join` under the wide ABI — the array half only; the streaming is
-/// `str24::join_from`. Borrows the array and the separator.
+/// `str24::join_from`. Borrows the array and all three separators (see
+/// `str24::gap_sep` for which one lands in which gap).
 #[no_mangle]
-pub extern "C" fn aipl_str_join(out: *mut str24::Str, arr: *const u8, sep: *const str24::Str) {
-    let sepv = unsafe { *sep };
+pub extern "C" fn aipl_str_join(
+    out: *mut str24::Str,
+    arr: *const u8,
+    sep: *const str24::Str,
+    final_sep: *const str24::Str,
+    only_sep: *const str24::Str,
+) {
     unsafe {
         let len = array_len(arr);
         let elems = arr_untag(arr).add(ARR_ELEMS_OFFSET) as *const str24::Str;
-        *out = str24::join_from(elems, len, sepv);
+        *out = str24::join_from(elems, len, *sep, *final_sep, *only_sep);
     }
 }
 
@@ -2665,16 +2671,20 @@ pub extern "C" fn aipl_arr_extend(
     }
 }
 
-/// Join a `T[][]` into a `T[]`, placing `sep`'s elements between consecutive
-/// parts. The array counterpart of `aipl_str_join`, and native for the same
-/// reason: the output length is known before anything is written, so the result
-/// is one exact-size allocation and each part moves as a single block copy.
-/// `drop_fn`/`retain_fn`/`elem_size` describe the *inner* element `T`. Consumes
-/// both arguments. Mirrors `aipl_arr_join` in codegen.
+/// Join a `T[][]` into a `T[]`, placing a separator's elements between
+/// consecutive parts. The array counterpart of `aipl_str_join`, and native for
+/// the same reason: the output length is known before anything is written, so
+/// the result is one exact-size allocation and each part moves as a single block
+/// copy. `drop_fn`/`retain_fn`/`elem_size` describe the *inner* element `T`.
+/// Consumes every argument. Which of the three separators lands in which gap is
+/// `str24::gap_sep`'s rule, shared with the string half. Mirrors `aipl_arr_join`
+/// in codegen.
 #[no_mangle]
 pub extern "C" fn aipl_arr_join(
     parts: *const u8,
     sep: *const u8,
+    final_sep: *const u8,
+    only_sep: *const u8,
     drop_fn: i64,
     retain_fn: i64,
     elem_size: i64,
@@ -2682,16 +2692,30 @@ pub extern "C" fn aipl_arr_join(
     count_builtin!(builtin_calls::AIPL_ARR_JOIN);
     unsafe {
         let parts_heap = aipl_arr_ensure_heap(parts);
-        let sep_heap = aipl_arr_ensure_heap(sep);
+        let seps = [
+            aipl_arr_ensure_heap(sep),
+            aipl_arr_ensure_heap(final_sep),
+            aipl_arr_ensure_heap(only_sep),
+        ];
         let n = if parts_heap.is_null() {
             0
         } else {
             array_len(parts_heap)
         };
-        let sep_len = if sep_heap.is_null() {
-            0
-        } else {
-            array_len(sep_heap)
+        // The separator heading the gap before part `i` — the array-side
+        // reading of `str24::gap_sep`.
+        let gap = |i: usize| -> *const u8 {
+            if n == 2 {
+                seps[2]
+            } else if i == n - 1 {
+                seps[1]
+            } else {
+                seps[0]
+            }
+        };
+        let gap_len = |i: usize| -> usize {
+            let s = gap(i);
+            if s.is_null() { 0 } else { array_len(s) }
         };
         // A bit-packed `bool[]` has no byte-addressable elements to copy, so it
         // appends one bit at a time through the copying push.
@@ -2700,6 +2724,8 @@ pub extern "C" fn aipl_arr_join(
             let mut i = 0;
             while i < n {
                 if i > 0 {
+                    let sep_heap = gap(i);
+                    let sep_len = gap_len(i);
                     let mut k = 0;
                     while k < sep_len {
                         let bit = i64::from(arr_load_bit_rt(sep_heap, k));
@@ -2731,14 +2757,21 @@ pub extern "C" fn aipl_arr_join(
                 i += 1;
             }
             aipl_array_dec(parts_heap);
-            aipl_array_dec(sep_heap);
+            let mut s = 0;
+            while s < seps.len() {
+                aipl_array_dec(seps[s]);
+                s += 1;
+            }
             return out;
         }
         let esz = core::cmp::max(elem_size, 8) as usize;
         // Measure first — this is the whole point of the builtin being native.
-        let mut total = sep_len * n.saturating_sub(1);
+        let mut total = 0usize;
         let mut i = 0;
         while i < n {
+            if i > 0 {
+                total += gap_len(i);
+            }
             let part = part_at_rt(parts_heap, i);
             if !part.is_null() {
                 total += array_len(part);
@@ -2752,8 +2785,9 @@ pub extern "C" fn aipl_arr_join(
         let mut pos = 0usize;
         i = 0;
         while i < n {
-            if i > 0 && sep_len > 0 {
-                let from = sep_heap.add(ARR_ELEMS_OFFSET);
+            let sep_len = if i > 0 { gap_len(i) } else { 0 };
+            if sep_len > 0 {
+                let from = gap(i).add(ARR_ELEMS_OFFSET);
                 memcpy(
                     dst.add(pos * esz) as *mut c_void,
                     from as *const c_void,
@@ -2778,7 +2812,11 @@ pub extern "C" fn aipl_arr_join(
         // Every element was copied by value; the result co-owns each one.
         elem_rc(retain_fn, dst, total);
         aipl_array_dec(parts_heap);
-        aipl_array_dec(sep_heap);
+        let mut s = 0;
+        while s < seps.len() {
+            aipl_array_dec(seps[s]);
+            s += 1;
+        }
         out
     }
 }

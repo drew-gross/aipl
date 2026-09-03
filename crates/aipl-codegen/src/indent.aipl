@@ -42,11 +42,11 @@ allocations: 33
 deallocations: 33
 reallocations: 11
 bytes allocated: 2060
-instructions executed: 1925
-binary size: 4608
-  code: 2020
+instructions executed: 2009
+binary size: 4672
+  code: 2088
   data: 361
-  metadata: 2227
+  metadata: 2223
 functions:
   __builtin_all$char$s0$lam3:
     calls: 13
@@ -80,7 +80,7 @@ functions:
     bytes: (external)
   indent:
     calls: 6
-    bytes: 656
+    bytes: 724
   main:
     calls: 1
     bytes: 104

@@ -231,11 +231,11 @@ allocations: 188
 deallocations: 188
 reallocations: 18
 bytes allocated: 10123
-instructions executed: 10470
-binary size: 30608
-  code: 17612
+instructions executed: 10680
+binary size: 31000
+  code: 17940
   data: 1788
-  metadata: 11208
+  metadata: 11272
 functions:
   __arr_drop_Cst:
     calls: 8
@@ -265,7 +265,7 @@ functions:
     calls: 12
     bytes: (external)
   aipl_arr_inc:
-    calls: 250
+    calls: 278
     bytes: (external)
   aipl_arr_join:
     calls: 14
@@ -274,7 +274,7 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 376
+    calls: 404
     bytes: (external)
   aipl_array_new:
     calls: 76
@@ -308,25 +308,25 @@ functions:
     bytes: (external)
   leaves:
     calls: 34
-    bytes: 764
+    bytes: 808
   main:
     calls: 1
     bytes: 100
   own_token_text:
     calls: 2
-    bytes: 1088
+    bytes: 1152
   show:
     calls: 14
-    bytes: 1592
+    bytes: 1652
   span:
     calls: 4
     bytes: 460
   text:
     calls: 4
-    bytes: 420
+    bytes: 476
   token_leaves:
     calls: 22
-    bytes: 736
+    bytes: 784
   token_text:
     calls: 4
-    bytes: 420
+    bytes: 476

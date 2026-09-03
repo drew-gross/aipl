@@ -1,0 +1,76 @@
+import { equal as ==, join, print, to_str } from builtins;
+
+// `sep` goes between consecutive parts; `final_sep` overrides it in the *last*
+// gap and `only_sep` in the sole gap of a two-part join. The two are separate
+// because they are the same gap seen two ways: a list of two has no "rest" for
+// `sep` to appear in, so `"a, b, or c"` and `"a or b"` have to name their gaps
+// apart. Both default to `sep`, so an ordinary join is unaffected.
+fn oxford(items: str[]) -> str { items.join(sep=", ", final_sep=", or ", only_sep=" or ") }.test({
+    assert(oxford([]) == "");
+    assert(oxford(["a"]) == "a");
+    assert(oxford(["a", "b"]) == "a or b");
+    assert(oxford(["a", "b", "c"]) == "a, b, or c");
+    assert(oxford(["a", "b", "c", "d"]) == "a, b, c, or d");
+    // Naming only one of the two leaves the other at `sep`.
+    assert(["a", "b", "c"].join(sep="-", final_sep="+") == "a-b+c");
+    assert(["a", "b", "c"].join(sep="-", only_sep="+") == "a-b-c");
+    assert(["a", "b"].join(sep="-", final_sep="+") == "a-b");
+    // The array half takes all three too, element-wise.
+    assert([[1, 2], [3], [4, 5]].join(sep=0, final_sep=9) == [1, 2, 0, 3, 9, 4, 5]);
+    assert([[1], [2]].join(sep=0, only_sep=9) == [1, 9, 2]);
+
+    // ...including a bit-packed `bool[]`, which has no byte-addressable
+    // elements and so appends one bit at a time.
+    assert(
+        [[true], [false], [true]].join(sep=true, final_sep=false) == [
+            true,
+            true,
+            false,
+            false,
+            true,
+        ],
+    );
+})
+
+fn main() !prints {
+    print(oxford(["red", "green", "blue"]));
+    print(to_str([["x"], ["y"], ["z"]].join(sep=["!"], final_sep=["?"])));
+}
+--- stdout ---
+red, green, or blue
+["x", "!", "y", "?", "z"]
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 0
+bytes allocated: 672
+instructions executed: 953
+binary size: 4320
+  code: 2208
+  data: 67
+  metadata: 2045
+functions:
+  __to_str_str$arr:
+    calls: 1
+    bytes: 812
+  aipl_arr_drop_arr:
+    calls: 1
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 10
+    bytes: (external)
+  aipl_arr_join:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 18
+    bytes: (external)
+  aipl_array_new:
+    calls: 7
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 11
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1396

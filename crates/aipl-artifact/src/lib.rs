@@ -377,7 +377,9 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_contains"
         | "aipl_char_at"
         | "aipl_str_data" => sig(2, true),
-        "aipl_concat" | "aipl_str_repeat" | "aipl_str_join" => sig(3, false),
+        "aipl_concat" | "aipl_str_repeat" => sig(3, false),
+        // The out pointer, the parts, and `join`'s three separators.
+        "aipl_str_join" => sig(5, false),
         "aipl_str_split" | "aipl_read_file_to_string" | "aipl_write_string_to_file" => {
             sig(2, true)
         }

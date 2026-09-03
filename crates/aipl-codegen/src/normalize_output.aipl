@@ -25,9 +25,9 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 880
-instructions executed: 1580
-binary size: 4320
-  code: 1816
+instructions executed: 1692
+binary size: 4376
+  code: 1872
   data: 509
   metadata: 1995
 functions:
@@ -57,4 +57,4 @@ functions:
     bytes: 120
   normalize_output:
     calls: 8
-    bytes: 416
+    bytes: 472

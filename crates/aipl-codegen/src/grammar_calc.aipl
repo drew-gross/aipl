@@ -382,15 +382,15 @@ fn depth(self: Calc) -> u64 {
     }
 }
 --- performance ---
-allocations: 8608
-deallocations: 8608
+allocations: 8612
+deallocations: 8612
 reallocations: 746
-bytes allocated: 495134
-instructions executed: 1256302
-binary size: 199288
-  code: 126108
+bytes allocated: 495290
+instructions executed: 1259912
+binary size: 196976
+  code: 124544
   data: 4284
-  metadata: 68896
+  metadata: 68148
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -475,13 +475,13 @@ functions:
     bytes: 140
   __m1__leaves:
     calls: 36
-    bytes: 764
+    bytes: 808
   __m1__own_token_text:
     calls: 268
-    bytes: 1088
+    bytes: 1152
   __m1__show:
     calls: 12
-    bytes: 1592
+    bytes: 1652
   __m1__span:
     calls: 2
     bytes: 460
@@ -538,7 +538,7 @@ functions:
     bytes: 2780
   __m5__error_at$CalcTok$Calc:
     calls: 4
-    bytes: 1420
+    bytes: 1532
   __m5__far_miss:
     calls: 141
     bytes: 940
@@ -572,9 +572,6 @@ functions:
   __m5__match_then$CalcTok$Calc:
     calls: 145
     bytes: 1720
-  __m5__oxford:
-    calls: 4
-    bytes: 1900
   __m5__parse$CalcTok$Calc:
     calls: 38
     bytes: 380
@@ -604,7 +601,7 @@ functions:
     bytes: 324
   __test$calc_cst:
     calls: 1
-    bytes: 1340
+    bytes: 1396
   __test$eval_calc:
     calls: 1
     bytes: 2116
@@ -633,7 +630,7 @@ functions:
     calls: 837
     bytes: (external)
   aipl_arr_inc:
-    calls: 23474
+    calls: 23508
     bytes: (external)
   aipl_arr_join:
     calls: 17
@@ -645,7 +642,7 @@ functions:
     calls: 33
     bytes: (external)
   aipl_array_dec:
-    calls: 29330
+    calls: 29364
     bytes: (external)
   aipl_array_new:
     calls: 3309
