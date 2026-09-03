@@ -5,9 +5,14 @@ struct Counter { n: i64 }
 // The shapes the increment lint must leave alone: adding something other than
 // one, adding one to a *different* binding, and a field store — which has no
 // `++` spelling, since `set x++;` takes a bare binding.
+//
+// The first of those is still an accumulate, so the *compound* lint owns it and
+// is squelched here: this case is about what `incr_by_one` does, and it can only
+// show that by keeping the long-hand spelling.
 fn main() !prints {
     mut n = 0;
-    set n = n + 2; // not one
+    set n = n + 2; #[allow]
+    // not one, so not the increment lint's
     mut m = 0;
     set m = n + 1; // one, but added to another binding
     mut c = Counter { n: 0 };

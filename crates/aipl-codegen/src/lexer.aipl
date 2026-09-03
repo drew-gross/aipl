@@ -38,8 +38,10 @@ import {
     starts_with,
     value_or,
     wrapping_add as +,
+    wrapping_add_assign as +=,
     wrapping_increment as ++,
     wrapping_sub as -,
+    wrapping_sub_assign as -=,
 } from builtins;
 // The `.test` block's decoding emits need a string-escape decoder. The library
 // deliberately provides none (escape meaning is a language's policy), so the
@@ -379,11 +381,11 @@ fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexErr
     while (0 < depth && i < self.len()) {
         if (self[i..].starts_with(open)) {
             set depth++;
-            set i = i + open.len();
+            set i += open.len();
         } else {
             if (self[i..].starts_with(close)) {
-                set depth = depth - 1;
-                set i = i + close.len();
+                set depth -= 1;
+                set i += close.len();
             } else {
                 set i++;
             };
@@ -686,7 +688,7 @@ fn template_scan<K>(
                         span: i..i + 2,
                     });
                 };
-                set i = i + 2;
+                set i += 2;
             } else {
                 set i++;
             };
@@ -771,7 +773,7 @@ fn interp_scan<K>(src: str, at: u64, open: u64, rules: TokenRule<K>[]) -> StepRe
                 set depth++;
             };
             if (src[i..step.end] == "}") {
-                set depth = depth - 1;
+                set depth -= 1;
             };
             set i = step.end;
         };

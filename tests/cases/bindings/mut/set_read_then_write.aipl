@@ -1,9 +1,9 @@
-import { equal as ==, wrapping_add as +, wrapping_mul as * } from builtins;
+import { equal as ==, wrapping_add_assign as +=, wrapping_mul_assign as *= } from builtins;
 
 fn f() -> i64 {
     mut x = 10;
-    set x = x + 5;
-    set x = x * 2;
+    set x += 5;
+    set x *= 2;
     x
 }.test({
     assert(f() == 30);

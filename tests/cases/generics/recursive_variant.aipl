@@ -1,4 +1,11 @@
-import { equal as ==, print, push, to_str, wrapping_add as + } from builtins;
+import {
+    equal as ==,
+    print,
+    push,
+    to_str,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
 
 // A *generic* variant that reaches itself — the parser library's `Rule<K>`.
 //
@@ -24,7 +31,7 @@ fn size<K: variant>(self: Rule<K>) -> u64 {
         Then(rs) => {
             mut n: u64 = 1;
             for (let r : rs) {
-                set n = n + r.size();
+                set n += r.size();
             }
             n
         },

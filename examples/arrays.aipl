@@ -4,6 +4,7 @@ import {
     push,
     value_or,
     wrapping_add as +,
+    wrapping_add_assign as +=,
     wrapping_sub as -,
 } from builtins;
 
@@ -23,7 +24,7 @@ import {
 fn sum(xs: i64[]) -> i64 {
     mut total = 0;
     for (let x : xs) {
-        set total = total + x;
+        set total += x;
     }
     total
 }

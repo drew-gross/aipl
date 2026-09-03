@@ -1,0 +1,15 @@
+import { print, to_str, += } from builtins;
+
+// `+=` has no bare form, exactly as `+` and `++` have none: the alias is what
+// picks the semantics, so the refusal names both flavors to choose between.
+fn main() !prints {
+    mut n = 1;
+    set n += 2;
+    print(n.to_str());
+}
+--- errors ---
+error: the "+=" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add_assign as +=` or `saturating_add_assign as +=` from builtins
+ --> ./tests/cases/compound_assign/err_bare_import.aipl:1:25
+  |
+1 | import { print, to_str, += } from builtins;
+  |                         ^^

@@ -61,6 +61,14 @@ gazelle! {
             // `+ 1` it desugars to (and the `+` import error it can raise) point
             // at the operator.
             PLUSPLUS: _,
+            // `+=` `-=` `*=` `/=` — the compound assignments (`set n += e;`).
+            // Each carries a span for the same reason `++` does: the operator
+            // node the statement desugars to, and any import error it raises,
+            // point at the operator rather than at the whole statement.
+            PLUSEQ: _,
+            MINUSEQ: _,
+            STAREQ: _,
+            SLASHEQ: _,
             // `|` — surrounds a lambda's parameter list (`|x| body`). Carries a
             // span for the lambda's start. (`||` is logical-or, lexed separately.)
             PIPE: _,
@@ -114,13 +122,25 @@ gazelle! {
                     // `wrapping_increment as ++` — `++` has no bare form either,
                     // so like `+` it is only ever reached through an alias.
                     | IDENT AS PLUSPLUS => aliased_plusplus
+                    // `wrapping_add_assign as +=`, and the other three compound
+                    // assignments. No bare form, exactly as `++` has none.
+                    | IDENT AS PLUSEQ => aliased_pluseq
+                    | IDENT AS MINUSEQ => aliased_minuseq
+                    | IDENT AS STAREQ => aliased_stareq
+                    | IDENT AS SLASHEQ => aliased_slasheq
                     | OP => op
                     | MINUS => op_minus
                     | LANGLE => op_lt
                     | RANGLE => op_gt
                     | OROR => op_or
                     | BANG => op_bang
-                    | PLUSPLUS => op_plusplus;
+                    | PLUSPLUS => op_plusplus
+                    // The bare spellings exist only so the loader can answer
+                    // them with "import it aliased", the way it does for `++`.
+                    | PLUSEQ => op_pluseq
+                    | MINUSEQ => op_minuseq
+                    | STAREQ => op_stareq
+                    | SLASHEQ => op_slasheq;
         import_names = import_name_list => present
                      | import_name_list COMMA => present_trailing
                      | _ => empty;
@@ -378,6 +398,15 @@ gazelle! {
         // gated on importing `+` like any other operator).
         assign_stmt = SET IDENT EQ expr SEMI => assign_stmt
                     | SET IDENT PLUSPLUS SEMI => incr_stmt
+                    // `set n += e;` and friends — the accumulate-in-place forms
+                    // of `set n = n + e;`. Like `++` they take a bare binding
+                    // (that is what makes the receiver mentionable twice), and
+                    // one token of lookahead after `SET IDENT` picks among all
+                    // of these.
+                    | SET IDENT PLUSEQ expr SEMI => add_assign_stmt
+                    | SET IDENT MINUSEQ expr SEMI => sub_assign_stmt
+                    | SET IDENT STAREQ expr SEMI => mul_assign_stmt
+                    | SET IDENT SLASHEQ expr SEMI => div_assign_stmt
                     // `set recv.method(args);` — writeback form of a mutating
                     // method call. Desugars to `set recv = recv.method(args)`;
                     // the `DOT` after `SET IDENT` disambiguates from the two
@@ -679,6 +708,10 @@ impl aipl::Types for Build {
     type Lbracket = Span;
     type Shim = Span;
     type Plusplus = Span;
+    type Pluseq = Span;
+    type Minuseq = Span;
+    type Stareq = Span;
+    type Slasheq = Span;
     type Hash = Span;
     type Builtins = Span;
     type Op = (BinOp, Span);
@@ -928,6 +961,10 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             aipl::ImportName::AliasedGt((name, span)) => name_as_op(name, span, ">"),
             aipl::ImportName::AliasedOr((name, span)) => name_as_op(name, span, "||"),
             aipl::ImportName::AliasedPlusplus((name, span), _) => name_as_op(name, span, "++"),
+            aipl::ImportName::AliasedPluseq((name, span), _) => name_as_op(name, span, "+="),
+            aipl::ImportName::AliasedMinuseq((name, span), _) => name_as_op(name, span, "-="),
+            aipl::ImportName::AliasedStareq((name, span), _) => name_as_op(name, span, "*="),
+            aipl::ImportName::AliasedSlasheq((name, span), _) => name_as_op(name, span, "/="),
             aipl::ImportName::AliasedBang((name, span)) => name_as_op(name, span, "!"),
             // Operator imports (`import { equal as ==, less_than as < } from builtins`). An `OP` token
             // carries a span, so keep it — the unused-import lint reports at the
@@ -946,6 +983,12 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             // `++` is reached through `wrapping_increment as ++` /
             // `saturating_increment as ++`.
             aipl::ImportName::OpPlusplus(span) => op_import_at("++", span),
+            // Same, for the compound assignments: `wrapping_add_assign as +=`
+            // and friends are the only spellings that work.
+            aipl::ImportName::OpPluseq(span) => op_import_at("+=", span),
+            aipl::ImportName::OpMinuseq(span) => op_import_at("-=", span),
+            aipl::ImportName::OpStareq(span) => op_import_at("*=", span),
+            aipl::ImportName::OpSlasheq(span) => op_import_at("/=", span),
         })
     }
 }
@@ -968,6 +1011,28 @@ fn op_import_at(spelling: &str, span: Span) -> ImportName {
         alias: None,
         span,
     }
+}
+
+/// Build the `(lhs, value, span)` of one compound assignment — `set n += e;` is
+/// `set n = n += e;`, with `op` the compound [`BinOp`] the loader later collapses
+/// to its base. The operator node carries the operator's own span, so a missing
+/// import (or a non-numeric receiver) points at `+=` rather than at the whole
+/// statement — the same choice the increment desugar makes.
+fn compound_assign(
+    name: String,
+    name_span: Span,
+    op: BinOp,
+    op_span: Span,
+    value: Expr,
+) -> (Expr, Expr, Span) {
+    let span = join_spans(&name_span, &value.span);
+    let recv = Expr::new(ExprKind::Ident(name.clone()), name_span.clone());
+    let combined = Expr::new(
+        ExprKind::Binop(Box::new(recv), op, Box::new(value)),
+        op_span,
+    );
+    let lhs = Expr::new(ExprKind::Ident(name), name_span);
+    (lhs, combined, span)
 }
 
 /// An `ImportName` binding builtin `name` to operator `op` (`name as op`).
@@ -2234,6 +2299,24 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
                 let lhs = Expr::new(ExprKind::Ident(name), name_span);
                 (lhs, value, span)
             }
+            // `set n += e;` is `set n = n += e;`, where `+=` is its own operator
+            // (gated on importing `+=`, not `+`) that the loader collapses to a
+            // plain add once gating has run — the same shape `set n++;` takes.
+            // The receiver is mentioned twice, which is why the form takes a
+            // bare binding: re-evaluating a field path or a call would change
+            // what the statement means.
+            aipl::AssignStmt::AddAssignStmt((name, name_span), op_span, value) => {
+                compound_assign(name, name_span, BinOp::AddAssign, op_span, value)
+            }
+            aipl::AssignStmt::SubAssignStmt((name, name_span), op_span, value) => {
+                compound_assign(name, name_span, BinOp::SubAssign, op_span, value)
+            }
+            aipl::AssignStmt::MulAssignStmt((name, name_span), op_span, value) => {
+                compound_assign(name, name_span, BinOp::MulAssign, op_span, value)
+            }
+            aipl::AssignStmt::DivAssignStmt((name, name_span), op_span, value) => {
+                compound_assign(name, name_span, BinOp::DivAssign, op_span, value)
+            }
             // `set recv.method(args);` — the writeback form of a mutating method
             // call, desugared to `set recv = recv.method(args)`. The receiver is
             // folded in as `args[0]` and the call is flagged method-style, exactly
@@ -3186,9 +3269,15 @@ fn op_precedence(op: BinOp) -> Precedence {
         BinOp::Add | BinOp::Concat => Precedence::Left(6),
         BinOp::Mul | BinOp::Div | BinOp::Rem => Precedence::Left(7),
         // Not produced by the token mapping below: `-` arrives as its own
-        // `Minus` token (it is also unary) and `++` is built directly by the
-        // increment desugar, so neither is ever looked up here.
-        BinOp::Sub | BinOp::Incr => unreachable!("{} has no infix token", binop_spelling(op)),
+        // `Minus` token (it is also unary), and `++` and the compound
+        // assignments are built directly by their statement desugars — none of
+        // them is ever infix, so none is looked up here.
+        BinOp::Sub
+        | BinOp::Incr
+        | BinOp::AddAssign
+        | BinOp::SubAssign
+        | BinOp::MulAssign
+        | BinOp::DivAssign => unreachable!("{} has no infix token", binop_spelling(op)),
     }
 }
 
@@ -3280,6 +3369,10 @@ pub enum LexedTokenKind {
     DotDot,
     PlusPlusPlus,
     PlusPlus,
+    PlusEq,
+    MinusEq,
+    StarEq,
+    SlashEq,
     Eq,
     Lt,
     Le,
@@ -3751,6 +3844,10 @@ fn classify_lexed(k: &LexedTokenKind) -> TokenKind {
         | K::DotDot
         | K::PlusPlusPlus
         | K::PlusPlus
+        | K::PlusEq
+        | K::MinusEq
+        | K::StarEq
+        | K::SlashEq
         | K::Eq
         | K::Lt
         | K::Le
@@ -3879,6 +3976,10 @@ fn lexed_to_terminals(out: LexedOutput) -> Vec<(aipl::Terminal<Build>, Span)> {
             // see `op_precedence` for the whole table.
             K::DotDot => T::Dotdot(Precedence::Left(4)),
             K::PlusPlus => T::Plusplus(span.clone()),
+            K::PlusEq => T::Pluseq(span.clone()),
+            K::MinusEq => T::Minuseq(span.clone()),
+            K::StarEq => T::Stareq(span.clone()),
+            K::SlashEq => T::Slasheq(span.clone()),
             K::Arrow => T::Arrow,
             K::FatArrow => T::Fatarrow,
             K::Pipe => T::Pipe(span.clone()),
@@ -4150,6 +4251,10 @@ const SYMBOL_DISPLAY_NAMES: &[(&str, &str)] = &[
     ("PIPE", "|"),
     ("BANG", "!"),
     ("PLUSPLUS", "++"),
+    ("PLUSEQ", "+="),
+    ("MINUSEQ", "-="),
+    ("STAREQ", "*="),
+    ("SLASHEQ", "/="),
     ("MINUS", "-"),
     ("OP", "operator"),
     ("LANGLE", "<"),

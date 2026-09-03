@@ -3950,8 +3950,18 @@ impl Cx<'_> {
                 )?;
                 Ok(Type::Primitive(Primitive::Bool))
             }
-            // The loader lowers `++` to an add before the checker runs.
-            BinOp::Incr => unreachable!("`++` is lowered to `+` by the loader"),
+            // The loader lowers `++` and every compound assignment to their
+            // base operation before the checker runs.
+            BinOp::Incr
+            | BinOp::AddAssign
+            | BinOp::SubAssign
+            | BinOp::MulAssign
+            | BinOp::DivAssign => {
+                unreachable!(
+                    "`{}` is lowered to its base operation by the loader",
+                    aipl_syntax::binop_spelling(op)
+                )
+            }
         }
     }
 }

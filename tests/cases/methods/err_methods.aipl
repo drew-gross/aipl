@@ -1,4 +1,4 @@
-import { push, wrapping_add as + } from builtins;
+import { push, wrapping_add_assign as += } from builtins;
 
 // Every *check-phase* method error, in one file, reported in one run. The
 // checker recovers at each item, so each failing function below is recorded and
@@ -9,7 +9,7 @@ fn no_self(x: i64) -> i64 { x }
 fn greet(self: str) -> i64 { 0 }
 
 fn add(mut self: i64, x: i64) {
-    set self = self + x;
+    set self += x;
 }
 
 // A method nothing declares.

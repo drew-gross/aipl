@@ -5,7 +5,7 @@ import {
     less_than as <,
     print,
     to_str,
-    wrapping_add as +,
+    wrapping_add_assign as +=,
     wrapping_increment as ++,
 } from builtins;
 
@@ -20,7 +20,7 @@ struct Tree { label: i64, kids: Tree[] }
 fn total(self: Tree) -> i64 {
     mut sum = self.label;
     for (let k : self.kids) {
-        set sum = sum + k.total();
+        set sum += k.total();
     }
     sum
 }

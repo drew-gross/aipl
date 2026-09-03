@@ -10,6 +10,7 @@
 //! file right after parsing (the markers come from the lexer via
 //! `parse_with_allows`), so lints fire before type checking.
 
+mod compound_assign;
 mod destructure_binding;
 mod eta_lambda;
 mod field_init_shorthand;
@@ -33,6 +34,7 @@ use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::{each_expr, Error, Span};
 use std::collections::HashSet;
 
+use self::compound_assign::{compound_assign, matching_compound};
 use self::destructure_binding::destructure_binding;
 use self::eta_lambda::eta_lambda;
 use self::field_init_shorthand::field_init_shorthand;
@@ -95,8 +97,20 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     });
     // Only where a `++` flavor provably matches this file's `+` — see
     // `matching_increment`, which also names the import when it's missing.
-    if let Some(incr) = matching_increment(program) {
+    let incr = matching_increment(program);
+    if let Some(incr) = incr {
         each_expr(program, &mut |e| incr_by_one(e, incr, &mut hits));
+    }
+    // The general form of the above, and partitioned against it rather than
+    // overlapping: `set x = x + 1;` belongs to the increment lint whenever that
+    // lint is live here, so `compound_assign` is told and leaves that one shape
+    // alone. Only the operators whose compound spelling provably means the same
+    // thing are advised — see `matching_compound`.
+    let compound = matching_compound(program);
+    if !compound.is_empty() {
+        each_expr(program, &mut |e| {
+            compound_assign(e, &compound, incr.is_some(), &mut hits)
+        });
     }
     // Only for the comparisons this file's `<`/`>` really are — see
     // `len_zero_cmp`, which also says whether `is_nonempty` needs importing.

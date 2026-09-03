@@ -1,4 +1,4 @@
-import { equal as ==, len, reverse, wrapping_add as + } from builtins;
+import { equal as ==, len, reverse, wrapping_add_assign as += } from builtins;
 
 // .reverse() returns an O(1) reversed view; iterating or comparing it
 // produces the same result as a fully-copied reversed array.
@@ -6,7 +6,7 @@ import { equal as ==, len, reverse, wrapping_add as + } from builtins;
 fn sum_reversed(xs: i64[]) -> i64 {
     mut total = 0;
     for (let x : xs.reverse()) {
-        set total = total + x;
+        set total += x;
     }
     total
 }.test({

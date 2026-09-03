@@ -1,0 +1,42 @@
+import { print, saturating_add_assign as +=, to_str, wrapping_add as + } from builtins;
+
+// `+` and `+=` here are *different* flavors — a wrapping add beside a saturating
+// accumulate — so `set n = n + 1;` and `set n += 1;` genuinely differ and the
+// lint stays quiet. It fires only when the file's two spellings resolve to the
+// same implementation, the same test `incr_by_one` makes of `+` against `++`.
+// (The added value is 10 rather than 1 so the *increment* lint has nothing to
+// say here either — this case is about the compound one.)
+fn main() !prints {
+    mut n: u8 = 250;
+    set n = n + 10; // wraps to 4
+    print(n.to_str());
+    mut m: u8 = 250;
+    set m += 10; // saturates at 255
+    print(m.to_str());
+}
+--- stdout ---
+4
+255
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 36
+instructions executed: 80
+binary size: 1304
+  code: 408
+  data: 1
+  metadata: 895
+functions:
+  __to_str_u8:
+    calls: 2
+    bytes: 204
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 204

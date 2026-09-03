@@ -1,0 +1,34 @@
+import { print, to_str, wrapping_add as + } from builtins;
+
+// `#[allow]` on the line squelches the compound-assignment lint, like any other
+// — the long-hand `set n = n + 5;` compiles and runs as written.
+fn main() !prints {
+    mut n = 10;
+    set n = n + 5; #[allow]
+    print(n.to_str());
+}
+--- stdout ---
+15
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 18
+instructions executed: 39
+binary size: 1168
+  code: 316
+  data: 1
+  metadata: 851
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 112

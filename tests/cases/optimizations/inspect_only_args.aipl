@@ -1,4 +1,4 @@
-import { equal as ==, to_str, wrapping_add as +, wrapping_increment as ++ } from builtins;
+import { equal as ==, to_str, wrapping_add_assign as +=, wrapping_increment as ++ } from builtins;
 
 // Retain elision for *inspect-only* arguments. A heap argument is normally
 // borrowed across a call by a matched pair — the caller retains it, the callee
@@ -29,7 +29,7 @@ fn count_ones(s: str) -> i64 {
 fn total(xs: i64[]) -> i64 {
     mut t = 0;
     for (let x : xs) {
-        set t = t + x;
+        set t += x;
     }
     t
 }

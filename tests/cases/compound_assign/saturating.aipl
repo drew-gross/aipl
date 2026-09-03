@@ -1,0 +1,41 @@
+import { print, saturating_add_assign as +=, saturating_sub_assign as -=, to_str } from builtins;
+
+// The two arithmetic compound assignments carry the same choice of semantics
+// their plain forms do, and the alias is what records it — `saturating_add_assign
+// as +=` here, `wrapping_add_assign as +=` in `basic.aipl`. Nothing downstream
+// can tell which spelling produced the operation, so the flavor is the whole
+// difference between these two files.
+fn main() !prints {
+    mut n: u8 = 250;
+    set n += 10; // clamps at 255 rather than wrapping to 4
+    print(n.to_str());
+    mut m: u8 = 3;
+    set m -= 10; // clamps at 0
+    print(m.to_str());
+}
+--- stdout ---
+255
+0
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 36
+instructions executed: 84
+binary size: 1320
+  code: 428
+  data: 1
+  metadata: 891
+functions:
+  __to_str_u8:
+    calls: 2
+    bytes: 204
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 224

@@ -1,0 +1,30 @@
+import { print, saturating_divide as /, to_str, wrapping_add as + } from builtins;
+
+// Every accumulate the lint flags, and what it advises for each. The `+` hit
+// names the import to add (this file has no `+=`); the `/` hit names its only
+// flavor, since `/` has just the one.
+fn main() !prints {
+    mut n = 10;
+    set n = n + 5;
+    set n = 3 + n; // the commutative order counts too
+    set n = n / 2;
+    print(n.to_str());
+}
+--- errors ---
+error: "n" accumulates onto itself — use the compound form "set n += ...;", importing `wrapping_add_assign as +=` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_compound_assign.aipl:8:9
+  |
+8 |     set n = n + 5;
+  |         ^^^^^^^^^
+
+error: "n" accumulates onto itself — use the compound form "set n += ...;", importing `wrapping_add_assign as +=` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_compound_assign.aipl:9:9
+  |
+9 |     set n = 3 + n; // the commutative order counts too
+  |         ^^^^^^^^^
+
+error: "n" accumulates onto itself — use the compound form "set n /= ...;", importing `saturating_divide_assign as /=` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_compound_assign.aipl:10:9
+   |
+10 |     set n = n / 2;
+   |         ^^^^^^^^^

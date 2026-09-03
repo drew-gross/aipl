@@ -6,6 +6,7 @@ import {
     less_than as <,
     logical_and as &&,
     wrapping_add as +,
+    wrapping_add_assign as +=,
     wrapping_increment as ++,
 } from builtins;
 
@@ -45,7 +46,7 @@ pub fn unescape(self: str) -> str {
     while (i < self.len()) {
         if (self[i] == some('\\') && i + 1 < self.len()) {
             set out = out +++ self[run_start..i] +++ self[i + 1..i + 2].escape_text();
-            set i = i + 2;
+            set i += 2;
             set run_start = i;
         } else {
             set i++;

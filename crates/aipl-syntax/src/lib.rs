@@ -1138,6 +1138,35 @@ pub mod ast {
         Incr,
         /// `concat`.
         Concat,
+        /// `wrapping_add_assign` / `saturating_add_assign`, from `set n += e`.
+        AddAssign,
+        /// `wrapping_sub_assign` / `saturating_sub_assign`, from `set n -= e`.
+        SubAssign,
+        /// `wrapping_mul_assign`, from `set n *= e`.
+        MulAssign,
+        /// `saturating_divide_assign`, from `set n /= e`.
+        DivAssign,
+    }
+
+    impl BinOp {
+        /// The plain operation a compound assignment accumulates with — `+=` →
+        /// [`BinOp::Add`] — or `None` for every other operator.
+        ///
+        /// The two differ only at the operator gate, which is the whole reason
+        /// the compound forms are variants of their own rather than the plain
+        /// op with a flag: `set n += e;` must demand the `+=` import and not
+        /// settle for a `+` one, exactly as `set n++;` demands `++`. Once
+        /// gating has run the loader collapses each to its base, so no pass
+        /// downstream ever sees one.
+        pub fn compound_assign_base(self) -> Option<BinOp> {
+            Some(match self {
+                BinOp::AddAssign => BinOp::Add,
+                BinOp::SubAssign => BinOp::Sub,
+                BinOp::MulAssign => BinOp::Mul,
+                BinOp::DivAssign => BinOp::Div,
+                _ => return None,
+            })
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1734,6 +1763,23 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
     ("wrapping_mul", "*", "__builtin_wrapping_mul"),
     ("wrapping_increment", "++", "__builtin_wrapping_add"),
     ("saturating_increment", "++", "__builtin_saturating_add"),
+    // The compound assignments, `set n += e;`. Each is its own named builtin
+    // rather than a second alias of the plain one, exactly as `++` is
+    // `wrapping_increment` and not `wrapping_add`: a name maps to one operator
+    // here, and the separate name is what a file's import list shows.
+    //
+    // Where the plain operator has a callable `__builtin_*` impl the compound
+    // form shares it, which is what lets the lint pair a file's `+` with the
+    // `+=` of matching semantics (the same trick `matching_increment` uses).
+    // `/=` has nothing to share — `saturating_divide`'s canonical is the marker
+    // `/` — so its own spelling is the marker, and the loader collapses the
+    // variant to `BinOp::Div` after gating.
+    ("wrapping_add_assign", "+=", "__builtin_wrapping_add"),
+    ("saturating_add_assign", "+=", "__builtin_saturating_add"),
+    ("wrapping_sub_assign", "-=", "__builtin_wrapping_sub"),
+    ("saturating_sub_assign", "-=", "__builtin_saturating_sub"),
+    ("wrapping_mul_assign", "*=", "__builtin_wrapping_mul"),
+    ("saturating_divide_assign", "/=", "/="),
     // The operators with a single semantics. They are listed here so that *every*
     // operator is imported the same way when it is imported *as an operator*:
     // `name as op`. Reading an import list then tells you which operators a file
@@ -1777,6 +1823,10 @@ pub fn binop_from_spelling(spelling: &str) -> Option<BinOp> {
         "+++" => BinOp::Concat,
         "/" => BinOp::Div,
         "%" => BinOp::Rem,
+        // `saturating_divide_assign`'s canonical is its own spelling (see
+        // [`OPERATOR_BUILTINS`]), so a bare call of it lands here like any other
+        // marker. The loader collapses the variant to `Div` right after.
+        "/=" => BinOp::DivAssign,
         _ => return None,
     })
 }
@@ -1875,6 +1925,12 @@ pub fn binop_spelling(op: BinOp) -> &'static str {
         // what the gate requires.
         BinOp::Incr => "++",
         BinOp::Concat => "+++",
+        // The compound assignments, likewise lowered to their base operation
+        // once the gate has seen the spelling written here.
+        BinOp::AddAssign => "+=",
+        BinOp::SubAssign => "-=",
+        BinOp::MulAssign => "*=",
+        BinOp::DivAssign => "/=",
     }
 }
 

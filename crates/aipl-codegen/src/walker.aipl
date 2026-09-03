@@ -35,6 +35,7 @@ import {
     not_equal as !=,
     push,
     saturating_sub as -,
+    saturating_sub_assign as -=,
     sort_by,
     starts_with,
     value_or,
@@ -489,6 +490,7 @@ fn fmt_kind(k: AiplTok) -> FmtKind {
         EqEq | Ne | Arrow | FatArrow | AndAnd | OrOr | Pipe | DotDot => Op,
         PlusPlusPlus | PlusPlus | Eq | Lt | Le | Gt | Ge | Bang => Op,
         Plus | Minus | Star | Slash | Percent => Op,
+        PlusEq | MinusEq | StarEq | SlashEq => Op,
         Period | Comma | Colon | Semi | Question | Hash => Punct,
         LParen | RParen | LBrace | RBrace | LBracket | RBracket => Punct,
         // Trivia never reaches the token stream (whitespace is skipped, comments
@@ -1430,13 +1432,32 @@ fn binding_ann(self: W) -> WDoc!FmtError {
     assert(walker_of("= 1 ;").binding_ann().rendered(100)? == "");
 })
 
-// `set n = e;`, `set n++;`, `set recv.f.g = e;`, or the writeback form
+// The compound-assignment operators. Each stands where a `=` would and is
+// spaced like one, so `set_stmt` renders them all the same way.
+fn is_compound_assign(self: str) -> bool {
+    match (self) {
+        "+=" | "-=" | "*=" | "/=" => true,
+        _ => false,
+    }
+}
+
+// `set n = e;`, `set n++;`, `set n += e;` (and the other three compound
+// assignments), `set recv.f.g = e;`, or the writeback form
 // `set recv.method(args);`.
 fn set_stmt(self: W) -> WDoc!FmtError {
     let n = self.bump().w.bump();
     if (n.w.peek_text() == "++") {
         let done = n.w.bump().w.expect(";")?.w;
         return ok(WDoc { w: done, doc: Text(`set {n.text}++;`) });
+    };
+    let compound = n.w.peek_text();
+    if (compound.is_compound_assign()) {
+        let v = n.w.bump().w.expr()?;
+        let done = v.w.expect(";")?.w;
+        return ok(WDoc {
+            w: done,
+            doc: Concat([Text(`set {n.text} {compound} `), v.doc, Text(";")]),
+        });
     };
     if (n.w.peek_text() == ".") {
         return n.w.set_member(n.text);
@@ -2203,7 +2224,7 @@ fn template_scan(self: W, start: u64, depth0: u64) -> WDoc!FmtError {
                         doc: RawBlock(self.src[start..span.end]),
                     });
                 };
-                set depth = depth - 1;
+                set depth -= 1;
             };
         };
         set w = stepped;
@@ -2280,7 +2301,7 @@ fn hug_close(self: W, start: u64) -> u64? {
                 if (depth <= 1) {
                     return some(i);
                 };
-                set depth = depth - 1;
+                set depth -= 1;
             };
         };
         set i++;
@@ -2505,6 +2526,13 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     assert(walker_of("{ mut x = 1 ; x }").block().rendered(100)? == "{\n    mut x = 1;\n    x\n}");
     assert(walker_of("{ set x = 1 ; }").block().rendered(100)? == "{\n    set x = 1;\n}");
     assert(walker_of("{ set x ++ ; }").block().rendered(100)? == "{\n    set x++;\n}");
+    // The compound assignments are spaced like the `=` they stand in for.
+    assert(walker_of("{ set x += 1 ; }").block().rendered(100)? == "{\n    set x += 1;\n}");
+    assert(walker_of("{ set x -= n ; }").block().rendered(100)? == "{\n    set x -= n;\n}");
+    assert(walker_of("{ set x *= 2 ; }").block().rendered(100)? == "{\n    set x *= 2;\n}");
+    assert(
+        walker_of("{ set x /= f ( 2 ) ; }").block().rendered(100)? == "{\n    set x /= f(2);\n}",
+    );
     assert(walker_of("{ set a . b = 1 ; }").block().rendered(100)? == "{\n    set a.b = 1;\n}");
     assert(
         walker_of("{ set xs . push ( 1 ) ; }")
@@ -2790,15 +2818,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 19520
-deallocations: 19520
-reallocations: 1203
-bytes allocated: 1186399
-instructions executed: 3203804
-binary size: 3833344
-  code: 2368736
-  data: 24412
-  metadata: 1440196
+allocations: 20240
+deallocations: 20240
+reallocations: 1235
+bytes allocated: 1227211
+instructions executed: 3320200
+binary size: 4037648
+  code: 2496052
+  data: 24868
+  metadata: 1516728
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2813,7 +2841,7 @@ functions:
     calls: 20
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1375
+    calls: 1416
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
     calls: 0
@@ -2837,7 +2865,7 @@ functions:
     calls: 27
     bytes: 140
   __arr_retain___m1__Doc:
-    calls: 1439
+    calls: 1473
     bytes: 116
   __arr_retain___m9__StepResult$__m8__AiplTok:
     calls: 0
@@ -2855,10 +2883,10 @@ functions:
     calls: 0
     bytes: 32
   __builtin_any$__m1__Doc$lam32$tail:
-    calls: 540
+    calls: 554
     bytes: 324
   __builtin_count_is_at_least$char$s0:
-    calls: 42
+    calls: 46
     bytes: 252
   __builtin_count_while$char$lam75:
     calls: 69
@@ -2885,10 +2913,10 @@ functions:
     calls: 1
     bytes: 1028
   __builtin_intersperse$__m1__Doc:
-    calls: 148
+    calls: 150
     bytes: 408
   __eq_FmtKind:
-    calls: 894
+    calls: 937
     bytes: 64
   __eq_FmtTok:
     calls: 0
@@ -2948,28 +2976,28 @@ functions:
     calls: 0
     bytes: 332
   __m1__col_after:
-    calls: 887
+    calls: 910
     bytes: 544
   __m1__fits:
     calls: 0
     bytes: 36
   __m1__fits$tail:
-    calls: 1555
+    calls: 1571
     bytes: 2684
   __m1__fits_atom:
     calls: 0
     bytes: 52
   __m1__fits_atom$tail:
-    calls: 543
+    calls: 547
     bytes: 312
   __m1__has_hard:
     calls: 0
     bytes: 32
   __m1__has_hard$tail:
-    calls: 1410
+    calls: 1443
     bytes: 688
   __m1__print_doc:
-    calls: 134
+    calls: 138
     bytes: 4952
   __m2__reindent_block:
     calls: 0
@@ -3017,7 +3045,7 @@ functions:
     calls: 84
     bytes: 940
   __m9__step_result$__m8__AiplTok:
-    calls: 3454
+    calls: 3626
     bytes: 12788
   __m9__template_scan$__m8__AiplTok:
     calls: 0
@@ -3026,10 +3054,10 @@ functions:
     calls: 94
     bytes: 468
   __rec_drop___m1__Doc:
-    calls: 2700
+    calls: 2788
     bytes: 184
   __rec_drop___m1__Work:
-    calls: 3939
+    calls: 4035
     bytes: 84
   __test$binding_ann:
     calls: 1
@@ -3042,7 +3070,7 @@ functions:
     bytes: 1708
   __test$walker_of:
     calls: 1
-    bytes: 1742256
+    bytes: 1857488
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
@@ -3050,49 +3078,49 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 484
+    calls: 489
     bytes: (external)
   aipl_arr_inc:
-    calls: 51824
+    calls: 53719
     bytes: (external)
   aipl_arr_reserve:
-    calls: 549
+    calls: 554
     bytes: (external)
   aipl_arr_slice:
     calls: 81
     bytes: (external)
   aipl_array_dec:
-    calls: 64085
+    calls: 66476
     bytes: (external)
   aipl_array_new:
-    calls: 10359
+    calls: 10804
     bytes: (external)
   aipl_array_push:
-    calls: 1542
+    calls: 1589
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1778
+    calls: 1823
     bytes: (external)
   aipl_array_with_cap:
-    calls: 198
+    calls: 202
     bytes: (external)
   aipl_assert:
-    calls: 178
+    calls: 182
     bytes: (external)
   aipl_rec_alloc:
-    calls: 6639
+    calls: 6823
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 45758
+    calls: 46925
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 4035
+    calls: 4137
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 39119
+    calls: 40102
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 4035
+    calls: 4137
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -3110,7 +3138,7 @@ functions:
     calls: 7
     bytes: 76
   atom:
-    calls: 113
+    calls: 118
     bytes: 3556
   base_ty:
     calls: 71
@@ -3119,40 +3147,40 @@ functions:
     calls: 7
     bytes: 2272
   binop_expr:
-    calls: 109
+    calls: 114
     bytes: 3204
   binop_tail:
-    calls: 109
+    calls: 114
     bytes: 4324
   block:
-    calls: 42
+    calls: 46
     bytes: 1136
   block_entries:
-    calls: 47
+    calls: 51
     bytes: 3948
   block_layout:
-    calls: 47
+    calls: 51
     bytes: 5196
   bump:
-    calls: 994
+    calls: 1026
     bytes: 1088
   call_arg:
-    calls: 11
+    calls: 12
     bytes: 5216
   call_arg_list:
-    calls: 18
+    calls: 19
     bytes: 792
   call_args_until:
-    calls: 21
+    calls: 22
     bytes: 2772
   case_params:
     calls: 6
     bytes: 6580
   comma_list_docs:
-    calls: 92
+    calls: 93
     bytes: 4104
   comment_starts_before:
-    calls: 286
+    calls: 300
     bytes: 280
   construct_body:
     calls: 0
@@ -3176,10 +3204,10 @@ functions:
     calls: 5
     bytes: 752
   expect:
-    calls: 422
+    calls: 435
     bytes: 1228
   expr:
-    calls: 107
+    calls: 112
     bytes: 760
   fn_attrs:
     calls: 22
@@ -3198,12 +3226,12 @@ functions:
     bytes: 13016
   format_program:
     calls: 8
-    bytes: 104924
+    bytes: 111792
   hug_close:
     calls: 0
     bytes: 732
   hugs_sole_arg:
-    calls: 18
+    calls: 19
     bytes: 1308
   ident_list:
     calls: 7
@@ -3216,7 +3244,7 @@ functions:
     bytes: 4172
   import_item:
     calls: 14
-    bytes: 16468
+    bytes: 16972
   index_or_from:
     calls: 3
     bytes: 4396
@@ -3236,7 +3264,7 @@ functions:
     calls: 3
     bytes: 3416
   lead:
-    calls: 280
+    calls: 294
     bytes: 1884
   let_stmt:
     calls: 3
@@ -3251,19 +3279,19 @@ functions:
     calls: 2
     bytes: 12028
   more_before:
-    calls: 183
+    calls: 185
     bytes: 200
   mut_stmt:
     calls: 2
     bytes: 7092
   name_atom:
-    calls: 96
+    calls: 101
     bytes: 5724
   named_ty:
     calls: 67
     bytes: 4108
   next_start:
-    calls: 42
+    calls: 46
     bytes: 532
   params_until:
     calls: 22
@@ -3281,13 +3309,13 @@ functions:
     calls: 3
     bytes: 3252
   peek_is:
-    calls: 894
+    calls: 937
     bytes: 288
   postfix:
-    calls: 113
+    calls: 118
     bytes: 5552
   postfix_segs:
-    calls: 113
+    calls: 118
     bytes: 3572
   program:
     calls: 12
@@ -3296,16 +3324,16 @@ functions:
     calls: 12
     bytes: 4684
   range_has_semi:
-    calls: 32
+    calls: 36
     bytes: 228
   range_tail:
-    calls: 107
+    calls: 112
     bytes: 2356
   rendered:
-    calls: 112
+    calls: 116
     bytes: 572
   sep_entry:
-    calls: 34
+    calls: 38
     bytes: 328
   set_member:
     calls: 2
@@ -3317,8 +3345,8 @@ functions:
     calls: 4
     bytes: 6456
   set_stmt:
-    calls: 4
-    bytes: 8176
+    calls: 8
+    bytes: 12888
   shim_bindings:
     calls: 0
     bytes: 3244
@@ -3335,7 +3363,7 @@ functions:
     calls: 4
     bytes: 1904
   statement:
-    calls: 34
+    calls: 38
     bytes: 5860
   str_atom:
     calls: 2
@@ -3365,10 +3393,10 @@ functions:
     calls: 0
     bytes: 2492
   tok_text:
-    calls: 3179
+    calls: 3293
     bytes: 456
   trailing_comment:
-    calls: 77
+    calls: 81
     bytes: 2168
   trim_last_break:
     calls: 0
@@ -3389,7 +3417,7 @@ functions:
     calls: 44
     bytes: 5784
   unary:
-    calls: 115
+    calls: 120
     bytes: 1876
   variant_cases:
     calls: 13
@@ -3401,7 +3429,7 @@ functions:
     calls: 6
     bytes: 2424
   walker_of:
-    calls: 126
+    calls: 130
     bytes: 740
   while_stmt:
     calls: 1

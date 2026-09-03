@@ -102,6 +102,10 @@ variant AiplTok =
     | DotDot
     | PlusPlusPlus
     | PlusPlus
+    | PlusEq
+    | MinusEq
+    | StarEq
+    | SlashEq
     | Eq
     | Lt
     | Le
@@ -346,6 +350,14 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         op("||", OrOr),
         op("..", DotDot),
         op("++", PlusPlus),
+        // The compound assignments, each before both the plain operator it
+        // accumulates with and the `=` that follows it: `+=` would otherwise
+        // lex as `+` then `=`. `-=` needs no such care against `Int` — that
+        // matcher takes a `-` only when a *digit* follows it.
+        op("+=", PlusEq),
+        op("-=", MinusEq),
+        op("*=", StarEq),
+        op("/=", SlashEq),
         op("<=", Le),
         op(">=", Ge),
         op("=", Eq),
@@ -637,15 +649,15 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 3664
-deallocations: 3664
+allocations: 3776
+deallocations: 3776
 reallocations: 33
-bytes allocated: 323989
-instructions executed: 866188
-binary size: 250664
-  code: 173404
+bytes allocated: 339733
+instructions executed: 897524
+binary size: 256536
+  code: 178124
   data: 6364
-  metadata: 70896
+  metadata: 72048
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
@@ -771,7 +783,7 @@ functions:
     calls: 56
     bytes: 940
   __m1__step_result$AiplTok:
-    calls: 1712
+    calls: 1768
     bytes: 12788
   __m1__template_scan$AiplTok:
     calls: 3
@@ -813,16 +825,16 @@ functions:
     calls: 180
     bytes: (external)
   aipl_arr_inc:
-    calls: 7671
+    calls: 7895
     bytes: (external)
   aipl_arr_reserve:
     calls: 180
     bytes: (external)
   aipl_array_dec:
-    calls: 11330
+    calls: 11666
     bytes: (external)
   aipl_array_new:
-    calls: 3599
+    calls: 3711
     bytes: (external)
   aipl_array_push:
     calls: 13
@@ -856,7 +868,7 @@ functions:
     bytes: 1224
   lex_aipl:
     calls: 20
-    bytes: 71988
+    bytes: 76708
   lex_aipl_tokens:
     calls: 2
     bytes: 424

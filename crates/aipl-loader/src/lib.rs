@@ -1082,6 +1082,9 @@ fn rewrite_expr(
                         Some(2) => {
                             let op = aipl_syntax::binop_from_spelling(&target)
                                 .expect("arity 2 means a binary spelling");
+                            // As in the `Binop` arm: a bare call of a compound
+                            // operator's named builtin is just the operation.
+                            let op = op.compound_assign_base().unwrap_or(op);
                             let rhs = rewritten.pop().expect("checked arity");
                             let lhs = rewritten.pop().expect("checked arity");
                             ExprKind::Binop(Box::new(lhs), op, Box::new(rhs))
@@ -1173,6 +1176,12 @@ fn rewrite_expr(
             // `wrapping_add as +`) maps the spelling to itself, so it stays a
             // primitive Binop.
             let spelling = aipl_syntax::binop_spelling(*op);
+            // Gating has already demanded the operator *as written*, which is
+            // the only thing a compound assignment needed its own variant for.
+            // From here it is the operation it accumulates with — but resolved
+            // through its own binding, so `wrapping_add_assign as +=` alone is
+            // enough and a file using `+=` need not also import `+`.
+            let op = &op.compound_assign_base().unwrap_or(*op);
             match view.get(spelling) {
                 Some(target) if target != spelling => {
                     ExprKind::Call(target.clone(), vec![lhs, rhs], false)

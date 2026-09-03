@@ -1,4 +1,4 @@
-import { print, push, to_str, wrapping_add as + } from builtins;
+import { print, push, to_str, wrapping_add_assign as += } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -14,7 +14,7 @@ fn main() !prints {
     print(to_str(pts[1])); // some(Point { x: 3, y: 4 })
     mut sx = 0;
     for (let p : pts) {
-        set sx = sx + p.x;
+        set sx += p.x;
     }
     print(to_str(sx)); // 4
 

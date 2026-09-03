@@ -1,4 +1,9 @@
-import { equal as ==, less_than as <, wrapping_add as +, wrapping_increment as ++ } from builtins;
+import {
+    equal as ==,
+    less_than as <,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+} from builtins;
 
 // `while (cond) { .. }` runs the body while `cond` (a bool) holds, re-checking
 // it before each pass. The counter is a `mut` declared before the loop; the
@@ -7,7 +12,7 @@ fn sum_below(n: i64) -> i64 {
     mut i = 0;
     mut total = 0;
     while (i < n) {
-        set total = total + i;
+        set total += i;
         set i++;
     }
     total

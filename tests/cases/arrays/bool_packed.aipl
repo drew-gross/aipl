@@ -1,4 +1,4 @@
-import { equal as ==, len, wrapping_add as + } from builtins;
+import { equal as ==, len, wrapping_add_assign as += } from builtins;
 
 // `bool[]` is bit-packed — 8 elements per byte (like `std::vector<bool>`) — but
 // presents exactly the ordinary array interface. This literal spans two bytes
@@ -16,7 +16,7 @@ fn packed() -> bool[] { [true, false, true, true, false, false, true, false, tru
     // Iteration reads each packed bit in order.
     mut trues = 0;
     for (let b : xs) {
-        set trues = trues + (if (b) { 1 } else { 0 });
+        set trues += (if (b) { 1 } else { 0 });
     }
     assert(trues == 5);
 })

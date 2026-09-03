@@ -6,7 +6,7 @@ import {
     sort,
     to_str,
     value_or,
-    wrapping_add as +,
+    wrapping_add_assign as +=,
     wrapping_sub as -,
 } from builtins;
 
@@ -20,7 +20,7 @@ import {
 fn sum(xs: u64[]) -> u64 {
     mut total: u64 = 0;
     for (let x : xs) {
-        set total = total + x;
+        set total += x;
     }
     total
 }.test({

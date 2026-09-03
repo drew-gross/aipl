@@ -5,6 +5,7 @@ import {
     print,
     to_str,
     wrapping_add as +,
+    wrapping_add_assign as +=,
     wrapping_increment as ++,
 } from builtins;
 
@@ -42,7 +43,7 @@ fn leaf(v: i64) -> Node { v, next: none, kids: [] }
 fn total(self: Node) -> i64 {
     mut s = self.v;
     for (let k : self.kids) {
-        set s = s + k.total();
+        set s += k.total();
     }
     match (self.next) {
         some(n) => s + n.total(),

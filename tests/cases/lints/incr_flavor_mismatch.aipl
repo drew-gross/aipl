@@ -4,9 +4,14 @@ import { print, saturating_increment as ++, to_str, wrapping_add as + } from bui
 // increment — so `set n = n + 1;` and `set n++;` genuinely differ and the lint
 // stays quiet. It fires only when the file's two spellings resolve to the same
 // implementation.
+//
+// With `incr_by_one` quiet, the compound lint is what still has advice for that
+// line (`wrapping_add_assign as +=` does match this file's `+`), so it is
+// squelched: the long-hand spelling is what this case is here to show.
 fn main() !prints {
     mut n: u8 = 255;
-    set n = n + 1; // wraps to 0
+    set n = n + 1; #[allow]
+    // wraps to 0
     print(n.to_str());
     mut m: u8 = 255;
     set m++; // saturates at 255

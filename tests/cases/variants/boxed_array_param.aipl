@@ -1,4 +1,4 @@
-import { len, print, push, to_str, wrapping_add as + } from builtins;
+import { len, print, push, to_str, wrapping_add as +, wrapping_add_assign as += } from builtins;
 
 // An `A[]` parameter where `A` is a boxed recursive variant.
 //
@@ -19,7 +19,7 @@ fn total(self: Tree) -> i64 {
 fn sum_all(ts: Tree[]) -> i64 {
     mut acc = 0;
     for (let t : ts) {
-        set acc = acc + t.total();
+        set acc += t.total();
     }
     acc
 }

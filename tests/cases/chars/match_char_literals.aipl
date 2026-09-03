@@ -1,4 +1,4 @@
-import { equal as ==, print, wrapping_add as + } from builtins;
+import { equal as ==, print, wrapping_add_assign as += } from builtins;
 
 // `match` on a `char` dispatches on char-literal arms. Like a `str` match this
 // compares by value over an *open* domain — every `char` a scrutinee could hold
@@ -29,7 +29,7 @@ fn escaped(c: char) -> str {
 fn score(s: str) -> i64 {
     mut total = 0;
     for (let c : s) {
-        set total = total + match (c) {
+        set total += match (c) {
             'a' => 1,
             'b' => 10,
             _ => 0,

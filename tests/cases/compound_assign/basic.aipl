@@ -1,0 +1,66 @@
+import {
+    print,
+    saturating_divide_assign as /=,
+    to_str,
+    wrapping_add_assign as +=,
+    wrapping_mul as *,
+    wrapping_mul_assign as *=,
+    wrapping_sub_assign as -=,
+} from builtins;
+
+// `set n += e;` accumulates in place — the compound form of `set n = n + e;`.
+// Like `set n++;` it takes a bare binding: the receiver is mentioned twice, so a
+// field path or a call would have to be re-evaluated to spell it this way.
+//
+// Each operator is imported on its own (`wrapping_add_assign as +=`), exactly as
+// `++` is `wrapping_increment as ++` rather than a second alias of `+`. The two
+// spellings are independent: this file accumulates with `+=`, `-=` and `/=`
+// without importing `+`, `-` or `/`, and imports `*` only for `triple`'s body.
+fn triple(x: i64) -> i64 { x * 3 }
+
+fn main() !prints {
+    mut n = 10;
+    set n += 5;
+    print(n.to_str());
+    set n -= 3;
+    print(n.to_str());
+    set n *= 4;
+    print(n.to_str());
+    set n /= 6;
+    print(n.to_str());
+
+    // The right-hand side is an arbitrary expression, not just a literal —
+    // and it is the *operand*, so `m` is read once on each side of the store.
+    mut m = 5;
+    set m += triple(m);
+    print(m.to_str());
+}
+--- stdout ---
+15
+12
+48
+8
+20
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 89
+instructions executed: 189
+binary size: 1696
+  code: 684
+  data: 1
+  metadata: 1011
+functions:
+  __to_str_i64:
+    calls: 5
+    bytes: 204
+  aipl_i64_len:
+    calls: 10
+    bytes: (external)
+  aipl_write_i64:
+    calls: 5
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 480

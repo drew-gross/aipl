@@ -1,4 +1,4 @@
-import { concat as +++, equal as ==, wrapping_add as + } from builtins;
+import { concat as +++, equal as ==, wrapping_add_assign as += } from builtins;
 
 // A variadic ("zero or more") parameter is written `T*`. Inside the body it is
 // the *sequence* type — `i64[]` here — so it iterates like any array. At a call
@@ -7,7 +7,7 @@ import { concat as +++, equal as ==, wrapping_add as + } from builtins;
 fn sum(self: i64, others: i64*) -> i64 {
     mut total = self;
     for (let i : others) {
-        set total = total + i;
+        set total += i;
     }
     total
 }.test({

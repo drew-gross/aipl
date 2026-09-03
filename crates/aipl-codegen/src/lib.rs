@@ -3563,6 +3563,10 @@ fn marshal_lex(
             "DotDot" => K::DotDot,
             "PlusPlusPlus" => K::PlusPlusPlus,
             "PlusPlus" => K::PlusPlus,
+            "PlusEq" => K::PlusEq,
+            "MinusEq" => K::MinusEq,
+            "StarEq" => K::StarEq,
+            "SlashEq" => K::SlashEq,
             "Eq" => K::Eq,
             "Lt" => K::Lt,
             "Le" => K::Le,
@@ -17514,12 +17518,20 @@ fn compile_expr_inner<M: Module>(
                     };
                     (v, ConcreteType::Primitive(Primitive::Bool))
                 }
-                // The loader lowers `++` to an add long before codegen, so this
-                // is unreachable rather than a diagnostic. It replaces a
-                // catch-all `other =>` arm that turned an unhandled operator into
-                // a runtime error message; with the enum, a new operator that
-                // codegen forgets is a compile error here instead.
-                BinOp::Incr => unreachable!("`++` is lowered to `+` by the loader"),
+                // The loader lowers `++` and the compound assignments to their
+                // base operation long before codegen, so these are unreachable
+                // rather than diagnostics. They replace a catch-all `other =>`
+                // arm that turned an unhandled operator into a runtime error
+                // message; with the enum, a new operator that codegen forgets is
+                // a compile error here instead.
+                BinOp::Incr
+                | BinOp::AddAssign
+                | BinOp::SubAssign
+                | BinOp::MulAssign
+                | BinOp::DivAssign => unreachable!(
+                    "`{}` is lowered to its base operation by the loader",
+                    aipl_syntax::binop_spelling(*op)
+                ),
             }
         }
         ExprKind::If(cond, then_e, else_e) => {

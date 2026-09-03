@@ -70,15 +70,15 @@ pub fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
     assert(fmt_layout("fn  main( )  {  }", 100) == ok("fn main() {}\n"));
 })
 --- performance ---
-allocations: 1953
-deallocations: 1953
+allocations: 2049
+deallocations: 2049
 reallocations: 30
-bytes allocated: 110170
-instructions executed: 361100
-binary size: 948160
-  code: 610496
+bytes allocated: 115674
+instructions executed: 377852
+binary size: 965688
+  code: 622536
   data: 1891
-  metadata: 335773
+  metadata: 341261
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -243,7 +243,7 @@ functions:
     calls: 18
     bytes: 940
   __m13__step_result$__m12__AiplTok:
-    calls: 816
+    calls: 864
     bytes: 12788
   __m13__template_scan$__m12__AiplTok:
     calls: 0
@@ -364,7 +364,7 @@ functions:
     bytes: 13016
   __m6__format_program:
     calls: 4
-    bytes: 110312
+    bytes: 117136
   __m6__hug_close:
     calls: 0
     bytes: 732
@@ -382,7 +382,7 @@ functions:
     bytes: 4172
   __m6__import_item:
     calls: 0
-    bytes: 16468
+    bytes: 16972
   __m6__index_or_from:
     calls: 0
     bytes: 4396
@@ -478,7 +478,7 @@ functions:
     bytes: 6456
   __m6__set_stmt:
     calls: 0
-    bytes: 8176
+    bytes: 12888
   __m6__shim_bindings:
     calls: 0
     bytes: 3244
@@ -612,16 +612,16 @@ functions:
     calls: 58
     bytes: (external)
   aipl_arr_inc:
-    calls: 4465
+    calls: 4657
     bytes: (external)
   aipl_arr_reserve:
     calls: 64
     bytes: (external)
   aipl_array_dec:
-    calls: 6298
+    calls: 6586
     bytes: (external)
   aipl_array_new:
-    calls: 1774
+    calls: 1870
     bytes: (external)
   aipl_array_push:
     calls: 24

@@ -1,4 +1,13 @@
-import { equal as ==, get, len, print, to_str, value_or, wrapping_add as + } from builtins;
+import {
+    equal as ==,
+    get,
+    len,
+    print,
+    to_str,
+    value_or,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
 
 // A `let` or `mut` binding may carry an explicit type: `let x: T = value;`.
 // Without one a binding simply takes its initializer's type, which is the right
@@ -26,7 +35,7 @@ struct P { x: i64, y: i64 }
 // against it — so the arithmetic wraps at 8 bits, not 64.
 fn wrapped() -> u8 {
     mut c: u8 = 250;
-    set c = c + 10;
+    set c += 10;
     c
 }.test({
     assert(wrapped() == 4); // 260 wraps to 4 in 8 bits

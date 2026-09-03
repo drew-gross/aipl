@@ -5124,8 +5124,9 @@ impl Mono<'_> {
                     BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
                         Type::Primitive(Primitive::I64)
                     }
-                    // Comparison and logical operators. `++` never reaches here:
-                    // the loader lowers it to an add before mono runs.
+                    // Comparison and logical operators. Neither `++` nor a
+                    // compound assignment reaches here: the loader lowers each
+                    // to its base operation before mono runs.
                     BinOp::Lt
                     | BinOp::Gt
                     | BinOp::Le
@@ -5134,7 +5135,11 @@ impl Mono<'_> {
                     | BinOp::Ne
                     | BinOp::And
                     | BinOp::Or
-                    | BinOp::Incr => Type::Primitive(Primitive::Bool),
+                    | BinOp::Incr
+                    | BinOp::AddAssign
+                    | BinOp::SubAssign
+                    | BinOp::MulAssign
+                    | BinOp::DivAssign => Type::Primitive(Primitive::Bool),
                 };
                 (node(ExprKind::Binop(Box::new(rl), *op, Box::new(rr))), ty)
             }

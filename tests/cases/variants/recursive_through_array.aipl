@@ -1,4 +1,4 @@
-import { equal as ==, not_equal as !=, print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, not_equal as !=, print, to_str, wrapping_add_assign as += } from builtins;
 
 // A variant that reaches itself only *through an array*: `CTree` carries
 // `Cst[]`, and no case has a direct `Cst` payload. That is still a containment
@@ -11,7 +11,7 @@ variant Cst = CLeaf(i64) | CTree(str, Cst[])
 fn sum_kids(kids: Cst[]) -> i64 {
     mut total = 1;
     for (let k : kids) {
-        set total = total + k.size();
+        set total += k.size();
     }
     total
 }

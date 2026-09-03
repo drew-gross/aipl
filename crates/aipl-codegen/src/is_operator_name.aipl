@@ -9,6 +9,7 @@ pub fn is_operator_name(self: str) -> bool {
         "==" | "!=" | "<" | ">" | "<=" | ">=" => true,
         "&&" | "||" | "!" => true,
         "++" | "+++" => true,
+        "+=" | "-=" | "*=" | "/=" => true,
         _ => false,
     }
 }.doc("""
@@ -35,12 +36,18 @@ pub fn is_operator_name(self: str) -> bool {
     assert("!".is_operator_name());
     assert("++".is_operator_name());
     assert("+++".is_operator_name());
+    assert("+=".is_operator_name());
+    assert("-=".is_operator_name());
+    assert("*=".is_operator_name());
+    assert("/=".is_operator_name());
 
     // Non-operators: names, near-misses, and the empty string.
     assert(!"wrapping_add".is_operator_name());
     assert(!"map".is_operator_name());
     assert(!"".is_operator_name());
     assert(!"=".is_operator_name()); // a single `=` is not an operator
+    assert(!"%=".is_operator_name()); // no compound form for `%`
+    assert(!"+++=".is_operator_name()); // nor for `+++`
     assert(!"&".is_operator_name()); // single, not `&&`
     assert(!"++++".is_operator_name()); // four, not `+++`
     assert(!"and".is_operator_name());
@@ -50,17 +57,17 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2707
-binary size: 33072
-  code: 23660
-  data: 1129
-  metadata: 8283
+instructions executed: 4105
+binary size: 50440
+  code: 36912
+  data: 1425
+  metadata: 12103
 functions:
   __test$is_operator_name:
     calls: 1
-    bytes: 23540
+    bytes: 36792
   aipl_assert:
-    calls: 23
+    calls: 29
     bytes: (external)
   aipl_test_begin:
     calls: 1

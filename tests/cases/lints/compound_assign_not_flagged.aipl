@@ -1,0 +1,53 @@
+import {
+    print,
+    saturating_divide as /,
+    to_str,
+    wrapping_add as +,
+    wrapping_sub as -,
+} from builtins;
+
+struct Counter { n: i64 }
+
+// The shapes the compound lint must leave alone. Subtraction and division are
+// not commutative, so a receiver on the *right* is not an accumulate at all:
+// `set n = 20 - n;` is not `set n -= 20;`, and rewriting it that way would
+// silently change the program.
+fn main() !prints {
+    mut n = 10;
+    set n = 20 - n; // the receiver is the subtrahend, not the accumulator
+    set n = 100 / n; // likewise the divisor
+    mut m = 0;
+    set m = n + 1; // an accumulate onto a *different* binding
+    mut c = Counter { n: 0 };
+    set c.n = c.n + 1; // a field store, which has no compound spelling
+    print(n.to_str());
+    print(m.to_str());
+    print(c.n.to_str());
+}
+--- stdout ---
+10
+11
+1
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 53
+instructions executed: 144
+binary size: 1544
+  code: 608
+  data: 1
+  metadata: 935
+functions:
+  __to_str_i64:
+    calls: 3
+    bytes: 204
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 404

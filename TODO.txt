@@ -214,7 +214,6 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 parser:
-  CharRun should use defaults
   chage Far to use a set of expected
   Mk should accept fns that only need kids
   implement "nested in" which should be good for the formatter
@@ -224,6 +223,7 @@ parser:
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
 utilities:
+  span.start - span.end should have a builtin
   add is_whitespace
   exponentiation operator
   take_while that is the counterpart of trim_while

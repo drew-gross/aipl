@@ -108,8 +108,10 @@ fn categorize(case: &str) -> &'static str {
         | "RawTemplateTail" => "str",
         "True" | "False" | "None" => "constant",
         "EqEq" | "Ne" | "Arrow" | "FatArrow" | "AndAnd" | "OrOr" | "Pipe" | "DotDot"
-        | "PlusPlusPlus" | "PlusPlus" | "Eq" | "Lt" | "Le" | "Gt" | "Ge" | "Bang" | "Plus"
-        | "Minus" | "Star" | "Slash" | "Percent" => "operator",
+        | "PlusPlusPlus" | "PlusPlus" | "PlusEq" | "MinusEq" | "StarEq" | "SlashEq" | "Eq"
+        | "Lt" | "Le" | "Gt" | "Ge" | "Bang" | "Plus" | "Minus" | "Star" | "Slash" | "Percent" => {
+            "operator"
+        }
         "Period" | "Comma" | "Colon" | "Semi" | "Question" | "Hash" | "LParen" | "RParen"
         | "LBrace" | "RBrace" | "LBracket" | "RBracket" => "punct",
         "Space" | "LineComment" | "BlockComment" | "AllowMarker" => "trivia",

@@ -1,4 +1,4 @@
-import { extend, join, print, to_str, wrapping_add as + } from builtins;
+import { extend, join, print, to_str, wrapping_add as +, wrapping_add_assign as += } from builtins;
 
 // `extend` is `push` for a whole array: `set dst.extend(src)` appends every
 // element of `src` to `dst` in place, leaving `src` untouched.
@@ -17,7 +17,7 @@ fn total(self: Tree) -> i64 {
 fn sum(ts: Tree[]) -> i64 {
     mut acc = 0;
     for (let t : ts) {
-        set acc = acc + t.total();
+        set acc += t.total();
     }
     acc
 }

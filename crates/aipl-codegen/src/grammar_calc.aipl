@@ -44,6 +44,7 @@ import {
     wrapping_add as +,
     wrapping_increment as ++,
     wrapping_mul as *,
+    wrapping_mul_assign as *=,
     wrapping_sub as -,
 } from builtins;
 import { Cst, own_token_text, show, span, text } from "./cst.aipl";
@@ -352,7 +353,7 @@ fn pow(base: i64, exp: i64) -> i64 {
     mut acc: i64 = 1;
     mut i: i64 = 0;
     while (i < exp) {
-        set acc = acc * base;
+        set acc *= base;
         set i++;
     }
     acc

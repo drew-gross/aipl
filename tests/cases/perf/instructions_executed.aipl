@@ -1,4 +1,4 @@
-import { print, to_str, wrapping_add as +, wrapping_increment as ++ } from builtins;
+import { print, to_str, wrapping_add_assign as +=, wrapping_increment as ++ } from builtins;
 
 // Exercises the "instructions executed" performance counter. The metric is the
 // sum, over every basic-block entry at runtime, of that block's (compile-time
@@ -11,7 +11,7 @@ fn triangle() -> i64 {
     mut i = 1;
     // Ten iterations (one per byte of the string).
     for (let _c : "0123456789") {
-        set sum = sum + i;
+        set sum += i;
         set i++;
     }
     sum

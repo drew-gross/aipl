@@ -34,6 +34,7 @@ import {
     split,
     value_or,
     wrapping_add as +,
+    wrapping_add_assign as +=,
     wrapping_increment as ++,
 } from builtins;
 import { reindent_block } from "./reindent_block.aipl";
@@ -177,7 +178,7 @@ fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -> str[] {
                     set work = rest;
                 } else {
                     set acc.push(s);
-                    set col = col + s.len();
+                    set col += s.len();
                     set work = rest;
                 },
                 BreakParent => {

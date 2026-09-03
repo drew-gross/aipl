@@ -6,7 +6,7 @@ import {
     len,
     logical_not as !,
     wrapping_add as +,
-    wrapping_sub as -,
+    wrapping_sub_assign as -=,
 } from builtins;
 
 // The AIPL implementation of the `right_fold` builtin — `left_fold`'s mirror
@@ -22,7 +22,7 @@ pub fn right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A) -> A {
     mut acc = init;
     mut i = self.len();
     while (i > 0) {
-        set i = i - 1;
+        set i -= 1;
         set acc = match (self[i]) {
             some(x) => f(x, acc),
             none => acc,

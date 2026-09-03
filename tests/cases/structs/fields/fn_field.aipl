@@ -1,4 +1,9 @@
-import { equal as ==, wrapping_add as +, wrapping_sub as - } from builtins;
+import {
+    equal as ==,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+    wrapping_sub as -,
+} from builtins;
 
 fn inc(x: i64) -> i64 { x + 1 }
 
@@ -16,7 +21,7 @@ fn apply_first() -> i64 { Op { f: inc }.f(41) }.test({
 fn dispatch() -> i64 {
     mut total = 0;
     for (let o : [Op { f: inc }, Op { f: dec }]) {
-        set total = total + o.f(100);
+        set total += o.f(100);
     }
     total
 }.test({

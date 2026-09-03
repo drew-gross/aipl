@@ -1,4 +1,10 @@
-import { concat as +++, print, to_str, wrapping_add as +, wrapping_increment as ++ } from builtins;
+import {
+    concat as +++,
+    print,
+    to_str,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+} from builtins;
 
 // `mut T { a, b } = value;` destructures like the `let` form
 // (`destructure.aipl`) but binds each field mutably, so the copies can be
@@ -16,7 +22,7 @@ fn boxed() -> Box<i64> { v: 7, tag: 3 }
 
 fn main() !prints {
     mut Point { x, y } = origin();
-    set x = x + 10;
+    set x += 10;
     print(`{x} {y}`);
 
     // The source is untouched: `p.x` still reads what it always did.
@@ -34,7 +40,7 @@ fn main() !prints {
 
     // Generic structs destructure mutably too.
     mut Box { v, tag } = boxed();
-    set v = v + tag;
+    set v += tag;
     print(to_str(v));
 }
 --- stdout ---
