@@ -1,0 +1,73 @@
+import { join, map, print, push, to_str } from builtins;
+
+// `#[allow]` keeps the `mut`, as every lint's escape hatch does. The marker
+// goes on the seed, which is where this lint points: `#[allow]` is line-scoped,
+// so the hit has to name a line that survives `aipl fmt`, and `mut out = xs;`
+// is a short statement that always occupies one.
+fn appended(xs: i64[], x: i64) -> i64[] {
+    mut out = xs; #[allow]
+    set out.push(x);
+    out
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by side
+// and proven to agree.
+fn appended_short(xs: i64[], x: i64) -> i64[] { [..xs, x] }
+
+fn show(xs: i64[]) -> str { xs.map(to_str).join(sep=",") }
+
+fn main() !prints {
+    print(show(appended([1, 2], 3)));
+    print(show(appended_short([1, 2], 3)));
+    print(show(appended([], 3)));
+    print(show(appended_short([], 3)));
+}
+--- stdout ---
+1,2,3
+1,2,3
+3
+3
+--- performance ---
+allocations: 24
+deallocations: 24
+reallocations: 6
+bytes allocated: 836
+instructions executed: 811
+binary size: 4920
+  code: 2448
+  data: 1
+  metadata: 2471
+functions:
+  __to_str_i64:
+    calls: 8
+    bytes: 204
+  aipl_arr_inc:
+    calls: 12
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 24
+    bytes: (external)
+  aipl_array_new:
+    calls: 4
+    bytes: (external)
+  aipl_array_push:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 10
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 4
+    bytes: (external)
+  aipl_i64_len:
+    calls: 16
+    bytes: (external)
+  aipl_write_i64:
+    calls: 8
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2244

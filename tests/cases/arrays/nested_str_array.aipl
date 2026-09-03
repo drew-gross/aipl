@@ -5,7 +5,7 @@ import { equal as ==, len, push, value_or, wrapping_increment as ++ } from built
 // drop releases each inner array, which in turn releases its strings.
 fn grid3() -> str[][] {
     let grid = [["a", "b"], ["c"]];
-    mut g2 = grid;
+    mut g2 = grid; #[allow]
     set g2.push(["d", "e", "f"]);
     g2
 }.test({

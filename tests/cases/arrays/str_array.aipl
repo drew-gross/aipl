@@ -5,7 +5,7 @@ import { equal as ==, len, push, wrapping_increment as ++ } from builtins;
 // the element strings so nothing leaks or double-frees. `ys` snapshots `xs`
 // before pushing, so `xs` stays length 2 (value semantics).
 fn appended(xs: str[], s: str) -> str[] {
-    mut ys = xs;
+    mut ys = xs; #[allow]
     set ys.push(s);
     ys
 }.test({

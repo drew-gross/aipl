@@ -6,7 +6,7 @@ import { equal as ==, filter, greater_than as >, len, logical_not as !, map, pus
 // Start with 7 elements (one byte), then push past the 8-element boundary so
 // the packed buffer grows into a second byte.
 fn grown() -> bool[] {
-    mut ys = [true, false, true, true, false, true, false];
+    mut ys = [true, false, true, true, false, true, false]; #[allow]
     set ys.push(true); // 8th element fills byte 0
     set ys.push(false); // 9th element starts byte 1
     ys

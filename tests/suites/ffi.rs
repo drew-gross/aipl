@@ -674,7 +674,7 @@ pub fn describe_all(ts: Token[]) -> str {
     out
 }
 pub fn appended(xs: i64[], v: i64) -> i64[] {
-    mut ys = xs;
+    mut ys = xs; #[allow]
     set ys.push(v);
     ys
 }";

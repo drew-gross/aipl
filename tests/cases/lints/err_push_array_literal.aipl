@@ -1,0 +1,71 @@
+import { len, print, push, to_str, wrapping_mul as * } from builtins;
+
+// `mut out = xs; set out.push(x); out` — an array bound `mut` only to append
+// to it and hand it straight back. The literal `[..xs, x]` says what the array
+// *is* in one expression, instead of a binding the reader has to follow
+// through two more statements to learn that appending is all that happens.
+
+// One push onto a named seed — the plain case.
+fn appended(xs: i64[], x: i64) -> i64[] {
+    mut out = xs;
+    set out.push(x);
+    out
+}
+
+// A run of pushes collapses the same way, and an empty seed needs no spread
+// at all. The annotation goes away with the binding.
+fn pair(a: i64, b: i64) -> i64[] {
+    mut out: i64[] = [];
+    set out.push(a);
+    set out.push(b);
+    out
+}
+
+fn evens(n: i64) -> i64[] { [n, n * 2] }
+
+// A call-shaped seed can't be quoted back into the advice — its span stops
+// before its parens — so the literal is shown with a placeholder in its place.
+fn from_call(n: i64, x: i64) -> i64[] {
+    mut out = evens(n);
+    set out.push(x);
+    out
+}
+
+// The same goes for a computed element. The longhand `set out = out.push(..)`
+// is the same statement written out, so it is flagged the same way.
+fn scaled(xs: i64[], n: i64) -> i64[] {
+    mut out = xs;
+    set out = out.push(n * 2);
+    out
+}
+
+fn main() !prints {
+    print(appended([1], 2).len().to_str());
+    print(pair(1, 2).len().to_str());
+    print(from_call(3, 4).len().to_str());
+    print(scaled([1], 2).len().to_str());
+}
+--- errors ---
+error: "out" is seeded and then only appended to before being returned — write "[..xs, x]" and drop the mut (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_array_literal.aipl:10:15
+   |
+10 |     mut out = xs;
+   |               ^^
+
+error: "out" is seeded and then only appended to before being returned — write "[a, b]" and drop the mut (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_array_literal.aipl:18:22
+   |
+18 |     mut out: i64[] = [];
+   |                      ^
+
+error: "out" is seeded and then only appended to before being returned — write "[..<array>, x]" and drop the mut (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_array_literal.aipl:29:15
+   |
+29 |     mut out = evens(n);
+   |               ^^^^^^^
+
+error: "out" is seeded and then only appended to before being returned — write "[..xs, <element>]" and drop the mut (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_push_array_literal.aipl:37:15
+   |
+37 |     mut out = xs;
+   |               ^^

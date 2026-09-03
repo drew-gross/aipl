@@ -51,7 +51,6 @@ import {
     logical_or as ||,
     map,
     map_err,
-    push,
     try_map,
     value_or,
     value_or_err,
@@ -167,11 +166,12 @@ fn leaf_at<K: variant, A: any>(p: Parser<K, A>, i: u64) -> Cst[] {
     match (p.toks[i]) {
         some(t) => {
             let start = prev_end(p, i);
-            mut out = p.trivia
-                .filter(|tr| start <= tr.span.start && tr.span.start < t.span.start)
-                .map(|tr| CTrivia(tr.span));
-            set out.push(CLeaf(t.span));
-            out
+            [
+                ..p.trivia
+                    .filter(|tr| start <= tr.span.start && tr.span.start < t.span.start)
+                    .map(|tr| CTrivia(tr.span)),
+                CLeaf(t.span),
+            ]
         },
         none => [],
     }
@@ -888,11 +888,11 @@ allocations: 2900
 deallocations: 2900
 reallocations: 331
 bytes allocated: 177457
-instructions executed: 419538
-binary size: 301608
-  code: 185100
+instructions executed: 420498
+binary size: 301840
+  code: 185224
   data: 5924
-  metadata: 110584
+  metadata: 110692
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1093,13 +1093,13 @@ functions:
     calls: 416
     bytes: (external)
   aipl_arr_inc:
-    calls: 8509
+    calls: 8701
     bytes: (external)
   aipl_arr_join:
     calls: 11
     bytes: (external)
   aipl_arr_reserve:
-    calls: 443
+    calls: 539
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 25
@@ -1108,16 +1108,16 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 10617
+    calls: 10809
     bytes: (external)
   aipl_array_new:
     calls: 1347
     bytes: (external)
   aipl_array_push:
-    calls: 247
+    calls: 151
     bytes: (external)
   aipl_array_push_mut:
-    calls: 331
+    calls: 427
     bytes: (external)
   aipl_array_with_cap:
     calls: 331
@@ -1166,7 +1166,7 @@ functions:
     bytes: 228
   leaf_at$Tok$Node:
     calls: 96
-    bytes: 1408
+    bytes: 1532
   lex_toks:
     calls: 42
     bytes: 696

@@ -1,13 +1,9 @@
-import { equal as ==, len, push, value_or } from builtins;
+import { equal as ==, len, value_or } from builtins;
 
 // Explicitly-written nested type annotations: `str[][]` as a parameter and
 // return type, `str[]` as the element. The recursive type grammar parses
 // `T[]`, `T[][]`, `T[]?`, etc.
-fn add_row(grid: str[][], row: str[]) -> str[][] {
-    mut g = grid;
-    set g.push(row);
-    g
-}.test({
+fn add_row(grid: str[][], row: str[]) -> str[][] { [..grid, row] }.test({
     let g = add_row([["a"]], ["b", "c"]);
     assert(g == [["a"], ["b", "c"]]);
     assert(len(g) == 2);
@@ -24,11 +20,11 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 632
-instructions executed: 862
-binary size: 6088
-  code: 3412
+instructions executed: 882
+binary size: 6576
+  code: 3636
   data: 137
-  metadata: 2539
+  metadata: 2803
 functions:
   __eq_str$arr:
     calls: 2
@@ -41,26 +37,29 @@ functions:
     bytes: 100
   __test$add_row:
     calls: 1
-    bytes: 1100
+    bytes: 1208
   __test$first:
     calls: 1
-    bytes: 1376
+    bytes: 1492
   aipl_arr_drop_arr:
     calls: 5
     bytes: (external)
   aipl_arr_inc:
-    calls: 11
+    calls: 15
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 2
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 22
+    calls: 26
     bytes: (external)
   aipl_array_new:
     calls: 9
     bytes: (external)
-  aipl_array_push:
+  aipl_array_push_mut:
     calls: 2
     bytes: (external)
   aipl_assert:

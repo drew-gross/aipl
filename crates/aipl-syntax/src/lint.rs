@@ -21,6 +21,7 @@ mod match_is_some_and;
 mod match_map_err;
 mod match_map_ok;
 mod match_value_or;
+mod push_array_literal;
 mod push_loop_pipeline;
 mod return_loop_find_if;
 mod slice_from_zero;
@@ -43,6 +44,7 @@ use self::match_is_some_and::match_is_some_and;
 use self::match_map_err::match_map_err;
 use self::match_map_ok::match_map_ok;
 use self::match_value_or::match_value_or;
+use self::push_array_literal::push_array_literal;
 use self::push_loop_pipeline::{pipeline_names, push_loop_pipeline};
 use self::return_loop_find_if::{find_if_name, return_loop_find_if};
 use self::slice_from_zero::slice_from_zero;
@@ -77,6 +79,13 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     each_expr(program, &mut |e| {
         push_loop_pipeline(e, src, &pipeline, &mut hits)
     });
+    // Same precondition, and the two shapes are disjoint: a seed followed by
+    // a loop is the pipeline's, a seed followed by pushes is the literal's.
+    if let Some(push) = imported_as(program, "push") {
+        each_expr(program, &mut |e| {
+            push_array_literal(e, src, &push, &mut hits)
+        });
+    }
     // The shape is all language syntax, so this one fires whether or not the
     // file imported `find_if` — the name is only for the advice, which says to
     // import it when it is missing.
@@ -166,6 +175,33 @@ fn lambda_safe(e: &Expr) -> bool {
         }
     });
     ok
+}
+
+/// `set acc.push(elem);` (or its longhand `set acc = acc.push(elem);`) — the
+/// pushed element and the statements that follow, when `stmt` is a push onto
+/// `acc` and nothing else. `push` is the calling file's local name for the
+/// builtin, so an aliased import is followed and a *user* function that
+/// happens to be called `push` is not.
+///
+/// Shared by the two push lints, which have to agree on what a push is: they
+/// differ only in what surrounds one.
+fn pushed_element<'a>(stmt: &'a Expr, acc: &str, push: &str) -> Option<(&'a Expr, &'a Expr)> {
+    let ExprKind::Assign(lhs, value, rest) = &stmt.kind else {
+        return None;
+    };
+    if !matches!(&lhs.kind, ExprKind::Ident(n) if n == acc) {
+        return None;
+    }
+    let ExprKind::Call(name, args, _) = &value.kind else {
+        return None;
+    };
+    if name != push || args.len() != 2 {
+        return None;
+    }
+    if !matches!(&args[0].kind, ExprKind::Ident(n) if n == acc) {
+        return None;
+    }
+    Some((&args[1], rest))
 }
 
 /// 0-based line number of byte offset `pos` in `src`.

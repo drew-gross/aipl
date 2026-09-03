@@ -4,7 +4,7 @@ import { equal as ==, len, push } from builtins;
 // place; a snapshot taken first (`let snap = bs`) keeps its own value, so a
 // later push to `bs` doesn't disturb it (value semantics).
 fn appended(xs: bool[], x: bool) -> bool[] {
-    mut ys = xs;
+    mut ys = xs; #[allow]
     set ys.push(x);
     ys
 }.test({

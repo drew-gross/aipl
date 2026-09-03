@@ -35,7 +35,7 @@ fn first(xs: u64[]) -> u64? { xs[0] }.test({
 })
 
 fn grown() -> u64[] {
-    mut xs: u64[] = [1];
+    mut xs: u64[] = [1]; #[allow]
     set xs.push(2);
     xs
 }.test({

@@ -1,4 +1,4 @@
-import { equal as ==, len, logical_not as !, print, push } from builtins;
+import { equal as ==, len, logical_not as !, print } from builtins;
 
 // Regression test for corruption of a `mut` *struct* binding reassigned from a
 // call on itself inside a loop. The `mut str` sibling of this bug is
@@ -40,11 +40,7 @@ import { equal as ==, len, logical_not as !, print, push } from builtins;
 
 struct St { acc: str[], done: bool }
 
-fn pushed(self: str[], x: str) -> str[] {
-    mut a = self;
-    set a.push(x);
-    a
-}
+fn pushed(self: str[], x: str) -> str[] { [..self, x] }
 
 fn step(s: St) -> St { acc: s.acc.pushed("k"), done: true }
 
@@ -67,24 +63,27 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 88
-instructions executed: 118
-binary size: 1792
-  code: 668
+instructions executed: 128
+binary size: 2056
+  code: 788
   data: 1
-  metadata: 1123
+  metadata: 1267
 functions:
   aipl_arr_inc:
-    calls: 7
+    calls: 9
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 9
+    calls: 11
     bytes: (external)
   aipl_array_new:
     calls: 1
     bytes: (external)
-  aipl_array_push:
+  aipl_array_push_mut:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 668
+    bytes: 788

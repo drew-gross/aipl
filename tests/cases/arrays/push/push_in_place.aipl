@@ -3,7 +3,7 @@ import { equal as ==, push } from builtins;
 // `xs.push(x)` appends to `xs` in place: the same variable holds the longer
 // array afterward (no reassignment needed).
 fn grown() -> i64[] {
-    mut xs = [5];
+    mut xs = [5]; #[allow]
     set xs.push(6);
     set xs.push(7);
     xs

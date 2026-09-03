@@ -1,4 +1,4 @@
-import { print, push, to_str } from builtins;
+import { print, to_str } from builtins;
 
 // A keyword parameter may be typed by its function's own *type variable*.
 //
@@ -14,11 +14,7 @@ import { print, push, to_str } from builtins;
 // pinned to an integer wherever the argument is left out — but a `str`
 // instantiation is still free to supply its own. Omitting it there is an error
 // (`err_generic_default_conflicts`).
-fn padded<T: any>(xs: T[], pad: T = 0) -> T[] {
-    mut out = xs;
-    set out.push(pad);
-    out
-}
+fn padded<T: any>(xs: T[], pad: T = 0) -> T[] { [..xs, pad] }
 
 fn main() !prints {
     print(to_str(padded([1, 2])));
@@ -34,11 +30,11 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 420
-instructions executed: 1195
-binary size: 4792
-  code: 2364
+instructions executed: 1225
+binary size: 5416
+  code: 2680
   data: 139
-  metadata: 2289
+  metadata: 2597
 functions:
   __to_str_i64$arr:
     calls: 2
@@ -47,15 +43,18 @@ functions:
     calls: 1
     bytes: 812
   aipl_arr_inc:
-    calls: 6
+    calls: 12
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 12
+    calls: 18
     bytes: (external)
   aipl_array_new:
     calls: 3
     bytes: (external)
-  aipl_array_push:
+  aipl_array_push_mut:
     calls: 3
     bytes: (external)
   aipl_i64_len:
@@ -69,4 +68,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 844
+    bytes: 1160

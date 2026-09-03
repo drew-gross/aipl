@@ -15,7 +15,7 @@ import { equal as ==, len, push } from builtins;
 // iteration), so that specific transition is rejected at compile time
 // instead of risking silent corruption (see `err_push_from_empty.aipl`).
 fn appended(xs: char[], x: char) -> char[] {
-    mut ys = xs;
+    mut ys = xs; #[allow]
     set ys.push(x);
     ys
 }.test({

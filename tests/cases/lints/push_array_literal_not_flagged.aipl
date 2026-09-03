@@ -1,0 +1,103 @@
+import { join, len, map, print, push, to_str } from builtins;
+
+// The shape has to be exactly "seed, pushes, the binding" — these are the
+// near-misses, and none of them is an array literal in disguise.
+
+// A pushed element that mentions the binding: `out.len()` is a running index,
+// and the literal has no `out` for it to refer to.
+fn indexed(xs: u64[]) -> u64[] {
+    mut out = xs;
+    set out.push(out.len());
+    out
+}
+
+// A statement between the pushes and the result reads `out` half-built, so the
+// pushes are not the last thing that happens to it.
+fn logged(xs: i64[], x: i64) !prints -> i64[] {
+    mut out = xs;
+    set out.push(x);
+    print(out.len().to_str());
+    out
+}
+
+// The binding outlives the pushes — something else appends to it later, so
+// there is no single literal that spells it.
+fn twice(xs: u64[], x: u64) -> u64[] {
+    mut out = xs;
+    set out.push(x);
+    let n = out.len();
+    set out.push(n);
+    out
+}
+
+// A push is not the last statement: the block returns something else.
+fn counted(xs: i64[], x: i64) -> u64 {
+    mut out = xs;
+    set out.push(x);
+    out.len()
+}
+
+fn show(xs: i64[]) -> str { xs.map(to_str).join(sep=",") }
+
+fn main() !prints {
+    print(indexed([1, 2]).len().to_str());
+    print(show(logged([1, 2], 3)));
+    print(twice([1, 2], 3).len().to_str());
+    print(counted([1, 2], 3).to_str());
+}
+--- stdout ---
+3
+3
+1,2,3
+4
+3
+--- performance ---
+allocations: 18
+deallocations: 18
+reallocations: 2
+bytes allocated: 694
+instructions executed: 518
+binary size: 3992
+  code: 1828
+  data: 1
+  metadata: 2163
+functions:
+  __to_str_i64:
+    calls: 3
+    bytes: 204
+  __to_str_u64:
+    calls: 4
+    bytes: 204
+  aipl_arr_inc:
+    calls: 9
+    bytes: (external)
+  aipl_array_dec:
+    calls: 19
+    bytes: (external)
+  aipl_array_new:
+    calls: 4
+    bytes: (external)
+  aipl_array_push:
+    calls: 5
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 3
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_u64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  aipl_write_u64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1420

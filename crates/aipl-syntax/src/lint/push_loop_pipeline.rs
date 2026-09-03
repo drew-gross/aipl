@@ -1,7 +1,7 @@
 use crate::ast::{Expr, ExprKind, Program};
 use crate::Error;
 
-use super::{imported_as, lone_stmt, spans_its_text};
+use super::{imported_as, lone_stmt, pushed_element, spans_its_text};
 
 /// The local names this file's imports give the three builtins the
 /// [`push_loop_pipeline`] rewrite is written in terms of. `None` means the
@@ -41,29 +41,6 @@ fn liftable(e: &Expr, acc: &str) -> bool {
         }
     });
     ok
-}
-
-/// `set acc.push(elem);` (or its longhand `set acc = acc.push(elem);`) —
-/// the pushed element, when `stmt` is a push onto `acc` and nothing else.
-/// `push` is this file's local name for the builtin, so an aliased import is
-/// followed and a *user* function that happens to be called `push` is not.
-fn pushed_element<'a>(stmt: &'a Expr, acc: &str, push: &str) -> Option<&'a Expr> {
-    let ExprKind::Assign(lhs, value, _) = &stmt.kind else {
-        return None;
-    };
-    if !matches!(&lhs.kind, ExprKind::Ident(n) if n == acc) {
-        return None;
-    }
-    let ExprKind::Call(name, args, _) = &value.kind else {
-        return None;
-    };
-    if name != push || args.len() != 2 {
-        return None;
-    }
-    if !matches!(&args[0].kind, ExprKind::Ident(n) if n == acc) {
-        return None;
-    }
-    Some(&args[1])
 }
 
 /// ```text
@@ -141,7 +118,7 @@ pub(super) fn push_loop_pipeline(
         }
         _ => (None, stmt),
     };
-    let Some(elem) = pushed_element(stmt, acc, push) else {
+    let Some((elem, _)) = pushed_element(stmt, acc, push) else {
         return;
     };
     if guard.is_some_and(|c| !liftable(c, acc)) || !liftable(elem, acc) {

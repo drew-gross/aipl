@@ -6,7 +6,7 @@ import { equal as ==, push } from builtins;
 // reuses its buffer (the push becomes a realloc), while a call on a named
 // (shared) array borrows and copies, leaving the original intact.
 fn extended(xs: i64[]) -> i64[] {
-    mut ys = xs;
+    mut ys = xs; #[allow]
     set ys.push(99);
     ys
 }.test({

@@ -6,7 +6,7 @@ import { equal as ==, push } from builtins;
 // eight allocations. Capacity grows 0→1→2→4→8, so the reallocations happen at
 // pushes 1,2,3,5 (4 of them); pushes 4,6,7,8 land in spare capacity for free.
 fn grown() -> i64[] {
-    mut a = [];
+    mut a = []; #[allow]
     set a.push(1);
     set a.push(2);
     set a.push(3);

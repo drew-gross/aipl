@@ -158,6 +158,7 @@ math:
   % should not abort. (what should it do? TBD)
 
 syntax:
+  add match (v) val if expr => r syntax
   destructuring with renames (let Foo { field as f, .. } = ...)
   allow passing int literals to u64 arguments
   implement if let, lint for it's use in case of none => {}
@@ -186,6 +187,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  when all type args are just passed to a single arg type, and those types don't matter to the function internals, omitting them should be allowed e.g. fn prev_end<K: variant, A: any>(p: Parser<K, A>, i: u64)  becomes fn prev_end(p: Parser, i: u64)
   add `container` bound, or maybe monad
   After parsing we types should be "bounds" e.g. Is(ConcreteType), Bound(any), [Bound(a), Bound(b)]. Literals can have a type of OneOf(Case, CaseConstructor) or FlexInt, etc. Then they are unified by type checking.
   an array should be typed by ALL it's components, not just the first
@@ -208,6 +210,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 parser:
+  chage Far to use a set of expected
   what's with Term(Str(""))? Why the ""?
   Mk should accept fns that only need kids
   implement "nested in" which should be good for the formatter
@@ -286,8 +289,10 @@ design:
     representation is not introspectable
     it's safe to call an untrusted function that doesn't declare any effects
     the most readable implementation is also the fastest
+    the langauge should be incapable of aborting
 
 optimizations:
+  why is [..arr, val] slower than let v = arr; v.push(val)?
   using templates for string builder loops should be just as fast as concat (somehow? Maybe they desugar to concat? maybe only when it's "s = `{s}...`?)
   for (let c : s) still takes a runtime call per byte
   to_str allocates a buffer for short results instead of packing them inline.
