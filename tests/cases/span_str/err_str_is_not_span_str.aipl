@@ -1,0 +1,14 @@
+// Assignability is one-way. A `str` is not a `SpanStr`: only the `span_str`
+// builtin, which anchors its source so `data - base` is an offset into it,
+// makes one — which is what keeps `.span()` total.
+import { SpanStr } from builtins;
+
+fn widen(s: str) -> SpanStr { s }
+
+fn main() {}
+--- errors ---
+error: fn "widen": body returns str, but the declared return type is SpanStr
+ --> ./tests/cases/span_str/err_str_is_not_span_str.aipl:6:31
+  |
+6 | fn widen(s: str) -> SpanStr { s }
+  |                               ^

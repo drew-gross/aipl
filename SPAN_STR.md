@@ -22,7 +22,7 @@ What `STR_REPR.md` settled, and what each settlement deleted here:
 What is left is genuinely small: a named type, one anchoring helper, two
 builtins, and the cases that pin the semantics.
 
-- [ ] 1 The type — `SpanStr` in the type system, str-shaped, importable
+- [x] 1 The type — `SpanStr` in the type system, str-shaped, importable
 - [ ] 2 `anchor` in `str24.rs` — the one runtime primitive still missing
 - [ ] 3 `span_str` (create) and `span` (recover) builtins
 - [ ] 4 Cases: creation, printing, `.span()` round-trip, anchoring, lifetime, edges
@@ -31,6 +31,28 @@ builtins, and the cases that pin the semantics.
 Stages 1–3 remain one indivisible change (the type is unusable without the
 builtins); 4 and 5 are what prove it. Stage 2 is now perhaps thirty lines in a
 file both runtimes share, where it used to be the bulk of the work.
+
+**Stage 1 landed, and what it left behind.** `SpanStr` is `SPAN_STR` /
+`is_span_str` / `is_str_named` in `aipl-syntax` — a named type joining
+`is_str_repr` beside `Error`, so it inherits `str`'s refcounting, sizing,
+equality, hashing and printing without a layout of its own — plus its entry in
+`IMPORTABLE_BUILTIN_TYPES` and the one-way `SpanStr → str` arm in
+`check::coerce`. Two things follow from stage 3 not existing yet:
+
+- **Nothing can construct a value**, so no `SpanStr` is reachable from `main`
+  and monomorphization (demand-driven from the seeds) never hands one to
+  codegen. The four cases in `tests/cases/span_str/` are therefore
+  checker-level: they pin the import gate, the one-way rule, and the two
+  positions the type is *not* valid in. The runtime behavior is stage 4's to
+  prove.
+- **`SpanStr` sits exactly where `Error` sits** — valid as a parameter, return
+  or local, and not as a struct field, array/optional element, or dict value,
+  because neither is in `is_set_elem` or `build_struct_layout`'s allowed set.
+  Widening that is what the `Token`-carries-a-`SpanStr` open question below
+  actually costs; it is not free, and it is not stage 1. Three diagnostics were
+  taught to name a builtin as the user wrote it rather than as
+  `__builtin_SpanStr`, and the element-type refusal now says the type is
+  str-shaped rather than "unknown".
 
 **Decisions, settled up front:**
 

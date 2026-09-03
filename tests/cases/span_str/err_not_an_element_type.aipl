@@ -1,0 +1,10 @@
+// A named str-repr type is not (yet) an array or optional element, exactly as
+// `Error` has never been. The diagnostic names it as written, not by its
+// canonical `__builtin_SpanStr`.
+import { SpanStr, len } from builtins;
+
+fn total(xs: SpanStr[]) -> u64 { len(xs) }
+
+fn main() {}
+--- errors ---
+error: fn "total": SpanStr is a builtin str-shaped type; it cannot be an array, optional, or dict element

@@ -2033,6 +2033,41 @@ pub fn is_error(t: &Type) -> bool {
     matches!(t, Type::Named(s) if s == ERROR)
 }
 
+/// The builtin `SpanStr` type: `str` that remembers where in its source it came
+/// from. Like [`ERROR`] it is a *named* type with `str`'s runtime
+/// representation (see [`is_str_repr`]), so it inherits every piece of `str`
+/// codegen — refcounting, equality, hashing, printing, concat — and needs no
+/// layout of its own. Unlike `Error`, which is ambient, it is importable
+/// ([`IMPORTABLE_BUILTIN_TYPES`]), so the name a user writes is `SpanStr` and
+/// the name every pass after the loader sees is this canonical one.
+///
+/// The pair it stands for — the text and the span it occupies — is already what
+/// a buffer-backed `str` *is* (`{base, data, len}`, `crates/aipl-codegen/src/str24.rs`);
+/// what this type adds is the promise that `data - base` is meaningful, which is
+/// why only the `span_str` builtin can produce one. See `SPAN_STR.md`.
+pub const SPAN_STR_NAME: &str = "SpanStr";
+
+/// Canonical internal name for [`SPAN_STR_NAME`] — what
+/// [`builtin_type_canonical`] rewrites an imported `SpanStr` to, and the only
+/// spelling the checker, monomorphization and codegen ever see.
+pub const SPAN_STR: &str = "__builtin_SpanStr";
+
+pub fn span_str_ty() -> Type {
+    Type::Named(SPAN_STR.into())
+}
+
+pub fn is_span_str(t: &Type) -> bool {
+    matches!(t, Type::Named(s) if s == SPAN_STR)
+}
+
+/// Whether `t` is a *named* type carrying `str`'s runtime representation —
+/// `Error` or `SpanStr`. The predicate to reach for at a site that asks "is this
+/// a str under the hood?"; [`is_error`] alone is for sites that mean the error
+/// type specifically (a `Result`'s Err payload).
+pub fn is_str_named(t: &Type) -> bool {
+    is_error(t) || is_span_str(t)
+}
+
 /// Every builtin's signature, written as AIPL source. These are *declarations*
 /// only — the checker (`aipl-codegen`) resolves a call to `map`/`value_or`/
 /// `print`/… against them exactly as it would a user function, with no notion
@@ -2290,7 +2325,7 @@ pub fn is_concat_str(t: &Type) -> bool {
 /// no such case to write.
 pub mod concrete {
     use super::ast::{ConcreteType, Primitive};
-    use super::ERROR;
+    use super::{ERROR, SPAN_STR};
 
     pub fn is_unit(t: &ConcreteType) -> bool {
         matches!(t, ConcreteType::Unit)
@@ -2302,6 +2337,18 @@ pub mod concrete {
 
     pub fn error_ty() -> ConcreteType {
         ConcreteType::Named(ERROR.into())
+    }
+
+    pub fn is_span_str(t: &ConcreteType) -> bool {
+        matches!(t, ConcreteType::Named(s) if s == SPAN_STR)
+    }
+
+    pub fn span_str_ty() -> ConcreteType {
+        ConcreteType::Named(SPAN_STR.into())
+    }
+
+    pub fn is_str_named(t: &ConcreteType) -> bool {
+        is_error(t) || is_span_str(t)
     }
 
     pub fn is_concat_str(t: &ConcreteType) -> bool {
@@ -2317,7 +2364,7 @@ pub mod concrete {
     }
 
     pub fn is_str_repr(t: &ConcreteType) -> bool {
-        matches!(t, ConcreteType::Primitive(Primitive::Str)) || is_error(t) || is_concat_str(t)
+        matches!(t, ConcreteType::Primitive(Primitive::Str)) || is_str_named(t) || is_concat_str(t)
     }
 
     pub fn is_set_elem(t: &ConcreteType) -> bool {
@@ -2382,7 +2429,7 @@ pub mod concrete {
 }
 
 pub fn is_str_repr(t: &Type) -> bool {
-    matches!(t, Type::Primitive(Primitive::Str)) || is_error(t) || is_concat_str(t)
+    matches!(t, Type::Primitive(Primitive::Str)) || is_str_named(t) || is_concat_str(t)
 }
 
 pub fn type_name(t: &Type) -> String {
@@ -2615,7 +2662,7 @@ pub const SHIM_SLOT_COUNT: usize = 2;
 /// needs no import), these behave like any other importable builtin: gated,
 /// and mapped to a reserved canonical name so a user's own type of the same
 /// name can never silently collide.
-pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span", "ExecResult"];
+pub const IMPORTABLE_BUILTIN_TYPES: &[&str] = &["Span", "ExecResult", SPAN_STR_NAME];
 
 /// Canonical internal name for an importable builtin type, or `None` if
 /// `name` isn't one. Mirrors [`builtin_canonical`] for types: the loader
@@ -3136,3 +3183,23 @@ pub fn ctor_ref_case(e: &ast::Expr) -> Option<(&str, &str)> {
 }
 
 pub mod lint;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// [`SPAN_STR`] is written out longhand so it can be `match`ed against, but
+    /// it is only correct while it agrees with what the loader actually rewrites
+    /// an imported `SpanStr` to.
+    #[test]
+    fn span_str_canonical_name_agrees() {
+        assert_eq!(
+            builtin_type_canonical(SPAN_STR_NAME).as_deref(),
+            Some(SPAN_STR)
+        );
+        assert!(is_span_str(&span_str_ty()));
+        assert!(is_str_repr(&span_str_ty()));
+        assert!(concrete::is_span_str(&concrete::span_str_ty()));
+        assert!(concrete::is_str_repr(&concrete::span_str_ty()));
+    }
+}
