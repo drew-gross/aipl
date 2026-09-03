@@ -31,6 +31,7 @@
 // backtracking — and neither matters at the sizes here.
 import {
     case_name,
+    case_of,
     contains,
     drop_last,
     equal as ==,
@@ -50,7 +51,6 @@ import {
     map,
     map_err,
     push,
-    same_case,
     try_map,
     value_or,
     value_or_err,
@@ -224,11 +224,12 @@ fn match_rule<K: variant, A: any>(
     }
 }
 
-// Any one token whose kind shares `k`'s constructor — the payload is ignored, so
-// `Term(Name(""))` matches every identifier.
-fn match_term<K: variant, A: any>(p: Parser<K, A>, k: K, pos: u64, far: Far) -> Step {
+// Any one token whose kind is the case `k` — `Term(Name)` matches every
+// identifier, whatever text it carries. `k` is a `Case<K>`: a case with no
+// payload, so naming a kind needs no value of that kind.
+fn match_term<K: variant, A: any>(p: Parser<K, A>, k: Case<K>, pos: u64, far: Far) -> Step {
     match (p.toks[pos]) {
-        some(t) => if (t.kind.same_case(k)) {
+        some(t) => if (t.kind.case_of() == k) {
             Step { hit: true, pos: pos + 1, kids: leaf_at(p, pos), far }
         } else {
             miss(far, pos, k.case_name())
@@ -620,7 +621,7 @@ pub fn parse<K: variant, A: any>(
     point (a formatter, a highlighter), and this when only the AST is.
 """).test({
     // ---- Term: any token of a kind, payload ignored ----
-    let r_word: Rule<Tok> = Term(Word(""));
+    let r_word: Rule<Tok> = Term(Word);
     let g_word = g_of([one("w", r_word)]);
     assert(shown("abc", g_word, "w")? == "(w abc)");
     assert(msg_of("123", g_word, "w") == "expected Word, found `123`");
@@ -637,7 +638,7 @@ pub fn parse<K: variant, A: any>(
     assert(msg_of("x", g_open, "o") == "expected `(`, found `x`");
 
     // ---- Then: a sequence, children concatenated ----
-    let r_pair: Rule<Tok> = Then([Term(Word("")), Term(Num(""))]);
+    let r_pair: Rule<Tok> = Then([Term(Word), Term(Num)]);
     let g_pair = g_of([one("p", r_pair)]);
     assert(shown("ab 12", g_pair, "p")? == "(p ab 12)");
 
@@ -646,29 +647,29 @@ pub fn parse<K: variant, A: any>(
     assert(msg_of("ab cd", g_pair, "p") == "expected Num, found `cd`");
 
     // ---- OneOf: ordered choice, and the expected *set* it leaves behind ----
-    let r_atom: Rule<Tok> = OneOf([Term(Word("")), Term(Num("")), Spelling("(")]);
+    let r_atom: Rule<Tok> = OneOf([Term(Word), Term(Num), Spelling("(")]);
     let g_atom = g_of([one("a", r_atom)]);
     assert(shown("x", g_atom, "a")? == "(a x)");
     assert(shown("7", g_atom, "a")? == "(a 7)");
     // Three alternatives, three expectations, Oxford-joined.
     assert(msg_of("]", g_atom, "a") == "expected Word, Num, or `(`, found `]`");
     // Two joins with "or"; a repeated expectation is deduped, not doubled.
-    let r_dup: Rule<Tok> = OneOf([Term(Word("")), Term(Num("")), Term(Word(""))]);
+    let r_dup: Rule<Tok> = OneOf([Term(Word), Term(Num), Term(Word)]);
     assert(msg_of("]", g_of([one("a", r_dup)]), "a") == "expected Word or Num, found `]`");
 
     // ---- Many: zero-or-more and one-or-more ----
-    let r_many: Rule<Tok> = many(Term(Word("")));
+    let r_many: Rule<Tok> = many(Term(Word));
     let g_many = g_of([one("m", r_many)]);
     assert(shown("a b c", g_many, "m")? == "(m a b c)");
     assert(shown("", g_many, "m")? == "(m)");
-    let r_many1: Rule<Tok> = many1(Term(Word("")));
+    let r_many1: Rule<Tok> = many1(Term(Word));
     assert(shown("a", g_of([one("m", r_many1)]), "m")? == "(m a)");
     assert(msg_of("", g_of([one("m", r_many1)]), "m") == "expected Word, found end of input");
 
     // A rule that can match empty input would repeat forever. It is refused,
     // not hung on — the driver's counterpart of the lexer's "no matcher matches
     // empty input" invariant.
-    let r_loop: Rule<Tok> = many(Maybe(Term(Word(""))));
+    let r_loop: Rule<Tok> = many(Maybe(Term(Word)));
     assert(
         msg_of(
             "x",
@@ -678,7 +679,7 @@ pub fn parse<K: variant, A: any>(
     );
 
     // ---- Maybe: present and absent ----
-    let r_opt: Rule<Tok> = Then([Term(Word("")), Maybe(Term(Num("")))]);
+    let r_opt: Rule<Tok> = Then([Term(Word), Maybe(Term(Num))]);
     let g_opt = g_of([one("m", r_opt)]);
     assert(shown("a 1", g_opt, "m")? == "(m a 1)");
     assert(shown("a", g_opt, "m")? == "(m a)");
@@ -686,7 +687,7 @@ pub fn parse<K: variant, A: any>(
     // ---- Named/NamedIdx: a reference reaching back through another production,
     // which is what makes the CST (and the parse) genuinely recursive ----
     let r_list: Rule<Tok> = Then([Spelling("("), many(Named("item")), Spelling(")")]);
-    let r_item: Rule<Tok> = OneOf([Term(Word("")), Named("list")]);
+    let r_item: Rule<Tok> = OneOf([Term(Word), Named("list")]);
     let g_sexp = g_of([one("list", r_list), one("item", r_item)]);
     assert(shown("(a b)", g_sexp, "list")? == "(list ( (item a) (item b) ))");
     assert(
@@ -699,7 +700,7 @@ pub fn parse<K: variant, A: any>(
     assert(msg_of("(a", g_sexp, "list") == "expected Word, `(`, or `)`, found end of input");
 
     // ---- ListOf: separators, and the trailing-separator rule ----
-    let r_nums: Rule<Tok> = Then([Spelling("["), ListOf(Term(Num("")), ",", false), Spelling("]")]);
+    let r_nums: Rule<Tok> = Then([Spelling("["), ListOf(Term(Num), ",", false), Spelling("]")]);
     let g_nums = g_of([one("l", r_nums)]);
     assert(shown("[1, 2, 3]", g_nums, "l")? == "(l [ 1 , 2 , 3 ])");
     // An empty list is a list.
@@ -708,13 +709,13 @@ pub fn parse<K: variant, A: any>(
     // With `trailing: false` the dangling separator is left for the enclosing
     // rule, which is what reports it.
     assert(msg_of("[1, 2,]", g_nums, "l") == "expected Num, found `]`");
-    let r_trail: Rule<Tok> = Then([Spelling("["), ListOf(Term(Num("")), ",", true), Spelling("]")]);
+    let r_trail: Rule<Tok> = Then([Spelling("["), ListOf(Term(Num), ",", true), Spelling("]")]);
     assert(shown("[1, 2,]", g_of([one("l", r_trail)]), "l")? == "(l [ 1 , 2 , ])");
 
     // ---- Climb: precedence and associativity ----
     let plus = Prec { power: 1, right: false, ops: ["+"] };
     let times = Prec { power: 2, right: false, ops: ["*"] };
-    let r_expr: Rule<Tok> = Climb(Term(Num("")), [plus, times]);
+    let r_expr: Rule<Tok> = Climb(Term(Num), [plus, times]);
     let g_expr = g_of([one("e", r_expr)]);
     // A bare atom climbs to itself: no operator, no extra node.
     assert(shown("1", g_expr, "e")? == "(e 1)");
@@ -726,7 +727,7 @@ pub fn parse<K: variant, A: any>(
     assert(shown("1 + 2 + 3", g_expr, "e")? == "(e (e (e 1) + (e 2)) + (e 3))");
     // The same level marked right-associative nests the other way.
     let rpow = Prec { power: 1, right: true, ops: ["*"] };
-    let r_pow: Rule<Tok> = Climb(Term(Num("")), [rpow]);
+    let r_pow: Rule<Tok> = Climb(Term(Num), [rpow]);
     assert(shown("1 * 2 * 3", g_of([one("e", r_pow)]), "e")? == "(e (e 1) * (e (e 2) * (e 3)))");
 
     // An operator with nothing after it leaves the operator unconsumed, so the
@@ -741,7 +742,7 @@ pub fn parse<K: variant, A: any>(
     // one word a reader wants — and only when the production got nowhere, so a
     // partly-matched one still reports the finer expectation.
     let r_stmt: Rule<Tok> = Then([Named("expr"), Spelling(";")]);
-    let r_alt: Rule<Tok> = OneOf([Term(Word("")), Term(Num(""))]);
+    let r_alt: Rule<Tok> = OneOf([Term(Word), Term(Num)]);
     let plain = g_of([one("stmt", r_stmt), one("expr", r_alt)]);
     assert(msg_of("]", plain, "stmt") == "expected Word or Num, found `]`");
     let labelled = g_of([one("stmt", r_stmt), labelled_prod("expr", r_alt, "an expression")]);
@@ -884,11 +885,11 @@ allocations: 2900
 deallocations: 2900
 reallocations: 331
 bytes allocated: 177457
-instructions executed: 424003
-binary size: 304632
-  code: 187616
+instructions executed: 419786
+binary size: 301632
+  code: 185124
   data: 5924
-  metadata: 111092
+  metadata: 110584
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1021,7 +1022,7 @@ functions:
     bytes: 1188
   __m2__link_rule$Tok:
     calls: 171
-    bytes: 4608
+    bytes: 4416
   __m2__name_index:
     calls: 116
     bytes: 400
@@ -1069,10 +1070,10 @@ functions:
     bytes: 48
   __rec_drop___m2__Rule$Tok:
     calls: 223
-    bytes: 356
+    bytes: 324
   __test$parse:
     calls: 1
-    bytes: 78516
+    bytes: 76384
   __test_try_fail___m2__ParseError:
     calls: 0
     bytes: 84
@@ -1189,7 +1190,7 @@ functions:
     bytes: 4004
   match_rule$Tok$Node:
     calls: 269
-    bytes: 4900
+    bytes: 4764
   match_then$Tok$Node:
     calls: 31
     bytes: 1720

@@ -7054,8 +7054,10 @@ fn build_variant_layout(
                 _ if is_set_elem(ty) => true, // i64/bool/char/str
                 ConcreteType::Array(_) | ConcreteType::Optional(_) => true,
                 // A function value is an 8-byte code address, stored inline like
-                // a scalar; it owns no heap, so it needs no drop.
-                ConcreteType::Fn(_, _) => true,
+                // a scalar; it owns no heap, so it needs no drop. A `Case<V>` is
+                // the same shape for the same reason — a tag in one word, owning
+                // nothing — which is what lets `Rule`'s `Term(Case<K>)` carry one.
+                ConcreteType::Fn(_, _) | ConcreteType::Case(_) => true,
                 ConcreteType::Named(n) if decls.contains_key(n.as_str()) => {
                     if !rec.contains_key(n.as_str()) {
                         resolve_type_layout(n, decls, layouts, on_stack, rec)?;
@@ -7737,6 +7739,23 @@ fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
     if is_str_shaped(actual) && is_str_shaped(expected) {
         return true;
     }
+    // A `Case<V>` *is* its tag, and mono lowers a constructor reference to that
+    // tag as a plain integer literal (there is no case-literal node, exactly as
+    // there is no `u8` literal node — a narrow integer is an `i64` iconst that
+    // its use site retypes). So the two are one value in two spellings here.
+    //
+    // This does not let an arbitrary integer stand in for a case: the *checker*
+    // is what decides a `Case<V>` position accepts only a constructor reference,
+    // and by here that has already been settled.
+    if matches!(actual, ConcreteType::Case(_)) || matches!(expected, ConcreteType::Case(_)) {
+        let tag_like = |t: &ConcreteType| {
+            matches!(t, ConcreteType::Case(_))
+                || matches!(t, ConcreteType::Primitive(p) if p.name() == "i64" || p.name() == "u64")
+        };
+        if tag_like(actual) && tag_like(expected) {
+            return true;
+        }
+    }
     match (actual, expected) {
         (ConcreteType::Optional(a), ConcreteType::Optional(b)) => coercible(a, b),
         (ConcreteType::Array(a), ConcreteType::Array(b)) => coercible(a, b),
@@ -7760,6 +7779,16 @@ fn merge_types(a: &ConcreteType, b: &ConcreteType) -> Option<ConcreteType> {
         return Some(a.clone());
     }
     if is_none_inner(a) {
+        return Some(b.clone());
+    }
+    // A `Case<V>` compared against a tag: mono lowered a constructor reference to
+    // a plain integer, so `k == Str` arrives here as `Case<V>` against `i64`.
+    // The case is the more informative of the two — it names the variant, which
+    // is what `emit_eq` needs — so it wins the merge.
+    if matches!(a, ConcreteType::Case(_)) && matches!(b, ConcreteType::Primitive(p) if p.is_int()) {
+        return Some(a.clone());
+    }
+    if matches!(b, ConcreteType::Case(_)) && matches!(a, ConcreteType::Primitive(p) if p.is_int()) {
         return Some(b.clone());
     }
     // `Error` and `str` share a representation; their common type is a plain str.
@@ -8783,7 +8812,14 @@ fn hand_off_arg<M: Module>(
 /// when it dies. Strings and arrays are heap; a struct/optional needs a drop
 /// iff a component does.
 fn needs_drop(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
+    // A `Case<V>` is a tag in a register — no payload, so nothing to release.
+    // That is the whole point of the type: it names a case without holding one.
+    if matches!(ty, ConcreteType::Case(_)) {
+        return false;
+    }
     match ty {
+        // Handled above: a tag owns nothing.
+        ConcreteType::Case(_) => false,
         // `str` (and `Error`, which shares its heap representation) is dropped
         // like a heap pointer; the other primitives own no heap.
         _ if is_str_repr(ty) => true,
@@ -9339,6 +9375,8 @@ fn emit_rc_w<M: Module>(
         return;
     }
     match ty {
+        // Unreachable: `needs_drop` already returned for a tag-only value.
+        ConcreteType::Case(_) => unreachable!("Case<V> owns nothing to retain or drop"),
         // `str` (and `Error`, a refcounted str pointer, and `char[]`, which
         // shares `str`'s representation — see `is_char_array`) — inc/dec the
         // pointer.
@@ -9883,7 +9921,15 @@ fn emit_eq_body<M: Module>(
     let structs = cx.structs;
     Ok(match ty {
         // All integer widths (and bool/char) compare by their canonical i64
-        // register value — distinct values have distinct canonical reps.
+        // register value — distinct values have distinct canonical reps. A
+        // `Case<V>` joins them: it is a tag, and two tags are the same case
+        // exactly when the integers match. The checker has already required both
+        // sides to be cases of the *same* variant, so tags from two different
+        // variants never meet here.
+        ConcreteType::Case(_) => {
+            let b = builder.ins().icmp(IntCC::Equal, lv, rv);
+            builder.ins().uextend(types::I64, b)
+        }
         ConcreteType::Primitive(p) if !matches!(p, Primitive::Str) => {
             let b = builder.ins().icmp(IntCC::Equal, lv, rv);
             builder.ins().uextend(types::I64, b)
@@ -12991,6 +13037,7 @@ fn type_symbol(ty: &ConcreteType) -> String {
     match ty {
         ConcreteType::Primitive(p) => p.name().to_string(),
         ConcreteType::Named(n) => sanitize_symbol(n),
+        ConcreteType::Case(n) => format!("{}$case", sanitize_symbol(n)),
         ConcreteType::Optional(inner) => format!("{}$opt", type_symbol(inner)),
         ConcreteType::Array(inner) => format!("{}$arr", type_symbol(inner)),
         ConcreteType::Set(inner) => format!("set${}", type_symbol(inner)),
@@ -14527,6 +14574,47 @@ fn compile_call_expr<M: Module>(
             let b = builder.ins().uextend(types::I64, nz);
             (b, ConcreteType::Primitive(Primitive::Bool))
         }
+        "__builtin_case_of" => {
+            // `v.case_of()`: which case `v` is, as a `Case<V>`. A variant value
+            // leads with its tag and a `Case<V>` *is* that tag, so this is one
+            // load and no payload is touched — the same read `same_case` and
+            // `case_name` do, handed back as a value instead of consumed on the
+            // spot. The receiver is borrowed; nothing is consumed.
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"case_of\" expects 1 argument, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (v, v_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            // The checker's `variant` bound is what guarantees this; the check
+            // catches a caller that reached codegen another way rather than
+            // reading a tag off something that has none.
+            let ConcreteType::Named(vname) = &v_ty else {
+                return Err(Error::at(
+                    format!(
+                        "\"case_of\" is only callable on a variant, got {}",
+                        type_name(&v_ty)
+                    ),
+                    args[0].span.clone(),
+                ));
+            };
+            if cx
+                .structs
+                .get(vname)
+                .and_then(TypeDef::as_variant)
+                .is_none()
+            {
+                return Err(Error::at(
+                    format!("\"case_of\" is only callable on a variant, got {vname}"),
+                    args[0].span.clone(),
+                ));
+            }
+            let tag = builder
+                .ins()
+                .load(types::I64, MemFlagsData::trusted(), v, 0);
+            (tag, ConcreteType::Case(vname.clone()))
+        }
         "__builtin_same_case" => {
             // `a.same_case(b)`: do these share a constructor, payloads ignored?
             //
@@ -14593,17 +14681,24 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (v, v_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            // The bound is enforced by the checker; this catches a caller that
-            // reached codegen another way (a synthesized call, say) rather than
-            // silently reading a tag off something that has none.
-            let ConcreteType::Named(vname) = &v_ty else {
-                return Err(Error::at(
-                    format!(
-                        "\"case_name\" is only callable on a variant, got {}",
-                        type_name(&v_ty)
-                    ),
-                    args[0].span.clone(),
-                ));
+            // A variant value leads with its tag; a `Case<V>` *is* the tag. Both
+            // name a case, which is what the `variant` bound now admits, so the
+            // only difference here is whether the tag needs loading.
+            let (vname, tag_is_value) = match &v_ty {
+                ConcreteType::Named(n) => (n, false),
+                ConcreteType::Case(n) => (n, true),
+                // The bound is enforced by the checker; this catches a caller
+                // that reached codegen another way (a synthesized call, say)
+                // rather than silently reading a tag off something that has none.
+                _ => {
+                    return Err(Error::at(
+                        format!(
+                            "\"case_name\" is only callable on a variant or a case, got {}",
+                            type_name(&v_ty)
+                        ),
+                        args[0].span.clone(),
+                    ));
+                }
             };
             let Some(cases) = cx
                 .structs
@@ -14619,9 +14714,13 @@ fn compile_call_expr<M: Module>(
                     args[0].span.clone(),
                 ));
             };
-            let tag = builder
-                .ins()
-                .load(types::I64, MemFlagsData::trusted(), v, 0);
+            let tag = if tag_is_value {
+                v
+            } else {
+                builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::trusted(), v, 0)
+            };
             let merge = builder.create_block();
             builder.append_block_param(merge, types::I64);
             for (k, ctor) in cases.iter().enumerate() {

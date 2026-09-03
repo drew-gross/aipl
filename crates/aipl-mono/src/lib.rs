@@ -422,6 +422,7 @@ fn lt_ty(
     order: &mut Vec<String>,
 ) -> Type {
     match t {
+        Type::Case(v) => Type::Case(Box::new(lt_ty(v, fields_map, order))),
         Type::Tuple(elems) => {
             let lowered: Vec<Type> = elems.iter().map(|e| lt_ty(e, fields_map, order)).collect();
             let name = check::tuple_struct_name(&lowered);
@@ -629,6 +630,7 @@ fn expand_ignored_payload(pattern: &Pattern, arity: usize) -> Pattern {
 /// name) is left unchanged.
 fn subst_type_params(t: &Type, map: &HashMap<String, Type>) -> Type {
     match t {
+        Type::Case(v) => Type::Case(Box::new(subst_type_params(v, map))),
         // Only a *variable* substitutes. Keying this on `Named` meant a struct
         // that happened to share a template parameter's name was rewritten too.
         Type::TypeVar(n) => map.get(n).cloned().unwrap_or_else(|| t.clone()),
@@ -4850,6 +4852,32 @@ impl Mono<'_> {
             .ty
             .clone()
             .map(|t| std::mem::replace(&mut self.cur_expected, Some(*t)));
+        // A constructor reference the checker resolved to a case: lower it to the
+        // tag, which is all a `Case<V>` is at runtime. The variant travels in the
+        // *type* — every later question (which case is this, what is it called)
+        // is answered from the declared `Case<V>`, not from this literal — so the
+        // value itself needs to carry nothing else.
+        if let (Some(Type::Case(want)), Some((case, variant))) =
+            (self.cur_expected.clone(), aipl_syntax::ctor_ref_case(expr))
+        {
+            if matches!(&*want, Type::Named(n) if n == variant) {
+                let tag = self
+                    .variants
+                    .get(variant)
+                    .and_then(|cs| cs.iter().position(|(c, _)| c == case))
+                    .ok_or_else(|| {
+                        Error::at(
+                            format!("unknown case {case:?} of variant {variant:?}"),
+                            span.clone(),
+                        )
+                    })?;
+                self.cur_expected = prev_expected.flatten();
+                return Ok((
+                    Expr::rebuilt(ExprKind::Num(tag as i64), expr),
+                    Type::Case(Box::new(Type::Named(variant.to_string()))),
+                ));
+            }
+        }
         let (rewritten, inferred) = match &expr.kind {
             ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
             ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
@@ -6595,6 +6623,9 @@ fn normalize_param_ty(
     fname: &str,
 ) -> Result<Type, Error> {
     match t {
+        Type::Case(v) => Ok(Type::Case(Box::new(normalize_param_ty(
+            v, type_vars, counter, fname,
+        )?))),
         Type::Any => Err(Error::msg(format!(
             "fn \"{fname}\": bare \"any\" is not allowed; use \"any[]\", \"any?\", or a named type parameter \"<T: any>\""
         ))),
@@ -6654,6 +6685,7 @@ fn normalize_param_ty(
 /// `any` becomes a fresh synthetic variable; anything else is kept as-is.
 fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -> Type {
     match t {
+        Type::Case(v) => Type::Case(Box::new(normalize_inner(v, type_vars, counter))),
         Type::Any => {
             let name = format!("$any{counter}");
             *counter += 1;
@@ -6810,6 +6842,7 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
 /// and bare `none` it already knows about.
 fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
     match t {
+        Type::Case(v) => Type::Case(Box::new(subst_vars(v, map))),
         // `t` is always a piece of an already-`normalize`d signature, which
         // never contains `Any` (converted to a synthetic `Named` type var) or
         // the mono-only pseudo-types (only ever produced as *substituted
@@ -6878,6 +6911,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
 /// anonymous `any`), so `Type::Any` counts as mentioning `"any"`.
 fn ty_mentions(t: &Type, name: &str) -> bool {
     match t {
+        Type::Case(v) => ty_mentions(v, name),
         Type::Primitive(_)
         | Type::Unit
         | Type::NoneInner
@@ -6903,6 +6937,7 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
 /// pseudo-type — see `subst_vars`).
 fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
     match t {
+        Type::Case(v) => ty_contains_var(v, vars),
         Type::Unit
         | Type::Primitive(_)
         | Type::Any
@@ -7472,6 +7507,7 @@ pub const DEFAULT_INLINE_MAX_EXPRS: usize = 4;
 /// signatures that carry none.
 fn mentions_abstract_type(ty: &Type) -> bool {
     match ty {
+        Type::Case(v) => mentions_abstract_type(v),
         Type::Any
         | Type::NoneInner
         | Type::EmptyArrayArg

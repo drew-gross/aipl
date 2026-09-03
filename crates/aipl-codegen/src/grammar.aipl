@@ -13,8 +13,8 @@
 //
 // **A rule set is written against a token *kind* type `K`**, the same `K` a
 // `lexer.aipl` rule set produces, so a language's lexer and grammar compose
-// directly: `Term(Name(""))` matches any token whose kind is a `Name`, payload
-// ignored (that's `same_case`, which is why `K` carries the `variant` bound).
+// directly: `Term(Name)` matches any token whose kind is a `Name`, payload
+// ignored (a `Case<K>` compare, which is why `K` carries the `variant` bound).
 //
 // Two authoring notes that are compiler limits rather than design:
 //
@@ -68,9 +68,11 @@ struct Prec { power: u64, right: bool, ops: str[] }
 // `OneOf` commits to the first alternative that matches, so alternatives are
 // tried in the order written and there is no ambiguity to resolve.
 //
-// - `Term(k)`: any one token whose kind shares `k`'s constructor — the payload
-//   is ignored, so `Term(Name(""))` matches every identifier. The one place a
-//   rule looks at a token's *kind* rather than its text.
+// - `Term(k)`: any one token whose kind is the case `k` — `Term(Name)` matches
+//   every identifier, whatever text it carries. The one place a rule looks at a
+//   token's *kind* rather than its text. `k` is a `Case<K>`, which is a case
+//   with no payload: naming a kind takes no value of that kind, so there is no
+//   dummy to invent and none to accidentally read.
 // - `Spelling(s)`: one token whose source text is exactly `s`. Punctuation and
 //   keywords, without having to name the kind that lexed them.
 // - `Then(rs)`: every rule in order; the matched children concatenate.
@@ -92,7 +94,7 @@ struct Prec { power: u64, right: bool, ops: str[] }
 //   *enclosing* production's index, so `1 + 2 * 3` yields a node per operand
 //   rather than one flat run.
 variant Rule<K: variant> =
-    | Term(K)
+    | Term(Case<K>)
     | Spelling(str)
     | Then(Rule<K>[])
     | OneOf(Rule<K>[])
@@ -218,7 +220,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // | list`. Enough to have a reference reach back through another production,
     // which is what linking has to get right.
     let r_list: Rule<Kind> = Then([Spelling("("), many(Named("item")), Spelling(")")]);
-    let r_item: Rule<Kind> = OneOf([Term(Atom("")), Named("list")]);
+    let r_item: Rule<Kind> = OneOf([Term(Atom), Named("list")]);
     let g: Grammar<Kind, Node> = Grammar {
         prods: [
             Production { name: "list", rule: r_list, build: Mk(keep) },
@@ -232,7 +234,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 
     let linked = link(g)?;
     // `item`'s two alternatives: a terminal, and a reference now an index.
-    assert(rule_of(linked, 1) == OneOf([Term(Atom("")), NamedIdx(0)]));
+    assert(rule_of(linked, 1) == OneOf([Term(Atom), NamedIdx(0)]));
 
     // The reference nested two levels down inside `list` is rewritten too, and
     // everything around it is left alone.
@@ -242,7 +244,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     assert(expect_of(linked, 1) == "an item");
 
     // Idempotent: a linked grammar links again to itself.
-    assert(rule_of(link(linked)?, 1) == OneOf([Term(Atom("")), NamedIdx(0)]));
+    assert(rule_of(link(linked)?, 1) == OneOf([Term(Atom), NamedIdx(0)]));
 
     // Every rule shape carries its reference, and every one is rewritten.
     let shapes: Grammar<Kind, Node> = Grammar {
@@ -315,11 +317,11 @@ allocations: 110
 deallocations: 110
 reallocations: 17
 bytes allocated: 9424
-instructions executed: 14099
-binary size: 45376
-  code: 27940
-  data: 1708
-  metadata: 15728
+instructions executed: 13904
+binary size: 44648
+  code: 27392
+  data: 1692
+  metadata: 15564
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -345,9 +347,6 @@ functions:
   __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam7:
     calls: 4
     bytes: 732
-  __eq_Kind:
-    calls: 2
-    bytes: 100
   __eq_ParseError:
     calls: 2
     bytes: 128
@@ -359,7 +358,7 @@ functions:
     bytes: 284
   __eq_Rule$Kind:
     calls: 12
-    bytes: 688
+    bytes: 696
   __eq_Rule$Kind$arr:
     calls: 3
     bytes: 300
@@ -380,13 +379,13 @@ functions:
     bytes: 72
   __rec_drop_Rule$Kind:
     calls: 55
-    bytes: 364
+    bytes: 324
   __test$failure_message:
     calls: 1
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 11948
+    bytes: 11644
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -449,7 +448,7 @@ functions:
     bytes: 1188
   link_rule$Kind:
     calls: 25
-    bytes: 4528
+    bytes: 4416
   main:
     calls: 1
     bytes: 180

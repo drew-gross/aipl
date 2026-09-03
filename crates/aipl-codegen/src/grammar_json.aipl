@@ -183,13 +183,13 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
         ListOf(Named("member"), ",", false),
         Spelling("}"),
     ]);
-    let r_member: Rule<JsonTok> = Then([Term(Str("")), Spelling(":"), Named("value")]);
+    let r_member: Rule<JsonTok> = Then([Term(Str), Spelling(":"), Named("value")]);
     let r_array: Rule<JsonTok> = Then([
         Spelling("["),
         ListOf(Named("value"), ",", false),
         Spelling("]"),
     ]);
-    let r_string: Rule<JsonTok> = Term(Str(""));
+    let r_string: Rule<JsonTok> = Term(Str);
     let r_number: Rule<JsonTok> = Then([Maybe(Spelling("-")), Term(Num)]);
     let r_bool: Rule<JsonTok> = OneOf([Spelling("true"), Spelling("false")]);
     let r_null: Rule<JsonTok> = Spelling("null");
@@ -411,11 +411,11 @@ allocations: 11263
 deallocations: 11263
 reallocations: 535
 bytes allocated: 815430
-instructions executed: 1694885
-binary size: 223408
-  code: 142648
+instructions executed: 1687015
+binary size: 222824
+  code: 142188
   data: 5228
-  metadata: 75532
+  metadata: 75408
 functions:
   __arr_drop_Json:
     calls: 125
@@ -521,7 +521,7 @@ functions:
     bytes: 1188
   __m2__link_rule$JsonTok:
     calls: 1110
-    bytes: 4528
+    bytes: 4416
   __m2__name_index:
     calls: 666
     bytes: 400
@@ -599,7 +599,7 @@ functions:
     bytes: 4004
   __m5__match_rule$JsonTok$Json:
     calls: 1251
-    bytes: 4748
+    bytes: 4668
   __m5__match_then$JsonTok$Json:
     calls: 235
     bytes: 1720
@@ -632,7 +632,7 @@ functions:
     bytes: 48
   __rec_drop___m2__Rule$JsonTok:
     calls: 2340
-    bytes: 364
+    bytes: 324
   __test$escape_json:
     calls: 1
     bytes: 812
@@ -722,7 +722,7 @@ functions:
     bytes: 440
   json_grammar:
     calls: 41
-    bytes: 6812
+    bytes: 6584
   lex_json:
     calls: 38
     bytes: 5732

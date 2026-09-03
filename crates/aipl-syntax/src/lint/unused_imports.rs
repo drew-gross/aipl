@@ -135,6 +135,9 @@ fn collect_ty_names(ty: &Type, out: &mut HashSet<String>) {
         Type::Named(n) => {
             out.insert(n.clone());
         }
+        // `Case<V>` mentions `V`, so importing a variant to name one of its
+        // cases counts as using the import.
+        Type::Case(v) => collect_ty_names(v, out),
         // A type parameter is bound by the signature, not imported.
         Type::TypeVar(_) => {}
         Type::Generic(base, args) => {

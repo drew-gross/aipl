@@ -186,7 +186,9 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  After parsing we types should be "bounds" e.g. Is(ConcreteType), Bound(any), [Bound(a), Bound(b)]. Literals can have a type of OneOf(Case, CaseConstructor) or FlexInt, etc. Then they are unified by type checking.
   an array should be typed by ALL it's components, not just the first
+  let ks: Case<Tok>[] = [Str, Num, End]; doesn't work.
   you should be able to mut n = 0; and get the right integer type
 
 numbers:

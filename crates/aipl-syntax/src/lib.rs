@@ -328,7 +328,25 @@ pub mod ast {
                     Type::Primitive(p)
                         if p.is_int() || *p == Primitive::Char || *p == Primitive::Str
                 ),
-                Bound::Variant => matches!(ty, Type::Named(n) if is_variant(n)),
+                // A `Case<V>` satisfies it too: the bound exists so a body can
+                // ask which case a value is, and a case is exactly that answer
+                // with the payload dropped. `case_name` therefore reads one the
+                // same way it reads a variant value, which is why it needs no
+                // second signature.
+                Bound::Variant => match ty {
+                    Type::Named(n) => is_variant(n),
+                    Type::Case(v) => match &**v {
+                        Type::Named(n) => is_variant(n),
+                        // Inside a generic body the variant is still a variable
+                        // — and one that carries this very bound, since
+                        // `Case<K>` only type-checks where `K` is a variant. So
+                        // `k.case_name()` works in `match_term` as well as at a
+                        // concrete instance.
+                        Type::TypeVar(_) => true,
+                        _ => false,
+                    },
+                    _ => false,
+                },
             }
         }
     }
@@ -404,6 +422,7 @@ pub mod ast {
 
     fn ty_mentions_any(t: &Type) -> bool {
         match t {
+            Type::Case(v) => ty_mentions_any(v),
             Type::Unit
             | Type::Primitive(_)
             | Type::Named(_)
@@ -638,6 +657,24 @@ pub mod ast {
         /// variants below instead, and so does a generic type parameter: see
         /// [`Type::TypeVar`].)
         Named(String),
+        /// `Case<V>` — one *case* of the variant `V`, carrying no payload.
+        ///
+        /// A variant value is a tag plus a payload; a `Case<V>` is the tag
+        /// alone. It exists because naming a case is not the same as having a
+        /// value of one: `Term(Str)` in a grammar wants to say "any token whose
+        /// kind is `Str`", and before this it had to construct one — `Term(Str(""))`
+        /// — with a payload that was never read and had to be invented.
+        ///
+        /// There is deliberately no syntax to get a payload out of one, because
+        /// there is no payload in it: the type is what makes the dummy value
+        /// unnecessary rather than merely conventional. Its runtime form is the
+        /// tag as a `u64` ([`ConcreteType::Case`]), so it costs one register and
+        /// no allocation, and `==` on two of them is an integer compare.
+        ///
+        /// The inner type is the variant, and is always a [`Type::Named`] (or a
+        /// [`Type::TypeVar`] standing for one) — `Case<i64>` is refused at type
+        /// validation, where the "is this a variant" question can be answered.
+        Case(Box<Type>),
         /// A generic type parameter — the `T` of `fn f<T: any>(x: T)`, and the
         /// synthetic variable an anonymous `any` normalizes to (which carries an
         /// empty name).
@@ -758,6 +795,11 @@ pub mod ast {
         Dict(Box<ConcreteType>, Box<ConcreteType>),
         Result(Box<ConcreteType>, Box<ConcreteType>),
         Fn(Vec<ConcreteType>, Box<ConcreteType>),
+        /// `Case<V>` with `V` resolved — see [`Type::Case`]. Holds the variant's
+        /// concrete name rather than its type, because the tag is all there is
+        /// at runtime and the name is only needed to render a case back
+        /// (`case_name`) and to keep two variants' cases from comparing equal.
+        Case(String),
         NoneInner,
         EmptyArrayArg,
         NoneLiteralArg,
@@ -798,6 +840,12 @@ pub mod ast {
                         .collect::<Option<Vec<_>>>()?,
                     Box::new(r.to_concrete()?),
                 ),
+                // The variant has to have resolved to a name by now; a `Case`
+                // still over a type variable is as abstract as the variable is.
+                Type::Case(v) => match v.to_concrete()? {
+                    ConcreteType::Named(n) => ConcreteType::Case(n),
+                    _ => return None,
+                },
             })
         }
     }
@@ -811,6 +859,7 @@ pub mod ast {
                 ConcreteType::Unit => Type::Unit,
                 ConcreteType::Primitive(p) => Type::Primitive(*p),
                 ConcreteType::Named(n) => Type::Named(n.clone()),
+                ConcreteType::Case(n) => Type::Case(Box::new(Type::Named(n.clone()))),
                 ConcreteType::NoneInner => Type::NoneInner,
                 ConcreteType::EmptyArrayArg => Type::EmptyArrayArg,
                 ConcreteType::NoneLiteralArg => Type::NoneLiteralArg,
@@ -1449,6 +1498,24 @@ pub fn flex_fit(
     target: &Type,
 ) -> Result<Option<Type>, (i64, &'static str)> {
     use ast::ExprKind as K;
+    // A constructor reference where a case is wanted *is* that case. The target
+    // is what distinguishes the two readings of `Str`: here it is the tag, and
+    // anywhere else it stays the value or the constructor function.
+    if let Type::Case(want) = target {
+        if let Some((_, variant)) = ctor_ref_case(e) {
+            let ok = match &**want {
+                // An unresolved variable is what a generic payload looks like
+                // (`Term`'s `Case<K>` before `K` is pinned) — the reference is
+                // what pins it.
+                Type::TypeVar(_) => true,
+                Type::Named(n) => n == variant,
+                _ => false,
+            };
+            if ok {
+                return Ok(Some(Type::Case(Box::new(Type::Named(variant.to_string())))));
+            }
+        }
+    }
     // Value-passing wrappers: only the tail decides the type. Mirrors
     // `flex_int_values`, so `{ let a = f(); [200] }` flexes like a bare `[200]`.
     match &e.kind {
@@ -1987,6 +2054,11 @@ fn __builtin_same_case<T: variant>(self: T, other: T) -> bool { false }
 // `"Space"`. The tag names the case, so this reads no payload — which is
 // what lets it be generic over every variant, like `same_case`.
 fn __builtin_case_name<T: variant>(self: T) -> str { "" }
+// `v.case_of()` — which case `v` is, as a `Case<T>` carrying no payload. The
+// counterpart to naming a case directly (`Term(Str)`): this is how a *value*
+// is compared against one, since `==` on two `Case<T>`s is a tag compare.
+// `same_case(a, b)` remains the way to compare two values.
+fn __builtin_case_of<T: variant>(self: T) -> Case<T> { __builtin_case_of(self) }
 fn __builtin_count_is_less_than<T: any>(self: T[], x: T, limit: u64) -> bool { false }
 fn __builtin_count_is_at_most<T: any>(self: T[], x: T, limit: u64) -> bool { false }
 fn __builtin_count_is_greater_than<T: any>(self: T[], x: T, limit: u64) -> bool { false }
@@ -2144,6 +2216,7 @@ pub mod concrete {
             ConcreteType::Unit => "()".into(),
             ConcreteType::Primitive(p) => p.name().into(),
             ConcreteType::Named(s) => s.clone(),
+            ConcreteType::Case(v) => format!("Case<{v}>"),
             ConcreteType::Optional(inner) => format!("{}?", type_name(inner)),
             ConcreteType::Array(inner) => format!("{}[]", type_name(inner)),
             ConcreteType::Set(inner) => format!("#{{{}}}", type_name(inner)),
@@ -2172,6 +2245,7 @@ pub fn type_name(t: &Type) -> String {
         Type::Unit => "()".into(),
         Type::Primitive(p) => p.name().into(),
         Type::Named(s) => s.clone(),
+        Type::Case(v) => format!("Case<{}>", type_name(v)),
         // A variable renders as the parameter the user wrote; the anonymous one
         // an `any` normalized to has no name to show, so it renders as `any`.
         Type::TypeVar(v) if v.is_empty() => "any".into(),
@@ -2264,6 +2338,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "intersperse",
     "same_case",
     "case_name",
+    "case_of",
     "count_is_less_than",
     "count_is_at_most",
     "count_is_greater_than",
@@ -2495,6 +2570,7 @@ fn promote_ty(ty: &mut ast::Type, vars: &[String]) {
     use ast::Type as T;
     match ty {
         T::Named(n) if vars.iter().any(|v| v == n) => *ty = T::TypeVar(n.clone()),
+        T::Case(v) => promote_ty(v, vars),
         T::Unit
         | T::Primitive(_)
         | T::Named(_)
@@ -2677,5 +2753,50 @@ pub const SPREAD_BASE_PREFIX: &str = "__spread_base$";
 /// checked, so a wrong field name is caught either way; what goes unchecked for
 /// a generic is a different template that happens to share field names.
 pub const DESTRUCTURE_BASE_PREFIX: &str = "__spat$";
+
+/// Parameter-name prefix of the lambda `aipl_mono::lower_ctor_refs` wraps a
+/// payload-carrying constructor reference in (`Circle` → `|__ctor0| Circle(__ctor0)`).
+/// Shared so [`ctor_ref_case`] can recognize that lambda and read the case back
+/// out of it — the two ends of one desugaring, like [`SPREAD_BASE_PREFIX`].
+pub const CTOR_PARAM_PREFIX: &str = "__ctor";
+
+/// The `(case, variant)` a constructor *reference* names, if `e` is one.
+///
+/// Two shapes reach here, because a reference is lowered differently by arity: a
+/// nullary constructor stays a bare `Ident`, while a payload-carrying one is
+/// already the lambda `lower_ctor_refs` made of it. Both still name the case, and
+/// the loader's variant-qualified `Case@Variant` form carries the variant along
+/// with it — so this needs no symbol table, which is what lets it live here and
+/// be used from [`flex_fit`].
+///
+/// This is how `Case<V>` is introduced: a reference in a position that wants a
+/// case *is* one, and everywhere else it keeps meaning what it meant before —
+/// the value, or the constructor function that `xs.map(Circle)` relies on.
+pub fn ctor_ref_case(e: &ast::Expr) -> Option<(&str, &str)> {
+    let qualified = match &e.kind {
+        ast::ExprKind::Ident(n) => n.as_str(),
+        ast::ExprKind::Lambda(params, body) => {
+            let ast::ExprKind::Call(name, args, _) = &body.kind else {
+                return None;
+            };
+            // Exactly the lambda `lower_ctor_refs` builds: one `__ctor{i}`
+            // parameter per payload slot, passed straight through in order. A
+            // hand-written `|x| Circle(x)` is deliberately *not* matched — it is
+            // a function the author wrote, and reading a case out of it would be
+            // guessing at intent.
+            let shaped = params.len() == args.len()
+                && params.iter().enumerate().all(|(i, p)| {
+                    p.name == format!("{CTOR_PARAM_PREFIX}{i}")
+                        && matches!(&args[i].kind, ast::ExprKind::Ident(a) if *a == p.name)
+                });
+            if !shaped {
+                return None;
+            }
+            name.as_str()
+        }
+        _ => return None,
+    };
+    qualified.split_once('@')
+}
 
 pub mod lint;

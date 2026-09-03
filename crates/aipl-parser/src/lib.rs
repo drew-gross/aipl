@@ -1565,6 +1565,21 @@ impl gazelle::Action<aipl::BaseTy<Self>> for Build {
                 None if name == "any" => Type::Any,
                 None => Type::Named(name),
             },
+            // `Case<V>` — one case of the variant `V`, carrying no payload. It
+            // borrows the generic-application *syntax* but is a type of its own
+            // (`Type::Case`), not a template instantiation: there is no `Case`
+            // declaration to instantiate, and its runtime form is the tag alone.
+            // Spelled here rather than resolved later so nothing downstream has
+            // to know that one generic base name is special.
+            aipl::BaseTy::Generic((name, span), args) if name == "Case" => {
+                if args.len() != 1 {
+                    return Err(Error::at(
+                        format!("Case<V> takes one type argument, got {}", args.len()),
+                        span,
+                    ));
+                }
+                Type::Case(Box::new(args.into_iter().next().expect("checked")))
+            }
             // `Foo<A, B>` — a generic type application. The base name is always
             // a user struct/variant template (never a primitive), resolved to a
             // synthetic monomorphic type by mono's `lower_generics` pre-pass.

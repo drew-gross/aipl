@@ -884,6 +884,9 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
         Type::EmptyArrayArg => Type::EmptyArrayArg,
         Type::NoneLiteralArg => Type::NoneLiteralArg,
         Type::ConcatStr => Type::ConcatStr,
+        // `Case<V>` names `V`, which resolves through the view like any other
+        // type name — importing the variant is what puts its cases in scope.
+        Type::Case(v) => Type::Case(Box::new(rewrite_type(v, view, type_vars))),
         // Already promoted by `promote_type_vars` at the end of parsing: a type
         // parameter is bound by its own declaration, so there is no name to
         // resolve through the file's view.

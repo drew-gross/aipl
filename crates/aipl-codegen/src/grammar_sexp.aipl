@@ -97,7 +97,7 @@ fn lower_item(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError {
 
 pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
     let r_list: Rule<SexpKind> = Then([Spelling("("), many(Named("item")), Spelling(")")]);
-    let r_item: Rule<SexpKind> = OneOf([Term(Atom("")), Named("list")]);
+    let r_item: Rule<SexpKind> = OneOf([Term(Atom), Named("list")]);
     Grammar {
         prods: [
             Production { name: "list", rule: r_list, build: Mk(lower_list) },
@@ -283,11 +283,11 @@ allocations: 25391
 deallocations: 25391
 reallocations: 2339
 bytes allocated: 1244194
-instructions executed: 4257100
-binary size: 186728
-  code: 118608
+instructions executed: 4238738
+binary size: 186280
+  code: 118268
   data: 3556
-  metadata: 64564
+  metadata: 64456
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -387,7 +387,7 @@ functions:
     bytes: 1188
   __m2__link_rule$SexpKind:
     calls: 184
-    bytes: 4528
+    bytes: 4416
   __m2__name_index:
     calls: 115
     bytes: 400
@@ -462,7 +462,7 @@ functions:
     bytes: 4004
   __m5__match_rule$SexpKind$Sexp:
     calls: 6070
-    bytes: 4588
+    bytes: 4504
   __m5__match_then$SexpKind$Sexp:
     calls: 854
     bytes: 1720
@@ -495,7 +495,7 @@ functions:
     bytes: 48
   __rec_drop___m2__Rule$SexpKind:
     calls: 408
-    bytes: 364
+    bytes: 324
   __test$parse_sexp:
     calls: 1
     bytes: 7592
@@ -600,7 +600,7 @@ functions:
     bytes: 444
   sexp_grammar:
     calls: 28
-    bytes: 1808
+    bytes: 1704
   shown:
     calls: 5
     bytes: 492

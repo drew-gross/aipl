@@ -1,0 +1,90 @@
+import { case_name, case_of, equal as ==, is_some_and, len, map, print } from builtins;
+
+// `Case<V>` is one *case* of the variant `V`, carrying no payload: the tag on
+// its own. It exists so that naming a case takes no value of that case — before
+// it, a grammar rule saying "any token whose kind is `Str`" had to build one,
+// `Term(Str(""))`, with a payload that was never read and had to be invented.
+//
+// A constructor reference *is* a case wherever a `Case<V>` is wanted, and keeps
+// meaning what it meant everywhere else — the value for a nullary case, the
+// constructor function otherwise (`ctor_as_fn_value.aipl`). The expected type is
+// what tells the two apart, which is why `kinds` below still maps constructors.
+variant Tok = Str(str) | Num(i64) | End
+
+fn is_kind(t: Tok, k: Case<Tok>) -> bool { t.case_of() == k }
+
+fn describe(k: Case<Tok>) -> str { k.case_name() }
+
+fn main() !prints {
+    // A bare constructor name, payload-carrying or not, is the case.
+    print(`{describe(Str)} {describe(Num)} {describe(End)}`);
+
+    // Comparing a value against a case reads the tag and nothing else, so the
+    // payload never has to be produced or matched.
+    print(`{is_kind(Str("hello"), Str)} {is_kind(Str("hello"), Num)}`);
+    print(`{is_kind(End, End)} {is_kind(Num(7), Num)}`);
+
+    // Cases compare with each other. The annotation is what asks for one: with
+    // no expected type a bare `Str` is still the constructor function, so this
+    // is also where the two readings are told apart.
+    let a: Case<Tok> = Str;
+    print(`{a == Str} {a == Num}`);
+
+    // The other reading is untouched: here `Str` is still the constructor
+    // function, because a `(str) -> Tok` is what `map` wants.
+    let built = ["a", "b"].map(Str);
+    print(`{built.len()} {built[0].is_some_and(|t| is_kind(t, Str))}`);
+}
+--- stdout ---
+Str Num End
+true false
+true true
+true false
+2 true
+--- performance ---
+allocations: 22
+deallocations: 22
+reallocations: 2
+bytes allocated: 1343
+instructions executed: 895
+binary size: 7312
+  code: 4428
+  data: 47
+  metadata: 2837
+functions:
+  __arr_drop_Tok:
+    calls: 1
+    bytes: 136
+  __arr_retain_Tok:
+    calls: 2
+    bytes: 136
+  __to_str_bool:
+    calls: 7
+    bytes: 232
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_array_dec:
+    calls: 2
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 2
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 7
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 3720

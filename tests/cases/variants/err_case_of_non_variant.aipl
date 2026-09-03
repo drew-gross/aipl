@@ -1,0 +1,8 @@
+// `Case<V>` is one case of the *variant* `V`, so `V` has to be one. A struct has
+// fields rather than cases, and a primitive has neither — neither has anything
+// for a case to name.
+struct Point { x: i64, y: i64 }
+
+fn f(c: Case<Point>) -> i64 { 0 }
+--- errors ---
+error: fn "f": Case<Point> — a case belongs to a variant, and Point is not one

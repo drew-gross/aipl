@@ -386,9 +386,9 @@ allocations: 8608
 deallocations: 8608
 reallocations: 746
 bytes allocated: 495134
-instructions executed: 1255372
-binary size: 199112
-  code: 126044
+instructions executed: 1254922
+binary size: 199080
+  code: 126012
   data: 4284
   metadata: 68784
 functions:
@@ -493,7 +493,7 @@ functions:
     bytes: 1188
   __m2__link_rule$CalcTok:
     calls: 520
-    bytes: 4420
+    bytes: 4416
   __m2__name_index:
     calls: 320
     bytes: 400
@@ -568,7 +568,7 @@ functions:
     bytes: 4004
   __m5__match_rule$CalcTok$Calc:
     calls: 980
-    bytes: 4292
+    bytes: 4272
   __m5__match_then$CalcTok$Calc:
     calls: 145
     bytes: 1720
@@ -697,7 +697,7 @@ functions:
     bytes: 444
   calc_grammar:
     calls: 41
-    bytes: 3452
+    bytes: 3444
   depth:
     calls: 10
     bytes: 288

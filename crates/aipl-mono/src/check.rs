@@ -65,6 +65,7 @@ pub(crate) fn err_side_from_tries(body_ty: Type, tries: &[Type]) -> Type {
 /// spelled.
 pub(crate) fn mangle_type(ty: &Type) -> String {
     match ty {
+        Type::Case(v) => format!("case_{}", mangle_type(v)),
         Type::Unit => panic!("Synthetic-type members cannot be unit"),
         // Tuple/generic members are parsed straight from source syntax; these
         // are compiler-internal pseudo-types that never appear there.
@@ -351,7 +352,12 @@ impl<'a> Cx<'a> {
     /// worth recording. Idempotent; a conflicting second answer poisons the
     /// entry rather than picking one.
     fn lock(&self, e: &Expr, ty: &Type) {
-        if needs_lock(&e.kind) {
+        // A constructor reference is context-dependent in the same way a bare
+        // `none` is: `Str` is the case where a `Case<V>` is wanted and the
+        // constructor function everywhere else, and only the expected type says
+        // which. Recording it is what lets mono lower it to a tag without
+        // re-deriving the context the checker already had.
+        if needs_lock(&e.kind) || aipl_syntax::ctor_ref_case(e).is_some() {
             self.lock_node(node_id(e), ty);
         }
     }
@@ -506,6 +512,7 @@ impl<'a> Cx<'a> {
                     self.bind_field(p, a, vars, map);
                 }
             }
+            (Type::Case(p), Type::Case(a)) => self.bind_field(p, a, vars, map),
             (Type::Array(p), Type::Array(a)) if !is_none_inner(a) => {
                 self.bind_field(p, a, vars, map)
             }
@@ -828,6 +835,19 @@ impl<'a> Cx<'a> {
         // rather than pinning here — see [`literal_pins_nothing`].
         let mut deferred: Vec<(&Type, Type)> = Vec::new();
         for (arg, pty) in args.iter().zip(&case.payload) {
+            // A constructor reference against a `Case<_>` payload is the case
+            // itself, and it is what pins the variable: `Term(Str)` learns
+            // `K = Tok` from `Str`. Checking it first would type it as the
+            // constructor *function* and pin `K` to that instead — which is what
+            // `Term(Str)` used to become.
+            if matches!(pty, Type::Case(_)) {
+                if let Ok(Some(t)) = aipl_syntax::flex_fit(arg, &Type::Unit, pty) {
+                    self.lock(arg, &t);
+                    self.bind_field(pty, &t, &vars, &mut map);
+                    arg_tys.push((arg, t));
+                    continue;
+                }
+            }
             let at = self.check_expr(arg, env, effects)?;
             if literal_pins_nothing(arg, pty, &vars) {
                 deferred.push((pty, at.clone()));
@@ -1340,6 +1360,19 @@ impl Cx<'_> {
     /// serve a parameter, a struct field and a variant payload alike.
     fn check_ty(&self, t: &Type, type_params: &[String], ctx: &str) -> Result<(), Error> {
         match t {
+            // `Case<V>` is a case of the *variant* `V`, so `V` has to be one —
+            // `Case<i64>` names nothing. A type parameter is allowed through:
+            // whether it lands on a variant is settled at instantiation, where
+            // the same check runs against the substituted type.
+            Type::Case(v) => match &**v {
+                Type::TypeVar(_) => Ok(()),
+                Type::Named(n) if self.variant_cases(n).is_some() => Ok(()),
+                other => Err(Error::msg(format!(
+                    "{ctx}: Case<{}> — a case belongs to a variant, and {} is not one",
+                    aipl_syntax::type_name(other),
+                    aipl_syntax::type_name(other)
+                ))),
+            },
             // Every primitive is a valid type in any general position.
             Type::Unit | Type::Primitive(_) => Ok(()),
             // The anonymous generic bound is valid anywhere a type-parameter
@@ -1557,6 +1590,8 @@ impl Cx<'_> {
 
     fn check_elem_ty(&self, t: &Type, type_params: &[String], ctx: &str) -> Result<(), Error> {
         match t {
+            // A tag in a register, so it fits an element slot like any scalar.
+            Type::Case(_) => self.check_ty(t, type_params, ctx),
             Type::Unit => Err(Error::msg("() is not allowed as an array/option element")),
             // A scalar primitive element: every integer width, plus
             // bool/char/str. An element slot is 8 bytes (`elem_size_of`) and a
@@ -2241,6 +2276,13 @@ impl Cx<'_> {
                 // type (if it fits), so `i8_val == 5` needs no explicit `i8(5)`.
                 let rt2 = self.flex_int(r, &rt, &lt)?;
                 let lt2 = self.flex_int(l, &lt, &rt)?;
+                // Record what the flex decided. An integer literal needs no
+                // record — it is already canonical in its register and only its
+                // static type moved — but a constructor reference does: `k == Str`
+                // makes `Str` a case, and without the note mono would re-derive
+                // the constructor function and hand codegen a lambda.
+                self.lock(l, &lt2);
+                self.lock(r, &rt2);
                 self.check_binop(
                     *op,
                     &lt2,
@@ -3355,6 +3397,18 @@ impl Cx<'_> {
         if let Some(exp) = expected {
             self.lock(arg, exp);
         }
+        // A constructor reference where a `Case<V>` is wanted is the case, not a
+        // lambda — it only *looks* like one because `lower_ctor_refs` wrapped it
+        // before checking. Settled before the lambda rule below, which would
+        // otherwise reject `f(Str)` for a `Case<Tok>` parameter.
+        if let Some(Type::Case(_)) = expected {
+            if let Some(t) = aipl_syntax::flex_fit(arg, &Type::Unit, expected.unwrap())
+                .ok()
+                .flatten()
+            {
+                return Ok(t);
+            }
+        }
         if let ExprKind::Lambda(params, body) = &arg.kind {
             let Some(Type::Fn(ptys, ret)) = expected else {
                 return Err(Error::at(
@@ -3930,6 +3984,7 @@ fn typevar_name(t: &Type) -> Option<&str> {
 fn mentions_typevar(t: &Type) -> bool {
     match t {
         Type::TypeVar(_) => true,
+        Type::Case(v) => mentions_typevar(v),
         Type::Optional(i) | Type::Array(i) | Type::Set(i) => mentions_typevar(i),
         Type::Dict(k, v) => mentions_typevar(k) || mentions_typevar(v),
         Type::Result(a, b) => mentions_typevar(a) || mentions_typevar(b),
@@ -3964,6 +4019,7 @@ fn is_valid_elem(t: &Type) -> bool {
 /// type variables coerce only with themselves. Identity for a concrete signature.
 fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
     match t {
+        Type::Case(v) => Type::Case(Box::new(subst_typevars(v, type_params))),
         Type::Any => typevar_ty(""),
         // A declared parameter is already a `TypeVar` (`promote_type_vars`, at
         // the end of parsing); `type_params` now only decides which variables
@@ -4107,6 +4163,22 @@ fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     // compared equal above. Distinguishing them is a separate change with its
     // own fanout; this keeps the naming purely additive.
     if is_typevar(actual) && is_typevar(expected) {
+        return Ok(());
+    }
+    // A `Case<V>` *is* its tag, and mono lowers a constructor reference to that
+    // tag as a plain integer. So the two are one value in two spellings once
+    // lowering has run, and a second pass over the lowered program must not read
+    // that as a type error. Introducing a case is still governed by `flex_fit`,
+    // which accepts only a constructor reference — a bare integer never becomes
+    // a case in source.
+    let tag_like = |t: &Type| {
+        matches!(t, Type::Case(_))
+            || matches!(t, Type::Primitive(p) if p.name() == "i64" || p.name() == "u64")
+    };
+    if (matches!(actual, Type::Case(_)) || matches!(expected, Type::Case(_)))
+        && tag_like(actual)
+        && tag_like(expected)
+    {
         return Ok(());
     }
     // A bare `none` / empty `[]` carries the placeholder element `__none__`,
@@ -4311,6 +4383,7 @@ pub(crate) fn collect_var_bindings(
         (Type::TypeVar(v), a) if vars.contains(v.as_str()) => {
             map.entry(v.clone()).or_insert_with(|| a.clone());
         }
+        (Type::Case(p), Type::Case(a)) => collect_var_bindings(p, a, vars, map),
         // A bare `none`/empty `[]` argument carries no element type (`__none__`),
         // so it can't pin the variable — leave it for another argument to fix.
         (Type::Array(p), Type::Array(a)) if !is_none_inner(a) => {
@@ -4360,6 +4433,7 @@ pub(crate) fn collect_var_bindings(
 /// in `vars` (concrete types, anonymous `any`) are left as-is.
 fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Type {
     match t {
+        Type::Case(v) => Type::Case(Box::new(subst_vars(v, map, vars))),
         Type::TypeVar(v) if vars.contains(v.as_str()) => {
             map.get(v).cloned().unwrap_or_else(unknown_ty)
         }
