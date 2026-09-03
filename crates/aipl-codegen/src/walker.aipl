@@ -1895,15 +1895,28 @@ fn struct_field_value(self: W, lead: Doc, fname: str) -> WDoc!FmtError {
 // ---------- if / match / lambda / templates ----------
 
 fn if_expr(self: W) -> WDoc!FmtError {
-    let cond = self.expect("if")?.w.expect("(")?.w.expr()?;
-    let closed = cond.w.expect(")")?.w;
+    let opened = self.expect("if")?.w.expect("(")?.w;
+
+    // `if (let PATTERN = EXPR) { .. }` — the `let` lookahead (never a valid
+    // `expr` lead) is what the grammar itself picks the production on, so the
+    // formatter branches the same way, right after `if (`. `else if (let ..)`
+    // reaches this same branch through the recursive `if_expr()` call below, so
+    // an if/else-if-let ladder needs nothing extra.
+    let lead = if (opened.peek_text() == "let") {
+        let clause = opened.bump().w.if_let_clause()?;
+        WDoc { w: clause.w, doc: Concat([Text("if (let "), clause.doc, Text(") ")]) }
+    } else {
+        let cond = opened.expr()?;
+        let closed = cond.w.expect(")")?.w;
+        WDoc { w: closed, doc: Concat([Text("if ("), cond.doc, Text(") ")]) }
+    };
 
     // The branches share one group (via the ungrouped `block_layout`), so they
     // break *together*: an `if`/`else` is either all on one line or both blocks
     // broken — never one inline and the other split. A trailing `else if` stays
     // its own group so a fitting tail can remain inline.
-    let then_b = closed.block_layout()?;
-    let head = [Text("if ("), cond.doc, Text(") "), then_b.doc];
+    let then_b = lead.w.block_layout()?;
+    let head = [lead.doc, then_b.doc];
     if (then_b.w.peek_text() != "else") {
         return ok(WDoc { w: then_b.w, doc: group(Concat(head)) });
     };
@@ -1914,6 +1927,17 @@ fn if_expr(self: W) -> WDoc!FmtError {
         stepped.block_layout()?
     };
     ok(WDoc { w: tail.w, doc: group(Concat([..head, Text(" else "), tail.doc])) })
+}
+
+// `PATTERN = EXPR)` — entered just past `if (let`; consumes the closing `)`
+// too; a plain `pattern()` covers `if let`'s pattern exactly (it never accepts
+// an array pattern — the grammar reaches it only through `pattern`, not the
+// `match_arm` alternative that adds array patterns on top).
+fn if_let_clause(self: W) -> WDoc!FmtError {
+    let pat = self.pattern()?;
+    let value = pat.w.expect("=")?.w.expr()?;
+    let closed = value.w.expect(")")?.w;
+    ok(WDoc { w: closed, doc: Concat([pat.doc, Text(" = "), value.doc]) })
 }
 
 fn match_expr(self: W) -> WDoc!FmtError {
@@ -2725,15 +2749,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 18914
-deallocations: 18914
+allocations: 18926
+deallocations: 18926
 reallocations: 1158
-bytes allocated: 1141177
-instructions executed: 3060055
-binary size: 3668136
-  code: 2267596
+bytes allocated: 1141889
+instructions executed: 3061741
+binary size: 3677448
+  code: 2273372
   data: 23596
-  metadata: 1376944
+  metadata: 1380480
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2748,7 +2772,7 @@ functions:
     calls: 17
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1312
+    calls: 1315
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
     calls: 0
@@ -2790,7 +2814,7 @@ functions:
     calls: 0
     bytes: 32
   __builtin_any$__m1__Doc$lam32$tail:
-    calls: 493
+    calls: 496
     bytes: 324
   __builtin_count_is_at_least$char$s0:
     calls: 42
@@ -2889,7 +2913,7 @@ functions:
     calls: 0
     bytes: 36
   __m1__fits$tail:
-    calls: 1374
+    calls: 1377
     bytes: 2684
   __m1__fits_atom:
     calls: 0
@@ -2901,7 +2925,7 @@ functions:
     calls: 0
     bytes: 32
   __m1__has_hard$tail:
-    calls: 1302
+    calls: 1305
     bytes: 688
   __m1__print_doc:
     calls: 131
@@ -2961,10 +2985,10 @@ functions:
     calls: 94
     bytes: 468
   __rec_drop___m1__Doc:
-    calls: 2580
+    calls: 2583
     bytes: 184
   __rec_drop___m1__Work:
-    calls: 3653
+    calls: 3659
     bytes: 84
   __test$binding_ann:
     calls: 1
@@ -2988,7 +3012,7 @@ functions:
     calls: 476
     bytes: (external)
   aipl_arr_inc:
-    calls: 50379
+    calls: 50412
     bytes: (external)
   aipl_arr_reserve:
     calls: 539
@@ -2997,10 +3021,10 @@ functions:
     calls: 81
     bytes: (external)
   aipl_array_dec:
-    calls: 62454
+    calls: 62490
     bytes: (external)
   aipl_array_new:
-    calls: 10236
+    calls: 10239
     bytes: (external)
   aipl_array_push:
     calls: 1484
@@ -3015,19 +3039,19 @@ functions:
     calls: 175
     bytes: (external)
   aipl_rec_alloc:
-    calls: 6233
+    calls: 6242
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 42600
+    calls: 42671
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 3740
+    calls: 3746
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 36367
+    calls: 36429
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 3740
+    calls: 3746
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -3142,7 +3166,10 @@ functions:
     bytes: 1704
   if_expr:
     calls: 3
-    bytes: 12112
+    bytes: 13716
+  if_let_clause:
+    calls: 0
+    bytes: 4172
   import_item:
     calls: 14
     bytes: 16468
@@ -3294,7 +3321,7 @@ functions:
     calls: 0
     bytes: 2492
   tok_text:
-    calls: 3059
+    calls: 3062
     bytes: 456
   trailing_comment:
     calls: 74

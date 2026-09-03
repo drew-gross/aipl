@@ -1,0 +1,69 @@
+import {
+    equal as ==,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    print,
+    to_str,
+    wrapping_add as +,
+} from builtins;
+
+fn safe_add(a: i64, b: i64, allow_neg: bool) -> i64!str {
+    if (!allow_neg && (a < 0 || b < 0)) {
+        return err("negative");
+    };
+    ok(a + b)
+}
+
+fn describe_result(r: i64!str) -> str { if (let ok(v) = r) { to_str(v) } else { "error" } }
+
+// A `str`/`char` scrutinee has no case list to be exhaustive over: `if let`
+// reuses the same value-equality `_` fallthrough a `match` on one would end
+// with, so a non-matching value just isn't a special case here either.
+fn greet(name: str) -> str {
+    if (let "world" = name) { "hello, world!" } else { `hi, {name}` }
+}.test({
+    assert(describe_result(safe_add(2, 3, false)) == "5");
+    assert(describe_result(safe_add(2, -3, false)) == "error");
+    assert(greet("world") == "hello, world!");
+    assert(greet("Drew") == "hi, Drew");
+})
+
+fn main() !prints {
+    print(describe_result(safe_add(2, 3, false)));
+    print(describe_result(safe_add(2, -3, false)));
+    print(greet("world"));
+    print(greet("Drew"));
+}
+--- stdout ---
+5
+error
+hello, world!
+hi, Drew
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 105
+instructions executed: 220
+binary size: 2992
+  code: 1584
+  data: 1
+  metadata: 1407
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1096
+  safe_add:
+    calls: 2
+    bytes: 284

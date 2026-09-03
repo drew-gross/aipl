@@ -440,6 +440,19 @@ gazelle! {
              // Else-less `if` (statement position): yields unit, so its `then`
              // block must be unit-typed. Desugars to `if .. {} else {}`.
              | IF LPAREN expr RPAREN block => if_no_else
+             // `if (let PATTERN = EXPR) { .. }` — bind `PATTERN`'s payload from
+             // `EXPR` and run the block if it matches; every other case falls
+             // through (to `else`, or to nothing). Parenthesized like every
+             // other control-flow condition here (`if`, `while`, `match`,
+             // `for`): unparenthesized, `EXPR { .. }` could equally be read as
+             // an unparenthesized struct construction ending in the `if`'s own
+             // opening brace, and after `LPAREN` the `LET` lookahead (never a
+             // valid `expr` lead) cleanly picks this production over plain
+             // `if (expr)`.
+             | IF LPAREN LET pattern EQ expr RPAREN block ELSE else_branch => if_let_else
+             // Else-less `if let` (statement position): same synthetic-unit
+             // desugar as else-less `if`.
+             | IF LPAREN LET pattern EQ expr RPAREN block => if_let_no_else
              | NONE => none_lit
              | MATCH LPAREN expr RPAREN LBRACE match_arms RBRACE => match_expr
              // `shim <effect> { op = f, .. } { body }` — install shims for an
@@ -469,7 +482,9 @@ gazelle! {
         // toward the nearer `else`) as the top-level `atom` if-productions.
         else_branch = block => plain
                     | IF LPAREN expr RPAREN block ELSE else_branch => elif
-                    | IF LPAREN expr RPAREN block => elif_no_else;
+                    | IF LPAREN expr RPAREN block => elif_no_else
+                    | IF LPAREN LET pattern EQ expr RPAREN block ELSE else_branch => elif_let
+                    | IF LPAREN LET pattern EQ expr RPAREN block => elif_let_no_else;
 
         // The portion of a template literal after the first interpolation.
         // Either the closing tail (`TEMPLATE_TAIL`) or another interpolation
@@ -1907,6 +1922,30 @@ impl gazelle::Action<aipl::Block<Self>> for Build {
     }
 }
 
+/// The `ExprKind::IfLet` shared by `Atom::IfLetElse`/`Atom::IfLetNoElse` and
+/// their `else`-position counterparts `ElseBranch::ElifLet`/`ElifLetNoElse` —
+/// one `if let` is built identically wherever it appears. The `MatchArm` pairs
+/// `pattern` with `then_b` as its body, carrying `pattern`'s own span (rather
+/// than the whole construct's), so a binding-count/type error underlines the
+/// pattern.
+fn if_let_kind(
+    pattern: Pattern,
+    pat_span: Span,
+    scrutinee: Expr,
+    then_b: Expr,
+    else_b: Expr,
+) -> ExprKind {
+    ExprKind::IfLet(
+        Box::new(MatchArm {
+            pattern,
+            body: then_b,
+            span: pat_span,
+        }),
+        Box::new(scrutinee),
+        Box::new(else_b),
+    )
+}
+
 impl gazelle::Action<aipl::ElseBranch<Self>> for Build {
     fn build(&mut self, node: aipl::ElseBranch<Self>) -> Result<Expr, Self::Error> {
         Ok(match node {
@@ -1928,6 +1967,25 @@ impl gazelle::Action<aipl::ElseBranch<Self>> for Build {
                 let else_b = Expr::new(ExprKind::Unit, span.clone());
                 Expr::new(
                     ExprKind::If(Box::new(cond), Box::new(then_b), Box::new(else_b)),
+                    span,
+                )
+            }
+            // `else if (let ..) { .. } else ..` — a nested `if let` in the else
+            // position, built identically to `Atom::IfLetElse`.
+            aipl::ElseBranch::ElifLet((pattern, pat_span), scrutinee, then_b, else_b) => {
+                let span = join_spans(&pat_span, &else_b.span);
+                Expr::new(
+                    if_let_kind(pattern, pat_span, scrutinee, then_b, else_b),
+                    span,
+                )
+            }
+            // `else if (let ..) { .. }` with no trailing else — built identically
+            // to `Atom::IfLetNoElse`.
+            aipl::ElseBranch::ElifLetNoElse((pattern, pat_span), scrutinee, then_b) => {
+                let span = join_spans(&pat_span, &then_b.span);
+                let else_b = Expr::new(ExprKind::Unit, span.clone());
+                Expr::new(
+                    if_let_kind(pattern, pat_span, scrutinee, then_b, else_b),
                     span,
                 )
             }
@@ -2423,6 +2481,22 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                 let else_b = Expr::new(ExprKind::Unit, span.clone());
                 Expr::new(
                     ExprKind::If(Box::new(cond), Box::new(then_b), Box::new(else_b)),
+                    span,
+                )
+            }
+            aipl::Atom::IfLetElse((pattern, pat_span), scrutinee, then_b, else_b) => {
+                let span = join_spans(&pat_span, &else_b.span);
+                Expr::new(
+                    if_let_kind(pattern, pat_span, scrutinee, then_b, else_b),
+                    span,
+                )
+            }
+            // Else-less `if let`: same synthetic-unit desugar as `IfNoElse`.
+            aipl::Atom::IfLetNoElse((pattern, pat_span), scrutinee, then_b) => {
+                let span = join_spans(&pat_span, &then_b.span);
+                let else_b = Expr::new(ExprKind::Unit, span.clone());
+                Expr::new(
+                    if_let_kind(pattern, pat_span, scrutinee, then_b, else_b),
                     span,
                 )
             }
@@ -3932,6 +4006,11 @@ fn bake_asserts(e: &mut Expr, src: &str) {
             for arm in arms {
                 bake_asserts(&mut arm.body, src);
             }
+        }
+        ExprKind::IfLet(arm, scrut, else_b) => {
+            bake_asserts(scrut, src);
+            bake_asserts(&mut arm.body, src);
+            bake_asserts(else_b, src);
         }
         ExprKind::Lambda(_, body) => bake_asserts(body, src),
         ExprKind::Num(_)

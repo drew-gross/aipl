@@ -133,6 +133,15 @@ fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
                 })
                 .collect(),
         ),
+        ExprKind::IfLet(arm, scrut, else_b) => ExprKind::IfLet(
+            Box::new(MatchArm {
+                pattern: arm.pattern.clone(),
+                body: fold_expr(&arm.body, env),
+                span: arm.span.clone(),
+            }),
+            f(scrut),
+            f(else_b),
+        ),
         ExprKind::ArrayLit(elems) => {
             ExprKind::ArrayLit(elems.iter().map(|x| fold_expr(x, env)).collect())
         }
@@ -190,21 +199,28 @@ fn propagatable(v: &Expr, ty: Option<&Type>) -> bool {
 /// Over-approximating costs a missed fold; getting scope tracking subtly wrong
 /// costs a wrong program, and the bindings this pass exists for — the inliner's
 /// `$inl<N>_<param>` — are unique by construction and never rebound.
+/// Whether `pattern` binds `name` — the per-pattern check [`binds_name`]
+/// shares between a `match` arm and an `if let`.
+fn pattern_binds(pattern: &Pattern, name: &str) -> bool {
+    match pattern {
+        Pattern::Ctor { bindings, .. } => bindings.iter().any(|b| b == name),
+        // An array pattern's identifier elements are binders; its literal
+        // elements are not, but treating both as binders only over-vetoes.
+        Pattern::Array(elems) => elems
+            .iter()
+            .any(|el| matches!(&el.kind, ExprKind::Ident(n) if n == name)),
+        Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => false,
+    }
+}
+
 fn binds_name(e: &Expr, name: &str) -> bool {
     let here = match &e.kind {
         ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) | ExprKind::For(n, _, _) => {
             n == name
         }
         ExprKind::Lambda(params, _) => params.iter().any(|p| p.name == name),
-        ExprKind::Match(_, arms) => arms.iter().any(|arm| match &arm.pattern {
-            Pattern::Ctor { bindings, .. } => bindings.iter().any(|b| b == name),
-            // An array pattern's identifier elements are binders; its literal
-            // elements are not, but treating both as binders only over-vetoes.
-            Pattern::Array(elems) => elems
-                .iter()
-                .any(|el| matches!(&el.kind, ExprKind::Ident(n) if n == name)),
-            Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => false,
-        }),
+        ExprKind::Match(_, arms) => arms.iter().any(|arm| pattern_binds(&arm.pattern, name)),
+        ExprKind::IfLet(arm, _, _) => pattern_binds(&arm.pattern, name),
         _ => false,
     };
     here || crate::children(e).iter().any(|c| binds_name(c, name))

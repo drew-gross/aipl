@@ -1,0 +1,11 @@
+variant V = A(i64) | B(i64)
+
+fn f(v: V) -> i64 { if (let C(x) = v) { x } else { 0 } }
+
+fn main() -> i64 { f(A(1)) }
+--- errors ---
+error: V has no constructor "C"
+ --> ./tests/cases/if_let/err_unknown_case.aipl:3:29
+  |
+3 | fn f(v: V) -> i64 { if (let C(x) = v) { x } else { 0 } }
+  |                             ^

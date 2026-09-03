@@ -10,7 +10,7 @@ generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 variant:
   add a "variant without" option for concrete/generic type that lets you still pass a conrete type to functions that accept generic
   add an is keyword that matches cases and maybe replaces same_case (or maybe just a .is(CaseName) method?)
-  allow variant constructors to have defaults, get rid of many in grammar.aipl
+  allow variant constructors to have defaults, get rid of many in grammar.aipl (since Many can have default of 0)
   Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
   allow variant constructors to have named args/defaults
@@ -76,6 +76,7 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
+  BinOp should be lowered to a call much earlier in the pipeline, it's currently too easy to inspect a binop and assume it corresponds to a call other than the one it actually does
   unify operators with regular functions even more
   field_size and elem_size_of are apparently near duplicates that can be DRYed
   remove single-letter prefixes such as JInt and CTree, the caller can import as if they need to disambiguate.
@@ -158,11 +159,12 @@ math:
   % should not abort. (what should it do? TBD)
 
 syntax:
+  locally mutable args
+  l.map(|v| v.field) stutters, should come up with a syntax that doesn't stutter
   allow default args to refer to each other (requires 1 to be set to break the cycle)
   add match (v) val if expr => r syntax
   destructuring with renames (let Foo { field as f, .. } = ...)
   allow passing int literals to u64 arguments
-  implement if let, lint for it's use in case of none => {}
   module level constants
   for (let i, c : dct) syntax for dicts
   allow match arm grouping to bind vars with the same type and name, or ignore bindings
@@ -209,14 +211,17 @@ write_file.aipl
 companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
+formatter:
+  when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
+
 parser:
+  CharRun with cont="" to match exactly on char doesn't express intent well enough, we should add an api that expresses it directly
+  CharRun should use defaults
   chage Far to use a set of expected
-  what's with Term(Str(""))? Why the ""?
   Mk should accept fns that only need kids
   implement "nested in" which should be good for the formatter
-  change the plan to include a toy langauge that has binary operators with precedence
   implement the plan
-  can use strings instead of spans in many places, it's COW/SSO so it should be fast
+  can use SpanStr instead of spans in many places once we have it, it's COW/SSO so it should be fast
   remove power from prec and use order within the list
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
@@ -236,6 +241,7 @@ utilities:
 skills:
 
 lint:
+  lint to use if let instead of match with empty none case
   lint !v.is_empty() to v.is_nonempty()
   linter should apply after import resolution so that it doesn't rely on function names as selected by the user (i.e. import as can't interfere with a lint)
   recommend a destructuring with rename when names would be ambiguous
@@ -292,6 +298,8 @@ design:
     the langauge should be incapable of aborting
 
 optimizations:
+  same-branch folding (if (cond) { a } else { a } should drop the if) (applies after default propagation in e.g. join)
+  contains should use a skip table
   inline_small should discount instructions that are just forwarding args from caller to an internal function. Also maybe sort by instructions and inline smallest first?
   monomorphize separately when arguments are defaults (so constants can be propagated)
   why is [..arr, val] slower than let v = arr; v.push(val)? turns out it's 2 calls (reserve + append) instead of 1, but the calls should be cheaper. Maybe there is more to do here, maybe not.
@@ -376,9 +384,6 @@ optimizations:
         One correction to my earlier framing: I sold B1 as "a two-line change with a plausibly large effect." The two-line part was right; the effect estimate wasn't, and I should have flagged that the call-dominated profile I'd already measured for C1 predicted this. If you want to keep going down the optimization list, C1 is now the one carrying B1's value as well as its own.
 
     B2. rewrite_expr clones the whole locals set per nested binding. crates/aipl-loader/src/lib.rs:917 — let with = |name| { let mut s = locals.clone(); … }, called for every let, lambda param, and loop variable. Quadratic in binding depth across every file on every compile. A push/pop scope stack or a persistent set fixes it.
-
-    B4. lexer.aipl costs 8.04s to build — 5.6× the next worst and ~18% of the corpus's 43s total build time (tests/performance_metrics.md), producing a 1.75MB object with 1.1MB of code from 1310 source lines and 57 instances. Worth profiling on its own; it's also the file the compiler dogfoods most heavily.
-      Profiled it. The cost was not codegen at all: 82% of the run was the dogfooded lexer, and 58% of the whole build was str24::contains, which called starts_with_at at every candidate offset and so paid a two-cursor rope descent per byte position. Flattening both sides once and scanning byte slices took the build 1.59s -> 0.37s. cmp got the same flat fast path (it is what a set/dict linear scan calls per element). Residual: the scan is still a naive windows().any() with no skip table, and contains on a rope now materializes it (as slice already did) rather than walking.
 
     B5. Clone-heavy passes: 620 .clone() in mono/lib.rs, 319 in codegen/lib.rs, 217 in check.rs. Not a finding per se, but the AST is cloned wholesale several times per compile (fold → mono → codegen); worth a look for Rc/borrow opportunities.
 

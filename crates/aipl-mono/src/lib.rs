@@ -308,6 +308,27 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, &[Type]>, scope: &mut Vec<String>)
                 .collect();
             rw(K::Match(Box::new(scrutinee), arms))
         }
+        K::IfLet(arm, scrutinee, else_b) => {
+            let scrutinee = lcr_expr(scrutinee, ctors, scope);
+            let bindings = arm.pattern.bindings();
+            for b in &bindings {
+                scope.push(b.clone());
+            }
+            let body = lcr_expr(&arm.body, ctors, scope);
+            for _ in &bindings {
+                scope.pop();
+            }
+            let arm = MatchArm {
+                body,
+                ..(**arm).clone()
+            };
+            let else_b = lcr_expr(else_b, ctors, scope);
+            rw(K::IfLet(
+                Box::new(arm),
+                Box::new(scrutinee),
+                Box::new(else_b),
+            ))
+        }
         K::Slice(a, b, c) => rw(K::Slice(
             Box::new(lcr_expr(a, ctors, scope)),
             Box::new(lcr_expr(b, ctors, scope)),
@@ -595,6 +616,15 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
                     span: arm.span.clone(),
                 })
                 .collect(),
+        ),
+        ExprKind::IfLet(arm, s, else_b) => ExprKind::IfLet(
+            Box::new(MatchArm {
+                pattern: arm.pattern.clone(),
+                body: lt_expr(&arm.body, fm, ord),
+                span: arm.span.clone(),
+            }),
+            Box::new(lt_expr(s, fm, ord)),
+            Box::new(lt_expr(else_b, fm, ord)),
         ),
     };
     Expr::rebuilt(kind, e)
@@ -912,6 +942,15 @@ impl GenericLowerer {
                         })
                     })
                     .collect::<Result<_, Error>>()?,
+            ),
+            K::IfLet(arm, s, else_b) => K::IfLet(
+                Box::new(MatchArm {
+                    pattern: arm.pattern.clone(),
+                    body: self.lower_expr(&arm.body)?,
+                    span: arm.span.clone(),
+                }),
+                b(self, s)?,
+                b(self, else_b)?,
             ),
         };
         Ok(Expr::rebuilt(kind, e))
@@ -4254,6 +4293,63 @@ impl Mono<'_> {
     /// Payload types a `match` arm binds: the optional's element for `some`, a
     /// variant case's payload positionally, else a permissive `i64` fill (the
     /// checker has already validated the pattern).
+    /// Every case of `st` other than `given` (a bare case name — no `@Variant`
+    /// qualifier), as `(case name, payload types)`. The [`ExprKind::IfLet`]
+    /// desugar's "everything else" arm set: mirrors [`Mono::match_payload_tys`]'s
+    /// type-driven case lookup, but for the whole case list rather than one
+    /// case's payload.
+    fn other_cases(&self, st: &Type, given: &str) -> Vec<(String, Vec<Type>)> {
+        let all: Vec<(String, Vec<Type>)> = match st {
+            Type::Optional(inner) => vec![
+                ("some".to_string(), vec![(**inner).clone()]),
+                ("none".to_string(), Vec::new()),
+            ],
+            Type::Result(ok, err) => vec![
+                (
+                    "ok".to_string(),
+                    if is_unit(ok) {
+                        Vec::new()
+                    } else {
+                        vec![(**ok).clone()]
+                    },
+                ),
+                ("err".to_string(), vec![(**err).clone()]),
+            ],
+            Type::Named(name) => self
+                .variants
+                .get(name)
+                .or_else(|| self.syn_variants.get(name))
+                .cloned()
+                .unwrap_or_default(),
+            Type::Generic(base, args) => self
+                .generic_variants
+                .get(base)
+                .map(|tmpl| {
+                    let map: HashMap<String, Type> = tmpl
+                        .type_vars
+                        .iter()
+                        .map(|tv| tv.name.clone())
+                        .zip(args.iter().cloned())
+                        .collect();
+                    tmpl.cases
+                        .iter()
+                        .map(|c| {
+                            (
+                                c.name.clone(),
+                                c.payload
+                                    .iter()
+                                    .map(|p| subst_type_params(p, &map))
+                                    .collect(),
+                            )
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        all.into_iter().filter(|(c, _)| c != given).collect()
+    }
+
     fn match_payload_tys(&self, scrut: &Type, ctor: &str, n: usize) -> Vec<Type> {
         // A pattern constructor may be variant-qualified (`Case@Variant`); the
         // scrutinee's type already fixes the variant, so match on the bare case.
@@ -5382,6 +5478,87 @@ impl Mono<'_> {
                     node(ExprKind::Match(Box::new(rs), rarms)),
                     merged.unwrap_or(Type::Primitive(Primitive::I64)),
                 )
+            }
+            // Same payload-binding logic as a `Match` arm — reusing
+            // `match_payload_tys`/`expand_ignored_payload` — but for the one
+            // named pattern only; `else_b` infers in the *original* `env` (its
+            // bindings never reach there), and the merge is a two-way one, as
+            // `If`'s branches get.
+            // `if let` names one case and lets every other value fall to
+            // `else` — the opposite of `match`'s exhaustiveness. Desugar into a
+            // genuine, exhaustive `Match` here, now that the scrutinee's
+            // concrete case list is known, so codegen never has to know the
+            // difference: it reuses the same tag-dispatch machinery, and a
+            // str/array/char scrutinee reuses the very `Wildcard` fallthrough
+            // that already means "everything else" there. For a tagged
+            // scrutinee, every case but the named one gets a synthesized arm
+            // whose bindings are `expand_ignored_payload`'s `"_"` filler
+            // (already relied on for `Ctor(..)`, so codegen's per-arm binding
+            // and drop logic already tolerates the repeats) and whose body is
+            // `else_b` — inferred once and (already-monomorphized) cloned into
+            // each one, which re-triggers no side effect the way calling
+            // `infer` again would.
+            ExprKind::IfLet(arm, scrut, else_b) => {
+                let (rs, st) = self.infer(scrut, env)?;
+                let bind_tys = match &arm.pattern {
+                    Pattern::Ctor { name, bindings, .. } => {
+                        self.match_payload_tys(&st, name, bindings.len())
+                    }
+                    Pattern::Array(_) => {
+                        let elem = match &st {
+                            Type::Array(e) => (**e).clone(),
+                            _ => Type::Primitive(Primitive::Char), // str, as char[]
+                        };
+                        vec![elem; arm.pattern.bindings().len()]
+                    }
+                    Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => Vec::new(),
+                };
+                let pattern = expand_ignored_payload(&arm.pattern, bind_tys.len());
+                let mut env2 = env.clone();
+                for (name, ty) in pattern.bindings().iter().zip(bind_tys) {
+                    env2.insert(name.clone(), ty);
+                }
+                let (rb, tt) = self.infer(&arm.body, &env2)?;
+                let given_arm = MatchArm {
+                    pattern,
+                    body: rb,
+                    span: arm.span.clone(),
+                };
+                let (re, et) = self.infer(else_b, env)?;
+                let else_arms: Vec<MatchArm> = if is_str_repr(&st)
+                    || matches!(&st, Type::Array(_) | Type::Primitive(Primitive::Char))
+                {
+                    vec![MatchArm {
+                        pattern: Pattern::Wildcard,
+                        body: re,
+                        span: else_b.span.clone(),
+                    }]
+                } else {
+                    let given = match &given_arm.pattern {
+                        Pattern::Ctor { name, .. } => {
+                            name.split('@').next().unwrap_or(name).to_string()
+                        }
+                        // Only reachable for a str/array/char scrutinee, which
+                        // took the branch above — a tagged scrutinee's pattern
+                        // is always `Ctor` (the checker rejects `Wildcard` there).
+                        _ => String::new(),
+                    };
+                    self.other_cases(&st, &given)
+                        .into_iter()
+                        .map(|(case, payload)| MatchArm {
+                            pattern: Pattern::Ctor {
+                                name: case,
+                                bindings: vec!["_".to_string(); payload.len()],
+                                ignore_payload: false,
+                            },
+                            body: re.clone(),
+                            span: else_b.span.clone(),
+                        })
+                        .collect()
+                };
+                let mut arms = vec![given_arm];
+                arms.extend(else_arms);
+                (node(ExprKind::Match(Box::new(rs), arms)), merge(tt, et))
             }
             ExprKind::Construct(name, inits) => {
                 // A construction of a generic struct template (`Box { value: 5 }`)
@@ -6818,6 +6995,15 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
                 })
                 .collect(),
         ),
+        K::IfLet(arm, scrut, else_b) => K::IfLet(
+            Box::new(MatchArm {
+                pattern: arm.pattern.clone(),
+                body: *r(&arm.body),
+                span: arm.span.clone(),
+            }),
+            r(scrut),
+            r(else_b),
+        ),
         K::ArrayLit(es) => K::ArrayLit(es.iter().map(|x| *r(x)).collect()),
         K::SetLit(es) => K::SetLit(es.iter().map(|x| *r(x)).collect()),
         K::TupleLit(es) => K::TupleLit(es.iter().map(|x| *r(x)).collect()),
@@ -7073,6 +7259,19 @@ fn collect_free(
                 }
             }
         }
+        ExprKind::IfLet(arm, s, else_b) => {
+            collect_free(s, bound, env, out, seen);
+            let names = arm.pattern.bindings();
+            let added: Vec<&String> = names
+                .iter()
+                .filter(|b| bound.insert((*b).clone()))
+                .collect();
+            collect_free(&arm.body, bound, env, out, seen);
+            for b in added {
+                bound.remove(b);
+            }
+            collect_free(else_b, bound, env, out, seen);
+        }
         ExprKind::Let(n, _, val, b) | ExprKind::LetMut(n, _, val, b) => {
             collect_free(val, bound, env, out, seen);
             let added = bound.insert(n.clone());
@@ -7250,6 +7449,21 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
                     bound.remove(&b);
                 }
             }
+        }
+        ExprKind::IfLet(arm, s, else_b) => {
+            count_uses(s, bound, counts);
+            let added: Vec<String> = arm
+                .pattern
+                .bindings()
+                .iter()
+                .filter(|b| bound.insert((*b).clone()))
+                .cloned()
+                .collect();
+            count_uses(&arm.body, bound, counts);
+            for b in added {
+                bound.remove(&b);
+            }
+            count_uses(else_b, bound, counts);
         }
         ExprKind::Let(n, _, val, b) | ExprKind::LetMut(n, _, val, b) => {
             count_uses(val, bound, counts);
@@ -7949,6 +8163,7 @@ pub fn children(e: &Expr) -> Vec<&Expr> {
             v.extend(arms.iter().map(|a| &a.body));
             v
         }
+        ExprKind::IfLet(arm, s, else_b) => vec![s.as_ref(), &arm.body, else_b.as_ref()],
         ExprKind::Lambda(_, b) => vec![b],
     }
 }
@@ -8013,6 +8228,7 @@ pub fn children_mut(e: &mut Expr) -> Vec<&mut Expr> {
             v.extend(arms.iter_mut().map(|a| &mut a.body));
             v
         }
+        ExprKind::IfLet(arm, s, else_b) => vec![s.as_mut(), &mut arm.body, else_b.as_mut()],
         ExprKind::Lambda(_, b) => vec![b],
     }
 }
@@ -8227,6 +8443,15 @@ fn replace_call(
                     span: a.span.clone(),
                 })
                 .collect(),
+        ),
+        ExprKind::IfLet(arm, s, else_b) => ExprKind::IfLet(
+            Box::new(MatchArm {
+                pattern: arm.pattern.clone(),
+                body: rc(&arm.body, counter, replaced),
+                span: arm.span.clone(),
+            }),
+            Box::new(rc(s, counter, replaced)),
+            Box::new(rc(else_b, counter, replaced)),
         ),
         ExprKind::Lambda(ps, b) => ExprKind::Lambda(ps.clone(), Box::new(rc(b, counter, replaced))),
     };
@@ -8454,6 +8679,15 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
                     span: a.span.clone(),
                 })
                 .collect(),
+        ),
+        ExprKind::IfLet(arm, s, else_b) => ExprKind::IfLet(
+            Box::new(MatchArm {
+                pattern: arm.pattern.clone(),
+                body: rename_params(&arm.body, &without_all(&arm.pattern.bindings())),
+                span: arm.span.clone(),
+            }),
+            Box::new(rename_params(s, map)),
+            Box::new(rename_params(else_b, map)),
         ),
         ExprKind::Lambda(ps, b) => {
             let names: Vec<String> = ps.iter().map(|p| p.name.clone()).collect();
@@ -8848,6 +9082,9 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
         ExprKind::Match(scrut, arms) => {
             is_n(scrut) || rec(scrut) || arms.iter().any(|arm| rec_tail(&arm.body))
         }
+        ExprKind::IfLet(arm, scrut, else_b) => {
+            is_n(scrut) || rec(scrut) || rec_tail(&arm.body) || rec_tail(else_b)
+        }
     }
 }
 
@@ -8900,6 +9137,7 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         ExprKind::DictLit(pairs) => pairs.iter().map(|(k, v)| c(k) + c(v)).sum(),
         ExprKind::Construct(_, inits) => inits.iter().map(|i| c(&i.value)).sum(),
         ExprKind::Match(s, arms) => c(s) + arms.iter().map(|a| c(&a.body)).sum::<usize>(),
+        ExprKind::IfLet(arm, s, else_b) => c(s) + c(&arm.body) + c(else_b),
         ExprKind::Lambda(_, body) => c(body),
     }
 }
@@ -8943,6 +9181,9 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         ExprKind::Construct(_, inits) => inits.iter().find_map(|i| find_move_into(param, &i.value)),
         ExprKind::Match(s, arms) => find_move_into(param, s)
             .or_else(|| arms.iter().find_map(|a| find_move_into(param, &a.body))),
+        ExprKind::IfLet(arm, s, else_b) => find_move_into(param, s)
+            .or_else(|| find_move_into(param, &arm.body))
+            .or_else(|| find_move_into(param, else_b)),
         ExprKind::Lambda(_, body) => find_move_into(param, body),
         ExprKind::Ident(_)
         | ExprKind::Num(_)

@@ -1,0 +1,47 @@
+import { equal as ==, print, to_str, wrapping_mul as * } from builtins;
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Empty
+
+// `else if (let ..)` chains exactly like `else if (..)`: each link tests one
+// more case, and the final `else` is what makes the whole thing legal without
+// naming every `Shape` case the way a `match` would have to.
+fn area(s: Shape) -> i64 {
+    if (let Circle(r) = s) { r * r } else if (let Rect(w, h) = s) { w * h } else { 0 }
+}.test({
+    assert(area(Circle(3)) == 9);
+    assert(area(Rect(4, 5)) == 20);
+    assert(area(Empty) == 0);
+})
+
+fn main() !prints {
+    print(to_str(area(Circle(3))));
+    print(to_str(area(Rect(4, 5))));
+    print(to_str(area(Empty)));
+}
+--- stdout ---
+9
+20
+0
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 52
+instructions executed: 143
+binary size: 1784
+  code: 852
+  data: 1
+  metadata: 931
+functions:
+  __to_str_i64:
+    calls: 3
+    bytes: 204
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 648

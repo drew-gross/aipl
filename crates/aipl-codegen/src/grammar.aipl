@@ -198,11 +198,10 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // Two productions of one name would make `Named` mean whichever came first
     // and leave the other unreachable — a typo that reads as a working grammar.
     for (let i, n : names) {
-        match (name_index(names, n)) {
-            some(j) => if (j != i) {
+        if (let some(j) = name_index(names, n)) {
+            if (j != i) {
                 return err(ParseError { message: `duplicate rule name "{n}"`, span: 0..0 });
-            },
-            none => {},
+            };
         };
     }
     let prods = g.prods.try_map(|p| ok(Production { ..p, rule: link_rule(p.rule, names)? }))?;
@@ -317,7 +316,7 @@ allocations: 110
 deallocations: 110
 reallocations: 17
 bytes allocated: 9424
-instructions executed: 13904
+instructions executed: 13914
 binary size: 44648
   code: 27392
   data: 1692

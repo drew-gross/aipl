@@ -691,6 +691,11 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
                 check_operators(&a.body, view)?;
             }
         }
+        ExprKind::IfLet(arm, s, else_b) => {
+            check_operators(s, view)?;
+            check_operators(&arm.body, view)?;
+            check_operators(else_b, view)?;
+        }
         ExprKind::Lambda(_, body) => check_operators(body, view)?,
         ExprKind::Num(_)
         | ExprKind::Bool(_)
@@ -1116,6 +1121,25 @@ fn rewrite_expr(
             ExprKind::Match(
                 Box::new(rewrite_expr(scrutinee, view, sc, locals)),
                 new_arms,
+            )
+        }
+        // The pattern's bindings are locals for `arm.body` (the `then` branch)
+        // only — not `scrutinee`, and not `else_b` — exactly the scoping one
+        // `Match` arm's bindings get.
+        ExprKind::IfLet(arm, scrutinee, else_b) => {
+            let mut then_locals = locals.clone();
+            for b in arm.pattern.bindings() {
+                then_locals.insert(b.clone());
+            }
+            let new_arm = MatchArm {
+                pattern: resolve_pattern(&arm.pattern, view, sc),
+                body: rewrite_expr(&arm.body, view, sc, &then_locals),
+                span: arm.span.clone(),
+            };
+            ExprKind::IfLet(
+                Box::new(new_arm),
+                Box::new(rewrite_expr(scrutinee, view, sc, locals)),
+                Box::new(rewrite_expr(else_b, view, sc, locals)),
             )
         }
         ExprKind::Neg(inner) => ExprKind::Neg(Box::new(rewrite_expr(inner, view, sc, locals))),

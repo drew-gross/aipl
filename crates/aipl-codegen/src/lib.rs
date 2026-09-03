@@ -16897,6 +16897,9 @@ fn compile_expr_inner<M: Module>(
     Ok(match &expr.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
+        ExprKind::IfLet(..) => {
+            unreachable!("`if let` is desugared to an exhaustive `Match` by mono's `infer`")
+        }
         // Unit carries no value; hand back a placeholder i64 the unit type
         // forbids anyone from consuming, mirroring the unit-call result.
         ExprKind::Unit => (builder.ins().iconst(types::I64, 0), ConcreteType::Unit),

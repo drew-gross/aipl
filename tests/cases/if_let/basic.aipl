@@ -1,0 +1,44 @@
+import { equal as ==, print, to_str } from builtins;
+
+// `if (let PATTERN = EXPR) { THEN }` binds `PATTERN`'s payload from `EXPR` and
+// runs `THEN` if it matches — the one case this site cares about. Every other
+// case (here, `none`) silently falls through with no arm to write, unlike a
+// `match`, which would require one.
+fn describe(x: i64?) -> str { if (let some(v) = x) { `got {to_str(v)}` } else { "nothing" } }.test({
+    assert(describe(some(5)) == "got 5");
+    assert(describe(none) == "nothing");
+})
+
+fn main() !prints {
+    print(describe(some(5)));
+    print(describe(none));
+}
+--- stdout ---
+got 5
+nothing
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 105
+instructions executed: 97
+binary size: 1816
+  code: 712
+  data: 1
+  metadata: 1103
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  describe:
+    calls: 2
+    bytes: 336
+  main:
+    calls: 1
+    bytes: 172

@@ -1,0 +1,9 @@
+fn f(x: i64?) -> i64 { if (let some(a, b) = x) { a } else { 0 } }
+
+fn main() -> i64 { f(none) }
+--- errors ---
+error: constructor "some" binds 1 value(s), but 2 given
+ --> ./tests/cases/if_let/err_wrong_arity.aipl:1:32
+  |
+1 | fn f(x: i64?) -> i64 { if (let some(a, b) = x) { a } else { 0 } }
+  |                                ^^^^

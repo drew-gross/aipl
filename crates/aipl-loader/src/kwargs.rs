@@ -932,6 +932,24 @@ impl Expander {
                     .collect::<Result<_, Error>>()?;
                 ExprKind::Match(Box::new(self.expand_expr(scrutinee, locals)?), new_arms)
             }
+            // Same scoping as `Match`'s arms: the pattern's bindings are locals
+            // for `arm.body` only, not `scrutinee` or `else_b`.
+            ExprKind::IfLet(arm, scrutinee, else_b) => {
+                let mut then_locals = locals.clone();
+                for b in arm.pattern.bindings() {
+                    then_locals.insert(b.clone());
+                }
+                let new_arm = MatchArm {
+                    pattern: arm.pattern.clone(),
+                    body: self.expand_expr(&arm.body, &then_locals)?,
+                    span: arm.span.clone(),
+                };
+                ExprKind::IfLet(
+                    Box::new(new_arm),
+                    Box::new(self.expand_expr(scrutinee, locals)?),
+                    Box::new(self.expand_expr(else_b, locals)?),
+                )
+            }
             ExprKind::Neg(x) => ExprKind::Neg(Box::new(self.expand_expr(x, locals)?)),
             ExprKind::Not(x) => ExprKind::Not(Box::new(self.expand_expr(x, locals)?)),
             ExprKind::Binop(a, op, b) => ExprKind::Binop(

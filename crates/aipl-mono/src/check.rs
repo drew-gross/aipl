@@ -204,6 +204,13 @@ fn outer_assign(body: &Expr, declared: &HashSet<String>) -> Option<(String, Span
                 outer_assign(&a.body, &inner)
             })
         }),
+        ExprKind::IfLet(arm, scrut, else_b) => outer_assign(scrut, declared)
+            .or_else(|| {
+                let mut inner = declared.clone();
+                inner.extend(arm.pattern.bindings());
+                outer_assign(&arm.body, &inner)
+            })
+            .or_else(|| outer_assign(else_b, declared)),
         // A lambda body is a separate function; its captures are checked there.
         ExprKind::Lambda(_, _) => None,
         _ => crate::children(body)
@@ -2851,6 +2858,40 @@ impl Cx<'_> {
                 let ty = merged.unwrap_or(Type::Primitive(Primitive::I64));
                 self.check_match_kind(&ty, arms, pos, span.clone())?;
                 ty
+            }
+            // `if (let PATTERN = EXPR) { THEN } else { ELSE }` — checked like a
+            // `match` with exactly one named arm, but without the exhaustiveness
+            // (or statement/expression-kind) restrictions `match` has: only this
+            // one case is named, `ELSE` covers everything else, and the two
+            // branches merge their types exactly as an ordinary `if`'s do (a
+            // bare-literal branch may flex to the other's narrow-int type). No
+            // `outer_assign` restriction either, for the same reason `if` itself
+            // has none: unlike `match`, there's only ever the one pattern to read,
+            // so an expression-position `if let` mutating an outer binding in
+            // `THEN` is no more surprising than an ordinary `if` doing the same.
+            ExprKind::IfLet(arm, scrut, else_b) => {
+                let st = self.check_expr(scrut, env, effects)?;
+                let bind_tys =
+                    self.match_arm_bindings(&st, arm, scrut.span.clone(), env, effects)?;
+                let mut env2 = env.clone();
+                for (name, ty) in arm.pattern.bindings().iter().zip(bind_tys) {
+                    env2.insert(name.clone(), Binding { ty, mutable: false });
+                }
+                let tt = self.check_expr_at(&arm.body, &env2, effects, pos)?;
+                let et = self.check_expr_at(else_b, env, effects, pos)?;
+                let tt = self.flex_int(&arm.body, &tt, &et)?;
+                let et = self.flex_int(else_b, &et, &tt)?;
+                if coerce(&tt, &et).is_err() && coerce(&et, &tt).is_err() {
+                    return Err(Error::at(
+                        format!(
+                            "if-let branches have mismatched types: {} vs {}",
+                            tyname(&tt),
+                            tyname(&et)
+                        ),
+                        span.clone(),
+                    ));
+                }
+                merge(tt, et)
             }
             ExprKind::Call(name, args, method_style) => {
                 // For a method call the receiver is `args[0]`, and two rules

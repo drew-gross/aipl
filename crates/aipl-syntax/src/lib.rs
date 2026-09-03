@@ -1196,6 +1196,41 @@ pub mod ast {
         /// match must cover every case, a `str` match must end with `_`. See
         /// [`MatchArm`].
         Match(Box<Expr>, Vec<MatchArm>),
+        /// `if (let PATTERN = EXPR) { THEN } (else { ELSE })?` — bind
+        /// `PATTERN`'s payload from `EXPR` and run `THEN` if it matches, `ELSE`
+        /// otherwise (`ELSE` is a synthetic `Unit` when no `else` is written,
+        /// exactly as an else-less `if` synthesizes one). The `MatchArm` pairs
+        /// `PATTERN` with `THEN` as its body — the same shape a `match` arm for
+        /// this one case would have — and its `span` is the pattern's own, so a
+        /// binding-count/type error underlines the pattern rather than the whole
+        /// construct.
+        ///
+        /// Unlike [`Match`], only this one case is named: `PATTERN` says which
+        /// case this site cares about, and every other case — including, for a
+        /// `str`/`char`/array scrutinee, every non-matching value — silently
+        /// falls to `ELSE`. So unlike `match`, adding a case to a variant never
+        /// forces an `if let` site to be revisited; that is the point of writing
+        /// one instead of a `match` with an empty arm per other case.
+        ///
+        /// Parenthesized (`if (let ..) { .. }`) for the same reason every other
+        /// control-flow condition in this grammar is (`if`, `while`, `match`,
+        /// `for`): a bare `if let PAT = EXPR { .. }` cannot tell an
+        /// unparenthesized struct construction (`IDENT { .. }`) ending `EXPR`
+        /// from the `if`'s own opening brace.
+        ///
+        /// `PATTERN` is [`Pattern`]'s ordinary grammar (a constructor, nullary or
+        /// variant-qualified, plus a string/char literal) — never an array
+        /// pattern, which the parser only reaches through `match_arm`'s separate
+        /// `[e0, e1, ...] => ..` alternative, not through `Pattern` itself.
+        ///
+        /// Eliminated before codegen: monomorphization's `infer` desugars it into
+        /// a genuine, exhaustive [`Match`] once the scrutinee's concrete case
+        /// list is known — one arm for `PATTERN`, plus one synthesized arm per
+        /// remaining case (or, for a `str`/`char`/array scrutinee, a single
+        /// [`Pattern::Wildcard`] fallthrough), each running a cloned, already-
+        /// inferred copy of `ELSE`. Codegen never has to know `if let` from
+        /// `match`.
+        IfLet(Box<MatchArm>, Box<Expr>, Box<Expr>),
         /// `[e0, e1, ...]` — an array literal. Element types must all
         /// agree (and be a primitive). An empty `[]` has element type
         /// `__none__` and coerces to any `T[]`, like bare `none`.
@@ -1880,6 +1915,11 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
             for a in arms {
                 collect_operators(&a.body, out);
             }
+        }
+        K::IfLet(arm, s, else_b) => {
+            collect_operators(s, out);
+            collect_operators(&arm.body, out);
+            collect_operators(else_b, out);
         }
         K::Lambda(_, body) => collect_operators(body, out),
         K::TupleLit(elems) => {
@@ -2677,6 +2717,9 @@ fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
             v.extend(arms.iter_mut().map(|a| &mut a.body));
             v
         }
+        K::IfLet(arm, scrutinee, else_b) => {
+            vec![scrutinee.as_mut(), &mut arm.body, else_b.as_mut()]
+        }
         K::Slice(a, b, c) => {
             let mut v = vec![a.as_mut(), b.as_mut()];
             if let Some(c) = c {
@@ -2738,6 +2781,11 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
             for arm in arms {
                 each_subexpr(&arm.body, f);
             }
+        }
+        K::IfLet(arm, scrutinee, else_b) => {
+            each_subexpr(scrutinee, f);
+            each_subexpr(&arm.body, f);
+            each_subexpr(else_b, f);
         }
         K::Slice(a, b, c) => {
             each_subexpr(a, f);
@@ -2818,6 +2866,16 @@ fn collect_free(
                 bound.truncate(depth);
             }
         }
+        // The pattern's bindings are in scope for `arm.body` (the `then`
+        // branch) only — not the scrutinee it's read from, and not `else_b`.
+        K::IfLet(arm, scrutinee, else_b) => {
+            collect_free(scrutinee, bound, out);
+            let depth = bound.len();
+            bound.extend(arm.pattern.bindings());
+            collect_free(&arm.body, bound, out);
+            bound.truncate(depth);
+            collect_free(else_b, bound, out);
+        }
         _ => {
             for child in children(e) {
                 collect_free(child, bound, out);
@@ -2862,6 +2920,7 @@ fn children(e: &ast::Expr) -> Vec<&ast::Expr> {
             v.extend(arms.iter().map(|a| &a.body));
             v
         }
+        K::IfLet(arm, scrutinee, else_b) => vec![scrutinee, &arm.body, else_b],
         K::Slice(a, b, c) => {
             let mut v = vec![&**a, &**b];
             if let Some(c) = c {

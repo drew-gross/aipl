@@ -1,0 +1,9 @@
+fn f(x: i64?) -> str { if (let some(v) = x) { "yes" } else { 1 } }
+
+fn main() -> i64 { 0 }
+--- errors ---
+error: if-let branches have mismatched types: str vs i64
+ --> ./tests/cases/if_let/err_branch_mismatch.aipl:1:32
+  |
+1 | fn f(x: i64?) -> str { if (let some(v) = x) { "yes" } else { 1 } }
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
