@@ -282,12 +282,12 @@ fn shown(src: str) -> str!ParseError { ok(sexp_cst(src)?.show(src, prod_names(se
 allocations: 25393
 deallocations: 25393
 reallocations: 2339
-bytes allocated: 1244174
-instructions executed: 4233698
-binary size: 188272
-  code: 119368
+bytes allocated: 1267718
+instructions executed: 4406944
+binary size: 190264
+  code: 120640
   data: 3556
-  metadata: 65348
+  metadata: 66068
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -306,7 +306,7 @@ functions:
     bytes: 140
   __arr_drop___m3__Token$SexpKind:
     calls: 981
-    bytes: 140
+    bytes: 160
   __arr_drop___m3__TokenRule$SexpKind:
     calls: 24
     bytes: 544
@@ -327,7 +327,7 @@ functions:
     bytes: 140
   __arr_retain___m3__Token$SexpKind:
     calls: 935
-    bytes: 140
+    bytes: 160
   __arr_retain___m3__TokenRule$SexpKind:
     calls: 0
     bytes: 544
@@ -402,7 +402,7 @@ functions:
     bytes: 1592
   __m3__finalize_template$SexpKind:
     calls: 0
-    bytes: 4240
+    bytes: 4356
   __m3__float_len:
     calls: 0
     bytes: 824
@@ -420,10 +420,10 @@ functions:
     bytes: 940
   __m3__step_result$SexpKind:
     calls: 3585
-    bytes: 6856
+    bytes: 7156
   __m3__template_scan$SexpKind:
     calls: 0
-    bytes: 2740
+    bytes: 2744
   __m3__template_step$SexpKind:
     calls: 0
     bytes: 468
@@ -432,7 +432,7 @@ functions:
     bytes: 2780
   __m5__error_at$SexpKind$Sexp:
     calls: 4
-    bytes: 1748
+    bytes: 1816
   __m5__far_miss:
     calls: 1712
     bytes: 940
@@ -441,7 +441,7 @@ functions:
     bytes: 228
   __m5__leaf_at$SexpKind$Sexp:
     calls: 890
-    bytes: 1360
+    bytes: 1760
   __m5__lower_node$SexpKind$Sexp:
     calls: 867
     bytes: 3688
@@ -462,7 +462,7 @@ functions:
     bytes: 4000
   __m5__match_rule$SexpKind$Sexp:
     calls: 6070
-    bytes: 4504
+    bytes: 4612
   __m5__match_then$SexpKind$Sexp:
     calls: 854
     bytes: 1720
@@ -471,19 +471,19 @@ functions:
     bytes: 380
   __m5__parse_cst$SexpKind$Sexp:
     calls: 23
-    bytes: 4492
+    bytes: 4368
   __m5__prev_end$SexpKind$Sexp:
     calls: 928
-    bytes: 504
+    bytes: 648
   __m5__quoted:
     calls: 431
     bytes: 456
   __m5__tok_text$SexpKind$Sexp:
     calls: 1282
-    bytes: 652
+    bytes: 720
   __m5__trailing_trivia$SexpKind$Sexp:
     calls: 38
-    bytes: 556
+    bytes: 704
   __rec_drop_Sexp:
     calls: 464
     bytes: 72

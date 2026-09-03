@@ -100,14 +100,19 @@ struct Far { pos: u64, expected: str[] }
 // alternative could fix: a malformed grammar, or a `build` that refused.
 struct Step { hit: bool, pos: u64, kids: Cst[], far: Far }
 
-// What the driver parses against: the source (rule spellings and lowering both
-// need the text behind a span), the tokens, the trivia the lexer set aside, and
-// the linked productions.
+// What the driver parses against: the tokens, the trivia the lexer set aside,
+// the linked productions, and `end` — one byte past the source's last byte.
+//
+// The source itself is *not* here. Every token carries its own text (a
+// `SpanStr`, see `lexer.aipl`), so matching a rule spelling reads the token and
+// nothing else. `end` is all that remains of the source: the empty span at end
+// of input, which `error_at` reports when a rule ran off the token list and
+// there is no token to point at.
 struct Parser<K: variant, A: any> {
-    src: str,
     toks: Token<K>[],
     trivia: Token<K>[],
     prods: Production<K, A>[],
+    end: u64,
 }
 
 // `far` updated with "`label` was expected at `pos`". Deeper wins outright;
@@ -136,7 +141,7 @@ fn miss(far: Far, pos: u64, label: str) -> Step { no(far_miss(far, pos, label), 
 // because no matcher in `lexer.aipl` ever produces an empty token.
 fn tok_text<K: variant, A: any>(p: Parser<K, A>, i: u64) -> str {
     match (p.toks[i]) {
-        some(t) => p.src[t.span],
+        some(t) => t.text.text,
         none => "",
     }
 }
@@ -150,7 +155,7 @@ fn prev_end<K: variant, A: any>(p: Parser<K, A>, i: u64) -> u64 {
         return 0;
     };
     match (p.toks[i - 1]) {
-        some(t) => t.span.end,
+        some(t) => t.text.span.end,
         none => 0,
     }
 }
@@ -165,9 +170,13 @@ fn leaf_at<K: variant, A: any>(p: Parser<K, A>, i: u64) -> Cst[] {
             let start = prev_end(p, i);
             [
                 ..p.trivia
-                    .filter(|tr| start <= tr.span.start && tr.span.start < t.span.start)
-                    .map(|tr| CTrivia(tr.span)),
-                CLeaf(t.span),
+                    .filter(
+                        |tr| {
+                            start <= tr.text.span.start && tr.text.span.start < t.text.span.start
+                        },
+                    )
+                    .map(|tr| CTrivia(tr.text.span)),
+                CLeaf(t.text.span),
             ]
         },
         none => [],
@@ -179,7 +188,7 @@ fn leaf_at<K: variant, A: any>(p: Parser<K, A>, i: u64) -> Cst[] {
 // covers the source to its last byte.
 fn trailing_trivia<K: variant, A: any>(p: Parser<K, A>) -> Cst[] {
     let start = prev_end(p, p.toks.len());
-    p.trivia.filter(|tr| start <= tr.span.start).map(|tr| CTrivia(tr.span))
+    p.trivia.filter(|tr| start <= tr.text.span.start).map(|tr| CTrivia(tr.text.span))
 }
 
 fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
@@ -515,8 +524,8 @@ fn error_at<K: variant, A: any>(p: Parser<K, A>, far: Far) -> ParseError {
         "end of input"
     };
     let span = match (p.toks[far.pos]) {
-        some(t) => t.span,
-        none => p.src.len()..p.src.len(),
+        some(t) => t.text.span,
+        none => p.end..p.end,
     };
     if (far.expected.is_empty()) {
         return ParseError { message: `unexpected {found}`, span };
@@ -541,7 +550,12 @@ pub fn parse_cst<K: variant, A: any>(
         message: `no rule named "{start}"`,
         span: 0..0,
     })?;
-    let p = Parser { src, toks: lexed.tokens, trivia: lexed.trivia, prods: linked.prods };
+    let p = Parser {
+        toks: lexed.tokens,
+        trivia: lexed.trivia,
+        prods: linked.prods,
+        end: src.len(),
+    };
     let Step { hit, far, pos, kids } = match_prod(p, i, 0, Far { pos: 0, expected: [] })?;
     if (!hit) {
         return err(error_at(p, far));
@@ -871,12 +885,12 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
 allocations: 2902
 deallocations: 2902
 reallocations: 331
-bytes allocated: 177061
-instructions executed: 417952
-binary size: 303392
-  code: 186012
+bytes allocated: 181717
+instructions executed: 435950
+binary size: 305416
+  code: 187320
   data: 5924
-  metadata: 111456
+  metadata: 112172
 functions:
   __arr_drop_Node:
     calls: 11
@@ -898,7 +912,7 @@ functions:
     bytes: 140
   __arr_drop___m3__Token$Tok:
     calls: 194
-    bytes: 168
+    bytes: 188
   __arr_drop___m3__TokenRule$Tok:
     calls: 42
     bytes: 572
@@ -922,7 +936,7 @@ functions:
     bytes: 140
   __arr_retain___m3__Token$Tok:
     calls: 116
-    bytes: 168
+    bytes: 188
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
     bytes: 572
@@ -1024,7 +1038,7 @@ functions:
     bytes: 1592
   __m3__finalize_template$Tok:
     calls: 0
-    bytes: 4728
+    bytes: 4840
   __m3__float_len:
     calls: 0
     bytes: 824
@@ -1042,10 +1056,10 @@ functions:
     bytes: 940
   __m3__step_result$Tok:
     calls: 388
-    bytes: 7680
+    bytes: 8020
   __m3__template_scan$Tok:
     calls: 0
-    bytes: 2740
+    bytes: 2744
   __m3__template_step$Tok:
     calls: 0
     bytes: 468
@@ -1138,7 +1152,7 @@ functions:
     bytes: 2780
   error_at$Tok$Node:
     calls: 14
-    bytes: 1884
+    bytes: 1956
   far_miss:
     calls: 54
     bytes: 940
@@ -1147,7 +1161,7 @@ functions:
     bytes: 228
   leaf_at$Tok$Node:
     calls: 96
-    bytes: 1532
+    bytes: 1928
   lex_toks:
     calls: 42
     bytes: 696
@@ -1174,7 +1188,7 @@ functions:
     bytes: 4000
   match_rule$Tok$Node:
     calls: 269
-    bytes: 4764
+    bytes: 4864
   match_then$Tok$Node:
     calls: 31
     bytes: 1720
@@ -1183,13 +1197,13 @@ functions:
     bytes: 380
   parse_cst$Tok$Node:
     calls: 42
-    bytes: 4492
+    bytes: 4368
   parsed:
     calls: 3
     bytes: 452
   prev_end$Tok$Node:
     calls: 148
-    bytes: 616
+    bytes: 772
   quoted:
     calls: 26
     bytes: 456
@@ -1204,10 +1218,10 @@ functions:
     bytes: 2320
   tok_text$Tok$Node:
     calls: 81
-    bytes: 768
+    bytes: 832
   trailing_trivia$Tok$Node:
     calls: 52
-    bytes: 612
+    bytes: 760
   trivia_rules:
     calls: 2
     bytes: 2848

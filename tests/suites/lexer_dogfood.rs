@@ -127,7 +127,9 @@ fn aipl_dump(engine: &Engine, src: &str) -> String {
         .call_values("lex_aipl_tokens", &[FfiValue::Str(src.to_string())])
         .expect("call lex_aipl_tokens");
     match res {
-        // ok: an array of `Token { kind, span }` structs.
+        // ok: an array of `Token { kind, text }` structs, where `text` is a
+        // `SpanStr { text, span }` — only the span is dumped, since the text is
+        // `src[span]` by that type's invariant and would add nothing to compare.
         FfiValue::Res(Ok(tokens)) => {
             let tokens = match *tokens {
                 FfiValue::Array(ts) => ts,
@@ -136,7 +138,7 @@ fn aipl_dump(engine: &Engine, src: &str) -> String {
             let mut out = String::new();
             for tok in &tokens {
                 let fields = as_struct(tok);
-                let (start, end) = span_bounds(field(fields, "span"));
+                let (start, end) = span_bounds(field(as_struct(field(fields, "text")), "span"));
                 let cat = match field(fields, "kind") {
                     FfiValue::Variant(case, _) => categorize(case),
                     other => panic!("token kind not a variant: {other:?}"),

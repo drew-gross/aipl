@@ -411,12 +411,12 @@ fn shown(src: str) -> str!ParseError { ok(json_cst(src)?.show(src, prod_names(js
 allocations: 11266
 deallocations: 11266
 reallocations: 535
-bytes allocated: 815351
-instructions executed: 1700136
-binary size: 224872
-  code: 143340
+bytes allocated: 822647
+instructions executed: 1750625
+binary size: 226864
+  code: 144612
   data: 5228
-  metadata: 76304
+  metadata: 77024
 functions:
   __arr_drop_Json:
     calls: 125
@@ -435,7 +435,7 @@ functions:
     bytes: 140
   __arr_drop___m3__Token$JsonTok:
     calls: 304
-    bytes: 140
+    bytes: 160
   __arr_drop___m3__TokenRule$JsonTok:
     calls: 38
     bytes: 544
@@ -456,7 +456,7 @@ functions:
     bytes: 140
   __arr_retain___m3__Token$JsonTok:
     calls: 232
-    bytes: 140
+    bytes: 160
   __arr_retain___m3__TokenRule$JsonTok:
     calls: 0
     bytes: 544
@@ -537,7 +537,7 @@ functions:
     bytes: 1592
   __m3__finalize_template$JsonTok:
     calls: 0
-    bytes: 4240
+    bytes: 4356
   __m3__float_len:
     calls: 154
     bytes: 824
@@ -555,10 +555,10 @@ functions:
     bytes: 940
   __m3__step_result$JsonTok:
     calls: 1357
-    bytes: 6856
+    bytes: 7156
   __m3__template_scan$JsonTok:
     calls: 0
-    bytes: 2740
+    bytes: 2744
   __m3__template_step$JsonTok:
     calls: 0
     bytes: 468
@@ -570,7 +570,7 @@ functions:
     bytes: 2780
   __m5__error_at$JsonTok$Json:
     calls: 7
-    bytes: 1748
+    bytes: 1816
   __m5__far_miss:
     calls: 317
     bytes: 940
@@ -579,7 +579,7 @@ functions:
     bytes: 228
   __m5__leaf_at$JsonTok$Json:
     calls: 184
-    bytes: 1360
+    bytes: 1760
   __m5__lower_node$JsonTok$Json:
     calls: 142
     bytes: 3316
@@ -600,7 +600,7 @@ functions:
     bytes: 4000
   __m5__match_rule$JsonTok$Json:
     calls: 1251
-    bytes: 4668
+    bytes: 4776
   __m5__match_then$JsonTok$Json:
     calls: 235
     bytes: 1720
@@ -609,19 +609,19 @@ functions:
     bytes: 380
   __m5__parse_cst$JsonTok$Json:
     calls: 37
-    bytes: 4492
+    bytes: 4368
   __m5__prev_end$JsonTok$Json:
     calls: 244
-    bytes: 504
+    bytes: 648
   __m5__quoted:
     calls: 243
     bytes: 456
   __m5__tok_text$JsonTok$Json:
     calls: 365
-    bytes: 652
+    bytes: 720
   __m5__trailing_trivia$JsonTok$Json:
     calls: 60
-    bytes: 556
+    bytes: 704
   __rec_drop_Json:
     calls: 101
     bytes: 212

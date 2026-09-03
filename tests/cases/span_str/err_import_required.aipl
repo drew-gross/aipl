@@ -1,7 +1,0 @@
-// `SpanStr` is importable, not ambient like `Error`: naming it without the
-// import is an error that names the import to add.
-fn narrow(s: SpanStr) -> str { s }
-
-fn main() {}
---- errors ---
-error: fn "narrow": unknown type "SpanStr" — "SpanStr" is a builtin type; import it with `import { SpanStr } from builtins;`

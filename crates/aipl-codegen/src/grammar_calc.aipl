@@ -386,12 +386,12 @@ fn depth(self: Calc) -> u64 {
 allocations: 8612
 deallocations: 8612
 reallocations: 746
-bytes allocated: 495290
-instructions executed: 1258408
-binary size: 200872
-  code: 126960
+bytes allocated: 505250
+instructions executed: 1356841
+binary size: 203720
+  code: 128732
   data: 4284
-  metadata: 69628
+  metadata: 70704
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -411,6 +411,9 @@ functions:
   __arr_drop___m3__StepResult$CalcTok:
     calls: 0
     bytes: 140
+  __arr_drop___m3__Token$CalcTok:
+    calls: 415
+    bytes: 128
   __arr_drop___m3__TokenRule$CalcTok:
     calls: 41
     bytes: 484
@@ -432,6 +435,9 @@ functions:
   __arr_retain___m3__StepResult$CalcTok:
     calls: 0
     bytes: 140
+  __arr_retain___m3__Token$CalcTok:
+    calls: 337
+    bytes: 128
   __arr_retain___m3__TokenRule$CalcTok:
     calls: 0
     bytes: 484
@@ -509,16 +515,16 @@ functions:
     bytes: 1592
   __m3__finalize_template$CalcTok:
     calls: 0
-    bytes: 3480
+    bytes: 3656
   __m3__float_len:
     calls: 0
     bytes: 824
   __m3__interp_scan$CalcTok:
     calls: 0
-    bytes: 2268
+    bytes: 2284
   __m3__lex$CalcTok:
     calls: 41
-    bytes: 1500
+    bytes: 1516
   __m3__lex_step$CalcTok:
     calls: 338
     bytes: 20052
@@ -527,10 +533,10 @@ functions:
     bytes: 940
   __m3__step_result$CalcTok:
     calls: 648
-    bytes: 5560
+    bytes: 5840
   __m3__template_scan$CalcTok:
     calls: 0
-    bytes: 2740
+    bytes: 2744
   __m3__template_step$CalcTok:
     calls: 0
     bytes: 468
@@ -539,7 +545,7 @@ functions:
     bytes: 2780
   __m5__error_at$CalcTok$Calc:
     calls: 4
-    bytes: 1532
+    bytes: 1644
   __m5__far_miss:
     calls: 141
     bytes: 940
@@ -548,7 +554,7 @@ functions:
     bytes: 228
   __m5__leaf_at$CalcTok$Calc:
     calls: 204
-    bytes: 1108
+    bytes: 1536
   __m5__lower_node$CalcTok$Calc:
     calls: 387
     bytes: 3316
@@ -569,7 +575,7 @@ functions:
     bytes: 4000
   __m5__match_rule$CalcTok$Calc:
     calls: 980
-    bytes: 4272
+    bytes: 4408
   __m5__match_then$CalcTok$Calc:
     calls: 145
     bytes: 1720
@@ -578,19 +584,19 @@ functions:
     bytes: 380
   __m5__parse_cst$CalcTok$Calc:
     calls: 40
-    bytes: 4492
+    bytes: 4368
   __m5__prev_end$CalcTok$Calc:
     calls: 276
-    bytes: 292
+    bytes: 500
   __m5__quoted:
     calls: 121
     bytes: 456
   __m5__tok_text$CalcTok$Calc:
     calls: 336
-    bytes: 456
+    bytes: 564
   __m5__trailing_trivia$CalcTok$Calc:
     calls: 72
-    bytes: 492
+    bytes: 648
   __rec_drop_Calc:
     calls: 181
     bytes: 132

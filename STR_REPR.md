@@ -10,8 +10,9 @@ rebuilding. There is no switch and no second runtime; 942 tests pass.
 Stages 1–4 below are follow-on programs the new layout unlocks, each separately
 justifiable rather than part of a single push.
 
-- [ ] 1 `SpanStr` — expose the window a slice already is (`SPAN_STR.md`). Slicing
-      itself is free now; what is missing is the language-level type.
+- [x] 1 `SpanStr` — **done, but not as a language feature**. Built and then
+      backed out as a str-repr builtin; it is an ordinary struct in the lexer
+      library instead (`SPAN_STR.md` records why). Nothing here is owed it.
 - [ ] 2 Rope-native operations — concat is already O(1); slicing a rope still
       materializes it, and `map`/`filter` over one could stream.
 - [ ] 3 Converge arrays onto the same model — inline and view arrays, one block
@@ -114,8 +115,9 @@ allocation is not a fact anything needs to branch on:
   computation, where it used to be a 32-byte view allocation or a byte copy for
   a short result.
 - **It deletes the "a view is an optimization, not a guarantee" wart** that
-  `SPAN_STR.md` is built around. Every buffer-backed `str` carries its own
-  provenance, so `SpanStr` collapses to a type marker plus `.span() = data - base`.
+  `SPAN_STR.md` used to be built around. (That plan then collapsed further, to a
+  library struct — `data - base` turned out to be relative to the *allocation*,
+  which is not what a span means. See `SPAN_STR.md`.)
 - Three live representations instead of four leaves a **spare tag**, where the
   current design is at capacity — and Stage 4 has a use for it.
 
@@ -305,7 +307,8 @@ exactly one reference, the same model a `str` binding uses — `is_str_shaped`, 
   load the object, load `data`, load `len`. It becomes: read `w1`, read `w2`.
 - **In-place mutation and growth become expressible**, on the ownership rule
   above.
-- **`SpanStr` nearly disappears as a feature** — see `SPAN_STR.md`.
+- **`SpanStr` disappeared as a feature entirely** — a plain struct in the lexer
+  library beat the builtin it was going to need; see `SPAN_STR.md`.
 
 ## What it costs
 

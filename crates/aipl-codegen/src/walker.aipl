@@ -457,8 +457,8 @@ pub fn format_program(src: str, width: u64) -> str!FmtError {
     // The lexer's tokens as the walker's own `(kind, span)` pairs. Trivia is
     // comments and `#[allow]` markers only — whitespace is a `skip` rule, so it
     // never reaches the trivia stream, and only its spans are kept.
-    let toks = lexed.tokens.map(|t| FmtTok { kind: fmt_kind(t.kind), span: t.span });
-    let w = new_walker(src, toks, lexed.trivia.map(|t| t.span));
+    let toks = lexed.tokens.map(|t| FmtTok { kind: fmt_kind(t.kind), span: t.text.span });
+    let w = new_walker(src, toks, lexed.trivia.map(|t| t.text.span));
     let d = w.program()?;
 
     // Every comment must have been carried into the output; one left behind
@@ -2821,12 +2821,12 @@ fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 allocations: 20240
 deallocations: 20240
 reallocations: 1235
-bytes allocated: 1227211
-instructions executed: 3320200
-binary size: 4037648
-  code: 2496052
+bytes allocated: 1229611
+instructions executed: 3325532
+binary size: 4038576
+  code: 2496644
   data: 24868
-  metadata: 1516728
+  metadata: 1517064
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2848,7 +2848,7 @@ functions:
     bytes: 140
   __arr_drop___m9__Token$__m8__AiplTok:
     calls: 100
-    bytes: 340
+    bytes: 360
   __arr_drop___m9__TokenRule$__m8__AiplTok:
     calls: 8
     bytes: 740
@@ -2872,7 +2872,7 @@ functions:
     bytes: 140
   __arr_retain___m9__Token$__m8__AiplTok:
     calls: 84
-    bytes: 340
+    bytes: 360
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
     bytes: 740
@@ -3028,7 +3028,7 @@ functions:
     bytes: 1592
   __m9__finalize_template$__m8__AiplTok:
     calls: 0
-    bytes: 7832
+    bytes: 7964
   __m9__float_len:
     calls: 0
     bytes: 824
@@ -3046,10 +3046,10 @@ functions:
     bytes: 940
   __m9__step_result$__m8__AiplTok:
     calls: 3626
-    bytes: 12788
+    bytes: 13052
   __m9__template_scan$__m8__AiplTok:
     calls: 0
-    bytes: 2740
+    bytes: 2744
   __m9__template_step$__m8__AiplTok:
     calls: 94
     bytes: 468
@@ -3226,7 +3226,7 @@ functions:
     bytes: 13016
   format_program:
     calls: 8
-    bytes: 111792
+    bytes: 111944
   hug_close:
     calls: 0
     bytes: 732

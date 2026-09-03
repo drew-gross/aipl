@@ -73,19 +73,19 @@ pub fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
 allocations: 2049
 deallocations: 2049
 reallocations: 30
-bytes allocated: 115674
-instructions executed: 377852
-binary size: 965688
-  code: 622536
+bytes allocated: 116250
+instructions executed: 379022
+binary size: 966672
+  code: 623184
   data: 1891
-  metadata: 341261
+  metadata: 341597
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
     bytes: 140
   __arr_drop___m13__Token$__m12__AiplTok:
     calls: 24
-    bytes: 340
+    bytes: 360
   __arr_drop___m13__TokenRule$__m12__AiplTok:
     calls: 4
     bytes: 740
@@ -109,7 +109,7 @@ functions:
     bytes: 140
   __arr_retain___m13__Token$__m12__AiplTok:
     calls: 18
-    bytes: 340
+    bytes: 360
   __arr_retain___m13__TokenRule$__m12__AiplTok:
     calls: 0
     bytes: 740
@@ -226,7 +226,7 @@ functions:
     bytes: 1592
   __m13__finalize_template$__m12__AiplTok:
     calls: 0
-    bytes: 7832
+    bytes: 7964
   __m13__float_len:
     calls: 0
     bytes: 824
@@ -244,10 +244,10 @@ functions:
     bytes: 940
   __m13__step_result$__m12__AiplTok:
     calls: 864
-    bytes: 12788
+    bytes: 13052
   __m13__template_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2740
+    bytes: 2744
   __m13__template_step$__m12__AiplTok:
     calls: 24
     bytes: 468
@@ -364,7 +364,7 @@ functions:
     bytes: 13016
   __m6__format_program:
     calls: 4
-    bytes: 117136
+    bytes: 117344
   __m6__hug_close:
     calls: 0
     bytes: 732

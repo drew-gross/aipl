@@ -49,8 +49,8 @@ use aipl_syntax::{
         Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl,
         Type, TypeParam, VariantCase, VariantDecl,
     },
-    concat_str_ty, is_concat_str, is_empty_array_arg, is_none_inner, is_none_literal_arg,
-    is_str_named, is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES,
+    concat_str_ty, is_concat_str, is_empty_array_arg, is_error, is_none_inner, is_none_literal_arg,
+    is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES,
 };
 
 /// Hard cap on the number of generic instances monomorphization will emit.
@@ -8766,7 +8766,7 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
 /// codegen's `is_heap` — structs/optionals are not moved as whole params.
 fn is_heap(t: &Type) -> bool {
     *t == Type::Primitive(Primitive::Str)
-        || is_str_named(t)
+        || is_error(t)
         || matches!(t, Type::Array(_) | Type::Set(_) | Type::Dict(_, _))
 }
 
@@ -8778,7 +8778,7 @@ fn is_heap(t: &Type) -> bool {
 /// beats converting at each use as though a boundary were being crossed.
 fn is_heap_concrete(t: &ConcreteType) -> bool {
     *t == ConcreteType::Primitive(Primitive::Str)
-        || aipl_syntax::concrete::is_str_named(t)
+        || aipl_syntax::concrete::is_error(t)
         || matches!(
             t,
             ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _)

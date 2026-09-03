@@ -27,8 +27,8 @@ use aipl_syntax::ast::{
     Program, Signature, StructDecl, Type, VariantDecl,
 };
 use aipl_syntax::{
-    binop_spelling, is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_span_str,
-    is_str_repr, type_name, Error, Span,
+    binop_spelling, is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr,
+    type_name, Error, Span,
 };
 
 /// A lambda body's type with its error side filled in from a `?` the body
@@ -1443,11 +1443,7 @@ impl Cx<'_> {
                 Ok(())
             }
             Type::Named(n) => {
-                // `Error` and `SpanStr` are named types with no declaration —
-                // both are `str` under the hood (`is_str_named`), so neither
-                // appears in the struct or variant tables.
                 let ok = n == "Error"
-                    || n == aipl_syntax::SPAN_STR
                     || self.has_struct(n)
                     || self.variants.contains_key(n)
                     || type_params.iter().any(|tp| tp == n);
@@ -1676,21 +1672,7 @@ impl Cx<'_> {
                 {
                     Ok(()) // arrays and optionals of structs/variants are supported
                 } else {
-                    // `Error` and `SpanStr` are *known* named types — they just
-                    // have no layout of their own, so they are not element
-                    // types. Saying "unknown" of one sends the reader looking
-                    // for a missing declaration. `tyname` also renders a builtin
-                    // under the name the user wrote, not its canonical
-                    // `__builtin_SpanStr`.
-                    Err(Error::msg(if aipl_syntax::is_str_named(t) {
-                        format!(
-                            "{ctx}: {} is a builtin str-shaped type; it cannot be an array, \
-                             optional, or dict element",
-                            tyname(t)
-                        )
-                    } else {
-                        format!("{ctx}: unknown type {:?}", tyname(t))
-                    }))
+                    Err(Error::msg(format!("{ctx}: unknown type {n:?}")))
                 }
             }
             // Nested arrays (`T[][]`) and nested optionals (`T??`) are allowed.
@@ -4312,15 +4294,6 @@ fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     if (is_error(actual) && *expected == Type::Primitive(Primitive::Str))
         || (*actual == Type::Primitive(Primitive::Str) && is_error(expected))
     {
-        return Ok(());
-    }
-    // `SpanStr` is `str` under the hood too, but the coercion is deliberately
-    // **one-way**: a `SpanStr` is usable everywhere a `str` is (printing, `==`,
-    // `len`, concat, dict keys), and a `str` is *not* a `SpanStr`. That is what
-    // keeps `.span()` total — every `SpanStr` came from the one builtin that
-    // anchors its source — and what keeps the derived operations honest, since
-    // `a +++ b` is a window into nothing. See `SPAN_STR.md`.
-    if is_span_str(actual) && *expected == Type::Primitive(Primitive::Str) {
         return Ok(());
     }
     // `str` functions as an alias of `char[]` (see `is_char_array`): a generic

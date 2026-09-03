@@ -91,8 +91,8 @@ use aipl_syntax::{
     },
     binop_spelling,
     concrete::{
-        error_ty, flex_int_ty, is_array_elem, is_dict_key, is_int_ty, is_none_inner, is_set_elem,
-        is_str_named, is_str_repr, is_unit, type_name,
+        error_ty, flex_int_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner,
+        is_set_elem, is_str_repr, is_unit, type_name,
     },
     IMPORTABLE_BUILTINS,
 };
@@ -3594,6 +3594,17 @@ fn marshal_lex(
         }
     }
 
+    // A `SpanStr` struct value as the span half. The text half is dropped: the
+    // Rust side already holds the source it passed in, so a token's text is
+    // `src[span]` there for free. Carrying it matters on the AIPL side, where
+    // the parser holds tokens and no source (see `parse.aipl`'s `Parser`).
+    fn span_str_span_of(v: FfiValue) -> Span {
+        let FfiValue::Struct(fields) = v else {
+            panic!("dogfooded lex_aipl(): expected a SpanStr struct, got {v:?}");
+        };
+        span_of(field(fields, "span"))
+    }
+
     // A `Token<AiplTok>[]` array value as mirrored tokens.
     fn tokens_of(v: FfiValue) -> Vec<LexedToken> {
         let FfiValue::Array(elems) = v else {
@@ -3607,17 +3618,17 @@ fn marshal_lex(
                 };
                 // Move both fields out (kind first — field consumes the vec).
                 let mut kind = None;
-                let mut span = None;
+                let mut text = None;
                 for (n, v) in fields {
                     match n.as_str() {
                         "kind" => kind = Some(v),
-                        "span" => span = Some(v),
+                        "text" => text = Some(v),
                         other => panic!("dogfooded lex_aipl(): unexpected Token field {other:?}"),
                     }
                 }
                 LexedToken {
                     kind: kind_of(kind.expect("dogfooded lex_aipl(): Token missing kind")),
-                    span: span_of(span.expect("dogfooded lex_aipl(): Token missing span")),
+                    span: span_str_span_of(text.expect("dogfooded lex_aipl(): Token missing text")),
                 }
             })
             .collect()
@@ -4354,7 +4365,7 @@ fn collect_named_types(
     out: &mut Vec<String>,
 ) {
     match t {
-        ConcreteType::Named(n) if !is_str_named(t) => {
+        ConcreteType::Named(n) if !is_error(t) => {
             if out.iter().any(|s| s == n) {
                 return;
             }
@@ -7043,10 +7054,7 @@ fn build_struct_layout(
                     "struct {}: field {} has type {}, but struct fields must be an integer (i8..i64, u8..u64), bool, char, str, a function, a struct, a variant, an array, or an optional of (an integer, bool, char, str, an array, or a recursive type)",
                     decl.name,
                     f.name,
-                    // `display_name`: a builtin type reaches here under its
-                    // canonical name (`__builtin_SpanStr`), and the message must
-                    // name it as the user wrote it.
-                    display_name(&type_name(&f.ty)),
+                    type_name(&f.ty),
                 )));
             }
         }
@@ -7834,13 +7842,9 @@ fn merge_types(a: &ConcreteType, b: &ConcreteType) -> Option<ConcreteType> {
     if matches!(b, ConcreteType::Case(_)) && matches!(a, ConcreteType::Primitive(p) if p.is_int()) {
         return Some(b.clone());
     }
-    // `Error`/`SpanStr` and `str` share a representation; their common type is a
-    // plain str — for `SpanStr` because the merge is exactly the widening its
-    // one-way assignability allows (`check::coerce`), so a `match`/`if` with a
-    // `SpanStr` arm and a `str` arm yields a `str` and the span is not claimed
-    // for text that never had one.
-    if (is_str_named(a) && *b == ConcreteType::Primitive(Primitive::Str))
-        || (*a == ConcreteType::Primitive(Primitive::Str) && is_str_named(b))
+    // `Error` and `str` share a representation; their common type is a plain str.
+    if (is_error(a) && *b == ConcreteType::Primitive(Primitive::Str))
+        || (*a == ConcreteType::Primitive(Primitive::Str) && is_error(b))
     {
         return Some(ConcreteType::Primitive(Primitive::Str));
     }
@@ -19448,7 +19452,7 @@ fn copy_composite(
 /// and `inc`'d when handed to a callee or returned.
 fn is_heap(t: &ConcreteType) -> bool {
     *t == ConcreteType::Primitive(Primitive::Str)
-        || is_str_named(t)
+        || is_error(t)
         || matches!(t, ConcreteType::Array(_) | ConcreteType::Set(_))
 }
 

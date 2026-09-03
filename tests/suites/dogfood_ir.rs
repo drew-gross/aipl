@@ -416,20 +416,29 @@ fn sanity_check(artifact: &str) {
     // the trivia side-channel (comments and `#[allow]` markers). This is the
     // richest entry the artifact serves — a result of a generic struct of
     // arrays of structs whose `kind` field is a variant.
-    let tok = |case: &str, payload: Vec<FfiValue>, s, e| {
+    // A `Token<AiplTok>`: its kind, plus the `SpanStr` carrying the matched text
+    // and the span it covers. The text is sliced out of `src` rather than
+    // written as a literal, so an expectation cannot claim text the source does
+    // not hold at that span — the invariant `span_str` establishes in
+    // `lexer.aipl` is the one this mirrors.
+    let tok = |src: &str, case: &str, payload: Vec<FfiValue>, s: usize, e: usize| {
         FfiValue::Struct(vec![
             (
                 "kind".to_string(),
                 FfiValue::Variant(case.to_string(), payload),
             ),
-            ("span".to_string(), span(s, e)),
+            (
+                "text".to_string(),
+                FfiValue::Struct(vec![
+                    ("text".to_string(), FfiValue::Str(src[s..e].to_string())),
+                    ("span".to_string(), span(s as i64, e as i64)),
+                ]),
+            ),
         ])
     };
+    let lex_src = "let x = 42; // note";
     let lexed = comp
-        .call_values(
-            "lex_aipl",
-            &[FfiValue::Str("let x = 42; // note".to_string())],
-        )
+        .call_values("lex_aipl", &[FfiValue::Str(lex_src.to_string())])
         .unwrap();
     assert_eq!(
         lexed,
@@ -437,16 +446,16 @@ fn sanity_check(artifact: &str) {
             (
                 "tokens".to_string(),
                 FfiValue::Array(vec![
-                    tok("Let", vec![], 0, 3),
-                    tok("Name", vec![FfiValue::Str("x".to_string())], 4, 5),
-                    tok("Eq", vec![], 6, 7),
-                    tok("IntLit", vec![FfiValue::Int(42)], 8, 10),
-                    tok("Semi", vec![], 10, 11),
+                    tok(lex_src, "Let", vec![], 0, 3),
+                    tok(lex_src, "Name", vec![FfiValue::Str("x".to_string())], 4, 5),
+                    tok(lex_src, "Eq", vec![], 6, 7),
+                    tok(lex_src, "IntLit", vec![FfiValue::Int(42)], 8, 10),
+                    tok(lex_src, "Semi", vec![], 10, 11),
                 ]),
             ),
             (
                 "trivia".to_string(),
-                FfiValue::Array(vec![tok("LineComment", vec![], 12, 19)]),
+                FfiValue::Array(vec![tok(lex_src, "LineComment", vec![], 12, 19)]),
             ),
         ]))))
     );
@@ -468,11 +477,9 @@ fn sanity_check(artifact: &str) {
     // `lex_aipl_stripped` drops trailing `--- section ---` blocks before lexing
     // (one FFI crossing for strip + lex), and kept tokens keep their original
     // spans.
+    let strip_src = "let x = 1\n--- stdout ---\nfoo";
     let stripped = comp
-        .call_values(
-            "lex_aipl_stripped",
-            &[FfiValue::Str("let x = 1\n--- stdout ---\nfoo".to_string())],
-        )
+        .call_values("lex_aipl_stripped", &[FfiValue::Str(strip_src.to_string())])
         .unwrap();
     assert_eq!(
         stripped,
@@ -480,10 +487,16 @@ fn sanity_check(artifact: &str) {
             (
                 "tokens".to_string(),
                 FfiValue::Array(vec![
-                    tok("Let", vec![], 0, 3),
-                    tok("Name", vec![FfiValue::Str("x".to_string())], 4, 5),
-                    tok("Eq", vec![], 6, 7),
-                    tok("IntLit", vec![FfiValue::Int(1)], 8, 9),
+                    tok(strip_src, "Let", vec![], 0, 3),
+                    tok(
+                        strip_src,
+                        "Name",
+                        vec![FfiValue::Str("x".to_string())],
+                        4,
+                        5
+                    ),
+                    tok(strip_src, "Eq", vec![], 6, 7),
+                    tok(strip_src, "IntLit", vec![FfiValue::Int(1)], 8, 9),
                 ]),
             ),
             ("trivia".to_string(), FfiValue::Array(vec![])),
