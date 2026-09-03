@@ -797,9 +797,9 @@ fn tok_rules() -> TokenRule<Tok>[] {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
     let digit = "0123456789";
     [
-        TokenRule { matcher: CharRun(" \t\n", " \t\n"), emit: Bare(Punct), skip: true },
-        TokenRule { matcher: CharRun(alpha, alpha), emit: Of(Word) },
-        TokenRule { matcher: CharRun(digit, digit), emit: Of(Num) },
+        TokenRule { matcher: CharRun(" \t\n"), emit: Bare(Punct), skip: true },
+        TokenRule { matcher: CharRun(alpha), emit: Of(Word) },
+        TokenRule { matcher: CharRun(digit), emit: Of(Num) },
         TokenRule { matcher: OneChar("()[],;+*"), emit: Bare(Punct) },
     ]
 }
@@ -808,10 +808,10 @@ fn trivia_rules() -> TokenRule<Tok>[] {
     let alpha = "abcdefghijklmnopqrstuvwxyz";
     let digit = "0123456789";
     [
-        TokenRule { matcher: CharRun(" \t\n", " \t\n"), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: CharRun(" \t\n"), emit: Bare(Punct), trivia: true },
         TokenRule { matcher: ToEol("//"), emit: Bare(Punct), trivia: true },
-        TokenRule { matcher: CharRun(alpha, alpha), emit: Of(Word) },
-        TokenRule { matcher: CharRun(digit, digit), emit: Of(Num) },
+        TokenRule { matcher: CharRun(alpha), emit: Of(Word) },
+        TokenRule { matcher: CharRun(digit), emit: Of(Num) },
         TokenRule { matcher: OneChar("()[],;+*"), emit: Bare(Punct) },
     ]
 }

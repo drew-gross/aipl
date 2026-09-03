@@ -99,7 +99,7 @@ variant Json =
 fn json_rules() -> TokenRule<JsonTok>[] {
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
     [
-        TokenRule { matcher: CharRun(" \t\r\n", " \t\r\n"), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: CharRun(" \t\r\n"), emit: Bare(Punct), trivia: true },
         TokenRule { matcher: Delimited("\"", "\"\\/bfnrtu"), emit: Of(Str) },
         TokenRule { matcher: Exact("-"), emit: Bare(Punct) },
         TokenRule { matcher: Float, emit: Bare(Num) },

@@ -8404,8 +8404,8 @@ function u0:69() -> i64 apple_aarch64 {
     gv19 = symbol colocated u1:1
     gv20 = symbol colocated u1:1
     gv21 = symbol colocated u1:1
-    gv22 = symbol colocated u1:0
-    gv23 = symbol colocated u1:1
+    gv22 = symbol colocated u1:1
+    gv23 = symbol colocated u1:0
     gv24 = symbol colocated u1:5
     gv25 = symbol colocated u1:6
     gv26 = symbol colocated u1:7
@@ -13349,10 +13349,10 @@ block341:
     v2554 = symbol_value.i64 gv22
     v2555 = iconst.i64 16
     v2556 = iadd v2554, v2555  ; v2555 = 16
-    v2557 = iconst.i64 53
+    v2557 = iconst.i64 63
     store notrap aligned v2556, v2553
     store notrap aligned v2556, v2553+8
-    store notrap aligned v2557, v2553+16  ; v2557 = 53
+    store notrap aligned v2557, v2553+16  ; v2557 = 63
     v2558 = iconst.i64 8
     v2559 = iadd v2551, v2558  ; v2558 = 8
     v2560 = load.i64 notrap aligned v2553
@@ -13366,10 +13366,10 @@ block341:
     v2564 = symbol_value.i64 gv23
     v2565 = iconst.i64 16
     v2566 = iadd v2564, v2565  ; v2565 = 16
-    v2567 = iconst.i64 63
+    v2567 = iconst.i64 53
     store notrap aligned v2566, v2563
     store notrap aligned v2566, v2563+8
-    store notrap aligned v2567, v2563+16  ; v2567 = 63
+    store notrap aligned v2567, v2563+16  ; v2567 = 53
     v2568 = iconst.i64 32
     v2569 = iadd v2551, v2568  ; v2568 = 32
     v2570 = load.i64 notrap aligned v2563
@@ -28080,6 +28080,7 @@ block1820:
 
 ; source variables:
 ;   v0 = three_quotes
+;   v15 = cont
 ;   v283 = $inl37_spelling
 ;   v287 = $inl38_kind
 ;   v391 = $inl39_spelling
@@ -148101,7 +148102,7 @@ block88:
     v211 = load.i64 notrap aligned v208+8
     v212 = stack_addr.i64 ss4
     call fn5(v212, v211)
-    v213 = call fn6(v196, v212)
+    v213 = call fn6(v198, v212)
     jump block87(v213)
 
 block89:
@@ -148117,7 +148118,7 @@ block90:
     v218 = call fn2(v200)
     v219 = stack_addr.i64 ss5
     call fn3(v219, v200, v217, v218)  ; v217 = 1
-    v220 = call fn7(v219, v198)
+    v220 = call fn7(v219, v196)
     v221 = iadd v216, v220  ; v216 = 1
     call fn8(v219)
     jump block92(v221)
@@ -155790,17 +155791,17 @@ block1249:
 ;   v2 = at
 ;   v3 = rules
 ;   v28 = r
-;   v196 = first
-;   v198 = cont
+;   v196 = cont
+;   v198 = first
 ;   v200 = $inl8_self
-;   v196 = $inl9_head
+;   v198 = $inl9_head
 ;   v200 = $inl228_self
 ;   v208 = $inl233_self
 ;   v211 = x
-;   v196 = $inl234_$cap42
+;   v198 = $inl234_$cap42
 ;   v211 = $inl109_c
-;   v196 = $inl110_head
-;   v198 = $inl10_cont
+;   v198 = $inl110_head
+;   v196 = $inl10_cont
 ;   v200 = $inl238_self
 ;   v200 = $inl178_self
 ;   v217 = $inl179_n
@@ -165723,7 +165724,7 @@ block316:
 ;   ss0 = toks
 ;   ss1 = trivia
 ;   v23 = n
-;   ss2 = __idx$35299
+;   ss2 = __idx$35567
 ;   v55 = txt
 ;   v57 = k
 ;   v65 = $inl271_self

@@ -84,7 +84,7 @@ variant Calc = Lit(i64) | Neg(Calc) | Bin(str, Calc, Calc)
 // invisible to it — `1 -2` would lex as two numbers and parse as nothing.
 fn calc_rules() -> TokenRule<CalcTok>[] {
     [
-        TokenRule { matcher: CharRun(" \t\r\n", " \t\r\n"), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: CharRun(" \t\r\n"), emit: Bare(Punct), trivia: true },
         TokenRule { matcher: OneChar("+-*/%^()"), emit: Bare(Punct) },
         TokenRule { matcher: Int, emit: Bare(Num) },
     ]

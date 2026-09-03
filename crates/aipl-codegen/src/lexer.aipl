@@ -109,13 +109,16 @@ struct LexError { message: str, span: Span }
 // spelled as strings (class membership via `contains`, a spelling matched
 // whole); none of them ever match empty input, so `lex` always makes progress.
 //
-// - `CharRun(first, cont)`: a maximal run — a char in `first` opens the token,
-//   chars in `cont` extend it. Identifiers, digit runs, whitespace.
+// - `CharRun(cont, first)`: a maximal run of chars in `cont`. `first` restricts
+//   what may *open* the run and defaults to `cont`, so the usual shape — one
+//   class for the whole token — is a single argument (`CharRun(digits)`, and
+//   whitespace runs), and only a narrower opener is worth naming
+//   (`CharRun(alnum, first = alpha)`: an identifier may not start with a digit).
 // - `OneChar(chars)`: exactly one char, any of `chars`. Single-character
 //   punctuation, where one rule stands for a whole class of one-char tokens
 //   (`OneChar("()[],;")`) instead of an `Exact` rule apiece. It is the direct
-//   spelling of what a `CharRun` whose `cont` is empty degenerates to, and says
-//   so at the rule rather than leaving the reader to work it out.
+//   concept a `CharRun` cannot state: a run needs something to continue with,
+//   so "exactly one" would have to be spelled as a run that can never extend.
 // - `Exact(spelling)`: the given spelling, verbatim. Punctuation and operators
 //   — one spelling per rule; when spellings share a prefix, order the rules
 //   longest first (`==` before `=`), since rule order is the priority mechanism
@@ -207,7 +210,7 @@ struct LexError { message: str, span: Span }
 // single-quoted `Delimited` string and enforces the one-char shape in a `Try`
 // emit (see `lex_aipl.aipl`'s `char_lit_emit`).
 variant Matcher =
-    | CharRun(str, str)
+    | CharRun(cont: str, first: str = cont)
     | OneChar(str)
     | Exact(str)
     | Keyword(str, str)
@@ -540,7 +543,7 @@ fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!L
 fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[]) -> StepResult<K>!LexError {
     for (let r : rules) {
         let res = match (r.matcher) {
-            CharRun(first, cont) => step_result(r, src, at, src[at..].char_run_len(first, cont))?,
+            CharRun(cont, first) => step_result(r, src, at, src[at..].char_run_len(first, cont))?,
             OneChar(chars) => step_result(r, src, at, src[at..].one_char_len(chars))?,
             Exact(spelling) => step_result(r, src, at, src[at..].exact_len(spelling))?,
             Keyword(spelling, boundary) => step_result(
@@ -902,9 +905,9 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // `Of` applies a constructor to the token's content (stripped for a delimited
     // matcher, raw text otherwise); `Bare` is a fixed kind; a skip rule's emit is
     // never applied.
-    let ws = TokenRule { matcher: CharRun(" \t\n\r", " \t\n\r"), emit: Bare(Ws), skip: true };
-    let ident = TokenRule { matcher: CharRun(alpha, alnum), emit: Of(Ident) };
-    let digits = TokenRule { matcher: CharRun("0123456789", "0123456789"), emit: Bare(Digits) };
+    let ws = TokenRule { matcher: CharRun(" \t\n\r"), emit: Bare(Ws), skip: true };
+    let ident = TokenRule { matcher: CharRun(alnum, first=alpha), emit: Of(Ident) };
+    let digits = TokenRule { matcher: CharRun("0123456789"), emit: Bare(Digits) };
     let base = [ws, ident, digits];
 
     // Empty / all-whitespace input produces no tokens.
@@ -917,6 +920,16 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex("x1", base)? == toks([tok(Ident("x1"), 0..2)]));
     assert(lex("1x", base)? == toks([tok(Digits, 0..1), tok(Ident("x"), 1..2)]));
     assert(lex("  hi  ", base)? == toks([tok(Ident("hi"), 2..4)]));
+
+    // `first` defaults to `cont`: `digits` names one class and gets a run that
+    // both opens and continues with it, while `ident` narrows only the opener —
+    // so an identifier may hold a digit but not start with one.
+    assert(lex("1x", [ws, digits]) == err(lex_err("unexpected character", 1..2)));
+    assert(lex("x1", [ws, ident])? == toks([tok(Ident("x1"), 0..2)]));
+    assert(lex("1x", [ws, ident]) == err(lex_err("unexpected character", 0..1)));
+    // Naming `first` explicitly as the same class is the default spelled out.
+    let d2 = TokenRule { matcher: CharRun("0123456789", first="0123456789"), emit: Bare(Digits) };
+    assert(lex("42", [ws, d2])? == lex("42", [ws, digits])?);
 
     // A byte no rule matches is a lex error carrying that byte's span.
     assert(lex("a+1", base) == err(lex_err("unexpected character", 1..2)));
@@ -1230,36 +1243,36 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1399
-deallocations: 1399
+allocations: 1452
+deallocations: 1452
 reallocations: 38
-bytes allocated: 81424
-instructions executed: 279295
-binary size: 1810992
-  code: 1208392
-  data: 7268
-  metadata: 595332
+bytes allocated: 85184
+instructions executed: 287920
+binary size: 1912408
+  code: 1275456
+  data: 7628
+  metadata: 629324
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
     bytes: 140
   __arr_drop_Token$Kind:
-    calls: 287
+    calls: 300
     bytes: 452
   __arr_drop_TokenRule$Kind:
-    calls: 21
+    calls: 26
     bytes: 856
   __arr_retain_StepResult$Kind:
     calls: 9
     bytes: 140
   __arr_retain_Token$Kind:
-    calls: 151
+    calls: 155
     bytes: 452
   __arr_retain_TokenRule$Kind:
     calls: 0
     bytes: 856
   __builtin_count_while$char$lam27:
-    calls: 60
+    calls: 64
     bytes: 220
   __builtin_count_while$char$s0$lam35:
     calls: 5
@@ -1274,22 +1287,22 @@ functions:
     calls: 13
     bytes: 1028
   __eq_Kind:
-    calls: 98
+    calls: 100
     bytes: 632
   __eq_LexError:
-    calls: 13
+    calls: 15
     bytes: 128
   __eq_LexResult$Kind:
-    calls: 45
+    calls: 47
     bytes: 120
   __eq_Token$Kind:
-    calls: 98
+    calls: 100
     bytes: 120
   __eq_Token$Kind$arr:
-    calls: 90
+    calls: 94
     bytes: 284
   __eq___builtin_Span:
-    calls: 111
+    calls: 115
     bytes: 104
   __eq_char$opt:
     calls: 85
@@ -1298,7 +1311,7 @@ functions:
     calls: 0
     bytes: 128
   __lambda_1:
-    calls: 28
+    calls: 29
     bytes: 96
   __lambda_10:
     calls: 0
@@ -1368,7 +1381,7 @@ functions:
     bytes: 1108
   __test$lex:
     calls: 1
-    bytes: 1122080
+    bytes: 1189144
   __test_try_fail_LexError:
     calls: 0
     bytes: 84
@@ -1376,25 +1389,25 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 292
+    calls: 300
     bytes: (external)
   aipl_arr_inc:
-    calls: 3219
+    calls: 3318
     bytes: (external)
   aipl_arr_reserve:
-    calls: 292
+    calls: 300
     bytes: (external)
   aipl_array_dec:
-    calls: 4610
+    calls: 4762
     bytes: (external)
   aipl_array_new:
-    calls: 1177
+    calls: 1222
     bytes: (external)
   aipl_array_push:
     calls: 72
     bytes: (external)
   aipl_assert:
-    calls: 59
+    calls: 63
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -1430,10 +1443,10 @@ functions:
     calls: 9
     bytes: 2284
   lex$Kind:
-    calls: 59
+    calls: 64
     bytes: 1516
   lex_step$Kind:
-    calls: 140
+    calls: 146
     bytes: 27220
   main:
     calls: 1
@@ -1448,7 +1461,7 @@ functions:
     calls: 3
     bytes: 3040
   step_result$Kind:
-    calls: 405
+    calls: 417
     bytes: 16012
   template_scan$Kind:
     calls: 16
@@ -1457,7 +1470,7 @@ functions:
     calls: 27
     bytes: 468
   toks:
-    calls: 43
+    calls: 44
     bytes: 128
   tpl_kind:
     calls: 17

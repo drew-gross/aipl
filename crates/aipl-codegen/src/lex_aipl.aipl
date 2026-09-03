@@ -233,7 +233,7 @@ fn char_lit_emit(text: str) -> AiplTok!str {
 fn aipl_rules() -> TokenRule<AiplTok>[] {
     let three_quotes = "\"\"\"";
     [
-        TokenRule { matcher: CharRun(" \t\n\r", " \t\n\r"), emit: Bare(Space), skip: true },
+        TokenRule { matcher: CharRun(" \t\n\r"), emit: Bare(Space), skip: true },
         TokenRule { matcher: ToEol("//"), emit: Bare(LineComment), trivia: true },
         // Block comments `/* ... */`, recorded as trivia like line comments.
         // `Nested` is depth-tracked (an inner `/* */` doesn't close the outer),
@@ -279,7 +279,7 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         kw("true", True),
         kw("false", False),
         kw("none", None),
-        TokenRule { matcher: CharRun(ident_start(), ident_cont()), emit: Of(Name) },
+        TokenRule { matcher: CharRun(ident_cont(), first=ident_start()), emit: Of(Name) },
         // Integer literals, signed or unsigned: `Int` matches a digit run with an
         // optional leading `-`, and `int_lit` parses the whole thing (so `-123` is
         // one token and the full i64 range is reachable — i64::MIN's magnitude a

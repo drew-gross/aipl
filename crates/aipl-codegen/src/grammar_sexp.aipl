@@ -74,9 +74,9 @@ fn sexp_rules() -> TokenRule<SexpKind>[] {
     let space = " \t\r\n";
     let sym = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/<>=!?_.";
     [
-        TokenRule { matcher: CharRun(space, space), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: CharRun(space), emit: Bare(Punct), trivia: true },
         TokenRule { matcher: ToEol(";"), emit: Bare(Punct), trivia: true },
-        TokenRule { matcher: CharRun(sym, sym), emit: Of(Atom) },
+        TokenRule { matcher: CharRun(sym), emit: Of(Atom) },
         TokenRule { matcher: OneChar("()"), emit: Bare(Punct) },
     ]
 }
