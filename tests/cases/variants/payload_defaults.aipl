@@ -1,0 +1,78 @@
+import { equal as ==, wrapping_add as +, wrapping_mul as * } from builtins;
+
+// A payload slot with a default is a *keyword* slot, carrying exactly a keyword
+// parameter's semantics: keyword slots come after every positional one, may only
+// be supplied by name at a construction, and a default may read the slots
+// declared before it.
+variant Shape = Circle(r: i64, color: str = "red") | Pt(x: i64, y: i64 = x + 1)
+
+fn color_of(s: Shape) -> str {
+    match (s) {
+        Circle(_, c) => c,
+        Pt(..) => "",
+    }
+}.test({
+    assert(color_of(Circle(1)) == "red");
+    assert(color_of(Circle(1, color="blue")) == "blue");
+})
+
+fn coords(p: Shape) -> i64 {
+    match (p) {
+        Pt(x, y) => x * 10 + y,
+        Circle(..) => 0,
+    }
+}.test({
+    // The default reads `x`, which is bound to the argument this construction
+    // passes for it — the same splice a keyword parameter's default gets.
+    assert(coords(Pt(4)) == 45);
+    assert(coords(Pt(4, y=9)) == 49);
+})
+
+// A generic case's slots work the same; the default is checked per instance.
+variant Opt<T> = Item(v: T, tag: str = "t") | Nil
+
+fn tag_of(o: Opt<i64>) -> str {
+    match (o) {
+        Item(_, t) => t,
+        Nil => "",
+    }
+}.test({
+    assert(tag_of(Item(3)) == "t");
+    assert(tag_of(Item(3, tag="z")) == "z");
+    assert(tag_of(Nil) == "");
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 402
+binary size: 4408
+  code: 2100
+  data: 388
+  metadata: 1920
+functions:
+  __test$color_of:
+    calls: 1
+    bytes: 668
+  __test$coords:
+    calls: 1
+    bytes: 332
+  __test$tag_of:
+    calls: 1
+    bytes: 864
+  aipl_assert:
+    calls: 7
+    bytes: (external)
+  aipl_test_begin:
+    calls: 3
+    bytes: (external)
+  aipl_test_end:
+    calls: 3
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 236

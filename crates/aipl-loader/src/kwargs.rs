@@ -27,12 +27,19 @@
 //! parameters are in scope, so a forward or self reference is rejected here
 //! rather than silently resolving to something in the caller's scope.
 //!
+//! A **variant case** declares its payload the same way (`Circle(r: i64,
+//! color: str = "red")`) and gets the same treatment: its constructor is
+//! registered under the loader's variant-qualified `Case@Variant` name, which
+//! is exactly what every construction call carries by now, so one set of rules
+//! covers `f(1, k = 2)` and `Circle(1, color = "blue")` alike.
+//!
 //! [`flatten`]: super::Loader::flatten
 
 use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast::{
-    Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Program, Signature, Type,
+    Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Param, Program, Signature,
+    Type, VariantCase, VariantDecl,
 };
 use aipl_syntax::{Error, Span};
 
@@ -50,8 +57,24 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
     // item can never shadow a reserved `__builtin_*` name.
     let mut fns: HashMap<String, FnKwInfo> = builtin_kw_infos()?;
     for item in &program.items {
-        let Item::Fn(f) = item else { continue };
-        fns.insert(f.name.clone(), FnKwInfo::from_sig(&f.name, &f.sig)?);
+        match item {
+            Item::Fn(f) => {
+                fns.insert(f.name.clone(), FnKwInfo::from_sig(&f.name, &f.sig)?);
+            }
+            // A variant case's constructor is a callee like any other: by now
+            // every construction of it — bare `Circle(..)`, qualified
+            // `Shape.Circle(..)`, or reached through an import — has been
+            // rewritten to the variant-qualified `Case@Variant`, so that is the
+            // name its keyword info is filed under.
+            Item::Variant(v) => {
+                for c in &v.cases {
+                    let name = ctor_name(v, c);
+                    let info = FnKwInfo::from_params(&name, &case_params(c))?;
+                    fns.insert(name, info);
+                }
+            }
+            _ => {}
+        }
     }
 
     let struct_fields = program
@@ -83,6 +106,24 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
         .items
         .iter()
         .map(|item| {
+            // A case's defaults are expanded and stored back for the same
+            // reason a keyword parameter's are: the declaration keeps a copy
+            // the checker reads, and it must not hold an unexpanded call.
+            if let Item::Variant(v) = item {
+                let mut cases = v.cases.clone();
+                for c in &mut cases {
+                    let expanded = cx.expanded_defaults(&ctor_name(v, c))?;
+                    for (slot, d) in c
+                        .payload
+                        .iter_mut()
+                        .filter(|slot| slot.default.is_some())
+                        .zip(expanded)
+                    {
+                        slot.default = Some(d);
+                    }
+                }
+                return Ok(Item::Variant(VariantDecl { cases, ..v.clone() }));
+            }
             let Item::Fn(f) = item else {
                 return Ok(item.clone());
             };
@@ -147,18 +188,24 @@ impl FnKwInfo {
     /// too (keyword parameters come last), and a default may only read
     /// parameters declared *before* it.
     fn from_sig(name: &str, sig: &Signature) -> Result<FnKwInfo, Error> {
+        FnKwInfo::from_params(name, &sig.params)
+    }
+
+    /// [`FnKwInfo::from_sig`] over a bare parameter list — what a variant
+    /// case's payload becomes (see [`case_params`]).
+    fn from_params(name: &str, sig_params: &[Param]) -> Result<FnKwInfo, Error> {
         let mut kw: Vec<(String, Expr)> = Vec::new();
         let mut positional = Vec::new();
-        for p in &sig.params {
+        for p in sig_params {
             match &p.default {
                 Some(d) => kw.push((p.name.clone(), d.clone())),
                 None => {
                     if let Some((kw_name, kw_default)) = kw.last() {
                         return Err(Error::at(
                             format!(
-                                "fn {:?}: parameter {:?} has no default but follows keyword \
+                                "{}: parameter {:?} has no default but follows keyword \
                                  parameter {kw_name:?}; parameters with defaults must come last",
-                                display(name),
+                                describe(name),
                                 p.name
                             ),
                             kw_default.span.clone(),
@@ -174,10 +221,10 @@ impl FnKwInfo {
         // parameter has nothing to bind to — and left alone it would resolve to
         // whatever the *caller* happens to have in scope under that name — so
         // it is refused here, where the declaration is what the span points at.
-        for (i, p) in sig.params.iter().enumerate() {
+        for (i, p) in sig_params.iter().enumerate() {
             let Some(d) = &p.default else { continue };
             let free = aipl_syntax::free_idents(d);
-            let Some(later) = sig.params[i..].iter().find(|q| free.contains(&q.name)) else {
+            let Some(later) = sig_params[i..].iter().find(|q| free.contains(&q.name)) else {
                 continue;
             };
             let relation = if later.name == p.name {
@@ -187,16 +234,15 @@ impl FnKwInfo {
             };
             return Err(Error::at(
                 format!(
-                    "fn {:?}: the default for parameter {:?} reads {relation} — a default may \
+                    "{}: the default for parameter {:?} reads {relation} — a default may \
                      only read parameters declared before it",
-                    display(name),
+                    describe(name),
                     p.name
                 ),
                 d.span.clone(),
             ));
         }
-        let params = sig
-            .params
+        let params = sig_params
             .iter()
             .map(|p| {
                 let ann = (!aipl_syntax::mentions_typevar(&p.ty)).then(|| p.ty.clone());
@@ -209,6 +255,35 @@ impl FnKwInfo {
             params,
         })
     }
+}
+
+/// The name a variant case's constructor is called by after loader rewriting:
+/// the variant-qualified `Case@Variant`. Shared so the registration and the
+/// write-back agree on one spelling.
+fn ctor_name(v: &VariantDecl, c: &VariantCase) -> String {
+    format!("{}@{}", c.name, v.name)
+}
+
+/// A variant case's payload slots as the parameter list its constructor takes,
+/// so one set of rules — [`FnKwInfo::from_params`] and everything downstream of
+/// it — covers a case and a function alike. An *unnamed* slot (`Circle(i64)`)
+/// gets a synthetic name no source identifier can collide with: it exists only
+/// so the slots line up positionally, and nothing can read it by name.
+fn case_params(c: &VariantCase) -> Vec<Param> {
+    c.payload
+        .iter()
+        .enumerate()
+        .map(|(i, slot)| Param {
+            name: slot
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("{}{i}", aipl_syntax::CASE_SLOT_PREFIX)),
+            ty: slot.ty.clone(),
+            mutable: false,
+            variadic: false,
+            default: slot.default.clone(),
+        })
+        .collect()
 }
 
 /// Keyword-parameter info for every builtin that declares one, keyed by the
@@ -614,18 +689,18 @@ impl Expander {
                     if found.is_some_and(|info| info.positional.iter().any(|p| p == k)) {
                         return Err(Error::at(
                             format!(
-                                "parameter {k:?} of fn {:?} is positional (it has no default) \
+                                "parameter {k:?} of {} is positional (it has no default) \
                                  and cannot be passed by keyword",
-                                display(name),
+                                describe(name),
                             ),
                             kspan.clone(),
                         ));
                     }
                     return Err(Error::at(
                         format!(
-                            "{:?} has no keyword parameter {k:?} (a keyword parameter is one \
+                            "{} has no keyword parameter {k:?} (a keyword parameter is one \
                              declared with a default, e.g. `k: i64 = 0`)",
-                            display(name)
+                            describe(name)
                         ),
                         kspan.clone(),
                     ));
@@ -637,9 +712,9 @@ impl Expander {
         if positional.len() != info.positional.len() {
             return Err(Error::at(
                 format!(
-                    "fn {:?} expects {} positional arg(s), got {} (its keyword parameter{} must \
+                    "{} expects {} positional arg(s), got {} (its keyword parameter{} must \
                      be passed by keyword: {})",
-                    display(name),
+                    describe(name),
                     info.positional.len(),
                     positional.len(),
                     if info.kw.len() == 1 { "" } else { "s" },
@@ -663,17 +738,17 @@ impl Expander {
                 if info.positional.iter().any(|p| *p == k) {
                     return Err(Error::at(
                         format!(
-                            "parameter {k:?} of fn {:?} is positional (it has no default) and \
+                            "parameter {k:?} of {} is positional (it has no default) and \
                              cannot be passed by keyword",
-                            display(name),
+                            describe(name),
                         ),
                         kspan,
                     ));
                 }
                 return Err(Error::at(
                     format!(
-                        "fn {:?} has no keyword parameter {k:?}; its keyword parameter{} {}",
-                        display(name),
+                        "{} has no keyword parameter {k:?}; its keyword parameter{} {}",
+                        describe(name),
                         if kw_names.len() == 1 { " is" } else { "s are" },
                         kw_names
                             .iter()
@@ -820,9 +895,9 @@ impl Expander {
                 {
                     return Err(Error::at(
                         format!(
-                            "fn {:?} has keyword parameters, so it cannot be passed as a \
+                            "{} has keyword parameters, so it cannot be passed as a \
                              function value",
-                            display(name)
+                            describe(name)
                         ),
                         e.span.clone(),
                     ));
@@ -1057,4 +1132,14 @@ impl Expander {
 fn display(name: &str) -> &str {
     let name = super::unmangled_name(name);
     name.strip_prefix("__builtin_").unwrap_or(name)
+}
+
+/// How `name` is named in a diagnostic. A variant case's constructor carries
+/// the loader's `Case@Variant` form (only constructors have an `@`), and is
+/// described as the case it is rather than as a `fn` the source never declared.
+fn describe(name: &str) -> String {
+    match name.split_once('@') {
+        Some((case, _)) => format!("variant case {case:?}"),
+        None => format!("fn {:?}", display(name)),
+    }
 }

@@ -70,8 +70,8 @@ fn referenced_names(program: &Program) -> HashSet<String> {
             }
             Item::Variant(v) => {
                 for case in &v.cases {
-                    for t in &case.payload {
-                        collect_ty_names(t, &mut out);
+                    for slot in &case.payload {
+                        collect_ty_names(&slot.ty, &mut out);
                     }
                 }
             }

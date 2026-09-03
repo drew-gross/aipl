@@ -1,0 +1,9 @@
+variant Shape = Circle(i64 = 1)
+
+fn main() -> i64 { match (Circle()) { Circle(..) => 0 } }
+--- errors ---
+error: unexpected '='; expected '!', ')', ',', ':', '<', '?', or '['
+ --> ./tests/cases/variants/err_payload_default_unnamed.aipl:1:28
+  |
+1 | variant Shape = Circle(i64 = 1)
+  |                            ^

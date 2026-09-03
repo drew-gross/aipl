@@ -1,0 +1,13 @@
+variant Shape = Circle(color: str = "red", r: i64)
+
+fn main() -> i64 {
+    match (Circle(1)) {
+        Circle(..) => 0,
+    }
+}
+--- errors ---
+error: variant case "Circle": parameter "r" has no default but follows keyword parameter "color"; parameters with defaults must come last
+ --> ./tests/cases/variants/err_payload_positional_after_default.aipl:1:37
+  |
+1 | variant Shape = Circle(color: str = "red", r: i64)
+  |                                     ^^^^^

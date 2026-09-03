@@ -1,0 +1,13 @@
+variant Shape = Circle(r: i64 = r)
+
+fn main() -> i64 {
+    match (Circle()) {
+        Circle(..) => 0,
+    }
+}
+--- errors ---
+error: variant case "Circle": the default for parameter "r" reads itself — a default may only read parameters declared before it
+ --> ./tests/cases/variants/err_payload_default_self_ref.aipl:1:33
+  |
+1 | variant Shape = Circle(r: i64 = r)
+  |                                 ^

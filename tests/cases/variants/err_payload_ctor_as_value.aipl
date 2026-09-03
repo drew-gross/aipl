@@ -1,0 +1,11 @@
+import { len, map } from builtins;
+
+variant Shape = Circle(r: i64, color: str = "red")
+
+fn main() -> i64 { [1, 2].map(Circle).len() }
+--- errors ---
+error: variant case "Circle" has keyword parameters, so it cannot be passed as a function value
+ --> ./tests/cases/variants/err_payload_ctor_as_value.aipl:5:31
+  |
+5 | fn main() -> i64 { [1, 2].map(Circle).len() }
+  |                               ^^^^^^

@@ -44,7 +44,7 @@ pub use subst::inline_single_use_bindings;
 use aipl_syntax::{
     ast,
     ast::{
-        is_unit, BinOp, Bound, ConcreteFieldDecl, ConcreteStructDecl, ConcreteType,
+        is_unit, BinOp, Bound, CaseParam, ConcreteFieldDecl, ConcreteStructDecl, ConcreteType,
         ConcreteVariantCase, ConcreteVariantDecl, Expr, ExprKind, FieldDecl, FieldInit, Function,
         Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl,
         Type, TypeParam, VariantCase, VariantDecl,
@@ -73,7 +73,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
     // Payload-carrying constructors: name → payload types (arity >= 1). Keyed by
     // both the bare case name and the loader's variant-qualified form
     // `Case@Variant`, so a qualified reference used as a value is wrapped too.
-    let mut ctors: HashMap<String, &[Type]> = HashMap::new();
+    let mut ctors: HashMap<String, Vec<Type>> = HashMap::new();
     for item in &program.items {
         if let Item::Variant(v) = item {
             // Every in-scope constructor is referenced by its loader-assigned
@@ -83,7 +83,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
                 if c.payload.is_empty() {
                     continue;
                 }
-                ctors.insert(format!("{}@{}", c.name, v.name), c.payload.as_slice());
+                ctors.insert(format!("{}@{}", c.name, v.name), c.payload_tys());
             }
         }
     }
@@ -135,7 +135,31 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
                     })
                     .collect(),
             }),
-            Item::Variant(_) | Item::Import(_) => item.clone(),
+            // A payload default is an expression like any other and may name a
+            // constructor: it is spliced at construction sites, but the
+            // declaration keeps its own copy, and the checker reads that one.
+            Item::Variant(v) => Item::Variant(VariantDecl {
+                cases: v
+                    .cases
+                    .iter()
+                    .map(|c| VariantCase {
+                        payload: c
+                            .payload
+                            .iter()
+                            .map(|slot| CaseParam {
+                                default: slot
+                                    .default
+                                    .as_ref()
+                                    .map(|d| lcr_expr(d, &ctors, &mut Vec::new())),
+                                ..slot.clone()
+                            })
+                            .collect(),
+                        ..c.clone()
+                    })
+                    .collect(),
+                ..v.clone()
+            }),
+            Item::Import(_) => item.clone(),
         })
         .collect();
     Program { items }
@@ -144,7 +168,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
 /// [`lower_ctor_refs`]'s expression walk. `scope` is the stack of bindings in
 /// scope (a name is pushed for the subexpressions it covers and popped after),
 /// so a shadowed constructor name is left alone.
-fn lcr_expr(e: &Expr, ctors: &HashMap<String, &[Type]>, scope: &mut Vec<String>) -> Expr {
+fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String>) -> Expr {
     use ExprKind as K;
     // `rebuilt`, not `new`: this is the same expression with a lowered kind, so
     // it keeps the spans the parser recorded on it (`Expr::value_span`).
@@ -413,7 +437,10 @@ pub fn lower_tuples(program: &Program) -> Program {
                         payload: c
                             .payload
                             .iter()
-                            .map(|t| lt_ty(t, &mut fields_map, &mut order))
+                            .map(|p| CaseParam {
+                                ty: lt_ty(&p.ty, &mut fields_map, &mut order),
+                                ..p.clone()
+                            })
                             .collect(),
                     })
                     .collect(),
@@ -825,8 +852,13 @@ impl GenericLowerer {
                 let payload = c
                     .payload
                     .iter()
-                    .map(|p| self.lower_ty(&subst_type_params(p, &map)))
-                    .collect::<Result<_, _>>()?;
+                    .map(|p| {
+                        Ok(CaseParam {
+                            ty: self.lower_ty(&subst_type_params(&p.ty, &map))?,
+                            ..p.clone()
+                        })
+                    })
+                    .collect::<Result<_, Error>>()?;
                 cases.push(VariantCase {
                     name: c.name.clone(),
                     payload,
@@ -1058,7 +1090,12 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
                             payload: c
                                 .payload
                                 .iter()
-                                .map(|t| lc.lower_ty(t))
+                                .map(|p| {
+                                    Ok(CaseParam {
+                                        ty: lc.lower_ty(&p.ty)?,
+                                        ..p.clone()
+                                    })
+                                })
                                 .collect::<Result<_, Error>>()?,
                         })
                     })
@@ -1126,7 +1163,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                     v.name.clone(),
                     v.cases
                         .iter()
-                        .map(|c| (c.name.clone(), c.payload.clone()))
+                        .map(|c| (c.name.clone(), c.payload_tys()))
                         .collect(),
                 );
                 passthrough.push(item.clone());
@@ -1448,7 +1485,20 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             type_vars: Vec::new(),
             cases: cases
                 .into_iter()
-                .map(|(name, payload)| VariantCase { name, payload })
+                .map(|(name, payload)| VariantCase {
+                    name,
+                    // A synthesized instance is downstream of every default
+                    // (the loader filled them at each construction site), so
+                    // its slots are plain types again.
+                    payload: payload
+                        .into_iter()
+                        .map(|ty| CaseParam {
+                            name: None,
+                            ty,
+                            default: None,
+                        })
+                        .collect(),
+                })
                 .collect(),
         })
         .collect();
@@ -1495,7 +1545,9 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                         payload: c
                             .payload
                             .iter()
-                            .map(|t| settled(t, &format!("variant {:?} case {:?}", v.name, c.name)))
+                            .map(|p| {
+                                settled(&p.ty, &format!("variant {:?} case {:?}", v.name, c.name))
+                            })
                             .collect(),
                     })
                     .collect(),
@@ -4338,7 +4390,7 @@ impl Mono<'_> {
                                 c.name.clone(),
                                 c.payload
                                     .iter()
-                                    .map(|p| subst_type_params(p, &map))
+                                    .map(|p| subst_type_params(&p.ty, &map))
                                     .collect(),
                             )
                         })
@@ -4387,7 +4439,7 @@ impl Mono<'_> {
                     Some(
                         case.payload
                             .iter()
-                            .map(|p| subst_type_params(p, &map))
+                            .map(|p| subst_type_params(&p.ty, &map))
                             .collect::<Vec<_>>(),
                     )
                 })
@@ -4452,7 +4504,7 @@ impl Mono<'_> {
                 let payload = c
                     .payload
                     .iter()
-                    .map(|p| self.resolve_generic_ty(&subst_type_params(p, &map)))
+                    .map(|p| self.resolve_generic_ty(&subst_type_params(&p.ty, &map)))
                     .collect::<Result<_, _>>()?;
                 cases.push((c.name.clone(), payload));
             }
@@ -4623,7 +4675,7 @@ impl Mono<'_> {
                     for c in &tmpl.cases {
                         if let Some((_, ipayload)) = cases.iter().find(|(n, _)| *n == c.name) {
                             for (pt, it) in c.payload.iter().zip(ipayload) {
-                                self.bind_field(pt, it, &vars, &mut map);
+                                self.bind_field(&pt.ty, it, &vars, &mut map);
                             }
                         }
                     }
@@ -4686,7 +4738,7 @@ impl Mono<'_> {
         // checker does the same, and the two must agree: it accepting a program
         // mono then rejects is a crash after a clean check.
         let mut deferred: Vec<(&Type, Type)> = Vec::new();
-        for (arg, pty) in args.iter().zip(&case.payload) {
+        for (arg, pty) in args.iter().zip(case.payload.iter().map(|p| &p.ty)) {
             let (ra, at) = self.infer(arg, env)?;
             let at = decay_concat(at);
             if check::literal_pins_nothing(arg, pty, &vars) {

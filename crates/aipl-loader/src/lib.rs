@@ -874,11 +874,30 @@ fn rewrite_item(
                 .iter()
                 .map(|c| aipl_syntax::ast::VariantCase {
                     name: c.name.clone(),
-                    payload: c
-                        .payload
-                        .iter()
-                        .map(|t| rewrite_type(t, view, &v.type_vars))
-                        .collect(),
+                    payload: {
+                        // A payload default is rewritten exactly as a keyword
+                        // parameter's is: the *named* slots declared before it
+                        // are its locals (a default may read one, and the
+                        // construction site binds it to the argument passed
+                        // there), so a global of the same name doesn't capture
+                        // it. Slots from this one on are deliberately left out,
+                        // so a forward or self reference stays an ordinary name
+                        // for `kwargs::FnKwInfo::from_params` to reject.
+                        let mut earlier: HashSet<String> = HashSet::new();
+                        let mut slots = Vec::with_capacity(c.payload.len());
+                        for slot in &c.payload {
+                            slots.push(aipl_syntax::ast::CaseParam {
+                                name: slot.name.clone(),
+                                ty: rewrite_type(&slot.ty, view, &v.type_vars),
+                                default: slot
+                                    .default
+                                    .as_ref()
+                                    .map(|d| rewrite_expr(d, view, sc, &earlier)),
+                            });
+                            earlier.extend(slot.name.clone());
+                        }
+                        slots
+                    },
                 })
                 .collect(),
         }),

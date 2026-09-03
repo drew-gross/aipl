@@ -1,0 +1,65 @@
+import { equal as ==, wrapping_mul as * } from builtins;
+
+// A case may name its payload slots. A name with no default is positional,
+// exactly as a parameter's is — it documents the slot and nothing else, so
+// construction and matching stay positional.
+variant Shape = Circle(r: i64) | Rect(w: i64, h: i64) | Empty
+
+fn area(s: Shape) -> i64 {
+    match (s) {
+        Circle(r) => r * r,
+        Rect(w, h) => w * h,
+        Empty => 0,
+    }
+}.test({
+    assert(area(Circle(5)) == 25);
+    assert(area(Rect(3, 4)) == 12);
+    assert(area(Empty) == 0);
+    assert(Rect(3, 4) == Rect(3, 4));
+})
+
+// Named and unnamed slots mix freely: only a *defaulted* slot needs a name.
+variant Span = At(u64, line: u64)
+
+fn line_of(s: Span) -> u64 {
+    match (s) {
+        At(_, l) => l,
+    }
+}.test({
+    assert(line_of(At(7, 2)) == 2);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 220
+binary size: 2376
+  code: 968
+  data: 249
+  metadata: 1159
+functions:
+  __eq_Shape:
+    calls: 1
+    bytes: 176
+  __test$area:
+    calls: 1
+    bytes: 500
+  __test$line_of:
+    calls: 1
+    bytes: 124
+  aipl_assert:
+    calls: 5
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 168

@@ -518,8 +518,39 @@ pub mod ast {
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct VariantCase {
         pub name: String,
-        /// Positional payload types; empty for a nullary case (e.g. `Empty`).
-        pub payload: Vec<Type>,
+        /// The payload slots, in declaration order; empty for a nullary case
+        /// (e.g. `Empty`).
+        pub payload: Vec<CaseParam>,
+    }
+
+    impl VariantCase {
+        /// The payload's types alone, in declaration order — what every pass
+        /// that doesn't care which slots were named needs (layout, patterns,
+        /// codegen, arity checks).
+        pub fn payload_tys(&self) -> Vec<Type> {
+            self.payload.iter().map(|p| p.ty.clone()).collect()
+        }
+    }
+
+    /// One slot of a variant case's payload. A case may spell a slot as a bare
+    /// type (`Circle(i64)`), as a named one (`Circle(r: i64)`), or as a named
+    /// one with a default (`Circle(r: i64 = 1)`) — the same three shapes a
+    /// function parameter has, with the same meaning: a default is what makes
+    /// the slot a *keyword* argument of the constructor.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct CaseParam {
+        /// The slot's declared name, or `None` for the bare positional form.
+        /// An unnamed slot can only be passed positionally and cannot carry a
+        /// default (there would be nothing to name it by at the call site).
+        pub name: Option<String>,
+        pub ty: Type,
+        /// `Some(expr)` for a keyword slot, written `k: T = expr`. Exactly
+        /// [`Param::default`]'s semantics, one construction at a time: keyword
+        /// slots come after every positional one, may only be supplied by
+        /// keyword (`Circle(1, color = "red")`), and a default may read the
+        /// slots declared before it. The loader fills every omitted one at the
+        /// construction site, so nothing downstream sees a partial payload.
+        pub default: Option<Expr>,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2543,7 +2574,8 @@ pub fn builtin_type_canonical(name: &str) -> Option<String> {
 }
 
 /// Visit every expression in `program` — function bodies, `.test` blocks, and
-/// keyword-parameter / struct-field default expressions — pre-order.
+/// keyword-parameter / struct-field / variant-payload default expressions —
+/// pre-order.
 pub fn each_expr(program: &ast::Program, f: &mut impl FnMut(&ast::Expr)) {
     for item in &program.items {
         match item {
@@ -2565,7 +2597,16 @@ pub fn each_expr(program: &ast::Program, f: &mut impl FnMut(&ast::Expr)) {
                     }
                 }
             }
-            ast::Item::Variant(_) | ast::Item::Import(_) => {}
+            ast::Item::Variant(v) => {
+                for case in &v.cases {
+                    for slot in &case.payload {
+                        if let Some(d) = &slot.default {
+                            each_subexpr(d, f);
+                        }
+                    }
+                }
+            }
+            ast::Item::Import(_) => {}
         }
     }
 }
@@ -2613,8 +2654,11 @@ pub fn promote_type_vars(program: &mut ast::Program) {
             ast::Item::Variant(v) => {
                 let vars: Vec<String> = v.type_vars.iter().map(|t| t.name.clone()).collect();
                 for case in &mut v.cases {
-                    for ty in &mut case.payload {
-                        promote_ty(ty, &vars);
+                    for slot in &mut case.payload {
+                        promote_ty(&mut slot.ty, &vars);
+                        if let Some(d) = &mut slot.default {
+                            promote_in_expr(d, &vars);
+                        }
                     }
                 }
             }
@@ -2968,6 +3012,12 @@ pub const SPREAD_BASE_PREFIX: &str = "__spread_base$";
 /// first — `f(g())` with `fn f(a: T, b: T = a)` must not call `g` twice. Same
 /// job as [`SPREAD_BASE_PREFIX`], for the same reason.
 pub const KWARG_ARG_PREFIX: &str = "__kwarg$";
+
+/// Name prefix the loader gives an *unnamed* variant payload slot
+/// (`Circle(i64)`) so a case's payload can be handled as a parameter list. The
+/// `$` keeps it unwritable in source, which is the point: an unnamed slot is
+/// positional-only and nothing may read it by name.
+pub const CASE_SLOT_PREFIX: &str = "__slot$";
 
 /// Prefix of the temporary a `let T { a, b } = value;` destructuring binds its
 /// scrutinee to (the parser's `StmtSpec::LetStruct` lowering). It plays the same

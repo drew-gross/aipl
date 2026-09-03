@@ -1,0 +1,13 @@
+variant Shape = Circle(r: i64, color: str = "red")
+
+fn main() -> i64 {
+    match (Circle(1, colour="blue")) {
+        Circle(..) => 0,
+    }
+}
+--- errors ---
+error: variant case "Circle" has no keyword parameter "colour"; its keyword parameter is "color"
+ --> ./tests/cases/variants/err_payload_unknown_kw.aipl:4:22
+  |
+4 |     match (Circle(1, colour="blue")) {
+  |                      ^^^^^^^^^^^^^

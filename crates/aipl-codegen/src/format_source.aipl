@@ -75,10 +75,10 @@ deallocations: 1953
 reallocations: 30
 bytes allocated: 110170
 instructions executed: 348995
-binary size: 932824
-  code: 601244
+binary size: 943832
+  code: 607792
   data: 1891
-  metadata: 329689
+  metadata: 334149
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -311,6 +311,9 @@ functions:
   __m6__call_args_until:
     calls: 0
     bytes: 2772
+  __m6__case_params:
+    calls: 0
+    bytes: 6580
   __m6__comma_list_docs:
     calls: 3
     bytes: 4104
@@ -556,7 +559,7 @@ functions:
     bytes: 7148
   __m6__variant_payload:
     calls: 0
-    bytes: 2456
+    bytes: 2424
   __m6__while_stmt:
     calls: 0
     bytes: 4884

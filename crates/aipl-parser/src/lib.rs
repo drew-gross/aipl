@@ -10,9 +10,9 @@ use gazelle_macros::gazelle;
 use aipl_syntax::{join_spans, Error, Span};
 
 use aipl_syntax::ast::{
-    BinOp, Bound, Expr, ExprKind, FieldDecl, FieldInit, Function, ImportDecl, ImportName,
-    ImportSource, Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program, Signature,
-    StructDecl, Type, TypeParam, VariantCase, VariantDecl,
+    BinOp, Bound, CaseParam, Expr, ExprKind, FieldDecl, FieldInit, Function, ImportDecl,
+    ImportName, ImportSource, Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program,
+    Signature, StructDecl, Type, TypeParam, VariantCase, VariantDecl,
 };
 use aipl_syntax::binop_spelling;
 
@@ -208,7 +208,19 @@ gazelle! {
                       | PIPE variant_case => first_leading_pipe
                       | variant_cases PIPE variant_case => rest;
         variant_case = IDENT => nullary
-                     | IDENT LPAREN ty_arg_list RPAREN => with_payload;
+                     | IDENT LPAREN case_params RPAREN => with_payload;
+        // A case's payload slots. Each is a bare type (`Circle(i64)`), a named
+        // type (`Circle(r: i64)`), or a named type with a default
+        // (`Circle(r: i64 = 1)`) — the same three shapes a parameter has, and
+        // the same meaning: a default makes the slot a keyword argument of the
+        // constructor. A bare `IDENT` *is* a type (`base_ty`), so the choice
+        // rests on one token of lookahead after it (`:` → named, else → the
+        // type), which full LR(1) resolves per state — `COLON` following a `ty`
+        // is otherwise only the dict type's `#{K: V}`.
+        case_params = case_param => first | case_params COMMA case_param => rest;
+        case_param = ty => positional
+                   | IDENT COLON ty => named
+                   | IDENT COLON ty EQ expr => named_with_default;
 
         fields = field_decl_list => present
                | field_decl_list COMMA => present_trailing
@@ -713,6 +725,8 @@ impl aipl::Types for Build {
     type VariantDecl = VariantDecl;
     type VariantCases = Vec<VariantCase>;
     type VariantCase = VariantCase;
+    type CaseParams = Vec<CaseParam>;
+    type CaseParam = CaseParam;
     type MatchBindings = Vec<String>;
     /// A constructor pattern's payload: the binder names, and whether the arm
     /// wrote `(..)` to say it isn't reading them.
@@ -1028,6 +1042,40 @@ impl gazelle::Action<aipl::VariantCase<Self>> for Build {
                 payload: Vec::new(),
             },
             aipl::VariantCase::WithPayload((name, _), payload) => VariantCase { name, payload },
+        })
+    }
+}
+
+impl gazelle::Action<aipl::CaseParams<Self>> for Build {
+    fn build(&mut self, node: aipl::CaseParams<Self>) -> Result<Vec<CaseParam>, Self::Error> {
+        Ok(match node {
+            aipl::CaseParams::First(p) => vec![p],
+            aipl::CaseParams::Rest(mut prev, p) => {
+                prev.push(p);
+                prev
+            }
+        })
+    }
+}
+
+impl gazelle::Action<aipl::CaseParam<Self>> for Build {
+    fn build(&mut self, node: aipl::CaseParam<Self>) -> Result<CaseParam, Self::Error> {
+        Ok(match node {
+            aipl::CaseParam::Positional(ty) => CaseParam {
+                name: None,
+                ty,
+                default: None,
+            },
+            aipl::CaseParam::Named((name, _), ty) => CaseParam {
+                name: Some(name),
+                ty,
+                default: None,
+            },
+            aipl::CaseParam::NamedWithDefault((name, _), ty, default) => CaseParam {
+                name: Some(name),
+                ty,
+                default: Some(default),
+            },
         })
     }
 }

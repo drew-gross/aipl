@@ -436,7 +436,7 @@ impl<'a> Cx<'a> {
                                 c.name.clone(),
                                 c.payload
                                     .iter()
-                                    .map(|p| crate::subst_type_params(p, &map))
+                                    .map(|p| crate::subst_type_params(&p.ty, &map))
                                     .collect(),
                             )
                         })
@@ -593,7 +593,7 @@ impl<'a> Cx<'a> {
                     for c in &tmpl.cases {
                         if let Some((_, ipayload)) = inst_cases.iter().find(|(n, _)| *n == c.name) {
                             for (pt, it) in c.payload.iter().zip(ipayload) {
-                                self.bind_field(pt, it, &vars, &mut map);
+                                self.bind_field(&pt.ty, it, &vars, &mut map);
                             }
                         }
                     }
@@ -696,7 +696,7 @@ impl<'a> Cx<'a> {
                 let payload = c
                     .payload
                     .iter()
-                    .map(|p| self.resolve_generic_ty(&crate::subst_type_params(p, &map)))
+                    .map(|p| self.resolve_generic_ty(&crate::subst_type_params(&p.ty, &map)))
                     .collect::<Result<_, _>>()?;
                 cases.push((c.name.clone(), payload));
             }
@@ -841,7 +841,7 @@ impl<'a> Cx<'a> {
         // A bare integer literal payload is deferred to the fallback chain below
         // rather than pinning here — see [`literal_pins_nothing`].
         let mut deferred: Vec<(&Type, Type)> = Vec::new();
-        for (arg, pty) in args.iter().zip(&case.payload) {
+        for (arg, pty) in args.iter().zip(case.payload.iter().map(|p| &p.ty)) {
             // A constructor reference against a `Case<_>` payload is the case
             // itself, and it is what pins the variable: `Term(Str)` learns
             // `K = Tok` from `Str`. Checking it first would type it as the
@@ -946,7 +946,7 @@ impl<'a> Cx<'a> {
                 .map(|tv| tv.name.clone())
                 .zip(type_args.iter().cloned())
                 .collect();
-            for ((arg, at), pty) in arg_tys.iter().zip(&case.payload) {
+            for ((arg, at), pty) in arg_tys.iter().zip(case.payload.iter().map(|p| &p.ty)) {
                 let target = crate::subst_type_params(pty, &subst);
                 let at = self.flex_int(arg, at, &target)?;
                 expect(
@@ -1032,7 +1032,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
                     v.name.clone(),
                     v.cases
                         .iter()
-                        .map(|c| (c.name.clone(), c.payload.clone()))
+                        .map(|c| (c.name.clone(), c.payload_tys()))
                         .collect(),
                 );
             }
@@ -1144,13 +1144,47 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
                 continue;
             }
             for case in &v.cases {
-                for ty in &case.payload {
+                // A payload default is checked in an environment holding the
+                // *named* slots declared before it — the ones it may read —
+                // exactly as a keyword parameter's default is, and for the same
+                // reason: the loader splices it at each construction site,
+                // binding every name it reads to the argument passed there.
+                let mut earlier: Env = HashMap::new();
+                for slot in &case.payload {
                     if let Err(e) = cx.check_ty(
-                        ty,
+                        &slot.ty,
                         &[],
                         &format!("variant {:?} case {:?} payload", v.name, case.name),
                     ) {
                         errors.push(e);
+                    }
+                    if let Some(default) = &slot.default {
+                        let checked = cx.check_expr(default, &earlier, &[]).and_then(|dt| {
+                            let dt = cx.flex_int(default, &dt, &slot.ty)?;
+                            expect(
+                                &dt,
+                                &slot.ty,
+                                &format!(
+                                    "default for variant {:?} case {:?} payload {:?}",
+                                    v.name,
+                                    case.name,
+                                    slot.name.as_deref().unwrap_or_default()
+                                ),
+                                default.span.clone(),
+                            )
+                        });
+                        if let Err(e) = checked {
+                            errors.push(e);
+                        }
+                    }
+                    if let Some(n) = &slot.name {
+                        earlier.insert(
+                            n.clone(),
+                            Binding {
+                                ty: slot.ty.clone(),
+                                mutable: false,
+                            },
+                        );
                     }
                 }
             }

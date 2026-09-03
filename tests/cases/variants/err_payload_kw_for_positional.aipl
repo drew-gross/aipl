@@ -1,0 +1,13 @@
+variant Shape = Circle(r: i64, color: str = "red")
+
+fn main() -> i64 {
+    match (Circle(1, r=2, color="blue")) {
+        Circle(..) => 0,
+    }
+}
+--- errors ---
+error: parameter "r" of variant case "Circle" is positional (it has no default) and cannot be passed by keyword
+ --> ./tests/cases/variants/err_payload_kw_for_positional.aipl:4:22
+  |
+4 |     match (Circle(1, r=2, color="blue")) {
+  |                      ^^^
