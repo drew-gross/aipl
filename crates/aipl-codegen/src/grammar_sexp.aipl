@@ -283,9 +283,9 @@ allocations: 25393
 deallocations: 25393
 reallocations: 2339
 bytes allocated: 1267718
-instructions executed: 4406944
-binary size: 190424
-  code: 120784
+instructions executed: 4404966
+binary size: 190496
+  code: 120856
   data: 3556
   metadata: 66084
 functions:
@@ -387,7 +387,7 @@ functions:
     bytes: 1188
   __m2__link_rule$SexpKind:
     calls: 184
-    bytes: 4424
+    bytes: 4496
   __m2__name_index:
     calls: 115
     bytes: 400
@@ -551,13 +551,13 @@ functions:
     calls: 2712
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 31710
+    calls: 31664
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 51
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 28998
+    calls: 28952
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 51

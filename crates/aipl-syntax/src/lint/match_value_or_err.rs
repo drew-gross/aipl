@@ -1,6 +1,43 @@
-use super::constant_value;
-use crate::ast::{Expr, ExprKind, Pattern};
+use crate::ast::{BinOp, Expr, ExprKind, Pattern};
 use crate::Error;
+
+/// Whether the optimizer will sink `e` into the branch that uses it, rather than
+/// evaluating it where it was written.
+///
+/// This is the lint's local stand-in for `aipl_mono::sink::can_defer`, which it
+/// cannot call: that runs after monomorphization over a call-graph closure,
+/// while a lint runs per file, before type checking. The two must agree on what
+/// is deferrable, because the whole justification for advising this rewrite is
+/// that the sinker undoes its eagerness.
+///
+/// The structural half is the same: nothing that leaves the function from where
+/// it sits, writes a binding, or may not terminate. `%` is here for the reason
+/// the sinker names — it traps on a zero divisor, so hoisting it onto the
+/// success path could kill a program that used to return.
+///
+/// The *effect* half is where the two differ, and where AIPL's effect discipline
+/// does the work: a caller must declare at least the effects of everything it
+/// calls, so a function that declares none cannot reach an effectful call at
+/// all. `pure_fn` is that fact about the enclosing function, and it makes the
+/// question answerable without a call graph. In an effect-declaring function the
+/// lint simply stays quiet, since it cannot tell which calls carry the effect.
+fn sinkable(e: &Expr, pure_fn: bool) -> bool {
+    fn blocks(e: &Expr) -> bool {
+        matches!(
+            &e.kind,
+            // Leaves the function from where it sits.
+            ExprKind::Try(_) | ExprKind::Return(_)
+            // May write a binding declared outside the value.
+            | ExprKind::Assign(..)
+            // May not terminate.
+            | ExprKind::For(..) | ExprKind::While(..)
+        ) || matches!(&e.kind, ExprKind::Binop(_, BinOp::Rem, _))
+            // `assert` aborts, and that is its whole purpose.
+            || matches!(&e.kind, ExprKind::Call(n, _, _) if n == "assert" || n == "__assert")
+            || crate::children(e).iter().any(|c| blocks(c))
+    }
+    pure_fn && !blocks(e)
+}
 
 /// `match (o) { some(v) => ok(v), none => err(e) }` — an optional turned into a
 /// result by naming both cases. That is exactly `o.value_or_err(e)`.
@@ -15,20 +52,19 @@ use crate::Error;
 /// early return the `none` arm was doing by hand. The advice says which of the
 /// two it is, since the second reads quite differently from the first.
 ///
-/// The error must be built from constants — see
-/// [`constant_value`](super::constant_value()), the same guard
-/// [`match_value_or`](super::match_value_or()) applies to its default, for the
-/// same reason. `value_or_err`'s error is an ordinary call argument, evaluated
-/// whether or not the optional is empty, while a `none` arm runs only when it
-/// is; advising the rewrite for an error that *does* work would move that work
-/// onto the success path.
+/// A *computed* error is fine, and that is the point of [`sinkable`]. Written
+/// out, `value_or_err`'s error is an ordinary call argument and so looks eager —
+/// but the optimizer inlines the builtin and sinks the argument into the `none`
+/// branch, so it is built exactly when the `match` built it. Measured on a
+/// struct error interpolating a runtime string: both spellings allocate the
+/// same, to the byte.
 ///
-/// That is not hypothetical. `grammar.aipl`'s `link_rule` builds its error by
-/// interpolating the rule name, and the `match` builds it only when a lookup
-/// fails; rewritten, it allocated a string on every *successful* lookup — and
-/// then leaked it, which is how the guard came to be written. The leak is a
-/// separate compiler bug, but even without it the rewrite was the wrong advice.
-pub(super) fn match_value_or_err(e: &Expr, src: &str, hits: &mut Vec<Error>) {
+/// This is where the rule differs from [`match_value_or`](super::match_value_or()),
+/// whose `constant_value` guard predates that reasoning. The lint stays quiet
+/// only for an error the sinker genuinely cannot defer — one that aborts, writes,
+/// or may not terminate, or that sits in an effect-declaring function where its
+/// effects cannot be told apart.
+pub(super) fn match_value_or_err(e: &Expr, src: &str, pure_fn: bool, hits: &mut Vec<Error>) {
     let ExprKind::Match(scrut, arms) = &e.kind else {
         return;
     };
@@ -70,7 +106,7 @@ pub(super) fn match_value_or_err(e: &Expr, src: &str, hits: &mut Vec<Error>) {
     if none_name != "err" {
         return;
     }
-    if !constant_value(error) {
+    if !sinkable(error, pure_fn) {
         return;
     }
     // Whether the `some` arm is the identity `ok(v)` — the shape that rewrites

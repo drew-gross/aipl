@@ -243,7 +243,6 @@ utilities:
 skills:
 
 lint:
-  lint to request value_or_err should request even in case of computed errors because we have inlining and code sinking
   lint to use if let instead of match with empty none case
   lint !v.is_empty() to v.is_nonempty()
   linter should apply after import resolution so that it doesn't rely on function names as selected by the user (i.e. import as can't interfere with a lint)

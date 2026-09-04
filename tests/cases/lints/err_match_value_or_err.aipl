@@ -36,6 +36,20 @@ fn tokenize(o: i64?) -> Tok!str {
 
 struct Fault { code: i64 }
 
+fn describe(tag: str) -> str { `no rule named "{tag}"` }
+
+// A *computed* error is flagged too, and that is the whole point: written out,
+// `value_or_err`'s error looks eager, but the optimizer inlines the builtin and
+// sinks the argument into the `none` branch, so it is built exactly when this
+// `match` builds it. Measured on `grammar.aipl`, the rewrite allocates the same
+// to the byte and executes ~260 fewer instructions.
+fn need_computed(o: i64?, tag: str) -> i64!str {
+    match (o) {
+        some(v) => ok(v),
+        none => err(describe(tag)),
+    }
+}
+
 // An inline struct error is flagged too. The message names it rather than
 // quoting it: a construction's span stops at its last token, before the closing
 // brace, so quoting would print advice that doesn't parse.
@@ -60,6 +74,9 @@ fn main() !prints {
     if (unwrap(none_first(none)) == -1) {
         print("err");
     };
+    if (unwrap(need_computed(some(9), "r")) == 9) {
+        print("computed");
+    };
 }
 --- errors ---
 error: this `match` turns an optional into a result — write "o.value_or_err("missing")" instead (or append #[allow] to this line to keep it)
@@ -81,7 +98,13 @@ error: this `match` turns an optional into a result — write "o.value_or_err("i
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or_err.aipl:45:17
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:49:17
    |
-45 |         none => err(Fault { code: 7 }),
+49 |         none => err(describe(tag)),
+   |                 ^^^^^^^^^^^^^^^^
+
+error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:59:17
+   |
+59 |         none => err(Fault { code: 7 }),
    |                 ^^^^^^^^^^^^^^^^^^^

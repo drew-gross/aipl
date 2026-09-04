@@ -39,6 +39,7 @@ import {
     sort_by,
     starts_with,
     value_or,
+    value_or_err,
     wrapping_add as +,
     wrapping_increment as ++,
 } from builtins;
@@ -2198,10 +2199,10 @@ fn lambda_param_ty(self: W, name: str) -> WDoc!FmtError {
 // (interpolation contents included — the formatter does not reach inside
 // templates).
 fn template_verbatim(self: W) -> WDoc!FmtError {
-    match (self.peek()) {
-        none => err(self.err_here("formatter: unterminated template literal in token stream")),
-        some(t) => self.template_scan(t.span.start, 0),
-    }
+    let FmtTok { span } = self
+        .peek()
+        .value_or_err(self.err_here("formatter: unterminated template literal in token stream"))?;
+    self.template_scan(span.start, 0)
 }
 
 fn template_scan(self: W, start: u64, depth0: u64) -> WDoc!FmtError {
@@ -2823,10 +2824,10 @@ deallocations: 20240
 reallocations: 1235
 bytes allocated: 1229611
 instructions executed: 3325532
-binary size: 4039984
-  code: 2498052
+binary size: 4040160
+  code: 2498240
   data: 24868
-  metadata: 1517064
+  metadata: 1517052
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3139,7 +3140,7 @@ functions:
     bytes: 76
   atom:
     calls: 118
-    bytes: 3548
+    bytes: 2836
   base_ty:
     calls: 71
     bytes: 4364
@@ -3392,6 +3393,9 @@ functions:
   template_scan:
     calls: 0
     bytes: 2496
+  template_verbatim:
+    calls: 0
+    bytes: 900
   tok_text:
     calls: 3293
     bytes: 456

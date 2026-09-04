@@ -412,9 +412,9 @@ allocations: 11266
 deallocations: 11266
 reallocations: 535
 bytes allocated: 822647
-instructions executed: 1750625
-binary size: 227152
-  code: 144884
+instructions executed: 1738082
+binary size: 227224
+  code: 144956
   data: 5228
   metadata: 77040
 functions:
@@ -522,7 +522,7 @@ functions:
     bytes: 1188
   __m2__link_rule$JsonTok:
     calls: 1110
-    bytes: 4424
+    bytes: 4496
   __m2__name_index:
     calls: 666
     bytes: 400
@@ -692,13 +692,13 @@ functions:
     calls: 2869
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 17037
+    calls: 16704
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 259
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 14168
+    calls: 13835
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 259

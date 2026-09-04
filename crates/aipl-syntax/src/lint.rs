@@ -31,7 +31,7 @@ mod slice_to_len;
 mod slice_whole;
 mod unused_imports;
 
-use crate::ast::{BinOp, Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::{each_expr, Error, Span};
 use std::collections::HashSet;
 
@@ -74,7 +74,25 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     each_expr(program, &mut |e| eta_lambda(e, &mut hits));
     each_expr(program, &mut |e| match_is_some_and(e, &mut hits));
     each_expr(program, &mut |e| match_value_or(e, src, &mut hits));
-    each_expr(program, &mut |e| match_value_or_err(e, src, &mut hits));
+    // Not `each_expr`: this lint needs to know whether the *enclosing* function
+    // declares any effects. AIPL requires a caller to declare at least the
+    // effects of everything it calls, so "declares none" is a sound local proof
+    // that the `none` arm's error is effect-free — which is what decides whether
+    // the optimizer may sink it. A `.test` body runs with every effect allowed,
+    // so it counts as effectful. Expressions outside a function body (a struct
+    // field or keyword-parameter default) have no enclosing signature to ask and
+    // are simply not visited.
+    for item in &program.items {
+        if let Item::Fn(func) = item {
+            let pure = func.sig.effects.is_empty();
+            crate::each_subexpr(&func.body, &mut |e| {
+                match_value_or_err(e, src, pure, &mut hits)
+            });
+            if let Some(tb) = &func.test_body {
+                crate::each_subexpr(tb, &mut |e| match_value_or_err(e, src, false, &mut hits));
+            }
+        }
+    }
     each_expr(program, &mut |e| match_map_err(e, &mut hits));
     each_expr(program, &mut |e| match_map_ok(e, &mut hits));
     each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));
@@ -219,50 +237,6 @@ fn pushed_element<'a>(stmt: &'a Expr, acc: &str, push: &str) -> Option<(&'a Expr
         return None;
     }
     Some((&args[1], rest))
-}
-
-/// Whether an expression is built purely from constants, and so costs the same
-/// computed eagerly as computed lazily.
-///
-/// Shared by the two lints that rewrite a `none` arm into a builtin taking that
-/// arm's value as a plain *argument* — [`match_value_or`]'s default and
-/// [`match_value_or_err`]'s error. An argument is evaluated whether or not the
-/// optional is empty, while a `none` arm runs only when it is, so advising
-/// either rewrite for a value that does real work would move that work onto the
-/// success path. `grammar.aipl` is the worked example: its error interpolates a
-/// rule name, which the `match` builds only on the failure path.
-///
-/// Literals and names, and anything assembled out of them: a struct or
-/// variant construction (a range literal `0..0` is one of these — it parses
-/// to a `__builtin_Span` construction), an array/set/dict/tuple literal, a
-/// field read, a negation. Arithmetic counts too, except `/` and `%`, which
-/// trap on a zero divisor — evaluating one eagerly could turn a program that
-/// returns into one that dies.
-///
-/// A *call* never counts, however cheap it looks: what it costs, and whether
-/// it has effects of its own, is not visible from here.
-fn constant_value(e: &Expr) -> bool {
-    match &e.kind {
-        ExprKind::Num(_)
-        | ExprKind::Bool(_)
-        | ExprKind::Str(_)
-        | ExprKind::Char(_)
-        | ExprKind::Ident(_)
-        | ExprKind::None
-        | ExprKind::Unit => true,
-        ExprKind::Construct(_, inits) => inits.iter().all(|i| constant_value(&i.value)),
-        ExprKind::ArrayLit(xs) | ExprKind::SetLit(xs) | ExprKind::TupleLit(xs) => {
-            xs.iter().all(constant_value)
-        }
-        ExprKind::DictLit(pairs) => pairs
-            .iter()
-            .all(|(k, v)| constant_value(k) && constant_value(v)),
-        ExprKind::Field(x, _) | ExprKind::Neg(x) | ExprKind::Not(x) => constant_value(x),
-        ExprKind::Binop(a, op, b) => {
-            !matches!(op, BinOp::Div | BinOp::Rem) && constant_value(a) && constant_value(b)
-        }
-        _ => false,
-    }
 }
 
 /// 0-based line number of byte offset `pos` in `src`.

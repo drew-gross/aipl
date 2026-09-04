@@ -26,7 +26,7 @@
 //     production's rule as an *annotated* binding — `let r: Rule<Kind> = ..` —
 //     and every constructor inside it resolves from that annotation. The `.test`
 //     blocks here and in `parse.aipl` are written in that idiom throughout.
-import { Span, equal as ==, map, not_equal as !=, try_map } from builtins;
+import { Span, equal as ==, map, not_equal as !=, try_map, value_or_err } from builtins;
 import { Cst } from "./cst.aipl";
 
 // Why a parse failed: a message, and the span of the offending source (absolute
@@ -172,10 +172,12 @@ pub fn name_index(names: str[], n: str) -> u64? {
 // before a parse rather than during one.
 fn link_rule<K: variant>(r: Rule<K>, names: str[]) -> Rule<K>!ParseError {
     match (r) {
-        Named(n) => match (name_index(names, n)) {
-            some(i) => ok(NamedIdx(i)),
-            none => err(ParseError { message: `no rule named "{n}"`, span: 0..0 }),
-        },
+        Named(n) => ok(NamedIdx(
+            name_index(names, n).value_or_err(ParseError {
+                message: `no rule named "{n}"`,
+                span: 0..0,
+            })?,
+        )),
         Then(rs) => ok(Then(link_rules(rs, names)?)),
         OneOf(rs) => ok(OneOf(link_rules(rs, names)?)),
         Many(sub, min) => ok(Many(link_rule(sub, names)?, min)),
@@ -316,9 +318,9 @@ allocations: 110
 deallocations: 110
 reallocations: 17
 bytes allocated: 9424
-instructions executed: 13906
-binary size: 44848
-  code: 27572
+instructions executed: 13646
+binary size: 44920
+  code: 27644
   data: 1692
   metadata: 15584
 functions:
@@ -416,13 +418,13 @@ functions:
     calls: 55
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 236
+    calls: 230
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 12
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 181
+    calls: 175
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 12
@@ -447,7 +449,7 @@ functions:
     bytes: 1188
   link_rule$Kind:
     calls: 25
-    bytes: 4424
+    bytes: 4496
   main:
     calls: 1
     bytes: 180

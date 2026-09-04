@@ -1,6 +1,13 @@
-import { print, to_str, value_or_err } from builtins;
+import { print, remainder as %, to_str, value_or_err } from builtins;
 
 // Shapes that look close but are deliberately left alone.
+//
+// A *computed* error is not among them: the optimizer inlines `value_or_err`
+// and sinks its argument into the `none` branch, so the rewrite builds the error
+// exactly when the `match` did. What survives here is the short list the sinker
+// itself refuses to defer.
+
+struct Fault { code: i64 }
 
 // The `none` arm does not build an `err`, so this is an ordinary unwrap with a
 // fallback — `value_or` territory, and a different lint's business.
@@ -27,31 +34,34 @@ fn need_loud(o: i64?) !prints -> i64!str {
     }
 }
 
-struct Fault { message: str }
-
-fn describe(tag: str) -> str { `no rule named "{tag}"` }
-
-// The error is not constant — it interpolates. `value_or_err` takes its error
-// as a plain argument, evaluated whether or not the optional is empty, while
-// this `none` arm runs only when it is; the rewrite would build the message on
-// every *successful* call. Same guard, and same reason, as `match_value_or`'s
-// on its default.
-fn need_described(o: i64?, tag: str) -> i64!Fault {
+// The enclosing function declares an effect, so the lint cannot tell whether
+// building the error is the part that has it — and an effect hoisted onto the
+// success path would happen on every call. AIPL requires a caller to declare at
+// least the effects of what it calls, which is exactly why "declares none" is
+// the proof the lint relies on everywhere else.
+fn need_effectful(o: i64?, tag: str) !prints -> i64!str {
     match (o) {
         some(v) => ok(v),
-        none => err(Fault { message: describe(tag) }),
+        none => err(shout(tag)),
     }
 }
 
-// A `match` on a *result*, not an optional: the arms are `ok`/`err`, so there
-// is no optional here to bridge and nothing for this lint to say.
-fn described(r: i64!Fault) -> i64 {
-    match (r) {
-        ok(v) => v,
-        err(e) => -2,
+fn shout(tag: str) !prints -> str {
+    print("building an error");
+    `no rule named "{tag}"`
+}
+
+// `%` traps on a zero divisor, so the sinker will not defer it and neither will
+// this lint: evaluated eagerly it could kill a program that used to return.
+fn need_rem(o: i64?, n: i64, d: i64) -> i64!Fault {
+    match (o) {
+        some(v) => ok(v),
+        none => err(Fault { code: n % d }),
     }
 }
 
+// A `match` on a *result*, not an optional: the arms are `ok`/`err`, so there is
+// no optional here to bridge and nothing for this lint to say.
 fn unwrap(r: i64!str) -> i64 {
     match (r) {
         ok(v) => v,
@@ -59,10 +69,18 @@ fn unwrap(r: i64!str) -> i64 {
     }
 }
 
+fn faulted(r: i64!Fault) -> i64 {
+    match (r) {
+        ok(v) => v,
+        err(e) => -2,
+    }
+}
+
 fn main() !prints {
     print(or_zero(none).to_str());
     print(unwrap(need_loud(none)).to_str());
-    print(described(need_described(some(4), "r")).to_str());
+    print(unwrap(need_effectful(some(4), "r")).to_str());
+    print(faulted(need_rem(some(6), 1, 0)).to_str());
     // The rewrite itself must not flag.
     print(unwrap(some(3).value_or_err("missing")).to_str());
 }
@@ -71,27 +89,28 @@ fn main() !prints {
 about to fail
 -1
 4
+6
 3
 --- performance ---
-allocations: 4
-deallocations: 4
+allocations: 5
+deallocations: 5
 reallocations: 0
-bytes allocated: 69
-instructions executed: 240
-binary size: 2824
-  code: 1488
+bytes allocated: 86
+instructions executed: 288
+binary size: 3008
+  code: 1652
   data: 1
-  metadata: 1335
+  metadata: 1355
 functions:
   __to_str_i64:
-    calls: 4
+    calls: 5
     bytes: 204
   aipl_i64_len:
-    calls: 8
+    calls: 10
     bytes: (external)
   aipl_write_i64:
-    calls: 4
+    calls: 5
     bytes: (external)
   main:
     calls: 1
-    bytes: 1284
+    bytes: 1448
