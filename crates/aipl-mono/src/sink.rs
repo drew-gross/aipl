@@ -99,7 +99,7 @@ pub fn sink_bindings(program: &Program, effectful: &HashSet<String>) -> Program 
 /// Seeded with [`ABORTING_BUILTINS`] and `effectful`, then closed over the call
 /// graph. A name that is neither defined here nor in the seeds is a builtin
 /// that neither aborts nor has effects (indexing yields `none` rather than
-/// trapping, `int_parse` yields a result), so it is safe to defer.
+/// trapping, `int_parse` an `i64?`), so it is safe to defer.
 pub(crate) fn undeferrable_fns(program: &Program, effectful: &HashSet<String>) -> HashSet<String> {
     let bodies: Vec<(&str, &Expr)> = program
         .items
