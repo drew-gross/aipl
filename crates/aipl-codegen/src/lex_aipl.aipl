@@ -656,9 +656,9 @@ allocations: 3776
 deallocations: 3776
 reallocations: 33
 bytes allocated: 343453
-instructions executed: 905476
-binary size: 414200
-  code: 284592
+instructions executed: 905473
+binary size: 413576
+  code: 283968
   data: 6420
   metadata: 123188
 functions:
@@ -748,13 +748,13 @@ functions:
     bytes: 144
   __lambda_3:
     calls: 1
-    bytes: 172
+    bytes: 164
   __lambda_4:
     calls: 0
     bytes: 144
   __lambda_5:
     calls: 1
-    bytes: 172
+    bytes: 164
   __lambda_6:
     calls: 0
     bytes: 48
@@ -766,37 +766,37 @@ functions:
     bytes: 744
   __m1__between_len:
     calls: 24
-    bytes: 724
+    bytes: 752
   __m1__delimited_len:
     calls: 45
     bytes: 1592
   __m1__finalize_template$AiplTok:
     calls: 3
-    bytes: 7964
+    bytes: 7976
   __m1__float_len:
     calls: 0
     bytes: 824
   __m1__interp_scan$AiplTok:
     calls: 1
-    bytes: 2284
+    bytes: 2300
   __m1__lex$AiplTok:
     calls: 20
-    bytes: 1516
+    bytes: 1520
   __m1__lex_step$AiplTok:
     calls: 91
-    bytes: 24992
+    bytes: 25000
   __m1__nested_len:
     calls: 56
     bytes: 940
   __m1__step_result$AiplTok:
     calls: 1768
-    bytes: 13052
+    bytes: 13068
   __m1__template_scan$AiplTok:
     calls: 3
     bytes: 2744
   __m1__template_step$AiplTok:
     calls: 35
-    bytes: 468
+    bytes: 476
   __m2__unescape:
     calls: 8
     bytes: 1108
@@ -814,13 +814,13 @@ functions:
     bytes: 692
   __test$lex_aipl:
     calls: 1
-    bytes: 117960
+    bytes: 117180
   __test$lex_aipl_stripped:
     calls: 1
     bytes: 6636
   __test$lex_aipl_tokens:
     calls: 1
-    bytes: 4692
+    bytes: 4676
   __test_try_fail___m1__LexError:
     calls: 0
     bytes: 84
@@ -871,10 +871,10 @@ functions:
     bytes: 272
   int_lit:
     calls: 4
-    bytes: 1224
+    bytes: 1212
   lex_aipl:
     calls: 20
-    bytes: 76708
+    bytes: 76816
   lex_aipl_tokens:
     calls: 2
     bytes: 424

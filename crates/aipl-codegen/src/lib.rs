@@ -13411,6 +13411,26 @@ fn compile_variant<M: Module>(
     // A boxed (recursive) variant lives on the heap behind a refcounted block;
     // a normal one lives in a fresh stack slot. Either way `base` addresses the
     // `{tag, payload}` layout, so tag/field stores are identical below.
+    // Phase 1: evaluate every payload argument before anything is stored or
+    // retained. See the struct `Construct` arm for why the two phases are
+    // separate: an argument can early-return (`?`, `return`), and a reference
+    // already retained into a variant that is not yet tracked is owned by
+    // nothing and leaks. `owned_temp_since` is the query form of
+    // `move_owned_temp` — the entries are batch-removed after the stores,
+    // because compiling a later argument pushes tracking of its own on top.
+    let mut vals: Vec<(u32, ConcreteType, Value, bool)> = Vec::with_capacity(args.len());
+    for ((offset, fty), arg) in fields.iter().zip(args) {
+        let before = scope_depth(scopes);
+        let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
+        // A bare literal takes the payload field's int type.
+        let actual = flex_int_ty(arg, &actual, fty);
+        expect_type(&actual, fty, "constructor argument", arg.span.clone())?;
+        vals.push((*offset, fty.clone(), v, owned_temp_since(scopes, before, v)));
+    }
+
+    // Phase 2: nothing below can early-return. A boxed variant's block is
+    // allocated here rather than before phase 1 for the same reason — an early
+    // return during phase 1 would have leaked the block itself.
     let boxed = cx.structs[vname].boxed();
     let base = if boxed {
         let size_v = builder.ins().iconst(types::I64, size as i64);
@@ -13428,13 +13448,10 @@ fn compile_variant<M: Module>(
     let scc = boxed.then(|| cx.structs[vname].scc());
     let tag_v = builder.ins().iconst(types::I64, tag as i64);
     builder.ins().store(MemFlagsData::trusted(), tag_v, base, 0);
-    for ((offset, fty), arg) in fields.iter().zip(args) {
-        let before = scope_depth(scopes);
-        let (v, actual) = compile_expr(module, builder, cx, scopes, arg)?;
-        // A bare literal takes the payload field's int type.
-        let actual = flex_int_ty(arg, &actual, fty);
-        expect_type(&actual, fty, "constructor argument", arg.span.clone())?;
-        let dst = builder.ins().iadd_imm_s(base, *offset as i64);
+    let mut moved: Vec<Value> = Vec::new();
+    for (offset, fty, v, owned_temp) in vals {
+        let fty = &fty;
+        let dst = builder.ins().iadd_imm_s(base, offset as i64);
         store_array_elem(builder, dst, v, fty, cx.structs);
         // An *internal* field — one that (through optional/result layers) refers
         // to a boxed value of this same recursion group — is a weak reference:
@@ -13454,11 +13471,18 @@ fn compile_variant<M: Module>(
                 RcOp::Retain,
                 scc,
             );
-        } else if !move_owned_temp(scopes, before, v) {
+        } else if owned_temp {
             // The variant co-owns each external heap payload field. A fresh temp
-            // is moved in (skip retain, untrack); a borrow is co-owned via retain.
+            // is moved in (skip retain, untrack below); a borrow is co-owned via
+            // retain.
+            moved.push(v);
+        } else {
             emit_retain(builder, module, cx.builtins, cx.structs, v, fty);
         }
+    }
+    if !moved.is_empty() {
+        let scope = scopes.last_mut().expect("scope");
+        scope.retain(|t| !matches!(t.owned, Owned::Value(x) if moved.contains(&x)));
     }
     if needs_drop(&vty, cx.structs) {
         scopes
@@ -17142,17 +17166,27 @@ fn compile_expr_inner<M: Module>(
                     span.clone(),
                 ));
             }
-            // A boxed (recursive) struct lives on a refcounted heap block,
-            // addressed by the returned pointer; a normal one in a fresh stack
-            // slot. Only the store target and the return value differ.
-            let boxed = structs[name].boxed();
-            let scc = boxed.then(|| structs[name].scc());
-            let slot = (!boxed).then(|| alloc_struct_slot(builder, layout));
-            let heap = boxed.then(|| {
-                let size_v = builder.ins().iconst(types::I64, layout.size as i64);
-                let drop_fn = rec_drop_fn_addr(builder, module, cx.elem_rc, name);
-                builtins.call(module, builder, "aipl_rec_alloc", &[size_v, drop_fn])
-            });
+            // Phase 1: evaluate every field initializer *before* anything is
+            // stored or retained.
+            //
+            // A field initializer can early-return — a `?` inside it, or a
+            // `return` — and that path drops what `scopes` tracks. Until a value
+            // has been retained into the struct it is an ordinary tracked temp,
+            // so it is dropped correctly; once retained into a struct that is not
+            // yet tracked itself (the struct is only pushed after the whole
+            // loop), that reference is owned by nothing and leaks. Interleaving
+            // "compile field k+1" with "retain field k" is what created that
+            // window.
+            //
+            // The array literal has always had this shape — which is exactly why
+            // `[a, f()?]` never leaked while `S { a, n: f()? }` did — so this
+            // mirrors it, `owned_temp_since` included: that is a *query*, where
+            // `move_owned_temp` consumes the entry, and consuming it here would
+            // be wrong because compiling a later field pushes tracking of its own
+            // on top. The moved entries are batch-removed after the stores
+            // instead.
+            let mut vals: Vec<(u32, ConcreteType, Value, bool)> =
+                Vec::with_capacity(field_inits.len());
             for init in field_inits {
                 let field = layout.field(&init.name).ok_or_else(|| {
                     Error::at(
@@ -17181,6 +17215,28 @@ fn compile_expr_inner<M: Module>(
                     let actual = flex_int_ty(&init.value, &actual, &fty);
                     expect_type(&actual, &fty, &ctx, init.value.span.clone())?;
                 }
+                vals.push((offset, fty, v, owned_temp_since(scopes, before, v)));
+            }
+
+            // Phase 2: no field expression runs from here on, so nothing below
+            // can early-return and the struct is filled in one uninterrupted
+            // stretch. A boxed struct's block is allocated here rather than
+            // before phase 1 for the same reason the retains moved: an early
+            // return during phase 1 would have leaked the block itself.
+            //
+            // A boxed (recursive) struct lives on a refcounted heap block,
+            // addressed by the returned pointer; a normal one in a fresh stack
+            // slot. Only the store target and the return value differ.
+            let boxed = structs[name].boxed();
+            let scc = boxed.then(|| structs[name].scc());
+            let slot = (!boxed).then(|| alloc_struct_slot(builder, layout));
+            let heap = boxed.then(|| {
+                let size_v = builder.ins().iconst(types::I64, layout.size as i64);
+                let drop_fn = rec_drop_fn_addr(builder, module, cx.elem_rc, name);
+                builtins.call(module, builder, "aipl_rec_alloc", &[size_v, drop_fn])
+            });
+            let mut moved: Vec<Value> = Vec::new();
+            for (offset, fty, v, owned_temp) in vals {
                 match (slot, heap) {
                     // Boxed: store into the heap payload via the block pointer.
                     (_, Some(base)) => {
@@ -17236,9 +17292,18 @@ fn compile_expr_inner<M: Module>(
                         RcOp::Retain,
                         scc,
                     );
-                } else if !move_owned_temp(scopes, before, v) {
+                } else if owned_temp {
+                    // Move: the struct inherits the temporary's ref, so no retain
+                    // — and untrack it below so it isn't dropped again at scope
+                    // exit (the struct's own drop releases it).
+                    moved.push(v);
+                } else {
                     emit_retain(builder, module, builtins, structs, v, &fty);
                 }
+            }
+            if !moved.is_empty() {
+                let scope = scopes.last_mut().expect("scope");
+                scope.retain(|t| !matches!(t.owned, Owned::Value(x) if moved.contains(&x)));
             }
             let sty = ConcreteType::Named(name.clone());
             let ptr = match (slot, heap) {

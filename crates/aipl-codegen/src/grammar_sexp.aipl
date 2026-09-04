@@ -284,10 +284,10 @@ deallocations: 25393
 reallocations: 2339
 bytes allocated: 1267718
 instructions executed: 4406944
-binary size: 190264
-  code: 120640
+binary size: 190424
+  code: 120784
   data: 3556
-  metadata: 66068
+  metadata: 66084
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -369,7 +369,7 @@ functions:
     bytes: 96
   __lambda_16:
     calls: 46
-    bytes: 944
+    bytes: 964
   __m1__leaves:
     calls: 14
     bytes: 808
@@ -387,7 +387,7 @@ functions:
     bytes: 1188
   __m2__link_rule$SexpKind:
     calls: 184
-    bytes: 4416
+    bytes: 4424
   __m2__name_index:
     calls: 115
     bytes: 400
@@ -396,40 +396,40 @@ functions:
     bytes: 492
   __m3__between_len:
     calls: 0
-    bytes: 724
+    bytes: 752
   __m3__delimited_len:
     calls: 0
     bytes: 1592
   __m3__finalize_template$SexpKind:
     calls: 0
-    bytes: 4356
+    bytes: 4364
   __m3__float_len:
     calls: 0
     bytes: 824
   __m3__interp_scan$SexpKind:
     calls: 0
-    bytes: 2284
+    bytes: 2300
   __m3__lex$SexpKind:
     calls: 24
-    bytes: 1516
+    bytes: 1520
   __m3__lex_step$SexpKind:
     calls: 936
-    bytes: 20992
+    bytes: 21000
   __m3__nested_len:
     calls: 0
     bytes: 940
   __m3__step_result$SexpKind:
     calls: 3585
-    bytes: 7156
+    bytes: 7152
   __m3__template_scan$SexpKind:
     calls: 0
     bytes: 2744
   __m3__template_step$SexpKind:
     calls: 0
-    bytes: 468
+    bytes: 476
   __m5__climb$SexpKind$Sexp:
     calls: 0
-    bytes: 2780
+    bytes: 2736
   __m5__error_at$SexpKind$Sexp:
     calls: 4
     bytes: 1816
@@ -441,25 +441,25 @@ functions:
     bytes: 228
   __m5__leaf_at$SexpKind$Sexp:
     calls: 890
-    bytes: 1760
+    bytes: 1720
   __m5__lower_node$SexpKind$Sexp:
     calls: 867
     bytes: 3688
   __m5__match_list_of$SexpKind$Sexp:
     calls: 0
-    bytes: 2628
+    bytes: 2636
   __m5__match_many$SexpKind$Sexp:
     calls: 426
     bytes: 1976
   __m5__match_maybe$SexpKind$Sexp:
     calls: 0
-    bytes: 844
+    bytes: 868
   __m5__match_one_of$SexpKind$Sexp:
     calls: 893
     bytes: 1312
   __m5__match_prod$SexpKind$Sexp:
     calls: 1747
-    bytes: 4000
+    bytes: 4012
   __m5__match_rule$SexpKind$Sexp:
     calls: 6070
     bytes: 4612
@@ -471,7 +471,7 @@ functions:
     bytes: 380
   __m5__parse_cst$SexpKind$Sexp:
     calls: 23
-    bytes: 4368
+    bytes: 4388
   __m5__prev_end$SexpKind$Sexp:
     calls: 928
     bytes: 648
@@ -495,10 +495,10 @@ functions:
     bytes: 324
   __test$parse_sexp:
     calls: 1
-    bytes: 7592
+    bytes: 7624
   __test$render_sexp:
     calls: 1
-    bytes: 2992
+    bytes: 2996
   __test$sexp_cst:
     calls: 1
     bytes: 2356
@@ -579,7 +579,7 @@ functions:
     bytes: 2952
   lower_item:
     calls: 448
-    bytes: 1044
+    bytes: 1040
   lower_list:
     calls: 419
     bytes: 268
@@ -597,7 +597,7 @@ functions:
     bytes: 444
   sexp_grammar:
     calls: 28
-    bytes: 1704
+    bytes: 1740
   shown:
     calls: 5
     bytes: 492

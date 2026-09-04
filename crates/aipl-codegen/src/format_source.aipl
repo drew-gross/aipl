@@ -75,8 +75,8 @@ deallocations: 2049
 reallocations: 30
 bytes allocated: 116250
 instructions executed: 379022
-binary size: 966672
-  code: 623184
+binary size: 967488
+  code: 624000
   data: 1891
   metadata: 341597
 functions:
@@ -187,13 +187,13 @@ functions:
     bytes: 144
   __lambda_17:
     calls: 0
-    bytes: 172
+    bytes: 164
   __lambda_18:
     calls: 0
     bytes: 144
   __lambda_19:
     calls: 0
-    bytes: 172
+    bytes: 164
   __lambda_20:
     calls: 0
     bytes: 48
@@ -211,7 +211,7 @@ functions:
     bytes: 272
   __m12__int_lit:
     calls: 0
-    bytes: 1224
+    bytes: 1212
   __m12__raw_tpl_kind:
     calls: 0
     bytes: 2168
@@ -220,37 +220,37 @@ functions:
     bytes: 2200
   __m13__between_len:
     calls: 12
-    bytes: 724
+    bytes: 752
   __m13__delimited_len:
     calls: 24
     bytes: 1592
   __m13__finalize_template$__m12__AiplTok:
     calls: 0
-    bytes: 7964
+    bytes: 7976
   __m13__float_len:
     calls: 0
     bytes: 824
   __m13__interp_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2284
+    bytes: 2300
   __m13__lex$__m12__AiplTok:
     calls: 4
-    bytes: 1516
+    bytes: 1520
   __m13__lex_step$__m12__AiplTok:
     calls: 27
-    bytes: 24992
+    bytes: 25000
   __m13__nested_len:
     calls: 18
     bytes: 940
   __m13__step_result$__m12__AiplTok:
     calls: 864
-    bytes: 13052
+    bytes: 13068
   __m13__template_scan$__m12__AiplTok:
     calls: 0
     bytes: 2744
   __m13__template_step$__m12__AiplTok:
     calls: 24
-    bytes: 468
+    bytes: 476
   __m14__unescape:
     calls: 0
     bytes: 1108
@@ -268,79 +268,79 @@ functions:
     bytes: 280
   __m4__split_test_sections:
     calls: 3
-    bytes: 1132
+    bytes: 1136
   __m5__parse_test_section_header:
     calls: 5
     bytes: 744
   __m6__array_atom:
     calls: 0
-    bytes: 2456
+    bytes: 2464
   __m6__atom:
     calls: 0
-    bytes: 3556
+    bytes: 3548
   __m6__base_ty:
     calls: 0
-    bytes: 4356
+    bytes: 4364
   __m6__binding_ann:
     calls: 0
-    bytes: 2272
+    bytes: 2276
   __m6__binop_expr:
     calls: 0
     bytes: 3204
   __m6__binop_tail:
     calls: 0
-    bytes: 4324
+    bytes: 4352
   __m6__block:
     calls: 3
-    bytes: 1136
+    bytes: 1144
   __m6__block_entries:
     calls: 3
-    bytes: 3948
+    bytes: 3952
   __m6__block_layout:
     calls: 3
-    bytes: 5196
+    bytes: 5192
   __m6__bump:
     calls: 18
-    bytes: 1088
+    bytes: 1100
   __m6__call_arg:
     calls: 0
     bytes: 5216
   __m6__call_arg_list:
     calls: 0
-    bytes: 792
+    bytes: 796
   __m6__call_args_until:
     calls: 0
-    bytes: 2772
+    bytes: 2776
   __m6__case_params:
     calls: 0
     bytes: 6580
   __m6__comma_list_docs:
     calls: 3
-    bytes: 4104
+    bytes: 4168
   __m6__comment_starts_before:
     calls: 10
     bytes: 280
   __m6__construct_body:
     calls: 0
-    bytes: 3640
+    bytes: 3716
   __m6__dict_entries:
     calls: 0
-    bytes: 4532
+    bytes: 4540
   __m6__dict_value:
     calls: 0
-    bytes: 1612
+    bytes: 1604
   __m6__dict_value_ty:
     calls: 0
     bytes: 1496
   __m6__dot_seg:
     calls: 0
-    bytes: 5408
+    bytes: 5400
   __m6__drop_trailing_break:
     calls: 0
-    bytes: 928
+    bytes: 924
   __m6__err_here:
     calls: 0
-    bytes: 752
+    bytes: 760
   __m6__expect:
     calls: 15
     bytes: 1228
@@ -355,16 +355,16 @@ functions:
     bytes: 1304
   __m6__fn_item:
     calls: 3
-    bytes: 18964
+    bytes: 19052
   __m6__fn_return:
     calls: 0
     bytes: 1904
   __m6__for_stmt:
     calls: 0
-    bytes: 13016
+    bytes: 12952
   __m6__format_program:
     calls: 4
-    bytes: 117344
+    bytes: 117464
   __m6__hug_close:
     calls: 0
     bytes: 732
@@ -373,73 +373,73 @@ functions:
     bytes: 1308
   __m6__ident_list:
     calls: 0
-    bytes: 1704
+    bytes: 1708
   __m6__if_expr:
     calls: 0
-    bytes: 13716
+    bytes: 13892
   __m6__if_let_clause:
     calls: 0
-    bytes: 4172
+    bytes: 4180
   __m6__import_item:
     calls: 0
-    bytes: 16972
+    bytes: 16904
   __m6__index_or_from:
     calls: 0
-    bytes: 4396
+    bytes: 4404
   __m6__index_seg:
     calls: 0
-    bytes: 4092
+    bytes: 4104
   __m6__item:
     calls: 3
     bytes: 1056
   __m6__lambda:
     calls: 0
-    bytes: 6656
+    bytes: 6672
   __m6__lambda_param_ty:
     calls: 0
-    bytes: 1616
+    bytes: 1624
   __m6__lambda_params:
     calls: 0
-    bytes: 3416
+    bytes: 3412
   __m6__lead:
     calls: 10
     bytes: 1884
   __m6__let_stmt:
     calls: 0
-    bytes: 14056
+    bytes: 14072
   __m6__match_arms:
     calls: 0
-    bytes: 8428
+    bytes: 8432
   __m6__match_expr:
     calls: 0
-    bytes: 12028
+    bytes: 12032
   __m6__more_before:
     calls: 3
     bytes: 200
   __m6__mut_stmt:
     calls: 0
-    bytes: 7092
+    bytes: 7100
   __m6__name_atom:
     calls: 0
-    bytes: 5724
+    bytes: 5728
   __m6__named_ty:
     calls: 0
-    bytes: 4108
+    bytes: 4112
   __m6__next_start:
     calls: 0
     bytes: 532
   __m6__params_until:
     calls: 3
-    bytes: 10208
+    bytes: 10212
   __m6__paren_atom:
     calls: 0
-    bytes: 6044
+    bytes: 6060
   __m6__paren_ty:
     calls: 0
-    bytes: 9728
+    bytes: 9712
   __m6__pattern:
     calls: 0
-    bytes: 8512
+    bytes: 8508
   __m6__pattern_alts:
     calls: 0
     bytes: 3252
@@ -448,43 +448,43 @@ functions:
     bytes: 288
   __m6__postfix:
     calls: 0
-    bytes: 5552
+    bytes: 5548
   __m6__postfix_segs:
     calls: 0
-    bytes: 3572
+    bytes: 3576
   __m6__program:
     calls: 4
     bytes: 2636
   __m6__program_items:
     calls: 4
-    bytes: 4684
+    bytes: 4696
   __m6__range_has_semi:
     calls: 0
     bytes: 228
   __m6__range_tail:
     calls: 0
-    bytes: 2356
+    bytes: 2352
   __m6__sep_entry:
     calls: 0
-    bytes: 328
+    bytes: 332
   __m6__set_member:
     calls: 0
-    bytes: 10884
+    bytes: 10904
   __m6__set_or_dict_atom:
     calls: 0
-    bytes: 5720
+    bytes: 5728
   __m6__set_or_dict_ty:
     calls: 0
-    bytes: 6456
+    bytes: 6460
   __m6__set_stmt:
     calls: 0
-    bytes: 12888
+    bytes: 12904
   __m6__shim_bindings:
     calls: 0
-    bytes: 3244
+    bytes: 3240
   __m6__shim_expr:
     calls: 0
-    bytes: 6580
+    bytes: 6600
   __m6__slice_to:
     calls: 0
     bytes: 1496
@@ -496,40 +496,40 @@ functions:
     bytes: 1904
   __m6__statement:
     calls: 0
-    bytes: 5860
+    bytes: 5876
   __m6__str_atom:
     calls: 0
-    bytes: 572
+    bytes: 568
   __m6__struct_atom:
     calls: 0
-    bytes: 3340
+    bytes: 3336
   __m6__struct_field_value:
     calls: 0
-    bytes: 1652
+    bytes: 1648
   __m6__struct_fields:
     calls: 0
     bytes: 6436
   __m6__struct_inits:
     calls: 0
-    bytes: 5956
+    bytes: 5972
   __m6__struct_item:
     calls: 0
-    bytes: 6620
+    bytes: 6632
   __m6__struct_pattern:
     calls: 0
-    bytes: 6288
+    bytes: 6296
   __m6__take_comment:
     calls: 0
-    bytes: 252
+    bytes: 256
   __m6__template_scan:
     calls: 0
-    bytes: 2492
+    bytes: 2496
   __m6__tok_text:
     calls: 51
     bytes: 456
   __m6__trailing_comment:
     calls: 3
-    bytes: 2168
+    bytes: 2188
   __m6__trim_last_break:
     calls: 0
     bytes: 32
@@ -538,31 +538,31 @@ functions:
     bytes: 1224
   __m6__tuple_rest:
     calls: 0
-    bytes: 2924
+    bytes: 2932
   __m6__ty:
     calls: 0
-    bytes: 5012
+    bytes: 5024
   __m6__ty_list:
     calls: 0
-    bytes: 2360
+    bytes: 2364
   __m6__type_params:
     calls: 3
-    bytes: 5784
+    bytes: 5788
   __m6__unary:
     calls: 0
-    bytes: 1876
+    bytes: 1884
   __m6__variant_cases:
     calls: 0
-    bytes: 4172
+    bytes: 4180
   __m6__variant_item:
     calls: 0
-    bytes: 7148
+    bytes: 7144
   __m6__variant_payload:
     calls: 0
-    bytes: 2424
+    bytes: 2432
   __m6__while_stmt:
     calls: 0
-    bytes: 4884
+    bytes: 4892
   __m6__with_last:
     calls: 0
     bytes: 36

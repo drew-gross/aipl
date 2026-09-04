@@ -38,10 +38,10 @@ deallocations: 19
 reallocations: 10
 bytes allocated: 1032
 instructions executed: 2006
-binary size: 8664
-  code: 5052
+binary size: 8656
+  code: 5048
   data: 410
-  metadata: 3202
+  metadata: 3198
 functions:
   __arr_drop_Shape:
     calls: 12
@@ -60,7 +60,7 @@ functions:
     bytes: 1852
   __test$labels:
     calls: 1
-    bytes: 996
+    bytes: 992
   __test$pair_up:
     calls: 1
     bytes: 1180

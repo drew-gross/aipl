@@ -1,0 +1,124 @@
+// A `?` that fires from inside a composite under construction must not leak the
+// parts already built.
+//
+// Construction used to interleave "compile field k+1" with "retain field k", so
+// a `?` in a later field early-returned through a struct that owned references
+// nothing tracked — the scope drop never saw it. Evaluating every field before
+// storing any closes the window: until a value is retained into the composite it
+// is an ordinary tracked temp, which the early-return path drops correctly.
+//
+// The array literal is the control. It always evaluated all its elements first,
+// which is exactly why `[a, f()?]` never leaked while `S { a, n: f()? }` did —
+// and is where the two-phase shape was borrowed from.
+//
+// What proves it is the `--- performance ---` section below: allocations must
+// equal deallocations. Each function is called on the *failing* path, with a
+// heap-allocated value already in place ahead of the `?`.
+import { first, int_parse, print, value_or } from builtins;
+
+struct S { a: str, n: i64 }
+
+variant V = Pair(str, i64) | Nil
+
+fn parse_it(body: str) -> i64!str {
+    match (body.int_parse()) {
+        some(v) => ok(v),
+        none => err("nope"), #[allow]
+    }
+}
+
+fn build_struct(a: str, body: str) -> S!str { ok(S { a, n: parse_it(body)? }) }
+
+fn build_variant(a: str, body: str) -> V!str { ok(Pair(a, parse_it(body)?)) }
+
+fn build_array(a: str, body: str) -> str[]!str { ok([a, `x{parse_it(body)?}`]) }
+
+// A spread base contributes *several* heap fields at once, each retained into
+// the new struct before the `?` in a later field runs — the shape this was found
+// in (`parse_spec.aipl` leaked three at a time).
+struct Wide { a: str, b: str, c: str, n: i64 }
+
+fn build_spread(w: Wide, body: str) -> Wide!str { ok(Wide { ..w, n: parse_it(body)? }) }
+
+fn msg(r: str!str) -> str {
+    match (r) {
+        ok(v) => v,
+        err(e) => e,
+    }
+}
+
+fn main() !prints {
+    // Runtime-built so each is a real allocation; a static literal is never
+    // freed and so could never show a leak.
+    let tags = ["a_tag_long_enough_to_need_the_heap"];
+    let t = tags.first().value_or("");
+    match (build_struct(`A{t}`, "nope")) {
+        ok(s) => print("unreachable"),
+        err(e) => print(e),
+    };
+    match (build_variant(`B{t}`, "nope")) {
+        ok(s) => print("unreachable"),
+        err(e) => print(e),
+    };
+    match (build_array(`C{t}`, "nope")) {
+        ok(s) => print("unreachable"),
+        err(e) => print(e),
+    };
+    let w = Wide { a: `D{t}`, b: `E{t}`, c: `F{t}`, n: 0 };
+    match (build_spread(w, "nope")) {
+        ok(s) => print("unreachable"),
+        err(e) => print(e),
+    };
+    // The success path still works: nothing is dropped that the value needs.
+    print(msg(ok(`G{t}`)));
+}
+--- stdout ---
+nope
+nope
+nope
+nope
+Ga_tag_long_enough_to_need_the_heap
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 672
+instructions executed: 1733
+binary size: 11600
+  code: 7464
+  data: 51
+  metadata: 4085
+functions:
+  __builtin_count_while$char$s0$lam4:
+    calls: 4
+    bytes: 172
+  __builtin_int_parse:
+    calls: 4
+    bytes: 1028
+  __lambda_2:
+    calls: 4
+    bytes: 140
+  __to_str_i64:
+    calls: 0
+    bytes: 204
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  build_array:
+    calls: 1
+    bytes: 772
+  build_spread:
+    calls: 1
+    bytes: 980
+  build_struct:
+    calls: 1
+    bytes: 564
+  build_variant:
+    calls: 1
+    bytes: 640
+  main:
+    calls: 1
+    bytes: 2964

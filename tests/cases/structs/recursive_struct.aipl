@@ -59,9 +59,9 @@ reallocations: 0
 bytes allocated: 453
 instructions executed: 611
 binary size: 6384
-  code: 2956
+  code: 2960
   data: 308
-  metadata: 3120
+  metadata: 3116
 functions:
   __rec_drop_Tree:
     calls: 5
@@ -98,7 +98,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1200
+    bytes: 1204
   total:
     calls: 4
     bytes: 316

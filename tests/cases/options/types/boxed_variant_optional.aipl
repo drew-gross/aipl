@@ -26,16 +26,16 @@ reallocations: 0
 bytes allocated: 280
 instructions executed: 213
 binary size: 3592
-  code: 1564
+  code: 1568
   data: 92
-  metadata: 1936
+  metadata: 1932
 functions:
   __rec_drop_List:
     calls: 5
     bytes: 48
   __test$pick:
     calls: 1
-    bytes: 1312
+    bytes: 1316
   aipl_assert:
     calls: 2
     bytes: (external)

@@ -56,8 +56,8 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 6098
-binary size: 10048
-  code: 5248
+binary size: 10088
+  code: 5288
   data: 987
   metadata: 3813
 functions:
@@ -72,7 +72,7 @@ functions:
     bytes: 744
   __test$split_test_sections:
     calls: 1
-    bytes: 3008
+    bytes: 3044
   aipl_assert:
     calls: 9
     bytes: (external)
@@ -90,4 +90,4 @@ functions:
     bytes: 128
   split_test_sections:
     calls: 9
-    bytes: 1132
+    bytes: 1136

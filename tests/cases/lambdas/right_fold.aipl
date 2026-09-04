@@ -47,10 +47,10 @@ deallocations: 27
 reallocations: 0
 bytes allocated: 1800
 instructions executed: 2241
-binary size: 10584
-  code: 6148
+binary size: 10592
+  code: 6160
   data: 606
-  metadata: 3830
+  metadata: 3826
 functions:
   __eq_List:
     calls: 5
@@ -60,7 +60,7 @@ functions:
     bytes: 44
   __test$to_list_keeps_order:
     calls: 1
-    bytes: 5852
+    bytes: 5864
   aipl_array_dec:
     calls: 8
     bytes: (external)

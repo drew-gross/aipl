@@ -59,10 +59,10 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 66
 instructions executed: 703
-binary size: 11848
-  code: 7836
+binary size: 11840
+  code: 7832
   data: 447
-  metadata: 3565
+  metadata: 3561
 functions:
   __to_str_Tok:
     calls: 1
@@ -75,4 +75,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 6072
+    bytes: 6068

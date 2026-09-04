@@ -37,9 +37,9 @@ reallocations: 0
 bytes allocated: 426
 instructions executed: 2027
 binary size: 20784
-  code: 10024
+  code: 10020
   data: 2083
-  metadata: 8677
+  metadata: 8681
 functions:
   __arr_drop_V:
     calls: 1
@@ -73,4 +73,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1788
+    bytes: 1784

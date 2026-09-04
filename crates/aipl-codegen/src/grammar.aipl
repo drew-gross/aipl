@@ -316,11 +316,11 @@ allocations: 110
 deallocations: 110
 reallocations: 17
 bytes allocated: 9424
-instructions executed: 13914
-binary size: 44648
-  code: 27392
+instructions executed: 13906
+binary size: 44848
+  code: 27572
   data: 1692
-  metadata: 15564
+  metadata: 15584
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -372,7 +372,7 @@ functions:
     bytes: 100
   __lambda_2:
     calls: 9
-    bytes: 944
+    bytes: 964
   __rec_drop_Node:
     calls: 0
     bytes: 72
@@ -384,7 +384,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 11644
+    bytes: 11796
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -447,7 +447,7 @@ functions:
     bytes: 1188
   link_rule$Kind:
     calls: 25
-    bytes: 4416
+    bytes: 4424
   main:
     calls: 1
     bytes: 180

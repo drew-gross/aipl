@@ -43,10 +43,10 @@ deallocations: 13
 reallocations: 0
 bytes allocated: 613
 instructions executed: 301
-binary size: 2704
-  code: 1084
+binary size: 2712
+  code: 1088
   data: 1
-  metadata: 1619
+  metadata: 1623
 functions:
   __rec_drop_Tree:
     calls: 10
@@ -77,7 +77,7 @@ functions:
     bytes: (external)
   build$lam1:
     calls: 3
-    bytes: 256
+    bytes: 260
   main:
     calls: 1
     bytes: 380

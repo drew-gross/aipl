@@ -232,10 +232,10 @@ deallocations: 188
 reallocations: 18
 bytes allocated: 10123
 instructions executed: 10680
-binary size: 31000
-  code: 17940
+binary size: 31048
+  code: 17992
   data: 1788
-  metadata: 11272
+  metadata: 11268
 functions:
   __arr_drop_Cst:
     calls: 8
@@ -260,7 +260,7 @@ functions:
     bytes: 48
   __test$show:
     calls: 1
-    bytes: 10868
+    bytes: 10920
   aipl_arr_drop_arr:
     calls: 12
     bytes: (external)

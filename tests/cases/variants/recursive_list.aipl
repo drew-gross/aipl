@@ -76,9 +76,9 @@ reallocations: 0
 bytes allocated: 1939
 instructions executed: 3882
 binary size: 6272
-  code: 2996
+  code: 3000
   data: 167
-  metadata: 3109
+  metadata: 3105
 functions:
   __eq_List:
     calls: 11
@@ -124,7 +124,7 @@ functions:
     bytes: 104
   main:
     calls: 1
-    bytes: 1476
+    bytes: 1480
   sum:
     calls: 4
     bytes: 104

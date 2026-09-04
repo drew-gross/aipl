@@ -460,6 +460,7 @@ case_tests! {
     cases_results_main_returns_ok = "cases/results/main_returns_ok",
     cases_results_payload_types = "cases/results/payload_types",
     cases_results_struct_payload = "cases/results/struct_payload",
+    cases_results_try_inside_composite_releases = "cases/results/try_inside_composite_releases",
     cases_results_try_operator = "cases/results/try_operator",
     cases_results_variant_payload = "cases/results/variant_payload",
     cases_results_void_ok = "cases/results/void_ok",

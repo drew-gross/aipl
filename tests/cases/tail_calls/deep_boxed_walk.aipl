@@ -35,10 +35,10 @@ deallocations: 200002
 reallocations: 0
 bytes allocated: 14400094
 instructions executed: 10600052
-binary size: 2608
-  code: 1036
+binary size: 2624
+  code: 1048
   data: 1
-  metadata: 1571
+  metadata: 1575
 functions:
   __rec_drop_List:
     calls: 200001
@@ -72,7 +72,7 @@ functions:
     bytes: 36
   build$tail:
     calls: 200001
-    bytes: 288
+    bytes: 300
   main:
     calls: 1
     bytes: 156

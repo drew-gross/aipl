@@ -325,10 +325,10 @@ deallocations: 288
 reallocations: 16
 bytes allocated: 19609
 instructions executed: 22259
-binary size: 32944
-  code: 19916
+binary size: 33016
+  code: 19992
   data: 689
-  metadata: 12339
+  metadata: 12335
 functions:
   __arr_drop_Doc:
     calls: 8
@@ -365,7 +365,7 @@ functions:
     bytes: 84
   __test$cleanup:
     calls: 1
-    bytes: 4872
+    bytes: 4932
   aipl_arr_inc:
     calls: 83
     bytes: (external)
@@ -440,4 +440,4 @@ functions:
     bytes: 108
   print_doc:
     calls: 9
-    bytes: 4952
+    bytes: 4968
