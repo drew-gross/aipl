@@ -6,7 +6,7 @@
 // lambda in different effect contexts. The fix ensures lambdas always
 // start with `effects: Vec::new()`, letting the type checker determine
 // which effects are actually needed from their body.
-import { equal as ==, push, remainder as % } from builtins;
+import { equal as ==, push, saturating_remainder as % } from builtins;
 
 fn is_even(x: i64) -> bool { x % 2 == 0 }
 
@@ -36,9 +36,9 @@ allocations: 6
 deallocations: 6
 reallocations: 4
 bytes allocated: 296
-instructions executed: 818
-binary size: 2784
-  code: 1252
+instructions executed: 917
+binary size: 2848
+  code: 1316
   data: 157
   metadata: 1375
 functions:
@@ -74,7 +74,7 @@ functions:
     bytes: (external)
   filter_evens$lam0:
     calls: 2
-    bytes: 292
+    bytes: 356
   main:
     calls: 1
     bytes: 112

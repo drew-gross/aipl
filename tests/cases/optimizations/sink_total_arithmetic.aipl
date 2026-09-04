@@ -1,0 +1,66 @@
+import {
+    is_nonempty,
+    len,
+    print,
+    saturating_remainder as %,
+    to_str,
+    wrapping_add as +,
+} from builtins;
+
+// Arithmetic sinks, because none of it can abort.
+//
+// This file used to assert the opposite. `%` trapped on a zero divisor, so
+// deferring it into a branch could turn a program that dies into one that
+// quietly returns — and the sinker pinned any binding whose value could reach
+// one, transitively through calls. `/` had been the example before that, until
+// it started saturating.
+//
+// Both are total now (`saturating_rem` in codegen: a zero divisor answers the
+// dividend, `MIN % -1` answers 0), and `assert` — the one remaining aborting
+// construct — exists only inside `.test` blocks. So no ordinary expression can
+// abort, and arithmetic pins nothing.
+//
+// `q` is read by one arm only, so the shape is the one the pass looks for. The
+// `instructions executed:` counter below is the assertion: the three remainders
+// sink into the arm that never runs, so they do not execute at all. Before, they
+// ran on the discarded path and showed up in the count.
+//
+// The divisor comes from `len` and the flag from `is_nonempty` so constant
+// folding can't collapse either away before the pass sees them.
+fn ratio(n: u64, d: u64) -> u64 { n % d }
+
+fn scaled(n: u64, d: u64) -> u64 { ratio(n, d) + ratio(n + 1, d) + ratio(n + 2, d) }
+
+fn pick(flag: bool, d: u64) -> u64 {
+    let q = scaled(10, d);
+    if (flag) { q } else { 0 }
+}
+
+fn main() !prints {
+    print(pick("".is_nonempty(), "ab".len()).to_str());
+}
+--- stdout ---
+0
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 17
+instructions executed: 42
+binary size: 1440
+  code: 520
+  data: 1
+  metadata: 919
+functions:
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 316

@@ -1,4 +1,4 @@
-import { print, saturating_divide as /, to_str, value_or, wrapping_add as + } from builtins;
+import { print, to_str, value_or, wrapping_add as + } from builtins;
 
 // Shapes that look close but are deliberately left alone.
 
@@ -41,22 +41,11 @@ fn or_computed_struct(o: Pt?) -> Pt {
     }
 }
 
-// Division can trap on a zero divisor, so evaluating it eagerly could turn a
-// program that returns into one that dies — not constant, however literal it
-// looks.
-fn or_divided(o: i64?, d: i64) -> i64 {
-    match (o) {
-        some(v) => v,
-        none => 100 / d,
-    }
-}
-
 fn main() !prints {
     print(plus_one(some(5)).to_str());
     print(always_zero(some(5)).to_str());
     print(or_call(none).to_str());
     print(or_computed_struct(none).x.to_str());
-    print(or_divided(none, 4).to_str());
     // The rewrite itself must not flag.
     print(some(3).value_or(0).to_str());
 }
@@ -65,28 +54,27 @@ fn main() !prints {
 0
 7
 7
-25
 3
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 5
+deallocations: 5
 reallocations: 0
-bytes allocated: 103
-instructions executed: 220
-binary size: 1824
-  code: 772
+bytes allocated: 85
+instructions executed: 187
+binary size: 1704
+  code: 692
   data: 1
-  metadata: 1051
+  metadata: 1011
 functions:
   __to_str_i64:
-    calls: 6
+    calls: 5
     bytes: 204
   aipl_i64_len:
-    calls: 12
+    calls: 10
     bytes: (external)
   aipl_write_i64:
-    calls: 6
+    calls: 5
     bytes: (external)
   main:
     calls: 1
-    bytes: 568
+    bytes: 488

@@ -76,6 +76,7 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
+  rename saturating_remainter to total_remainder (maybe also do total_divide?)
   BinOp should be lowered to a call much earlier in the pipeline, it's currently too easy to inspect a binop and assume it corresponds to a call other than the one it actually does
   unify operators with regular functions even more
   field_size and elem_size_of are apparently near duplicates that can be DRYed
@@ -156,7 +157,6 @@ HOF:
   lower_item returns a T!E but the body doesn't seem to have any error paths. I think this is because it's passed to a function that accepts lambdas that return errors. There should be a better way to do this (Liskov substitution principle?)
 
 math:
-  % should not abort. (what should it do? TBD)
 
 syntax:
   expr! should return the err held in expr, or exit the test if expr is not an error (only valid in tests for now)
@@ -419,7 +419,7 @@ effects:
   all effects should be shimmable actually
 
 assert:
-  assert should not cause the test to stop, we can keep running the subsequent lines in most cases (e.g. past write file effects at least until all effects are shimmed) and then it gets baked into a return, not an abort
+  assert should not cause the test to stop, we can keep running the subsequent lines in most cases (e.g. past write file effects at least until all effects are shimmed) and then it gets baked into a return, not an abort. Then there is no such thing as ABORTING_BUILTINS
 
 allocator:
   make own allocator

@@ -301,9 +301,13 @@ fn fold_binop(l: &Expr, op: BinOp, r: &Expr) -> Option<ExprKind> {
                 // `saturating_div` in codegen, which this must agree with).
                 // `checked_div` returns `None` in exactly those two cases.
                 BinOp::Div => ExprKind::Num(a.checked_div(b).unwrap_or(i64::MAX)),
-                // `srem` still traps on the same pairs, so leave those to run
-                // time rather than fold an answer the runtime won't produce.
-                BinOp::Rem => ExprKind::Num(a.checked_rem(b)?),
+                // `%` is total too (see `saturating_rem` in codegen, which this
+                // must agree with): a zero divisor answers the dividend — the
+                // only answer that keeps `(a / b) * b + (a % b) == a` intact
+                // beside a saturating `/` — and `MIN % -1` answers 0, the true
+                // remainder. `checked_rem` returns `None` in exactly those two
+                // cases, and they are told apart by the divisor.
+                BinOp::Rem => ExprKind::Num(a.checked_rem(b).unwrap_or(if b == 0 { a } else { 0 })),
                 BinOp::Lt => ExprKind::Bool(a < b),
                 BinOp::Gt => ExprKind::Bool(a > b),
                 BinOp::Le => ExprKind::Bool(a <= b),

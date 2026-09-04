@@ -18,7 +18,7 @@ fn calls_a_scalar_function() {
 #[test]
 fn bool_and_char_marshal_as_i64() {
     let src = "\
-import { remainder as %, equal as ==} from builtins;
+import { saturating_remainder as %, equal as ==} from builtins;
 pub fn is_even(n: i64) -> bool { n % 2 == 0 }
 pub fn echo_char(c: char) -> char { c }";
     let e = Engine::compile(src).unwrap();

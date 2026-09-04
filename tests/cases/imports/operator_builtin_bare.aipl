@@ -6,8 +6,8 @@ import {
     logical_and,
     logical_not,
     logical_or,
-    remainder,
     saturating_divide,
+    saturating_remainder,
     wrapping_add,
     wrapping_increment,
     wrapping_mul,
@@ -29,7 +29,11 @@ fn arithmetic() -> i64 {
 }.test({
     assert(equal(arithmetic(), 11));
     assert(equal(saturating_divide(9, 2), 4));
-    assert(equal(remainder(9, 2), 1));
+    assert(equal(saturating_remainder(9, 2), 1));
+
+    // Total: a zero divisor answers the dividend, which is what keeps
+    // `(a / b) * b + (a % b) == a` intact beside a saturating `/`.
+    assert(equal(saturating_remainder(9, 0), 9));
 
     // Comparison and logic, as functions.
     assert(logical_and(less_than(1, 2), greater_than(2, 1)));
@@ -45,17 +49,17 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 176
-instructions executed: 153
-binary size: 2688
-  code: 792
-  data: 446
-  metadata: 1450
+instructions executed: 164
+binary size: 2880
+  code: 840
+  data: 518
+  metadata: 1522
 functions:
   __test$arithmetic:
     calls: 1
-    bytes: 684
+    bytes: 732
   aipl_assert:
-    calls: 8
+    calls: 9
     bytes: (external)
   aipl_test_begin:
     calls: 1

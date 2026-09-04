@@ -319,7 +319,7 @@ paths.
 | `*` | `wrapping_mul` | `<` | `less_than` |
 | `++` | `wrapping_increment` / `saturating_increment` | `>` | `greater_than` |
 | `/` | `saturating_divide` | `<=` | `less_than_or_equal` |
-| `%` | `remainder` | `>=` | `greater_than_or_equal` |
+| `%` | `saturating_remainder` | `>=` | `greater_than_or_equal` |
 | `+++` | `concat` | `&&` | `logical_and` |
 | `!` | `logical_not` | `\|\|` | `logical_or` |
 

@@ -1,4 +1,4 @@
-import { print, remainder as %, to_str, value_or_err } from builtins;
+import { print, to_str, value_or_err } from builtins;
 
 // Shapes that look close but are deliberately left alone.
 //
@@ -51,15 +51,6 @@ fn shout(tag: str) !prints -> str {
     `no rule named "{tag}"`
 }
 
-// `%` traps on a zero divisor, so the sinker will not defer it and neither will
-// this lint: evaluated eagerly it could kill a program that used to return.
-fn need_rem(o: i64?, n: i64, d: i64) -> i64!Fault {
-    match (o) {
-        some(v) => ok(v),
-        none => err(Fault { code: n % d }),
-    }
-}
-
 // A `match` on a *result*, not an optional: the arms are `ok`/`err`, so there is
 // no optional here to bridge and nothing for this lint to say.
 fn unwrap(r: i64!str) -> i64 {
@@ -80,7 +71,6 @@ fn main() !prints {
     print(or_zero(none).to_str());
     print(unwrap(need_loud(none)).to_str());
     print(unwrap(need_effectful(some(4), "r")).to_str());
-    print(faulted(need_rem(some(6), 1, 0)).to_str());
     // The rewrite itself must not flag.
     print(unwrap(some(3).value_or_err("missing")).to_str());
 }
@@ -89,28 +79,27 @@ fn main() !prints {
 about to fail
 -1
 4
-6
 3
 --- performance ---
-allocations: 5
-deallocations: 5
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 86
-instructions executed: 288
-binary size: 3008
-  code: 1652
+bytes allocated: 69
+instructions executed: 240
+binary size: 2800
+  code: 1484
   data: 1
-  metadata: 1355
+  metadata: 1315
 functions:
   __to_str_i64:
-    calls: 5
+    calls: 4
     bytes: 204
   aipl_i64_len:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_write_i64:
-    calls: 5
+    calls: 4
     bytes: (external)
   main:
     calls: 1
-    bytes: 1448
+    bytes: 1280

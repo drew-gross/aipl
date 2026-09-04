@@ -54,7 +54,7 @@
 
 use std::collections::HashSet;
 
-use aipl_syntax::ast::{BinOp, Expr, ExprKind, Item, MatchArm, Program};
+use aipl_syntax::ast::{Expr, ExprKind, Item, MatchArm, Program};
 
 use crate::{ConcreteFn, MonoProgram};
 
@@ -62,10 +62,10 @@ use crate::{ConcreteFn, MonoProgram};
 /// could turn a program that dies into one that doesn't. `__assert` is what
 /// `assert(c)` lowers to, and its whole purpose is to abort.
 ///
-/// `/` used to be here. It saturates now — a zero divisor and `i64::MIN / -1`
-/// both answer `MAX` — so it can be deferred like any other arithmetic. `%`
-/// still traps on those pairs, and is caught structurally below rather than by
-/// name: it resolves to the operator, not to a call.
+/// `/` and `%` used to be here. Both are total now — a zero divisor and
+/// `i64::MIN / -1` answer `MAX` and, for `%`, the dividend and 0 — so either can
+/// be deferred like any other arithmetic. Nothing else in the language aborts,
+/// which is why this list is down to one entry.
 const ABORTING_BUILTINS: &[&str] = &["__assert"];
 
 /// Sink every binding in `program` that only one branch of the following
@@ -134,12 +134,14 @@ fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> Ha
 }
 
 /// Whether evaluating `e` can reach something in `blocked` — a call to one of
-/// them, a bare `/` or `%` the loader hasn't rewritten, or a `shim`, which
-/// *installs* an effect and so is an effect happening.
+/// them, or a `shim`, which *installs* an effect and so is an effect happening.
+///
+/// `%` used to be listed here structurally (it resolves to the operator, not to
+/// a call) because it trapped on a zero divisor. It is total now, so arithmetic
+/// no longer pins a binding in place at all.
 fn reaches_blocked(e: &Expr, blocked: &HashSet<String>) -> bool {
     let here = match &e.kind {
         ExprKind::Call(name, _, _) => blocked.contains(name),
-        ExprKind::Binop(_, op, _) => *op == BinOp::Rem,
         ExprKind::Shim(..) => true,
         _ => false,
     };

@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, Expr, ExprKind, Pattern};
+use crate::ast::{Expr, ExprKind, Pattern};
 use crate::Error;
 
 /// Whether the optimizer will sink `e` into the branch that uses it, rather than
@@ -11,9 +11,10 @@ use crate::Error;
 /// that the sinker undoes its eagerness.
 ///
 /// The structural half is the same: nothing that leaves the function from where
-/// it sits, writes a binding, or may not terminate. `%` is here for the reason
-/// the sinker names — it traps on a zero divisor, so hoisting it onto the
-/// success path could kill a program that used to return.
+/// it sits, writes a binding, or may not terminate. Arithmetic is absent because
+/// none of it aborts — `/` and `%` are both total (see `saturating_rem` in
+/// codegen), so there is no longer any expression whose eager evaluation could
+/// kill a program that used to return.
 ///
 /// The *effect* half is where the two differ, and where AIPL's effect discipline
 /// does the work: a caller must declare at least the effects of everything it
@@ -31,7 +32,7 @@ fn sinkable(e: &Expr, pure_fn: bool) -> bool {
             | ExprKind::Assign(..)
             // May not terminate.
             | ExprKind::For(..) | ExprKind::While(..)
-        ) || matches!(&e.kind, ExprKind::Binop(_, BinOp::Rem, _))
+        )
             // `assert` aborts, and that is its whole purpose.
             || matches!(&e.kind, ExprKind::Call(n, _, _) if n == "assert" || n == "__assert")
             || crate::children(e).iter().any(|c| blocks(c))

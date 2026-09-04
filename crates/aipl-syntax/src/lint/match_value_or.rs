@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, Expr, ExprKind, Pattern};
+use crate::ast::{Expr, ExprKind, Pattern};
 use crate::Error;
 
 /// Whether an expression is built purely from constants, and so costs the same
@@ -25,6 +25,12 @@ use crate::Error;
 ///
 /// A *call* never counts, however cheap it looks: what it costs, and whether
 /// it has effects of its own, is not visible from here.
+///
+/// Arithmetic all counts. `/` and `%` used to be excluded because they trapped
+/// on a zero divisor, so evaluating one eagerly could turn a program that
+/// returns into one that dies; both are total now (see `saturating_rem` in
+/// codegen), and nothing in the language aborts, so the exclusion had nothing
+/// left to protect.
 fn constant_default(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Num(_)
@@ -42,9 +48,7 @@ fn constant_default(e: &Expr) -> bool {
             .iter()
             .all(|(k, v)| constant_default(k) && constant_default(v)),
         ExprKind::Field(x, _) | ExprKind::Neg(x) | ExprKind::Not(x) => constant_default(x),
-        ExprKind::Binop(a, op, b) => {
-            !matches!(op, BinOp::Div | BinOp::Rem) && constant_default(a) && constant_default(b)
-        }
+        ExprKind::Binop(a, _, b) => constant_default(a) && constant_default(b),
         _ => false,
     }
 }

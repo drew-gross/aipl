@@ -6859,6 +6859,46 @@ fn saturating_div(builder: &mut FunctionBuilder, a: Value, b: Value, p: Primitiv
     builder.ins().select(overflows, max, quotient)
 }
 
+/// `a % b`, total: no input pair traps.
+///
+/// The remainder half of [`saturating_div`], and it has to answer the same two
+/// pairs that one does, because `srem`/`urem` trap on exactly them:
+///
+/// - **`b == 0` answers `a`.** That is the only answer that keeps the division
+///   identity intact next to a saturating `/`:
+///   `(a / 0) * 0 + (a % 0)` is `MAX * 0 + a`, which is `a`. Answering `0` would
+///   break it.
+/// - **`MIN % -1` answers `0`**, the true remainder (`MIN` is divisible by
+///   `-1`). The identity cannot hold here whatever we pick — the real quotient
+///   is not representable, which is precisely what `MIN / -1` saturating to
+///   `MAX` already conceded — so the remainder is simply correct instead.
+///
+/// Both fall out of one guard: dividing by 1 instead yields a remainder of 0,
+/// which is already the answer wanted for `MIN % -1`, so only the zero-divisor
+/// case needs a select of its own.
+fn saturating_rem(builder: &mut FunctionBuilder, a: Value, b: Value, p: Primitive) -> Value {
+    let zero = builder.ins().iconst(types::I64, 0);
+    let one = builder.ins().iconst(types::I64, 1);
+    let div_by_zero = builder.ins().icmp(IntCC::Equal, b, zero);
+    let guarded = if p.int_signed() {
+        let min = builder.ins().iconst(types::I64, int_min_bits(p));
+        let neg_one = builder.ins().iconst(types::I64, -1);
+        let a_min = builder.ins().icmp(IntCC::Equal, a, min);
+        let b_neg = builder.ins().icmp(IntCC::Equal, b, neg_one);
+        let both = builder.ins().band(a_min, b_neg);
+        builder.ins().bor(div_by_zero, both)
+    } else {
+        div_by_zero
+    };
+    let safe_b = builder.ins().select(guarded, one, b);
+    let rem = if p.int_signed() {
+        builder.ins().srem(a, safe_b)
+    } else {
+        builder.ins().urem(a, safe_b)
+    };
+    builder.ins().select(div_by_zero, a, rem)
+}
+
 /// Every named type `ty` reaches. The names are *borrowed* from `ty`, which is
 /// why this walks the concrete representation directly rather than widening at
 /// the call site: a widened temporary would not outlive the collection.
@@ -17469,13 +17509,11 @@ fn compile_expr_inner<M: Module>(
                         let ConcreteType::Primitive(p) = &lt else {
                             unreachable!()
                         };
-                        let signed = p.int_signed();
                         let raw = match op {
                             BinOp::Sub => builder.ins().isub(lv, rv),
                             BinOp::Mul => builder.ins().imul(lv, rv),
                             BinOp::Div => saturating_div(builder, lv, rv, *p),
-                            BinOp::Rem if signed => builder.ins().srem(lv, rv),
-                            _ => builder.ins().urem(lv, rv),
+                            _ => saturating_rem(builder, lv, rv, *p),
                         };
                         (canon_int(builder, raw, *p), lt.clone())
                     } else {
@@ -17495,7 +17533,7 @@ fn compile_expr_inner<M: Module>(
                             BinOp::Sub => builder.ins().isub(lv, rv),
                             BinOp::Mul => builder.ins().imul(lv, rv),
                             BinOp::Div => saturating_div(builder, lv, rv, Primitive::I64),
-                            _ => builder.ins().srem(lv, rv),
+                            _ => saturating_rem(builder, lv, rv, Primitive::I64),
                         };
                         (v, ConcreteType::Primitive(Primitive::I64))
                     }

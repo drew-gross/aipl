@@ -37,8 +37,8 @@ import {
     less_than as <,
     map_err,
     map_ok,
-    remainder as %,
     saturating_divide as /,
+    saturating_remainder as %,
     to_str,
     value_or_err,
     wrapping_add as +,
@@ -387,11 +387,11 @@ allocations: 8612
 deallocations: 8612
 reallocations: 746
 bytes allocated: 505250
-instructions executed: 1350921
-binary size: 204088
-  code: 129088
+instructions executed: 1350932
+binary size: 204152
+  code: 129148
   data: 4284
-  metadata: 70716
+  metadata: 70720
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -716,7 +716,7 @@ functions:
     bytes: 32
   eval_calc$tail:
     calls: 59
-    bytes: 976
+    bytes: 1036
   lex_calc:
     calls: 41
     bytes: 2108

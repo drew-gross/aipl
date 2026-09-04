@@ -1138,7 +1138,7 @@ pub mod ast {
         Mul,
         /// `saturating_divide`.
         Div,
-        /// `remainder`.
+        /// `saturating_remainder`.
         Rem,
         /// `less_than`.
         Lt,
@@ -1828,7 +1828,7 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
     ("logical_not", "!", "!"),
     ("concat", "+++", "+++"),
     ("saturating_divide", "/", "/"),
-    ("remainder", "%", "%"),
+    ("saturating_remainder", "%", "%"),
 ];
 
 /// The [`BinOp`] an operator spelling denotes, for the operator builtins whose
