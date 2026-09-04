@@ -226,9 +226,34 @@ pub fn set_caret_block_hook(f: fn(&str, Span, &str) -> String) {
 pub mod ast {
     use crate::Span;
 
+    /// One source file behind a merged program: the label diagnostics name it
+    /// by, and the text its spans index. A file's position in
+    /// [`Program::sources`] is the loader's file index — the `<N>` in a mangled
+    /// `__m<N>__name` — so a pass holding an item's global name can recover the
+    /// file it came from (see [`crate::mangled_file_index`]).
+    #[derive(Debug, Clone, PartialEq, Eq, Default)]
+    pub struct FileSource {
+        pub label: String,
+        pub source: String,
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Program {
         pub items: Vec<Item>,
+        /// The files this program was flattened from, indexed by loader file
+        /// index. Empty for a program that was never merged (a single parsed
+        /// file, or one synthesized by a pass), in which case spans index
+        /// whatever source the caller holds — which is what they did before this
+        /// existed.
+        ///
+        /// This exists so a diagnostic raised by a *post-load* pass can be
+        /// attributed to the file it belongs to. The loader tags the errors it
+        /// raises itself (`tag_origin`), but everything after flattening runs on
+        /// one merged program where per-file identity survives only in the
+        /// mangled names — so without this a checker error against an imported
+        /// file gets rendered into the entry file's source, at a byte offset
+        /// that means nothing there.
+        pub sources: Vec<FileSource>,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1895,6 +1920,23 @@ static IS_OPERATOR_NAME_HOOK: std::sync::OnceLock<fn(&str) -> bool> = std::sync:
 /// returns).
 pub fn set_is_operator_name_hook(f: fn(&str) -> bool) {
     let _ = IS_OPERATOR_NAME_HOOK.set(f);
+}
+
+/// The loader file index encoded in a mangled `__m<N>__name`, or `None` when the
+/// name carries no such prefix — a root-file item (the loader leaves those
+/// unmangled) or a builtin declaration.
+///
+/// The inverse direction of the loader's `mangle`, kept here because the passes
+/// that need it (attributing a diagnostic to its file, via
+/// [`ast::Program::sources`]) live downstream of the loader and cannot call into
+/// it.
+pub fn mangled_file_index(name: &str) -> Option<u32> {
+    let rest = name.strip_prefix("__m")?;
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    if digits.is_empty() || !rest[digits.len()..].starts_with("__") {
+        return None;
+    }
+    digits.parse().ok()
 }
 
 /// The canonical operator spelling for a [`BinOp`] — what a diagnostic prints,

@@ -33,6 +33,8 @@ use aipl_syntax::ast::{
 /// test body, and every struct field default.
 pub fn fold_constants(program: &Program) -> Program {
     Program {
+        // Rewrites bodies/items only; the file map carries through unchanged.
+        sources: program.sources.clone(),
         items: program
             .items
             .iter()

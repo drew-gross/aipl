@@ -1,0 +1,26 @@
+// A *checker* error raised against an imported file must point into that file.
+//
+// The loader tags the diagnostics it raises while reading each file, but
+// checking runs on one merged program where a function's origin survives only
+// in the `__m<N>__` its name was mangled with. Untagged, this error's span — a
+// byte offset into `util.aipl` — was rendered against *this* file's source: past
+// its end for a short entry file (yielding a column of tens of thousands, and a
+// caret row that many spaces wide), or at a plausible but wrong line for a long
+// one. `Program::sources` plus `check`'s `attribute` is what re-attaches the
+// file. The padding below exists so the offending offset would land *inside*
+// this file, which is the silent-misattribution case rather than the loud one.
+import { helper } from "./util.aipl";
+
+fn main() -> i64 { helper(3) }
+--- file: util.aipl ---
+import { wrapping_add as + } from builtins;
+
+// `nosuchfn` is undefined — the checker reports it, and the caret below must
+// name util.aipl, not the file that imported it.
+pub fn helper(n: i64) -> i64 { nosuchfn(n) + 1 }
+--- errors ---
+error: call to undefined fn "nosuchfn"
+ --> util.aipl:5:32
+  |
+5 | pub fn helper(n: i64) -> i64 { nosuchfn(n) + 1 }
+  |                                ^^^^^^^^^^

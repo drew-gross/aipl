@@ -2655,7 +2655,12 @@ pub fn build_test_program(program: &Program) -> Program {
         test_body: None,
         doc: None,
     }));
-    Program { items }
+    Program {
+        items,
+        // The test driver is synthesized around the same files, so a diagnostic
+        // raised while checking a `.test` body still attributes to its file.
+        sources: program.sources.clone(),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -3752,6 +3757,9 @@ fn compile_program<M: Module>(
             .map(Item::Struct)
             .chain(program.items.iter().cloned())
             .collect(),
+        // Splicing declarations in front of the user's items does not change
+        // which file any of them came from.
+        sources: program.sources.clone(),
     };
 
     // Standalone type-check over the (non-monomorphized) source: validates
@@ -3787,6 +3795,8 @@ fn compile_program<M: Module>(
     // error, on a duplicate name).
     let lowered_builtins = aipl_mono::lower_tuples(&Program {
         items: builtin_decls(&needed),
+        // Synthesized declarations: no source file behind them.
+        sources: Vec::new(),
     });
     let check_program = Program {
         items: lowered_builtins
@@ -3794,6 +3804,10 @@ fn compile_program<M: Module>(
             .into_iter()
             .chain(program.items.iter().cloned())
             .collect(),
+        // The map the checker attributes its diagnostics with — see
+        // `Program::sources`. The builtin declarations prepended above carry no
+        // file index, so they resolve to nothing and stay untagged.
+        sources: program.sources.clone(),
     };
     // `check` hands back the program with the types of context-dependent
     // expressions stamped in (`Expr::ty`) — a bare `none`, an empty `[]`, a
@@ -3805,6 +3819,7 @@ fn compile_program<M: Module>(
     // nor adds items, so the tail lines up by construction.
     let program = &Program {
         items: checked.items[checked.items.len() - program.items.len()..].to_vec(),
+        sources: checked.sources.clone(),
     };
 
     // Optimization: inline single-use private functions (a no-op unless the

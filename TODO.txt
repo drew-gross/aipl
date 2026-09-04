@@ -158,6 +158,7 @@ math:
   % should not abort. (what should it do? TBD)
 
 syntax:
+  expr! should return the err held in expr, or exit the test if expr is not an error (only valid in tests for now)
   converge arrays and string (for inlining, ropes, etc.)
   locally mutable args
   l.map(|v| v.field) stutters, should come up with a syntax that doesn't stutter
@@ -224,6 +225,7 @@ parser:
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
 utilities:
+  numeric < vs. lexicographic <. Also maybe a < for map/dict purposes that uses compiler-decided ordering?
   span.start - span.end should have a builtin
   add is_whitespace
   exponentiation operator
@@ -685,13 +687,13 @@ Reasons dec.aipl uses a cons list:
 
 signedness:
     2. An integer literal doesn't flex through a constructor. In a fn returning u64!E,
-       ok(0) types its payload i64 and is rejected, so the three "declined" sites in
-       lexer.aipl bind `let declined: u64 = 0;` first. Literals flex fine into an
-       annotated let, a parameter, or a struct field — just not through ok/err/some.
+      ok(0) types its payload i64 and is rejected, so the three "declined" sites in
+      lexer.aipl bind `let declined: u64 = 0;` first. Literals flex fine into an
+      annotated let, a parameter, or a struct field — just not through ok/err/some.
 
     3. A lambda or fn-ref specialization created inside a .test body inherits that
-       body's "all effects allowed", and a production caller then reuses the same
-       instance — so a helper called from both places fails with a spurious effect
-       error (ucount_while$lam0 has effect "!prints"). That is why ucount_while carries
-       no .test block. This is the "test-block effect poisoning" already seen while
-       porting the lexer, now with a concrete reproducer.
+      body's "all effects allowed", and a production caller then reuses the same
+      instance — so a helper called from both places fails with a spurious effect
+      error (ucount_while$lam0 has effect "!prints"). That is why ucount_while carries
+      no .test block. This is the "test-block effect poisoning" already seen while
+      porting the lexer, now with a concrete reproducer.

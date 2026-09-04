@@ -236,6 +236,7 @@ case_tests! {
     cases_imports_err_bare_incr_operator = "cases/imports/err_bare_incr_operator",
     cases_imports_err_bare_plus_operator = "cases/imports/err_bare_plus_operator",
     cases_imports_err_builtin_type_not_imported = "cases/imports/err_builtin_type_not_imported",
+    cases_imports_err_checker_error_in_imported_file = "cases/imports/err_checker_error_in_imported_file",
     cases_imports_err_constructor_not_imported = "cases/imports/err_constructor_not_imported",
     cases_imports_err_duplicate_import_source = "cases/imports/err_duplicate_import_source",
     cases_imports_err_import_collides_with_local = "cases/imports/err_import_collides_with_local",

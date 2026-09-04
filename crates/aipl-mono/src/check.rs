@@ -1193,7 +1193,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
     for item in &program.items {
         if let Item::Fn(f) = item {
             if let Err(e) = cx.check_fn(f) {
-                errors.push(e);
+                errors.push(attribute(e, &f.name, &program.sources));
             }
         }
     }
@@ -1216,6 +1216,32 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
         }
     }
     Ok(out)
+}
+
+/// Tag `e` with the file the function named `name` came from, so the renderer
+/// points its caret into *that* source rather than whatever the caller happens
+/// to hold.
+///
+/// This is the post-load half of the loader's `tag_origin`. The loader tags the
+/// diagnostics it raises while reading each file, but checking runs on one
+/// merged program, where the only surviving trace of a function's origin is the
+/// `__m<N>__` its name was mangled with. A span from an imported file rendered
+/// against the entry file's source lands at a meaningless offset — far past the
+/// end for a short file, and, worse, at a plausible but wrong line for a long
+/// one.
+///
+/// Leaves the error alone when the name carries no file index (a root-file item,
+/// which the caller already renders correctly, or a builtin declaration) or the
+/// program has no source map (a single parsed file). `Error::in_file` keeps the
+/// innermost attribution, so an error already tagged by the loader is untouched.
+fn attribute(e: Error, name: &str, sources: &[aipl_syntax::ast::FileSource]) -> Error {
+    let Some(idx) = aipl_syntax::mangled_file_index(name) else {
+        return e;
+    };
+    match sources.get(idx as usize) {
+        Some(f) if !f.source.is_empty() => e.in_file(&f.label, &f.source),
+        _ => e,
+    }
 }
 
 /// The identity of an expression node — its address in the program being

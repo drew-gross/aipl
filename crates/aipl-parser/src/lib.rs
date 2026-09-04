@@ -901,7 +901,12 @@ pub enum BlockTail {
 impl gazelle::Action<aipl::Program<Self>> for Build {
     fn build(&mut self, node: aipl::Program<Self>) -> Result<Program, Self::Error> {
         let aipl::Program::Program(items) = node;
-        Ok(Program { items })
+        // A single parsed file has no merged-source map; the loader fills one in
+        // when it flattens several files together.
+        Ok(Program {
+            items,
+            sources: Vec::new(),
+        })
     }
 }
 

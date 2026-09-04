@@ -80,6 +80,8 @@ use crate::sink::{can_defer, undeferrable_fns};
 pub fn inline_single_use_bindings(program: &Program, effectful: &HashSet<String>) -> Program {
     let blocked = undeferrable_fns(program, effectful);
     Program {
+        // Rewrites bodies/items only; the file map carries through unchanged.
+        sources: program.sources.clone(),
         items: program
             .items
             .iter()

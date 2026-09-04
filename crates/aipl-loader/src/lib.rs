@@ -150,6 +150,11 @@ struct Loader {
 
 struct LoadedFile {
     index: u32,
+    /// This file's text, kept so `flatten` can hand the merged program a source
+    /// map (`Program::sources`). A post-load pass raising a diagnostic against
+    /// an item from this file needs the source its spans index; by then only the
+    /// mangled name says which file that is.
+    source: String,
     /// Functions + structs from this file (imports stripped out).
     items: Vec<Item>,
     /// `import { ... } from "./other"` declarations. `from` resolved to
@@ -229,6 +234,7 @@ impl Loader {
             path.to_path_buf(),
             LoadedFile {
                 index,
+                source: src.to_string(),
                 items,
                 imports,
                 builtin_imports,
@@ -294,6 +300,7 @@ impl Loader {
                 key.clone(),
                 LoadedFile {
                     index,
+                    source: src.to_string(),
                     items,
                     imports,
                     builtin_imports,
@@ -571,7 +578,24 @@ impl Loader {
         // their defaults) now that every reference is a final global name —
         // after this, calls are fully positional and no `ExprKind::KwArg`
         // survives into the merged program.
-        kwargs::expand_keyword_args(&Program { items: merged })
+        // The source map, positional by loader file index, so a downstream pass
+        // can resolve a mangled `__m<N>__name` back to the file it came from.
+        // Sized to the highest index actually assigned; a gap (there are none
+        // today) reads as an empty entry, which attributes nothing rather than
+        // attributing wrongly.
+        let mut sources = vec![aipl_syntax::ast::FileSource::default(); self.next_index as usize];
+        for (path, file) in &self.files {
+            if let Some(slot) = sources.get_mut(file.index as usize) {
+                *slot = aipl_syntax::ast::FileSource {
+                    label: file_label(path),
+                    source: file.source.clone(),
+                };
+            }
+        }
+        kwargs::expand_keyword_args(&Program {
+            items: merged,
+            sources,
+        })
     }
 }
 

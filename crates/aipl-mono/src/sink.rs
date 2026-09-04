@@ -75,6 +75,8 @@ const ABORTING_BUILTINS: &[&str] = &["__assert"];
 pub fn sink_bindings(program: &Program, effectful: &HashSet<String>) -> Program {
     let blocked = undeferrable_fns(program, effectful);
     Program {
+        // Rewrites bodies/items only; the file map carries through unchanged.
+        sources: program.sources.clone(),
         items: program
             .items
             .iter()

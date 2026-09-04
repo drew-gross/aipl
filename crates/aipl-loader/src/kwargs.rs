@@ -159,7 +159,11 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
             }))
         })
         .collect::<Result<_, _>>()?;
-    Ok(Program { items })
+    Ok(Program {
+        items,
+        // Expansion rewrites bodies only; the file map is unchanged.
+        sources: program.sources.clone(),
+    })
 }
 
 /// What the expansion needs to know about one function: how many positional

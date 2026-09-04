@@ -7423,9 +7423,9 @@ block54:
 
 ; source variables:
 ;   v1 = text
-;   v4 = $inl107_self
+;   v4 = $inl224_self
 ;   v7 = v
-;   v12 = $inl108_e
+;   v12 = $inl225_e
 ; __m13__char_lit_emit
 function u0:68(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -30142,15 +30142,15 @@ block6(v17: i64):
 ;   v0 = self
 ;   v1 = head
 ;   v2 = cont
-;   v0 = $inl224_self
-;   v10 = $inl233_self
+;   v0 = $inl228_self
+;   v10 = $inl237_self
 ;   v13 = x
-;   v1 = $inl234_$cap42
-;   v13 = $inl109_c
-;   v1 = $inl110_head
-;   v0 = $inl237_self
-;   v0 = $inl178_self
-;   v19 = $inl179_n
+;   v1 = $inl238_$cap42
+;   v13 = $inl107_c
+;   v1 = $inl108_head
+;   v0 = $inl241_self
+;   v0 = $inl176_self
+;   v19 = $inl177_n
 ; __m12__one_char_len
 function u0:77(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
@@ -30205,12 +30205,12 @@ block6(v16: i64):
 ; source variables:
 ;   v0 = self
 ;   v1 = chars
-;   v0 = $inl225_self
-;   v9 = $inl241_self
+;   v0 = $inl229_self
+;   v9 = $inl245_self
 ;   v12 = x
-;   v1 = $inl242_$cap48
-;   v12 = $inl113_c
-;   v1 = $inl114_chars
+;   v1 = $inl246_$cap48
+;   v12 = $inl111_c
+;   v1 = $inl112_chars
 ; __m12__exact_len
 function u0:78(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) -> i64 apple_aarch64
@@ -30310,11 +30310,11 @@ block6(v26: i64):
 ;   v0 = self
 ;   v1 = spelling
 ;   v2 = boundary
-;   v14 = $inl245_self
+;   v14 = $inl249_self
 ;   v17 = x
-;   v2 = $inl246_$cap51
-;   v17 = $inl115_c
-;   v2 = $inl116_boundary
+;   v2 = $inl250_$cap51
+;   v17 = $inl113_c
+;   v2 = $inl114_boundary
 ; __m12__delimited_len
 function u0:80(i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
@@ -30841,28 +30841,28 @@ block44:
 ;   v3 = delims
 ;   v4 = escapes
 ;   v5 = msg
-;   v1 = $inl226_self
-;   v13 = $inl119_self
+;   v1 = $inl230_self
+;   v13 = $inl117_self
 ;   v16 = x
-;   v3 = $inl120_$cap54
-;   v16 = $inl117_c
-;   v3 = $inl118_delims
-;   v1 = $inl227_self
-;   v47 = $inl249_self
+;   v3 = $inl118_$cap54
+;   v16 = $inl115_c
+;   v3 = $inl116_delims
+;   v1 = $inl231_self
+;   v47 = $inl253_self
 ;   v50 = v
-;   v51 = $inl250_default
+;   v51 = $inl254_default
 ;   v48 = d
 ;   ss4 = i
 ;   ss5 = closed
-;   v74 = $inl251_self
+;   v74 = $inl255_self
 ;   v77 = v
-;   v78 = $inl252_default
+;   v78 = $inl256_default
 ;   v75 = c
-;   v112 = $inl123_self
+;   v112 = $inl121_self
 ;   v115 = x
-;   v4 = $inl124_$cap57
-;   v115 = $inl121_e
-;   v4 = $inl122_escapes
+;   v4 = $inl122_$cap57
+;   v115 = $inl119_e
+;   v4 = $inl120_escapes
 ;   v5 = $inl164_msg
 ; __m12__unterminated_msg
 function u0:81(i64, i64) apple_aarch64 {
@@ -31740,11 +31740,11 @@ block9(v66: i64):
 ;   v0 = self
 ;   v1 = int_end
 ;   ss0 = end
-;   v28 = $inl255_self
+;   v28 = $inl259_self
 ;   v31 = x
 ;   v78 = has_sign
 ;   v79 = digits
-;   v94 = $inl256_self
+;   v94 = $inl260_self
 ;   v97 = x
 ; __m12__float_len
 function u0:87(i64) -> i64 apple_aarch64 {
@@ -32002,11 +32002,11 @@ block25(v127: i64):
 ;   v0 = $inl20_self
 ;   v1 = $inl21_int_end
 ;   ss0 = end
-;   v36 = $inl257_self
+;   v36 = $inl261_self
 ;   v39 = x
 ;   v86 = has_sign
 ;   v87 = digits
-;   v102 = $inl258_self
+;   v102 = $inl262_self
 ;   v105 = x
 ;   v124 = end
 ; __m12__int_len
@@ -32111,8 +32111,8 @@ block9(v43: i64):
 
 ; source variables:
 ;   v0 = self
-;   v0 = $inl228_self
-;   v22 = $inl259_self
+;   v0 = $inl232_self
+;   v22 = $inl263_self
 ;   v25 = x
 ;   v34 = start
 ;   v39 = digits
@@ -34059,11 +34059,12 @@ block0(v0: i64, v1: i64):
 ;   v1 = text
 ; __m12__int_tok
 function u0:94(i64, i64) apple_aarch64 {
-    ss0 = explicit_slot 16, align = 8
-    ss1 = explicit_slot 32, align = 8
-    ss2 = explicit_slot 40, align = 8
+    ss0 = explicit_slot 32, align = 8
+    ss1 = explicit_slot 16, align = 8
+    ss2 = explicit_slot 16, align = 8
     ss3 = explicit_slot 24, align = 8
     ss4 = explicit_slot 32, align = 8
+    ss5 = explicit_slot 40, align = 8
     gv0 = symbol colocated u1:2
     sig0 = (i64, i64) apple_aarch64
     sig1 = (i64) apple_aarch64
@@ -34074,685 +34075,587 @@ function u0:94(i64, i64) apple_aarch64 {
 
 block0(v0: i64, v1: i64):
     v2 = stack_addr.i64 ss0
-    call fn0(v2, v1)
-    v4 = load.i64 notrap aligned v2
-    brif v4, block2, block3
+    v3 = iconst.i64 2
+    store notrap aligned v3, v2  ; v3 = 2
+    v4 = stack_addr.i64 ss1
+    call fn0(v4, v1)
+    v6 = load.i64 notrap aligned v4
+    brif v6, block2, block3
 
 block2:
-    v5 = load.i64 notrap aligned v2+8
-    v6 = stack_addr.i64 ss1
-    v7 = iconst.i64 2
-    store notrap aligned v7, v6  ; v7 = 2
-    v8 = iconst.i64 8
-    v9 = iadd v6, v8  ; v8 = 8
-    store notrap aligned v5, v9
-    v10 = stack_addr.i64 ss2
-    v11 = iconst.i64 1
-    store notrap aligned v11, v10  ; v11 = 1
-    v12 = iconst.i64 8
-    v13 = iadd v10, v12  ; v12 = 8
-    v14 = load.i64 notrap aligned v6
-    store notrap aligned v14, v13
-    v15 = load.i64 notrap aligned v6+8
-    store notrap aligned v15, v13+8
-    v16 = load.i64 notrap aligned v6+16
-    store notrap aligned v16, v13+16
-    v17 = load.i64 notrap aligned v6+24
-    store notrap aligned v17, v13+24
-    v18 = load.i64 notrap aligned v10
-    v19 = iconst.i64 1
-    v20 = icmp eq v18, v19  ; v19 = 1
-    brif v20, block4, block5
+    v7 = load.i64 notrap aligned v4+8
+    v8 = stack_addr.i64 ss2
+    v9 = iconst.i64 1
+    store notrap aligned v9, v8  ; v9 = 1
+    v10 = iconst.i64 8
+    v11 = iadd v8, v10  ; v10 = 8
+    store notrap aligned v7, v11
+    jump block1(v8)
+
+block3:
+    v12 = stack_addr.i64 ss3
+    v13 = symbol_value.i64 gv0
+    v14 = iconst.i64 16
+    v15 = iadd v13, v14  ; v14 = 16
+    v16 = iconst.i64 29
+    store notrap aligned v15, v12
+    store notrap aligned v15, v12+8
+    store notrap aligned v16, v12+16  ; v16 = 29
+    v17 = stack_addr.i64 ss4
+    v18 = iconst.i64 0
+    store notrap aligned v18, v17  ; v18 = 0
+    v19 = iconst.i64 8
+    v20 = iadd v17, v19  ; v19 = 8
+    v21 = load.i64 notrap aligned v12
+    store notrap aligned v21, v20
+    v22 = load.i64 notrap aligned v12+8
+    store notrap aligned v22, v20+8
+    v23 = load.i64 notrap aligned v12+16
+    store notrap aligned v23, v20+16
+    v24 = load.i64 notrap aligned v17
+    v25 = iconst.i64 0
+    v26 = icmp eq v24, v25  ; v25 = 0
+    brif v26, block4, block5
 
 block4:
-    v21 = iconst.i64 8
-    v22 = iadd.i64 v10, v21  ; v21 = 8
-    v23 = load.i64 notrap aligned v22
-    v24 = iconst.i64 1
-    v25 = icmp eq v23, v24  ; v24 = 1
-    brif v25, block7, block8
-
-block7:
-    v26 = iconst.i64 8
-    v27 = iadd.i64 v22, v26  ; v26 = 8
-    call fn1(v27)
-    jump block6
-
-block8:
-    v28 = iconst.i64 9
-    v29 = icmp.i64 eq v23, v28  ; v28 = 9
-    brif v29, block9, block10
-
-block9:
-    v30 = iconst.i64 8
-    v31 = iadd.i64 v22, v30  ; v30 = 8
-    call fn1(v31)
-    jump block6
-
-block10:
-    v32 = iconst.i64 10
-    v33 = icmp.i64 eq v23, v32  ; v32 = 10
-    brif v33, block11, block12
-
-block11:
-    v34 = iconst.i64 8
-    v35 = iadd.i64 v22, v34  ; v34 = 8
-    call fn1(v35)
-    jump block6
-
-block12:
-    v36 = iconst.i64 11
-    v37 = icmp.i64 eq v23, v36  ; v36 = 11
-    brif v37, block13, block14
-
-block13:
-    v38 = iconst.i64 8
-    v39 = iadd.i64 v22, v38  ; v38 = 8
-    call fn1(v39)
-    jump block6
-
-block14:
-    v40 = iconst.i64 14
-    v41 = icmp.i64 eq v23, v40  ; v40 = 14
-    brif v41, block15, block16
-
-block15:
-    v42 = iconst.i64 8
-    v43 = iadd.i64 v22, v42  ; v42 = 8
-    call fn1(v43)
-    jump block6
-
-block16:
-    v44 = iconst.i64 15
-    v45 = icmp.i64 eq v23, v44  ; v44 = 15
-    brif v45, block17, block18
-
-block17:
-    v46 = iconst.i64 8
-    v47 = iadd.i64 v22, v46  ; v46 = 8
-    call fn1(v47)
-    jump block6
-
-block18:
-    v48 = iconst.i64 16
-    v49 = icmp.i64 eq v23, v48  ; v48 = 16
-    brif v49, block19, block20
-
-block19:
-    v50 = iconst.i64 8
-    v51 = iadd.i64 v22, v50  ; v50 = 8
-    call fn1(v51)
-    jump block6
-
-block20:
-    v52 = iconst.i64 17
-    v53 = icmp.i64 eq v23, v52  ; v52 = 17
-    brif v53, block21, block22
-
-block21:
-    v54 = iconst.i64 8
-    v55 = iadd.i64 v22, v54  ; v54 = 8
-    call fn1(v55)
-    jump block6
-
-block22:
-    v56 = iconst.i64 18
-    v57 = icmp.i64 eq v23, v56  ; v56 = 18
-    brif v57, block23, block24
-
-block23:
-    v58 = iconst.i64 8
-    v59 = iadd.i64 v22, v58  ; v58 = 8
-    call fn1(v59)
-    jump block6
-
-block24:
-    v60 = iconst.i64 19
-    v61 = icmp.i64 eq v23, v60  ; v60 = 19
-    brif v61, block25, block26
-
-block25:
-    v62 = iconst.i64 8
-    v63 = iadd.i64 v22, v62  ; v62 = 8
-    call fn1(v63)
-    jump block6
-
-block26:
-    v64 = iconst.i64 20
-    v65 = icmp.i64 eq v23, v64  ; v64 = 20
-    brif v65, block27, block28
-
-block27:
-    v66 = iconst.i64 8
-    v67 = iadd.i64 v22, v66  ; v66 = 8
-    call fn1(v67)
-    jump block6
-
-block28:
-    v68 = iconst.i64 21
-    v69 = icmp.i64 eq v23, v68  ; v68 = 21
-    brif v69, block29, block30
-
-block29:
-    v70 = iconst.i64 8
-    v71 = iadd.i64 v22, v70  ; v70 = 8
-    call fn1(v71)
-    jump block6
-
-block30:
-    jump block6
-
-block6:
+    v27 = iconst.i64 8
+    v28 = iadd.i64 v17, v27  ; v27 = 8
+    call fn1(v28)
     jump block5
 
 block5:
-    v72 = load.i64 notrap aligned v10
-    v73 = iconst.i64 1
-    v74 = icmp eq v72, v73  ; v73 = 1
-    brif v74, block31, block32
+    v29 = load.i64 notrap aligned v17
+    v30 = iconst.i64 0
+    v31 = icmp eq v29, v30  ; v30 = 0
+    brif v31, block6, block7
+
+block6:
+    v32 = iconst.i64 8
+    v33 = iadd.i64 v17, v32  ; v32 = 8
+    call fn1(v33)
+    jump block7
+
+block7:
+    v34 = load.i64 notrap aligned v17
+    v35 = iconst.i64 0
+    v36 = icmp eq v34, v35  ; v35 = 0
+    brif v36, block8, block9
+
+block8:
+    v37 = iconst.i64 8
+    v38 = iadd.i64 v17, v37  ; v37 = 8
+    call fn2(v38)
+    jump block9
+
+block9:
+    jump block1(v17)
+
+block1(v5: i64):
+    v39 = load.i64 notrap aligned v5
+    brif v39, block10, block11
+
+block11:
+    v40 = load.i64 notrap aligned v5
+    v41 = iconst.i64 1
+    v42 = icmp eq v40, v41  ; v41 = 1
+    brif v42, block12, block13
+
+block12:
+    v43 = iconst.i64 8
+    v44 = iadd.i64 v5, v43  ; v43 = 8
+    v45 = load.i64 notrap aligned v44
+    v46 = iconst.i64 1
+    v47 = icmp eq v45, v46  ; v46 = 1
+    brif v47, block15, block16
+
+block15:
+    v48 = iconst.i64 8
+    v49 = iadd.i64 v44, v48  ; v48 = 8
+    call fn1(v49)
+    jump block14
+
+block16:
+    v50 = iconst.i64 9
+    v51 = icmp.i64 eq v45, v50  ; v50 = 9
+    brif v51, block17, block18
+
+block17:
+    v52 = iconst.i64 8
+    v53 = iadd.i64 v44, v52  ; v52 = 8
+    call fn1(v53)
+    jump block14
+
+block18:
+    v54 = iconst.i64 10
+    v55 = icmp.i64 eq v45, v54  ; v54 = 10
+    brif v55, block19, block20
+
+block19:
+    v56 = iconst.i64 8
+    v57 = iadd.i64 v44, v56  ; v56 = 8
+    call fn1(v57)
+    jump block14
+
+block20:
+    v58 = iconst.i64 11
+    v59 = icmp.i64 eq v45, v58  ; v58 = 11
+    brif v59, block21, block22
+
+block21:
+    v60 = iconst.i64 8
+    v61 = iadd.i64 v44, v60  ; v60 = 8
+    call fn1(v61)
+    jump block14
+
+block22:
+    v62 = iconst.i64 14
+    v63 = icmp.i64 eq v45, v62  ; v62 = 14
+    brif v63, block23, block24
+
+block23:
+    v64 = iconst.i64 8
+    v65 = iadd.i64 v44, v64  ; v64 = 8
+    call fn1(v65)
+    jump block14
+
+block24:
+    v66 = iconst.i64 15
+    v67 = icmp.i64 eq v45, v66  ; v66 = 15
+    brif v67, block25, block26
+
+block25:
+    v68 = iconst.i64 8
+    v69 = iadd.i64 v44, v68  ; v68 = 8
+    call fn1(v69)
+    jump block14
+
+block26:
+    v70 = iconst.i64 16
+    v71 = icmp.i64 eq v45, v70  ; v70 = 16
+    brif v71, block27, block28
+
+block27:
+    v72 = iconst.i64 8
+    v73 = iadd.i64 v44, v72  ; v72 = 8
+    call fn1(v73)
+    jump block14
+
+block28:
+    v74 = iconst.i64 17
+    v75 = icmp.i64 eq v45, v74  ; v74 = 17
+    brif v75, block29, block30
+
+block29:
+    v76 = iconst.i64 8
+    v77 = iadd.i64 v44, v76  ; v76 = 8
+    call fn1(v77)
+    jump block14
+
+block30:
+    v78 = iconst.i64 18
+    v79 = icmp.i64 eq v45, v78  ; v78 = 18
+    brif v79, block31, block32
 
 block31:
-    v75 = iconst.i64 8
-    v76 = iadd.i64 v10, v75  ; v75 = 8
-    v77 = load.i64 notrap aligned v76
-    v78 = iconst.i64 1
-    v79 = icmp eq v77, v78  ; v78 = 1
-    brif v79, block34, block35
-
-block34:
     v80 = iconst.i64 8
-    v81 = iadd.i64 v76, v80  ; v80 = 8
+    v81 = iadd.i64 v44, v80  ; v80 = 8
     call fn1(v81)
-    jump block33
-
-block35:
-    v82 = iconst.i64 9
-    v83 = icmp.i64 eq v77, v82  ; v82 = 9
-    brif v83, block36, block37
-
-block36:
-    v84 = iconst.i64 8
-    v85 = iadd.i64 v76, v84  ; v84 = 8
-    call fn1(v85)
-    jump block33
-
-block37:
-    v86 = iconst.i64 10
-    v87 = icmp.i64 eq v77, v86  ; v86 = 10
-    brif v87, block38, block39
-
-block38:
-    v88 = iconst.i64 8
-    v89 = iadd.i64 v76, v88  ; v88 = 8
-    call fn1(v89)
-    jump block33
-
-block39:
-    v90 = iconst.i64 11
-    v91 = icmp.i64 eq v77, v90  ; v90 = 11
-    brif v91, block40, block41
-
-block40:
-    v92 = iconst.i64 8
-    v93 = iadd.i64 v76, v92  ; v92 = 8
-    call fn1(v93)
-    jump block33
-
-block41:
-    v94 = iconst.i64 14
-    v95 = icmp.i64 eq v77, v94  ; v94 = 14
-    brif v95, block42, block43
-
-block42:
-    v96 = iconst.i64 8
-    v97 = iadd.i64 v76, v96  ; v96 = 8
-    call fn1(v97)
-    jump block33
-
-block43:
-    v98 = iconst.i64 15
-    v99 = icmp.i64 eq v77, v98  ; v98 = 15
-    brif v99, block44, block45
-
-block44:
-    v100 = iconst.i64 8
-    v101 = iadd.i64 v76, v100  ; v100 = 8
-    call fn1(v101)
-    jump block33
-
-block45:
-    v102 = iconst.i64 16
-    v103 = icmp.i64 eq v77, v102  ; v102 = 16
-    brif v103, block46, block47
-
-block46:
-    v104 = iconst.i64 8
-    v105 = iadd.i64 v76, v104  ; v104 = 8
-    call fn1(v105)
-    jump block33
-
-block47:
-    v106 = iconst.i64 17
-    v107 = icmp.i64 eq v77, v106  ; v106 = 17
-    brif v107, block48, block49
-
-block48:
-    v108 = iconst.i64 8
-    v109 = iadd.i64 v76, v108  ; v108 = 8
-    call fn1(v109)
-    jump block33
-
-block49:
-    v110 = iconst.i64 18
-    v111 = icmp.i64 eq v77, v110  ; v110 = 18
-    brif v111, block50, block51
-
-block50:
-    v112 = iconst.i64 8
-    v113 = iadd.i64 v76, v112  ; v112 = 8
-    call fn1(v113)
-    jump block33
-
-block51:
-    v114 = iconst.i64 19
-    v115 = icmp.i64 eq v77, v114  ; v114 = 19
-    brif v115, block52, block53
-
-block52:
-    v116 = iconst.i64 8
-    v117 = iadd.i64 v76, v116  ; v116 = 8
-    call fn1(v117)
-    jump block33
-
-block53:
-    v118 = iconst.i64 20
-    v119 = icmp.i64 eq v77, v118  ; v118 = 20
-    brif v119, block54, block55
-
-block54:
-    v120 = iconst.i64 8
-    v121 = iadd.i64 v76, v120  ; v120 = 8
-    call fn1(v121)
-    jump block33
-
-block55:
-    v122 = iconst.i64 21
-    v123 = icmp.i64 eq v77, v122  ; v122 = 21
-    brif v123, block56, block57
-
-block56:
-    v124 = iconst.i64 8
-    v125 = iadd.i64 v76, v124  ; v124 = 8
-    call fn1(v125)
-    jump block33
-
-block57:
-    jump block33
-
-block33:
-    jump block32
+    jump block14
 
 block32:
-    v126 = load.i64 notrap aligned v6
-    v127 = iconst.i64 1
-    v128 = icmp eq v126, v127  ; v127 = 1
-    brif v128, block59, block60
+    v82 = iconst.i64 19
+    v83 = icmp.i64 eq v45, v82  ; v82 = 19
+    brif v83, block33, block34
 
-block59:
-    v129 = iconst.i64 8
-    v130 = iadd.i64 v6, v129  ; v129 = 8
-    call fn2(v130)
-    jump block58
+block33:
+    v84 = iconst.i64 8
+    v85 = iadd.i64 v44, v84  ; v84 = 8
+    call fn1(v85)
+    jump block14
 
-block60:
-    v131 = iconst.i64 9
-    v132 = icmp.i64 eq v126, v131  ; v131 = 9
-    brif v132, block61, block62
+block34:
+    v86 = iconst.i64 20
+    v87 = icmp.i64 eq v45, v86  ; v86 = 20
+    brif v87, block35, block36
 
-block61:
-    v133 = iconst.i64 8
-    v134 = iadd.i64 v6, v133  ; v133 = 8
-    call fn2(v134)
-    jump block58
+block35:
+    v88 = iconst.i64 8
+    v89 = iadd.i64 v44, v88  ; v88 = 8
+    call fn1(v89)
+    jump block14
 
-block62:
-    v135 = iconst.i64 10
-    v136 = icmp.i64 eq v126, v135  ; v135 = 10
-    brif v136, block63, block64
+block36:
+    v90 = iconst.i64 21
+    v91 = icmp.i64 eq v45, v90  ; v90 = 21
+    brif v91, block37, block38
 
-block63:
-    v137 = iconst.i64 8
-    v138 = iadd.i64 v6, v137  ; v137 = 8
-    call fn2(v138)
-    jump block58
+block37:
+    v92 = iconst.i64 8
+    v93 = iadd.i64 v44, v92  ; v92 = 8
+    call fn1(v93)
+    jump block14
 
-block64:
-    v139 = iconst.i64 11
-    v140 = icmp.i64 eq v126, v139  ; v139 = 11
-    brif v140, block65, block66
+block38:
+    jump block14
 
-block65:
-    v141 = iconst.i64 8
-    v142 = iadd.i64 v6, v141  ; v141 = 8
-    call fn2(v142)
-    jump block58
+block14:
+    jump block13
 
-block66:
-    v143 = iconst.i64 14
-    v144 = icmp.i64 eq v126, v143  ; v143 = 14
-    brif v144, block67, block68
+block13:
+    v94 = iconst.i64 0
+    v95 = icmp.i64 eq v40, v94  ; v94 = 0
+    brif v95, block39, block40
 
-block67:
-    v145 = iconst.i64 8
-    v146 = iadd.i64 v6, v145  ; v145 = 8
-    call fn2(v146)
-    jump block58
+block39:
+    v96 = iconst.i64 8
+    v97 = iadd.i64 v5, v96  ; v96 = 8
+    call fn1(v97)
+    jump block40
 
-block68:
-    v147 = iconst.i64 15
-    v148 = icmp.i64 eq v126, v147  ; v147 = 15
-    brif v148, block69, block70
+block40:
+    v98 = load.i64 notrap aligned v5
+    v99 = iconst.i64 0
+    v100 = icmp eq v98, v99  ; v99 = 0
+    brif v100, block41, block42
 
-block69:
-    v149 = iconst.i64 8
-    v150 = iadd.i64 v6, v149  ; v149 = 8
-    call fn2(v150)
-    jump block58
+block41:
+    v101 = iconst.i64 8
+    v102 = iadd.i64 v5, v101  ; v101 = 8
+    call fn2(v102)
+    jump block42
 
-block70:
-    v151 = iconst.i64 16
-    v152 = icmp.i64 eq v126, v151  ; v151 = 16
-    brif v152, block71, block72
+block42:
+    v103 = load.i64 notrap aligned v5
+    store notrap aligned v103, v0
+    v104 = load.i64 notrap aligned v5+8
+    store notrap aligned v104, v0+8
+    v105 = load.i64 notrap aligned v5+16
+    store notrap aligned v105, v0+16
+    v106 = load.i64 notrap aligned v5+24
+    store notrap aligned v106, v0+24
+    v107 = load.i64 notrap aligned v5+32
+    store notrap aligned v107, v0+32
+    return
 
-block71:
-    v153 = iconst.i64 8
-    v154 = iadd.i64 v6, v153  ; v153 = 8
-    call fn2(v154)
-    jump block58
+block10:
+    v108 = load.i64 notrap aligned v5+8
+    v109 = iconst.i64 8
+    v110 = iadd.i64 v2, v109  ; v109 = 8
+    store notrap aligned v108, v110
+    v111 = stack_addr.i64 ss5
+    v112 = iconst.i64 1
+    store notrap aligned v112, v111  ; v112 = 1
+    v113 = iconst.i64 8
+    v114 = iadd v111, v113  ; v113 = 8
+    v115 = load.i64 notrap aligned v2
+    store notrap aligned v115, v114
+    v116 = load.i64 notrap aligned v2+8
+    store notrap aligned v116, v114+8
+    v117 = load.i64 notrap aligned v2+16
+    store notrap aligned v117, v114+16
+    v118 = load.i64 notrap aligned v2+24
+    store notrap aligned v118, v114+24
+    v119 = load.i64 notrap aligned v111
+    v120 = iconst.i64 1
+    v121 = icmp eq v119, v120  ; v120 = 1
+    brif v121, block43, block44
 
-block72:
-    v155 = iconst.i64 17
-    v156 = icmp.i64 eq v126, v155  ; v155 = 17
-    brif v156, block73, block74
+block43:
+    v122 = iconst.i64 8
+    v123 = iadd.i64 v111, v122  ; v122 = 8
+    v124 = load.i64 notrap aligned v123
+    v125 = iconst.i64 1
+    v126 = icmp eq v124, v125  ; v125 = 1
+    brif v126, block46, block47
 
-block73:
-    v157 = iconst.i64 8
-    v158 = iadd.i64 v6, v157  ; v157 = 8
-    call fn2(v158)
-    jump block58
+block46:
+    v127 = iconst.i64 8
+    v128 = iadd.i64 v123, v127  ; v127 = 8
+    call fn1(v128)
+    jump block45
 
-block74:
-    v159 = iconst.i64 18
-    v160 = icmp.i64 eq v126, v159  ; v159 = 18
-    brif v160, block75, block76
+block47:
+    v129 = iconst.i64 9
+    v130 = icmp.i64 eq v124, v129  ; v129 = 9
+    brif v130, block48, block49
 
-block75:
-    v161 = iconst.i64 8
-    v162 = iadd.i64 v6, v161  ; v161 = 8
-    call fn2(v162)
-    jump block58
+block48:
+    v131 = iconst.i64 8
+    v132 = iadd.i64 v123, v131  ; v131 = 8
+    call fn1(v132)
+    jump block45
 
-block76:
-    v163 = iconst.i64 19
-    v164 = icmp.i64 eq v126, v163  ; v163 = 19
-    brif v164, block77, block78
+block49:
+    v133 = iconst.i64 10
+    v134 = icmp.i64 eq v124, v133  ; v133 = 10
+    brif v134, block50, block51
 
-block77:
-    v165 = iconst.i64 8
-    v166 = iadd.i64 v6, v165  ; v165 = 8
-    call fn2(v166)
-    jump block58
+block50:
+    v135 = iconst.i64 8
+    v136 = iadd.i64 v123, v135  ; v135 = 8
+    call fn1(v136)
+    jump block45
 
-block78:
-    v167 = iconst.i64 20
-    v168 = icmp.i64 eq v126, v167  ; v167 = 20
-    brif v168, block79, block80
+block51:
+    v137 = iconst.i64 11
+    v138 = icmp.i64 eq v124, v137  ; v137 = 11
+    brif v138, block52, block53
 
-block79:
-    v169 = iconst.i64 8
-    v170 = iadd.i64 v6, v169  ; v169 = 8
-    call fn2(v170)
-    jump block58
+block52:
+    v139 = iconst.i64 8
+    v140 = iadd.i64 v123, v139  ; v139 = 8
+    call fn1(v140)
+    jump block45
 
-block80:
-    v171 = iconst.i64 21
-    v172 = icmp.i64 eq v126, v171  ; v171 = 21
-    brif v172, block81, block82
+block53:
+    v141 = iconst.i64 14
+    v142 = icmp.i64 eq v124, v141  ; v141 = 14
+    brif v142, block54, block55
 
-block81:
-    v173 = iconst.i64 8
-    v174 = iadd.i64 v6, v173  ; v173 = 8
-    call fn2(v174)
-    jump block58
+block54:
+    v143 = iconst.i64 8
+    v144 = iadd.i64 v123, v143  ; v143 = 8
+    call fn1(v144)
+    jump block45
 
-block82:
-    jump block58
+block55:
+    v145 = iconst.i64 15
+    v146 = icmp.i64 eq v124, v145  ; v145 = 15
+    brif v146, block56, block57
+
+block56:
+    v147 = iconst.i64 8
+    v148 = iadd.i64 v123, v147  ; v147 = 8
+    call fn1(v148)
+    jump block45
+
+block57:
+    v149 = iconst.i64 16
+    v150 = icmp.i64 eq v124, v149  ; v149 = 16
+    brif v150, block58, block59
 
 block58:
-    v175 = load.i64 notrap aligned v10
-    v176 = iconst.i64 1
-    v177 = icmp eq v175, v176  ; v176 = 1
-    brif v177, block83, block84
+    v151 = iconst.i64 8
+    v152 = iadd.i64 v123, v151  ; v151 = 8
+    call fn1(v152)
+    jump block45
+
+block59:
+    v153 = iconst.i64 17
+    v154 = icmp.i64 eq v124, v153  ; v153 = 17
+    brif v154, block60, block61
+
+block60:
+    v155 = iconst.i64 8
+    v156 = iadd.i64 v123, v155  ; v155 = 8
+    call fn1(v156)
+    jump block45
+
+block61:
+    v157 = iconst.i64 18
+    v158 = icmp.i64 eq v124, v157  ; v157 = 18
+    brif v158, block62, block63
+
+block62:
+    v159 = iconst.i64 8
+    v160 = iadd.i64 v123, v159  ; v159 = 8
+    call fn1(v160)
+    jump block45
+
+block63:
+    v161 = iconst.i64 19
+    v162 = icmp.i64 eq v124, v161  ; v161 = 19
+    brif v162, block64, block65
+
+block64:
+    v163 = iconst.i64 8
+    v164 = iadd.i64 v123, v163  ; v163 = 8
+    call fn1(v164)
+    jump block45
+
+block65:
+    v165 = iconst.i64 20
+    v166 = icmp.i64 eq v124, v165  ; v165 = 20
+    brif v166, block66, block67
+
+block66:
+    v167 = iconst.i64 8
+    v168 = iadd.i64 v123, v167  ; v167 = 8
+    call fn1(v168)
+    jump block45
+
+block67:
+    v169 = iconst.i64 21
+    v170 = icmp.i64 eq v124, v169  ; v169 = 21
+    brif v170, block68, block69
+
+block68:
+    v171 = iconst.i64 8
+    v172 = iadd.i64 v123, v171  ; v171 = 8
+    call fn1(v172)
+    jump block45
+
+block69:
+    jump block45
+
+block45:
+    jump block44
+
+block44:
+    v173 = load.i64 notrap aligned v2
+    v174 = iconst.i64 1
+    v175 = icmp eq v173, v174  ; v174 = 1
+    brif v175, block71, block72
+
+block71:
+    v176 = iconst.i64 8
+    v177 = iadd.i64 v2, v176  ; v176 = 8
+    call fn2(v177)
+    jump block70
+
+block72:
+    v178 = iconst.i64 9
+    v179 = icmp.i64 eq v173, v178  ; v178 = 9
+    brif v179, block73, block74
+
+block73:
+    v180 = iconst.i64 8
+    v181 = iadd.i64 v2, v180  ; v180 = 8
+    call fn2(v181)
+    jump block70
+
+block74:
+    v182 = iconst.i64 10
+    v183 = icmp.i64 eq v173, v182  ; v182 = 10
+    brif v183, block75, block76
+
+block75:
+    v184 = iconst.i64 8
+    v185 = iadd.i64 v2, v184  ; v184 = 8
+    call fn2(v185)
+    jump block70
+
+block76:
+    v186 = iconst.i64 11
+    v187 = icmp.i64 eq v173, v186  ; v186 = 11
+    brif v187, block77, block78
+
+block77:
+    v188 = iconst.i64 8
+    v189 = iadd.i64 v2, v188  ; v188 = 8
+    call fn2(v189)
+    jump block70
+
+block78:
+    v190 = iconst.i64 14
+    v191 = icmp.i64 eq v173, v190  ; v190 = 14
+    brif v191, block79, block80
+
+block79:
+    v192 = iconst.i64 8
+    v193 = iadd.i64 v2, v192  ; v192 = 8
+    call fn2(v193)
+    jump block70
+
+block80:
+    v194 = iconst.i64 15
+    v195 = icmp.i64 eq v173, v194  ; v194 = 15
+    brif v195, block81, block82
+
+block81:
+    v196 = iconst.i64 8
+    v197 = iadd.i64 v2, v196  ; v196 = 8
+    call fn2(v197)
+    jump block70
+
+block82:
+    v198 = iconst.i64 16
+    v199 = icmp.i64 eq v173, v198  ; v198 = 16
+    brif v199, block83, block84
 
 block83:
-    v178 = iconst.i64 8
-    v179 = iadd.i64 v10, v178  ; v178 = 8
-    v180 = load.i64 notrap aligned v179
-    v181 = iconst.i64 1
-    v182 = icmp eq v180, v181  ; v181 = 1
-    brif v182, block86, block87
-
-block86:
-    v183 = iconst.i64 8
-    v184 = iadd.i64 v179, v183  ; v183 = 8
-    call fn2(v184)
-    jump block85
-
-block87:
-    v185 = iconst.i64 9
-    v186 = icmp.i64 eq v180, v185  ; v185 = 9
-    brif v186, block88, block89
-
-block88:
-    v187 = iconst.i64 8
-    v188 = iadd.i64 v179, v187  ; v187 = 8
-    call fn2(v188)
-    jump block85
-
-block89:
-    v189 = iconst.i64 10
-    v190 = icmp.i64 eq v180, v189  ; v189 = 10
-    brif v190, block90, block91
-
-block90:
-    v191 = iconst.i64 8
-    v192 = iadd.i64 v179, v191  ; v191 = 8
-    call fn2(v192)
-    jump block85
-
-block91:
-    v193 = iconst.i64 11
-    v194 = icmp.i64 eq v180, v193  ; v193 = 11
-    brif v194, block92, block93
-
-block92:
-    v195 = iconst.i64 8
-    v196 = iadd.i64 v179, v195  ; v195 = 8
-    call fn2(v196)
-    jump block85
-
-block93:
-    v197 = iconst.i64 14
-    v198 = icmp.i64 eq v180, v197  ; v197 = 14
-    brif v198, block94, block95
-
-block94:
-    v199 = iconst.i64 8
-    v200 = iadd.i64 v179, v199  ; v199 = 8
-    call fn2(v200)
-    jump block85
-
-block95:
-    v201 = iconst.i64 15
-    v202 = icmp.i64 eq v180, v201  ; v201 = 15
-    brif v202, block96, block97
-
-block96:
-    v203 = iconst.i64 8
-    v204 = iadd.i64 v179, v203  ; v203 = 8
-    call fn2(v204)
-    jump block85
-
-block97:
-    v205 = iconst.i64 16
-    v206 = icmp.i64 eq v180, v205  ; v205 = 16
-    brif v206, block98, block99
-
-block98:
-    v207 = iconst.i64 8
-    v208 = iadd.i64 v179, v207  ; v207 = 8
-    call fn2(v208)
-    jump block85
-
-block99:
-    v209 = iconst.i64 17
-    v210 = icmp.i64 eq v180, v209  ; v209 = 17
-    brif v210, block100, block101
-
-block100:
-    v211 = iconst.i64 8
-    v212 = iadd.i64 v179, v211  ; v211 = 8
-    call fn2(v212)
-    jump block85
-
-block101:
-    v213 = iconst.i64 18
-    v214 = icmp.i64 eq v180, v213  ; v213 = 18
-    brif v214, block102, block103
-
-block102:
-    v215 = iconst.i64 8
-    v216 = iadd.i64 v179, v215  ; v215 = 8
-    call fn2(v216)
-    jump block85
-
-block103:
-    v217 = iconst.i64 19
-    v218 = icmp.i64 eq v180, v217  ; v217 = 19
-    brif v218, block104, block105
-
-block104:
-    v219 = iconst.i64 8
-    v220 = iadd.i64 v179, v219  ; v219 = 8
-    call fn2(v220)
-    jump block85
-
-block105:
-    v221 = iconst.i64 20
-    v222 = icmp.i64 eq v180, v221  ; v221 = 20
-    brif v222, block106, block107
-
-block106:
-    v223 = iconst.i64 8
-    v224 = iadd.i64 v179, v223  ; v223 = 8
-    call fn2(v224)
-    jump block85
-
-block107:
-    v225 = iconst.i64 21
-    v226 = icmp.i64 eq v180, v225  ; v225 = 21
-    brif v226, block108, block109
-
-block108:
-    v227 = iconst.i64 8
-    v228 = iadd.i64 v179, v227  ; v227 = 8
-    call fn2(v228)
-    jump block85
-
-block109:
-    jump block85
-
-block85:
-    jump block84
+    v200 = iconst.i64 8
+    v201 = iadd.i64 v2, v200  ; v200 = 8
+    call fn2(v201)
+    jump block70
 
 block84:
-    jump block1(v10)
+    v202 = iconst.i64 17
+    v203 = icmp.i64 eq v173, v202  ; v202 = 17
+    brif v203, block85, block86
 
-block3:
-    v229 = stack_addr.i64 ss3
-    v230 = symbol_value.i64 gv0
-    v231 = iconst.i64 16
-    v232 = iadd v230, v231  ; v231 = 16
-    v233 = iconst.i64 29
-    store notrap aligned v232, v229
-    store notrap aligned v232, v229+8
-    store notrap aligned v233, v229+16  ; v233 = 29
-    v234 = stack_addr.i64 ss4
-    v235 = iconst.i64 0
-    store notrap aligned v235, v234  ; v235 = 0
-    v236 = iconst.i64 8
-    v237 = iadd v234, v236  ; v236 = 8
-    v238 = load.i64 notrap aligned v229
-    store notrap aligned v238, v237
-    v239 = load.i64 notrap aligned v229+8
-    store notrap aligned v239, v237+8
-    v240 = load.i64 notrap aligned v229+16
-    store notrap aligned v240, v237+16
-    v241 = load.i64 notrap aligned v234
-    v242 = iconst.i64 0
-    v243 = icmp eq v241, v242  ; v242 = 0
-    brif v243, block110, block111
+block85:
+    v204 = iconst.i64 8
+    v205 = iadd.i64 v2, v204  ; v204 = 8
+    call fn2(v205)
+    jump block70
 
-block110:
-    v244 = iconst.i64 8
-    v245 = iadd.i64 v234, v244  ; v244 = 8
-    call fn1(v245)
-    jump block111
+block86:
+    v206 = iconst.i64 18
+    v207 = icmp.i64 eq v173, v206  ; v206 = 18
+    brif v207, block87, block88
 
-block111:
-    v246 = load.i64 notrap aligned v234
-    v247 = iconst.i64 0
-    v248 = icmp eq v246, v247  ; v247 = 0
-    brif v248, block112, block113
+block87:
+    v208 = iconst.i64 8
+    v209 = iadd.i64 v2, v208  ; v208 = 8
+    call fn2(v209)
+    jump block70
 
-block112:
-    v249 = iconst.i64 8
-    v250 = iadd.i64 v234, v249  ; v249 = 8
-    call fn1(v250)
-    jump block113
+block88:
+    v210 = iconst.i64 19
+    v211 = icmp.i64 eq v173, v210  ; v210 = 19
+    brif v211, block89, block90
 
-block113:
-    v251 = load.i64 notrap aligned v234
-    v252 = iconst.i64 0
-    v253 = icmp eq v251, v252  ; v252 = 0
-    brif v253, block114, block115
+block89:
+    v212 = iconst.i64 8
+    v213 = iadd.i64 v2, v212  ; v212 = 8
+    call fn2(v213)
+    jump block70
 
-block114:
-    v254 = iconst.i64 8
-    v255 = iadd.i64 v234, v254  ; v254 = 8
-    call fn2(v255)
-    jump block115
+block90:
+    v214 = iconst.i64 20
+    v215 = icmp.i64 eq v173, v214  ; v214 = 20
+    brif v215, block91, block92
 
-block115:
-    jump block1(v234)
+block91:
+    v216 = iconst.i64 8
+    v217 = iadd.i64 v2, v216  ; v216 = 8
+    call fn2(v217)
+    jump block70
 
-block1(v3: i64):
-    v256 = load.i64 notrap aligned v3
-    store notrap aligned v256, v0
-    v257 = load.i64 notrap aligned v3+8
-    store notrap aligned v257, v0+8
-    v258 = load.i64 notrap aligned v3+16
-    store notrap aligned v258, v0+16
-    v259 = load.i64 notrap aligned v3+24
-    store notrap aligned v259, v0+24
-    v260 = load.i64 notrap aligned v3+32
-    store notrap aligned v260, v0+32
+block92:
+    v218 = iconst.i64 21
+    v219 = icmp.i64 eq v173, v218  ; v218 = 21
+    brif v219, block93, block94
+
+block93:
+    v220 = iconst.i64 8
+    v221 = iadd.i64 v2, v220  ; v220 = 8
+    call fn2(v221)
+    jump block70
+
+block94:
+    jump block70
+
+block70:
+    v222 = load.i64 notrap aligned v111
+    store notrap aligned v222, v0
+    v223 = load.i64 notrap aligned v111+8
+    store notrap aligned v223, v0+8
+    v224 = load.i64 notrap aligned v111+16
+    store notrap aligned v224, v0+16
+    v225 = load.i64 notrap aligned v111+24
+    store notrap aligned v225, v0+24
+    v226 = load.i64 notrap aligned v111+32
+    store notrap aligned v226, v0+32
     return
 }
 
 ; source variables:
 ;   v1 = text
-;   v5 = v
+;   v4 = $inl226_self
+;   v7 = v
+;   v12 = $inl227_e
 ; __m12__nonempty_str
 function u0:95(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -39174,11 +39077,11 @@ block9(v53: i64):
 ; source variables:
 ;   v1 = s
 ;   v5 = opened
-;   v5 = $inl129_self
+;   v5 = $inl127_self
 ;   ss2 = k
 ;   ss3 = __idx$309
 ;   v15 = c
-;   v15 = $inl128_c
+;   v15 = $inl126_c
 ;   v29 = i
 ;   v49 = tail
 ; __m15__reindent_block
@@ -39797,20 +39700,20 @@ block42:
 ;   v1 = $inl175_self
 ;   v7 = ls
 ;   v10 = n
-;   v7 = $inl130_self
+;   v7 = $inl128_self
 ;   v33 = $inl220_self
 ;   v71 = v
 ;   v72 = $inl221_default
 ;   v76 = closing
-;   v7 = $inl131_self
+;   v7 = $inl129_self
 ;   v112 = $inl222_self
 ;   v150 = v
 ;   v151 = $inl223_default
 ;   v147 = opening
 ;   ss12 = out
-;   v7 = $inl132_self
-;   v7 = $inl275_self
-;   v163 = $inl276_n
+;   v7 = $inl130_self
+;   v7 = $inl279_self
+;   v163 = $inl280_n
 ;   v182 = content
 ;   v206 = $inl6_self
 ;   v208 = $inl7_target
@@ -40427,10 +40330,10 @@ block3(v16: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = c
-;   v1 = $inl229_self
-;   v1 = $inl238_self
-;   v1 = $inl178_self
-;   v17 = $inl179_n
+;   v1 = $inl233_self
+;   v1 = $inl242_self
+;   v1 = $inl176_self
+;   v17 = $inl177_n
 ; __m7__trim_suffix
 function u0:107(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
@@ -40494,8 +40397,8 @@ block3(v18: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = c
-;   v1 = $inl133_self
-;   v1 = $inl134_self
+;   v1 = $inl131_self
+;   v1 = $inl132_self
 ; __m14__escape_text
 function u0:108(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -47515,16 +47418,16 @@ block330:
 ;   v1 = src
 ;   v2 = width
 ;   v1 = $inl155_src
-;   v4 = $inl136_self
+;   v4 = $inl134_self
 ;   v10 = v
 ;   v43 = e
-;   v43 = $inl135_e
+;   v43 = $inl133_e
 ;   v140 = lexed
 ;   v1 = $inl177_src
-;   v141 = $inl138_$arr
+;   v141 = $inl136_$arr
 ;   ss4 = $out
 ;   v173 = $e
-;   v173 = $inl137_t
+;   v173 = $inl135_t
 ;   v216 = $inl326_k
 ;   v395 = _
 ;   v399 = _
@@ -47538,10 +47441,10 @@ block330:
 ;   v474 = _
 ;   v477 = _
 ;   v661 = $inl178_toks
-;   v662 = $inl140_$arr
+;   v662 = $inl138_$arr
 ;   ss81 = $out
 ;   v694 = $e
-;   v694 = $inl139_t
+;   v694 = $inl137_t
 ;   v795 = $inl179_comments
 ;   v872 = d
 ;   v946 = c
@@ -48933,11 +48836,11 @@ block7(v39: i64):
 ;   v0 = self
 ;   v1 = n
 ;   v2 = k
-;   v13 = $inl143_self
+;   v13 = $inl141_self
 ;   v42 = x
-;   v2 = $inl144_$cap76
-;   v42 = $inl141_t
-;   v2 = $inl142_k
+;   v2 = $inl142_$cap76
+;   v42 = $inl139_t
+;   v2 = $inl140_k
 ; __m18__comment_before_cursor
 function u0:135(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -49840,9 +49743,9 @@ block42:
 ; source variables:
 ;   v0 = self
 ;   v3 = n
-;   v23 = $inl261_self
+;   v23 = $inl265_self
 ;   v54 = v
-;   v57 = $inl262_default
+;   v57 = $inl266_default
 ;   v52 = $inl356_self
 ;   v91 = _
 ;   v94 = _
@@ -70218,23 +70121,23 @@ block31:
 
 ; source variables:
 ;   v0 = entries
-;   v0 = $inl152_self
+;   v0 = $inl150_self
 ;   ss0 = out
 ;   v32 = x
 ;   ss3 = k
 ;   ss4 = placed
 ;   v103 = y
-;   v32 = $inl150_a
-;   v103 = $inl151_b
+;   v32 = $inl148_a
+;   v103 = $inl149_b
 ;   v108 = $inl42_a
 ;   v110 = $inl43_b
 ;   v115 = a_builtins
 ;   v100 = step
 ;   ss9 = __spread$0
-;   v225 = $inl154_$arr
+;   v225 = $inl152_$arr
 ;   ss10 = $out
 ;   v257 = $e
-;   v257 = $inl153_e
+;   v257 = $inl151_e
 ; __m18__item
 function u0:172(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -84153,9 +84056,9 @@ block42:
 ; source variables:
 ;   v0 = self
 ;   v3 = n
-;   v23 = $inl263_self
+;   v23 = $inl267_self
 ;   v54 = v
-;   v57 = $inl264_default
+;   v57 = $inl268_default
 ;   v52 = $inl355_self
 ;   v89 = ds
 ;   v98 = _
@@ -105285,15 +105188,15 @@ block64:
 ;   v228 = $inl57_segs
 ;   ss4 = n
 ;   v255 = s
-;   v317 = $inl156_$arr
+;   v317 = $inl154_$arr
 ;   ss8 = $out
 ;   v349 = $e
-;   v349 = $inl155_s
+;   v349 = $inl153_s
 ;   ss12 = __spread$13
-;   v383 = $inl158_$arr
+;   v383 = $inl156_$arr
 ;   ss13 = $out
 ;   v415 = $e
-;   v415 = $inl157_s
+;   v415 = $inl155_s
 ;   v561 = $inl58_segs
 ;   ss19 = out
 ;   v593 = s
@@ -136795,9 +136698,9 @@ block29:
 ;   v11 = $inl317_self
 ;   v22 = $inl358_self
 ;   v22 = $inl27_self
-;   v32 = $inl267_self
+;   v32 = $inl271_self
 ;   v61 = v
-;   v75 = $inl268_default
+;   v75 = $inl272_default
 ;   v58 = __spat$81737
 ;   v77 = span
 ;   v79 = kind
@@ -137070,9 +136973,9 @@ block7(v36: i64):
 
 ; source variables:
 ;   v1 = self
-;   v11 = $inl271_self
+;   v11 = $inl275_self
 ;   v39 = v
-;   v44 = $inl272_default
+;   v44 = $inl276_default
 ; __m18__cur_tok
 function u0:247(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -137194,9 +137097,9 @@ block7(v37: i64):
 ; source variables:
 ;   v1 = self
 ;   v1 = $inl190_self
-;   v11 = $inl269_self
+;   v11 = $inl273_self
 ;   v40 = v
-;   v54 = $inl270_default
+;   v54 = $inl274_default
 ; __m18__comment_starts_before
 function u0:248(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -137291,11 +137194,11 @@ block7(v36: i64):
 ; source variables:
 ;   v0 = self
 ;   v1 = end
-;   v11 = $inl161_self
+;   v11 = $inl159_self
 ;   v39 = x
-;   v1 = $inl162_$cap97
-;   v39 = $inl159_c
-;   v1 = $inl160_end
+;   v1 = $inl160_$cap97
+;   v39 = $inl157_c
+;   v1 = $inl158_end
 ; __m18__hugs_sole_arg
 function u0:249(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -137589,13 +137492,13 @@ block18(v96: i64):
 ;   v0 = $inl215_self
 ;   v71 = $inl216_n
 ;   v90 = open_at
-;   v95 = $inl166_self
+;   v95 = $inl164_self
 ;   v98 = x
-;   v0 = $inl167_$cap100
-;   v90 = $inl168_$cap101
-;   v98 = $inl163_close
-;   v0 = $inl164_self
-;   v90 = $inl165_open_at
+;   v0 = $inl165_$cap100
+;   v90 = $inl166_$cap101
+;   v98 = $inl161_close
+;   v0 = $inl162_self
+;   v90 = $inl163_open_at
 ;   v0 = $inl65_self
 ;   v90 = $inl66_open_at
 ;   v98 = $inl67_close
@@ -138124,10 +138027,10 @@ block3(v9: i64):
 ; source variables:
 ;   v0 = args
 ;   v1 = hug
-;   v0 = $inl169_self
-;   v35 = $inl265_self
+;   v0 = $inl167_self
+;   v35 = $inl269_self
 ;   v66 = v
-;   v69 = $inl266_default
+;   v69 = $inl270_default
 ; __m18__toks_of
 function u0:253(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -140478,8 +140381,8 @@ block3(v7: i64):
 
 ; source variables:
 ;   v0 = self
-;   v0 = $inl172_self
-;   v1 = $inl173_n
+;   v0 = $inl170_self
+;   v1 = $inl171_n
 ; __m6__trim_end_while$lam25
 function u0:282(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -141515,21 +141418,21 @@ block32(v104: i64):
 ; source variables:
 ;   v1 = self
 ;   v6 = neg
-;   v1 = $inl239_self
-;   v1 = $inl178_self
-;   v8 = $inl179_n
+;   v1 = $inl243_self
+;   v1 = $inl176_self
+;   v8 = $inl177_n
 ;   v7 = body
-;   v7 = $inl175_self
+;   v7 = $inl173_self
 ;   v26 = digits
-;   v26 = $inl176_self
-;   v40 = $inl177_init
+;   v26 = $inl174_self
+;   v40 = $inl175_init
 ;   ss5 = acc
 ;   ss6 = ok
 ;   v49 = x
 ;   v54 = step
-;   v54 = $inl279_self
+;   v54 = $inl283_self
 ;   v68 = v
-;   v70 = $inl280_default
+;   v70 = $inl284_default
 ;   v91 = v
 ;   v109 = min
 ; __builtin_value_or_err$i64$str
@@ -142358,8 +142261,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap42
 ;   v4 = x
-;   v4 = $inl109_c
-;   v1 = $inl110_head
+;   v4 = $inl107_c
+;   v1 = $inl108_head
 ; __builtin_drop_first$char$s0
 function u0:303(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -142384,8 +142287,8 @@ block0(v0: i64, v1: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl178_self
-;   v2 = $inl179_n
+;   v1 = $inl176_self
+;   v2 = $inl177_n
 ; __lambda_44
 function u0:304(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -142486,8 +142389,8 @@ block3:
 ;   v1 = $cap45
 ;   ss0 = n
 ;   v9 = x
-;   v9 = $inl111_c
-;   v1 = $inl112_cont
+;   v9 = $inl109_c
+;   v1 = $inl110_cont
 ; __lambda_47
 function u0:306(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -142537,8 +142440,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap48
 ;   v4 = x
-;   v4 = $inl113_c
-;   v1 = $inl114_chars
+;   v4 = $inl111_c
+;   v1 = $inl112_chars
 ; __lambda_50
 function u0:308(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -142588,8 +142491,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap51
 ;   v4 = x
-;   v4 = $inl115_c
-;   v1 = $inl116_boundary
+;   v4 = $inl113_c
+;   v1 = $inl114_boundary
 ; __lambda_53
 function u0:310(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -142639,8 +142542,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap54
 ;   v4 = x
-;   v4 = $inl117_c
-;   v1 = $inl118_delims
+;   v4 = $inl115_c
+;   v1 = $inl116_delims
 ; __builtin_value_or$char
 function u0:312(i64, i64) -> i64 apple_aarch64 {
 block0(v0: i64, v1: i64):
@@ -142711,8 +142614,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap57
 ;   v4 = x
-;   v4 = $inl121_e
-;   v1 = $inl122_escapes
+;   v4 = $inl119_e
+;   v1 = $inl120_escapes
 ; __lambda_59
 function u0:315(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -142813,7 +142716,7 @@ block3:
 ;   v3 = self
 ;   ss1 = n
 ;   v11 = x
-;   v11 = $inl125_x
+;   v11 = $inl123_x
 ; __builtin_count_while$char$s0$lam60
 function u0:316(i64) -> i64 apple_aarch64 {
     sig0 = (i64, i64, i64) -> i64 tail
@@ -142976,7 +142879,7 @@ block1(v1: i64):
 ; source variables:
 ;   v0 = self
 ;   v3 = x
-;   v3 = $inl126_e
+;   v3 = $inl124_e
 ; __lambda_65
 function u0:322(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -143020,7 +142923,7 @@ block1(v1: i64):
 ; source variables:
 ;   v0 = self
 ;   v3 = x
-;   v3 = $inl127_sign
+;   v3 = $inl125_sign
 ; __lambda_67
 function u0:324(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -143134,7 +143037,7 @@ block3:
 ;   ss0 = k
 ;   ss1 = __idx$309
 ;   v11 = c
-;   v11 = $inl128_c
+;   v11 = $inl126_c
 ;   v25 = i
 ; __builtin_last$str
 function u0:326(i64, i64) apple_aarch64 {
@@ -143365,8 +143268,8 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = self
-;   v0 = $inl277_self
-;   v1 = $inl278_n
+;   v0 = $inl281_self
+;   v1 = $inl282_n
 ; __builtin_last$char$s0
 function u0:329(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
@@ -143932,7 +143835,7 @@ block1(v2: i64):
 ;   v1 = self
 ;   v7 = v
 ;   v40 = e
-;   v40 = $inl135_e
+;   v40 = $inl133_e
 ; __lambda_71
 function u0:335(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -146481,7 +146384,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl137_t
+;   v32 = $inl135_t
 ;   v75 = $inl326_k
 ;   v254 = _
 ;   v258 = _
@@ -146832,7 +146735,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl139_t
+;   v32 = $inl137_t
 ; __lambda_75
 function u0:339(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64, i64) -> i64 apple_aarch64
@@ -146877,8 +146780,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap76
 ;   v5 = x
-;   v5 = $inl141_t
-;   v1 = $inl142_k
+;   v5 = $inl139_t
+;   v1 = $inl140_k
 ; __lambda_78
 function u0:341(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -147060,8 +146963,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap79
 ;   v5 = x
-;   v5 = $inl145_c
-;   v1 = $inl146_self
+;   v5 = $inl143_c
+;   v1 = $inl144_self
 ;   v1 = $inl188_self
 ; __builtin_value_or$__m17__Doc
 function u0:343(i64, i64) -> i64 apple_aarch64 {
@@ -148886,8 +148789,8 @@ block3:
 ;   ss3 = k
 ;   ss4 = placed
 ;   v107 = y
-;   v32 = $inl147_a
-;   v107 = $inl148_b
+;   v32 = $inl145_a
+;   v107 = $inl146_b
 ;   v113 = $inl39_a
 ;   v115 = $inl40_b
 ;   v113 = $inl35_self
@@ -149073,7 +148976,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl149_n
+;   v32 = $inl147_n
 ; __map86
 function u0:347(i64) -> i64 apple_aarch64 {
     sig0 = (i64) -> i64 tail
@@ -149593,8 +149496,8 @@ block3:
 ;   ss3 = k
 ;   ss4 = placed
 ;   v103 = y
-;   v32 = $inl150_a
-;   v103 = $inl151_b
+;   v32 = $inl148_a
+;   v103 = $inl149_b
 ;   v108 = $inl42_a
 ;   v110 = $inl43_b
 ;   v115 = a_builtins
@@ -149741,7 +149644,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl153_e
+;   v32 = $inl151_e
 ; __lambda_92
 function u0:353(i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -149873,7 +149776,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl155_s
+;   v32 = $inl153_s
 ; __lambda_94
 function u0:355(i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -150005,7 +149908,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl157_s
+;   v32 = $inl155_s
 ; __builtin_value_or$__m18__FmtTok
 function u0:357(i64, i64, i64) apple_aarch64 {
 block0(v0: i64, v1: i64, v2: i64):
@@ -150098,8 +150001,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap97
 ;   v5 = x
-;   v5 = $inl159_c
-;   v1 = $inl160_end
+;   v5 = $inl157_c
+;   v1 = $inl158_end
 ; __lambda_99
 function u0:361(i64, i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -150246,9 +150149,9 @@ block1(v3: i64):
 ;   v1 = $cap100
 ;   v2 = $cap101
 ;   v5 = x
-;   v5 = $inl163_close
-;   v1 = $inl164_self
-;   v2 = $inl165_open_at
+;   v5 = $inl161_close
+;   v1 = $inl162_self
+;   v2 = $inl163_open_at
 ;   v1 = $inl65_self
 ;   v2 = $inl66_open_at
 ;   v5 = $inl67_close
@@ -150451,7 +150354,7 @@ block3:
 ;   ss0 = k
 ;   ss1 = __idx$309
 ;   v11 = c
-;   v11 = $inl170_c
+;   v11 = $inl168_c
 ;   v25 = i
 ; __lambda_105
 function u0:366(i64) -> i64 apple_aarch64 {
@@ -150549,7 +150452,7 @@ block3:
 ;   v3 = self
 ;   ss1 = n
 ;   v11 = x
-;   v11 = $inl171_c
+;   v11 = $inl169_c
 ; __builtin_count_while$char$s0$lam106
 function u0:367(i64) -> i64 apple_aarch64 {
     sig0 = (i64, i64, i64) -> i64 tail
@@ -150928,9 +150831,9 @@ block12(v41: i64):
 ;   ss1 = ok
 ;   v11 = x
 ;   v16 = step
-;   v16 = $inl281_self
+;   v16 = $inl285_self
 ;   v30 = v
-;   v32 = $inl282_default
+;   v32 = $inl286_default
 ; __m12__lex_step$__m13__AiplTok
 function u0:376(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -159210,25 +159113,25 @@ block1249:
 ;   v198 = first
 ;   v200 = $inl8_self
 ;   v198 = $inl9_head
-;   v200 = $inl230_self
-;   v208 = $inl235_self
+;   v200 = $inl234_self
+;   v208 = $inl239_self
 ;   v211 = x
-;   v198 = $inl236_$cap42
-;   v211 = $inl109_c
-;   v198 = $inl110_head
+;   v198 = $inl240_$cap42
+;   v211 = $inl107_c
+;   v198 = $inl108_head
 ;   v196 = $inl10_cont
-;   v200 = $inl240_self
-;   v200 = $inl178_self
-;   v217 = $inl179_n
+;   v200 = $inl244_self
+;   v200 = $inl176_self
+;   v217 = $inl177_n
 ;   v406 = chars
 ;   v408 = $inl11_self
 ;   v406 = $inl12_chars
-;   v408 = $inl231_self
-;   v416 = $inl243_self
+;   v408 = $inl235_self
+;   v416 = $inl247_self
 ;   v419 = x
-;   v406 = $inl244_$cap48
-;   v419 = $inl113_c
-;   v406 = $inl114_chars
+;   v406 = $inl248_$cap48
+;   v419 = $inl111_c
+;   v406 = $inl112_chars
 ;   v609 = spelling
 ;   v611 = $inl13_self
 ;   v609 = $inl14_spelling
@@ -159237,11 +159140,11 @@ block1249:
 ;   v808 = $inl15_self
 ;   v804 = $inl16_spelling
 ;   v806 = $inl17_boundary
-;   v820 = $inl247_self
+;   v820 = $inl251_self
 ;   v823 = x
-;   v806 = $inl248_$cap51
-;   v823 = $inl115_c
-;   v806 = $inl116_boundary
+;   v806 = $inl252_$cap51
+;   v823 = $inl113_c
+;   v806 = $inl114_boundary
 ;   v1018 = delims
 ;   v1020 = escapes
 ;   v1379 = open
@@ -159255,8 +159158,8 @@ block1249:
 ;   v2408 = $inl18_self
 ;   v2406 = $inl19_marker
 ;   v2789 = $inl22_self
-;   v2789 = $inl232_self
-;   v2811 = $inl260_self
+;   v2789 = $inl236_self
+;   v2811 = $inl264_self
 ;   v2814 = x
 ;   v2823 = start
 ;   v2828 = digits
@@ -159397,8 +159300,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap113
 ;   v5 = x
-;   v5 = $inl180_t
-;   v1 = $inl181_c
+;   v5 = $inl178_t
+;   v1 = $inl179_c
 ; __builtin_count_while$char$s0$lam115
 function u0:382(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -159475,7 +159378,7 @@ block3:
 ;   v0 = self
 ;   ss0 = n
 ;   v8 = x
-;   v8 = $inl174_c
+;   v8 = $inl172_c
 ; __builtin_value_or$i64
 function u0:383(i64, i64) -> i64 apple_aarch64 {
 block0(v0: i64, v1: i64):
@@ -163776,8 +163679,8 @@ block651:
 ;   v2 = $inl158_src
 ;   v56 = $inl159_at
 ;   v70 = text
-;   v72 = $inl182_e
-;   v70 = $inl183_matched
+;   v72 = $inl180_e
+;   v70 = $inl181_matched
 ;   v112 = $inl23_m
 ;   v163 = $inl24_text
 ;   v187 = _
@@ -163796,7 +163699,7 @@ block651:
 ;   v327 = _
 ;   v328 = _
 ;   v342 = _
-;   v164 = $inl184_value
+;   v164 = $inl182_value
 ;   v384 = s
 ;   v379 = content
 ;   v398 = k
@@ -166244,16 +166147,16 @@ block43:
 ;   ss4 = seg_start
 ;   v47 = text_start
 ;   v59 = end
-;   v114 = $inl253_self
+;   v114 = $inl257_self
 ;   v117 = v
-;   v118 = $inl254_default
+;   v118 = $inl258_default
 ;   v115 = c
 ;   v198 = interp
-;   v242 = $inl189_self
+;   v242 = $inl187_self
 ;   v245 = x
-;   v4 = $inl190_$cap120
-;   v245 = $inl187_e
-;   v4 = $inl188_escapes
+;   v4 = $inl188_$cap120
+;   v245 = $inl185_e
+;   v4 = $inl186_escapes
 ; __lambda_116
 function u0:388(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 40, align = 8
@@ -166935,8 +166838,8 @@ block1(v3: i64):
 ;   v2 = $cap117
 ;   v8 = v
 ;   v199 = e
-;   v199 = $inl185_message
-;   v2 = $inl186_matched
+;   v199 = $inl183_message
+;   v2 = $inl184_matched
 ; __m12__finalize_template$__m13__AiplTok
 function u0:390(i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -169261,17 +169164,17 @@ block316:
 ;   ss0 = toks
 ;   ss1 = trivia
 ;   v24 = n
-;   ss2 = __idx$38135
+;   ss2 = __idx$38153
 ;   v56 = txt
 ;   v58 = k
-;   v66 = $inl273_self
+;   v66 = $inl277_self
 ;   v94 = v
-;   v99 = $inl274_default
+;   v99 = $inl278_default
 ;   v91 = sp
-;   v3 = $inl191_e
-;   v56 = $inl192_text
-;   v103 = $inl193_seg
-;   v91 = $inl194_span
+;   v3 = $inl189_e
+;   v56 = $inl190_text
+;   v103 = $inl191_seg
+;   v91 = $inl192_span
 ;   v131 = f
 ;   v289 = f
 ;   v423 = _
@@ -169283,9 +169186,9 @@ block316:
 ;   v705 = kind
 ;   v1 = $inl160_src
 ;   v91 = $inl161_at
-;   v789 = $inl195_self
+;   v789 = $inl193_self
 ;   v825 = v
-;   v848 = $inl196_default
+;   v848 = $inl194_default
 ;   v822 = run
 ; __m12__interp_scan$__m13__AiplTok
 function u0:391(i64, i64, i64, i64, i64) apple_aarch64 {
@@ -169969,8 +169872,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap120
 ;   v4 = x
-;   v4 = $inl187_e
-;   v1 = $inl188_escapes
+;   v4 = $inl185_e
+;   v1 = $inl186_escapes
 ; __m12__seg_emit$__m13__AiplTok
 function u0:394(i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 40, align = 8
@@ -172007,8 +171910,8 @@ block1(v3: i64):
 ;   v2 = $cap123
 ;   v8 = v
 ;   v199 = e
-;   v199 = $inl197_message
-;   v2 = $inl198_span
+;   v199 = $inl195_message
+;   v2 = $inl196_span
 ; __rec_drop___m17__Doc
 function u0:398(i64) apple_aarch64 {
     sig0 = (i64) apple_aarch64

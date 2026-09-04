@@ -11,6 +11,7 @@ import {
     Span,
     equal as ==,
     len,
+    less_than as <,
     max,
     min,
     repeat,
@@ -23,7 +24,16 @@ import { line_at } from "./line_at.aipl";
 pub fn caret_block(source: str, span: Span, filename: str) -> str {
     // `at.span` is the line's byte range, so the source line is one slice.
     let at = line_at(source, span.start);
-    let col = span.start - at.span.start;
+
+    // Clamped to the line's own width. `line_at` answers a past-the-end offset
+    // with the *last* line (it clamps, and is tested to), so without this the
+    // column is the whole leftover byte count — and the caret row below is that
+    // many spaces. An offset far past the end of a short file then renders tens
+    // of thousands of spaces on one line, which a terminal wraps into screenfuls
+    // of apparent blank lines. A span that does not belong to `source` is the
+    // way that happens in practice, so this is a bound, not a formality.
+    let line_len = at.span.end - at.span.start;
+    let col = min(span.start - at.span.start, line_len);
 
     // The underline runs from the error's start to the earlier of its end and
     // the line's end, and is at least one column wide. `-` is `saturating_sub`,
@@ -91,29 +101,44 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
               | ^^^^^
         """,
     );
+
+    // A span that starts *past the end* of `source` — which is what a span
+    // belonging to some other file looks like once it is rendered against this
+    // one. `line_at` clamps to the last line and the column clamps to that
+    // line's width, so the block stays the size of the source. Unclamped, the
+    // caret row alone was `span.start` bytes of spaces.
+    assert(
+        caret_block("a\nb", Span { start: 5000, end: 5006 }, "input") == """
+             --> input:2:2
+              |
+            2 | b
+              |  ^
+        """,
+    );
+    assert(caret_block("a\nb", Span { start: 5000, end: 5006 }, "input").len() < 40);
 })
 --- performance ---
-allocations: 139
-deallocations: 139
+allocations: 187
+deallocations: 187
 reallocations: 0
-bytes allocated: 9646
-instructions executed: 4070
-binary size: 8768
-  code: 4004
-  data: 1543
-  metadata: 3221
+bytes allocated: 13008
+instructions executed: 5187
+binary size: 9824
+  code: 4440
+  data: 1884
+  metadata: 3500
 functions:
   __m1__line_at:
-    calls: 6
+    calls: 8
     bytes: 532
   __test$caret_block:
     calls: 1
-    bytes: 1356
+    bytes: 1760
   __to_str_u64:
-    calls: 24
+    calls: 32
     bytes: 204
   aipl_assert:
-    calls: 6
+    calls: 8
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -125,14 +150,14 @@ functions:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 48
+    calls: 64
     bytes: (external)
   aipl_write_u64:
-    calls: 24
+    calls: 32
     bytes: (external)
   caret_block:
-    calls: 6
-    bytes: 1800
+    calls: 8
+    bytes: 1832
   main:
     calls: 1
     bytes: 112

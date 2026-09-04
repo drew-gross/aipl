@@ -162,7 +162,10 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
             Item::Import(_) => item.clone(),
         })
         .collect();
-    Program { items }
+    Program {
+        items,
+        sources: program.sources.clone(),
+    }
 }
 
 /// [`lower_ctor_refs`]'s expression walk. `scope` is the stack of bindings in
@@ -460,7 +463,10 @@ pub fn lower_tuples(program: &Program) -> Program {
         })
         .collect();
     synth.append(&mut new_items);
-    Program { items: synth }
+    Program {
+        items: synth,
+        sources: program.sources.clone(),
+    }
 }
 
 /// Lower a type, registering any new synthetic tuple-struct in `fields_map`/`order`.
@@ -1109,7 +1115,10 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
     // precede any use.
     let mut out = lc.synth;
     out.extend(items);
-    Ok(Program { items: out })
+    Ok(Program {
+        items: out,
+        sources: program.sources.clone(),
+    })
 }
 
 /// Rewrite `program` so it contains no type variables: every generic function

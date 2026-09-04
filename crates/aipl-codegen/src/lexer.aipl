@@ -37,6 +37,7 @@ import {
     push,
     starts_with,
     value_or,
+    value_or_err,
     wrapping_add as +,
     wrapping_add_assign as +=,
     wrapping_increment as ++,
@@ -887,10 +888,7 @@ fn esc_str(text: str) -> Kind { Str(text.unescape()) }
 // Parsing policy, and what overflow means, is the caller's — a bignum lexer would
 // parse into a wide type and never fail here.
 fn int_tok(text: str) -> Kind!str {
-    match (text.int_parse()) {
-        some(v) => ok(IntTok(v)),
-        none => err("integer literal overflows i64"),
-    }
+    ok(IntTok(text.int_parse().value_or_err("integer literal overflows i64")?))
 }
 
 // A `Try` emit: the escaped-string decoder above, plus a content rule the
@@ -1352,11 +1350,11 @@ allocations: 1453
 deallocations: 1453
 reallocations: 38
 bytes allocated: 95424
-instructions executed: 300378
-binary size: 1947664
-  code: 1305080
+instructions executed: 299535
+binary size: 1947336
+  code: 1304892
   data: 9612
-  metadata: 632972
+  metadata: 632832
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1549,7 +1547,7 @@ functions:
     bytes: 824
   int_tok:
     calls: 13
-    bytes: 1724
+    bytes: 1536
   interp_scan$Kind:
     calls: 9
     bytes: 2284
