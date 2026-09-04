@@ -158,6 +158,7 @@ math:
   % should not abort. (what should it do? TBD)
 
 syntax:
+  converge arrays and string (for inlining, ropes, etc.)
   locally mutable args
   l.map(|v| v.field) stutters, should come up with a syntax that doesn't stutter
   allow default args to refer to each other (requires 1 to be set to break the cycle)
@@ -297,6 +298,8 @@ design:
     apis should express intent
 
 optimizations:
+  Niche-filled optionals — `T?` in a spare bit of `T`, no separate tag word. str has spare bits, should be no problem
+  rope-native operations
   same-branch folding (if (cond) { a } else { a } should drop the if) (applies after default propagation in e.g. join)
   contains should use a skip table
   inline_small should discount instructions that are just forwarding args from caller to an internal function. Also maybe sort by instructions and inline smallest first?
