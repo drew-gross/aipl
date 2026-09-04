@@ -75,10 +75,10 @@ deallocations: 2049
 reallocations: 30
 bytes allocated: 116250
 instructions executed: 379022
-binary size: 967680
-  code: 624188
+binary size: 967592
+  code: 624136
   data: 1891
-  metadata: 341601
+  metadata: 341565
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -232,7 +232,7 @@ functions:
     bytes: 824
   __m13__interp_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2300
+    bytes: 2248
   __m13__lex$__m12__AiplTok:
     calls: 4
     bytes: 1520

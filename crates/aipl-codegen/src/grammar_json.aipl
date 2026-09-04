@@ -413,10 +413,10 @@ deallocations: 11266
 reallocations: 535
 bytes allocated: 822647
 instructions executed: 1738082
-binary size: 227224
-  code: 144956
+binary size: 227136
+  code: 144904
   data: 5228
-  metadata: 77040
+  metadata: 77004
 functions:
   __arr_drop_Json:
     calls: 125
@@ -543,7 +543,7 @@ functions:
     bytes: 824
   __m3__interp_scan$JsonTok:
     calls: 0
-    bytes: 2300
+    bytes: 2248
   __m3__lex$JsonTok:
     calls: 38
     bytes: 1520

@@ -887,10 +887,10 @@ deallocations: 2902
 reallocations: 331
 bytes allocated: 181717
 instructions executed: 434373
-binary size: 306088
-  code: 187976
+binary size: 306008
+  code: 187924
   data: 5924
-  metadata: 112188
+  metadata: 112160
 functions:
   __arr_drop_Node:
     calls: 11
@@ -1044,7 +1044,7 @@ functions:
     bytes: 824
   __m3__interp_scan$Tok:
     calls: 0
-    bytes: 2300
+    bytes: 2248
   __m3__lex$Tok:
     calls: 42
     bytes: 1520

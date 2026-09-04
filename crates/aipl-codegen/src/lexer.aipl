@@ -824,11 +824,14 @@ fn interp_scan<K>(src: str, at: u64, open: u64, rules: TokenRule<K>[]) -> StepRe
             };
             set toks.extend(step.tokens);
             set trivia.extend(step.trivia);
-            if (src[i..step.end] == "{") {
-                set depth++;
-            };
-            if (src[i..step.end] == "}") {
-                set depth -= 1;
+            match (src[i..step.end]) {
+                "{" => {
+                    set depth++;
+                },
+                "}" => {
+                    set depth -= 1;
+                },
+                _ => {},
             };
             set i = step.end;
         };
@@ -1350,11 +1353,11 @@ allocations: 1453
 deallocations: 1453
 reallocations: 38
 bytes allocated: 95424
-instructions executed: 299529
-binary size: 1943104
-  code: 1300660
+instructions executed: 299406
+binary size: 1943016
+  code: 1300608
   data: 9612
-  metadata: 632832
+  metadata: 632796
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1550,7 +1553,7 @@ functions:
     bytes: 1536
   interp_scan$Kind:
     calls: 9
-    bytes: 2300
+    bytes: 2248
   lex$Kind:
     calls: 64
     bytes: 1520

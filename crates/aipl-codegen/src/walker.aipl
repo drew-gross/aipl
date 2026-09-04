@@ -2824,10 +2824,10 @@ deallocations: 20240
 reallocations: 1235
 bytes allocated: 1229611
 instructions executed: 3325532
-binary size: 4040160
-  code: 2498240
+binary size: 4040080
+  code: 2498188
   data: 24868
-  metadata: 1517052
+  metadata: 1517024
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3035,7 +3035,7 @@ functions:
     bytes: 824
   __m9__interp_scan$__m8__AiplTok:
     calls: 0
-    bytes: 2300
+    bytes: 2248
   __m9__lex$__m8__AiplTok:
     calls: 8
     bytes: 1520
