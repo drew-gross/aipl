@@ -15,7 +15,8 @@ import { equal as ==, to_digit } from builtins;
 pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
     match (self) {
         some(v) => ok(v),
-        none => err(e),
+        // `value_or_err` cannot be written in terms of itself
+        none => err(e), #[allow]
     }
 }.doc("""
     Turns an optional into a result: `some(v)` becomes `ok(v)`, `none` becomes

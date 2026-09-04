@@ -1,41 +1,6 @@
-use crate::ast::{BinOp, Expr, ExprKind, Pattern};
+use super::constant_value;
+use crate::ast::{Expr, ExprKind, Pattern};
 use crate::Error;
-
-/// Whether a `none` arm's value is built purely from constants, and so costs
-/// the same computed eagerly as computed lazily.
-///
-/// Literals and names, and anything assembled out of them: a struct or
-/// variant construction (a range literal `0..0` is one of these — it parses
-/// to a `__builtin_Span` construction), an array/set/dict/tuple literal, a
-/// field read, a negation. Arithmetic counts too, except `/` and `%`, which
-/// trap on a zero divisor — evaluating one eagerly could turn a program that
-/// returns into one that dies.
-///
-/// A *call* never counts, however cheap it looks: what it costs, and whether
-/// it has effects of its own, is not visible from here.
-fn constant_default(e: &Expr) -> bool {
-    match &e.kind {
-        ExprKind::Num(_)
-        | ExprKind::Bool(_)
-        | ExprKind::Str(_)
-        | ExprKind::Char(_)
-        | ExprKind::Ident(_)
-        | ExprKind::None
-        | ExprKind::Unit => true,
-        ExprKind::Construct(_, inits) => inits.iter().all(|i| constant_default(&i.value)),
-        ExprKind::ArrayLit(xs) | ExprKind::SetLit(xs) | ExprKind::TupleLit(xs) => {
-            xs.iter().all(constant_default)
-        }
-        ExprKind::DictLit(pairs) => pairs
-            .iter()
-            .all(|(k, v)| constant_default(k) && constant_default(v)),
-        ExprKind::Field(x, _) | ExprKind::Neg(x) | ExprKind::Not(x) => constant_default(x),
-        ExprKind::Binop(a, op, b) => {
-            !matches!(op, BinOp::Div | BinOp::Rem) && constant_default(a) && constant_default(b)
-        }
-        _ => false,
-    }
-}
 
 /// `match (o) { some(v) => v, none => d }` — an optional unwrapped to its
 /// payload with a fallback. That is exactly `o.value_or(d)`.
@@ -44,7 +9,7 @@ fn constant_default(e: &Expr) -> bool {
 /// arm is what separates this from a `map`, where the payload is transformed
 /// on the way out. Arm order doesn't matter.
 ///
-/// The default must be built from constants — see [`constant_default`].
+/// The default must be built from constants — see [`constant_value`](super::constant_value()).
 /// `value_or`'s default is an ordinary call argument, so it is evaluated
 /// whether or not the optional is empty, while a `none` arm runs only when
 /// it is; advising the rewrite for a default that *does* work would move
@@ -93,7 +58,7 @@ pub(super) fn match_value_or(e: &Expr, src: &str, hits: &mut Vec<Error>) {
     if payload != binder {
         return;
     }
-    if !constant_default(&none_arm.body) {
+    if !constant_value(&none_arm.body) {
         return;
     }
     // The default's own span stops at the last *token* the expression

@@ -1,0 +1,97 @@
+import { print, to_str, value_or_err } from builtins;
+
+// Shapes that look close but are deliberately left alone.
+
+// The `none` arm does not build an `err`, so this is an ordinary unwrap with a
+// fallback — `value_or` territory, and a different lint's business.
+fn or_zero(o: i64?) -> i64 {
+    match (o) {
+        // `match_value_or` flags this one, which is the point — it is that
+        // lint's shape, not this one's. Squelched so the case stays about which
+        // lint does *not* fire here.
+        some(v) => v, #[allow]
+        none => 0,
+    }
+}
+
+// The `none` arm does more than build the error. `value_or_err` takes the error
+// as a plain argument and has nowhere to put the rest of the arm, so rewriting
+// would drop the print — the lint stays quiet rather than advising that.
+fn need_loud(o: i64?) !prints -> i64!str {
+    match (o) {
+        some(v) => ok(v),
+        none => {
+            print("about to fail");
+            err("missing")
+        },
+    }
+}
+
+struct Fault { message: str }
+
+fn describe(tag: str) -> str { `no rule named "{tag}"` }
+
+// The error is not constant — it interpolates. `value_or_err` takes its error
+// as a plain argument, evaluated whether or not the optional is empty, while
+// this `none` arm runs only when it is; the rewrite would build the message on
+// every *successful* call. Same guard, and same reason, as `match_value_or`'s
+// on its default.
+fn need_described(o: i64?, tag: str) -> i64!Fault {
+    match (o) {
+        some(v) => ok(v),
+        none => err(Fault { message: describe(tag) }),
+    }
+}
+
+// A `match` on a *result*, not an optional: the arms are `ok`/`err`, so there
+// is no optional here to bridge and nothing for this lint to say.
+fn described(r: i64!Fault) -> i64 {
+    match (r) {
+        ok(v) => v,
+        err(e) => -2,
+    }
+}
+
+fn unwrap(r: i64!str) -> i64 {
+    match (r) {
+        ok(v) => v,
+        err(e) => -1,
+    }
+}
+
+fn main() !prints {
+    print(or_zero(none).to_str());
+    print(unwrap(need_loud(none)).to_str());
+    print(described(need_described(some(4), "r")).to_str());
+    // The rewrite itself must not flag.
+    print(unwrap(some(3).value_or_err("missing")).to_str());
+}
+--- stdout ---
+0
+about to fail
+-1
+4
+3
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 69
+instructions executed: 240
+binary size: 2824
+  code: 1488
+  data: 1
+  metadata: 1335
+functions:
+  __to_str_i64:
+    calls: 4
+    bytes: 204
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1284

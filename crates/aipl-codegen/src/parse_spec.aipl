@@ -16,6 +16,7 @@ import {
     starts_with,
     trim,
     value_or,
+    value_or_err,
 } from builtins;
 import { lines as split_lines } from "./lines.aipl";
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
@@ -155,9 +156,12 @@ fn finalize(spec: Spec, name: str, buf: str) -> Spec!str {
         // One argument per line. An empty section is *no* arguments: `lines("")`
         // yields a single empty element, which would become one empty argument.
         "cli" => ok(Spec { ..spec, cli: if (body == "") { [] } else { body.split_lines() } }),
-        "exit code" => match (body.trim().int_parse()) {
-            some(n) => ok(Spec { ..spec, exit_code: some(n) }),
-            none => err("exit code section must contain a single integer"),
+        "exit code" => {
+            let n = body
+                .trim()
+                .int_parse()
+                .value_or_err("exit code section must contain a single integer")?;
+            ok(Spec { ..spec, exit_code: some(n) })
         },
         _ => err(`unknown section name "{name}"`),
     }
@@ -181,11 +185,11 @@ allocations: 127
 deallocations: 127
 reallocations: 0
 bytes allocated: 8264
-instructions executed: 30294
-binary size: 90336
-  code: 60328
+instructions executed: 30114
+binary size: 90376
+  code: 60480
   data: 1822
-  metadata: 28186
+  metadata: 28074
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -224,10 +228,10 @@ functions:
     calls: 0
     bytes: 276
   aipl_arr_inc:
-    calls: 235
+    calls: 229
     bytes: (external)
   aipl_array_dec:
-    calls: 292
+    calls: 286
     bytes: (external)
   aipl_array_new:
     calls: 55
@@ -252,7 +256,7 @@ functions:
     bytes: 1284
   finalize:
     calls: 25
-    bytes: 20864
+    bytes: 21016
   main:
     calls: 1
     bytes: 108
