@@ -9,6 +9,7 @@ import {
     saturating_divide,
     saturating_remainder,
     wrapping_add,
+    wrapping_decrement,
     wrapping_increment,
     wrapping_mul,
     wrapping_sub,
@@ -28,6 +29,7 @@ fn arithmetic() -> i64 {
     wrapping_add(wrapping_sub(wrapping_mul(3, 4), 2), wrapping_increment(0, 1))
 }.test({
     assert(equal(arithmetic(), 11));
+    assert(equal(wrapping_decrement(5, 1), 4));
     assert(equal(saturating_divide(9, 2), 4));
     assert(equal(saturating_remainder(9, 2), 1));
 
@@ -49,17 +51,17 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 176
-instructions executed: 164
-binary size: 2880
-  code: 840
-  data: 518
-  metadata: 1522
+instructions executed: 175
+binary size: 3064
+  code: 888
+  data: 582
+  metadata: 1594
 functions:
   __test$arithmetic:
     calls: 1
-    bytes: 732
+    bytes: 780
   aipl_assert:
-    calls: 9
+    calls: 10
     bytes: (external)
   aipl_test_begin:
     calls: 1

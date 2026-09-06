@@ -1,0 +1,39 @@
+// `-` need not be a builtin at all: bound to one of your own functions, no `--`
+// flavor can match it, so the decrement lint stays quiet rather than
+// recommending a form that would call something else.
+import { print, to_str } from builtins;
+import { my_custom_sub as - } from "./mymath_sub.aipl";
+
+fn main() !prints {
+    mut n = 0;
+    set n = n - 1; // == my_custom_sub(n, 1), not a decrement
+    print(n.to_str());
+}
+--- file: mymath_sub.aipl ---
+import { wrapping_sub as - } from builtins;
+pub fn my_custom_sub(a: i64, b: i64) -> i64 { a - b - 1000 }
+--- stdout ---
+-1001
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 21
+instructions executed: 41
+binary size: 1176
+  code: 320
+  data: 1
+  metadata: 855
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 116

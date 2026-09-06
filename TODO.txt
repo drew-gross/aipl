@@ -159,7 +159,6 @@ HOF:
 math:
 
 syntax:
-  Lets add a -- operator (with wrapping and saturating, like ++), and a lint to recommend it over set x -= 1, set x = x - 1, etc.
   expr! should return the err held in expr, or exit the test if expr is not an error (only valid in tests for now)
   converge arrays and string (for inlining, ropes, etc.)
   locally mutable args
@@ -244,6 +243,7 @@ utilities:
 skills:
 
 lint:
+  any lint that works on bare assignment should work on field assignment (e.g. lint to use --)
   lint to use if let instead of match with empty none case
   lint !v.is_empty() to v.is_nonempty()
   linter should apply after import resolution so that it doesn't rely on function names as selected by the user (i.e. import as can't interfere with a lint)

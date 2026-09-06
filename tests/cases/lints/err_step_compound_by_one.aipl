@@ -1,0 +1,24 @@
+import { print, to_str, wrapping_add_assign as +=, wrapping_sub_assign as -= } from builtins;
+
+// The compound spellings are the same statements: `set n += 1;` adds one and
+// `set n -= 1;` subtracts one, so the step lint owns them too. It pairs against
+// the binding of the operator that was *written* — `+=`/`-=` here — so a file
+// need not import the plain `+`/`-` at all for the advice to be sound.
+fn main() !prints {
+    mut n = 3;
+    set n += 1;
+    set n -= 1;
+    print(n.to_str());
+}
+--- errors ---
+error: adding 1 to "n" — use the increment form "set n++;", importing `wrapping_increment as ++` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_step_compound_by_one.aipl:9:9
+  |
+9 |     set n += 1;
+  |         ^^^^^^
+
+error: subtracting 1 from "n" — use the decrement form "set n--;", importing `wrapping_decrement as --` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_step_compound_by_one.aipl:10:9
+   |
+10 |     set n -= 1;
+   |         ^^^^^^

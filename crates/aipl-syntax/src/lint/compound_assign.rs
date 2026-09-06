@@ -1,3 +1,4 @@
+use super::step_by_one::Steps;
 use crate::ast::{BinOp, Expr, ExprKind, ImportSource, Item, Program};
 use crate::Error;
 
@@ -14,15 +15,15 @@ use crate::Error;
 /// field path or a call would have to be re-evaluated. A field store
 /// (`set p.n = p.n + 1;`) therefore has no shorter spelling to recommend.
 ///
-/// `incr` says whether [`super::incr_by_one`] is live for this file. When it
-/// is, `set x = x + 1;` belongs to it — `set x++;` is the more specific advice
-/// — and this lint bows out rather than offering a second rewrite of the same
-/// line. When it isn't (no `++` flavor matches this file's `+`), `+= 1` is the
-/// only advice left and this lint gives it.
+/// `steps` is what [`super::step_by_one`] can advise here. Where it has advice
+/// for this operator, `set x = x ± 1;` belongs to it — `set x++;` / `set x--;`
+/// is the more specific rewrite — and this lint bows out rather than offering a
+/// second rewrite of the same line. Where it hasn't (no step flavor matches
+/// this file's operator), `±= 1` is the only advice left and this lint gives it.
 ///
 /// `ops` is what to recommend per operator, from [`matching_compound`]: the
 /// compound spelling, plus the import to name when the file lacks it.
-pub(super) fn compound_assign(e: &Expr, ops: &CompoundOps, incr: bool, hits: &mut Vec<Error>) {
+pub(super) fn compound_assign(e: &Expr, ops: &CompoundOps, steps: &Steps, hits: &mut Vec<Error>) {
     let ExprKind::Assign(lhs, value, _) = &e.kind else {
         return;
     };
@@ -46,8 +47,8 @@ pub(super) fn compound_assign(e: &Expr, ops: &CompoundOps, incr: bool, hits: &mu
     } else {
         return;
     };
-    // `set x = x + 1;` is the increment lint's when that lint can fire here.
-    if incr && matches!(op, BinOp::Add) && matches!(operand.kind, ExprKind::Num(1)) {
+    // `set x = x ± 1;` is the step lint's when that lint can fire here.
+    if matches!(operand.kind, ExprKind::Num(1)) && steps.get(*op).is_some() {
         return;
     }
     // Name the import too when it's missing: no compound operator has a bare
@@ -94,7 +95,7 @@ impl CompoundOps {
 /// provably means the same thing.
 ///
 /// Both spellings are bound by import and neither binding is fixed, so — as
-/// with `+`/`++` (see [`super::matching_increment`]) — the two only agree when
+/// with `+`/`++` (see [`super::step_by_one`]) — the two only agree when
 /// they resolve to the same implementation: `wrapping_add as +` pairs with
 /// `wrapping_add_assign as +=`, `saturating_add as +` with
 /// `saturating_add_assign as +=`. Where the operator has only *one* flavor

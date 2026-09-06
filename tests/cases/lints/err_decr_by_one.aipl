@@ -1,0 +1,18 @@
+import { print, saturating_sub as -, to_str } from builtins;
+
+// The decrement lint names the `--` flavor that matches the operator the line
+// actually wrote. This file subtracts with `saturating_sub`, so the form it
+// recommends is the saturating decrement — taking `wrapping_decrement as --`
+// instead would wrap past the type's bound where this code clamps at it, which
+// is the silent change the pairing exists to prevent.
+fn main() !prints {
+    mut n: u8 = 1;
+    set n = n - 1;
+    print(n.to_str());
+}
+--- errors ---
+error: subtracting 1 from "n" — use the decrement form "set n--;", importing `saturating_decrement as --` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_decr_by_one.aipl:10:9
+   |
+10 |     set n = n - 1;
+   |         ^^^^^^^^^

@@ -61,6 +61,9 @@ gazelle! {
             // `+ 1` it desugars to (and the `+` import error it can raise) point
             // at the operator.
             PLUSPLUS: _,
+            // `--` — the decrement statement `set n--;`, the mirror of `++` and
+            // spanned for the same reason.
+            MINUSMINUS: _,
             // `+=` `-=` `*=` `/=` — the compound assignments (`set n += e;`).
             // Each carries a span for the same reason `++` does: the operator
             // node the statement desugars to, and any import error it raises,
@@ -122,6 +125,8 @@ gazelle! {
                     // `wrapping_increment as ++` — `++` has no bare form either,
                     // so like `+` it is only ever reached through an alias.
                     | IDENT AS PLUSPLUS => aliased_plusplus
+                    // `wrapping_decrement as --`, likewise.
+                    | IDENT AS MINUSMINUS => aliased_minusminus
                     // `wrapping_add_assign as +=`, and the other three compound
                     // assignments. No bare form, exactly as `++` has none.
                     | IDENT AS PLUSEQ => aliased_pluseq
@@ -135,6 +140,7 @@ gazelle! {
                     | OROR => op_or
                     | BANG => op_bang
                     | PLUSPLUS => op_plusplus
+                    | MINUSMINUS => op_minusminus
                     // The bare spellings exist only so the loader can answer
                     // them with "import it aliased", the way it does for `++`.
                     | PLUSEQ => op_pluseq
@@ -395,9 +401,11 @@ gazelle! {
                  | MUT IDENT COLON ty EQ expr SEMI => mut_ty_stmt;
         // `set n = expr;` stores to a mut binding; `set n++;` is sugar for
         // `set n = n + 1;` (so it desugars to a `+`/`wrapping_add` use and is
-        // gated on importing `+` like any other operator).
+        // gated on importing `+` like any other operator), and `set n--;` the
+        // same over `-`.
         assign_stmt = SET IDENT EQ expr SEMI => assign_stmt
                     | SET IDENT PLUSPLUS SEMI => incr_stmt
+                    | SET IDENT MINUSMINUS SEMI => decr_stmt
                     // `set n += e;` and friends — the accumulate-in-place forms
                     // of `set n = n + e;`. Like `++` they take a bare binding
                     // (that is what makes the receiver mentionable twice), and
@@ -708,6 +716,7 @@ impl aipl::Types for Build {
     type Lbracket = Span;
     type Shim = Span;
     type Plusplus = Span;
+    type Minusminus = Span;
     type Pluseq = Span;
     type Minuseq = Span;
     type Stareq = Span;
@@ -966,6 +975,7 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             aipl::ImportName::AliasedGt((name, span)) => name_as_op(name, span, ">"),
             aipl::ImportName::AliasedOr((name, span)) => name_as_op(name, span, "||"),
             aipl::ImportName::AliasedPlusplus((name, span), _) => name_as_op(name, span, "++"),
+            aipl::ImportName::AliasedMinusminus((name, span), _) => name_as_op(name, span, "--"),
             aipl::ImportName::AliasedPluseq((name, span), _) => name_as_op(name, span, "+="),
             aipl::ImportName::AliasedMinuseq((name, span), _) => name_as_op(name, span, "-="),
             aipl::ImportName::AliasedStareq((name, span), _) => name_as_op(name, span, "*="),
@@ -988,6 +998,7 @@ impl gazelle::Action<aipl::ImportName<Self>> for Build {
             // `++` is reached through `wrapping_increment as ++` /
             // `saturating_increment as ++`.
             aipl::ImportName::OpPlusplus(span) => op_import_at("++", span),
+            aipl::ImportName::OpMinusminus(span) => op_import_at("--", span),
             // Same, for the compound assignments: `wrapping_add_assign as +=`
             // and friends are the only spellings that work.
             aipl::ImportName::OpPluseq(span) => op_import_at("+=", span),
@@ -1016,6 +1027,24 @@ fn op_import_at(spelling: &str, span: Span) -> ImportName {
         alias: None,
         span,
     }
+}
+
+/// Build the `(lhs, value, span)` of one step-by-one statement — `set n++;` is
+/// `set n = n ++ 1;` and `set n--;` is `set n = n -- 1;`, where `op` is the
+/// step operator ([`BinOp::Incr`] / [`BinOp::Decr`], gated on importing `++` /
+/// `--`). The loader collapses each to a plain add / subtract after gating, so
+/// codegen never sees one. The `1` and the operator carry the operator's own
+/// span so diagnostics (a missing import, or a non-integer `n`) point at it.
+fn step_by_one(name: String, name_span: Span, op: BinOp, op_span: Span) -> (Expr, Expr, Span) {
+    let span = join_spans(&name_span, &op_span);
+    let recv = Expr::new(ExprKind::Ident(name.clone()), name_span.clone());
+    let one = Expr::new(ExprKind::Num(1), op_span);
+    let value = Expr::new(
+        ExprKind::Binop(Box::new(recv), op, Box::new(one)),
+        span.clone(),
+    );
+    let lhs = Expr::new(ExprKind::Ident(name), name_span);
+    (lhs, value, span)
 }
 
 /// Build the `(lhs, value, span)` of one compound assignment — `set n += e;` is
@@ -2288,21 +2317,14 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
                 let lhs = Expr::new(ExprKind::Ident(name), name_span);
                 (lhs, value, span)
             }
-            // `set n++;` is `set n = n ++ 1;`, where `++` is its own operator
-            // ([`BinOp::Incr`], gated on importing `++`). The loader collapses it
-            // to a plain add / `wrapping_add` after gating, so codegen never sees
-            // `Incr`. The `1` and operator carry the `++` span so diagnostics
-            // (a missing `++` import, or a non-integer `n`) point at the operator.
+            // `set n++;` — see [`step_by_one`], which builds both step forms.
             aipl::AssignStmt::IncrStmt((name, name_span), pp_span) => {
-                let span = join_spans(&name_span, &pp_span);
-                let recv = Expr::new(ExprKind::Ident(name.clone()), name_span.clone());
-                let one = Expr::new(ExprKind::Num(1), pp_span);
-                let value = Expr::new(
-                    ExprKind::Binop(Box::new(recv), BinOp::Incr, Box::new(one)),
-                    span.clone(),
-                );
-                let lhs = Expr::new(ExprKind::Ident(name), name_span);
-                (lhs, value, span)
+                step_by_one(name, name_span, BinOp::Incr, pp_span)
+            }
+            // `set n--;` — the same shape over `--`/[`BinOp::Decr`], which the
+            // loader collapses to a plain subtract once gating has run.
+            aipl::AssignStmt::DecrStmt((name, name_span), mm_span) => {
+                step_by_one(name, name_span, BinOp::Decr, mm_span)
             }
             // `set n += e;` is `set n = n += e;`, where `+=` is its own operator
             // (gated on importing `+=`, not `+`) that the loader collapses to a
@@ -3279,6 +3301,7 @@ fn op_precedence(op: BinOp) -> Precedence {
         // them is ever infix, so none is looked up here.
         BinOp::Sub
         | BinOp::Incr
+        | BinOp::Decr
         | BinOp::AddAssign
         | BinOp::SubAssign
         | BinOp::MulAssign
@@ -3374,6 +3397,7 @@ pub enum LexedTokenKind {
     DotDot,
     PlusPlusPlus,
     PlusPlus,
+    MinusMinus,
     PlusEq,
     MinusEq,
     StarEq,
@@ -3849,6 +3873,7 @@ fn classify_lexed(k: &LexedTokenKind) -> TokenKind {
         | K::DotDot
         | K::PlusPlusPlus
         | K::PlusPlus
+        | K::MinusMinus
         | K::PlusEq
         | K::MinusEq
         | K::StarEq
@@ -3981,6 +4006,7 @@ fn lexed_to_terminals(out: LexedOutput) -> Vec<(aipl::Terminal<Build>, Span)> {
             // see `op_precedence` for the whole table.
             K::DotDot => T::Dotdot(Precedence::Left(4)),
             K::PlusPlus => T::Plusplus(span.clone()),
+            K::MinusMinus => T::Minusminus(span.clone()),
             K::PlusEq => T::Pluseq(span.clone()),
             K::MinusEq => T::Minuseq(span.clone()),
             K::StarEq => T::Stareq(span.clone()),
@@ -4256,6 +4282,7 @@ const SYMBOL_DISPLAY_NAMES: &[(&str, &str)] = &[
     ("PIPE", "|"),
     ("BANG", "!"),
     ("PLUSPLUS", "++"),
+    ("MINUSMINUS", "--"),
     ("PLUSEQ", "+="),
     ("MINUSEQ", "-="),
     ("STAREQ", "*="),

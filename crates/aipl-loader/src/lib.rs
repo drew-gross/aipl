@@ -1210,13 +1210,14 @@ fn rewrite_expr(
                 Some(target) if target != spelling => {
                     ExprKind::Call(target.clone(), vec![lhs, rhs], false)
                 }
-                // [`BinOp::Incr`] always takes the branch above: like `+`, it has
-                // no bare form, so it is only ever bound to a named flavor
-                // (`wrapping_increment`/`saturating_increment`, i.e. one of the
-                // `__builtin_*_add` impls) or to a user function — and gating has
-                // already rejected a use with no binding at all. So no `Incr`
+                // [`BinOp::Incr`] and [`BinOp::Decr`] always take the branch
+                // above: like `+`, neither has a bare form, so each is only ever
+                // bound to a named flavor (`wrapping_increment` /
+                // `saturating_decrement`, i.e. one of the `__builtin_*_add` /
+                // `__builtin_*_sub` impls) or to a user function — and gating has
+                // already rejected a use with no binding at all. So neither
                 // survives the rewrite into mono or codegen, which is what lets
-                // both treat that variant as unreachable.
+                // both treat those variants as unreachable.
                 _ => ExprKind::Binop(Box::new(lhs), *op, Box::new(rhs)),
             }
         }

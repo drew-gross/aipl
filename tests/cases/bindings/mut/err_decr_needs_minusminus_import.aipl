@@ -1,0 +1,19 @@
+import { greater_than as > } from builtins;
+
+// `set n--;` uses the `--` operator, which must be imported on its own spelling
+// — importing `-` does not enable it, even though the two share an
+// implementation. Here `--` is not imported, so the operator gate rejects it,
+// pointing at the `--` and naming the wrapping flavor to import.
+fn drain(start: i64) -> i64 {
+    mut n = start;
+    while (n > 0) {
+        set n--;
+    }
+    n
+}
+--- errors ---
+error: operator "--" must be imported: add `import { wrapping_decrement as -- } from builtins;`
+  --> ./tests/cases/bindings/mut/err_decr_needs_minusminus_import.aipl:10:13
+   |
+10 |         set n--;
+   |             ^^^

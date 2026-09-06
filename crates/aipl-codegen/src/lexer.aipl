@@ -40,9 +40,9 @@ import {
     value_or_err,
     wrapping_add as +,
     wrapping_add_assign as +=,
+    wrapping_decrement as --,
     wrapping_increment as ++,
     wrapping_sub as -,
-    wrapping_sub_assign as -=,
 } from builtins;
 // The `.test` block's decoding emits need a string-escape decoder. The library
 // deliberately provides none (escape meaning is a language's policy), so the
@@ -433,7 +433,7 @@ fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexErr
             set i += open.len();
         } else {
             if (self[i..].starts_with(close)) {
-                set depth -= 1;
+                set depth--;
                 set i += close.len();
             } else {
                 set i++;
@@ -829,7 +829,7 @@ fn interp_scan<K>(src: str, at: u64, open: u64, rules: TokenRule<K>[]) -> StepRe
                     set depth++;
                 },
                 "}" => {
-                    set depth -= 1;
+                    set depth--;
                 },
                 _ => {},
             };

@@ -15,7 +15,6 @@ mod destructure_binding;
 mod eta_lambda;
 mod field_init_shorthand;
 mod fn_body_type_stutter;
-mod incr_by_one;
 mod is_empty_longhand;
 mod len_gt_zero;
 mod match_is_some_and;
@@ -29,6 +28,7 @@ mod return_loop_find_if;
 mod slice_from_zero;
 mod slice_to_len;
 mod slice_whole;
+mod step_by_one;
 mod unused_imports;
 
 use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
@@ -40,7 +40,6 @@ use self::destructure_binding::destructure_binding;
 use self::eta_lambda::eta_lambda;
 use self::field_init_shorthand::field_init_shorthand;
 use self::fn_body_type_stutter::fn_body_type_stutter;
-use self::incr_by_one::{incr_by_one, matching_increment};
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
 use self::match_is_some_and::match_is_some_and;
@@ -54,6 +53,7 @@ use self::return_loop_find_if::{find_if_name, return_loop_find_if};
 use self::slice_from_zero::slice_from_zero;
 use self::slice_to_len::slice_to_len;
 use self::slice_whole::slice_whole;
+use self::step_by_one::{matching_steps, step_by_one};
 use self::unused_imports::unused_imports;
 
 /// Run every lint over `program` — function bodies, `.test` blocks, and
@@ -116,21 +116,21 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     each_expr(program, &mut |e| {
         return_loop_find_if(e, src, find_if.as_deref(), &mut hits)
     });
-    // Only where a `++` flavor provably matches this file's `+` — see
-    // `matching_increment`, which also names the import when it's missing.
-    let incr = matching_increment(program);
-    if let Some(incr) = incr {
-        each_expr(program, &mut |e| incr_by_one(e, incr, &mut hits));
+    // Only where a `++`/`--` flavor provably matches the operator written —
+    // see `matching_steps`, which also names the import when it's missing.
+    let steps = matching_steps(program);
+    if !steps.is_empty() {
+        each_expr(program, &mut |e| step_by_one(e, &steps, &mut hits));
     }
     // The general form of the above, and partitioned against it rather than
-    // overlapping: `set x = x + 1;` belongs to the increment lint whenever that
-    // lint is live here, so `compound_assign` is told and leaves that one shape
+    // overlapping: `set x = x + 1;` belongs to the step lint whenever that lint
+    // is live here, so `compound_assign` is told and leaves that one shape
     // alone. Only the operators whose compound spelling provably means the same
     // thing are advised — see `matching_compound`.
     let compound = matching_compound(program);
     if !compound.is_empty() {
         each_expr(program, &mut |e| {
-            compound_assign(e, &compound, incr.is_some(), &mut hits)
+            compound_assign(e, &compound, &steps, &mut hits)
         });
     }
     // Only for the comparisons this file's `<`/`>` really are — see

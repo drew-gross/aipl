@@ -103,6 +103,7 @@ variant AiplTok =
     | DotDot
     | PlusPlusPlus
     | PlusPlus
+    | MinusMinus
     | PlusEq
     | MinusEq
     | StarEq
@@ -351,6 +352,12 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         op("||", OrOr),
         op("..", DotDot),
         op("++", PlusPlus),
+        // `--` sits with `++` and, like `-=`, needs no care against `Int`: that
+        // matcher takes a `-` only when a *digit* follows it, and here the next
+        // character is another `-`. It does mean `a--5` lexes `a`, `--`, `5`
+        // where it once lexed `a` then the literal `-5` — the same spacing rule
+        // `a - 5` already had.
+        op("--", MinusMinus),
         // The compound assignments, each before both the plain operator it
         // accumulates with and the `=` that follows it: `+=` would otherwise
         // lex as `+` then `=`. `-=` needs no such care against `Int` — that
@@ -652,15 +659,15 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 3776
-deallocations: 3776
+allocations: 3804
+deallocations: 3804
 reallocations: 33
-bytes allocated: 343453
-instructions executed: 905466
-binary size: 413496
-  code: 283916
+bytes allocated: 347389
+instructions executed: 913300
+binary size: 414744
+  code: 284876
   data: 6420
-  metadata: 123160
+  metadata: 123448
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
@@ -789,7 +796,7 @@ functions:
     calls: 56
     bytes: 940
   __m1__step_result$AiplTok:
-    calls: 1768
+    calls: 1782
     bytes: 13068
   __m1__template_scan$AiplTok:
     calls: 3
@@ -831,16 +838,16 @@ functions:
     calls: 180
     bytes: (external)
   aipl_arr_inc:
-    calls: 7895
+    calls: 7951
     bytes: (external)
   aipl_arr_reserve:
     calls: 180
     bytes: (external)
   aipl_array_dec:
-    calls: 11666
+    calls: 11750
     bytes: (external)
   aipl_array_new:
-    calls: 3711
+    calls: 3739
     bytes: (external)
   aipl_array_push:
     calls: 13
@@ -874,7 +881,7 @@ functions:
     bytes: 1212
   lex_aipl:
     calls: 20
-    bytes: 76816
+    bytes: 77776
   lex_aipl_tokens:
     calls: 2
     bytes: 424

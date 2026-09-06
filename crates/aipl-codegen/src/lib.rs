@@ -3568,6 +3568,7 @@ fn marshal_lex(
             "DotDot" => K::DotDot,
             "PlusPlusPlus" => K::PlusPlusPlus,
             "PlusPlus" => K::PlusPlus,
+            "MinusMinus" => K::MinusMinus,
             "PlusEq" => K::PlusEq,
             "MinusEq" => K::MinusEq,
             "StarEq" => K::StarEq,
@@ -17654,6 +17655,7 @@ fn compile_expr_inner<M: Module>(
                 // message; with the enum, a new operator that codegen forgets is
                 // a compile error here instead.
                 BinOp::Incr
+                | BinOp::Decr
                 | BinOp::AddAssign
                 | BinOp::SubAssign
                 | BinOp::MulAssign

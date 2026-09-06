@@ -318,10 +318,11 @@ paths.
 | `-` | `wrapping_sub` / `saturating_sub` | `!=` | `not_equal` |
 | `*` | `wrapping_mul` | `<` | `less_than` |
 | `++` | `wrapping_increment` / `saturating_increment` | `>` | `greater_than` |
-| `/` | `saturating_divide` | `<=` | `less_than_or_equal` |
-| `%` | `saturating_remainder` | `>=` | `greater_than_or_equal` |
-| `+++` | `concat` | `&&` | `logical_and` |
-| `!` | `logical_not` | `\|\|` | `logical_or` |
+| `--` | `wrapping_decrement` / `saturating_decrement` | `<=` | `less_than_or_equal` |
+| `/` | `saturating_divide` | `>=` | `greater_than_or_equal` |
+| `%` | `saturating_remainder` | `&&` | `logical_and` |
+| `+++` | `concat` | `\|\|` | `logical_or` |
+| `!` | `logical_not` | | |
 
 `OPERATOR_BUILTINS` (`crates/aipl-syntax/src/lib.rs`) is the single place these
 are declared — extend it rather than adding a per-operator special case. The

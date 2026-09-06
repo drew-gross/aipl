@@ -1161,6 +1161,10 @@ pub mod ast {
         /// separate variant is what lets the gate demand the `++` import rather
         /// than accepting a `+` one.
         Incr,
+        /// `wrapping_decrement` / `saturating_decrement`, from `set n--`. The
+        /// mirror of [`BinOp::Incr`] in every respect: lowered to
+        /// [`BinOp::Sub`] once the gate has demanded the `--` import.
+        Decr,
         /// `concat`.
         Concat,
         /// `wrapping_add_assign` / `saturating_add_assign`, from `set n += e`.
@@ -1788,6 +1792,8 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
     ("wrapping_mul", "*", "__builtin_wrapping_mul"),
     ("wrapping_increment", "++", "__builtin_wrapping_add"),
     ("saturating_increment", "++", "__builtin_saturating_add"),
+    ("wrapping_decrement", "--", "__builtin_wrapping_sub"),
+    ("saturating_decrement", "--", "__builtin_saturating_sub"),
     // The compound assignments, `set n += e;`. Each is its own named builtin
     // rather than a second alias of the plain one, exactly as `++` is
     // `wrapping_increment` and not `wrapping_add`: a name maps to one operator
@@ -1963,9 +1969,10 @@ pub fn binop_spelling(op: BinOp) -> &'static str {
         BinOp::Ge => ">=",
         BinOp::And => "&&",
         BinOp::Or => "||",
-        // Lowered to `+` by the loader after operator gating; this spelling is
-        // what the gate requires.
+        // Lowered to `+`/`-` by the loader after operator gating; these
+        // spellings are what the gate requires.
         BinOp::Incr => "++",
+        BinOp::Decr => "--",
         BinOp::Concat => "+++",
         // The compound assignments, likewise lowered to their base operation
         // once the gate has seen the spelling written here.

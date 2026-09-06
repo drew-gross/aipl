@@ -1,0 +1,56 @@
+import { print, to_str, wrapping_decrement as --, wrapping_sub as - } from builtins;
+
+struct Counter { n: i64 }
+
+// The shapes the decrement lint must leave alone: subtracting something other
+// than one, subtracting one from a *different* binding, subtracting the binding
+// *from* one — which is no decrement at all — and a field store, which has no
+// `--` spelling since `set x--;` takes a bare binding.
+//
+// The first of those is still an accumulate, so the *compound* lint owns it and
+// is squelched here: this case is about what the step lint does, and it can only
+// show that by keeping the long-hand spelling.
+fn main() !prints {
+    mut n = 9;
+    set n = n - 2; #[allow]
+    // not one, so not the decrement lint's
+    mut m = 0;
+    set m = n - 1; // one, but subtracted from another binding
+    mut k = 1;
+    set k = 1 - k; // the binding on the right: `1 - k`, not `k - 1`
+    mut c = Counter { n: 1 };
+    set c.n = c.n - 1; // a field store, not a bare binding
+    set n--; // the recommended form itself never trips its own lint
+    print(n.to_str());
+    print(m.to_str());
+    print(k.to_str());
+    print(c.n.to_str());
+}
+--- stdout ---
+6
+6
+0
+0
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 68
+instructions executed: 168
+binary size: 1568
+  code: 592
+  data: 1
+  metadata: 975
+functions:
+  __to_str_i64:
+    calls: 4
+    bytes: 204
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 388

@@ -3976,9 +3976,10 @@ impl Cx<'_> {
                 )?;
                 Ok(Type::Primitive(Primitive::Bool))
             }
-            // The loader lowers `++` and every compound assignment to their
-            // base operation before the checker runs.
+            // The loader lowers `++`/`--` and every compound assignment to
+            // their base operation before the checker runs.
             BinOp::Incr
+            | BinOp::Decr
             | BinOp::AddAssign
             | BinOp::SubAssign
             | BinOp::MulAssign

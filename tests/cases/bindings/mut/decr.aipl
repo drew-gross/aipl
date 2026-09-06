@@ -1,0 +1,57 @@
+import {
+    equal as ==,
+    greater_than as >,
+    wrapping_add_assign as +=,
+    wrapping_decrement as --,
+} from builtins;
+
+// `set n--;` decrements a mut binding by one — the mirror of `set n++;` (see
+// `bindings/mut/incr`). `--` is its own operator with its own flavors, imported
+// separately from `-`: `wrapping_decrement as --` here, `saturating_decrement as
+// --` for the clamping one (see `bindings/mut/decr_saturating`). Each shares its
+// `-` counterpart's implementation, since decrementing is subtracting 1.
+fn triangle(n: i64) -> i64 {
+    mut i = n;
+    mut total = 0;
+    while (i > 0) {
+        set total += i;
+        set i--;
+    }
+    total
+}.test({
+    assert(triangle(4) == 10);
+    assert(triangle(1) == 1);
+    assert(triangle(0) == 0);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 215
+binary size: 1512
+  code: 416
+  data: 139
+  metadata: 957
+functions:
+  __test$triangle:
+    calls: 1
+    bytes: 220
+  aipl_assert:
+    calls: 3
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 108
+  triangle:
+    calls: 3
+    bytes: 88

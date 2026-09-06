@@ -2,13 +2,13 @@ import { logical_not as ! } from builtins;
 
 pub fn is_operator_name(self: str) -> bool {
     match (self) {
-        // Grouped by what they do rather than packed to the line: all sixteen in
+        // Grouped by what they do rather than packed to the line: all of them in
         // one alternation runs past the width, and the formatter would then break
-        // it one-per-line — back to the sixteen arms this replaces.
+        // it one-per-line — back to the one-per-operator arms this replaces.
         "+" | "-" | "*" | "/" | "%" => true,
         "==" | "!=" | "<" | ">" | "<=" | ">=" => true,
         "&&" | "||" | "!" => true,
-        "++" | "+++" => true,
+        "++" | "--" | "+++" => true,
         "+=" | "-=" | "*=" | "/=" => true,
         _ => false,
     }
@@ -35,6 +35,7 @@ pub fn is_operator_name(self: str) -> bool {
     assert("||".is_operator_name());
     assert("!".is_operator_name());
     assert("++".is_operator_name());
+    assert("--".is_operator_name());
     assert("+++".is_operator_name());
     assert("+=".is_operator_name());
     assert("-=".is_operator_name());
@@ -50,6 +51,7 @@ pub fn is_operator_name(self: str) -> bool {
     assert(!"+++=".is_operator_name()); // nor for `+++`
     assert(!"&".is_operator_name()); // single, not `&&`
     assert(!"++++".is_operator_name()); // four, not `+++`
+    assert(!"---".is_operator_name()); // three, not `--`
     assert(!"and".is_operator_name());
 })
 --- performance ---
@@ -57,17 +59,17 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 4105
-binary size: 50440
-  code: 36912
-  data: 1425
-  metadata: 12103
+instructions executed: 4605
+binary size: 56264
+  code: 41356
+  data: 1521
+  metadata: 13387
 functions:
   __test$is_operator_name:
     calls: 1
-    bytes: 36792
+    bytes: 41236
   aipl_assert:
-    calls: 29
+    calls: 31
     bytes: (external)
   aipl_test_begin:
     calls: 1

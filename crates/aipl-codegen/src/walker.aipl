@@ -34,8 +34,8 @@ import {
     min,
     not_equal as !=,
     push,
+    saturating_decrement as --,
     saturating_sub as -,
-    saturating_sub_assign as -=,
     sort_by,
     starts_with,
     value_or,
@@ -489,7 +489,7 @@ fn fmt_kind(k: AiplTok) -> FmtKind {
         StrLit(_, _) => StrTok,
         CharTok(_) => CharTok,
         EqEq | Ne | Arrow | FatArrow | AndAnd | OrOr | Pipe | DotDot => Op,
-        PlusPlusPlus | PlusPlus | Eq | Lt | Le | Gt | Ge | Bang => Op,
+        PlusPlusPlus | PlusPlus | MinusMinus | Eq | Lt | Le | Gt | Ge | Bang => Op,
         Plus | Minus | Star | Slash | Percent => Op,
         PlusEq | MinusEq | StarEq | SlashEq => Op,
         Period | Comma | Colon | Semi | Question | Hash => Punct,
@@ -1442,14 +1442,24 @@ fn is_compound_assign(self: str) -> bool {
     }
 }
 
-// `set n = e;`, `set n++;`, `set n += e;` (and the other three compound
-// assignments), `set recv.f.g = e;`, or the writeback form
+// The step-by-one operators. Each stands where a whole `= e` would, so
+// `set_stmt` renders them the same way: glued to the binding, then the `;`.
+fn is_step_by_one(self: str) -> bool {
+    match (self) {
+        "++" | "--" => true,
+        _ => false,
+    }
+}
+
+// `set n = e;`, `set n++;`, `set n--;`, `set n += e;` (and the other three
+// compound assignments), `set recv.f.g = e;`, or the writeback form
 // `set recv.method(args);`.
 fn set_stmt(self: W) -> WDoc!FmtError {
     let n = self.bump().w.bump();
-    if (n.w.peek_text() == "++") {
+    let step = n.w.peek_text();
+    if (step.is_step_by_one()) {
         let done = n.w.bump().w.expect(";")?.w;
-        return ok(WDoc { w: done, doc: Text(`set {n.text}++;`) });
+        return ok(WDoc { w: done, doc: Text(`set {n.text}{step};`) });
     };
     let compound = n.w.peek_text();
     if (compound.is_compound_assign()) {
@@ -2225,7 +2235,7 @@ fn template_scan(self: W, start: u64, depth0: u64) -> WDoc!FmtError {
                         doc: RawBlock(self.src[start..span.end]),
                     });
                 };
-                set depth -= 1;
+                set depth--;
             };
         };
         set w = stepped;
@@ -2302,7 +2312,7 @@ fn hug_close(self: W, start: u64) -> u64? {
                 if (depth <= 1) {
                     return some(i);
                 };
-                set depth -= 1;
+                set depth--;
             };
         };
         set i++;
@@ -2527,6 +2537,7 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     assert(walker_of("{ mut x = 1 ; x }").block().rendered(100)? == "{\n    mut x = 1;\n    x\n}");
     assert(walker_of("{ set x = 1 ; }").block().rendered(100)? == "{\n    set x = 1;\n}");
     assert(walker_of("{ set x ++ ; }").block().rendered(100)? == "{\n    set x++;\n}");
+    assert(walker_of("{ set x -- ; }").block().rendered(100)? == "{\n    set x--;\n}");
     // The compound assignments are spaced like the `=` they stand in for.
     assert(walker_of("{ set x += 1 ; }").block().rendered(100)? == "{\n    set x += 1;\n}");
     assert(walker_of("{ set x -= n ; }").block().rendered(100)? == "{\n    set x -= n;\n}");
@@ -2819,15 +2830,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 // something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20240
-deallocations: 20240
-reallocations: 1235
-bytes allocated: 1229611
-instructions executed: 3325532
-binary size: 4040080
-  code: 2498188
-  data: 24868
-  metadata: 1517024
+allocations: 20383
+deallocations: 20383
+reallocations: 1242
+bytes allocated: 1237198
+instructions executed: 3347480
+binary size: 4090560
+  code: 2529788
+  data: 24972
+  metadata: 1535800
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2842,7 +2853,7 @@ functions:
     calls: 20
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1416
+    calls: 1421
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
     calls: 0
@@ -2866,7 +2877,7 @@ functions:
     calls: 27
     bytes: 140
   __arr_retain___m1__Doc:
-    calls: 1473
+    calls: 1479
     bytes: 116
   __arr_retain___m9__StepResult$__m8__AiplTok:
     calls: 0
@@ -2884,10 +2895,10 @@ functions:
     calls: 0
     bytes: 32
   __builtin_any$__m1__Doc$lam32$tail:
-    calls: 554
+    calls: 556
     bytes: 324
   __builtin_count_is_at_least$char$s0:
-    calls: 46
+    calls: 47
     bytes: 252
   __builtin_count_while$char$lam75:
     calls: 69
@@ -2977,7 +2988,7 @@ functions:
     calls: 0
     bytes: 332
   __m1__col_after:
-    calls: 910
+    calls: 913
     bytes: 544
   __m1__fits:
     calls: 0
@@ -2995,10 +3006,10 @@ functions:
     calls: 0
     bytes: 32
   __m1__has_hard$tail:
-    calls: 1443
+    calls: 1448
     bytes: 688
   __m1__print_doc:
-    calls: 138
+    calls: 139
     bytes: 4968
   __m2__reindent_block:
     calls: 0
@@ -3046,7 +3057,7 @@ functions:
     calls: 84
     bytes: 940
   __m9__step_result$__m8__AiplTok:
-    calls: 3626
+    calls: 3669
     bytes: 13068
   __m9__template_scan$__m8__AiplTok:
     calls: 0
@@ -3055,10 +3066,10 @@ functions:
     calls: 94
     bytes: 476
   __rec_drop___m1__Doc:
-    calls: 2788
+    calls: 2800
     bytes: 184
   __rec_drop___m1__Work:
-    calls: 4035
+    calls: 4047
     bytes: 84
   __test$binding_ann:
     calls: 1
@@ -3071,7 +3082,7 @@ functions:
     bytes: 1708
   __test$walker_of:
     calls: 1
-    bytes: 1858084
+    bytes: 1887684
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
@@ -3079,49 +3090,49 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 489
+    calls: 490
     bytes: (external)
   aipl_arr_inc:
-    calls: 53719
+    calls: 54050
     bytes: (external)
   aipl_arr_reserve:
-    calls: 554
+    calls: 555
     bytes: (external)
   aipl_arr_slice:
     calls: 81
     bytes: (external)
   aipl_array_dec:
-    calls: 66476
+    calls: 66916
     bytes: (external)
   aipl_array_new:
-    calls: 10804
+    calls: 10904
     bytes: (external)
   aipl_array_push:
-    calls: 1589
+    calls: 1597
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1823
+    calls: 1832
     bytes: (external)
   aipl_array_with_cap:
-    calls: 202
+    calls: 203
     bytes: (external)
   aipl_assert:
-    calls: 182
+    calls: 183
     bytes: (external)
   aipl_rec_alloc:
-    calls: 6823
+    calls: 6847
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 46925
+    calls: 47065
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 4137
+    calls: 4150
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 40102
+    calls: 40218
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 4137
+    calls: 4150
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -3154,16 +3165,16 @@ functions:
     calls: 114
     bytes: 4352
   block:
-    calls: 46
+    calls: 47
     bytes: 1144
   block_entries:
-    calls: 51
+    calls: 52
     bytes: 3952
   block_layout:
-    calls: 51
+    calls: 52
     bytes: 5192
   bump:
-    calls: 1026
+    calls: 1032
     bytes: 1100
   call_arg:
     calls: 12
@@ -3181,7 +3192,7 @@ functions:
     calls: 93
     bytes: 4168
   comment_starts_before:
-    calls: 300
+    calls: 302
     bytes: 280
   construct_body:
     calls: 0
@@ -3205,7 +3216,7 @@ functions:
     calls: 5
     bytes: 760
   expect:
-    calls: 435
+    calls: 438
     bytes: 1228
   expr:
     calls: 112
@@ -3227,7 +3238,7 @@ functions:
     bytes: 12952
   format_program:
     calls: 8
-    bytes: 112048
+    bytes: 113760
   hug_close:
     calls: 0
     bytes: 732
@@ -3245,7 +3256,7 @@ functions:
     bytes: 4180
   import_item:
     calls: 14
-    bytes: 16904
+    bytes: 17012
   index_or_from:
     calls: 3
     bytes: 4404
@@ -3265,7 +3276,7 @@ functions:
     calls: 3
     bytes: 3412
   lead:
-    calls: 294
+    calls: 296
     bytes: 1884
   let_stmt:
     calls: 3
@@ -3292,7 +3303,7 @@ functions:
     calls: 67
     bytes: 4112
   next_start:
-    calls: 46
+    calls: 47
     bytes: 532
   params_until:
     calls: 22
@@ -3325,16 +3336,16 @@ functions:
     calls: 12
     bytes: 4696
   range_has_semi:
-    calls: 36
+    calls: 37
     bytes: 228
   range_tail:
     calls: 112
     bytes: 2352
   rendered:
-    calls: 116
+    calls: 117
     bytes: 572
   sep_entry:
-    calls: 38
+    calls: 39
     bytes: 332
   set_member:
     calls: 2
@@ -3346,8 +3357,8 @@ functions:
     calls: 4
     bytes: 6460
   set_stmt:
-    calls: 8
-    bytes: 12904
+    calls: 9
+    bytes: 13084
   shim_bindings:
     calls: 0
     bytes: 3240
@@ -3364,7 +3375,7 @@ functions:
     calls: 4
     bytes: 1904
   statement:
-    calls: 38
+    calls: 39
     bytes: 5876
   str_atom:
     calls: 2
@@ -3397,10 +3408,10 @@ functions:
     calls: 0
     bytes: 900
   tok_text:
-    calls: 3293
+    calls: 3304
     bytes: 456
   trailing_comment:
-    calls: 81
+    calls: 82
     bytes: 2188
   trim_last_break:
     calls: 0
@@ -3433,7 +3444,7 @@ functions:
     calls: 6
     bytes: 2432
   walker_of:
-    calls: 130
+    calls: 131
     bytes: 748
   while_stmt:
     calls: 1
