@@ -136,27 +136,29 @@ variant AiplTok =
 // and `_`) and those that may continue one (adds digits). A keyword rule uses
 // the continue class as its boundary, so `if` doesn't bite the front off `iffy`
 // (see `kw`), and the identifier rule uses both (see `aipl_rules`).
-fn ident_start() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_" }
+pub fn ident_start() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_" }
 
-fn ident_cont() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789" }
+pub fn ident_cont() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789" }
 
 // One keyword/constant rule: match the exact `spelling` at an identifier
 // boundary (so `fn`/`true` don't split `fnord`/`trueish`) and emit the fixed
 // `kind`. Every keyword and constant is a single `kw` call in `aipl_rules`, so
 // the spelling and its `AiplTok` arm are named together — no spelling→arm
 // `match` to keep in sync with a separate spelling list.
-fn kw(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
+fn kw(spelling: str, kind: AiplTok, scope: str) -> TokenRule<AiplTok> {
     matcher: Keyword(spelling, ident_cont()),
     emit: Bare(kind),
+    scope,
 }
 
 // One operator/punctuation rule: match the exact `spelling` (no identifier
 // boundary) and emit the fixed `kind`. Each `op` is one rule matching one
 // spelling, and rules are first-match-wins — so `aipl_rules` lists the `op`
 // rules longest spelling first (`==` before `=`) to keep maximal munch.
-fn op(spelling: str, kind: AiplTok) -> TokenRule<AiplTok> {
+fn op(spelling: str, kind: AiplTok, scope: str) -> TokenRule<AiplTok> {
     matcher: Exact(spelling),
     emit: Bare(kind),
+    scope,
 }
 
 // The `OfSeg` emit for the `` `...` `` template rule: the `Template` matcher hands
@@ -236,11 +238,44 @@ fn char_lit_emit(text: str) -> AiplTok!str {
 // and finally the operator/punctuation rules — each spelling its own `op` rule,
 // listed longest first so first-match-wins still yields maximal munch (`==`
 // before `=`), since separate rules don't get `Exact`'s automatic longest-match.
-fn aipl_rules() -> TokenRule<AiplTok>[] {
+// The TextMate scopes AIPL's tokens are painted with, named once here so the
+// rule table below reads as spelling/kind/scope triples and
+// `editors/vscode/syntaxes/aipl.tmLanguage.json` — generated from this table by
+// `highlight_aipl.aipl` — cannot disagree with it. These are TextMate's
+// conventional names, which is what lets an editor theme colour AIPL without
+// knowing anything about AIPL.
+fn s_keyword() -> str { "keyword.control.aipl" }
+
+fn s_constant() -> str { "constant.language.aipl" }
+
+// `import`/`from`/`as` are keywords like any other, but scoped as the
+// import-statement family so a theme can colour a module header on its own.
+// They are consecutive in the table below, so they come out of the highlighter
+// generator as one alternation between the two halves of the keyword run.
+fn s_import() -> str { "keyword.control.import.aipl" }
+
+fn s_name() -> str { "variable.other.aipl" }
+
+fn s_number() -> str { "constant.numeric.integer.aipl" }
+
+fn s_string() -> str { "string.quoted.double.aipl" }
+
+fn s_char() -> str { "string.quoted.single.aipl" }
+
+fn s_operator() -> str { "keyword.operator.aipl" }
+
+fn s_punct() -> str { "punctuation.aipl" }
+
+pub fn aipl_rules() -> TokenRule<AiplTok>[] {
     let three_quotes = "\"\"\"";
     [
         TokenRule { matcher: CharRun(" \t\n\r"), emit: Bare(Space), skip: true },
-        TokenRule { matcher: ToEol("//"), emit: Bare(LineComment), trivia: true },
+        TokenRule {
+            matcher: ToEol("//"),
+            emit: Bare(LineComment),
+            trivia: true,
+            scope: "comment.line.double-slash.aipl",
+        },
         // Block comments `/* ... */`, recorded as trivia like line comments.
         // `Nested` is depth-tracked (an inner `/* */` doesn't close the outer),
         // matching the Rust lexer, and reports an unterminated comment as a hard
@@ -251,6 +286,7 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
             emit: Bare(BlockComment),
             trivia: true,
             unterminated: "unterminated block comment",
+            scope: "comment.block.aipl",
         },
         // `#[allow]` is the lint-squelch marker: like the Rust lexer, it's
         // recorded as trivia and kept out of the token stream, not lexed as a
@@ -258,44 +294,53 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
         // spelling would otherwise claim the lead); the exact-8-char match means
         // a `#{` dict prefix or a `#[` that isn't `#[allow]` still falls through
         // to `Hash` + `LBracket`, matching the real lexer.
-        TokenRule { matcher: Exact("#[allow]"), emit: Bare(AllowMarker), trivia: true },
+        TokenRule {
+            matcher: Exact("#[allow]"),
+            emit: Bare(AllowMarker),
+            trivia: true,
+            scope: "comment.line.allow.aipl",
+        },
         // Keywords and constants, each its own `kw` rule (identifier-boundary
         // matched, so `iffy`/`noneish` stay `Name`s). Order among them is
         // immaterial — the spellings are disjoint — but all must precede the
         // identifier rule. Constants (`true`/`false`/`none`) get their own kinds,
         // a distinct category from keywords, mirroring the Rust lexer.
-        kw("fn", Fn),
-        kw("let", Let),
-        kw("mut", Mut),
-        kw("set", Set),
-        kw("pub", Pub),
-        kw("import", Import),
-        kw("from", From),
-        kw("as", As),
-        kw("for", For),
-        kw("while", While),
-        kw("match", Match),
-        kw("return", Return),
-        kw("shim", Shim),
-        kw("struct", Struct),
-        kw("variant", Variant),
-        kw("if", If),
-        kw("else", Else),
-        kw("builtins", Builtins),
-        kw("true", True),
-        kw("false", False),
-        kw("none", None),
-        TokenRule { matcher: CharRun(ident_cont(), first=ident_start()), emit: Of(Name) },
+        kw("fn", Fn, s_keyword()),
+        kw("let", Let, s_keyword()),
+        kw("mut", Mut, s_keyword()),
+        kw("set", Set, s_keyword()),
+        kw("pub", Pub, s_keyword()),
+        kw("import", Import, s_import()),
+        kw("from", From, s_import()),
+        kw("as", As, s_import()),
+        kw("for", For, s_keyword()),
+        kw("while", While, s_keyword()),
+        kw("match", Match, s_keyword()),
+        kw("return", Return, s_keyword()),
+        kw("shim", Shim, s_keyword()),
+        kw("struct", Struct, s_keyword()),
+        kw("variant", Variant, s_keyword()),
+        kw("if", If, s_keyword()),
+        kw("else", Else, s_keyword()),
+        kw("builtins", Builtins, s_keyword()),
+        kw("true", True, s_constant()),
+        kw("false", False, s_constant()),
+        kw("none", None, s_constant()),
+        TokenRule {
+            matcher: CharRun(ident_cont(), first=ident_start()),
+            emit: Of(Name),
+            scope: s_name(),
+        },
         // Integer literals, signed or unsigned: `Int` matches a digit run with an
         // optional leading `-`, and `int_lit` parses the whole thing (so `-123` is
         // one token and the full i64 range is reachable — i64::MIN's magnitude a
         // bare digit run can't spell as a positive literal). The `-` is consumed
         // only when a digit *immediately* follows, so `Int` declines on `- ` and
-        // `-x` and `op("-", Minus)` below claims those (subtraction / unary minus).
+        // `-x` and `op("-", Minus, ..)` below claims those (subtraction / unary minus).
         // Placing `Int` before that operator rule is the whole disambiguation.
         // Consequence: a value minus a number must be spaced (`a - 5`); `a-5` lexes
         // `a` then the literal `-5`.
-        TokenRule { matcher: Int, emit: Try(int_lit) },
+        TokenRule { matcher: Int, emit: Try(int_lit), scope: s_number() },
         // Raw strings before the plain string rule: `Between` declines (length 0)
         // unless the source opens with `"""`, so a single `"` still falls through
         // to `Delimited` — but a `"""` is claimed here as one raw token rather
@@ -306,11 +351,13 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
             matcher: Between(three_quotes, three_quotes),
             emit: Of(|text: str| StrLit(process_raw_string(text), TripleQuoted)),
             unterminated: "unterminated raw string literal",
+            scope: s_string(),
         },
         TokenRule {
             matcher: Delimited("\"", "ntr\\\""),
             emit: Of(|text: str| StrLit(text.unescape(), Quoted)),
             unterminated: "unterminated string literal",
+            scope: s_string(),
         },
         // Char literals `'x'`/`'\n'`: lexed exactly like a `"..."` string but
         // single-quoted — a `Delimited("'", ..)` scan (escape-aware, so `'\''`
@@ -324,6 +371,7 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
             matcher: Delimited("'", "ntr\\'\""),
             emit: Try(char_lit_emit),
             unterminated: "unterminated char literal",
+            scope: s_char(),
         },
         // Template literals. Triple-backtick before single (`Template` declines
         // unless the source opens with its delim, so ``` ``` ``` must be claimed
@@ -337,59 +385,64 @@ fn aipl_rules() -> TokenRule<AiplTok>[] {
             matcher: Template("```", "", dedent_segments),
             emit: OfSeg(raw_tpl_kind),
             unterminated: "unterminated triple-backtick template literal",
+            scope: s_string(),
         },
-        TokenRule { matcher: Template("`", "\\`{ntr", |segs: str[]| segs), emit: OfSeg(tpl_kind) },
+        TokenRule {
+            matcher: Template("`", "\\`{ntr", |segs: str[]| segs),
+            emit: OfSeg(tpl_kind),
+            scope: s_string(),
+        },
         // Operators and punctuation, one `op` rule per spelling, longest first so
         // first-match-wins is maximal munch: the three-char `+++`, then the
         // two-char forms (`==`/`=>` before `=`, `<=`/`>=` before `<`/`>`, `++`
         // before `+`, `||` before `|`, `..` before `.`), then the one-char rest.
-        op("+++", PlusPlusPlus),
-        op("==", EqEq),
-        op("!=", Ne),
-        op("->", Arrow),
-        op("=>", FatArrow),
-        op("&&", AndAnd),
-        op("||", OrOr),
-        op("..", DotDot),
-        op("++", PlusPlus),
+        op("+++", PlusPlusPlus, s_operator()),
+        op("==", EqEq, s_operator()),
+        op("!=", Ne, s_operator()),
+        op("->", Arrow, s_operator()),
+        op("=>", FatArrow, s_operator()),
+        op("&&", AndAnd, s_operator()),
+        op("||", OrOr, s_operator()),
+        op("..", DotDot, s_operator()),
+        op("++", PlusPlus, s_operator()),
         // `--` sits with `++` and, like `-=`, needs no care against `Int`: that
         // matcher takes a `-` only when a *digit* follows it, and here the next
         // character is another `-`. It does mean `a--5` lexes `a`, `--`, `5`
         // where it once lexed `a` then the literal `-5` — the same spacing rule
         // `a - 5` already had.
-        op("--", MinusMinus),
+        op("--", MinusMinus, s_operator()),
         // The compound assignments, each before both the plain operator it
         // accumulates with and the `=` that follows it: `+=` would otherwise
         // lex as `+` then `=`. `-=` needs no such care against `Int` — that
         // matcher takes a `-` only when a *digit* follows it.
-        op("+=", PlusEq),
-        op("-=", MinusEq),
-        op("*=", StarEq),
-        op("/=", SlashEq),
-        op("<=", Le),
-        op(">=", Ge),
-        op("=", Eq),
-        op("<", Lt),
-        op(">", Gt),
-        op("!", Bang),
-        op("+", Plus),
-        op("-", Minus),
-        op("*", Star),
-        op("/", Slash),
-        op("%", Percent),
-        op("|", Pipe),
-        op(".", Period),
-        op(",", Comma),
-        op(":", Colon),
-        op(";", Semi),
-        op("?", Question),
-        op("#", Hash),
-        op("(", LParen),
-        op(")", RParen),
-        op("{", LBrace),
-        op("}", RBrace),
-        op("[", LBracket),
-        op("]", RBracket),
+        op("+=", PlusEq, s_operator()),
+        op("-=", MinusEq, s_operator()),
+        op("*=", StarEq, s_operator()),
+        op("/=", SlashEq, s_operator()),
+        op("<=", Le, s_operator()),
+        op(">=", Ge, s_operator()),
+        op("=", Eq, s_operator()),
+        op("<", Lt, s_operator()),
+        op(">", Gt, s_operator()),
+        op("!", Bang, s_operator()),
+        op("+", Plus, s_operator()),
+        op("-", Minus, s_operator()),
+        op("*", Star, s_operator()),
+        op("/", Slash, s_operator()),
+        op("%", Percent, s_operator()),
+        op("|", Pipe, s_operator()),
+        op(".", Period, s_punct()),
+        op(",", Comma, s_punct()),
+        op(":", Colon, s_punct()),
+        op(";", Semi, s_punct()),
+        op("?", Question, s_punct()),
+        op("#", Hash, s_punct()),
+        op("(", LParen, s_punct()),
+        op(")", RParen, s_punct()),
+        op("{", LBrace, s_punct()),
+        op("}", RBrace, s_punct()),
+        op("[", LBracket, s_punct()),
+        op("]", RBracket, s_punct()),
     ]
 }
 
@@ -662,12 +715,12 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
 allocations: 3804
 deallocations: 3804
 reallocations: 33
-bytes allocated: 347389
-instructions executed: 913300
-binary size: 414744
-  code: 284876
-  data: 6420
-  metadata: 123448
+bytes allocated: 380989
+instructions executed: 956368
+binary size: 429376
+  code: 295388
+  data: 6700
+  metadata: 127288
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
@@ -677,7 +730,7 @@ functions:
     bytes: 360
   __arr_drop___m1__TokenRule$AiplTok:
     calls: 20
-    bytes: 740
+    bytes: 756
   __arr_retain___m1__StepResult$AiplTok:
     calls: 1
     bytes: 140
@@ -686,26 +739,26 @@ functions:
     bytes: 360
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
-    bytes: 740
-  __builtin_all$char$s0$lam41:
+    bytes: 756
+  __builtin_all$char$s0$lam51:
     calls: 4
     bytes: 212
-  __builtin_count_while$char$lam27:
+  __builtin_count_while$char$lam15:
     calls: 49
     bytes: 220
-  __builtin_count_while$char$s0$lam16:
-    calls: 0
-    bytes: 172
-  __builtin_count_while$char$s0$lam35:
+  __builtin_count_while$char$s0$lam23:
     calls: 2
     bytes: 176
-  __builtin_count_while$char$s0$lam37:
+  __builtin_count_while$char$s0$lam25:
     calls: 28
     bytes: 184
-  __builtin_count_while$char$s0$lam38:
+  __builtin_count_while$char$s0$lam32:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam48:
     calls: 4
     bytes: 172
-  __builtin_count_while$char$s0$lam40:
+  __builtin_count_while$char$s0$lam50:
     calls: 2
     bytes: 172
   __builtin_int_parse:
@@ -747,12 +800,12 @@ functions:
   __lambda_1:
     calls: 16
     bytes: 104
-  __lambda_12:
-    calls: 5
-    bytes: 140
   __lambda_2:
     calls: 0
     bytes: 144
+  __lambda_28:
+    calls: 5
+    bytes: 140
   __lambda_3:
     calls: 1
     bytes: 164
@@ -791,7 +844,7 @@ functions:
     bytes: 1520
   __m1__lex_step$AiplTok:
     calls: 91
-    bytes: 25000
+    bytes: 25260
   __m1__nested_len:
     calls: 56
     bytes: 940
@@ -821,10 +874,10 @@ functions:
     bytes: 692
   __test$lex_aipl:
     calls: 1
-    bytes: 117180
+    bytes: 119020
   __test$lex_aipl_stripped:
     calls: 1
-    bytes: 6636
+    bytes: 6740
   __test$lex_aipl_tokens:
     calls: 1
     bytes: 4676
@@ -861,6 +914,9 @@ functions:
   aipl_assert:
     calls: 20
     bytes: (external)
+  aipl_rules:
+    calls: 20
+    bytes: 85844
   aipl_test_begin:
     calls: 3
     bytes: (external)
@@ -880,11 +936,11 @@ functions:
     calls: 4
     bytes: 1212
   lex_aipl:
-    calls: 20
-    bytes: 77776
+    calls: 0
+    bytes: 144
   lex_aipl_tokens:
     calls: 2
-    bytes: 424
+    bytes: 488
   main:
     calls: 1
     bytes: 272

@@ -673,6 +673,8 @@ case_tests! {
     crates_aipl_codegen_src_grammar_calc = "crates/aipl-codegen/src/grammar_calc",
     crates_aipl_codegen_src_grammar_json = "crates/aipl-codegen/src/grammar_json",
     crates_aipl_codegen_src_grammar_sexp = "crates/aipl-codegen/src/grammar_sexp",
+    crates_aipl_codegen_src_highlight = "crates/aipl-codegen/src/highlight",
+    crates_aipl_codegen_src_highlight_aipl = "crates/aipl-codegen/src/highlight_aipl",
     crates_aipl_codegen_src_indent = "crates/aipl-codegen/src/indent",
     crates_aipl_codegen_src_int_fits = "crates/aipl-codegen/src/int_fits",
     crates_aipl_codegen_src_is_operator_name = "crates/aipl-codegen/src/is_operator_name",

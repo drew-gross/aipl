@@ -73,12 +73,12 @@ pub fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
 allocations: 2073
 deallocations: 2073
 reallocations: 30
-bytes allocated: 117626
-instructions executed: 383210
-binary size: 970200
-  code: 626088
-  data: 1891
-  metadata: 342221
+bytes allocated: 124346
+instructions executed: 395094
+binary size: 982904
+  code: 636668
+  data: 2171
+  metadata: 344065
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -88,7 +88,7 @@ functions:
     bytes: 360
   __arr_drop___m13__TokenRule$__m12__AiplTok:
     calls: 4
-    bytes: 740
+    bytes: 756
   __arr_drop___m6__ImportEntry:
     calls: 0
     bytes: 148
@@ -112,7 +112,7 @@ functions:
     bytes: 360
   __arr_retain___m13__TokenRule$__m12__AiplTok:
     calls: 0
-    bytes: 740
+    bytes: 756
   __arr_retain___m6__ImportEntry:
     calls: 0
     bytes: 148
@@ -128,7 +128,7 @@ functions:
   __arr_retain___m7__Doc:
     calls: 30
     bytes: 116
-  __builtin_all$char$s0$lam80:
+  __builtin_all$char$s0$lam90:
     calls: 0
     bytes: 212
   __builtin_any$__m7__Doc$lam97:
@@ -140,22 +140,22 @@ functions:
   __builtin_count_is_at_least$char$s0:
     calls: 0
     bytes: 252
-  __builtin_count_while$char$lam56:
+  __builtin_count_while$char$lam36:
     calls: 12
     bytes: 220
-  __builtin_count_while$char$s0$lam45:
-    calls: 0
-    bytes: 172
-  __builtin_count_while$char$s0$lam64:
+  __builtin_count_while$char$s0$lam44:
     calls: 0
     bytes: 176
-  __builtin_count_while$char$s0$lam66:
+  __builtin_count_while$char$s0$lam46:
     calls: 12
     bytes: 184
-  __builtin_count_while$char$s0$lam77:
+  __builtin_count_while$char$s0$lam61:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam79:
+  __builtin_count_while$char$s0$lam87:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam89:
     calls: 0
     bytes: 172
   __builtin_drop_last$str:
@@ -200,7 +200,7 @@ functions:
   __lambda_21:
     calls: 0
     bytes: 64
-  __lambda_41:
+  __lambda_57:
     calls: 0
     bytes: 140
   __m12__char_lit_emit:
@@ -238,7 +238,7 @@ functions:
     bytes: 1520
   __m13__lex_step$__m12__AiplTok:
     calls: 27
-    bytes: 25000
+    bytes: 25260
   __m13__nested_len:
     calls: 18
     bytes: 940
@@ -364,7 +364,7 @@ functions:
     bytes: 12952
   __m6__format_program:
     calls: 4
-    bytes: 119128
+    bytes: 129416
   __m6__hug_close:
     calls: 0
     bytes: 732

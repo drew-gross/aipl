@@ -75,6 +75,9 @@ value_or for structs:
   1. Literal flexing against a pinned type variable (the hard blocker; independently valuable, and adjacent to your existing TODO about repeated type variables in builtin signatures).
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
+highlighter:
+  range collapsing in charachter classes
+
 misc cleanup:
   use an enum for the builtins
   made logical not more like the rest of the operators (lower it to a call immediately)

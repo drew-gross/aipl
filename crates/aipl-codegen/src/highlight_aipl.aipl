@@ -1,0 +1,396 @@
+// AIPL's own TextMate grammar, as data — the file
+// `editors/vscode/syntaxes/aipl.tmLanguage.json` is generated from. This is the
+// highlighter's counterpart of `lex_aipl.aipl`: `highlight.aipl` is the generic
+// machinery, and this is just the table.
+//
+// Almost all of it comes straight from `aipl_rules()` — the same rule list the
+// lexer runs on, whose `scope` fields say what each token is painted. What is
+// left is what a *lexer* cannot know:
+//
+//   - `fn NAME` / `struct NAME`, where the name is scoped for its position, not
+//     its spelling. The names they accept come from the identifier rule's own
+//     character classes, so the two cannot disagree.
+//   - The builtin type names, which lex as ordinary identifiers and are told
+//     apart afterwards (`classify_lexed` in `aipl-parser`); this list is that
+//     one, and the only genuinely duplicated data here.
+//   - The `!prints` effect marker, which is one token to the lexer (`!`) and two
+//     halves to a reader.
+//   - The `--- section ---` tail of a test-case file, which is not AIPL at all:
+//     everything after the first marker is expected output, and highlighting it
+//     as source would be actively wrong.
+//
+// Regenerate the JSON with:
+//
+//     cargo test --test compiler -- --ignored highlighting::fill_tmlanguage
+//
+// `highlighting::checked_in_tmlanguage_is_current` fails when the checked-in
+// file and this description disagree, and the rest of `tests/highlighting.rs`
+// validates the *result* against every token of every case file and example —
+// which is the real check on anything changed here.
+import { contains, value_or } from builtins;
+import {
+    Caps,
+    Entry,
+    Expansion,
+    Include,
+    Match,
+    Pat,
+    Region,
+    Tm,
+    decl_pat,
+    matcher_regex,
+    rule_pats,
+    tm_json,
+    word_pat,
+} from "./highlight.aipl";
+import { aipl_rules, ident_cont, ident_start } from "./lex_aipl.aipl";
+import { CharRun } from "./lexer.aipl";
+
+pub fn aipl_tmlanguage() -> str {
+    let Expansion { pats, entries } = rule_pats(aipl_rules(), escape_scope());
+    let ident = ident_regex();
+    let main: Pat[] = [
+        // These four come before the lexical patterns so that a tie at one
+        // position goes to the more specific one: `fn` here rather than as a
+        // bare keyword, `i64` here rather than as a bare identifier. A pattern
+        // that starts *later* never loses to them — TextMate takes the earliest
+        // match first — so a `fn` inside a comment or a string is still comment
+        // or string.
+        decl_pat("fn", ident, "keyword.declaration.function.aipl", "entity.name.function.aipl"),
+        decl_pat(
+            "struct",
+            ident,
+            "keyword.declaration.struct.aipl",
+            "entity.name.type.struct.aipl",
+        ),
+        effect_pat(),
+        word_pat(builtin_types(), "support.type.builtin.aipl"),
+        ..pats,
+    ];
+    tm_json(Tm {
+        name: "AIPL",
+        scope_name: "source.aipl",
+        file_types: ["aipl"],
+        top: [Include("section-tail"), Include("main")],
+        note: """
+            Generated from crates/aipl-codegen/src/highlight_aipl.aipl, which
+            derives it from the lexer's own rule table. Do not edit by hand:
+            regenerate with `cargo test --test compiler -- --ignored
+            highlighting::fill_tmlanguage`.
+        """,
+        repo: [
+            Entry { name: "main", pats: main },
+            Entry { name: "section-tail", pats: [section_tail()] },
+            ..entries,
+        ],
+    })
+}.doc("""
+    AIPL's TextMate grammar as `.tmLanguage.json` text — what
+    `editors/vscode/syntaxes/aipl.tmLanguage.json` holds. Derived from
+    `aipl_rules()` plus the four patterns a lexer cannot describe; see the file
+    header.
+""").test({
+    let json = aipl_tmlanguage();
+
+    // The frame.
+    assert(json.contains("\"scopeName\": \"source.aipl\""));
+    assert(json.contains("\"fileTypes\": [\"aipl\"]"));
+    assert(json.contains("{ \"include\": \"#section-tail\" }"));
+
+    // The keyword and constant runs, merged from their individual `kw` rules in
+    // table order — every keyword AIPL has, in one alternation.
+    assert(json.contains("\\\\bfn\\\\b|\\\\blet\\\\b|\\\\bmut\\\\b"));
+    assert(json.contains("\\\\btrue\\\\b|\\\\bfalse\\\\b|\\\\bnone\\\\b"));
+
+    // The operator run stays longest-first, which is what keeps the alternation
+    // maximal munch: `+++` ahead of `++`, `==` ahead of `=`.
+    assert(json.contains("\\\\+\\\\+\\\\+|==|!="));
+
+    // The three string forms are regions, and the triple-quoted one is listed
+    // before the single — the same ordering the lexer rules carry.
+    let q = "\"";
+    let esc_q = "\\\"";
+    assert(json.contains(`{q}begin{q}: {q}{esc_q}{esc_q}{esc_q}{q}`));
+    assert(json.contains("\"name\": \"string.quoted.double.aipl\""));
+    assert(json.contains("\"name\": \"string.quoted.single.aipl\""));
+
+    // A template interpolation includes the whole language back into itself.
+    assert(json.contains("{ \"include\": \"#main\" }"));
+
+    // The block comment is the one self-referential pattern, so the one that
+    // needed a name.
+    assert(json.contains("\"comment-block\": {"));
+
+    // The contextual declarations, and the post-lexical type names.
+    assert(json.contains("\"match\": \"\\\\b(fn)\\\\s+"));
+    assert(json.contains("\"name\": \"entity.name.function.aipl\""));
+    assert(json.contains("\\\\bi64\\\\b"));
+
+    // ... and the section tail, which runs to end of file.
+    assert(json.contains("\"contentName\": \"meta.section-content.aipl\""));
+})
+
+// What an escape sequence inside a string, char or template literal is painted.
+// One scope for all of them, since a `\n` means the same thing wherever it is.
+fn escape_scope() -> str { "constant.character.escape.aipl" }
+
+// The identifier regex, built from the very classes the identifier *rule* is
+// built from (`lex_aipl.aipl`), so `fn NAME` accepts exactly the names AIPL
+// accepts. `matcher_regex` answers `none` only for the delimiter-scanning
+// matchers, which a `CharRun` is not.
+fn ident_regex() -> str { matcher_regex(CharRun(ident_cont(), first=ident_start())).value_or("") }
+
+// The builtin type names. Lexically these are plain identifiers — the AIPL lexer
+// emits `Name` for them and `classify_lexed` (`crates/aipl-parser/src/lib.rs`)
+// is what separates them out — so there is no rule to derive this from, and this
+// list has to stay in step with that one by hand.
+fn builtin_types() -> str[] {
+    ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "bool", "char", "str", "any"]
+}
+
+// An effect declaration — `!prints` in a signature. The effect names are spelled
+// out rather than matched as any `!ident`, which would mis-scope the unary `!`
+// in `!true` / `!ready`; they must stay in step with `KNOWN_EFFECTS`.
+fn effect_pat() -> Pat {
+    Caps("(!)(prints)\\b", ["keyword.operator.effect.aipl", "entity.name.tag.effect.aipl"])
+}
+
+// A test-case file's `--- name ---` markers and everything after the first one.
+// The tail is expected output, not AIPL, so it is scoped as plain content and
+// only the markers themselves are painted — as comments, which is the closest
+// thing a theme has to "not code". `\z` never matches inside the text, so the
+// region runs to end of file.
+fn section_tail() -> Pat {
+    let marker = "^[ \\t]*---[ \\t]+\\S.*?\\S[ \\t]+---[ \\t]*\\r?$";
+    Region(
+        marker,
+        "\\z",
+        [Match(marker, "comment.line.section-marker.aipl")],
+        begin_scope="comment.line.section-marker.aipl",
+        content_scope="meta.section-content.aipl",
+    )
+}
+--- performance ---
+allocations: 7169
+deallocations: 7169
+reallocations: 282
+bytes allocated: 862325
+instructions executed: 692257
+binary size: 218496
+  code: 157840
+  data: 3296
+  metadata: 57360
+functions:
+  __arr_drop___m1__Entry:
+    calls: 2
+    bytes: 148
+  __arr_drop___m1__Item:
+    calls: 91
+    bytes: 172
+  __arr_drop___m1__Pat:
+    calls: 35
+    bytes: 116
+  __arr_drop___m4__TokenRule$__m6__AiplTok:
+    calls: 1
+    bytes: 756
+  __arr_retain___m1__Entry:
+    calls: 2
+    bytes: 148
+  __arr_retain___m1__Item:
+    calls: 174
+    bytes: 172
+  __arr_retain___m1__Pat:
+    calls: 32
+    bytes: 116
+  __arr_retain___m4__TokenRule$__m6__AiplTok:
+    calls: 0
+    bytes: 756
+  __builtin_all$char$s0$lam43:
+    calls: 793
+    bytes: 212
+  __builtin_count_while$char$s0$lam31:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam40:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam42:
+    calls: 0
+    bytes: 172
+  __builtin_int_parse:
+    calls: 0
+    bytes: 1028
+  __eq_char$opt:
+    calls: 0
+    bytes: 100
+  __lambda_0:
+    calls: 0
+    bytes: 136
+  __lambda_1:
+    calls: 0
+    bytes: 104
+  __lambda_2:
+    calls: 0
+    bytes: 144
+  __lambda_27:
+    calls: 0
+    bytes: 140
+  __lambda_3:
+    calls: 0
+    bytes: 164
+  __lambda_4:
+    calls: 0
+    bytes: 144
+  __lambda_5:
+    calls: 0
+    bytes: 164
+  __lambda_6:
+    calls: 0
+    bytes: 48
+  __lambda_7:
+    calls: 0
+    bytes: 64
+  __m10__trim_prefix:
+    calls: 0
+    bytes: 260
+  __m11__trim_suffix:
+    calls: 0
+    bytes: 332
+  __m1__arr_fld:
+    calls: 12
+    bytes: 1036
+  __m1__caps_fld:
+    calls: 4
+    bytes: 1344
+  __m1__char_class:
+    calls: 10
+    bytes: 728
+  __m1__class_char:
+    calls: 266
+    bytes: 996
+  __m1__decl_pat:
+    calls: 2
+    bytes: 564
+  __m1__entry_name:
+    calls: 3
+    bytes: 444
+  __m1__escape_pat:
+    calls: 6
+    bytes: 308
+  __m1__fld:
+    calls: 63
+    bytes: 348
+  __m1__json_char:
+    calls: 2500
+    bytes: 1228
+  __m1__json_str:
+    calls: 153
+    bytes: 728
+  __m1__matcher_pat:
+    calls: 76
+    bytes: 5348
+  __m1__obj_fld:
+    calls: 5
+    bytes: 1576
+  __m1__obj_of:
+    calls: 28
+    bytes: 928
+  __m1__pat_json:
+    calls: 33
+    bytes: 4488
+  __m1__re_escape:
+    calls: 99
+    bytes: 1488
+  __m1__run_len:
+    calls: 16
+    bytes: 1340
+  __m2__indent:
+    calls: 123
+    bytes: 724
+  __m5__unescape:
+    calls: 0
+    bytes: 1108
+  __m6__char_lit_emit:
+    calls: 0
+    bytes: 1536
+  __m6__dedent_segments:
+    calls: 0
+    bytes: 272
+  __m6__int_lit:
+    calls: 0
+    bytes: 1212
+  __m6__raw_tpl_kind:
+    calls: 0
+    bytes: 2168
+  __m6__tpl_kind:
+    calls: 0
+    bytes: 2200
+  __m7__process_raw_string:
+    calls: 0
+    bytes: 1712
+  __rec_drop___m1__Pat:
+    calls: 170
+    bytes: 268
+  __test$aipl_tmlanguage:
+    calls: 1
+    bytes: 117484
+  __to_str_u64:
+    calls: 7
+    bytes: 204
+  aipl_arr_extend:
+    calls: 2
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 807
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 144
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 9
+    bytes: (external)
+  aipl_array_dec:
+    calls: 1341
+    bytes: (external)
+  aipl_array_new:
+    calls: 191
+    bytes: (external)
+  aipl_array_push:
+    calls: 3
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 1164
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 189
+    bytes: (external)
+  aipl_assert:
+    calls: 15
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 170
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 3393
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 3223
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 14
+    bytes: (external)
+  aipl_write_u64:
+    calls: 7
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 120

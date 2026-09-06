@@ -287,12 +287,22 @@ variant Matcher =
 // "unterminated delimited token" / "unterminated template literal") — so a rule
 // can name its token in the diagnostic (`"unterminated string literal"`) without
 // every rule having to.
+//
+// `scope` is the TextMate scope a syntax highlighter should paint this rule's
+// matches — `"keyword.control.aipl"`, `"string.quoted.double.aipl"`. `lex`
+// ignores it entirely: it is carried here so that one rule set describes a
+// language's lexical structure *once*, for the lexer and the highlighter both
+// (`highlight.aipl` generates the second from it), rather than the two drifting
+// apart as separate descriptions. Empty means "not highlighted", which is what a
+// `skip` rule wants. The same hint on the syntactic half is
+// `Production.scope` in `grammar.aipl`.
 struct TokenRule<K> {
     matcher: Matcher,
     emit: Emit<K>,
     skip: bool = false,
     trivia: bool = false,
     unterminated: str = "",
+    scope: str = "",
 }
 
 // What `lex` returns: the emitted tokens, and the trivia side-channel — the
@@ -1352,12 +1362,12 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
 allocations: 1453
 deallocations: 1453
 reallocations: 38
-bytes allocated: 95424
-instructions executed: 299406
-binary size: 1943016
-  code: 1300608
-  data: 9612
-  metadata: 632796
+bytes allocated: 98184
+instructions executed: 303921
+binary size: 1965576
+  code: 1317764
+  data: 9620
+  metadata: 638192
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1367,7 +1377,7 @@ functions:
     bytes: 472
   __arr_drop_TokenRule$Kind:
     calls: 26
-    bytes: 856
+    bytes: 872
   __arr_retain_StepResult$Kind:
     calls: 9
     bytes: 140
@@ -1376,7 +1386,7 @@ functions:
     bytes: 472
   __arr_retain_TokenRule$Kind:
     calls: 0
-    bytes: 856
+    bytes: 872
   __builtin_count_while$char$lam27:
     calls: 64
     bytes: 220
@@ -1490,7 +1500,7 @@ functions:
     bytes: 1108
   __test$lex:
     calls: 1
-    bytes: 1210696
+    bytes: 1227536
   __test$span_str:
     calls: 1
     bytes: 3152
@@ -1559,7 +1569,7 @@ functions:
     bytes: 1520
   lex_step$Kind:
     calls: 146
-    bytes: 27228
+    bytes: 27512
   main:
     calls: 1
     bytes: 168

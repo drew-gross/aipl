@@ -410,12 +410,12 @@ fn depth(self: Calc) -> u64 {
 allocations: 8899
 deallocations: 8899
 reallocations: 779
-bytes allocated: 525569
-instructions executed: 1378372
-binary size: 249192
-  code: 158596
+bytes allocated: 528521
+instructions executed: 1385089
+binary size: 250160
+  code: 159212
   data: 4980
-  metadata: 85616
+  metadata: 85968
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -446,7 +446,7 @@ functions:
     bytes: 128
   __arr_drop___m4__TokenRule$CalcTok:
     calls: 41
-    bytes: 484
+    bytes: 500
   __arr_retain_Calc:
     calls: 407
     bytes: 116
@@ -476,7 +476,7 @@ functions:
     bytes: 128
   __arr_retain___m4__TokenRule$CalcTok:
     calls: 0
-    bytes: 484
+    bytes: 500
   __builtin_count_while$char$lam55:
     calls: 132
     bytes: 220
@@ -620,7 +620,7 @@ functions:
     bytes: 1520
   __m4__lex_step$CalcTok:
     calls: 338
-    bytes: 20060
+    bytes: 20332
   __m4__nested_len:
     calls: 0
     bytes: 940
@@ -821,7 +821,7 @@ functions:
     bytes: 1036
   lex_calc:
     calls: 41
-    bytes: 2108
+    bytes: 2420
   lower_atom:
     calls: 105
     bytes: 1352

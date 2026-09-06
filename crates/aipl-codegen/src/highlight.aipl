@@ -1,0 +1,942 @@
+// Generates a TextMate grammar — the `.tmLanguage.json` a VS Code, Sublime or
+// Zed extension ships — from the data a language is *already* described with.
+//
+// The input is a `TokenRule[]`, the same rule set `lexer.aipl` lexes with. Every
+// rule carries a `scope` (see `TokenRule` in `lexer.aipl`), and this file turns
+// each rule's `Matcher` into the TextMate pattern that recognizes the same text.
+// A highlighter is then not a third hand-written description of the language but
+// a projection of the first one, which is the whole point: the copy that drifts
+// is the copy nobody generated.
+//
+// **Order means the same thing in both.** `lex` is first-match-wins at a
+// position; TextMate takes the pattern whose match starts earliest and breaks a
+// tie by the order patterns are listed. So a rule list already ordered for
+// maximal munch — `==` before `=`, the block comment before `/` — comes out
+// ordered correctly, and consecutive rules sharing a scope merge into one
+// ordered alternation for free.
+//
+// **What does not come from the lexer.** Two kinds of pattern have no lexical
+// rule to derive from, and both are supplied by the caller:
+//
+//   - *Contextual declarations* — `fn NAME`, `struct NAME` — where the name gets
+//     a different scope for being in that position. `decl_pat` builds one from a
+//     keyword and the identifier regex, so the names it accepts are still the
+//     lexer's.
+//   - *Post-lexical classes* — a language whose builtin type names lex as plain
+//     identifiers and are told apart later. `word_pat` builds the alternation.
+//
+// Anything else is `Pat`, hand-built: the model below is the escape hatch, and
+// `highlight_aipl.aipl` uses it for exactly one pattern (the test-case section
+// tail, which is not AIPL syntax at all).
+//
+// **Regex dialect.** The output has to satisfy two engines: Oniguruma, which is
+// what a real editor runs, and Rust's `regex`, which is what the oracle in
+// `tests/highlighting.rs` validates the checked-in file with. `regex` has no
+// lookaround, so a keyword boundary is `\b..\b` rather than a negative lookahead
+// on the rule's own continuation class — correct whenever that class is the
+// word-character set, which is the only case any rule set here has.
+import {
+    concat as +++,
+    contains,
+    drop_last,
+    equal as ==,
+    is_empty,
+    join,
+    len,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    map,
+    split,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+} from builtins;
+import { indent } from "./indent.aipl";
+import {
+    Bare,
+    Between,
+    CharRun,
+    Delimited,
+    Exact,
+    Float,
+    Int,
+    Keyword,
+    Matcher,
+    Nested,
+    OneChar,
+    Template,
+    ToEol,
+    TokenRule,
+} from "./lexer.aipl";
+
+// ---------- the TextMate model ----------
+
+// One TextMate pattern, as data. Four shapes, which is every shape the grammars
+// generated here use and every shape the oracle interprets:
+//
+// - `Match(regex, scope)`: paint what `regex` matches. An empty scope matches
+//   and paints nothing, which is only useful inside a region.
+// - `Caps(regex, scopes)`: paint capture group `i + 1` with `scopes[i]` — the
+//   contextual shape, where one match has differently-scoped halves.
+// - `Region(begin, end, inner, ..)`: everything from `begin` to `end`, with
+//   `inner` applied to what lies between. `scope` paints the whole region,
+//   `begin_scope` just the opening match, `content_scope` just the interior.
+// - `Include(name)`: defer to the repository entry called `name`. A region whose
+//   `inner` includes its *own* entry is how a nestable construct (a block
+//   comment inside a block comment) is written, and the only reason a pattern
+//   ever needs a name.
+variant Pat =
+    | Match(str, str)
+    | Caps(str, str[])
+    | Region(
+        begin: str,
+        end: str,
+        inner: Pat[],
+        scope: str = "",
+        begin_scope: str = "",
+        content_scope: str = ""
+    )
+    | Include(str)
+
+// One named repository entry: a list of patterns tried in order.
+struct Entry { name: str, pats: Pat[] }
+
+// A whole TextMate grammar. `top` is the pattern list applied to a file, and
+// `repo` the named entries it and they reach through `Include` — including the
+// conventional `main`, which is where a language's own patterns live so that a
+// string interpolation can include the whole language back into itself.
+//
+// `note` becomes the top-level `comment` key, which the format reserves for
+// exactly this and every consumer ignores. A generated file that does not say it
+// is generated gets hand-edited, so it is not optional in practice.
+struct Tm {
+    name: str,
+    scope_name: str,
+    file_types: str[],
+    top: Pat[],
+    repo: Entry[],
+    note: str = "",
+}
+
+// ---------- regex construction ----------
+
+// The chars a regex reads specially outside a character class, and so that a
+// literal spelling must escape. `-` is not among them: it is only special
+// *inside* a class (see `class_char`).
+fn re_meta() -> str {
+    let backslash = "\\";
+    `{backslash}.^$|?*+()[]{ob()}{cb()}`
+}
+
+// The chars that must be escaped *inside* `[...]`, where the rules are different
+// and much shorter.
+fn class_meta() -> str {
+    let backslash = "\\";
+    `{backslash}[]^-`
+}
+
+fn ob() -> str { "{" }
+
+fn cb() -> str { "}" }
+
+pub fn re_escape(s: str) -> str {
+    mut out = "";
+    for (let ch : s) {
+        set out = if (re_meta().contains(ch)) { `{out}\\{ch}` } else { `{out}{ch}` };
+    }
+    out
+}.doc("""
+    `s` as a regex matching exactly `s`: every character the engine reads
+    specially is backslash-escaped. Used for a rule's fixed spelling — an
+    operator, a keyword, a delimiter.
+""").test({
+    assert(re_escape("fn") == "fn");
+    assert(re_escape("+++") == "\\+\\+\\+");
+    assert(re_escape("#[allow]") == "#\\[allow\\]");
+    assert(re_escape("(") == "\\(");
+    assert(re_escape("}") == "\\}");
+    // `-` is literal outside a class, so it is left alone.
+    assert(re_escape("->") == "->");
+    assert(re_escape("") == "");
+})
+
+pub fn char_class(chars: str) -> str {
+    mut body = "";
+    for (let ch : chars) {
+        set body = `{body}{class_char(ch)}`;
+    }
+    `[{body}]`
+}.doc("""
+    A regex character class accepting exactly the characters of `chars`, in the
+    order given. Written out literally rather than collapsed into ranges: the
+    class is data, the character set comes from a lexer rule that spells it out
+    too, and a range is only a shorter way to say the same thing.
+""").test({
+    assert(char_class("abc") == "[abc]");
+    assert(char_class("0123456789") == "[0123456789]");
+    // The four class metacharacters are escaped; nothing else is.
+    assert(char_class("a-z") == "[a\\-z]");
+    assert(char_class("[]") == "[\\[\\]]");
+    assert(char_class("^") == "[\\^]");
+    // Whitespace is spelled with the escapes a JSON string can carry verbatim.
+    assert(char_class(" \t\n\r") == "[ \\t\\n\\r]");
+})
+
+// One character inside a class: the control characters as their regex escapes
+// (so the generated JSON carries no literal newline), the four class
+// metacharacters backslashed, everything else verbatim.
+fn class_char(ch: char) -> str {
+    if (ch == '\n') {
+        return "\\n";
+    };
+    if (ch == '\t') {
+        return "\\t";
+    };
+    if (ch == '\r') {
+        return "\\r";
+    };
+    if (class_meta().contains(ch)) {
+        return `\\{ch}`;
+    };
+    `{ch}`
+}
+
+// ---------- matchers become patterns ----------
+
+pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
+    match (m) {
+        // A run of `cont` chars opened by a `first` char. When the two classes
+        // are the same the run is one class and a `+`.
+        CharRun(cont, first) => {
+            let body = if (first == cont) {
+                `{char_class(cont)}+`
+            } else {
+                `{char_class(first)}{char_class(cont)}*`
+            };
+            Match(body, scope)
+        },
+        OneChar(chars) => Match(char_class(chars), scope),
+        Exact(s) => Match(re_escape(s), scope),
+        // The identifier boundary the rule wants, spelled as `\b` — see the
+        // dialect note in the header.
+        Keyword(s, _) => Match(`\\b{re_escape(s)}\\b`, scope),
+        ToEol(prefix) => Match(`{re_escape(prefix)}.*$`, scope),
+        Int => Match("-?[0-9]+", scope),
+        Float => Match("-?[0-9]+\\.[0-9]+", scope),
+        // An escape-aware scan closed by its own opening delimiter. The escape
+        // pattern is not decoration: it is what stops `end` from matching a
+        // delimiter the source escaped (`'\''`).
+        Delimited(open, escapes) => Region(
+            re_escape(open),
+            re_escape(open),
+            [escape_pat(escapes, esc_scope)],
+            scope=scope,
+        ),
+        Between(open, close) => {
+            let verbatim: Pat[] = [];
+            Region(re_escape(open), re_escape(close), verbatim, scope=scope)
+        },
+        // Depth-tracked, so the region includes itself — which is the one thing
+        // that needs a repository entry to refer to (see `rule_pats`).
+        Nested(open, close) => Region(
+            re_escape(open),
+            re_escape(close),
+            [Include(entry_name(scope))],
+            scope=scope,
+        ),
+        Template(open, escapes, _) => Region(
+            re_escape(open),
+            re_escape(open),
+            template_inner(escapes, esc_scope),
+            scope=scope,
+        ),
+    }
+}.doc("""
+    The TextMate pattern recognizing what `m` matches, painted `scope`. A
+    matcher that scans between delimiters becomes a `Region`, and `esc_scope` is
+    what its escape sequences are painted (`constant.character.escape.*`);
+    every other matcher becomes a plain `Match`.
+
+    Total over `Matcher`, so a new matcher shape in `lexer.aipl` fails to compile
+    here until it has a highlighting answer.
+""").test({
+    let none_scope = "";
+    assert(matcher_pat(Exact("=="), "op", none_scope) == Match("==", "op"));
+    assert(matcher_pat(Keyword("fn", "abc"), "kw", none_scope) == Match("\\bfn\\b", "kw"));
+    // `(` and `)` are literal inside a class, so a class escapes neither.
+    assert(matcher_pat(OneChar("()"), "p", none_scope) == Match("[()]", "p"));
+    assert(matcher_pat(ToEol("//"), "c", none_scope) == Match("//.*$", "c"));
+    assert(matcher_pat(Int, "n", none_scope) == Match("-?[0-9]+", "n"));
+
+    // A run with one class is `+`; a run with a narrower opener is the opener
+    // then the rest starred — the identifier shape.
+    assert(matcher_pat(CharRun("ab"), "r", none_scope) == Match("[ab]+", "r"));
+    assert(matcher_pat(CharRun("ab1", first="ab"), "r", none_scope) == Match("[ab][ab1]*", "r"));
+
+    // A delimited scan closes on its own delimiter and carries its escapes.
+    let esc: Pat = Match("\\\\[nt]", "esc");
+    assert(matcher_pat(Delimited("\"", "nt"), "s", "esc") == Region("\"", "\"", [esc], scope="s"));
+
+    // A verbatim scan has no inner patterns, and may close on a different
+    // delimiter than it opened with.
+    let empty: Pat[] = [];
+    assert(matcher_pat(Between("<", ">"), "s", "esc") == Region("<", ">", empty, scope="s"));
+
+    // A nestable region refers to itself by the name its scope makes.
+    let self_ref: Pat[] = [Include("comment-block")];
+    assert(
+        matcher_pat(Nested("/*", "*/"), "comment.block.aipl", "esc") == Region(
+            "/\\*",
+            "\\*/",
+            self_ref,
+            scope="comment.block.aipl",
+        ),
+    );
+
+    // A template carries its escapes *and* an interpolation that includes the
+    // whole language back into itself; a raw one (no escapes) carries only the
+    // interpolation.
+    let interp: Pat = Region("\\{", "\\}", [Include("main")]);
+    assert(
+        matcher_pat(Template("`", "nt", |segs: str[]| segs), "s", "esc") == Region(
+            "`",
+            "`",
+            [Match("\\\\[nt]", "esc"), interp],
+            scope="s",
+        ),
+    );
+    assert(
+        matcher_pat(Template("```", "", |segs: str[]| segs), "s", "esc") == Region(
+            "```",
+            "```",
+            [interp],
+            scope="s",
+        ),
+    );
+})
+
+pub fn matcher_regex(m: Matcher) -> str? {
+    match (matcher_pat(m, "", "")) {
+        Match(re, _) => some(re),
+        Caps(..) | Region(..) | Include(..) => none,
+    }
+}.doc("""
+    The plain regex `m` matches, or `none` when `m` scans between delimiters and
+    needs a whole region rather than one expression. The way to reuse a rule's
+    own character classes in a pattern written by hand — a `fn NAME` declaration
+    accepting exactly the names the identifier rule accepts.
+""").test({
+    assert(matcher_regex(Exact("->")) == some("->"));
+    assert(matcher_regex(CharRun("ab1", first="ab")) == some("[ab][ab1]*"));
+    // The four delimiter-scanning matchers have no single-expression form.
+    assert(matcher_regex(Delimited("\"", "nt")) == none);
+    assert(matcher_regex(Between("<", ">")) == none);
+    assert(matcher_regex(Nested("/*", "*/")) == none);
+    assert(matcher_regex(Template("`", "", |segs: str[]| segs)) == none);
+})
+
+// A backslash followed by one of `escapes` — what a delimited scan treats as an
+// escape rather than as content.
+fn escape_pat(escapes: str, scope: str) -> Pat { Match(`\\\\{char_class(escapes)}`, scope) }
+
+// What lies inside a template literal: its escapes, when it has any, and the
+// `{ .. }` interpolation, which includes the whole language back into itself so
+// an interpolated expression keeps its ordinary scopes.
+fn template_inner(escapes: str, esc_scope: str) -> Pat[] {
+    let interp: Pat = Region("\\{", "\\}", [Include("main")]);
+    if (escapes.is_empty()) { [interp] } else { [escape_pat(escapes, esc_scope), interp] }
+}
+
+// The repository entry name a scope makes: its parts joined with `-`, without
+// the trailing language suffix — `comment.block.aipl` becomes `comment-block`.
+// Only a self-referential region needs one, so this is the whole naming scheme.
+fn entry_name(scope: str) -> str { scope.split(".").drop_last().join(sep="-") }
+
+// ---------- rule sets become patterns ----------
+
+// What a rule set expands to: the patterns, in rule order, and the repository
+// entries some of them need names for. A self-referential region can only be
+// written as a named entry that includes itself, so the expansion cannot be a
+// bare pattern list.
+struct Expansion { pats: Pat[], entries: Entry[] }
+
+// One scoped rule reduced to what the merge below needs: its pattern, its
+// scope, the regex when the pattern is a plain `Match`, and whether it has to
+// become a named entry.
+struct Item { scope: str, re: str, pat: Pat, plain: bool, named: bool }
+
+pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
+    mut pats: Pat[] = [];
+    mut entries: Entry[] = [];
+    for (let it : merge_runs(items_of(rules, esc_scope))) {
+        if (it.named) {
+            let name = entry_name(it.scope);
+            set entries = [..entries, Entry { name, pats: [it.pat] }];
+            set pats = [..pats, Include(name)];
+        } else {
+            set pats = [..pats, it.pat];
+        };
+    }
+    Expansion { pats, entries }
+}.doc("""
+    The patterns `rules` describes, in rule order — one per rule, except that a
+    run of consecutive rules sharing a scope collapses into a single ordered
+    alternation, which is what turns twenty `Keyword` rules into one
+    `\\bfn\\b|\\blet\\b|..`. Rules with no scope (whitespace, anything a
+    highlighter should not paint) are dropped.
+
+    Order is preserved exactly, and regex alternation is ordered too, so a rule
+    list written longest-spelling-first stays maximal munch. `esc_scope` paints
+    the escape sequences inside delimited literals.
+
+    A self-referential region — a nestable block comment — comes back as an
+    `Include` plus the named entry it refers to, since that shape cannot be
+    written inline.
+""").test({
+    // Consecutive same-scope rules merge, in order, and a differently-scoped
+    // rule between them breaks the run.
+    let rules: TokenRule<Kind>[] = [
+        TokenRule { matcher: CharRun(" \t"), emit: Bare(Punct), skip: true },
+        TokenRule { matcher: Keyword("fn", "abc"), emit: Bare(Punct), scope: "kw" },
+        TokenRule { matcher: Keyword("let", "abc"), emit: Bare(Punct), scope: "kw" },
+        TokenRule { matcher: Keyword("true", "abc"), emit: Bare(Punct), scope: "const" },
+        TokenRule { matcher: Exact("=="), emit: Bare(Punct), scope: "op" },
+        TokenRule { matcher: Exact("="), emit: Bare(Punct), scope: "op" },
+    ];
+    let got = rule_pats(rules, "esc");
+    let no_entries: Entry[] = [];
+    assert(got.entries == no_entries);
+
+    // The unscoped whitespace rule is gone; the two keyword rules are one
+    // alternation; `==` still precedes `=`, which is what keeps it maximal munch.
+    assert(
+        got.pats == [
+            Match("\\bfn\\b|\\blet\\b", "kw"),
+            Match("\\btrue\\b", "const"),
+            Match("==|=", "op"),
+        ],
+    );
+
+    // A region is never merged into a run, and a self-referential one becomes a
+    // named entry plus the include that reaches it.
+    let with_block: TokenRule<Kind>[] = [
+        TokenRule { matcher: Nested("/*", "*/"), emit: Bare(Punct), scope: "comment.block.x" },
+        TokenRule { matcher: Exact("+"), emit: Bare(Punct), scope: "op" },
+    ];
+    let block = rule_pats(with_block, "esc");
+    assert(block.pats == [Include("comment-block"), Match("\\+", "op")]);
+    assert(block.entries.len() == 1);
+    assert(
+        block.entries == [
+            Entry {
+                name: "comment-block",
+                pats: [Region("/\\*", "\\*/", [Include("comment-block")], scope="comment.block.x")],
+            },
+        ],
+    );
+})
+
+fn items_of<K>(rules: TokenRule<K>[], esc_scope: str) -> Item[] {
+    mut out: Item[] = [];
+    for (let r : rules) {
+        if (!r.scope.is_empty()) {
+            let named = self_referential(r.matcher);
+            let item = match (matcher_pat(r.matcher, r.scope, esc_scope)) {
+                Match(re, _) => Item {
+                    scope: r.scope,
+                    re,
+                    pat: Match(re, r.scope),
+                    plain: true,
+                    named,
+                },
+                Caps(..) | Region(..) | Include(..) => Item {
+                    scope: r.scope,
+                    re: "",
+                    pat: matcher_pat(r.matcher, r.scope, esc_scope),
+                    plain: false,
+                    named,
+                },
+            };
+            set out = [..out, item];
+        };
+    }
+    out
+}
+
+// `items` with each maximal run of consecutive plain items sharing a scope
+// collapsed into one alternation. Alternation is ordered, so the collapse
+// preserves the priority the rule order encoded.
+fn merge_runs(items: Item[]) -> Item[] {
+    mut out: Item[] = [];
+    mut i: u64 = 0;
+    while (i < items.len()) {
+        let n = run_len(items, i);
+        match (items[i]) {
+            some(it) => {
+                if (n == 1) {
+                    set out = [..out, it];
+                } else {
+                    let re = items[i..i + n].map(|x| x.re).join(sep="|");
+                    set out = [..out, Item { ..it, re, pat: Match(re, it.scope) }];
+                };
+            },
+            none => {},
+        };
+        set i += n;
+    }
+    out
+}
+
+// How many items starting at `i` merge into one: 1 unless the item is a plain
+// `Match` and the items after it are too and share its scope.
+fn run_len(items: Item[], i: u64) -> u64 {
+    match (items[i]) {
+        some(it) => {
+            if (!it.plain) {
+                return 1;
+            };
+            mut n: u64 = 1;
+            mut going = true;
+            while (going) {
+                match (items[i + n]) {
+                    some(next) => {
+                        if (next.plain && next.scope == it.scope) {
+                            set n++;
+                        } else {
+                            set going = false;
+                        };
+                    },
+                    none => {
+                        set going = false;
+                    },
+                };
+            }
+            n
+        },
+        none => 1,
+    }
+}
+
+// Whether a matcher's pattern has to refer to itself — a depth-tracked region,
+// which is the only shape that cannot be written inline. Exhaustive on purpose:
+// a new matcher shape has to answer this before it compiles.
+fn self_referential(m: Matcher) -> bool {
+    match (m) {
+        Nested(..) => true,
+        CharRun(..)
+        | OneChar(..)
+        | Exact(..)
+        | Keyword(..)
+        | Delimited(..)
+        | Between(..)
+        | Template(..)
+        | ToEol(..)
+        | Int
+        | Float => false,
+    }
+}
+
+// ---------- patterns the lexer cannot describe ----------
+
+pub fn decl_pat(keyword: str, name_re: str, kw_scope: str, name_scope: str) -> Pat {
+    Caps(`\\b({re_escape(keyword)})\\s+({name_re})`, [kw_scope, name_scope])
+}.doc("""
+    A declaration: `keyword` then a name matching `name_re`, with the two halves
+    painted `kw_scope` and `name_scope`. This is the one genuinely *syntactic*
+    thing a highlighter does — a name means something different for standing
+    after `fn` — and the only one a regex- and line-based target can express.
+
+    Pass `name_re` from the identifier rule's own matcher (`matcher_regex`) so
+    the names a declaration accepts stay the names the lexer accepts. It must
+    contain no capture groups of its own, which a character-class run never does.
+""").test({
+    assert(decl_pat("fn", "[a-z]+", "kw", "name") == Caps("\\b(fn)\\s+([a-z]+)", ["kw", "name"]));
+})
+
+pub fn word_pat(words: str[], scope: str) -> Pat {
+    Match(words.map(|w| `\\b{re_escape(w)}\\b`).join(sep="|"), scope)
+}.doc("""
+    An alternation of whole words, all painted `scope` — for a class the lexer
+    does not distinguish because it is decided after lexing, like the builtin
+    type names that are lexically just identifiers.
+""").test({
+    assert(word_pat(["i64", "str"], "type") == Match("\\bi64\\b|\\bstr\\b", "type"));
+})
+
+// ---------- JSON ----------
+
+pub fn tm_json(g: Tm) -> str {
+    mut fields = [fld("$schema", json_str(SCHEMA()))];
+    if (!g.note.is_empty()) {
+        set fields = [..fields, fld("comment", json_str(g.note))];
+    };
+    set fields = [
+        ..fields,
+        fld("name", json_str(g.name)),
+        fld("scopeName", json_str(g.scope_name)),
+        fld("fileTypes", inline_arr(g.file_types.map(json_str))),
+        arr_fld("patterns", g.top.map(pat_json)),
+        obj_fld("repository", g.repo.map(entry_json)),
+    ];
+    `{obj_of(fields)}\n`
+}.doc("""
+    `g` as the `.tmLanguage.json` text an editor extension ships: two-space
+    indented, one trailing newline. Generated files are read in diffs, so the
+    layout is fixed and deterministic rather than minified.
+""").test({
+    let g = Tm {
+        name: "Toy",
+        scope_name: "source.toy",
+        file_types: ["toy"],
+        top: [Include("main")],
+        repo: [Entry { name: "main", pats: [Match("\\bfn\\b", "keyword.toy")] }],
+    };
+    assert(
+        tm_json(g) == """
+            {
+              "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+              "name": "Toy",
+              "scopeName": "source.toy",
+              "fileTypes": ["toy"],
+              "patterns": [
+                { "include": "#main" }
+              ],
+              "repository": {
+                "main": {
+                  "patterns": [
+                    {
+                      "match": "\\bfn\\b",
+                      "name": "keyword.toy"
+                    }
+                  ]
+                }
+              }
+            }
+        """ +++ "\n",
+    );
+})
+
+fn SCHEMA() -> str {
+    "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json"
+}
+
+fn pat_json(p: Pat) -> str {
+    match (p) {
+        Include(name) => `{ob()} "include": "#{name}" {cb()}`,
+        Match(re, scope) => {
+            mut fields = [fld("match", json_str(re))];
+            if (!scope.is_empty()) {
+                set fields = [..fields, fld("name", json_str(scope))];
+            };
+            obj_of(fields)
+        },
+        Caps(re, scopes) => obj_of([fld("match", json_str(re)), caps_fld("captures", scopes, 1)]),
+        Region(begin, end, inner, scope, begin_scope, content_scope) => {
+            mut fields = [fld("begin", json_str(begin)), fld("end", json_str(end))];
+            if (!scope.is_empty()) {
+                set fields = [..fields, fld("name", json_str(scope))];
+            };
+            if (!begin_scope.is_empty()) {
+                set fields = [..fields, caps_fld("beginCaptures", [begin_scope], 0)];
+            };
+            if (!content_scope.is_empty()) {
+                set fields = [..fields, fld("contentName", json_str(content_scope))];
+            };
+            if (!inner.is_empty()) {
+                set fields = [..fields, arr_fld("patterns", inner.map(pat_json))];
+            };
+            obj_of(fields)
+        },
+    }
+}
+
+fn entry_json(e: Entry) -> str {
+    let body = arr_fld("patterns", e.pats.map(pat_json));
+    `{json_str(e.name)}: {ob()}\n{body.indent(2)}\n{cb()}`
+}
+
+// One `"key": value` line, where `value` is already JSON.
+fn fld(key: str, value: str) -> str { `{json_str(key)}: {value}` }
+
+// `"key": [ .. ]`, one item per line. Items arrive rendered at column 0 and are
+// indented here, which is what keeps every renderer below indentation-free.
+fn arr_fld(key: str, items: str[]) -> str {
+    if (items.is_empty()) {
+        return `{json_str(key)}: []`;
+    };
+    let body = items.map(|x| x.indent(2)).join(sep=",\n");
+    `{json_str(key)}: [\n{body}\n]`
+}
+
+fn obj_fld(key: str, entries: str[]) -> str {
+    if (entries.is_empty()) {
+        return `{json_str(key)}: {ob()}{cb()}`;
+    };
+    let body = entries.map(|x| x.indent(2)).join(sep=",\n");
+    `{json_str(key)}: {ob()}\n{body}\n{cb()}`
+}
+
+// `"key": { "<base>": { "name": ".." }, .. }` — the capture-scope map, whose
+// keys are group numbers counting from `base` (1 for `captures`, 0 for
+// `beginCaptures`, which scopes the whole opening match).
+fn caps_fld(key: str, scopes: str[], base: u64) -> str {
+    mut entries: str[] = [];
+    for (let i, scope : scopes) {
+        let n = base + i;
+        set entries = [..entries, `"{n}": {ob()} "name": {json_str(scope)} {cb()}`];
+    }
+    obj_fld(key, entries)
+}
+
+fn inline_arr(items: str[]) -> str { `[{items.join(sep=", ")}]` }
+
+fn obj_of(fields: str[]) -> str {
+    let body = fields.map(|f| f.indent(2)).join(sep=",\n");
+    `{ob()}\n{body}\n{cb()}`
+}
+
+pub fn json_str(s: str) -> str {
+    mut body = "";
+    for (let ch : s) {
+        set body = `{body}{json_char(ch)}`;
+    }
+    `"{body}"`
+}.doc("""
+    `s` as a JSON string literal, quotes included: backslashes and double quotes
+    escaped, and the three whitespace control characters spelled as `\\n`, `\\t`
+    and `\\r`. Nothing else in a generated grammar needs escaping — the regexes
+    carry backslashes by the handful, which is the case that matters.
+""").test({
+    assert(json_str("abc") == "\"abc\"");
+    assert(json_str("") == "\"\"");
+    // A regex's backslashes double, and its quotes escape.
+    assert(json_str("\\bfn\\b") == "\"\\\\bfn\\\\b\"");
+    assert(json_str("say \"hi\"") == "\"say \\\"hi\\\"\"");
+    assert(json_str("a\nb\tc") == "\"a\\nb\\tc\"");
+})
+
+fn json_char(ch: char) -> str {
+    let backslash = "\\";
+    if (ch == '\\') {
+        return `{backslash}{backslash}`;
+    };
+    if (ch == '"') {
+        return `{backslash}"`;
+    };
+    if (ch == '\n') {
+        return `{backslash}n`;
+    };
+    if (ch == '\t') {
+        return `{backslash}t`;
+    };
+    if (ch == '\r') {
+        return `{backslash}r`;
+    };
+    `{ch}`
+}
+
+// ---------- test-only fixtures ----------
+//
+// A token-kind type, because a `TokenRule<K>` cannot be written down without
+// one. The rules above never look at a kind — a highlighter cares what a rule
+// *matches*, not what it emits — so one bare case is the whole fixture.
+
+variant Kind = Punct
+--- performance ---
+allocations: 1085
+deallocations: 1085
+reallocations: 33
+bytes allocated: 93191
+instructions executed: 72707
+binary size: 123728
+  code: 77352
+  data: 5034
+  metadata: 41342
+functions:
+  __arr_drop_Entry:
+    calls: 3
+    bytes: 148
+  __arr_drop_Item:
+    calls: 14
+    bytes: 172
+  __arr_drop_Pat:
+    calls: 29
+    bytes: 116
+  __arr_drop___m3__TokenRule$Kind:
+    calls: 2
+    bytes: 500
+  __arr_retain_Entry:
+    calls: 1
+    bytes: 148
+  __arr_retain_Item:
+    calls: 22
+    bytes: 172
+  __arr_retain_Pat:
+    calls: 8
+    bytes: 116
+  __arr_retain___m3__TokenRule$Kind:
+    calls: 0
+    bytes: 500
+  __builtin_all$char$s0$lam21:
+    calls: 38
+    bytes: 212
+  __eq_Entry:
+    calls: 1
+    bytes: 128
+  __eq_Entry$arr:
+    calls: 2
+    bytes: 284
+  __eq_Pat:
+    calls: 14
+    bytes: 480
+  __eq_Pat$arr:
+    calls: 11
+    bytes: 300
+  __eq_str$arr:
+    calls: 1
+    bytes: 364
+  __eq_str$opt:
+    calls: 6
+    bytes: 100
+  __lambda_0:
+    calls: 0
+    bytes: 64
+  __lambda_1:
+    calls: 0
+    bytes: 64
+  __lambda_2:
+    calls: 0
+    bytes: 64
+  __m1__indent:
+    calls: 12
+    bytes: 724
+  __rec_drop_Pat:
+    calls: 64
+    bytes: 268
+  __test$char_class:
+    calls: 1
+    bytes: 996
+  __test$decl_pat:
+    calls: 1
+    bytes: 1084
+  __test$json_str:
+    calls: 1
+    bytes: 852
+  __test$matcher_pat:
+    calls: 1
+    bytes: 11352
+  __test$matcher_regex:
+    calls: 1
+    bytes: 8052
+  __test$re_escape:
+    calls: 1
+    bytes: 1104
+  __test$rule_pats:
+    calls: 1
+    bytes: 7888
+  __test$tm_json:
+    calls: 1
+    bytes: 5932
+  __test$word_pat:
+    calls: 1
+    bytes: 1196
+  __to_str_u64:
+    calls: 0
+    bytes: 204
+  aipl_arr_inc:
+    calls: 150
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 20
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 7
+    bytes: (external)
+  aipl_array_dec:
+    calls: 265
+    bytes: (external)
+  aipl_array_new:
+    calls: 63
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 82
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 24
+    bytes: (external)
+  aipl_assert:
+    calls: 44
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 64
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 187
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 123
+    bytes: (external)
+  aipl_test_begin:
+    calls: 9
+    bytes: (external)
+  aipl_test_end:
+    calls: 9
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  arr_fld:
+    calls: 2
+    bytes: 1036
+  caps_fld:
+    calls: 0
+    bytes: 1344
+  char_class:
+    calls: 15
+    bytes: 728
+  class_char:
+    calls: 43
+    bytes: 996
+  entry_name:
+    calls: 5
+    bytes: 444
+  escape_pat:
+    calls: 3
+    bytes: 308
+  fld:
+    calls: 6
+    bytes: 348
+  json_char:
+    calls: 201
+    bytes: 1228
+  json_str:
+    calls: 21
+    bytes: 728
+  main:
+    calls: 1
+    bytes: 664
+  matcher_pat:
+    calls: 26
+    bytes: 5348
+  obj_fld:
+    calls: 1
+    bytes: 1576
+  obj_of:
+    calls: 2
+    bytes: 928
+  pat_json:
+    calls: 2
+    bytes: 4488
+  re_escape:
+    calls: 42
+    bytes: 1488
+  rule_pats$Kind:
+    calls: 2
+    bytes: 10776
+  run_len:
+    calls: 5
+    bytes: 1340

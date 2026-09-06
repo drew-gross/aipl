@@ -6,7 +6,7 @@ Long-running, interleaved with other work. Update the checkboxes as items land;
 each is sized to be finishable in one session.
 
 - [x] 1 `ebnf.aipl` + FIRST sets
-- [ ] 2 Highlighter generator (oracle: `tests/highlighting.rs`)
+- [x] 2 Highlighter generator (oracle: `tests/highlighting.rs`)
 - [ ] 3 AIPL's grammar, differential-tested against gazelle
 - [ ] 4 Formatter generator
 - [ ] 5 Retire gazelle
@@ -148,12 +148,41 @@ expectations, or the error messages get *worse* than the ones the collapsing in
 `expect_as` was built to keep readable. That is its own change, with its own
 tests; the sets it needs exist and are proven.
 
-**2 — The highlighter generator.** Generate
-`editors/vscode/syntaxes/aipl.tmLanguage.json` from the grammar. First because it
-**already has a strict oracle**: `tests/highlighting.rs` validates that file
-against every token of every case file and example. The target is regex- and
-line-based, so the generator emits token classification plus contextual patterns
-for the easy declarations — what the hand-written grammar does today.
+**2 — The highlighter generator. Done.**
+`editors/vscode/syntaxes/aipl.tmLanguage.json` is now generated, not written:
+`highlight.aipl` is the machinery, `highlight_aipl.aipl` the table, and
+`highlighting::checked_in_tmlanguage_is_current` fails when the checked-in file
+and the description disagree (`--ignored highlighting::fill_tmlanguage`
+regenerates it). The rest of `tests/highlighting.rs` — the strict oracle, every
+token of every case file and example — validates the result unchanged.
+
+**The source is the lexer's own rule table.** `TokenRule` gained a
+`scope: str = ""` field (`lexer.aipl`), the `Production.scope` idea one level
+down: carried, ignored by `lex`, and read by the generator. `highlight.aipl`
+maps each `Matcher` to the TextMate pattern recognizing the same text — a
+`Delimited`/`Between`/`Template` scan to a begin/end region with its escapes, a
+`Nested` one to the single self-referential entry that needs a name, everything
+else to a plain regex — and is total over `Matcher`, so a new matcher shape has
+to answer for the highlighter before it compiles.
+
+**Order carries across for free**, which is the result that made this cheap:
+`lex` is first-match-wins at a position and TextMate takes the earliest match,
+tie broken by listing order. A rule list already sorted for maximal munch (`==`
+before `=`, the block comment before `/`) comes out sorted, and consecutive
+rules sharing a scope collapse into one *ordered* alternation — twenty `kw`
+rules become one `\bfn\b|\blet\b|..`.
+
+Four patterns have no lexical rule to derive from and are supplied by
+`highlight_aipl.aipl`: the `fn NAME` / `struct NAME` declarations (whose name
+regex still comes from the identifier rule's own character classes), the builtin
+type names (which lex as ordinary identifiers and are separated by
+`classify_lexed`, the one genuinely duplicated list), the `!prints` effect
+marker, and the `--- section ---` tail, which is not AIPL source at all. Adding
+a `variant NAME` declaration is now one line of data.
+
+Nothing joined `DOGFOOD_SOURCE_FILES`: the Rust test JIT-compiles the generator
+through `Engine::compile_file` and calls it, so there is no `.clif` for it. The
+`TokenRule` field does move the lexer's IR, which handoff regenerates.
 
 **3 — AIPL's own grammar**, differential-tested against gazelle across the whole
 corpus, in the shape of

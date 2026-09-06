@@ -885,12 +885,12 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
 allocations: 2902
 deallocations: 2902
 reallocations: 331
-bytes allocated: 181717
-instructions executed: 434373
-binary size: 306008
-  code: 187924
+bytes allocated: 185797
+instructions executed: 440611
+binary size: 307688
+  code: 189156
   data: 5924
-  metadata: 112160
+  metadata: 112608
 functions:
   __arr_drop_Node:
     calls: 11
@@ -915,7 +915,7 @@ functions:
     bytes: 188
   __arr_drop___m3__TokenRule$Tok:
     calls: 42
-    bytes: 572
+    bytes: 588
   __arr_retain_Node:
     calls: 10
     bytes: 116
@@ -939,7 +939,7 @@ functions:
     bytes: 188
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
-    bytes: 572
+    bytes: 588
   __builtin_count_while$char$lam28:
     calls: 101
     bytes: 220
@@ -1050,7 +1050,7 @@ functions:
     bytes: 1520
   __m3__lex_step$Tok:
     calls: 151
-    bytes: 21560
+    bytes: 21832
   __m3__nested_len:
     calls: 0
     bytes: 940
@@ -1215,7 +1215,7 @@ functions:
     bytes: 844
   tok_rules:
     calls: 40
-    bytes: 2328
+    bytes: 2736
   tok_text$Tok$Node:
     calls: 81
     bytes: 832
@@ -1224,4 +1224,4 @@ functions:
     bytes: 760
   trivia_rules:
     calls: 2
-    bytes: 2848
+    bytes: 3368

@@ -2833,12 +2833,12 @@ fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 allocations: 20383
 deallocations: 20383
 reallocations: 1242
-bytes allocated: 1237198
-instructions executed: 3347480
-binary size: 4090560
-  code: 2529788
-  data: 24972
-  metadata: 1535800
+bytes allocated: 1250638
+instructions executed: 3383032
+binary size: 4103384
+  code: 2540488
+  data: 25252
+  metadata: 1537644
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2863,7 +2863,7 @@ functions:
     bytes: 360
   __arr_drop___m9__TokenRule$__m8__AiplTok:
     calls: 8
-    bytes: 740
+    bytes: 756
   __arr_retain_ImportEntry:
     calls: 30
     bytes: 148
@@ -2887,8 +2887,8 @@ functions:
     bytes: 360
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
-    bytes: 740
-  __builtin_all$char$s0$lam65:
+    bytes: 756
+  __builtin_all$char$s0$lam81:
     calls: 0
     bytes: 212
   __builtin_any$__m1__Doc$lam32:
@@ -2900,23 +2900,23 @@ functions:
   __builtin_count_is_at_least$char$s0:
     calls: 47
     bytes: 252
-  __builtin_count_while$char$lam75:
+  __builtin_count_while$char$lam68:
     calls: 69
     bytes: 220
+  __builtin_count_while$char$s0$lam100:
+    calls: 1
+    bytes: 172
   __builtin_count_while$char$s0$lam52:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam64:
-    calls: 0
-    bytes: 172
-  __builtin_count_while$char$s0$lam83:
+  __builtin_count_while$char$s0$lam76:
     calls: 1
     bytes: 176
-  __builtin_count_while$char$s0$lam85:
+  __builtin_count_while$char$s0$lam78:
     calls: 50
     bytes: 184
-  __builtin_count_while$char$s0$lam90:
-    calls: 1
+  __builtin_count_while$char$s0$lam80:
+    calls: 0
     bytes: 172
   __builtin_drop_last$str:
     calls: 0
@@ -2972,7 +2972,7 @@ functions:
   __lambda_44:
     calls: 0
     bytes: 64
-  __lambda_68:
+  __lambda_84:
     calls: 1
     bytes: 140
   __m10__unescape:
@@ -3052,7 +3052,7 @@ functions:
     bytes: 1520
   __m9__lex_step$__m8__AiplTok:
     calls: 131
-    bytes: 25000
+    bytes: 25260
   __m9__nested_len:
     calls: 84
     bytes: 940
@@ -3238,7 +3238,7 @@ functions:
     bytes: 12952
   format_program:
     calls: 8
-    bytes: 113760
+    bytes: 124168
   hug_close:
     calls: 0
     bytes: 732

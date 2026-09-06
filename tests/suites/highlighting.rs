@@ -396,12 +396,80 @@ fn find_end(
     }
 }
 
-fn load_grammar() -> Grammar {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+/// The `.tmLanguage.json` this suite validates — and, since Stage 2 of the
+/// parser-library plan, *generates*: the checked-in file is the output of the
+/// AIPL description in `crates/aipl-codegen/src/highlight_aipl.aipl`, which is
+/// itself derived from the lexer's own rule table (`aipl_rules`).
+fn tmlanguage_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("editors")
         .join("vscode")
         .join("syntaxes")
-        .join("aipl.tmLanguage.json");
+        .join("aipl.tmLanguage.json")
+}
+
+/// Run the AIPL generator and return the grammar text it produces.
+///
+/// The generator is compiled fresh from source rather than reached through the
+/// dogfood engine: it is not on the compiler's own path, so it is deliberately
+/// *not* in `DOGFOOD_SOURCE_FILES` and there is no checked-in IR for it. One
+/// JIT compile per test run is the whole cost.
+/// Compiling the generator's dependency closure (it reaches the whole lexer)
+/// recurses deeper than a test thread's default stack allows, so the work runs
+/// on a 64 MB worker — the same reason `lexer_dogfood.rs` and `dogfood_ir.rs`
+/// spawn one.
+fn generated_tmlanguage() -> String {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("crates")
+                .join("aipl-codegen")
+                .join("src")
+                .join("highlight_aipl.aipl");
+            let engine = aipl::Engine::compile_file(&path)
+                .unwrap_or_else(|e| panic!("compile {}: {e:?}", path.display()));
+            match engine.call_values("aipl_tmlanguage", &[]) {
+                Ok(aipl::FfiValue::Str(s)) => s,
+                other => panic!("aipl_tmlanguage(): {other:?}"),
+            }
+        })
+        .expect("spawn worker")
+        .join()
+        .expect("worker panicked")
+}
+
+#[test]
+fn checked_in_tmlanguage_is_current() {
+    let path = tmlanguage_path();
+    let checked_in = fs::read_to_string(&path).expect("read tmLanguage.json");
+    let generated = generated_tmlanguage();
+    assert_eq!(
+        checked_in,
+        generated,
+        "{} is out of date with its generator \
+         (crates/aipl-codegen/src/highlight_aipl.aipl). Regenerate it with:\n    \
+         cargo test --test compiler -- --ignored highlighting::fill_tmlanguage",
+        path.display()
+    );
+}
+
+/// Author helper: rewrite the checked-in grammar from the AIPL description, then
+/// fail so the diff gets reviewed before it is committed — the same shape as the
+/// other `fill_*` helpers.
+#[test]
+#[ignore]
+fn fill_tmlanguage() {
+    let path = tmlanguage_path();
+    fs::write(&path, generated_tmlanguage()).expect("write tmLanguage.json");
+    panic!(
+        "rewrote {} from crates/aipl-codegen/src/highlight_aipl.aipl — review the diff",
+        path.display()
+    );
+}
+
+fn load_grammar() -> Grammar {
+    let path = tmlanguage_path();
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path:?}: {e}"));
     let json: Value = serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse JSON: {e}"));
     compile_grammar(&json)

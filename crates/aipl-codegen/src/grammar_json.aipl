@@ -445,12 +445,12 @@ fn shown(src: str) -> str!ParseError { ok(json_cst(src)?.show(src, prod_names(js
 allocations: 11684
 deallocations: 11684
 reallocations: 567
-bytes allocated: 859290
-instructions executed: 1786118
-binary size: 272928
-  code: 174592
+bytes allocated: 867498
+instructions executed: 1802126
+binary size: 274608
+  code: 175824
   data: 6404
-  metadata: 91932
+  metadata: 92380
 functions:
   __arr_drop_Json:
     calls: 125
@@ -478,7 +478,7 @@ functions:
     bytes: 160
   __arr_drop___m4__TokenRule$JsonTok:
     calls: 38
-    bytes: 544
+    bytes: 560
   __arr_retain_Json:
     calls: 135
     bytes: 116
@@ -505,7 +505,7 @@ functions:
     bytes: 160
   __arr_retain___m4__TokenRule$JsonTok:
     calls: 0
-    bytes: 544
+    bytes: 560
   __builtin_count_while$char$lam54:
     calls: 39
     bytes: 220
@@ -652,7 +652,7 @@ functions:
     bytes: 1520
   __m4__lex_step$JsonTok:
     calls: 233
-    bytes: 21000
+    bytes: 21272
   __m4__nested_len:
     calls: 0
     bytes: 940
@@ -832,7 +832,7 @@ functions:
     bytes: 6728
   lex_json:
     calls: 38
-    bytes: 5684
+    bytes: 6612
   lower_array:
     calls: 11
     bytes: 268

@@ -300,12 +300,12 @@ fn shown(src: str) -> str!ParseError { ok(sexp_cst(src)?.show(src, prod_names(se
 allocations: 25507
 deallocations: 25507
 reallocations: 2355
-bytes allocated: 1275343
-instructions executed: 4415993
-binary size: 235248
-  code: 150304
+bytes allocated: 1277647
+instructions executed: 4439711
+binary size: 236336
+  code: 151024
   data: 3940
-  metadata: 81004
+  metadata: 81372
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -333,7 +333,7 @@ functions:
     bytes: 160
   __arr_drop___m4__TokenRule$SexpKind:
     calls: 24
-    bytes: 544
+    bytes: 560
   __arr_retain_Sexp:
     calls: 873
     bytes: 116
@@ -360,7 +360,7 @@ functions:
     bytes: 160
   __arr_retain___m4__TokenRule$SexpKind:
     calls: 0
-    bytes: 544
+    bytes: 560
   __builtin_count_while$char$lam53:
     calls: 77
     bytes: 220
@@ -501,7 +501,7 @@ functions:
     bytes: 1520
   __m4__lex_step$SexpKind:
     calls: 936
-    bytes: 21000
+    bytes: 21272
   __m4__nested_len:
     calls: 0
     bytes: 940
@@ -669,7 +669,7 @@ functions:
     bytes: 312
   lex_sexp:
     calls: 24
-    bytes: 2952
+    bytes: 3368
   lower_item:
     calls: 448
     bytes: 1040
