@@ -41,8 +41,14 @@ fn ident(s: &str) -> Expr {
     dummy(ExprKind::Ident(s.into()))
 }
 
+/// An operator use, as the call the parser builds: the callee is the operator's
+/// spelling, and the operands are the arguments.
 fn binop(l: Expr, op: BinOp, r: Expr) -> Expr {
-    dummy(ExprKind::Binop(Box::new(l), op, Box::new(r)))
+    dummy(ExprKind::Call(
+        aipl_syntax::binop_spelling(op).into(),
+        vec![l, r],
+        false,
+    ))
 }
 
 fn neg(e: Expr) -> Expr {
@@ -50,7 +56,7 @@ fn neg(e: Expr) -> Expr {
 }
 
 fn not(e: Expr) -> Expr {
-    dummy(ExprKind::Not(Box::new(e)))
+    dummy(ExprKind::Call("!".into(), vec![e], false))
 }
 
 fn call(name: &str, args: Vec<Expr>) -> Expr {
@@ -639,8 +645,8 @@ fn line_comment_does_not_steal_division_operator() {
     let p = parse("fn f(x: i64, y: i64) -> i64 { x / y }").unwrap();
     let f = fn_item(&p, 0);
     match &f.body.kind {
-        ExprKind::Binop(_, op, _) => assert_eq!(*op, BinOp::Div),
-        other => panic!("expected binop, got {other:?}"),
+        ExprKind::Call(op, args, _) if args.len() == 2 => assert_eq!(op, "/"),
+        other => panic!("expected a `/` call, got {other:?}"),
     }
 }
 
@@ -1039,7 +1045,7 @@ fn parses_lambda_argument() {
     assert_eq!(params.len(), 1);
     assert_eq!(params[0].name, "x");
     assert!(params[0].ty.is_none());
-    assert!(matches!(&body.kind, ExprKind::Binop(..)));
+    assert!(matches!(&body.kind, ExprKind::Call(op, args, _) if op == "+" && args.len() == 2));
     assert!(matches!(&args[1].kind, ExprKind::Num(5)));
 }
 
@@ -1058,8 +1064,8 @@ fn or_token_serves_both_roles() {
     let p = parse("fn main() -> bool { a || b }").unwrap();
     let f = fn_item(&p, 0);
     assert!(
-        matches!(&f.body.kind, ExprKind::Binop(_, BinOp::Or, _)),
-        "expected logical-or binop, got {:?}",
+        matches!(&f.body.kind, ExprKind::Call(op, args, _) if op == "||" && args.len() == 2),
+        "expected a logical-or call, got {:?}",
         f.body.kind
     );
     // ...and the lead of a no-arg lambda in argument position.
@@ -1073,5 +1079,5 @@ fn or_token_serves_both_roles() {
     };
     assert!(params.is_empty());
     // The body is the `a || b` logical-or.
-    assert!(matches!(&body.kind, ExprKind::Binop(_, BinOp::Or, _)));
+    assert!(matches!(&body.kind, ExprKind::Call(op, args, _) if op == "||" && args.len() == 2));
 }

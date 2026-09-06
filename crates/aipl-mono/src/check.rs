@@ -2341,39 +2341,6 @@ impl Cx<'_> {
                 )?;
                 Type::Primitive(Primitive::I64)
             }
-            ExprKind::Not(x) => {
-                let t = self.check_expr(x, env, effects)?;
-                expect(
-                    &t,
-                    &Type::Primitive(Primitive::Bool),
-                    "\"!\" operand",
-                    x.span.clone(),
-                )?;
-                Type::Primitive(Primitive::Bool)
-            }
-            ExprKind::Binop(l, op, r) => {
-                let lt = self.check_expr(l, env, effects)?;
-                let rt = self.check_expr(r, env, effects)?;
-                // A bare integer literal flexes to the *other* operand's integer
-                // type (if it fits), so `i8_val == 5` needs no explicit `i8(5)`.
-                let rt2 = self.flex_int(r, &rt, &lt)?;
-                let lt2 = self.flex_int(l, &lt, &rt)?;
-                // Record what the flex decided. An integer literal needs no
-                // record — it is already canonical in its register and only its
-                // static type moved — but a constructor reference does: `k == Str`
-                // makes `Str` a case, and without the note mono would re-derive
-                // the constructor function and hand codegen a lambda.
-                self.lock(l, &lt2);
-                self.lock(r, &rt2);
-                self.check_binop(
-                    *op,
-                    &lt2,
-                    &rt2,
-                    l.span.clone(),
-                    r.span.clone(),
-                    span.clone(),
-                )?
-            }
             ExprKind::If(c, t, e) => {
                 let ct = self.check_expr(c, env, effects)?;
                 expect(
@@ -3148,6 +3115,43 @@ impl Cx<'_> {
                 } else {
                     Type::Primitive(Primitive::Bool)
                 });
+            }
+        }
+        // An operator resolved (in the loader) to its canonical `__builtin_*`
+        // impl. Typed exactly as the operator is, because it *is* the operator:
+        // after import resolution `a == b` and a bare `equal(a, b)` are one call,
+        // so both reach `check_binop` here. The flex and the `lock` are the
+        // operator's too — a bare integer literal takes the other operand's
+        // width, and a constructor reference is recorded so mono does not
+        // re-derive it (`k == Str`). Reserved names, not imported.
+        if name == "__builtin_logical_not" {
+            if let [x] = args {
+                let t = self.check_expr(x, env, effects)?;
+                expect(
+                    &t,
+                    &Type::Primitive(Primitive::Bool),
+                    "\"!\" operand",
+                    x.span.clone(),
+                )?;
+                return Ok(Type::Primitive(Primitive::Bool));
+            }
+        }
+        if let Some(op) = aipl_syntax::binop_for_builtin(name) {
+            if args.len() == 2 {
+                let lt = self.check_expr(&args[0], env, effects)?;
+                let rt = self.check_expr(&args[1], env, effects)?;
+                let rt2 = self.flex_int(&args[1], &rt, &lt)?;
+                let lt2 = self.flex_int(&args[0], &lt, &rt)?;
+                self.lock(&args[0], &lt2);
+                self.lock(&args[1], &rt2);
+                return self.check_binop(
+                    op,
+                    &lt2,
+                    &rt2,
+                    args[0].span.clone(),
+                    args[1].span.clone(),
+                    span.clone(),
+                );
             }
         }
         // `a + b` / `a - b` resolve (in the loader) to a call to the file's bound
@@ -3975,19 +3979,6 @@ impl Cx<'_> {
                     rspan,
                 )?;
                 Ok(Type::Primitive(Primitive::Bool))
-            }
-            // The loader lowers `++`/`--` and every compound assignment to
-            // their base operation before the checker runs.
-            BinOp::Incr
-            | BinOp::Decr
-            | BinOp::AddAssign
-            | BinOp::SubAssign
-            | BinOp::MulAssign
-            | BinOp::DivAssign => {
-                unreachable!(
-                    "`{}` is lowered to its base operation by the loader",
-                    aipl_syntax::binop_spelling(op)
-                )
             }
         }
     }

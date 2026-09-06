@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::Error;
 
 /// What [`is_empty_longhand`] needs from the file's imports: whether `==` and `!`
@@ -71,17 +71,24 @@ pub(super) fn empty_names(program: &Program) -> EmptyNames {
 /// mean guessing at what an unusual spelling meant.
 pub(super) fn is_empty_longhand(e: &Expr, src: &str, names: &EmptyNames, hits: &mut Vec<Error>) {
     let recv = match &e.kind {
-        // `!x.is_nonempty()`
-        ExprKind::Not(inner) if names.not => match &inner.kind {
-            ExprKind::Call(f, args, _)
-                if args.len() == 1 && names.nonempty.as_deref().is_some_and(|n| n == f) =>
-            {
-                Some(&args[0])
-            }
+        // `!x.is_nonempty()` — `!` is a call named for its spelling, like every
+        // operator.
+        ExprKind::Call(op, args, _) if op == "!" && names.not => match args.as_slice() {
+            [inner] => match &inner.kind {
+                ExprKind::Call(f, args, _)
+                    if args.len() == 1 && names.nonempty.as_deref().is_some_and(|n| n == f) =>
+                {
+                    Some(&args[0])
+                }
+                _ => None,
+            },
             _ => None,
         },
         // `x.len() == 0`, either operand order.
-        ExprKind::Binop(l, BinOp::Eq, r) if names.eq => {
+        ExprKind::Call(op, args, _) if op == "==" && names.eq => {
+            let [l, r] = args.as_slice() else {
+                return;
+            };
             let is_zero = |e: &Expr| matches!(e.kind, ExprKind::Num(0));
             let Some(len) = names.len.as_deref() else {
                 return;

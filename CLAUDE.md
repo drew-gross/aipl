@@ -305,12 +305,30 @@ separate thing from importing the operator: the bare name makes the function
 available, the alias makes the operator spelling available, and a file may have
 either or both. Only the operator has no bare form.
 
-Nothing downstream of import resolution can tell which spelling was used. The
-single-semantics builtins have no `__builtin_*` impl behind them — their
-canonical is the operator spelling itself — so a call to one is lowered back to
-the same primitive node the operator produces (`binop_from_spelling`, in the
-loader's `rewrite_expr`). `concat(a, b)` and `a +++ b` are one program, not two
-paths.
+**An operator use is an ordinary call.** The parser builds `a + b` as a call
+whose callee is the spelling — `+` — so the loader gates that name against the
+file's imports and then maps it through the same view every other call goes
+through, landing on the canonical `__builtin_*` impl (or on one of your own
+functions, for `import { my_add as + }`). There is no operator node: `ExprKind`
+has no `Binop`, and nothing downstream of import resolution can tell an operator
+was written. `concat(a, b)` and `a +++ b` are one program because they are
+literally the same call.
+
+That is why every operator has a real `__builtin_*` canonical, including the
+single-semantics ones. They used to resolve to the operator spelling itself — a
+*marker* rather than a callable name — which forced the loader to lower a bare
+`concat(a, b)` back into the primitive node the operator produced, and forced
+every pass to carry two shapes for one question. Twice that cost a silent bug:
+mono and codegen each hand-matched the in-place-append shape and disagreed (now
+`aipl_syntax::self_append`, asked by both), and `aliases_or_unsafe` counted an
+operand as a read but a call argument as an escape.
+
+The one exception is unary `-`: it has no named builtin to resolve to, so it
+stays `ExprKind::Neg` and is gated by hand. `BinOp` survives too, but only as an
+opcode — the parser's precedence table, and `binop_for_builtin`, which names the
+operation behind a canonical. It is deliberately not total: the arithmetic impls
+are excluded, because `__builtin_wrapping_add` and `__builtin_saturating_add`
+would both answer `Add` and the flavor would be lost.
 
 | operator | import as | operator | import as |
 |---|---|---|---|

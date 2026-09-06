@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::Error;
 
 /// What [`len_gt_zero`] needs from the file's imports: whether `<` and `>`
@@ -63,7 +63,10 @@ pub(super) fn len_zero_cmp(program: &Program) -> LenZeroCmp {
 /// idioms people actually reach for, not every expression that happens to
 /// mention a length and a zero.
 pub(super) fn len_gt_zero(e: &Expr, src: &str, cmp: &LenZeroCmp, hits: &mut Vec<Error>) {
-    let ExprKind::Binop(l, op, r) = &e.kind else {
+    let ExprKind::Call(op, args, _) = &e.kind else {
+        return;
+    };
+    let [l, r] = args.as_slice() else {
         return;
     };
     let is_zero = |e: &Expr| matches!(e.kind, ExprKind::Num(0));
@@ -72,9 +75,9 @@ pub(super) fn len_gt_zero(e: &Expr, src: &str, cmp: &LenZeroCmp, hits: &mut Vec<
     let Some(len) = cmp.len.as_deref() else {
         return;
     };
-    let recv = match op {
-        BinOp::Lt if cmp.lt && is_zero(l) => len_receiver(r, len),
-        BinOp::Gt if cmp.gt && is_zero(r) => len_receiver(l, len),
+    let recv = match op.as_str() {
+        "<" if cmp.lt && is_zero(l) => len_receiver(r, len),
+        ">" if cmp.gt && is_zero(r) => len_receiver(l, len),
         _ => None,
     };
     let Some(recv) = recv else {

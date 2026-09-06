@@ -1029,20 +1029,30 @@ fn op_import_at(spelling: &str, span: Span) -> ImportName {
     }
 }
 
+/// One operator use, as the call it is: `a + b` is a call to `+` with the two
+/// operands as arguments, and `!x` a call to `!` with one.
+///
+/// The operator spelling *is* the callee name here, which is what lets the
+/// loader treat an operator like any other imported name: it gates the spelling
+/// against the file's imports and then maps it through the same view every other
+/// call goes through, landing on the canonical `__builtin_*` impl (or on a user
+/// function, for `import { my_add as + }`). Nothing downstream of that has to
+/// know an operator was written — there is no operator node to carry.
+fn operator_call(spelling: &str, args: Vec<Expr>, span: Span) -> Expr {
+    Expr::new(ExprKind::Call(spelling.to_string(), args, false), span)
+}
+
 /// Build the `(lhs, value, span)` of one step-by-one statement — `set n++;` is
 /// `set n = n ++ 1;` and `set n--;` is `set n = n -- 1;`, where `op` is the
 /// step operator ([`BinOp::Incr`] / [`BinOp::Decr`], gated on importing `++` /
 /// `--`). The loader collapses each to a plain add / subtract after gating, so
 /// codegen never sees one. The `1` and the operator carry the operator's own
 /// span so diagnostics (a missing import, or a non-integer `n`) point at it.
-fn step_by_one(name: String, name_span: Span, op: BinOp, op_span: Span) -> (Expr, Expr, Span) {
+fn step_by_one(name: String, name_span: Span, spelling: &str, op_span: Span) -> (Expr, Expr, Span) {
     let span = join_spans(&name_span, &op_span);
     let recv = Expr::new(ExprKind::Ident(name.clone()), name_span.clone());
     let one = Expr::new(ExprKind::Num(1), op_span);
-    let value = Expr::new(
-        ExprKind::Binop(Box::new(recv), op, Box::new(one)),
-        span.clone(),
-    );
+    let value = operator_call(spelling, vec![recv, one], span.clone());
     let lhs = Expr::new(ExprKind::Ident(name), name_span);
     (lhs, value, span)
 }
@@ -1055,16 +1065,13 @@ fn step_by_one(name: String, name_span: Span, op: BinOp, op_span: Span) -> (Expr
 fn compound_assign(
     name: String,
     name_span: Span,
-    op: BinOp,
+    spelling: &str,
     op_span: Span,
     value: Expr,
 ) -> (Expr, Expr, Span) {
     let span = join_spans(&name_span, &value.span);
     let recv = Expr::new(ExprKind::Ident(name.clone()), name_span.clone());
-    let combined = Expr::new(
-        ExprKind::Binop(Box::new(recv), op, Box::new(value)),
-        op_span,
-    );
+    let combined = operator_call(spelling, vec![recv, value], op_span);
     let lhs = Expr::new(ExprKind::Ident(name), name_span);
     (lhs, combined, span)
 }
@@ -2319,12 +2326,12 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
             }
             // `set n++;` — see [`step_by_one`], which builds both step forms.
             aipl::AssignStmt::IncrStmt((name, name_span), pp_span) => {
-                step_by_one(name, name_span, BinOp::Incr, pp_span)
+                step_by_one(name, name_span, "++", pp_span)
             }
             // `set n--;` — the same shape over `--`/[`BinOp::Decr`], which the
             // loader collapses to a plain subtract once gating has run.
             aipl::AssignStmt::DecrStmt((name, name_span), mm_span) => {
-                step_by_one(name, name_span, BinOp::Decr, mm_span)
+                step_by_one(name, name_span, "--", mm_span)
             }
             // `set n += e;` is `set n = n += e;`, where `+=` is its own operator
             // (gated on importing `+=`, not `+`) that the loader collapses to a
@@ -2333,16 +2340,16 @@ impl gazelle::Action<aipl::AssignStmt<Self>> for Build {
             // bare binding: re-evaluating a field path or a call would change
             // what the statement means.
             aipl::AssignStmt::AddAssignStmt((name, name_span), op_span, value) => {
-                compound_assign(name, name_span, BinOp::AddAssign, op_span, value)
+                compound_assign(name, name_span, "+=", op_span, value)
             }
             aipl::AssignStmt::SubAssignStmt((name, name_span), op_span, value) => {
-                compound_assign(name, name_span, BinOp::SubAssign, op_span, value)
+                compound_assign(name, name_span, "-=", op_span, value)
             }
             aipl::AssignStmt::MulAssignStmt((name, name_span), op_span, value) => {
-                compound_assign(name, name_span, BinOp::MulAssign, op_span, value)
+                compound_assign(name, name_span, "*=", op_span, value)
             }
             aipl::AssignStmt::DivAssignStmt((name, name_span), op_span, value) => {
-                compound_assign(name, name_span, BinOp::DivAssign, op_span, value)
+                compound_assign(name, name_span, "/=", op_span, value)
             }
             // `set recv.method(args);` — the writeback form of a mutating method
             // call, desugared to `set recv = recv.method(args)`. The receiver is
@@ -2507,7 +2514,7 @@ impl gazelle::Action<aipl::Unary<Self>> for Build {
             }
             aipl::Unary::Not(e) => {
                 let span = e.span.clone();
-                Expr::new(ExprKind::Not(Box::new(e)), span)
+                operator_call("!", vec![e], span)
             }
             aipl::Unary::Postfix(e) => e,
         })
@@ -3174,10 +3181,7 @@ fn op_value_lambda(op: BinOp, sp: Span) -> Expr {
     };
     let lhs = Expr::new(ExprKind::Ident("lhs".to_string()), sp.clone());
     let rhs = Expr::new(ExprKind::Ident("rhs".to_string()), sp.clone());
-    let body = Expr::new(
-        ExprKind::Binop(Box::new(lhs), op, Box::new(rhs)),
-        sp.clone(),
-    );
+    let body = operator_call(binop_spelling(op), vec![lhs, rhs], sp.clone());
     Expr::new(
         ExprKind::Lambda(vec![lhs_param, rhs_param], Box::new(body)),
         sp,
@@ -3247,7 +3251,7 @@ impl gazelle::Action<aipl::Expr<Self>> for Build {
             aipl::Expr::Term(t) => t,
             aipl::Expr::Binop(l, op, r) => {
                 let span = join_spans(&l.span, &r.span);
-                Expr::new(ExprKind::Binop(Box::new(l), op, Box::new(r)), span)
+                operator_call(binop_spelling(op), vec![l, r], span)
             }
             // `start..end` — a range expression is sugar for constructing the
             // builtin `Span` struct. Desugared right here (no name is written,
@@ -3296,16 +3300,8 @@ fn op_precedence(op: BinOp) -> Precedence {
         BinOp::Add | BinOp::Concat => Precedence::Left(6),
         BinOp::Mul | BinOp::Div | BinOp::Rem => Precedence::Left(7),
         // Not produced by the token mapping below: `-` arrives as its own
-        // `Minus` token (it is also unary), and `++` and the compound
-        // assignments are built directly by their statement desugars — none of
-        // them is ever infix, so none is looked up here.
-        BinOp::Sub
-        | BinOp::Incr
-        | BinOp::Decr
-        | BinOp::AddAssign
-        | BinOp::SubAssign
-        | BinOp::MulAssign
-        | BinOp::DivAssign => unreachable!("{} has no infix token", binop_spelling(op)),
+        // `Minus` token, since it is also unary.
+        BinOp::Sub => unreachable!("{} has no infix token", binop_spelling(op)),
     }
 }
 
@@ -4146,8 +4142,7 @@ fn bake_asserts(e: &mut Expr, src: &str) {
                 bake_asserts(v, src);
             }
         }
-        ExprKind::Binop(a, _, b)
-        | ExprKind::Seq(a, b)
+        ExprKind::Seq(a, b)
         | ExprKind::Let(_, _, a, b)
         | ExprKind::LetMut(_, _, a, b)
         | ExprKind::Assign(_, a, b)
@@ -4170,7 +4165,6 @@ fn bake_asserts(e: &mut Expr, src: &str) {
             }
         }
         ExprKind::Neg(x)
-        | ExprKind::Not(x)
         | ExprKind::Field(x, _)
         | ExprKind::Try(x)
         | ExprKind::Return(x)

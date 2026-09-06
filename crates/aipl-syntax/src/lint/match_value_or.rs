@@ -47,8 +47,15 @@ fn constant_default(e: &Expr) -> bool {
         ExprKind::DictLit(pairs) => pairs
             .iter()
             .all(|(k, v)| constant_default(k) && constant_default(v)),
-        ExprKind::Field(x, _) | ExprKind::Neg(x) | ExprKind::Not(x) => constant_default(x),
-        ExprKind::Binop(a, _, b) => constant_default(a) && constant_default(b),
+        ExprKind::Field(x, _) | ExprKind::Neg(x) => constant_default(x),
+        // An operator use is a call named for its spelling, and is constant when
+        // its operands are — the rule the `Binop`/`Not` nodes carried before
+        // operators became calls. Keying on the operator names rather than on
+        // "is a call" is what keeps the old meaning exactly: an *ordinary* call
+        // can do anything, including fail, so it is still not a constant.
+        ExprKind::Call(name, args, _) if !crate::operator_named_forms(name).is_empty() => {
+            args.iter().all(constant_default)
+        }
         _ => false,
     }
 }

@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::Error;
 
 /// A step of one written the long way — `set x = x + 1;`, `set x += 1;`, and
@@ -24,10 +24,16 @@ pub(super) fn step_by_one(e: &Expr, steps: &Steps, hits: &mut Vec<Error>) {
     let ExprKind::Ident(name) = &lhs.kind else {
         return;
     };
-    let ExprKind::Binop(l, op, r) = &value.kind else {
+    // An operator use is a call whose callee is the spelling that was written —
+    // which is exactly what this lint keys on, since `+` and `+=` want different
+    // advice and are told apart by nothing else.
+    let ExprKind::Call(written, args, _) = &value.kind else {
         return;
     };
-    let Some(step) = steps.get(*op) else {
+    let [l, r] = args.as_slice() else {
+        return;
+    };
+    let Some(step) = steps.get(written) else {
         return;
     };
     let is_one = |e: &Expr| matches!(e.kind, ExprKind::Num(1));
@@ -87,12 +93,16 @@ impl Step {
 /// about; built by [`matching_steps`].
 #[derive(Default)]
 pub(super) struct Steps {
-    steps: Vec<(BinOp, Step)>,
+    steps: Vec<(&'static str, Step)>,
 }
 
 impl Steps {
-    pub(super) fn get(&self, op: BinOp) -> Option<Step> {
-        self.steps.iter().find(|(o, _)| *o == op).map(|(_, s)| *s)
+    /// The advice for the operator spelled `written`, if this lint has any here.
+    pub(super) fn get(&self, written: &str) -> Option<Step> {
+        self.steps
+            .iter()
+            .find(|(w, _)| *w == written)
+            .map(|(_, s)| *s)
     }
 
     /// Nothing to advise anywhere — the driver skips the walk entirely.
@@ -134,11 +144,11 @@ pub(super) fn matching_steps(program: &Program) -> Steps {
     let binding = |spelling: &str| bound.iter().find(|(l, _)| *l == spelling).map(|(_, c)| *c);
 
     let mut steps = Vec::new();
-    for (op, written, spelling, commutative) in [
-        (BinOp::Add, "+", "++", true),
-        (BinOp::AddAssign, "+=", "++", false),
-        (BinOp::Sub, "-", "--", false),
-        (BinOp::SubAssign, "-=", "--", false),
+    for (written, spelling, commutative) in [
+        ("+", "++", true),
+        ("+=", "++", false),
+        ("-", "--", false),
+        ("-=", "--", false),
     ] {
         // The written operator has to be this file's, and a builtin: a user's
         // `+` has no step flavor to pair with.
@@ -158,7 +168,7 @@ pub(super) fn matching_steps(program: &Program) -> Steps {
             None => Some(name),
         };
         steps.push((
-            op,
+            written,
             Step {
                 spelling,
                 commutative,

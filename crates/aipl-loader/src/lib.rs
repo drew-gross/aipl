@@ -629,17 +629,11 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
     match &e.kind {
         // A shim's bindings are bare names; operators can only be in its body.
         ExprKind::Shim(_, _, body) => check_operators(body, view)?,
-        ExprKind::Binop(a, op, b) => {
-            require(aipl_syntax::binop_spelling(*op), e.span.clone())?;
-            check_operators(a, view)?;
-            check_operators(b, view)?;
-        }
+        // Unary `-` is the one operator with no named builtin behind it, so it
+        // is still a node of its own and still gated here by hand. Every other
+        // operator is a `Call` named for its spelling and gated in that arm.
         ExprKind::Neg(x) => {
             require("-", e.span.clone())?;
-            check_operators(x, view)?;
-        }
-        ExprKind::Not(x) => {
-            require("!", e.span.clone())?;
             check_operators(x, view)?;
         }
         ExprKind::Field(x, _)
@@ -672,11 +666,19 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
             }
         }
         ExprKind::Call(name, args, _) => {
+            // An operator use is a call named for the spelling written, so the
+            // gate is one membership test on the callee. This replaces a `Binop`
+            // arm and a `Not` arm that asked the same question of their own node
+            // kinds — the operator having no node of its own is exactly what
+            // collapses the three into one.
+            if aipl_syntax::is_operator_name(name) {
+                require(name, e.span.clone())?;
+            }
             // A bare-imported operator builtin is called like any function, but
-            // its arity is the operator's — and `rewrite_expr` lowers it to a
-            // one- or two-operand primitive node, so a miscount has to be
-            // rejected here rather than surfacing as a call to a function that
-            // does not exist.
+            // its arity is the operator's — and no signature covers it (these are
+            // intrinsified rather than emitted), so a miscount has to be rejected
+            // here rather than surfacing as a call to a function that does not
+            // exist.
             if let Some(arity) = view.get(name).and_then(|t| aipl_syntax::operator_arity(t)) {
                 if args.len() != arity {
                     return Err(Error::at(
@@ -1088,35 +1090,20 @@ fn rewrite_expr(
                         .collect(),
                     false,
                 ),
-                None => {
-                    let target = view.get(name).cloned().unwrap_or_else(|| name.clone());
-                    let mut rewritten: Vec<Expr> = args
-                        .iter()
+                // A bare-imported operator builtin (`import { concat }` then
+                // `concat(a, b)`) needs nothing special: its canonical is a real
+                // `__builtin_*`, the same one the operator spelling resolves to,
+                // so both spellings land on this one line and are the same
+                // program. (They used to diverge — the canonical was a marker, so
+                // the call had to be lowered back into the primitive node the
+                // operator produced.)
+                None => ExprKind::Call(
+                    view.get(name).cloned().unwrap_or_else(|| name.clone()),
+                    args.iter()
                         .map(|a| rewrite_expr(a, view, sc, locals))
-                        .collect();
-                    // A bare-imported single-semantics operator builtin
-                    // (`import { concat }` then `concat(a, b)`) resolves to a
-                    // canonical that is the operator *spelling* — a marker, not a
-                    // callable `__builtin_*`. Lower the call to the primitive node
-                    // the operator itself produces, so the call and the operator
-                    // are the same program and the checker and codegen need to know
-                    // about only one of them. Arity was verified by
-                    // `check_operators`.
-                    match aipl_syntax::operator_arity(&target) {
-                        Some(2) => {
-                            let op = aipl_syntax::binop_from_spelling(&target)
-                                .expect("arity 2 means a binary spelling");
-                            // As in the `Binop` arm: a bare call of a compound
-                            // operator's named builtin is just the operation.
-                            let op = op.compound_assign_base().unwrap_or(op);
-                            let rhs = rewritten.pop().expect("checked arity");
-                            let lhs = rewritten.pop().expect("checked arity");
-                            ExprKind::Binop(Box::new(lhs), op, Box::new(rhs))
-                        }
-                        Some(_) => ExprKind::Not(Box::new(rewritten.pop().expect("checked arity"))),
-                        None => ExprKind::Call(target, rewritten, *method_style),
-                    }
-                }
+                        .collect(),
+                    *method_style,
+                ),
             }
         }
         ExprKind::Construct(name, fields) => ExprKind::Construct(
@@ -1189,38 +1176,6 @@ fn rewrite_expr(
             )
         }
         ExprKind::Neg(inner) => ExprKind::Neg(Box::new(rewrite_expr(inner, view, sc, locals))),
-        ExprKind::Not(inner) => ExprKind::Not(Box::new(rewrite_expr(inner, view, sc, locals))),
-        ExprKind::Binop(l, op, r) => {
-            let lhs = rewrite_expr(l, view, sc, locals);
-            let rhs = rewrite_expr(r, view, sc, locals);
-            // A binary operator imported as one of the file's own functions
-            // (`import { my_add as + } from "./x"`) desugars to a call to that
-            // function — the view maps the operator spelling to its
-            // already-mangled name. A builtin operator (bare ops,
-            // `wrapping_add as +`) maps the spelling to itself, so it stays a
-            // primitive Binop.
-            let spelling = aipl_syntax::binop_spelling(*op);
-            // Gating has already demanded the operator *as written*, which is
-            // the only thing a compound assignment needed its own variant for.
-            // From here it is the operation it accumulates with — but resolved
-            // through its own binding, so `wrapping_add_assign as +=` alone is
-            // enough and a file using `+=` need not also import `+`.
-            let op = &op.compound_assign_base().unwrap_or(*op);
-            match view.get(spelling) {
-                Some(target) if target != spelling => {
-                    ExprKind::Call(target.clone(), vec![lhs, rhs], false)
-                }
-                // [`BinOp::Incr`] and [`BinOp::Decr`] always take the branch
-                // above: like `+`, neither has a bare form, so each is only ever
-                // bound to a named flavor (`wrapping_increment` /
-                // `saturating_decrement`, i.e. one of the `__builtin_*_add` /
-                // `__builtin_*_sub` impls) or to a user function — and gating has
-                // already rejected a use with no binding at all. So neither
-                // survives the rewrite into mono or codegen, which is what lets
-                // both treat those variants as unreachable.
-                _ => ExprKind::Binop(Box::new(lhs), *op, Box::new(rhs)),
-            }
-        }
         ExprKind::If(cond, then_b, else_b) => ExprKind::If(
             Box::new(rewrite_expr(cond, view, sc, locals)),
             Box::new(rewrite_expr(then_b, view, sc, locals)),

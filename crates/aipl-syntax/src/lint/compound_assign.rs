@@ -1,5 +1,5 @@
 use super::step_by_one::Steps;
-use crate::ast::{BinOp, Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::Error;
 
 /// `set x = x + e;` — an accumulate written the long way; `set x += e;` is the
@@ -30,10 +30,14 @@ pub(super) fn compound_assign(e: &Expr, ops: &CompoundOps, steps: &Steps, hits: 
     let ExprKind::Ident(name) = &lhs.kind else {
         return;
     };
-    let ExprKind::Binop(l, op, r) = &value.kind else {
+    // An operator use is a call named for the spelling written.
+    let ExprKind::Call(written, args, _) = &value.kind else {
         return;
     };
-    let Some((spelling, import)) = ops.get(*op) else {
+    let [l, r] = args.as_slice() else {
+        return;
+    };
+    let Some((spelling, import)) = ops.get(written) else {
         return;
     };
     let is_target = |e: &Expr| matches!(&e.kind, ExprKind::Ident(n) if n == name);
@@ -42,13 +46,13 @@ pub(super) fn compound_assign(e: &Expr, ops: &CompoundOps, steps: &Steps, hits: 
     // accumulations of `x` at all.
     let operand = if is_target(l) {
         r
-    } else if is_target(r) && matches!(op, BinOp::Add | BinOp::Mul) {
+    } else if is_target(r) && matches!(written.as_str(), "+" | "*") {
         l
     } else {
         return;
     };
     // `set x = x ± 1;` is the step lint's when that lint can fire here.
-    if matches!(operand.kind, ExprKind::Num(1)) && steps.get(*op).is_some() {
+    if matches!(operand.kind, ExprKind::Num(1)) && steps.get(written).is_some() {
         return;
     }
     // Name the import too when it's missing: no compound operator has a bare
@@ -74,14 +78,15 @@ pub(super) fn compound_assign(e: &Expr, ops: &CompoundOps, steps: &Steps, hits: 
 /// lint must stay quiet about.
 #[derive(Default)]
 pub(super) struct CompoundOps {
-    ops: Vec<(BinOp, &'static str, Option<&'static str>)>,
+    ops: Vec<(&'static str, &'static str, Option<&'static str>)>,
 }
 
 impl CompoundOps {
-    fn get(&self, op: BinOp) -> Option<(&'static str, Option<&'static str>)> {
+    /// The advice for the operator spelled `written`, if this lint has any here.
+    fn get(&self, written: &str) -> Option<(&'static str, Option<&'static str>)> {
         self.ops
             .iter()
-            .find(|(o, _, _)| *o == op)
+            .find(|(w, _, _)| *w == written)
             .map(|(_, spelling, import)| (*spelling, *import))
     }
 
@@ -127,12 +132,7 @@ pub(super) fn matching_compound(program: &Program) -> CompoundOps {
     let binding = |spelling: &str| bound.iter().find(|(l, _)| *l == spelling).map(|(_, c)| *c);
 
     let mut ops = Vec::new();
-    for (op, plain, compound) in [
-        (BinOp::Add, "+", "+="),
-        (BinOp::Sub, "-", "-="),
-        (BinOp::Mul, "*", "*="),
-        (BinOp::Div, "/", "/="),
-    ] {
+    for (plain, compound) in [("+", "+="), ("-", "-="), ("*", "*="), ("/", "/=")] {
         // The plain operator has to be this file's, and a builtin: a user's `+`
         // has no compound flavor to pair with.
         let Some(Some(plain_impl)) = binding(plain) else {
@@ -152,10 +152,10 @@ pub(super) fn matching_compound(program: &Program) -> CompoundOps {
         let want = crate::operator_builtin(name).map(|(_, canonical)| canonical);
         match binding(compound) {
             // Already imported, and it accumulates the same way.
-            Some(c) if c == want => ops.push((op, compound, None)),
+            Some(c) if c == want => ops.push((plain, compound, None)),
             // Bound to something else — another flavor, or a user function.
             Some(_) => {}
-            None => ops.push((op, compound, Some(name))),
+            None => ops.push((plain, compound, Some(name))),
         }
     }
     CompoundOps { ops }

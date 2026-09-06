@@ -1030,12 +1030,6 @@ impl Expander {
                 )
             }
             ExprKind::Neg(x) => ExprKind::Neg(Box::new(self.expand_expr(x, locals)?)),
-            ExprKind::Not(x) => ExprKind::Not(Box::new(self.expand_expr(x, locals)?)),
-            ExprKind::Binop(a, op, b) => ExprKind::Binop(
-                Box::new(self.expand_expr(a, locals)?),
-                *op,
-                Box::new(self.expand_expr(b, locals)?),
-            ),
             ExprKind::If(c, t, f) => ExprKind::If(
                 Box::new(self.expand_expr(c, locals)?),
                 Box::new(self.expand_expr(t, locals)?),

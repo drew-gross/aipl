@@ -84,14 +84,12 @@ fn referenced_names(program: &Program) -> HashSet<String> {
         ExprKind::Ident(n) | ExprKind::Call(n, _, _) | ExprKind::Construct(n, _) => {
             out.insert(n.clone());
         }
-        ExprKind::Binop(_, op, _) => {
-            out.insert(crate::binop_spelling(*op).to_string());
-        }
+        // No arm for operators: an operator use is a `Call` whose callee is the
+        // spelling, so the arm above already records `+`, `==`, `!` and the rest
+        // exactly as it records any other name. Unary `-` is the one operator
+        // with no named builtin behind it, so it stays a node and needs its own.
         ExprKind::Neg(_) => {
             out.insert("-".to_string());
-        }
-        ExprKind::Not(_) => {
-            out.insert("!".to_string());
         }
         // A shim's name and bindings all name functions.
         ExprKind::Shim(name, binds, _) => {

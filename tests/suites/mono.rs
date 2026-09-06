@@ -37,8 +37,14 @@ fn mono_fn_names(p: &aipl::mono::MonoProgram) -> Vec<String> {
     names
 }
 
+/// Monomorphize one source, **through the loader** — mono's input is a loaded
+/// program, not a parsed one. An operator is a call to its spelling until the
+/// loader resolves it against the file's imports, so a source using `+++` has to
+/// be loaded for mono to see the concat it names.
 fn mono_names(src: &str) -> Vec<String> {
-    let prog = parse(src).expect("parse");
+    aipl::install_parser_hooks();
+    let prog = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
+        .expect("load");
     let mono = monomorphize(&prog, DebugOptions::OFF).expect("monomorphize");
     mono_fn_names(&mono)
 }
@@ -190,7 +196,8 @@ fn use_counts_counts_builtins() {
 #[test]
 fn one_instance_per_element_type() {
     let names = mono_names(
-        "fn g(v: any[]) -> i64 { 0 }
+        "import { wrapping_add as + } from builtins;
+         fn g(v: any[]) -> i64 { 0 }
          fn main() -> i64 { g([1, 2]) + g(['a']) }",
     );
     // The generic template is dropped; one concrete instance per element type.
@@ -200,7 +207,8 @@ fn one_instance_per_element_type() {
 #[test]
 fn same_element_type_is_memoized() {
     let names = mono_names(
-        "fn g(v: any[]) -> i64 { 0 }
+        "import { wrapping_add as + } from builtins;
+         fn g(v: any[]) -> i64 { 0 }
          fn main() -> i64 { g([1, 2]) + g([3, 4]) }",
     );
     assert_eq!(names, vec!["g$i64", "main"]);
@@ -230,7 +238,8 @@ fn concat_arg_makes_distinct_monomorphization() {
     // `str` parameter emits a distinct, concat-specialized instance (`$c0`)
     // alongside the plain instance used for a plain-str argument.
     let names = mono_names(
-        "fn label(s: str) -> str { s }
+        "import { concat as +++ } from builtins;
+         fn label(s: str) -> str { s }
          fn main() {
              let g = \"a\" +++ \"b\";
              label(g);
@@ -264,7 +273,8 @@ fn recursive_generic_terminates() {
 #[test]
 fn any_optional_instances_per_inner_type() {
     let names = mono_names(
-        "fn g(x: any?) -> i64 { 0 }
+        "import { wrapping_add as + } from builtins;
+         fn g(x: any?) -> i64 { 0 }
          fn main() -> i64 { g(some(1)) + g(some('a')) }",
     );
     assert_eq!(names, vec!["g$char", "g$i64", "main"]);
@@ -285,7 +295,8 @@ fn each_any_param_is_an_independent_type_variable() {
 fn two_array_params_specialize_on_the_type_tuple() {
     // `(i64, char)` and `(i64, i64)` are distinct instances.
     let names = mono_names(
-        "fn f(a: any[], b: any[]) -> i64 { 0 }
+        "import { wrapping_add as + } from builtins;
+         fn f(a: any[], b: any[]) -> i64 { 0 }
          fn main() -> i64 { f([1], ['c']) + f([1], [2]) }",
     );
     assert_eq!(names, vec!["f$i64$char", "f$i64$i64", "main"]);
@@ -304,7 +315,8 @@ fn named_type_param_unifies_across_uses() {
 #[test]
 fn named_type_param_distinct_instances_per_type() {
     let names = mono_names(
-        "fn value_or<T: any>(s: T?, d: T) -> T { d }
+        "import { wrapping_add as + } from builtins;
+         fn value_or<T: any>(s: T?, d: T) -> T { d }
          fn main() -> i64 { value_or(some(1), 2) + value_or(some('a'), 'b') }",
     );
     assert_eq!(names, vec!["main", "value_or$char", "value_or$i64"]);
@@ -330,7 +342,8 @@ fn int_literal_arg_makes_one_instance_per_value() {
     // that *is* the literal folds away at the call site instead (see
     // `int_literal_call_folding_emits_no_instance`).
     let names = mono_names(
-        "fn wrap<T: any>(x: T) -> T[] { [x] }
+        "import { wrapping_add as + } from builtins;
+         fn wrap<T: any>(x: T) -> T[] { [x] }
          fn main() -> i64 { wrap(5).len() + wrap(7).len() }",
     );
     assert_eq!(names, vec!["main", "wrap$i64$lit0_5", "wrap$i64$lit0_7"]);
@@ -344,7 +357,8 @@ fn int_literal_args_are_dropped_per_variable_not_per_argument() {
     // variable on the second, giving both calls one instance called with
     // different values.
     let names = mono_names(
-        "fn pair<T: any>(a: T, b: T) -> T[] { [a, b] }
+        "import { wrapping_add as + } from builtins;
+         fn pair<T: any>(a: T, b: T) -> T[] { [a, b] }
          fn main() -> i64 { pair(0, 5).len() + pair(0, 7).len() }",
     );
     assert_eq!(

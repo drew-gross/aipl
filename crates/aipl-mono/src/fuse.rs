@@ -88,8 +88,15 @@ fn fuse_expr(e: &mut Expr, effectful: &HashSet<String>) {
 /// effect check walks a whole subtree — worth paying only once a shape matched.
 fn try_fuse(e: &Expr, effectful: &HashSet<String>) -> Option<Expr> {
     let fused = match &e.kind {
-        ExprKind::Binop(l, op, r) => comparison_fusions::build(l, *op, r, e),
-        ExprKind::Call(..) => slice_fusions::build(e).or_else(|| chain_fusions::build(e)),
+        // A resolved operator call is the comparison fusions' shape (`xs.count(..)
+        // < k`); any other call is the slice/chain shapes'. Operators arrive here
+        // as calls like everything else, so the two live in one arm.
+        ExprKind::Call(name, args, _) => {
+            match (aipl_syntax::binop_for_builtin(name), args.as_slice()) {
+                (Some(op), [l, r]) => comparison_fusions::build(l, op, r, e),
+                _ => slice_fusions::build(e).or_else(|| chain_fusions::build(e)),
+            }
+        }
         _ => None,
     }?;
     // An effect *anywhere* in `e` rules the rewrite out, wherever the call sits:

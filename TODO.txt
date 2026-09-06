@@ -76,6 +76,8 @@ value_or for structs:
   3. Widen match_value_or to constant-built defaults — and fix its message, which splices a Construct span that stops before the closing brace and rendered as value_or(FmtTok { kind: Punct, span: 0..0.
 
 misc cleanup:
+  use an enum for the builtins
+  made logical not more like the rest of the operators (lower it to a call immediately)
   rename saturating_remainter to total_remainder (maybe also do total_divide?)
   BinOp should be lowered to a call much earlier in the pipeline, it's currently too easy to inspect a binop and assume it corresponds to a call other than the one it actually does
   unify operators with regular functions even more
@@ -243,6 +245,7 @@ utilities:
 skills:
 
 lint:
+  xs.fold(0, +) should be sum probably? I guess with wrapping and saturating variants
   any lint that works on bare assignment should work on field assignment (e.g. lint to use --)
   lint to use if let instead of match with empty none case
   lint !v.is_empty() to v.is_nonempty()

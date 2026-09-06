@@ -13,8 +13,16 @@ fn parse(src: &str) -> Result<aipl::ast::Program, Error> {
     aipl::parse(src)
 }
 
+/// Compile one source the way a real program is compiled: **through the
+/// loader**, which is where imports are resolved. Parsing alone is not enough —
+/// `x + y` parses to a call to the name `+`, and only the loader maps that to
+/// the implementation the file imported. (It was enough back when an operator
+/// was a node of its own, which is exactly what let these tests skip a phase
+/// every real compile runs.)
 fn compile(src: &str) -> Compilation {
-    let program = parse(src).unwrap();
+    aipl::install_parser_hooks();
+    let program = aipl::loader::load_program_sources(&[("./main.aipl", src)], DebugOptions::OFF)
+        .expect("load");
     Compilation::new(&program, DebugOptions::OFF).unwrap()
 }
 
@@ -32,7 +40,10 @@ fn struct_decl_alone_compiles() {
 
 #[test]
 fn ir_contains_function_body() {
-    let comp = compile("fn add(x: i64, y: i64) -> i64 { x + y }");
+    let comp = compile(
+        "import { wrapping_add as + } from builtins;
+         fn add(x: i64, y: i64) -> i64 { x + y }",
+    );
     let ir = comp.ir();
     assert!(ir.contains("function"), "missing 'function' header: {ir}");
     assert!(ir.contains("i64"), "missing i64 type: {ir}");

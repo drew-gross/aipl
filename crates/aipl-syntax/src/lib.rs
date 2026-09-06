@@ -1111,17 +1111,23 @@ pub mod ast {
         s
     }
 
-    /// A binary operator, as stored in [`ExprKind::Binop`].
+    /// Which *operation* an operator performs. **Not an AST node:** an operator
+    /// use is an [`ExprKind::Call`] named for the operator's spelling, which the
+    /// loader resolves to a canonical `__builtin_*` impl like any other imported
+    /// name. This enum is the opcode behind those names, reached through
+    /// [`binop_for_builtin`] — plus the parser's precedence table, the one place
+    /// a spelling still needs an operation before resolution has happened.
     ///
     /// Variants name the **builtin** an operator resolves to, never the spelling
     /// a source file imported it as — `Concat`, not `+++`. Which alias a file
     /// writes is a property of its import list (`OPERATOR_BUILTINS`); after
-    /// import resolution nothing downstream should be able to tell, and with an
-    /// enum nothing can, because there is no character left to compare against.
+    /// import resolution nothing downstream can tell, because there is no
+    /// operator left to tell about.
     ///
     /// Where an operator has more than one semantics (`wrapping_add` vs
-    /// `saturating_add`) the *alias* records the choice, so one variant covers
-    /// both — the flavor is resolved by name, not by opcode.
+    /// `saturating_add`) the flavor lives in the *canonical name*, not here —
+    /// which is why [`binop_for_builtin`] deliberately does not answer for the
+    /// arithmetic impls: one opcode cannot distinguish them.
     ///
     /// This was a bare `char` with a private encoding (`'E'` for `==`, `'C'` for
     /// `+++`), which two passes independently got wrong by testing `'+'` — the
@@ -1156,46 +1162,8 @@ pub mod ast {
         And,
         /// `logical_or`.
         Or,
-        /// `wrapping_increment` / `saturating_increment`, from `set n++`. The
-        /// loader lowers it to [`BinOp::Add`] once operator gating has run; the
-        /// separate variant is what lets the gate demand the `++` import rather
-        /// than accepting a `+` one.
-        Incr,
-        /// `wrapping_decrement` / `saturating_decrement`, from `set n--`. The
-        /// mirror of [`BinOp::Incr`] in every respect: lowered to
-        /// [`BinOp::Sub`] once the gate has demanded the `--` import.
-        Decr,
         /// `concat`.
         Concat,
-        /// `wrapping_add_assign` / `saturating_add_assign`, from `set n += e`.
-        AddAssign,
-        /// `wrapping_sub_assign` / `saturating_sub_assign`, from `set n -= e`.
-        SubAssign,
-        /// `wrapping_mul_assign`, from `set n *= e`.
-        MulAssign,
-        /// `saturating_divide_assign`, from `set n /= e`.
-        DivAssign,
-    }
-
-    impl BinOp {
-        /// The plain operation a compound assignment accumulates with — `+=` →
-        /// [`BinOp::Add`] — or `None` for every other operator.
-        ///
-        /// The two differ only at the operator gate, which is the whole reason
-        /// the compound forms are variants of their own rather than the plain
-        /// op with a flag: `set n += e;` must demand the `+=` import and not
-        /// settle for a `+` one, exactly as `set n++;` demands `++`. Once
-        /// gating has run the loader collapses each to its base, so no pass
-        /// downstream ever sees one.
-        pub fn compound_assign_base(self) -> Option<BinOp> {
-            Some(match self {
-                BinOp::AddAssign => BinOp::Add,
-                BinOp::SubAssign => BinOp::Sub,
-                BinOp::MulAssign => BinOp::Mul,
-                BinOp::DivAssign => BinOp::Div,
-                _ => return None,
-            })
-        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1223,9 +1191,7 @@ pub mod ast {
         /// Non-mutating calls are indifferent to the flag
         /// (`x.to_str()` ≡ `to_str(x)`).
         Call(String, Vec<Expr>, bool),
-        Binop(Box<Expr>, BinOp, Box<Expr>),
         Neg(Box<Expr>),
-        Not(Box<Expr>),
         If(Box<Expr>, Box<Expr>, Box<Expr>),
         Construct(String, Vec<FieldInit>),
         Field(Box<Expr>, String),
@@ -1810,65 +1776,112 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
     ("wrapping_sub_assign", "-=", "__builtin_wrapping_sub"),
     ("saturating_sub_assign", "-=", "__builtin_saturating_sub"),
     ("wrapping_mul_assign", "*=", "__builtin_wrapping_mul"),
-    ("saturating_divide_assign", "/=", "/="),
+    (
+        "saturating_divide_assign",
+        "/=",
+        "__builtin_saturating_divide",
+    ),
     // The operators with a single semantics. They are listed here so that *every*
     // operator is imported the same way when it is imported *as an operator*:
     // `name as op`. Reading an import list then tells you which operators a file
     // uses and, where it matters, which flavor, without the reader having to
     // know which operators happen to be ambiguous.
     //
-    // Their canonical impl is the operator spelling itself: unlike `+`, there is
-    // nothing to dispatch between, so the view maps straight through. That makes
-    // the canonical a *marker* rather than a callable `__builtin_*`, which is why
-    // a bare import of one of these names lowers its calls back to the primitive
-    // node (`binop_from_spelling`, used by the loader's `rewrite_expr`) instead
-    // of emitting a call to a function that does not exist.
-    ("equal", "==", "=="),
-    ("not_equal", "!=", "!="),
-    ("less_than", "<", "<"),
-    ("greater_than", ">", ">"),
-    ("less_than_or_equal", "<=", "<="),
-    ("greater_than_or_equal", ">=", ">="),
-    ("logical_and", "&&", "&&"),
-    ("logical_or", "||", "||"),
-    ("logical_not", "!", "!"),
-    ("concat", "+++", "+++"),
-    ("saturating_divide", "/", "/"),
-    ("saturating_remainder", "%", "%"),
+    // They have only one flavor, so there is nothing for the view to dispatch
+    // between — but the canonical is still a real `__builtin_*`, exactly as the
+    // multi-flavor operators' are. That uniformity is the point: **after import
+    // resolution an operator use is an ordinary call**, and no pass downstream of
+    // the loader has to know an operator was involved. These canonicals used to be
+    // the operator spelling itself — a *marker* rather than a callable name — which
+    // is what forced the loader to lower a bare `concat(a, b)` back into a
+    // primitive node so the call and the operator stayed one program. With a real
+    // canonical both spellings simply resolve to the same callee and that special
+    // case is gone.
+    ("equal", "==", "__builtin_equal"),
+    ("not_equal", "!=", "__builtin_not_equal"),
+    ("less_than", "<", "__builtin_less_than"),
+    ("greater_than", ">", "__builtin_greater_than"),
+    ("less_than_or_equal", "<=", "__builtin_less_than_or_equal"),
+    (
+        "greater_than_or_equal",
+        ">=",
+        "__builtin_greater_than_or_equal",
+    ),
+    ("logical_and", "&&", "__builtin_logical_and"),
+    ("logical_or", "||", "__builtin_logical_or"),
+    ("logical_not", "!", "__builtin_logical_not"),
+    ("concat", "+++", "__builtin_concat"),
+    ("saturating_divide", "/", "__builtin_saturating_divide"),
+    (
+        "saturating_remainder",
+        "%",
+        "__builtin_saturating_remainder",
+    ),
 ];
 
-/// The [`BinOp`] an operator spelling denotes, for the operator builtins whose
-/// "canonical impl" is the spelling itself — a marker rather than a callable
-/// function (see [`OPERATOR_BUILTINS`]). `None` for `!`, which is unary
-/// (`ExprKind::Not`), and for a spelling that names a real `__builtin_*` impl.
-pub fn binop_from_spelling(spelling: &str) -> Option<BinOp> {
-    Some(match spelling {
-        "==" => BinOp::Eq,
-        "!=" => BinOp::Ne,
-        "<" => BinOp::Lt,
-        ">" => BinOp::Gt,
-        "<=" => BinOp::Le,
-        ">=" => BinOp::Ge,
-        "&&" => BinOp::And,
-        "||" => BinOp::Or,
-        "+++" => BinOp::Concat,
-        "/" => BinOp::Div,
-        "%" => BinOp::Rem,
-        // `saturating_divide_assign`'s canonical is its own spelling (see
-        // [`OPERATOR_BUILTINS`]), so a bare call of it lands here like any other
-        // marker. The loader collapses the variant to `Div` right after.
-        "/=" => BinOp::DivAssign,
+/// The single [`BinOp`] a canonical `__builtin_*` impl performs, for the
+/// operators that have exactly one — the comparisons, the logical pair,
+/// concatenation, and saturating divide/remainder.
+///
+/// This is the one place a resolved operator call is turned back into an opcode,
+/// and it is deliberately *not* total over the operator builtins: the arithmetic
+/// impls are excluded because `__builtin_wrapping_add` and
+/// `__builtin_saturating_add` would both answer [`BinOp::Add`], losing the flavor
+/// that is the whole reason they are separate names. Those keep their own
+/// dispatch (in mono and codegen), keyed on the canonical name.
+///
+/// `None` for `__builtin_logical_not`, which is unary.
+pub fn binop_for_builtin(canonical: &str) -> Option<BinOp> {
+    Some(match canonical {
+        "__builtin_equal" => BinOp::Eq,
+        "__builtin_not_equal" => BinOp::Ne,
+        "__builtin_less_than" => BinOp::Lt,
+        "__builtin_greater_than" => BinOp::Gt,
+        "__builtin_less_than_or_equal" => BinOp::Le,
+        "__builtin_greater_than_or_equal" => BinOp::Ge,
+        "__builtin_logical_and" => BinOp::And,
+        "__builtin_logical_or" => BinOp::Or,
+        "__builtin_concat" => BinOp::Concat,
+        "__builtin_saturating_divide" => BinOp::Div,
+        "__builtin_saturating_remainder" => BinOp::Rem,
         _ => return None,
     })
 }
 
-/// How many operands the operator `spelling` takes, or `None` if it is not one
-/// of the marker spellings [`binop_from_spelling`] covers plus unary `!`. Used
-/// to check the arity of a bare operator-builtin *call* (`concat(a, b)`).
-pub fn operator_arity(spelling: &str) -> Option<usize> {
-    match spelling {
-        "!" => Some(1),
-        _ => binop_from_spelling(spelling).map(|_| 2),
+/// The right operand of `name +++ r` — the shape `set a = a +++ b;` takes, where
+/// the append can go into `a`'s own buffer instead of building a fresh string.
+///
+/// Two passes have to agree on this shape exactly: mono decides whether the
+/// binding is `exclusive`, and codegen emits the in-place append. Either one
+/// alone leaves the optimization off. They were two hand-written matches once,
+/// written against the old `char` opcode encoding and naming *addition* rather
+/// than concatenation — so neither ever fired, and nothing noticed. One function,
+/// asked twice, cannot disagree with itself.
+pub fn self_append<'a>(value: &'a ast::Expr, name: &str) -> Option<&'a ast::Expr> {
+    let ast::ExprKind::Call(f, args, _) = &value.kind else {
+        return None;
+    };
+    let [l, r] = args.as_slice() else {
+        return None;
+    };
+    (binop_for_builtin(f) == Some(BinOp::Concat)
+        && matches!(&l.kind, ast::ExprKind::Ident(n) if n == name))
+    .then_some(r)
+}
+
+/// How many operands the canonical `__builtin_*` impl of an operator takes, or
+/// `None` when the name is not one. Used to check the arity of a bare
+/// operator-builtin *call* (`concat(a, b)`), which no signature covers because
+/// these are intrinsified rather than emitted.
+pub fn operator_arity(canonical: &str) -> Option<usize> {
+    match canonical {
+        "__builtin_logical_not" => Some(1),
+        "__builtin_wrapping_add"
+        | "__builtin_saturating_add"
+        | "__builtin_wrapping_sub"
+        | "__builtin_saturating_sub"
+        | "__builtin_wrapping_mul" => Some(2),
+        _ => binop_for_builtin(canonical).map(|_| 2),
     }
 }
 
@@ -1969,17 +1982,7 @@ pub fn binop_spelling(op: BinOp) -> &'static str {
         BinOp::Ge => ">=",
         BinOp::And => "&&",
         BinOp::Or => "||",
-        // Lowered to `+`/`-` by the loader after operator gating; these
-        // spellings are what the gate requires.
-        BinOp::Incr => "++",
-        BinOp::Decr => "--",
         BinOp::Concat => "+++",
-        // The compound assignments, likewise lowered to their base operation
-        // once the gate has seen the spelling written here.
-        BinOp::AddAssign => "+=",
-        BinOp::SubAssign => "-=",
-        BinOp::MulAssign => "*=",
-        BinOp::DivAssign => "/=",
     }
 }
 
@@ -1990,17 +1993,20 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
     match &e.kind {
         // A shim's bindings are plain names; only its body holds expressions.
         K::Shim(_, _, body) => collect_operators(body, out),
-        K::Binop(a, op, b) => {
-            out.insert(binop_spelling(*op).to_string());
-            collect_operators(a, out);
-            collect_operators(b, out);
+        // An operator use is a call named for the spelling written, so the
+        // spellings are read straight off the callees. `operator_named_forms`
+        // answers "is this an operator" without the `is_operator_name` hook,
+        // which this (loader-independent) tooling has no reason to install.
+        K::Call(name, args, _) => {
+            if !operator_named_forms(name).is_empty() {
+                out.insert(name.clone());
+            }
+            for a in args {
+                collect_operators(a, out);
+            }
         }
         K::Neg(x) => {
             out.insert("-".to_string());
-            collect_operators(x, out);
-        }
-        K::Not(x) => {
-            out.insert("!".to_string());
             collect_operators(x, out);
         }
         K::Field(x, _) | K::Try(x) | K::Return(x) | K::KwArg(_, x) | K::Spread(x) => {
@@ -2030,7 +2036,7 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
                 collect_operators(c, out);
             }
         }
-        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args) => {
+        K::ArrayLit(args) | K::SetLit(args) => {
             for a in args {
                 collect_operators(a, out);
             }
@@ -2845,8 +2851,7 @@ fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
         }
         K::Construct(_, inits) => inits.iter_mut().map(|i| &mut i.value).collect(),
         K::DictLit(pairs) => pairs.iter_mut().flat_map(|(k, v)| [k, v]).collect(),
-        K::Binop(a, _, b)
-        | K::Seq(a, b)
+        K::Seq(a, b)
         | K::Index(a, b)
         | K::Let(_, _, a, b)
         | K::LetMut(_, _, a, b)
@@ -2854,7 +2859,6 @@ fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
         | K::While(a, b) => vec![a.as_mut(), b.as_mut()],
         K::Assign(a, b, c) | K::If(a, b, c) => vec![a.as_mut(), b.as_mut(), c.as_mut()],
         K::Neg(x)
-        | K::Not(x)
         | K::Field(x, _)
         | K::Try(x)
         | K::Return(x)
@@ -2902,8 +2906,7 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
                 each_subexpr(v, f);
             }
         }
-        K::Binop(a, _, b)
-        | K::Seq(a, b)
+        K::Seq(a, b)
         | K::Index(a, b)
         | K::Let(_, _, a, b)
         | K::LetMut(_, _, a, b)
@@ -2918,7 +2921,6 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
             each_subexpr(c, f);
         }
         K::Neg(x)
-        | K::Not(x)
         | K::Field(x, _)
         | K::Try(x)
         | K::Return(x)
@@ -3048,8 +3050,7 @@ fn children(e: &ast::Expr) -> Vec<&ast::Expr> {
         }
         K::Construct(_, inits) => inits.iter().map(|i| &i.value).collect(),
         K::DictLit(pairs) => pairs.iter().flat_map(|(k, v)| [k, v]).collect(),
-        K::Binop(a, _, b)
-        | K::Seq(a, b)
+        K::Seq(a, b)
         | K::Index(a, b)
         | K::Let(_, _, a, b)
         | K::LetMut(_, _, a, b)
@@ -3057,7 +3058,6 @@ fn children(e: &ast::Expr) -> Vec<&ast::Expr> {
         | K::While(a, b) => vec![a, b],
         K::Assign(a, b, c) | K::If(a, b, c) => vec![a, b, c],
         K::Neg(x)
-        | K::Not(x)
         | K::Field(x, _)
         | K::Try(x)
         | K::Return(x)

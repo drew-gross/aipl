@@ -239,11 +239,6 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
                 })
                 .collect(),
         )),
-        K::Binop(a, op, b) => rw(K::Binop(
-            Box::new(lcr_expr(a, ctors, scope)),
-            *op,
-            Box::new(lcr_expr(b, ctors, scope)),
-        )),
         K::Seq(a, b) => rw(K::Seq(
             Box::new(lcr_expr(a, ctors, scope)),
             Box::new(lcr_expr(b, ctors, scope)),
@@ -298,7 +293,6 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
             Box::new(lcr_expr(f, ctors, scope)),
         )),
         K::Neg(x) => rw(K::Neg(Box::new(lcr_expr(x, ctors, scope)))),
-        K::Not(x) => rw(K::Not(Box::new(lcr_expr(x, ctors, scope)))),
         K::Field(x, f) => rw(K::Field(Box::new(lcr_expr(x, ctors, scope)), f.clone())),
         K::Try(x) => rw(K::Try(Box::new(lcr_expr(x, ctors, scope)))),
         K::Return(x) => rw(K::Return(Box::new(lcr_expr(x, ctors, scope)))),
@@ -530,6 +524,15 @@ fn lt_ty(
     }
 }
 
+/// A synthesized operator use: a call to the canonical `__builtin_*` impl,
+/// which is exactly what a source operator resolves to. Mono's own index
+/// arithmetic and length comparisons are spelled this way because there is only
+/// one shape to spell them in — the operator has no node of its own, so nothing
+/// downstream needs an alternative form to understand.
+fn op_call(canonical: &str, args: Vec<Expr>, span: Span) -> Expr {
+    Expr::new(ExprKind::Call(canonical.to_string(), args, false), span)
+}
+
 /// Walk an expression, lowering any `Type::Tuple` that appears in lambda-param
 /// type annotations. All other expression structure is preserved unchanged.
 fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<String>) -> Expr {
@@ -560,15 +563,9 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
         | ExprKind::Unit
         | ExprKind::Ident(_) => e.kind.clone(),
         ExprKind::Neg(x) => ExprKind::Neg(Box::new(lt_expr(x, fm, ord))),
-        ExprKind::Not(x) => ExprKind::Not(Box::new(lt_expr(x, fm, ord))),
         ExprKind::Field(x, f) => ExprKind::Field(Box::new(lt_expr(x, fm, ord)), f.clone()),
         ExprKind::Try(x) => ExprKind::Try(Box::new(lt_expr(x, fm, ord))),
         ExprKind::Return(x) => ExprKind::Return(Box::new(lt_expr(x, fm, ord))),
-        ExprKind::Binop(a, op, b) => ExprKind::Binop(
-            Box::new(lt_expr(a, fm, ord)),
-            *op,
-            Box::new(lt_expr(b, fm, ord)),
-        ),
         ExprKind::Seq(a, b) => {
             ExprKind::Seq(Box::new(lt_expr(a, fm, ord)), Box::new(lt_expr(b, fm, ord)))
         }
@@ -911,11 +908,9 @@ impl GenericLowerer {
             K::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
             K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
             K::Neg(x) => K::Neg(b(self, x)?),
-            K::Not(x) => K::Not(b(self, x)?),
             K::Field(x, f) => K::Field(b(self, x)?, f.clone()),
             K::Try(x) => K::Try(b(self, x)?),
             K::Return(x) => K::Return(b(self, x)?),
-            K::Binop(a, op, c) => K::Binop(b(self, a)?, *op, b(self, c)?),
             K::Seq(a, c) => K::Seq(b(self, a)?, b(self, c)?),
             K::Index(a, c) => K::Index(b(self, a)?, b(self, c)?),
             K::While(a, c) => K::While(b(self, a)?, b(self, c)?),
@@ -2787,11 +2782,12 @@ impl Mono<'_> {
                 ExprKind::Assign(
                     Box::new(id(name)),
                     Box::new(Expr::new(
-                        ExprKind::Binop(
-                            Box::new(id(name)),
-                            BinOp::Add,
-                            Box::new(Expr::new(ExprKind::Num(1), span.clone())),
-                        ),
+                        op_call(
+                            "__builtin_wrapping_add",
+                            vec![id(name), Expr::new(ExprKind::Num(1), span.clone())],
+                            span.clone(),
+                        )
+                        .kind,
                         span.clone(),
                     )),
                     Box::new(Expr::new(ExprKind::Unit, span.clone())),
@@ -3088,11 +3084,12 @@ impl Mono<'_> {
                 ExprKind::Assign(
                     Box::new(id("$i")),
                     Box::new(Expr::new(
-                        ExprKind::Binop(
-                            Box::new(id("$i")),
-                            BinOp::Add,
-                            Box::new(Expr::new(ExprKind::Num(1), span.clone())),
-                        ),
+                        op_call(
+                            "__builtin_wrapping_add",
+                            vec![id("$i"), Expr::new(ExprKind::Num(1), span.clone())],
+                            span.clone(),
+                        )
+                        .kind,
                         span.clone(),
                     )),
                     Box::new(Expr::new(ExprKind::Unit, span.clone())),
@@ -3382,11 +3379,12 @@ impl Mono<'_> {
                 ExprKind::Assign(
                     Box::new(id(n)),
                     Box::new(Expr::new(
-                        ExprKind::Binop(
-                            Box::new(id(n)),
-                            BinOp::Add,
-                            Box::new(Expr::new(ExprKind::Num(1), span.clone())),
-                        ),
+                        op_call(
+                            "__builtin_wrapping_add",
+                            vec![id(n), Expr::new(ExprKind::Num(1), span.clone())],
+                            span.clone(),
+                        )
+                        .kind,
                         span.clone(),
                     )),
                     Box::new(Expr::new(ExprKind::Unit, span.clone())),
@@ -3557,8 +3555,9 @@ impl Mono<'_> {
                     span.clone(),
                 )
             };
-            let cond = Expr::new(
-                ExprKind::Binop(Box::new(len_of("$a")), BinOp::Lt, Box::new(len_of("$b"))),
+            let cond = op_call(
+                "__builtin_less_than",
+                vec![len_of("$a"), len_of("$b")],
                 span.clone(),
             );
             Expr::new(
@@ -3791,11 +3790,12 @@ impl Mono<'_> {
                 ExprKind::Assign(
                     Box::new(id("$w")),
                     Box::new(Expr::new(
-                        ExprKind::Binop(
-                            Box::new(id("$w")),
-                            BinOp::Add,
-                            Box::new(Expr::new(ExprKind::Num(1), span.clone())),
-                        ),
+                        op_call(
+                            "__builtin_wrapping_add",
+                            vec![id("$w"), Expr::new(ExprKind::Num(1), span.clone())],
+                            span.clone(),
+                        )
+                        .kind,
                         span.clone(),
                     )),
                     Box::new(Expr::new(ExprKind::Unit, span.clone())),
@@ -5099,60 +5099,6 @@ impl Mono<'_> {
                     Type::Primitive(Primitive::I64),
                 )
             }
-            ExprKind::Not(inner) => {
-                let (ri, _) = self.infer(inner, env)?;
-                (
-                    node(ExprKind::Not(Box::new(ri))),
-                    Type::Primitive(Primitive::Bool),
-                )
-            }
-            ExprKind::Binop(l, op, r) => {
-                let (rl, lt) = self.infer(l, env)?;
-                let (rr, rt) = self.infer(r, env)?;
-                // A bare literal operand flexes to the other's integer type
-                // (the checker verified the fit); keeps mono's types consistent
-                // with codegen so e.g. `i8_val + 1` infers as `i8`.
-                let lt = aipl_syntax::flex_int_ty(&rl, &lt, &rt);
-                let rt = aipl_syntax::flex_int_ty(&rr, &rt, &lt);
-                let ty = match op {
-                    // Concatenation builds a lazy concat node (see
-                    // `aipl_concat_lazy`), so its result carries the *concat-str*
-                    // representation — which a downstream `fn(s: str)` call uses to
-                    // select a concat-specialized instance. (`Error` concatenates
-                    // like `str` too.)
-                    BinOp::Concat => concat_str_ty(),
-                    // Same-integer-type arithmetic keeps that width/signedness.
-                    // (An add here is the increment sugar / mono's internal index
-                    // math; a user's `+` is a call to
-                    // `__builtin_wrapping_add`/`_saturating_add`.)
-                    BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem
-                        if aipl_syntax::is_int_ty(&lt) && lt == rt =>
-                    {
-                        lt.clone()
-                    }
-                    BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
-                        Type::Primitive(Primitive::I64)
-                    }
-                    // Comparison and logical operators. Neither `++`/`--` nor
-                    // a compound assignment reaches here: the loader lowers
-                    // each to its base operation before mono runs.
-                    BinOp::Lt
-                    | BinOp::Gt
-                    | BinOp::Le
-                    | BinOp::Ge
-                    | BinOp::Eq
-                    | BinOp::Ne
-                    | BinOp::And
-                    | BinOp::Or
-                    | BinOp::Incr
-                    | BinOp::Decr
-                    | BinOp::AddAssign
-                    | BinOp::SubAssign
-                    | BinOp::MulAssign
-                    | BinOp::DivAssign => Type::Primitive(Primitive::Bool),
-                };
-                (node(ExprKind::Binop(Box::new(rl), *op, Box::new(rr))), ty)
-            }
             ExprKind::ArrayLit(elems) => {
                 let mut relems = Vec::with_capacity(elems.len());
                 let mut elem_ty = Type::NoneInner;
@@ -6015,6 +5961,26 @@ impl Mono<'_> {
                         lt
                     } else {
                         Type::Primitive(Primitive::I64)
+                    };
+                    (node(ExprKind::Call(name.clone(), rargs, method_style)), ret)
+                } else if let Some(op) =
+                    aipl_syntax::binop_for_builtin(name).filter(|_| atys.len() == 2)
+                {
+                    // The rest of the operators, resolved to their canonical impl.
+                    // The result type is the operator's, so this mirrors the
+                    // opcode table the primitive node uses: concatenation carries
+                    // the *concat-str* representation (a lazy concat node, which a
+                    // downstream `fn(s: str)` call uses to pick a
+                    // concat-specialized instance), saturating divide/remainder
+                    // keep a same-width integer, and every comparison and logical
+                    // operator is bool. Kept as-is; codegen intrinsifies it.
+                    let lt = aipl_syntax::flex_int_ty(&rargs[0], &atys[0], &atys[1]);
+                    let rt = aipl_syntax::flex_int_ty(&rargs[1], &atys[1], &lt);
+                    let ret = match op {
+                        BinOp::Concat => concat_str_ty(),
+                        BinOp::Div | BinOp::Rem if aipl_syntax::is_int_ty(&lt) && lt == rt => lt,
+                        BinOp::Div | BinOp::Rem => Type::Primitive(Primitive::I64),
+                        _ => Type::Primitive(Primitive::Bool),
                     };
                     (node(ExprKind::Call(name.clone(), rargs, method_style)), ret)
                 } else if (matches!(
@@ -7028,9 +6994,7 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
         }
         // Everything else just carries the substitution to its children.
         K::Call(name, args, m) => K::Call(name.clone(), args.iter().map(|a| *r(a)).collect(), *m),
-        K::Binop(a, op, b) => K::Binop(r(a), *op, r(b)),
         K::Neg(x) => K::Neg(r(x)),
-        K::Not(x) => K::Not(r(x)),
         K::Try(x) => K::Try(r(x)),
         K::Return(x) => K::Return(r(x)),
         K::Field(x, f) => K::Field(r(x), f.clone()),
@@ -7271,12 +7235,10 @@ fn collect_free(
         | ExprKind::Char(_)
         | ExprKind::None
         | ExprKind::Unit => {}
-        ExprKind::Neg(x)
-        | ExprKind::Not(x)
-        | ExprKind::Field(x, _)
-        | ExprKind::Try(x)
-        | ExprKind::Return(x) => collect_free(x, bound, env, out, seen),
-        ExprKind::Binop(a, _, b) | ExprKind::Seq(a, b) | ExprKind::Index(a, b) => {
+        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => {
+            collect_free(x, bound, env, out, seen)
+        }
+        ExprKind::Seq(a, b) | ExprKind::Index(a, b) => {
             collect_free(a, bound, env, out, seen);
             collect_free(b, bound, env, out, seen);
         }
@@ -7464,12 +7426,10 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
         | ExprKind::Char(_)
         | ExprKind::None
         | ExprKind::Unit => {}
-        ExprKind::Neg(x)
-        | ExprKind::Not(x)
-        | ExprKind::Field(x, _)
-        | ExprKind::Try(x)
-        | ExprKind::Return(x) => count_uses(x, bound, counts),
-        ExprKind::Binop(a, _, b) | ExprKind::Seq(a, b) | ExprKind::Index(a, b) => {
+        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => {
+            count_uses(x, bound, counts)
+        }
+        ExprKind::Seq(a, b) | ExprKind::Index(a, b) => {
             count_uses(a, bound, counts);
             count_uses(b, bound, counts);
         }
@@ -8198,13 +8158,10 @@ pub fn children(e: &Expr) -> Vec<&Expr> {
         | ExprKind::Ident(_)
         | ExprKind::None
         | ExprKind::Unit => vec![],
-        ExprKind::Neg(x)
-        | ExprKind::Not(x)
-        | ExprKind::Field(x, _)
-        | ExprKind::Try(x)
-        | ExprKind::Return(x) => vec![x],
-        ExprKind::Binop(a, _, b)
-        | ExprKind::Seq(a, b)
+        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => {
+            vec![x]
+        }
+        ExprKind::Seq(a, b)
         | ExprKind::Index(a, b)
         | ExprKind::Let(_, _, a, b)
         | ExprKind::LetMut(_, _, a, b)
@@ -8263,13 +8220,10 @@ pub fn children_mut(e: &mut Expr) -> Vec<&mut Expr> {
         | ExprKind::Ident(_)
         | ExprKind::None
         | ExprKind::Unit => vec![],
-        ExprKind::Neg(x)
-        | ExprKind::Not(x)
-        | ExprKind::Field(x, _)
-        | ExprKind::Try(x)
-        | ExprKind::Return(x) => vec![x],
-        ExprKind::Binop(a, _, b)
-        | ExprKind::Seq(a, b)
+        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => {
+            vec![x]
+        }
+        ExprKind::Seq(a, b)
         | ExprKind::Index(a, b)
         | ExprKind::Let(_, _, a, b)
         | ExprKind::LetMut(_, _, a, b)
@@ -8422,15 +8376,9 @@ fn replace_call(
             *m,
         ),
         ExprKind::Neg(x) => ExprKind::Neg(Box::new(rc(x, counter, replaced))),
-        ExprKind::Not(x) => ExprKind::Not(Box::new(rc(x, counter, replaced))),
         ExprKind::Try(x) => ExprKind::Try(Box::new(rc(x, counter, replaced))),
         ExprKind::Return(x) => ExprKind::Return(Box::new(rc(x, counter, replaced))),
         ExprKind::Field(x, fld) => ExprKind::Field(Box::new(rc(x, counter, replaced)), fld.clone()),
-        ExprKind::Binop(a, op, b) => ExprKind::Binop(
-            Box::new(rc(a, counter, replaced)),
-            *op,
-            Box::new(rc(b, counter, replaced)),
-        ),
         ExprKind::Seq(a, b) => ExprKind::Seq(
             Box::new(rc(a, counter, replaced)),
             Box::new(rc(b, counter, replaced)),
@@ -8652,15 +8600,9 @@ fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
         | ExprKind::None
         | ExprKind::Unit => e.kind.clone(),
         ExprKind::Neg(x) => ExprKind::Neg(Box::new(rename_params(x, map))),
-        ExprKind::Not(x) => ExprKind::Not(Box::new(rename_params(x, map))),
         ExprKind::Try(x) => ExprKind::Try(Box::new(rename_params(x, map))),
         ExprKind::Return(x) => ExprKind::Return(Box::new(rename_params(x, map))),
         ExprKind::Field(x, fld) => ExprKind::Field(Box::new(rename_params(x, map)), fld.clone()),
-        ExprKind::Binop(a, op, b) => ExprKind::Binop(
-            Box::new(rename_params(a, map)),
-            *op,
-            Box::new(rename_params(b, map)),
-        ),
         ExprKind::Seq(a, b) => ExprKind::Seq(
             Box::new(rename_params(a, map)),
             Box::new(rename_params(b, map)),
@@ -8990,10 +8932,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
         | ExprKind::Char(_)
         | ExprKind::None
         | ExprKind::Unit => false,
-        ExprKind::Neg(x) | ExprKind::Not(x) | ExprKind::Field(x, _) | ExprKind::Try(x) => {
-            is_n(x) || rec(x)
-        }
-        ExprKind::Binop(a, _, b) => (!is_n(a) && rec(a)) || (!is_n(b) && rec(b)),
+        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) => is_n(x) || rec(x),
         // `return value` moves `value` out of the function, exactly like a tail
         // expression — a bare `return name` is a move-out, not an alias.
         ExprKind::Return(x) => rec_tail(x),
@@ -9011,6 +8950,17 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
             // trailing `$a`, so it doesn't alias the binding.
             if fname == "__map_result" {
                 return args.iter().any(|a| if is_n(a) { !tail } else { rec(a) });
+            }
+            // An operator, resolved to its canonical impl. Its operands are read,
+            // not aliased — a bare `name` operand does not disqualify the binding
+            // — which is what the `Binop` arm above says for the same operators
+            // reached as primitive nodes. Both spellings have to answer alike:
+            // this arm is the one a *user's* `a == b` now takes, and without it
+            // every comparison against an exclusive binding would look like the
+            // binding escaping into a call, silently switching `push` off its
+            // in-place path.
+            if aipl_syntax::binop_for_builtin(fname).is_some() || fname == "__builtin_logical_not" {
+                return args.iter().any(|a| !is_n(a) && rec(a));
             }
             if *method_style {
                 // Method form: `args[0]` is the receiver, which a few builtins
@@ -9079,12 +9029,13 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     // safe unless we're iterating `a`, or the other operand
                     // aliases it (it is read while `a` grows).
                     //
-                    // This arm used to be written against the `char` opcode
-                    // encoding and named the wrong one — addition rather than
-                    // concatenation — so it asked about integer arithmetic, which
-                    // never has a `str` operand. It could not fire, and no `str`
-                    // builder binding was ever exclusive.
-                    ExprKind::Binop(l, BinOp::Concat, r) if matches!(&l.kind, ExprKind::Ident(n) if n == name) => {
+                    // The shape itself is `aipl_syntax::self_append`, which
+                    // codegen's emitting arm asks too — the two have to agree, and
+                    // once did not: both were hand-written against the old `char`
+                    // opcode encoding and named addition rather than
+                    // concatenation, so neither could fire.
+                    _ if aipl_syntax::self_append(val, name).is_some() => {
+                        let r = aipl_syntax::self_append(val, name).expect("matched");
                         iterating || rec(r)
                     }
                     // `set a = a.trim()` / `set a = trim(a)` both fold to the
@@ -9171,13 +9122,8 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         | ExprKind::Char(_)
         | ExprKind::None
         | ExprKind::Unit => 0,
-        ExprKind::Neg(x)
-        | ExprKind::Not(x)
-        | ExprKind::Field(x, _)
-        | ExprKind::Try(x)
-        | ExprKind::Return(x) => c(x),
-        ExprKind::Binop(a, _, b)
-        | ExprKind::Seq(a, b)
+        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => c(x),
+        ExprKind::Seq(a, b)
         | ExprKind::Index(a, b)
         | ExprKind::Let(_, _, a, b)
         | ExprKind::LetMut(_, _, a, b)
@@ -9223,7 +9169,6 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         | ExprKind::LetMut(_, _, a, b)
         | ExprKind::Assign(_, a, b)
         | ExprKind::Seq(a, b)
-        | ExprKind::Binop(a, _, b)
         | ExprKind::Index(a, b)
         | ExprKind::For(_, a, b)
         | ExprKind::While(a, b) => find_move_into(param, a).or_else(|| find_move_into(param, b)),
@@ -9233,11 +9178,9 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         ExprKind::Slice(a, b, d) => find_move_into(param, a)
             .or_else(|| find_move_into(param, b))
             .or_else(|| d.as_ref().and_then(|d| find_move_into(param, d))),
-        ExprKind::Neg(x)
-        | ExprKind::Not(x)
-        | ExprKind::Field(x, _)
-        | ExprKind::Try(x)
-        | ExprKind::Return(x) => find_move_into(param, x),
+        ExprKind::Neg(x) | ExprKind::Field(x, _) | ExprKind::Try(x) | ExprKind::Return(x) => {
+            find_move_into(param, x)
+        }
         ExprKind::Call(_, args, _)
         | ExprKind::ArrayLit(args)
         | ExprKind::SetLit(args)

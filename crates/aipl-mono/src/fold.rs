@@ -89,9 +89,7 @@ fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
             args.iter().map(|x| fold_expr(x, env)).collect(),
             *ms,
         ),
-        ExprKind::Binop(a, op, b) => ExprKind::Binop(f(a), *op, f(b)),
         ExprKind::Neg(x) => ExprKind::Neg(f(x)),
-        ExprKind::Not(x) => ExprKind::Not(f(x)),
         ExprKind::If(c, t, e2) => ExprKind::If(f(c), f(t), f(e2)),
         ExprKind::Construct(name, inits) => ExprKind::Construct(
             name.clone(),
@@ -237,11 +235,6 @@ fn try_fold(kind: &ExprKind) -> Option<ExprKind> {
             ExprKind::Num(n) => Some(ExprKind::Num(n.wrapping_neg())),
             _ => None,
         },
-        ExprKind::Not(x) => match &x.kind {
-            ExprKind::Bool(b) => Some(ExprKind::Bool(!b)),
-            _ => None,
-        },
-        ExprKind::Binop(l, op, r) => fold_binop(l, *op, r),
         // `if (true) { a } else { b }` → `a`. The discarded branch is the one
         // that would not have run, so dropping it changes nothing observable —
         // and it removes a control-flow split, which is what later passes care
@@ -263,12 +256,30 @@ fn try_fold(kind: &ExprKind) -> Option<ExprKind> {
                 crate::contains_context_literal(t) || crate::contains_context_literal(f);
             (!unifies_types).then(|| taken.kind.clone())
         }
-        // The reserved impls the loader resolves `+`/`-` to. Only these names:
-        // an operator aliased to a user function is an ordinary call.
+        // The reserved impls the loader resolves an operator to. Only these
+        // names: an operator aliased to a user function is an ordinary call.
         ExprKind::Call(name, args, _) => {
+            // `!` resolved to its canonical impl folds like the node it replaced.
+            if name == "__builtin_logical_not" {
+                let [x] = args.as_slice() else {
+                    return None;
+                };
+                let ExprKind::Bool(b) = &x.kind else {
+                    return None;
+                };
+                return Some(ExprKind::Bool(!b));
+            }
             let [a, b] = args.as_slice() else {
                 return None;
             };
+            // The operators with one operation each fold through the shared
+            // opcode table — the same `fold_binop` the primitive nodes use, so
+            // `1 < 2` folds whether it was written as `<` or as `less_than(1, 2)`.
+            // The arithmetic impls cannot: their flavor lives in the name, which
+            // is exactly what an opcode drops.
+            if let Some(op) = aipl_syntax::binop_for_builtin(name) {
+                return fold_binop(a, op, b);
+            }
             let (ExprKind::Num(a), ExprKind::Num(b)) = (&a.kind, &b.kind) else {
                 return None;
             };
