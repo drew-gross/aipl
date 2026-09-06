@@ -1,0 +1,977 @@
+// Introspection over a `Grammar` (see `grammar.aipl`): what it *says*, rendered
+// as EBNF, and what it can *start with*, computed as FIRST sets. Neither parses
+// anything — both are pure functions of the grammar value, which is the whole
+// reason the grammar is data and the driver is somewhere else.
+//
+// **The EBNF dump** (`ebnf`) is the grammar as a reader would write it by hand:
+// one `name = rule ;` line per production, sequence by juxtaposition, `|` for
+// ordered choice, and the postfix `?`/`*`/`+` for the repetitions. `ListOf` and
+// `Climb` are combinators rather than EBNF operators, so both are *expanded*:
+// a list into its `(item (sep item)* sep?)?` longhand, and a climb into the flat
+// `atom (op atom)*` with the precedence it actually uses stated in a trailing
+// `(* precedence: ... *)` comment — EBNF cannot express binding power or
+// associativity, so the honest thing is to say them rather than to imply them.
+// The dump is a *debug* rendering like `cst.aipl`'s `show`: it never fails, so a
+// grammar can be dumped linked or unlinked (a `Named` renders as its name, a
+// `NamedIdx` as the name it indexes, or `?` when it indexes nothing).
+//
+// **FIRST sets** (`first_sets`) answer, per production, which terminals a match
+// can begin with and whether it can match nothing at all. Two uses:
+//
+//   - A grammar author reads them. A production whose FIRST set is empty matches
+//     nothing; two alternatives of a `OneOf` whose sets overlap are the ones
+//     where the order written decides the parse.
+//   - A driver prunes with them. `OneOf` currently tries every alternative and
+//     backtracks; `can_start` is the test that skips an alternative no token
+//     could begin — which is what keeps a PEG parse near-linear without packrat
+//     memoization, and memoization needs the hash-backed dicts that do not exist
+//     yet. This file computes and proves the sets; wiring them into
+//     `parse.aipl`'s `match_one_of` is a separate change, because pruning an
+//     alternative also has to keep contributing its expectations to `Far` or the
+//     error messages get worse.
+//
+// A terminal here is a `Sym`: a token *kind* (what `Term` matches) or an exact
+// *spelling* (what `Spelling` matches). The two are genuinely different tests —
+// a kind ignores the text and a spelling ignores the kind — so a FIRST set holds
+// both and `can_start` asks both.
+//
+// The computation is a fixed point, because a reference may reach back through
+// the production it started from: every production starts empty and
+// not-nullable, each round recomputes all of them from the previous round, and
+// the loop stops when a round changes nothing. Both halves of a `First` only
+// ever grow, so it terminates — and unlike the parse, it terminates on a
+// left-recursive grammar too.
+import {
+    case_name,
+    contains,
+    equal as ==,
+    extend,
+    first,
+    is_empty,
+    join,
+    len,
+    less_than as <,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    sort_by,
+    try_map,
+    value_or,
+    value_or_err,
+} from builtins;
+import { Cst } from "./cst.aipl";
+import {
+    Climb,
+    Grammar,
+    ListOf,
+    Many,
+    Maybe,
+    Mk,
+    Named,
+    NamedIdx,
+    OneOf,
+    ParseError,
+    Prec,
+    Production,
+    Rule,
+    Spelling,
+    Term,
+    Then,
+    link,
+    many,
+    many1,
+    prod_names,
+} from "./grammar.aipl";
+
+// ---------- EBNF ----------
+
+// Where a rule sits in its parent, which is all that decides whether it needs
+// parentheses. `Alt` is a production's whole right-hand side, where nothing
+// binds looser and even a choice renders bare; `Seq` is one element of a
+// sequence, where a choice needs parentheses but a nested sequence does not
+// (concatenation is associative, so it flattens); `Item` is the operand of a
+// postfix `?`/`*`/`+`, where both need them.
+variant Ctx = Alt | Seq | Item
+
+// `s` in double quotes — how EBNF spells a literal terminal.
+fn dq(s: str) -> str {
+    let q = "\"";
+    `{q}{s}{q}`
+}
+
+pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
+    let names = prod_names(g);
+    g.prods.map(|p| prod_line(p, names)).join(sep="\n")
+}.doc("""
+    `g` rendered as EBNF: one `name = rule ;` line per production, in grammar
+    order, with no trailing newline.
+
+    Sequence is juxtaposition, choice is `|`, and repetition is the postfix
+    `?` (`Maybe`), `*` (`Many` with minimum 0) and `+` (`Many` with minimum 1);
+    a higher minimum renders as `{n,}`. `ListOf` and `Climb` have no EBNF
+    operator and are expanded — the list into its separator longhand, the climb
+    into `atom (op atom)*` plus a `(* precedence: ... *)` note, since EBNF cannot
+    express binding power.
+
+    Total, like `cst.aipl`'s `show`: a grammar may be dumped linked or unlinked,
+    and a reference that resolves to nothing renders as `?` rather than failing.
+""").test({
+    // Parentheses are decided by where a rule sits rather than by how it was
+    // written: a choice needs them inside a sequence, a sequence only under a
+    // postfix, and neither needs them as a whole right-hand side.
+    let r_alt: Rule<Kind> = OneOf([Term(Num), Term(Name)]);
+    let r_seq: Rule<Kind> = Then([Term(Num), OneOf([Term(Name), Spelling("+")])]);
+    let r_star: Rule<Kind> = many(OneOf([Term(Num), Term(Name)]));
+    let r_plus: Rule<Kind> = many1(Then([Term(Num), Term(Name)]));
+    let two: u64 = 2;
+    let r_min2: Rule<Kind> = Many(Term(Num), two);
+    let r_opt: Rule<Kind> = Maybe(Named("alt"));
+    let no_rules: Rule<Kind>[] = [];
+    let r_empty: Rule<Kind> = Then(no_rules);
+    let r_never: Rule<Kind> = OneOf(no_rules);
+    let r_list: Rule<Kind> = ListOf(Term(Num), ",", false);
+    let g = g_of([
+        one("alt", r_alt),
+        one("seq", r_seq),
+        one("star", r_star),
+        one("plus", r_plus),
+        one("min2", r_min2),
+        one("opt", r_opt),
+        one("empty", r_empty),
+        one("never", r_never),
+        one("list", r_list),
+    ]);
+    assert(
+        ebnf(g) == """
+            alt = Num | Name ;
+            seq = Num (Name | "+") ;
+            star = (Num | Name)* ;
+            plus = (Num Name)+ ;
+            min2 = Num{2,} ;
+            opt = alt? ;
+            empty = (* empty *) ;
+            never = (* never *) ;
+            list = (Num ("," Num)*)? ;
+        """,
+    );
+
+    // A right-associative level is marked, because the flat rendering is the
+    // one thing that cannot show which way it nests.
+    let r_pow: Rule<Kind> = Climb(Term(Num), [Prec { power: 3, right: true, ops: ["^"] }]);
+    assert(
+        ebnf(g_of([one("pow", r_pow)])) == """
+            pow = Num ("^" Num)* ; (* precedence: "^" (right) *)
+        """,
+    );
+
+    // Total, and indifferent to linking: an unresolved reference renders as the
+    // name it names, and an index resolving to nothing as `?`.
+    let nine: u64 = 9;
+    let r_far: Rule<Kind> = NamedIdx(nine);
+    let r_miss: Rule<Kind> = Named("nope");
+    assert(
+        ebnf(g_of([one("a", r_far), one("b", r_miss)])) == """
+            a = ? ;
+            b = nope ;
+        """,
+    );
+})
+
+// One production's line, plus the precedence note if its rule climbs. The note
+// hangs off the *line* rather than off the climb it describes, so a `Climb`
+// nested inside a sequence still reads as one uninterrupted rule.
+fn prod_line<K: variant, A: any>(p: Production<K, A>, names: str[]) -> str {
+    let body = render_rule(p.rule, names, Alt);
+    let note = prec_note(climb_precs(p.rule));
+    if (note.is_empty()) { `{p.name} = {body} ;` } else { `{p.name} = {body} ; {note}` }
+}
+
+fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
+    match (r) {
+        Term(k) => k.case_name(),
+        Spelling(s) => dq(s),
+        Named(n) => n,
+        NamedIdx(i) => names[i].value_or("?"),
+        Then(rs) => {
+            if (rs.is_empty()) {
+                return "(* empty *)";
+            };
+            let body = rs.map(|x| render_rule(x, names, Seq)).join(sep=" ");
+            match (ctx) {
+                Alt | Seq => body,
+                Item => `({body})`,
+            }
+        },
+        OneOf(rs) => {
+            if (rs.is_empty()) {
+                return "(* never *)";
+            };
+            let body = rs.map(|x| render_rule(x, names, Seq)).join(sep=" | ");
+            match (ctx) {
+                Alt => body,
+                Seq | Item => `({body})`,
+            }
+        },
+        Many(sub, min) => {
+            let body = render_rule(sub, names, Item);
+            `{body}{rep_suffix(min)}`
+        },
+        Maybe(sub) => {
+            let body = render_rule(sub, names, Item);
+            `{body}?`
+        },
+        ListOf(item, sep, trailing) => render_list_of(item, sep, trailing, names),
+        Climb(atom, precs) => render_climb(atom, precs, names, ctx),
+    }
+}
+
+// `*`, `+`, or the `{n,}` longhand for a minimum EBNF has no operator for. The
+// braces come from bindings rather than from the template, which has no escape
+// for a literal one.
+fn rep_suffix(min: u64) -> str {
+    if (min == 0) {
+        return "*";
+    };
+    if (min == 1) {
+        return "+";
+    };
+    let open = "{";
+    let close = "}";
+    `{open}{min},{close}`
+}
+
+// A separated list, longhand. The outer `?` is not decoration: `ListOf` always
+// matches, because an empty list is a list.
+fn render_list_of<K: variant>(item: Rule<K>, sep: str, trailing: bool, names: str[]) -> str {
+    let it = render_rule(item, names, Item);
+    let s = dq(sep);
+    if (trailing) { `({it} ({s} {it})* {s}?)?` } else { `({it} ({s} {it})*)?` }
+}
+
+// A climb, flattened: every operator of every level in one alternation. The
+// nesting that binding power produces is stated in `prec_note` instead — writing
+// it structurally would need one EBNF production per level, and inlining those
+// doubles the atom's text per level.
+fn render_climb<K: variant>(atom: Rule<K>, precs: Prec[], names: str[], ctx: Ctx) -> str {
+    let a = render_rule(atom, names, Seq);
+    let ops = all_ops(precs);
+    let op = match (ops.first()) {
+        some(only) => if (ops.len() == 1) {
+            dq(only)
+        } else {
+            let alts = ops.map(dq).join(sep=" | ");
+            `({alts})`
+        },
+        none => "(* never *)",
+    };
+    let body = `{a} ({op} {a})*`;
+    match (ctx) {
+        Alt | Seq => body,
+        Item => `({body})`,
+    }
+}
+
+// Every operator spelling in `precs`, deduped, in the order the levels list
+// them.
+fn all_ops(precs: Prec[]) -> str[] {
+    mut out: str[] = [];
+    for (let pr : precs) {
+        for (let o : pr.ops) {
+            if (!out.contains(o)) {
+                set out = [..out, o];
+            };
+        }
+    }
+    out
+}
+
+// The precedence levels of the first `Climb` in `r`, or `[]` when it has none.
+// A rule holding two climbs is not a shape any grammar here writes; the first is
+// what the note describes.
+fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
+    match (r) {
+        Climb(_, precs) => precs,
+        Then(rs) | OneOf(rs) => first_precs(rs),
+        // Not grouped into one alternation: `_` counts as a bound name, so
+        // arms whose payloads differ only in how many slots they ignore are
+        // refused as binding different names.
+        Many(sub, _) => climb_precs(sub),
+        Maybe(sub) => climb_precs(sub),
+        ListOf(sub, _, _) => climb_precs(sub),
+        Term(..) | Spelling(..) | Named(..) | NamedIdx(..) => [],
+    }
+}
+
+fn first_precs<K: variant>(rs: Rule<K>[]) -> Prec[] {
+    for (let sub : rs) {
+        let ps = climb_precs(sub);
+        if (!ps.is_empty()) {
+            return ps;
+        };
+    }
+    []
+}
+
+// `(* precedence: "*" > "+" "-" *)` — the levels loosest-last, each one its
+// operators, with a right-associative level marked. Empty when there is nothing
+// to say.
+fn prec_note(precs: Prec[]) -> str {
+    if (precs.is_empty()) {
+        return "";
+    };
+    let levels = powers_desc(precs).map(|pw| level_text(precs, pw)).join(sep=" > ");
+    `(* precedence: {levels} *)`
+}
+
+// The distinct binding powers in `precs`, tightest first.
+fn powers_desc(precs: Prec[]) -> u64[] {
+    mut out: u64[] = [];
+    for (let pr : precs) {
+        if (!out.contains(pr.power)) {
+            set out = [..out, pr.power];
+        };
+    }
+    out.sort_by(|a, b| b < a)
+}
+
+// One level: its operators, gathered across every `Prec` sharing that power,
+// since a power written twice is one level as far as binding goes.
+fn level_text(precs: Prec[], power: u64) -> str {
+    mut ops: str[] = [];
+    mut right = false;
+    for (let pr : precs) {
+        if (pr.power == power) {
+            set ops.extend(pr.ops);
+            if (pr.right) {
+                set right = true;
+            };
+        };
+    }
+    let listed = ops.map(dq).join(sep=" ");
+    if (right) { `{listed} (right)` } else { listed }
+}
+
+// ---------- FIRST sets ----------
+
+// A terminal a match can begin with: a token *kind*, as `Term` matches it, or an
+// exact *spelling*, as `Spelling` does. Kept apart because the two tests are
+// different — a kind ignores the token's text, a spelling ignores its kind — so
+// a set holding `SKind(Num)` and one holding `SText("1")` are not the same set
+// even where they accept the same token.
+variant Sym<K: variant> = SKind(Case<K>) | SText(str)
+
+// What one production (or one rule) can begin with: the terminal set, and
+// whether it can match nothing at all. `nullable` is not a property of the set —
+// an empty set with `nullable: true` is a rule that matches only emptiness, and
+// a non-empty set with it is one that may or may not consume — so both travel
+// together.
+struct First<K: variant> { syms: Sym<K>[], nullable: bool }
+
+pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError {
+    linked_first_sets(link(g)?)
+}.doc("""
+    The FIRST set of every production of `g`, in grammar order: the terminals a
+    match of that production can begin with, and whether it can match nothing.
+
+    `g` is linked here, so it may be handed over unlinked; linking is idempotent.
+    Fails only the way `link` fails — an unresolved reference, or a duplicate
+    rule name.
+
+    Computed as a fixed point, so a reference reaching back through the
+    production it started from is fine, left recursion included: the sets only
+    grow, and the loop stops on the round that changes nothing.
+""").test({
+    // Nullability reaching through a reference is what makes this a fixed point
+    // rather than one pass: `a` cannot know it continues past `b` until `b` is
+    // known nullable, and `b` is computed after it.
+    let r_a: Rule<Kind> = Then([Named("b"), Named("c")]);
+    let r_b: Rule<Kind> = Maybe(Spelling("x"));
+    let r_c: Rule<Kind> = Term(Num);
+    let fp = g_of([one("a", r_a), one("b", r_b), one("c", r_c)]);
+    assert(
+        show_first_sets(fp)? == """
+            a = "x" Num
+            b = "x" <empty>
+            c = Num
+        """,
+    );
+
+    // Left recursion: the parse would not terminate, and this does — the sets
+    // only grow, so the round that adds nothing ends it.
+    let r_e: Rule<Kind> = OneOf([Then([Named("e"), Spelling("+"), Term(Num)]), Term(Num)]);
+    assert(show_first_sets(g_of([one("e", r_e)]))? == "e = Num");
+
+    // It fails only the way `link` fails.
+    let r_bad: Rule<Kind> = Named("nope");
+    let bad = g_of([one("a", r_bad)]);
+    assert(first_sets(bad) == err(ParseError { message: "no rule named \"nope\"", span: 0..0 }));
+})
+
+// The fixed point itself, over an already-linked grammar. Split out because the
+// loop reads whole productions and `link` returns a whole grammar, and a `let`
+// binding that only ever has its fields read is a lint.
+fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError {
+    // One empty set per production, and the annotated `[]` is what pins `K`:
+    // nothing in `First { syms: .., nullable: false }` mentions it otherwise.
+    let empty: Sym<K>[] = [];
+    mut sets = g.prods.map(|p| First { syms: empty, nullable: false });
+    mut going = true;
+    while (going) {
+        // The round is computed against the previous round's sets, not against
+        // itself, so the result does not depend on the order productions happen
+        // to sit in.
+        let prev = sets;
+        let next = g.prods.try_map(|p| rule_first(p.rule, prev))?;
+        if (next == prev) {
+            set going = false;
+        } else {
+            set sets = next;
+        };
+    }
+    ok(sets)
+}
+
+pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseError {
+    match (r) {
+        Term(k) => ok(First { syms: [SKind(k)], nullable: false }),
+        Spelling(s) => {
+            // `SText` mentions no `K`, so nothing in the constructor pins the
+            // type parameter — the annotated binding is what does, the same
+            // idiom `grammar.aipl` writes its rules with.
+            let sym: Sym<K> = SText(s);
+            ok(First { syms: [sym], nullable: false })
+        },
+        // A sequence begins with its first element — and also with its second,
+        // when the first can match nothing, and so on. It is nullable only when
+        // every element is.
+        Then(rs) => {
+            mut acc: Sym<K>[] = [];
+            mut empty_ok = true;
+            for (let sub : rs) {
+                if (empty_ok) {
+                    let First { syms, nullable } = rule_first(sub, sets)?;
+                    set acc = union_syms(acc, syms);
+                    set empty_ok = nullable;
+                };
+            }
+            ok(First { syms: acc, nullable: empty_ok })
+        },
+        // A choice begins with anything any alternative does, and is nullable
+        // when any one is. Order does not matter here even though it matters to
+        // the parse: this is what *could* start a match, not which branch takes
+        // it.
+        OneOf(rs) => {
+            mut acc: Sym<K>[] = [];
+            mut empty_ok = false;
+            for (let sub : rs) {
+                let First { syms, nullable } = rule_first(sub, sets)?;
+                set acc = union_syms(acc, syms);
+                if (nullable) {
+                    set empty_ok = true;
+                };
+            }
+            ok(First { syms: acc, nullable: empty_ok })
+        },
+        Many(sub, min) => {
+            let First { syms, nullable } = rule_first(sub, sets)?;
+            ok(First { syms, nullable: nullable || min == 0 })
+        },
+        Maybe(sub) => {
+            let First { syms } = rule_first(sub, sets)?;
+            ok(First { syms, nullable: true })
+        },
+        // A list begins with its item and never with its separator — the driver
+        // tries the item first and an empty list is a list, which is also why it
+        // is always nullable.
+        ListOf(item, sep, trailing) => {
+            let First { syms } = rule_first(item, sets)?;
+            ok(First { syms, nullable: true })
+        },
+        // A climb begins with its atom: an operator only ever appears after one.
+        Climb(atom, precs) => rule_first(atom, sets),
+        NamedIdx(i) => sets[i].value_or_err(ParseError {
+            message: `no production at index {i}`,
+            span: 0..0,
+        }),
+        // `link` rewrites every one of these, and `first_sets` links first —
+        // reaching one means `rule_first` was called with a rule from an
+        // unlinked grammar, whose references cannot be followed.
+        Named(n) => err(ParseError { message: `unlinked rule reference "{n}"`, span: 0..0 }),
+    }
+}.doc("""
+    What an arbitrary rule can begin with, given `sets` — the FIRST sets of the
+    grammar's productions, as `first_sets` returns them.
+
+    This is the piece a driver would prune a `OneOf` with: `first_sets` once per
+    grammar, then this per alternative. Fails on a `Named` reference, which means
+    the rule came from an unlinked grammar, and on a `NamedIdx` pointing past the
+    end of `sets`.
+""").test({
+    let sets = first_sets(fixture())?;
+
+    // An arbitrary rule against the grammar's sets — what a driver would prune
+    // one alternative with. The optional `!` contributes its spelling without
+    // making the sequence nullable, since `atom` after it is not.
+    let three: u64 = 3;
+    let r: Rule<Kind> = Then([Maybe(Spelling("!")), NamedIdx(three)]);
+    assert(
+        rule_first(r, sets)?.show_first() == """
+            "!" Num Name "("
+        """,
+    );
+
+    // A whole-sequence nullability: every element optional, so the rule is too.
+    let r_all_opt: Rule<Kind> = Then([Maybe(Spelling("!")), Maybe(Term(Num))]);
+    assert(
+        rule_first(r_all_opt, sets)?.show_first() == """
+            "!" Num <empty>
+        """,
+    );
+
+    // A reference that cannot be followed, and one that points nowhere.
+    let r_named: Rule<Kind> = Named("atom");
+    assert(first_msg(r_named, sets) == "unlinked rule reference \"atom\"");
+    let nine: u64 = 9;
+    let r_far: Rule<Kind> = NamedIdx(nine);
+    assert(first_msg(r_far, sets) == "no production at index 9");
+})
+
+// `a` with everything from `b` that is not already in it. Sets are a handful of
+// entries and are built once per grammar, so a scan is the whole implementation
+// — the same trade `grammar.aipl`'s `name_index` makes.
+fn union_syms<K: variant>(a: Sym<K>[], b: Sym<K>[]) -> Sym<K>[] {
+    mut out = a;
+    for (let s : b) {
+        if (!out.contains(s)) {
+            set out = [..out, s];
+        };
+    }
+    out
+}
+
+pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
+    let spelled: Sym<K> = SText(text);
+    self.nullable || self.syms.contains(SKind(kind)) || self.syms.contains(spelled)
+}.doc("""
+    Whether a token of kind `kind` spelled `text` could begin a match of `self` —
+    the test a driver skips an alternative on.
+
+    A nullable rule accepts anything, because it can match without consuming the
+    token at all; otherwise the token's kind is looked for among the set's kinds
+    and its spelling among the set's spellings. Conservative in the direction
+    that matters: it is never false for a token that could in fact start a match,
+    so pruning on it cannot lose a parse.
+""").test({
+    let syms: Sym<Kind>[] = [SKind(Num), SText("(")];
+    let f: First<Kind> = First { syms, nullable: false };
+
+    // A kind names itself only where the expected type says `Case<K>`, which a
+    // constructor argument gives and a plain argument does not — hence the
+    // annotated bindings, the same idiom a `Rule` is written with.
+    let num: Case<Kind> = Num;
+    let name: Case<Kind> = Name;
+    let punct: Case<Kind> = Punct;
+
+    // By kind, ignoring the token's text; by spelling, ignoring its kind.
+    assert(f.can_start(num, "3"));
+    assert(f.can_start(punct, "("));
+    // Neither, so a driver may skip this alternative without trying it.
+    assert(!f.can_start(name, "x"));
+
+    // A nullable rule accepts anything: it need not consume the token at all.
+    let no_syms: Sym<Kind>[] = [];
+    let nullable: First<Kind> = First { syms: no_syms, nullable: true };
+    assert(nullable.can_start(name, "x"));
+
+    // A rule that begins with nothing and matches nothing accepts nothing.
+    let dead: First<Kind> = First { syms: no_syms, nullable: false };
+    assert(!dead.can_start(name, "x"));
+})
+
+pub fn show_first<K: variant>(self: First<K>) -> str {
+    // The lambda is not forwarding for its own sake: `show_sym` is generic, and
+    // a generic function has no value form to pass to `map`.
+    let syms = self.syms.map(|s| show_sym(s)).join(sep=" "); #[allow]
+    if (!self.nullable) {
+        return syms;
+    };
+    if (syms.is_empty()) {
+        return "<empty>";
+    };
+    `{syms} <empty>`
+}.doc("""
+    `self` as one readable line: each terminal in set order — a kind by its case
+    name, a spelling in double quotes — with `<empty>` appended when the rule is
+    nullable. A debug rendering, like `cst.aipl`'s `show`.
+""").test({
+    let syms: Sym<Kind>[] = [SKind(Num), SText("(")];
+    let f: First<Kind> = First { syms, nullable: false };
+    assert(
+        f.show_first() == """
+            Num "("
+        """,
+    );
+
+    // Nullability is not a member of the set, so it renders after it.
+    let nullable: First<Kind> = First { syms: f.syms, nullable: true };
+    assert(
+        nullable.show_first() == """
+            Num "(" <empty>
+        """,
+    );
+
+    // The two degenerate sets are distinguishable: matching only emptiness is
+    // not the same as matching nothing at all.
+    let no_syms: Sym<Kind>[] = [];
+    let only_empty: First<Kind> = First { syms: no_syms, nullable: true };
+    assert(only_empty.show_first() == "<empty>");
+    let dead: First<Kind> = First { syms: no_syms, nullable: false };
+    assert(dead.show_first() == "");
+})
+
+fn show_sym<K: variant>(self: Sym<K>) -> str {
+    match (self) {
+        SKind(k) => k.case_name(),
+        SText(s) => dq(s),
+    }
+}
+
+pub fn show_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> str!ParseError {
+    let sets = first_sets(g)?;
+    let names = prod_names(g);
+    mut lines: str[] = [];
+    for (let i, n : names) {
+        let f = sets[i].value_or_err(ParseError {
+            message: `no first set at index {i}`,
+            span: 0..0,
+        })?;
+        set lines = [..lines, `{n} = {f.show_first()}`];
+    }
+    ok(lines.join(sep="\n"))
+}.doc("""
+    `first_sets` rendered one `name = terminals` line per production, in grammar
+    order, with no trailing newline — the FIRST-set counterpart of `ebnf`, and
+    what makes a whole grammar's sets one readable assertion.
+""").test({
+    // The fixture grammar, dumped both ways. Between them the two dumps say
+    // everything this file computes, over every `Rule` arm the grammar uses.
+    let g = fixture();
+    assert(
+        ebnf(g) == """
+            prog = (stmt (";" stmt)* ";"?)? ;
+            stmt = Name "=" expr ;
+            expr = atom (("+" | "*") atom)* ; (* precedence: "*" > "+" *)
+            atom = Num | Name | "(" expr ")" ;
+            opt = "!"? Name+ ;
+        """,
+    );
+
+    assert(
+        show_first_sets(g)? == """
+            prog = Name <empty>
+            stmt = Name
+            expr = Num Name "("
+            atom = Num Name "("
+            opt = "!" Name
+        """,
+    );
+
+    // Linking changes indices, not meaning: both dumps come out the same from a
+    // grammar handed over linked.
+    assert(ebnf(link(g)?) == ebnf(g));
+    assert(show_first_sets(link(g)?)? == show_first_sets(g)?);
+})
+
+// ---------- test-only fixtures ----------
+//
+// A token kind and an AST, because a `Grammar<K, A>` cannot be written down
+// without both, and one grammar over them exercising every `Rule` arm. A real
+// consumer brings its own pair; `grammar_json.aipl` is the worked example.
+
+variant Kind = Num(str) | Name(str) | Punct
+
+variant Node = NLeaf(str) | NList(Node[])
+
+// The trivial lowering every fixture production passes: `Build` has no
+// payload-free arm to mean "nothing to lower".
+fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(NList(kids)) }
+
+fn one(name: str, rule: Rule<Kind>) -> Production<Kind, Node> { name, rule, build: Mk(keep) }
+
+fn g_of(ps: Production<Kind, Node>[]) -> Grammar<Kind, Node> { prods: ps }
+
+// The message a `rule_first` failure reports — and a distinguishable string when
+// it unexpectedly succeeded, so a broken assertion says which way it broke.
+// `grammar.aipl`'s `failure_message` is the same idea over a `str!ParseError`.
+fn first_msg(r: Rule<Kind>, sets: First<Kind>[]) -> str {
+    match (rule_first(r, sets)) {
+        ok(f) => `unexpectedly computed: {f.show_first()}`,
+        err(e) => e.message,
+    }
+}
+
+// A grammar with one production per shape worth rendering: a separated list, a
+// sequence, a precedence climb over two levels, an ordered choice with a nested
+// sequence in it, and an optional prefix in front of a one-or-more.
+fn fixture() -> Grammar<Kind, Node> {
+    let r_prog: Rule<Kind> = ListOf(Named("stmt"), ";", true);
+    let r_stmt: Rule<Kind> = Then([Term(Name), Spelling("="), Named("expr")]);
+    let r_expr: Rule<Kind> = Climb(
+        Named("atom"),
+        [Prec { power: 1, right: false, ops: ["+"] }, Prec { power: 2, right: false, ops: ["*"] }],
+    );
+    let r_atom: Rule<Kind> = OneOf([
+        Term(Num),
+        Term(Name),
+        Then([Spelling("("), Named("expr"), Spelling(")")]),
+    ]);
+    let r_opt: Rule<Kind> = Then([Maybe(Spelling("!")), many1(Term(Name))]);
+    Grammar {
+        prods: [
+            one("prog", r_prog),
+            one("stmt", r_stmt),
+            one("expr", r_expr),
+            one("atom", r_atom),
+            one("opt", r_opt),
+        ],
+    }
+}
+--- performance ---
+allocations: 1364
+deallocations: 1364
+reallocations: 144
+bytes allocated: 101607
+instructions executed: 143285
+binary size: 104160
+  code: 65640
+  data: 3684
+  metadata: 34836
+functions:
+  __arr_drop_First$Kind:
+    calls: 77
+    bytes: 116
+  __arr_drop_Sym$Kind:
+    calls: 182
+    bytes: 140
+  __arr_drop___m2__Prec:
+    calls: 3
+    bytes: 120
+  __arr_drop___m2__Production$Kind$Node:
+    calls: 42
+    bytes: 188
+  __arr_drop___m2__Rule$Kind:
+    calls: 91
+    bytes: 116
+  __arr_retain_First$Kind:
+    calls: 149
+    bytes: 116
+  __arr_retain_Sym$Kind:
+    calls: 139
+    bytes: 140
+  __arr_retain___m2__Prec:
+    calls: 0
+    bytes: 120
+  __arr_retain___m2__Production$Kind$Node:
+    calls: 60
+    bytes: 188
+  __arr_retain___m2__Rule$Kind:
+    calls: 119
+    bytes: 116
+  __builtin_try_map$__m2__Production$Kind$Node$First<Kind>$__m2__ParseError$lam15:
+    calls: 17
+    bytes: 920
+  __builtin_try_map$__m2__Production$Kind$Node$__m2__Production$Kind$Node$__m2__ParseError$lam7:
+    calls: 9
+    bytes: 972
+  __builtin_try_map$__m2__Rule$Kind$__m2__Rule<Kind>$__m2__ParseError$lam30:
+    calls: 27
+    bytes: 732
+  __eq_First$Kind:
+    calls: 36
+    bytes: 128
+  __eq_First$Kind$arr:
+    calls: 17
+    bytes: 284
+  __eq_Sym$Kind:
+    calls: 114
+    bytes: 144
+  __eq_Sym$Kind$arr:
+    calls: 36
+    bytes: 284
+  __eq___builtin_Span:
+    calls: 1
+    bytes: 104
+  __eq___m2__ParseError:
+    calls: 1
+    bytes: 128
+  __lambda_5:
+    calls: 35
+    bytes: 964
+  __m2__link$Kind$Node:
+    calls: 9
+    bytes: 1188
+  __m2__link_rule$Kind:
+    calls: 133
+    bytes: 4496
+  __m2__name_index:
+    calls: 59
+    bytes: 400
+  __m2__prod_names$Kind$Node:
+    calls: 20
+    bytes: 492
+  __map24:
+    calls: 0
+    bytes: 380
+  __rec_drop_Node:
+    calls: 0
+    bytes: 72
+  __rec_drop___m2__Rule$Kind:
+    calls: 224
+    bytes: 324
+  __test$can_start:
+    calls: 1
+    bytes: 900
+  __test$ebnf:
+    calls: 1
+    bytes: 8132
+  __test$first_sets:
+    calls: 1
+    bytes: 4592
+  __test$rule_first:
+    calls: 1
+    bytes: 2232
+  __test$show_first:
+    calls: 1
+    bytes: 1044
+  __test$show_first_sets:
+    calls: 1
+    bytes: 1604
+  __test_try_fail___m2__ParseError:
+    calls: 0
+    bytes: 84
+  __to_str___m2__ParseError:
+    calls: 0
+    bytes: 824
+  __to_str_u64:
+    calls: 2
+    bytes: 204
+  aipl_arr_extend:
+    calls: 14
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 2960
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 144
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 21
+    bytes: (external)
+  aipl_array_dec:
+    calls: 3719
+    bytes: (external)
+  aipl_array_new:
+    calls: 328
+    bytes: (external)
+  aipl_array_push:
+    calls: 185
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 370
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 88
+    bytes: (external)
+  aipl_assert:
+    calls: 23
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 224
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 1665
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 43
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 1441
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 43
+    bytes: (external)
+  aipl_test_begin:
+    calls: 6
+    bytes: (external)
+  aipl_test_end:
+    calls: 6
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  can_start$Kind:
+    calls: 5
+    bytes: 552
+  climb_precs$Kind:
+    calls: 0
+    bytes: 32
+  climb_precs$Kind$tail:
+    calls: 84
+    bytes: 1144
+  dq:
+    calls: 47
+    bytes: 456
+  ebnf$Kind$Node:
+    calls: 6
+    bytes: 1560
+  first_msg:
+    calls: 2
+    bytes: 480
+  first_precs$Kind:
+    calls: 0
+    bytes: 32
+  first_precs$Kind$tail:
+    calls: 19
+    bytes: 420
+  first_sets$Kind$Node:
+    calls: 7
+    bytes: 324
+  fixture:
+    calls: 2
+    bytes: 4488
+  keep:
+    calls: 0
+    bytes: 268
+  linked_first_sets$Kind$Node:
+    calls: 6
+    bytes: 1084
+  main:
+    calls: 1
+    bytes: 452
+  prec_note:
+    calls: 27
+    bytes: 3468
+  render_rule$Kind:
+    calls: 88
+    bytes: 7164
+  rep_suffix:
+    calls: 6
+    bytes: 724
+  rule_first$Kind:
+    calls: 228
+    bytes: 5464
+  show_first$Kind:
+    calls: 25
+    bytes: 1264
+  show_first_sets$Kind$Node:
+    calls: 5
+    bytes: 2540
+  union_syms$Kind:
+    calls: 99
+    bytes: 736

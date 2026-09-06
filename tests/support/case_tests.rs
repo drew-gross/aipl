@@ -663,6 +663,7 @@ case_tests! {
     crates_aipl_codegen_src_cst = "crates/aipl-codegen/src/cst",
     crates_aipl_codegen_src_dedent = "crates/aipl-codegen/src/dedent",
     crates_aipl_codegen_src_doc = "crates/aipl-codegen/src/doc",
+    crates_aipl_codegen_src_ebnf = "crates/aipl-codegen/src/ebnf",
     crates_aipl_codegen_src_fill_or_add_section = "crates/aipl-codegen/src/fill_or_add_section",
     crates_aipl_codegen_src_fill_or_add_section_file = "crates/aipl-codegen/src/fill_or_add_section_file",
     crates_aipl_codegen_src_find_files = "crates/aipl-codegen/src/find_files",

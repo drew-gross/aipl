@@ -5,7 +5,7 @@
 Long-running, interleaved with other work. Update the checkboxes as items land;
 each is sized to be finishable in one session.
 
-- [ ] 1 `ebnf.aipl` + FIRST sets
+- [x] 1 `ebnf.aipl` + FIRST sets
 - [ ] 2 Highlighter generator (oracle: `tests/highlighting.rs`)
 - [ ] 3 AIPL's grammar, differential-tested against gazelle
 - [ ] 4 Formatter generator
@@ -122,9 +122,31 @@ harness and by `aipl check crates`. Nothing joins `DOGFOOD_SOURCE_FILES` or
 `FMT_SOURCE_FILES` (`crates/aipl-codegen/src/lib.rs:3352,3391`) until Stage 3, so
 until then **no `.clif` regeneration is involved**.
 
-**1 — Introspection, proven.** `ebnf.aipl` dumps the grammar as EBNF; FIRST-set
-computation lets `OneOf` pick a branch without backtracking (also why packrat
-memoization is not needed while dicts remain linear scans).
+**1 — Introspection, proven. Done.** `ebnf.aipl` holds both halves, each a pure
+function of the grammar value.
+
+`ebnf` dumps a grammar as EBNF — one `name = rule ;` line per production,
+juxtaposition for sequence, `|` for choice, postfix `?`/`*`/`+` for the
+repetitions. `ListOf` and `Climb` are combinators with no EBNF operator, so both
+expand: a list into its `(item (sep item)* sep?)?` longhand, a climb into the
+flat `atom (op atom)*` plus a `(* precedence: "^" (right) > "*" > "+" *)` note,
+since EBNF states neither binding power nor associativity. Total, like `show` —
+a grammar dumps linked or unlinked. All three toys assert their own dump, so the
+description and the parser cannot drift.
+
+`first_sets` computes, per production, the terminals a match can begin with and
+whether it can match nothing; `rule_first` answers the same for an arbitrary
+rule, and `can_start` is the predicate over a token's kind *and* its spelling
+(the two are different tests, so a `Sym` is one or the other). A fixed point, so
+a reference reaching back through the production it started from is fine —
+including left recursion, which the sets survive and the parse does not.
+
+**Not done, deliberately: the driver still backtracks.** Pruning
+`match_one_of`'s alternatives with `can_start` is a change to `parse.aipl`, and
+the catch is `Far`: an alternative that is skipped must still contribute its
+expectations, or the error messages get *worse* than the ones the collapsing in
+`expect_as` was built to keep readable. That is its own change, with its own
+tests; the sets it needs exist and are proven.
 
 **2 — The highlighter generator.** Generate
 `editors/vscode/syntaxes/aipl.tmLanguage.json` from the grammar. First because it
