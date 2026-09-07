@@ -3416,6 +3416,40 @@ impl Cx<'_> {
                 continue;
             }
             let aty = self.check_expr(arg, env, effects)?;
+            // The element type is nobody's business here, but the *container* is
+            // not variable: `map`'s `self: T[]` says the receiver is an array
+            // whatever `T` turns out to be. See `shape_fits`.
+            //
+            // A variadic parameter is exempt: its stored type is the *sequence*
+            // the body sees (`T[]`, or `str` for chars), while a call site may
+            // equally pass one bare `T` or a `T?`, and codegen normalizes. So
+            // `[[1], [2]].join(sep=0)` is a single separator element, not a
+            // shape error.
+            let variadic = sig.params.get(i).is_some_and(|p| p.variadic);
+            if !variadic && !shape_fits(pty, &aty) {
+                // Phrase the receiver as a receiver. `a.map(f)` and `map(a, f)`
+                // are one AST, so there is no call *form* to read — but a first
+                // parameter named `self` is what makes the method spelling
+                // possible, and "arg 0" for it would name a position the reader
+                // never wrote. The wording then matches the check
+                // monomorphization still makes behind this one.
+                let msg = if i == 0 && sig.params.first().is_some_and(|p| p.name == "self") {
+                    format!(
+                        "{} expects {}, got {}",
+                        display(name),
+                        shape_name(pty),
+                        tyname(&aty)
+                    )
+                } else {
+                    format!(
+                        "fn {:?} arg {i}: expected {}, got {}",
+                        display(name),
+                        shape_name(pty),
+                        tyname(&aty)
+                    )
+                };
+                return Err(Error::at(msg, arg.span.clone()));
+            }
             self.bind_field(pty, &aty, &vars, &mut map);
             atys[i] = aty;
         }
@@ -4029,6 +4063,83 @@ fn demangle_named(n: &str) -> String {
 /// checker stays permissive rather than reporting a false mismatch.
 fn unknown_ty() -> Type {
     Type::Named("__unknown__".to_string())
+}
+
+/// Whether `aty` has the *shape* `pty` demands — its outermost type
+/// constructor, and nothing below it.
+///
+/// The unification in `check_call` binds a generic signature's type variables
+/// from the argument types but deliberately does not *coerce* against the
+/// parameter types: an `any[]` parameter's element type varies per call, and
+/// pinning it here would be unsound. The gap that left is that nothing checked
+/// the container either. `map`'s `self: T[]` says "an array" no matter what `T`
+/// is, but `map(5, |x| x)` bound no variable, contradicted nothing, and sailed
+/// through — to be caught in monomorphization, by which point `5` had been
+/// substituted for the binding that held it and the error pointed at a `let`
+/// somewhere else in the function rather than at the call.
+///
+/// Only the outermost constructor is judged. Going deeper would pre-empt the
+/// better, specific messages the later passes already give for nested shapes —
+/// `join`'s "expected an array of arrays, got an array of i64" is the one that
+/// matters — and would gain nothing they don't already say.
+fn shape_fits(pty: &Type, aty: &Type) -> bool {
+    // A bare type variable accepts anything; that is what makes it a variable.
+    // A function-typed parameter is pass 2's business, not this one's.
+    if matches!(pty, Type::TypeVar(_) | Type::Fn(_, _)) {
+        return true;
+    }
+    // Argument types that are not yet knowable: the abstract variable of an
+    // enclosing generic body (which may well be an array once instantiated), the
+    // permissive `__unknown__`, an untyped `none`/`[]`, and an unresolved
+    // generic application. Judging any of these here would reject programs that
+    // are fine.
+    if matches!(
+        aty,
+        Type::TypeVar(_) | Type::NoneInner | Type::Generic(_, _)
+    ) || is_unknown(aty)
+    {
+        return true;
+    }
+    match pty {
+        // An array parameter accepts the whole container family, not just an
+        // array. `str` and `char[]` share a representation, so a string receiver
+        // *is* an array of chars (`"a b".find_index(..)` scans its chars) — and
+        // a set or a dict is accepted because a family of builtins declares
+        // `self: T[]` and takes those anyway: `len`, `is_empty`, `is_nonempty`,
+        // `contains`. Their signature does not say so, and the passes that know
+        // which of them mean it are downstream of here, so this stays out of
+        // their way.
+        //
+        // What is left is the case that motivated the check and the one users
+        // actually hit: a scalar, a struct, a variant, an optional or a result
+        // where an array was wanted.
+        Type::Array(_) => {
+            matches!(aty, Type::Array(_) | Type::Set(_) | Type::Dict(_, _))
+                || aipl_syntax::is_str_repr(aty)
+        }
+        Type::Optional(_) => matches!(aty, Type::Optional(_)),
+        Type::Set(_) => matches!(aty, Type::Set(_)),
+        Type::Dict(_, _) => matches!(aty, Type::Dict(_, _)),
+        Type::Result(_, _) => matches!(aty, Type::Result(_, _)),
+        // A concrete parameter type is left to the synthesis-only rule: it still
+        // has to admit a bare integer literal flexing to its width, which is
+        // settled per call site and not here.
+        _ => true,
+    }
+}
+
+/// What shape a parameter type demands, in the words an error should use —
+/// "an array", not "T[]", since the element type is exactly the part the caller
+/// is free to choose.
+fn shape_name(pty: &Type) -> &'static str {
+    match pty {
+        Type::Array(_) => "an array",
+        Type::Optional(_) => "an optional",
+        Type::Set(_) => "a set",
+        Type::Dict(_, _) => "a dict",
+        Type::Result(_, _) => "a result",
+        _ => "a value",
+    }
 }
 
 fn is_unknown(t: &Type) -> bool {

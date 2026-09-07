@@ -129,4 +129,10 @@ error: lambda body returns bool, but i64 was expected
 66 | fn lambda_body_type() -> i64 { apply_i64(|x| true, 3) }
    |                                              ^^^^
 
+error: map expects an array, got i64
+  --> ./tests/cases/lambdas/err_lambdas.aipl:70:22
+   |
+70 |     print(to_str(map(5, |x| x + 1)));
+   |                      ^
+
 error: fn "return_function": cannot return a function value ((i64) -> i64)

@@ -1,0 +1,73 @@
+import { len, map, print, to_str, wrapping_add as +, zip_with } from builtins;
+
+// A generic signature's *container* is not a type variable. `map`'s
+// `self: T[]` says "an array" whatever `T` turns out to be, and the checker now
+// says so — at the call, naming what it got.
+//
+// It used to say so only in monomorphization, which runs after simple bindings
+// are substituted: `let n = 5; n.map(..)` reported against the `5` in the `let`,
+// a line that need not be anywhere near the call. Every error below points at
+// the receiver that is wrong.
+//
+// The check is deliberately one level deep. It judges the outermost type
+// constructor and nothing under it, so the specific messages the later passes
+// give for nested shapes — `join`'s "an array of arrays" — still get their say.
+
+struct P { x: i64 }
+
+variant V = A | B(i64)
+
+// A scalar. The binding is what made this report in the wrong place before.
+fn scalar() -> i64[] {
+    let n = 5;
+    n.map(|x| x + 1)
+}
+
+// A struct, and a variant: neither is an array, and neither has an element type
+// to guess at.
+fn a_struct(p: P) -> i64[] { p.map(|x| x + 1) }
+
+fn a_variant(v: V) -> i64[] { v.map(|x| x + 1) }
+
+// An optional is the near miss worth naming: `i64?` holds an `i64` the way an
+// array holds elements, and it is still not an array.
+fn an_optional(o: i64?) -> i64[] { o.map(|x| x + 1) }
+
+// The receiver is fine and a later *argument* is not. That one is reported by
+// position, because only the receiver has a spelling a reader wrote — `a.f(b)`
+// and `f(a, b)` are one AST, so there is no call form to read back.
+fn bad_arg(xs: i64[]) -> i64[] { xs.zip_with(5, |a, b| a + b) }
+
+fn main() !prints {
+    print(to_str(scalar().len()));
+}
+--- errors ---
+error: map expects an array, got i64
+  --> ./tests/cases/generics/err_container_shape.aipl:23:5
+   |
+23 |     n.map(|x| x + 1)
+   |     ^
+
+error: map expects an array, got P
+  --> ./tests/cases/generics/err_container_shape.aipl:28:30
+   |
+28 | fn a_struct(p: P) -> i64[] { p.map(|x| x + 1) }
+   |                              ^
+
+error: map expects an array, got V
+  --> ./tests/cases/generics/err_container_shape.aipl:30:31
+   |
+30 | fn a_variant(v: V) -> i64[] { v.map(|x| x + 1) }
+   |                               ^
+
+error: map expects an array, got i64?
+  --> ./tests/cases/generics/err_container_shape.aipl:34:36
+   |
+34 | fn an_optional(o: i64?) -> i64[] { o.map(|x| x + 1) }
+   |                                    ^
+
+error: fn "zip_with" arg 1: expected an array, got i64
+  --> ./tests/cases/generics/err_container_shape.aipl:39:46
+   |
+39 | fn bad_arg(xs: i64[]) -> i64[] { xs.zip_with(5, |a, b| a + b) }
+   |                                              ^

@@ -151,12 +151,10 @@ bugs:
       `xs.filter(keep).map(f)`; restructured around it rather than fixing.
 
 errors:
-  error: fn "sexp_grammar": unknown type "__m2__Grammar" when sexp_grammar is de-stuttered. Bad error, but also it shouild compile.
   bad error for calling map on non-array:
     error: field access on non-struct value of type _
       --> crates/aipl-codegen/src/grammar.aipl:325:24
     325 |     g.prods[i].map(|p| p.expect_as).value_or("")
-  error: cannot infer type parameter "K" of generic variant "__m2__Rule" — a constructor argument or a single existing instance must determine it <--- when sexp_grammar is de-stuttered
 
 HOF:
   lower_item returns a T!E but the body doesn't seem to have any error paths. I think this is because it's passed to a function that accepts lambdas that return errors. There should be a better way to do this (Liskov substitution principle?)

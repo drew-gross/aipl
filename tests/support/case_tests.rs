@@ -199,6 +199,7 @@ case_tests! {
     cases_generics_emit_builder_multi = "cases/generics/emit_builder_multi",
     cases_generics_empty_array_arg = "cases/generics/empty_array_arg",
     cases_generics_err_bound_not_propagated = "cases/generics/err_bound_not_propagated",
+    cases_generics_err_container_shape = "cases/generics/err_container_shape",
     cases_generics_err_generics = "cases/generics/err_generics",
     cases_generics_err_instance_name_demangled = "cases/generics/err_instance_name_demangled",
     cases_generics_errors_err_any_in_return = "cases/generics/errors/err_any_in_return",
