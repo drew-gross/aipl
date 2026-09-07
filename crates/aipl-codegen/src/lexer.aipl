@@ -129,28 +129,31 @@ struct Token<K> { kind: K, text: SpanStr }
 variant Seg = Plain | Head | Middle | Tail
 
 // How a rule turns its matched token into a kind `K`: a fixed set of options.
-// `Bare` is a finished kind for a valueless token (punctuation, an operator);
-// `Of` applies a constructor to the token's *content string* — the
+//
+// Four of the five are handed the token's *content string* — the
 // delimiter-stripped text for a string matcher (`Delimited`/`Between`/`Nested`),
 // or the raw matched text for everything else (identifiers, whose text is their
 // content, and numeric `Int`/`Float` runs, whose emit parses the digits itself).
-// The two never overlap — a matcher either strips delimiters or has none — so one
-// option serves both, always handing over the meaningful content. `OfSeg` is for
-// a `Template` rule, applied to each segment's text and its position.
-//
-// `Try`/`TrySeg` are the fallible siblings: the function returns `K!str` — a
-// kind, or an error *message*. Interpreting a match can fail (a numeric literal
-// that overflows i64, a string that breaks a content rule — e.g. a single-quoted
-// string that isn't exactly one char, a consumer's char literal); when it returns
-// `err(msg)` the library pairs the message with the token's whole span to build a
-// `LexError` (see `apply_emit`). The token span is the right location for a
-// whole-token verdict like overflow; a matcher-level, byte-precise error (an
-// unterminated string, an unknown escape) still comes from scanning, not the emit.
+// The two never overlap — a matcher either strips delimiters or has none — so
+// one notion serves both, always handing over the meaningful content.
 variant Emit<K> =
+    // A finished kind for a valueless token: punctuation, an operator.
     | Bare(K)
+    // Applies a constructor to the token's content string.
     | Of((str) -> K)
+    // For a `Template` rule: applied to each segment's text and its position, so
+    // one rule can produce a different kind per position.
     | OfSeg((str, Seg) -> K)
+    // `Of`'s fallible sibling: the function returns `K!str` — a kind, or an
+    // error *message*. Interpreting a match can fail (a numeric literal that
+    // overflows i64, a single-quoted string that isn't exactly one char), and on
+    // `err(msg)` the library pairs the message with the token's whole span to
+    // build a `LexError` (see `apply_emit`). The token span is the right
+    // location for a whole-token verdict like overflow; a matcher-level,
+    // byte-precise error (an unterminated string, an unknown escape) still comes
+    // from scanning, not the emit.
     | Try((str) -> K!str)
+    // `OfSeg`'s fallible sibling, on the same terms.
     | TrySeg((str, Seg) -> K!str)
 
 // Why a lex failed: what went wrong, and the span of the offending source
@@ -160,93 +163,6 @@ struct LexError { message: str, span: Span }
 // One token shape, as plain data. Char classes and fixed spellings are both
 // spelled as strings (class membership via `contains`, a spelling matched
 // whole); none of them ever match empty input, so `lex` always makes progress.
-//
-// - `CharRun(cont, first)`: a maximal run of chars in `cont`. `first` restricts
-//   what may *open* the run and defaults to `cont`, so the usual shape — one
-//   class for the whole token — is a single argument (`CharRun(digits)`, and
-//   whitespace runs), and only a narrower opener is worth naming
-//   (`CharRun(alnum, first = alpha)`: an identifier may not start with a digit).
-// - `OneChar(chars)`: exactly one char, any of `chars`. Single-character
-//   punctuation, where one rule stands for a whole class of one-char tokens
-//   (`OneChar("()[],;")`) instead of an `Exact` rule apiece. It is the direct
-//   concept a `CharRun` cannot state: a run needs something to continue with,
-//   so "exactly one" would have to be spelled as a run that can never extend.
-// - `Exact(spelling)`: the given spelling, verbatim. Punctuation and operators
-//   — one spelling per rule; when spellings share a prefix, order the rules
-//   longest first (`==` before `=`), since rule order is the priority mechanism
-//   (a single rule matching a set, with its own longest-wins, would duplicate
-//   that ordering as a second mechanism).
-// - `Keyword(spelling, boundary)`: like `Exact`, but the spelling only matches
-//   when the char after it is absent or outside `boundary` (the identifier
-//   continue class) — so a keyword rule placed before the identifier rule
-//   claims `if` without biting the front off `iffy`. One spelling per rule, as
-//   with `Exact`; a shared prefix (`in`/`int`) is resolved by the boundary
-//   check, not rule order, so order among keyword rules doesn't matter.
-// - `Delimited(delims, escapes)`: a char in `delims` opens the token, which
-//   runs to just past the next occurrence of the *same* char. `escapes` is
-//   the set of chars that may follow a backslash inside the token: `\` plus
-//   an allowed char is content (in particular an escaped delimiter does not
-//   close), `\` plus anything else is a lex error, and "" turns escape
-//   handling off entirely (a backslash is ordinary content). A token still
-//   open at the end of the source is a lex error. String literals. `escapes`
-//   governs *scanning* only — the token's value is the delimiter-stripped text
-//   left *un-decoded*, so the rule's `emit` decides what escapes mean, with its
-//   own decoder (the library provides none — escape semantics are the
-//   language's).
-// - `Between(open, close)`: the `open` spelling opens the token, which runs to
-//   just past the next *full* occurrence of the `close` spelling. Unlike
-//   `Delimited`, open and close are multi-char and may differ, and the scan
-//   matches the whole `close` — so a partial close inside (a lone `"` or `""`
-//   under a `"""` close) is ordinary content. Contents are verbatim (no escape
-//   processing), which is what raw strings `"""..."""` and non-nesting block
-//   comments `/* ... */` want. Both spellings must be non-empty. A token still
-//   open at the end of the source is a lex error.
-// - `Nested(open, close)`: like `Between`, but depth-tracked — each further
-//   `open` inside raises the nesting depth and the matching `close` lowers it,
-//   so the token ends only at the `close` that balances the outermost `open`.
-//   Rust-style nesting block comments `/* ... /* ... */ ... */`. `open` and
-//   `close` must be distinct (a delimiter can't both open and close a level)
-//   and non-empty. A token still open (depth > 0) at the end of the source is a
-//   lex error.
-// - `Template(delim, escapes, finalize)`: a template literal — text with
-//   `{expr}` interpolations. The `delim` spelling opens and closes the literal;
-//   it may be multi-char and scans like `Between` (a lone backtick under a
-//   triple-backtick delim is content). Text segments follow `escapes` as in
-//   `Delimited` (`\{` doesn't interpolate, an escaped delim doesn't close,
-//   `""` turns escapes off — the verbatim raw-template shape). A `{` in text
-//   opens an interpolation, lexed by the full rule set until the balancing
-//   `}` — so skip rules and nested template rules apply inside — with brace
-//   depth tracked and the closing `}` consumed without a token. `finalize` is a
-//   `(str[]) -> str[]` the caller supplies to post-process a literal's text
-//   segments *as a group* before they're emitted (it must return one text per
-//   input segment) — for a transform that needs the whole literal, like
-//   de-denting a raw template's shared indent; pass an identity for none. The
-//   emitted kinds are context-dependent, derived from the rule's kind K: a
-//   literal with no interpolations is one K token; otherwise K_head (the open
-//   delim through the first `{`), each interpolation's tokens under their own
-//   rules' kinds, K_middle for each segment between interpolations, and
-//   K_tail (through the closing delim). The `skip` flag is ignored — a
-//   template always produces tokens.
-// - `ToEol(marker)`: the `marker` spelling, then everything up to (not
-//   including) the next newline. Line comments — usually `skip: true`.
-// - `Float`: a digit run that extends past a fraction (`.` plus at least one
-//   digit) and/or an exponent (`e`/`E`, an optional sign, at least one
-//   digit), JSON style. A bare digit run does *not* match — put a `Float`
-//   rule ahead of the int rule and each number lexes as the right one.
-// - `Int`: a decimal digit run with an *optional* leading `-` — a distinct
-//   matcher because a number is not an identifier, but (like `Float`) it carries
-//   no computed value: its text is left *unparsed*, so the rule pairs it with an
-//   `Of`/`Try` emit that parses the digits (and any sign) itself (via the
-//   `int_parse` builtin, or its own scanner). Parsing — base, digit separators,
-//   and what overflow means — is the caller's, not the library's. The `-` is
-//   consumed only when a digit *immediately* follows it, so `- 5`/`-x` (a space or
-//   a letter after the `-`) don't match and are left for a `-` operator rule. Rule
-//   order alone then decides the reading: `Int` before a `-` operator makes `-5` a
-//   signed literal (and `a - 5` still subtraction, since the `- 5` there has a
-//   space); the operator before `Int` makes every `-` the operator and `Int`
-//   unsigned. Scanning the sign *into* the token is also what lets the emit reach
-//   the full signed range — an i64's `-9223372036854775808` overflows as a
-//   positive literal, so it's only expressible with the `-` and digits together.
 //
 // Tokens carry values (see `TokenValue`), computed by the claiming matcher:
 // `Delimited` a `StrVal` of the delimiter-stripped contents, *un-decoded* (the
@@ -262,16 +178,102 @@ struct LexError { message: str, span: Span }
 // single-quoted `Delimited` string and enforces the one-char shape in a `Try`
 // emit (see `lex_aipl.aipl`'s `char_lit_emit`).
 variant Matcher =
+    // A maximal run of chars in `cont`. `first` restricts what may *open* the
+    // run and defaults to `cont`, so the usual shape — one class for the whole
+    // token — is a single argument (`CharRun(digits)`, and whitespace runs),
+    // and only a narrower opener is worth naming
+    // (`CharRun(alnum, first = alpha)`: an identifier may not start with a
+    // digit).
     | CharRun(cont: str, first: str = cont)
+    // Exactly one char, any of `chars`. Single-character punctuation, where one
+    // rule stands for a whole class of one-char tokens (`OneChar("()[],;")`)
+    // instead of an `Exact` rule apiece. It is the direct concept a `CharRun`
+    // cannot state: a run needs something to continue with, so "exactly one"
+    // would have to be spelled as a run that can never extend.
     | OneChar(str)
+    // The given spelling, verbatim. Punctuation and operators — one spelling
+    // per rule; when spellings share a prefix, order the rules longest first
+    // (`==` before `=`), since rule order is the priority mechanism (a single
+    // rule matching a set, with its own longest-wins, would duplicate that
+    // ordering as a second mechanism).
     | Exact(str)
+    // Like `Exact`, but the spelling only matches when the char after it is
+    // absent or outside `boundary` (the identifier continue class) — so a
+    // keyword rule placed before the identifier rule claims `if` without biting
+    // the front off `iffy`. One spelling per rule, as with `Exact`; a shared
+    // prefix (`in`/`int`) is resolved by the boundary check, not rule order, so
+    // order among keyword rules doesn't matter.
     | Keyword(str, str)
+    // A char in `delims` opens the token, which runs to just past the next
+    // occurrence of the *same* char. `escapes` is the set of chars that may
+    // follow a backslash inside the token: `\` plus an allowed char is content
+    // (in particular an escaped delimiter does not close), `\` plus anything
+    // else is a lex error, and "" turns escape handling off entirely (a
+    // backslash is ordinary content). A token still open at the end of the
+    // source is a lex error. String literals. `escapes` governs *scanning* only
+    // — the token's value is the delimiter-stripped text left *un-decoded*, so
+    // the rule's `emit` decides what escapes mean, with its own decoder (the
+    // library provides none — escape semantics are the language's).
     | Delimited(str, str)
+    // The `open` spelling opens the token, which runs to just past the next
+    // *full* occurrence of the `close` spelling. Unlike `Delimited`, open and
+    // close are multi-char and may differ, and the scan matches the whole
+    // `close` — so a partial close inside (a lone `"` or `""` under a `"""`
+    // close) is ordinary content. Contents are verbatim (no escape processing),
+    // which is what raw strings `"""..."""` and non-nesting block comments
+    // `/* ... */` want. Both spellings must be non-empty. A token still open at the
+    // end of the source is a lex error.
     | Between(str, str)
+    // Like `Between`, but depth-tracked — each further `open` inside raises the
+    // nesting depth and the matching `close` lowers it, so the token ends only
+    // at the `close` that balances the outermost `open`. Rust-style nesting
+    // block comments `/* ... /* ... */ ... */`. `open` and `close` must be
+    // distinct (a delimiter can't both open and close a level) and non-empty. A
+    // token still open (depth > 0) at the end of the source is a lex error.
     | Nested(str, str)
+    // A template literal — text with `{expr}` interpolations. The `delim`
+    // spelling opens and closes the literal; it may be multi-char and scans
+    // like `Between` (a lone backtick under a triple-backtick delim is
+    // content). Text segments follow `escapes` as in `Delimited` (`\{` doesn't
+    // interpolate, an escaped delim doesn't close, `""` turns escapes off — the
+    // verbatim raw-template shape). A `{` in text opens an interpolation, lexed
+    // by the full rule set until the balancing `}` — so skip rules and nested
+    // template rules apply inside — with brace depth tracked and the closing
+    // `}` consumed without a token. `finalize` is a `(str[]) -> str[]` the
+    // caller supplies to post-process a literal's text segments *as a group*
+    // before they're emitted (it must return one text per input segment) — for
+    // a transform that needs the whole literal, like de-denting a raw
+    // template's shared indent; pass an identity for none. The emitted kinds
+    // are context-dependent, derived from the rule's kind K: a literal with no
+    // interpolations is one K token; otherwise K_head (the open delim through
+    // the first `{`), each interpolation's tokens under their own rules' kinds,
+    // K_middle for each segment between interpolations, and K_tail (through the
+    // closing delim). The `skip` flag is ignored — a template always produces
+    // tokens.
     | Template(str, str, (str[]) -> str[])
+    // The `marker` spelling, then everything up to (not including) the next
+    // newline. Line comments — usually `skip: true`.
     | ToEol(str)
+    // A digit run that extends past a fraction (`.` plus at least one digit)
+    // and/or an exponent (`e`/`E`, an optional sign, at least one digit), JSON
+    // style. A bare digit run does *not* match — put a `Float` rule ahead of
+    // the int rule and each number lexes as the right one.
     | Float
+    // A decimal digit run with an *optional* leading `-` — a distinct matcher
+    // because a number is not an identifier, but (like `Float`) it carries no
+    // computed value: its text is left *unparsed*, so the rule pairs it with an
+    // `Of`/`Try` emit that parses the digits (and any sign) itself (via the
+    // `int_parse` builtin, or its own scanner). Parsing — base, digit
+    // separators, and what overflow means — is the caller's, not the library's.
+    // The `-` is consumed only when a digit *immediately* follows it, so
+    // `- 5`/`-x` (a space or a letter after the `-`) don't match and are left for
+    // a `-` operator rule. Rule order alone then decides the reading: `Int`
+    // before a `-` operator makes `-5` a signed literal (and `a - 5` still
+    // subtraction, since the `- 5` there has a space); the operator before
+    // `Int` makes every `-` the operator and `Int` unsigned. Scanning the sign
+    // *into* the token is also what lets the emit reach the full signed range —
+    // an i64's `-9223372036854775808` overflows as a positive literal, so it's
+    // only expressible with the `-` and digits together.
     | Int
 
 // One prioritized entry of a rule set: the shape to match, how to turn a match

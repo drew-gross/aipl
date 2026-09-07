@@ -73,22 +73,17 @@ import {
 // ---------- the TextMate model ----------
 
 // One TextMate pattern, as data. Four shapes, which is every shape the grammars
-// generated here use and every shape the oracle interprets:
-//
-// - `Match(regex, scope)`: paint what `regex` matches. An empty scope matches
-//   and paints nothing, which is only useful inside a region.
-// - `Caps(regex, scopes)`: paint capture group `i + 1` with `scopes[i]` — the
-//   contextual shape, where one match has differently-scoped halves.
-// - `Region(begin, end, inner, ..)`: everything from `begin` to `end`, with
-//   `inner` applied to what lies between. `scope` paints the whole region,
-//   `begin_scope` just the opening match, `content_scope` just the interior.
-// - `Include(name)`: defer to the repository entry called `name`. A region whose
-//   `inner` includes its *own* entry is how a nestable construct (a block
-//   comment inside a block comment) is written, and the only reason a pattern
-//   ever needs a name.
+// generated here use and every shape the oracle interprets.
 variant Pat =
+    // Paint what `regex` matches. An empty scope matches and paints nothing,
+    // which is only useful inside a region.
     | Match(str, str)
+    // Paint capture group `i + 1` with `scopes[i]` — the contextual shape, where
+    // one match has differently-scoped halves.
     | Caps(str, str[])
+    // Everything from `begin` to `end`, with `inner` applied to what lies
+    // between. `scope` paints the whole region, `begin_scope` just the opening
+    // match, `content_scope` just the interior.
     | Region(
         begin: str,
         end: str,
@@ -97,6 +92,10 @@ variant Pat =
         begin_scope: str = "",
         content_scope: str = ""
     )
+    // Defer to the repository entry called `name`. A region whose `inner`
+    // includes its *own* entry is how a nestable construct (a block comment
+    // inside a block comment) is written, and the only reason a pattern ever
+    // needs a name.
     | Include(str)
 
 // One named repository entry: a list of patterns tried in order.

@@ -67,48 +67,47 @@ struct Prec { power: u64, right: bool, ops: str[] }
 // One rule shape, as plain data. Ordered choice makes this a PEG, not a CFG:
 // `OneOf` commits to the first alternative that matches, so alternatives are
 // tried in the order written and there is no ambiguity to resolve.
-//
-// - `Term(k)`: any one token whose kind is the case `k` — `Term(Name)` matches
-//   every identifier, whatever text it carries. The one place a rule looks at a
-//   token's *kind* rather than its text. `k` is a `Case<K>`, which is a case
-//   with no payload: naming a kind takes no value of that kind, so there is no
-//   dummy to invent and none to accidentally read.
-// - `Literal(s)`: one token whose source text is exactly `s`. Punctuation and
-//   keywords, matched by what they are written as rather than by the kind that
-//   lexed them — the counterpart of `Term`, which asks the kind and ignores the
-//   text. Grammar files conventionally import it aliased (`Literal as Lit`): it
-//   is by far the most-written rule in any real grammar, and the short form is
-//   what keeps a production on one line. A convention, not a requirement —
-//   `grammar_calc.aipl` imports it unaliased, its own AST having a `Lit` case
-//   already, and an import colliding with a local is a hard error.
-// - `Then(rs)`: every rule in order; the matched children concatenate.
-// - `OneOf(rs)`: the first alternative that matches, in order.
-// - `Many(r, min)`: `r` repeated until it stops matching, at least `min` times —
-//   `0` is a PEG `*`, `1` a `+`. A rule that can match empty input would spin
-//   here forever, so the driver refuses one outright rather than hanging.
-// - `Maybe(r)`: `r`, or nothing. Always matches.
-// - `Named(n)`: a reference to the production called `n`. `link` rewrites every
-//   one of these to a `NamedIdx`, so the driver never compares strings.
-// - `NamedIdx(i)`: a reference to production `i`, and the *only* rule that
-//   builds a CST node — one `CTree(i, ..)` per reference matched.
-// - `ListOf(item, sep, trailing)`: zero or more `item`s separated by the
-//   spelling `sep`, with a trailing separator allowed when `trailing`. Always
-//   matches (an empty list is a list); a separator with no item after it is
-//   consumed when `trailing`, and left for the enclosing rule when not.
-// - `Climb(atom, precs)`: precedence climbing — an `atom`, then binary operators
-//   drawn from `precs`, nested by binding power. Each application nests under the
-//   *enclosing* production's index, so `1 + 2 * 3` yields a node per operand
-//   rather than one flat run.
 variant Rule<K: variant> =
+    // Any one token whose kind is the case `k` — `Term(Name)` matches every
+    // identifier, whatever text it carries. The one place a rule looks at a
+    // token's *kind* rather than its text. `k` is a `Case<K>`, which is a case
+    // with no payload: naming a kind takes no value of that kind, so there is no
+    // dummy to invent and none to accidentally read.
     | Term(Case<K>)
+    // One token whose source text is exactly `s`. Punctuation and keywords,
+    // matched by what they are written as rather than by the kind that lexed
+    // them — the counterpart of `Term`, which asks the kind and ignores the
+    // text. Grammar files conventionally import it aliased (`Literal as Lit`):
+    // it is by far the most-written rule in any real grammar, and the short form
+    // is what keeps a production on one line. A convention, not a requirement —
+    // `grammar_calc.aipl` imports it unaliased, its own AST having a `Lit` case
+    // already, and an import colliding with a local is a hard error.
     | Literal(str)
+    // Every rule in order; the matched children concatenate.
     | Then(Rule<K>[])
+    // The first alternative that matches, in order.
     | OneOf(Rule<K>[])
+    // `r` repeated until it stops matching, at least `min` times — `0` is a PEG
+    // `*`, `1` a `+`. A rule that can match empty input would spin here forever,
+    // so the driver refuses one outright rather than hanging.
     | Many(Rule<K>, u64)
+    // `r`, or nothing. Always matches.
     | Maybe(Rule<K>)
+    // A reference to the production called `n`. `link` rewrites every one of
+    // these to a `NamedIdx`, so the driver never compares strings.
     | Named(str)
+    // A reference to production `i`, and the *only* rule that builds a CST node
+    // — one `CTree(i, ..)` per reference matched.
     | NamedIdx(u64)
+    // Zero or more `item`s separated by the literal `sep`, with a trailing
+    // separator allowed when `trailing`. Always matches (an empty list is a
+    // list); a separator with no item after it is consumed when `trailing`, and
+    // left for the enclosing rule when not.
     | ListOf(Rule<K>, str, bool)
+    // Precedence climbing — an `atom`, then binary operators drawn from `precs`,
+    // nested by binding power. Each application nests under the *enclosing*
+    // production's index, so `1 + 2 * 3` yields a node per operand rather than
+    // one flat run.
     | Climb(Rule<K>, Prec[])
 
 // How a production's matched node becomes a value of the caller's AST type `A`:

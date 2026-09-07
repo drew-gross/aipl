@@ -10,7 +10,6 @@ generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
 variant:
   add a "variant without" option for concrete/generic type that lets you still pass a conrete type to functions that accept generic
   add an is keyword that matches cases and maybe replaces same_case (or maybe just a .is(CaseName) method?)
-  allow variant constructors to have defaults, get rid of many in grammar.aipl (since Many can have default of 0)
   Decide if I want bare variant assignment. Similar: Can a function that returns T be passed as an argument to a function that returns T!str?
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
 
@@ -220,6 +219,7 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 parser:
+  allow Many default, get rid of many and many1, and some stuff in grammar_aipl.aipl (since Many can have default of 0)
   minimize rule binding shorthand necessity by improving the type system
   chage Far to use a set of expected
   Mk should accept fns that only need kids
