@@ -6253,6 +6253,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_count_while", "builtin_count_while.aipl"),
     ("__builtin_count_if", "builtin_count_if.aipl"),
     ("__builtin_find_if", "builtin_find_if.aipl"),
+    ("__builtin_find_index", "builtin_find_index.aipl"),
     (
         "__builtin_is_all_whitespace",
         "builtin_is_all_whitespace.aipl",

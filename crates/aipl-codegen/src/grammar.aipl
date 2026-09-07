@@ -26,7 +26,7 @@
 //     production's rule as an *annotated* binding — `let r: Rule<Kind> = ..` —
 //     and every constructor inside it resolves from that annotation. The `.test`
 //     blocks here and in `parse.aipl` are written in that idiom throughout.
-import { Span, equal as ==, map, not_equal as !=, try_map, value_or_err } from builtins;
+import { Span, equal as ==, find_index, map, not_equal as !=, try_map, value_or_err } from builtins;
 import { Cst } from "./cst.aipl";
 
 // Why a parse failed: a message, and the span of the offending source (absolute
@@ -162,27 +162,15 @@ pub fn many1<K: variant>(r: Rule<K>) -> Rule<K> { Many(r, 1) }
 // tree against, and what `link` resolves references through.
 pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods.map(|p| p.name) }
 
-// The index of `n` in `names`, or `none`. Names are few and lookups happen once
-// per reference at link time, so a scan is the whole implementation.
-pub fn name_index(names: str[], n: str) -> u64? {
-    for (let i, x : names) {
-        if (x == n) {
-            return some(i);
-        };
-    }
-    none
-}
-
 // One rule with every `Named(n)` in it rewritten to `NamedIdx(i)`. Fails when a
 // reference names no production — the error a grammar author most wants caught
 // before a parse rather than during one.
 fn link_rule<K: variant>(r: Rule<K>, names: str[]) -> Rule<K>!ParseError {
     match (r) {
         Named(n) => ok(NamedIdx(
-            name_index(names, n).value_or_err(ParseError {
-                message: `no rule named "{n}"`,
-                span: 0..0,
-            })?,
+            names
+                .find_index(|x| x == n)
+                .value_or_err(ParseError { message: `no rule named "{n}"`, span: 0..0 })?,
         )),
         Then(rs) => ok(Then(link_rules(rs, names)?)),
         OneOf(rs) => ok(OneOf(link_rules(rs, names)?)),
@@ -206,7 +194,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // Two productions of one name would make `Named` mean whichever came first
     // and leave the other unreachable — a typo that reads as a working grammar.
     for (let i, n : names) {
-        if (let some(j) = name_index(names, n)) {
+        if (let some(j) = names.find_index(|x| x == n)) {
             if (j != i) {
                 return err(ParseError { message: `duplicate rule name "{n}"`, span: 0..0 });
             };
@@ -236,8 +224,8 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     };
 
     assert(prod_names(g) == ["list", "item"]);
-    assert(name_index(prod_names(g), "item") == some(1));
-    assert(name_index(prod_names(g), "nope") == none);
+    assert(prod_names(g).find_index(|x| x == "item") == some(1));
+    assert(prod_names(g).find_index(|x| x == "nope") == none);
 
     let linked = link(g)?;
     // `item`'s two alternatives: a terminal, and a reference now an index.
@@ -324,11 +312,11 @@ allocations: 110
 deallocations: 110
 reallocations: 17
 bytes allocated: 9424
-instructions executed: 13646
-binary size: 44920
-  code: 27644
-  data: 1692
-  metadata: 15584
+instructions executed: 13660
+binary size: 46496
+  code: 28804
+  data: 1708
+  metadata: 15984
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -348,10 +336,22 @@ functions:
   __arr_retain_Rule$Kind:
     calls: 16
     bytes: 116
-  __builtin_try_map$Production$Kind$Node$Production$Kind$Node$ParseError$lam4:
+  __builtin_find_index$str$lam1:
+    calls: 1
+    bytes: 412
+  __builtin_find_index$str$lam14:
+    calls: 7
+    bytes: 400
+  __builtin_find_index$str$lam3:
+    calls: 1
+    bytes: 412
+  __builtin_find_index$str$lam8:
+    calls: 11
+    bytes: 400
+  __builtin_try_map$Production$Kind$Node$Production$Kind$Node$ParseError$lam11:
     calls: 4
     bytes: 972
-  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam7:
+  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam17:
     calls: 4
     bytes: 732
   __eq_ParseError:
@@ -378,7 +378,7 @@ functions:
   __eq_u64$opt:
     calls: 2
     bytes: 100
-  __lambda_2:
+  __lambda_9:
     calls: 9
     bytes: 964
   __rec_drop_Node:
@@ -392,7 +392,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 11796
+    bytes: 11732
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -459,9 +459,6 @@ functions:
   main:
     calls: 1
     bytes: 180
-  name_index:
-    calls: 20
-    bytes: 400
   prod_names$Kind$Node:
     calls: 9
     bytes: 492

@@ -439,10 +439,10 @@ deallocations: 11684
 reallocations: 567
 bytes allocated: 867498
 instructions executed: 1802126
-binary size: 274608
-  code: 175824
+binary size: 275680
+  code: 176624
   data: 6404
-  metadata: 92380
+  metadata: 92652
 functions:
   __arr_drop_Json:
     calls: 125
@@ -498,28 +498,37 @@ functions:
   __arr_retain___m4__TokenRule$JsonTok:
     calls: 0
     bytes: 560
-  __builtin_count_while$char$lam54:
+  __builtin_count_while$char$lam63:
     calls: 39
     bytes: 220
-  __builtin_count_while$char$s0$lam62:
+  __builtin_count_while$char$s0$lam71:
     calls: 0
     bytes: 176
-  __builtin_count_while$char$s0$lam64:
+  __builtin_count_while$char$s0$lam73:
     calls: 308
     bytes: 184
-  __builtin_find_if$__m3__Prec$lam101:
+  __builtin_find_if$__m3__Prec$lam110:
     calls: 0
     bytes: 688
-  __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam73:
+  __builtin_find_index$str$lam23:
+    calls: 37
+    bytes: 400
+  __builtin_find_index$str$lam43:
+    calls: 304
+    bytes: 400
+  __builtin_find_index$str$lam57:
+    calls: 342
+    bytes: 400
+  __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam82:
     calls: 142
     bytes: 748
-  __builtin_try_map$__m3__Production$JsonTok$Json$__m2__First<JsonTok>$__m3__ParseError$lam46:
+  __builtin_try_map$__m3__Production$JsonTok$Json$__m2__First<JsonTok>$__m3__ParseError$lam52:
     calls: 3
     bytes: 920
-  __builtin_try_map$__m3__Production$JsonTok$Json$__m3__Production$JsonTok$Json$__m3__ParseError$lam40:
+  __builtin_try_map$__m3__Production$JsonTok$Json$__m3__Production$JsonTok$Json$__m3__ParseError$lam46:
     calls: 38
     bytes: 972
-  __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule<JsonTok>$__m3__ParseError$lam76:
+  __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule<JsonTok>$__m3__ParseError$lam85:
     calls: 228
     bytes: 732
   __eq_Json:
@@ -549,7 +558,7 @@ functions:
   __lambda_18:
     calls: 35
     bytes: 96
-  __lambda_38:
+  __lambda_44:
     calls: 304
     bytes: 964
   __m1__leaves:
@@ -618,9 +627,6 @@ functions:
   __m3__link_rule$JsonTok:
     calls: 1140
     bytes: 4496
-  __m3__name_index:
-    calls: 683
-    bytes: 400
   __m3__prod_names$JsonTok$Json:
     calls: 81
     bytes: 492
@@ -717,7 +723,7 @@ functions:
   __m6__trailing_trivia$JsonTok$Json:
     calls: 60
     bytes: 704
-  __map34:
+  __map37:
     calls: 0
     bytes: 380
   __rec_drop_Json:

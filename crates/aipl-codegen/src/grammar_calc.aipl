@@ -415,10 +415,10 @@ deallocations: 8899
 reallocations: 779
 bytes allocated: 528521
 instructions executed: 1385089
-binary size: 250160
-  code: 159212
+binary size: 251232
+  code: 160012
   data: 4980
-  metadata: 85968
+  metadata: 86240
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -480,34 +480,43 @@ functions:
   __arr_retain___m4__TokenRule$CalcTok:
     calls: 0
     bytes: 500
-  __builtin_count_while$char$lam55:
+  __builtin_count_while$char$lam64:
     calls: 132
     bytes: 220
-  __builtin_count_while$char$s0$lam47:
+  __builtin_count_while$char$s0$lam53:
     calls: 94
     bytes: 172
-  __builtin_count_while$char$s0$lam63:
+  __builtin_count_while$char$s0$lam72:
     calls: 0
     bytes: 176
-  __builtin_count_while$char$s0$lam65:
+  __builtin_count_while$char$s0$lam74:
     calls: 104
     bytes: 184
-  __builtin_find_if$__m3__Prec$lam102:
+  __builtin_find_if$__m3__Prec$lam111:
     calls: 102
     bytes: 688
+  __builtin_find_index$str$lam19:
+    calls: 40
+    bytes: 400
+  __builtin_find_index$str$lam43:
+    calls: 123
+    bytes: 400
+  __builtin_find_index$str$lam58:
+    calls: 164
+    bytes: 400
   __builtin_int_parse:
     calls: 94
     bytes: 1028
-  __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam74:
+  __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam83:
     calls: 387
     bytes: 748
-  __builtin_try_map$__m3__Production$CalcTok$Calc$__m2__First<CalcTok>$__m3__ParseError$lam46:
+  __builtin_try_map$__m3__Production$CalcTok$Calc$__m2__First<CalcTok>$__m3__ParseError$lam52:
     calls: 4
     bytes: 920
-  __builtin_try_map$__m3__Production$CalcTok$Calc$__m3__Production$CalcTok$Calc$__m3__ParseError$lam40:
+  __builtin_try_map$__m3__Production$CalcTok$Calc$__m3__Production$CalcTok$Calc$__m3__ParseError$lam46:
     calls: 41
     bytes: 972
-  __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule<CalcTok>$__m3__ParseError$lam77:
+  __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule<CalcTok>$__m3__ParseError$lam86:
     calls: 164
     bytes: 732
   __eq_Calc:
@@ -528,10 +537,10 @@ functions:
   __eq_char$opt:
     calls: 104
     bytes: 100
-  __lambda_24:
+  __lambda_27:
     calls: 95
     bytes: 140
-  __lambda_38:
+  __lambda_44:
     calls: 123
     bytes: 964
   __m1__leaves:
@@ -597,9 +606,6 @@ functions:
   __m3__link_rule$CalcTok:
     calls: 533
     bytes: 4496
-  __m3__name_index:
-    calls: 327
-    bytes: 400
   __m3__prod_names$CalcTok$Calc:
     calls: 84
     bytes: 492
@@ -693,7 +699,7 @@ functions:
   __m6__trailing_trivia$CalcTok$Calc:
     calls: 72
     bytes: 648
-  __map34:
+  __map37:
     calls: 0
     bytes: 380
   __rec_drop_Calc:

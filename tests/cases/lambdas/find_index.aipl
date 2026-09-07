@@ -1,0 +1,143 @@
+import {
+    equal as ==,
+    filter,
+    find_index,
+    greater_than as >,
+    is_some,
+    is_some_and,
+    len,
+    less_than as <,
+    logical_not as !,
+} from builtins;
+
+// `arr.find_index(pred)` is the *position* of the first element satisfying
+// `pred`, or `none` when no element does — `find_if` answering where rather than
+// what, and short-circuiting the same way. A higher-order builtin like
+// `filter`/`map`: the lambda is lifted, captures threaded through. Like
+// `find_if`, it is implemented in AIPL itself (`builtin_find_index.aipl`) and
+// specializes like a user generic.
+//
+// The answer is an optional and not a bare `u64` because position 0 is a real
+// answer: `some(0)` (matched at the front) and `none` (matched nowhere) are
+// different, and a sentinel would conflate them.
+fn is_neg(self: i64) -> bool { self < 0 }
+
+// What the position is *for*: reading a second array at the same offset.
+fn value_for(keys: str[], vals: i64[], k: str) -> i64? {
+    match (keys.find_index(|x| x == k)) {
+        some(i) => vals[i],
+        none => none,
+    }
+}
+
+fn first_big(xs: i64[]) -> u64? { xs.find_index(|x| x > 10) }.test({
+    assert([1, 2, 9].find_index(|x| x > 5) == some(2));
+    assert([1, 2, 3].find_index(|x| x > 5) == none); // nothing matches -> none
+    // The *first* match, not the last: it stops there.
+    assert([9, 1, 7].find_index(|x| x > 5) == some(0));
+    assert(find_index([5, 4], |x| x == 4) == some(1)); // free-call form
+    assert([1, -2, -3].find_index(is_neg) == some(1)); // a named predicate
+    assert(['a', 'b'].find_index(|c| c == 'b') == some(1)); // any element type
+    assert("a b".find_index(|c| c == ' ') == some(1)); // a str iterates its chars
+    // `none` on an empty array (a typed empty from `filter`).
+    assert([1, 2].filter(|x| x > 100).find_index(|x| x > 0) == none);
+    // Method-chain helper + a captured bound.
+    assert(first_big([1, 20, 3]) == some(1));
+    assert(!first_big([1, 2, 3]).is_some());
+
+    // A found position indexes the array it came from, so it is always in range.
+    let xs = [4, 5, 6];
+    assert(xs.find_index(|x| x == 6).is_some());
+    assert(!xs.find_index(|x| x == 6).is_some_and(|i| i > xs.len()));
+
+    // ... and a parallel array, which is the shape the builtin exists for.
+    let keys = ["a", "b", "c"];
+    assert(value_for(keys, [10, 20, 30], "b") == some(20));
+    assert(value_for(keys, [10, 20, 30], "z") == none);
+})
+--- performance ---
+allocations: 13
+deallocations: 13
+reallocations: 0
+bytes allocated: 722
+instructions executed: 2404
+binary size: 12248
+  code: 7312
+  data: 997
+  metadata: 3939
+functions:
+  __builtin_find_index$char$lam10:
+    calls: 1
+    bytes: 236
+  __builtin_find_index$char$s0$lam12:
+    calls: 1
+    bytes: 236
+  __builtin_find_index$i64$lam1:
+    calls: 1
+    bytes: 292
+  __builtin_find_index$i64$lam16:
+    calls: 1
+    bytes: 292
+  __builtin_find_index$i64$lam18:
+    calls: 1
+    bytes: 292
+  __builtin_find_index$i64$lam20:
+    calls: 1
+    bytes: 292
+  __builtin_find_index$i64$lam22:
+    calls: 1
+    bytes: 292
+  __builtin_find_index$i64$lam24:
+    calls: 1
+    bytes: 292
+  __builtin_find_index$i64$lam3:
+    calls: 1
+    bytes: 292
+  __builtin_find_index$i64$lam5:
+    calls: 1
+    bytes: 292
+  __builtin_find_index$i64$lam7:
+    calls: 1
+    bytes: 292
+  __builtin_find_index$i64$lam8:
+    calls: 1
+    bytes: 292
+  __builtin_find_index$str$lam30:
+    calls: 2
+    bytes: 400
+  __eq_i64$opt:
+    calls: 2
+    bytes: 100
+  __eq_u64$opt:
+    calls: 9
+    bytes: 100
+  __filter14$own0:
+    calls: 1
+    bytes: 272
+  __test$first_big:
+    calls: 1
+    bytes: 2940
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 13
+    bytes: (external)
+  aipl_array_new:
+    calls: 12
+    bytes: (external)
+  aipl_assert:
+    calls: 14
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 108

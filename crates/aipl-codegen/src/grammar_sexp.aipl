@@ -302,10 +302,10 @@ deallocations: 25507
 reallocations: 2355
 bytes allocated: 1277647
 instructions executed: 4439711
-binary size: 236336
-  code: 151024
+binary size: 237400
+  code: 151824
   data: 3940
-  metadata: 81372
+  metadata: 81636
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -361,28 +361,37 @@ functions:
   __arr_retain___m4__TokenRule$SexpKind:
     calls: 0
     bytes: 560
-  __builtin_count_while$char$lam53:
+  __builtin_count_while$char$lam62:
     calls: 77
     bytes: 220
-  __builtin_count_while$char$s0$lam61:
+  __builtin_count_while$char$s0$lam70:
     calls: 5
     bytes: 176
-  __builtin_count_while$char$s0$lam63:
+  __builtin_count_while$char$s0$lam72:
     calls: 0
     bytes: 184
-  __builtin_find_if$__m3__Prec$lam100:
+  __builtin_find_if$__m3__Prec$lam109:
     calls: 0
     bytes: 688
-  __builtin_try_map$__m1__Cst$Sexp$__m3__ParseError$lam72:
+  __builtin_find_index$str$lam22:
+    calls: 23
+    bytes: 400
+  __builtin_find_index$str$lam41:
+    calls: 48
+    bytes: 400
+  __builtin_find_index$str$lam56:
+    calls: 48
+    bytes: 400
+  __builtin_try_map$__m1__Cst$Sexp$__m3__ParseError$lam81:
     calls: 867
     bytes: 748
-  __builtin_try_map$__m3__Production$SexpKind$Sexp$__m2__First<SexpKind>$__m3__ParseError$lam44:
+  __builtin_try_map$__m3__Production$SexpKind$Sexp$__m2__First<SexpKind>$__m3__ParseError$lam50:
     calls: 3
     bytes: 920
-  __builtin_try_map$__m3__Production$SexpKind$Sexp$__m3__Production$SexpKind$Sexp$__m3__ParseError$lam38:
+  __builtin_try_map$__m3__Production$SexpKind$Sexp$__m3__Production$SexpKind$Sexp$__m3__ParseError$lam44:
     calls: 24
     bytes: 972
-  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam75:
+  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam84:
     calls: 48
     bytes: 732
   __eq_Sexp:
@@ -412,7 +421,7 @@ functions:
   __lambda_17:
     calls: 41
     bytes: 96
-  __lambda_36:
+  __lambda_42:
     calls: 48
     bytes: 964
   __m1__leaves:
@@ -475,9 +484,6 @@ functions:
   __m3__link_rule$SexpKind:
     calls: 192
     bytes: 4496
-  __m3__name_index:
-    calls: 119
-    bytes: 400
   __m3__prod_names$SexpKind$Sexp:
     calls: 54
     bytes: 492
@@ -571,7 +577,7 @@ functions:
   __m6__trailing_trivia$SexpKind$Sexp:
     calls: 38
     bytes: 704
-  __map32:
+  __map35:
     calls: 0
     bytes: 380
   __rec_drop_Sexp:

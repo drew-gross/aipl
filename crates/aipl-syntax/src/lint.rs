@@ -25,6 +25,7 @@ mod match_value_or_err;
 mod push_array_literal;
 mod push_loop_pipeline;
 mod return_loop_find_if;
+mod return_loop_find_index;
 mod slice_from_zero;
 mod slice_to_len;
 mod slice_whole;
@@ -50,6 +51,7 @@ use self::match_value_or_err::match_value_or_err;
 use self::push_array_literal::push_array_literal;
 use self::push_loop_pipeline::{pipeline_names, push_loop_pipeline};
 use self::return_loop_find_if::{find_if_name, return_loop_find_if};
+use self::return_loop_find_index::{find_index_name, return_loop_find_index};
 use self::slice_from_zero::slice_from_zero;
 use self::slice_to_len::slice_to_len;
 use self::slice_whole::slice_whole;
@@ -115,6 +117,12 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     let find_if = find_if_name(program);
     each_expr(program, &mut |e| {
         return_loop_find_if(e, src, find_if.as_deref(), &mut hits)
+    });
+    // The same loop returning the *position* instead. Disjoint from the one
+    // above: a loop returns the element or its index, never both.
+    let find_index = find_index_name(program);
+    each_expr(program, &mut |e| {
+        return_loop_find_index(e, src, find_index.as_deref(), &mut hits)
     });
     // Only where a `++`/`--` flavor provably matches the operator written —
     // see `matching_steps`, which also names the import when it's missing.

@@ -1,0 +1,192 @@
+import {
+    find_index,
+    len,
+    less_than as <,
+    logical_and as &&,
+    print,
+    to_str,
+    wrapping_add as +,
+    wrapping_increment as ++,
+} from builtins;
+
+// The shapes the indexed find-loop lint must leave alone. It rewrites exactly
+// one shape — an indexed loop whose body is an else-less `if` around
+// `return some(<the index binding>);`, falling through to `none`, with a test
+// that reads only the element — so everything here compiles.
+
+// **The test reads the index.** `find_index` hands its predicate the element and
+// nothing else, so there is nowhere for `i` to go: this is a scan the builtin
+// cannot express, and mis-advising it would silently change what is searched.
+fn later_big(xs: i64[], lo: i64) -> u64? {
+    for (let i, x : xs) {
+        if (0 < i && lo < x) {
+            return some(i);
+        };
+    }
+    none
+}
+
+// The position is adjusted on the way out — a `find_index` *and* an arithmetic
+// step, which is two things the one-line advice doesn't spell.
+fn one_past_big(xs: i64[], lo: i64) -> u64? {
+    for (let i, x : xs) {
+        if (lo < x) {
+            return some(i + 1);
+        };
+    }
+    none
+}
+
+// The *element* is returned, not the index. That is `return_loop_find_if`'s
+// shape, and this lint leaves it to that one — a loop returns one or the other,
+// never both, so the two lints never fire on the same loop.
+fn first_big(xs: i64[], lo: i64) -> i64? {
+    for (let i, x : xs) {
+        if (lo < x) {
+            return some(x); #[allow]
+        };
+    }
+    none
+}
+
+// An `if`/`else`: the loop returns on every element, so it never runs past the
+// first one and is not a search at all.
+fn head_sign(xs: i64[]) -> u64? {
+    for (let i, x : xs) {
+        if (0 < x) {
+            return some(i);
+        } else {
+            return some(0);
+        };
+    }
+    none
+}
+
+// A second statement in the loop body — work `find_index` has nowhere to put.
+fn noisy(xs: i64[], lo: i64) !prints -> u64? {
+    for (let i, x : xs) {
+        print(x.to_str());
+        if (lo < x) {
+            return some(i);
+        };
+    }
+    none
+}
+
+// The fall-through is not the not-found answer: falling off the end does work,
+// so the loop is not simply a search.
+fn index_or_len(xs: i64[], lo: i64) -> u64? {
+    for (let i, x : xs) {
+        if (lo < x) {
+            return some(i);
+        };
+    }
+    some(xs.len())
+}
+
+// A plain (unindexed) loop returning a *count* it kept itself. There is no
+// index binding to match, and the counter is the user's, not the fold's.
+fn count_to_big(xs: i64[], lo: i64) -> u64? {
+    mut n: u64 = 0;
+    for (let x : xs) {
+        if (lo < x) {
+            return some(n);
+        };
+        set n++;
+    }
+    none
+}
+
+// The rewrite itself, which of course must not fire.
+fn index_of_big(xs: i64[], lo: i64) -> u64? { xs.find_index(|x| lo < x) }
+
+fn main() !prints {
+    let xs = [1, 5, 9];
+    print(later_big(xs, 0).to_str());
+    print(one_past_big(xs, 2).to_str());
+    print(first_big(xs, 2).to_str());
+    print(head_sign(xs).to_str());
+    print(noisy(xs, 4).to_str());
+    print(index_or_len(xs, 99).to_str());
+    print(count_to_big(xs, 2).to_str());
+    print(index_of_big(xs, 2).to_str());
+}
+--- stdout ---
+some(1)
+some(2)
+some(5)
+some(0)
+1
+5
+some(1)
+some(3)
+some(1)
+some(1)
+--- performance ---
+allocations: 11
+deallocations: 11
+reallocations: 0
+bytes allocated: 274
+instructions executed: 1336
+binary size: 6856
+  code: 4224
+  data: 139
+  metadata: 2493
+functions:
+  __builtin_find_index$i64$lam1:
+    calls: 1
+    bytes: 296
+  __to_str_i64:
+    calls: 2
+    bytes: 204
+  __to_str_i64$opt:
+    calls: 1
+    bytes: 388
+  __to_str_u64$opt:
+    calls: 7
+    bytes: 388
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_u64_len:
+    calls: 14
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 16
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  aipl_write_u64:
+    calls: 7
+    bytes: (external)
+  count_to_big:
+    calls: 1
+    bytes: 304
+  first_big:
+    calls: 1
+    bytes: 304
+  head_sign:
+    calls: 1
+    bytes: 308
+  index_or_len:
+    calls: 1
+    bytes: 316
+  later_big:
+    calls: 1
+    bytes: 332
+  main:
+    calls: 1
+    bytes: 692
+  noisy:
+    calls: 1
+    bytes: 384
+  one_past_big:
+    calls: 1
+    bytes: 308

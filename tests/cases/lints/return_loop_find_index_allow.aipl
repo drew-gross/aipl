@@ -1,0 +1,92 @@
+import { equal as ==, find_index, less_than as <, print, to_str } from builtins;
+
+// `#[allow]` on the `return` line squelches `return_loop_find_index`, like any
+// other lint — the long-hand loop compiles and runs as written.
+//
+// Both spellings are here side by side and asserted to agree, so the rewrite the
+// lint advises is proven equivalent rather than merely plausible.
+fn index_of_big_loop(xs: i64[], lo: i64) -> u64? {
+    for (let i, x : xs) {
+        if (lo < x) {
+            return some(i); #[allow]
+        };
+    }
+    none
+}
+
+fn index_of_big(xs: i64[], lo: i64) -> u64? { xs.find_index(|x| lo < x) }
+
+fn main() !prints {
+    let xs = [1, 5, 9];
+    print(index_of_big_loop(xs, 2).to_str());
+    print(index_of_big(xs, 2).to_str());
+
+    // Found at the front, and not found at all — the two answers a sentinel
+    // would conflate.
+    print(index_of_big_loop(xs, 0).to_str());
+    print(index_of_big(xs, 0).to_str());
+    print(index_of_big_loop(xs, 99).to_str());
+    print(index_of_big(xs, 99).to_str());
+    print((index_of_big_loop(xs, 2) == index_of_big(xs, 2)).to_str());
+}
+--- stdout ---
+some(1)
+some(1)
+some(0)
+some(0)
+none
+none
+true
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 208
+instructions executed: 1179
+binary size: 5016
+  code: 2856
+  data: 119
+  metadata: 2041
+functions:
+  __builtin_find_index$i64$lam1:
+    calls: 1
+    bytes: 296
+  __builtin_find_index$i64$lam3:
+    calls: 1
+    bytes: 296
+  __builtin_find_index$i64$lam5:
+    calls: 1
+    bytes: 296
+  __builtin_find_index$i64$lam7:
+    calls: 1
+    bytes: 296
+  __eq_u64$opt:
+    calls: 1
+    bytes: 100
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_u64$opt:
+    calls: 6
+    bytes: 388
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 11
+    bytes: (external)
+  aipl_write_u64:
+    calls: 4
+    bytes: (external)
+  index_of_big_loop:
+    calls: 4
+    bytes: 304
+  main:
+    calls: 1
+    bytes: 648

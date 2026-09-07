@@ -249,6 +249,7 @@ utilities:
 skills:
 
 lint:
+  Update the builtin skill: lint against ad-hoc reimplementations is optional, but recommended, don't make the lint if a) the lint will be super complicated, or b) following the lint won't improve the caller code
   xs.fold(0, +) should be sum probably? I guess with wrapping and saturating variants
   any lint that works on bare assignment should work on field assignment (e.g. lint to use --)
   lint to use if let instead of match with empty none case
@@ -273,7 +274,6 @@ lint:
   recognize ad-hoc implementations of min/max an request using the function
   set w.pos = w.pos + 1; <--- should be set w.pos++;
   forbid unnecessary allow
-  advance and skip_comment have the  W { W { } } stuttering, why isn't the linter flagging it?
   lint fix mode
     first need an import-insert probably
   "use value_or" lint should recommend value_or even when the arg is expensive, IF the arg has no effects.
@@ -347,6 +347,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    filter/find.
     depth in grammar_sexp can be xs.map(depth).maximum() + 1 and fuse to map_max
     fusions should work if there are unrelated operations in between (use a dep graph?)
     reverse should fuse with basically everything

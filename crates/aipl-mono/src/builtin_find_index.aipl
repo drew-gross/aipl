@@ -1,0 +1,145 @@
+import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
+
+// The AIPL implementation of the `find_index` builtin. Monomorphization registers
+// this function under the canonical name `__builtin_find_index` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_index(pred)` resolves
+// through the ordinary generic / higher-order machinery — the in-file name
+// `find_index` is only for this file's own tests, which read exactly like user
+// code.
+//
+// It is `find_if` answering a different question: both stop at the first element
+// satisfying `pred`, and where that one hands back the element, this hands back
+// where it was. The optional carries the not-found case, so an empty array needs
+// no special handling — and `none` is a genuinely different answer from
+// `some(0)`, which is why the position cannot be reported as a bare `u64`.
+//
+// The `#[allow]` squelches `return_loop_find_index`, which flags exactly this
+// shape — an indexed loop returning the first match's position — and asks for
+// `find_index`. Here it *is* `find_index`. Without the marker the lint fires on
+// a builtin's own source, which panics the compiler for every program that
+// reaches it.
+pub fn find_index<T: any>(self: T[], pred: (T) -> bool) -> u64? {
+    for (let i, x : self) {
+        if (pred(x)) {
+            return some(i); #[allow]
+        };
+    }
+    none
+}.doc("""
+    The position of the first element of `self` satisfying `pred`, or `none` when
+    none does, stopping at the first match. Generic over the element type and
+    callable as a method: `xs.find_index(pred)`. A `str` receiver iterates its
+    chars, since `str` and `char[]` share a representation.
+
+    The counterpart of `find_if`, which hands back the element rather than its
+    position. Reach for this one when the position is the answer — to index a
+    parallel array with it, or to record a reference as an offset instead of a
+    name. See `any` for the same scan reporting only whether a match existed.
+""").test({
+    assert([1, 2, 3, 4].find_index(|x| x > 2) == some(2));
+    assert([1, 2, 3].find_index(|x| x > 9) == none); // nothing matches
+
+    // The *first* match, not the last: it stops there. And position 0 is a
+    // match like any other — distinguishable from `none` only because the
+    // answer is an optional.
+    assert([5, 1, 7].find_index(|x| x > 2) == some(0));
+    assert(find_index([2, 4], |x| x > 3) == some(1)); // function-call form too
+
+    // Generic over the element type — the same definition serves char and str.
+    assert(['a', 'b', 'c'].find_index(|c| c == 'b') == some(1));
+    assert(["go", "stop"].find_index(|s| s == "stop") == some(1));
+    // A `str` receiver iterates its chars.
+    assert("a b".find_index(|c| c == ' ') == some(1));
+    assert("abc".find_index(|c| c == ' ') == none);
+
+    assert([8, 9, 9].find_index(is_nine) == some(1)); // a named predicate
+    let limit = 3;
+    assert([1, 5, 9].find_index(|x| x > limit) == some(1)); // a captured bound
+    // `none` on an empty array (a typed empty from `filter`).
+    assert([1, 2].filter(is_nine).find_index(|x| x == 99) == none);
+})
+
+fn is_nine(self: i64) -> bool { self == 9 }.test({
+    assert(is_nine(9));
+    assert(!is_nine(8));
+})
+--- performance ---
+allocations: 9
+deallocations: 9
+reallocations: 0
+bytes allocated: 483
+instructions executed: 1757
+binary size: 10024
+  code: 5832
+  data: 809
+  metadata: 3383
+functions:
+  __eq_u64$opt:
+    calls: 11
+    bytes: 100
+  __filter19$own0:
+    calls: 1
+    bytes: 272
+  __test$find_index:
+    calls: 1
+    bytes: 1940
+  __test$is_nine:
+    calls: 1
+    bytes: 180
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 9
+    bytes: (external)
+  aipl_array_new:
+    calls: 8
+    bytes: (external)
+  aipl_assert:
+    calls: 13
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  find_index$char$lam9:
+    calls: 1
+    bytes: 236
+  find_index$char$s0$lam13:
+    calls: 1
+    bytes: 236
+  find_index$char$s0$lam15:
+    calls: 1
+    bytes: 236
+  find_index$i64$lam1:
+    calls: 1
+    bytes: 292
+  find_index$i64$lam16:
+    calls: 1
+    bytes: 292
+  find_index$i64$lam18:
+    calls: 1
+    bytes: 292
+  find_index$i64$lam21:
+    calls: 1
+    bytes: 292
+  find_index$i64$lam3:
+    calls: 1
+    bytes: 292
+  find_index$i64$lam5:
+    calls: 1
+    bytes: 292
+  find_index$i64$lam7:
+    calls: 1
+    bytes: 292
+  find_index$str$lam11:
+    calls: 1
+    bytes: 412
+  main:
+    calls: 1
+    bytes: 176

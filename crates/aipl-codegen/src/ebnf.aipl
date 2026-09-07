@@ -538,7 +538,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
 
 // `a` with everything from `b` that is not already in it. Sets are a handful of
 // entries and are built once per grammar, so a scan is the whole implementation
-// — the same trade `grammar.aipl`'s `name_index` makes.
+// — the same trade the `find_index` scan in `grammar.aipl`'s `link` makes.
 fn union_syms<K: variant>(a: Sym<K>[], b: Sym<K>[]) -> Sym<K>[] {
     mut out = a;
     for (let s : b) {
@@ -742,10 +742,10 @@ deallocations: 1364
 reallocations: 144
 bytes allocated: 101607
 instructions executed: 143285
-binary size: 104160
-  code: 65640
+binary size: 104704
+  code: 66040
   data: 3684
-  metadata: 34836
+  metadata: 34980
 functions:
   __arr_drop_First$Kind:
     calls: 77
@@ -777,13 +777,19 @@ functions:
   __arr_retain___m2__Rule$Kind:
     calls: 119
     bytes: 116
-  __builtin_try_map$__m2__Production$Kind$Node$First<Kind>$__m2__ParseError$lam15:
+  __builtin_find_index$str$lam21:
+    calls: 24
+    bytes: 400
+  __builtin_find_index$str$lam7:
+    calls: 35
+    bytes: 400
+  __builtin_try_map$__m2__Production$Kind$Node$First<Kind>$__m2__ParseError$lam18:
     calls: 17
     bytes: 920
-  __builtin_try_map$__m2__Production$Kind$Node$__m2__Production$Kind$Node$__m2__ParseError$lam7:
+  __builtin_try_map$__m2__Production$Kind$Node$__m2__Production$Kind$Node$__m2__ParseError$lam10:
     calls: 9
     bytes: 972
-  __builtin_try_map$__m2__Rule$Kind$__m2__Rule<Kind>$__m2__ParseError$lam30:
+  __builtin_try_map$__m2__Rule$Kind$__m2__Rule<Kind>$__m2__ParseError$lam36:
     calls: 27
     bytes: 732
   __eq_First$Kind:
@@ -804,7 +810,7 @@ functions:
   __eq___m2__ParseError:
     calls: 1
     bytes: 128
-  __lambda_5:
+  __lambda_8:
     calls: 35
     bytes: 964
   __m2__link$Kind$Node:
@@ -813,13 +819,10 @@ functions:
   __m2__link_rule$Kind:
     calls: 133
     bytes: 4496
-  __m2__name_index:
-    calls: 59
-    bytes: 400
   __m2__prod_names$Kind$Node:
     calls: 20
     bytes: 492
-  __map24:
+  __map30:
     calls: 0
     bytes: 380
   __rec_drop_Node:
