@@ -195,7 +195,7 @@ of the corpus's syntax-error fixtures.
 **LR to PEG was three mechanical translations**, and one that isn't. Left-recursive
 list rules become `sep1`/`ListOf` (four helpers, because what varies is whether
 the list may be empty and whether a trailing separator is allowed); left-recursive
-postfix rules (`postfix`, `base_ty`) become an atom plus `many(suffix)`; and
+postfix rules (`postfix`, `base_ty`) become an atom plus `Many(suffix)`; and
 `expr binop expr` with a runtime precedence table becomes `Climb` over
 `op_precedence`'s levels, `..` included. What is *not* mechanical is
 **alternative order**: LR picks with a token of lookahead, a PEG commits to the
@@ -204,7 +204,7 @@ grammar's comments say "one token of lookahead picks the production", that token
 is what the ordering encodes.
 
 Two shapes were copied verbatim rather than simplified. `block_body`/`block_tail`
-keep gazelle's right recursion: written as `many(stmt)` plus an optional trailing
+keep gazelle's right recursion: written as `Many(stmt)` plus an optional trailing
 expression, a PEG parses that expression *twice* — once inside the statement
 alternative that then fails on its missing `;` — and the doubling compounds
 through nested blocks. Deciding after the expression parses it once.

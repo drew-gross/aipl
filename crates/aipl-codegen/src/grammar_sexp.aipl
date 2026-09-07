@@ -42,6 +42,7 @@ import { ebnf, show_first_sets } from "./ebnf.aipl";
 import {
     Grammar,
     Literal as Lit,
+    Many,
     Mk,
     Named,
     OneOf,
@@ -51,7 +52,6 @@ import {
     Term,
     Then,
     failure_message,
-    many,
     prod_names,
 } from "./grammar.aipl";
 import { Bare, CharRun, LexResult, Of, OneChar, ToEol, TokenRule, lex } from "./lexer.aipl";
@@ -97,7 +97,7 @@ fn lower_item(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError {
 }
 
 pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
-    let r_list: Rule<SexpKind> = Then([Lit("("), many(Named("item")), Lit(")")]);
+    let r_list: Rule<SexpKind> = Then([Lit("("), Many(Named("item")), Lit(")")]);
     let r_item: Rule<SexpKind> = OneOf([Term(Atom), Named("list")]);
     Grammar {
         prods: [

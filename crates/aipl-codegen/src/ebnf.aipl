@@ -78,8 +78,6 @@ import {
     Term,
     Then,
     link,
-    many,
-    many1,
     prod_names,
 } from "./grammar.aipl";
 
@@ -121,10 +119,10 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     // postfix, and neither needs them as a whole right-hand side.
     let r_alt: Rule<Kind> = OneOf([Term(Num), Term(Name)]);
     let r_seq: Rule<Kind> = Then([Term(Num), OneOf([Term(Name), Literal("+")])]);
-    let r_star: Rule<Kind> = many(OneOf([Term(Num), Term(Name)]));
-    let r_plus: Rule<Kind> = many1(Then([Term(Num), Term(Name)]));
+    let r_star: Rule<Kind> = Many(OneOf([Term(Num), Term(Name)]));
+    let r_plus: Rule<Kind> = Many(Then([Term(Num), Term(Name)]), min=1);
     let two: u64 = 2;
-    let r_min2: Rule<Kind> = Many(Term(Num), two);
+    let r_min2: Rule<Kind> = Many(Term(Num), min=two);
     let r_opt: Rule<Kind> = Maybe(Named("alt"));
     let no_rules: Rule<Kind>[] = [];
     let r_empty: Rule<Kind> = Then(no_rules);
@@ -725,7 +723,7 @@ fn fixture() -> Grammar<Kind, Node> {
         Term(Name),
         Then([Literal("("), Named("expr"), Literal(")")]),
     ]);
-    let r_opt: Rule<Kind> = Then([Maybe(Literal("!")), many1(Term(Name))]);
+    let r_opt: Rule<Kind> = Then([Maybe(Literal("!")), Many(Term(Name), min=1)]);
     Grammar {
         prods: [
             one("prog", r_prog),

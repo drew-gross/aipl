@@ -13,7 +13,7 @@
 //     may be empty and whether a trailing separator is allowed, so there are
 //     four helpers rather than one.
 //   - *Left-recursive postfix rules* (`postfix`, `base_ty`) become an atom
-//     followed by `many(suffix)`.
+//     followed by `Many(suffix)`.
 //   - *`expr binop expr` with a precedence table* becomes `Climb`, whose levels
 //     are `op_precedence`'s, `..` included (level 4, between `==` and `<`).
 //
@@ -27,7 +27,7 @@
 // Two shapes are deliberately copied verbatim rather than simplified:
 //
 //   - `block_body`/`block_tail` keep gazelle's right recursion. Written as
-//     `many(stmt)` followed by an optional trailing expression, a PEG parses the
+//     `Many(stmt)` followed by an optional trailing expression, a PEG parses the
 //     trailing expression *twice* — once inside the statement alternative that
 //     then fails on its missing `;` — and that doubling compounds through nested
 //     blocks. Deciding after the expression, as gazelle does, parses it once.
@@ -62,6 +62,7 @@ import {
     Grammar,
     ListOf,
     Literal as Lit,
+    Many,
     Maybe,
     Mk,
     Named,
@@ -72,8 +73,6 @@ import {
     Rule,
     Term,
     Then,
-    many,
-    many1,
 } from "./grammar.aipl";
 import {
     AiplTok,
@@ -109,14 +108,16 @@ import { strip_test_sections } from "./strip_test_sections.aipl";
 
 // One or more `item`, separated by `s`, no trailing separator — the shape of
 // gazelle's `x_list = x | x_list COMMA x`.
-fn sep1(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { Then([item, many(Then([Lit(s), item]))]) }
+fn sep1(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { Then([item, Many(Then([Lit(s), item]))]) }
 
 // The same, with an optional trailing separator — `x_list | x_list COMMA`.
 fn sep1t(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { Then([sep1(item, s), Maybe(Lit(s))]) }
 
 // Two or more — an alternation of patterns, which is `sep1` with the first
 // repetition required.
-fn sep2(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { Then([item, many1(Then([Lit(s), item]))]) }
+fn sep2(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> {
+    Then([item, Many(Then([Lit(s), item]), min=1)])
+}
 
 // ---------- the grammar ----------
 
@@ -136,7 +137,7 @@ pub fn aipl_grammar() -> Grammar<AiplTok, Ast> {
 fn items() -> Production<AiplTok, Ast>[] {
     // `program = item*`, and every byte of the file has to be one: `parse_cst`
     // refuses input left over after the start rule.
-    let program: Rule<AiplTok> = many(Named("item"));
+    let program: Rule<AiplTok> = Many(Named("item"));
     let item: Rule<AiplTok> = OneOf([
         Named("function"),
         Named("struct_decl"),
@@ -199,10 +200,10 @@ fn items() -> Production<AiplTok, Ast>[] {
         Lit("("),
         ListOf(Named("param"), ",", true),
         Lit(")"),
-        many(Named("effect")),
+        Many(Named("effect")),
         Maybe(Then([Lit("->"), Named("ty")])),
         Named("fn_body"),
-        many(Named("fn_attr")),
+        Many(Named("fn_attr")),
     ]);
     let effect: Rule<AiplTok> = Then([Lit("!"), Term(Name)]);
 
@@ -332,7 +333,7 @@ fn types() -> Production<AiplTok, Ast>[] {
     // Left-recursive postfix under LR; here a core followed by its suffixes.
     let base_ty: Rule<AiplTok> = Then([
         Named("ty_core"),
-        many(OneOf([Lit("?"), Then([Lit("["), Lit("]")])])),
+        Many(OneOf([Lit("?"), Then([Lit("["), Lit("]")])])),
     ]);
     let ty_core: Rule<AiplTok> = OneOf([
         Then([Lit("#"), Lit("{"), Named("ty"), Lit(":"), Named("ty"), Lit("}")]),
@@ -531,7 +532,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([Lit("!"), Named("unary")]),
         Named("postfix"),
     ]);
-    let postfix: Rule<AiplTok> = Then([Named("atom"), many(Named("suffix"))]);
+    let postfix: Rule<AiplTok> = Then([Named("atom"), Many(Named("suffix"))]);
 
     // The method call comes before the field access — both open `. IDENT` — and
     // the two open-ended slices before the plain index.
@@ -630,7 +631,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     let template: Rule<AiplTok> = Then([
         OneOf([Term(TemplateHead), Term(RawTemplateHead)]),
         Named("expr"),
-        many(Then([OneOf([Term(TemplateMid), Term(RawTemplateMid)]), Named("expr")])),
+        Many(Then([OneOf([Term(TemplateMid), Term(RawTemplateMid)]), Named("expr")])),
         OneOf([Term(TemplateTail), Term(RawTemplateTail)]),
     ]);
 

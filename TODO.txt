@@ -219,7 +219,6 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 parser:
-  allow Many default, get rid of many and many1, and some stuff in grammar_aipl.aipl (since Many can have default of 0)
   minimize rule binding shorthand necessity by improving the type system
   chage Far to use a set of expected
   Mk should accept fns that only need kids
@@ -228,6 +227,9 @@ parser:
   can use SpanStr instead of spans in many places once we have it, it's COW/SSO so it should be fast
   remove power from prec and use order within the list
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
+
+grammar:
+  make an ebnf loader as well as dumper
 
 utilities:
   numeric < vs. lexicographic <. Also maybe a < for map/dict purposes that uses compiler-decided ordering?
