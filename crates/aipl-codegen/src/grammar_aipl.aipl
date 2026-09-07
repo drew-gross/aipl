@@ -1,0 +1,1292 @@
+// AIPL's own syntax, as a `Grammar` value — the third and largest consumer of
+// the parser library, and the one the whole thing was built for. It describes
+// the same language as the gazelle LR(1) grammar in `crates/aipl-parser/src/lib.rs`,
+// against the same token stream (`lex_aipl.aipl`), and is differential-tested
+// against it over the entire corpus.
+//
+// **LR to PEG: what had to change.** Gazelle is LR(1) with left recursion and a
+// runtime precedence table; this driver is a PEG with ordered choice. Three
+// mechanical translations cover almost all of it:
+//
+//   - *Left-recursive list rules* (`param_list = param | param_list COMMA param`)
+//     become `sep1`/`ListOf`. The distinction that matters is whether the list
+//     may be empty and whether a trailing separator is allowed, so there are
+//     four helpers rather than one.
+//   - *Left-recursive postfix rules* (`postfix`, `base_ty`) become an atom
+//     followed by `many(suffix)`.
+//   - *`expr binop expr` with a precedence table* becomes `Climb`, whose levels
+//     are `op_precedence`'s, `..` included (level 4, between `==` and `<`).
+//
+// What is *not* mechanical is **alternative order**. LR picks a production with
+// a token of lookahead; a PEG commits to the first alternative that matches, so
+// every choice here is written longest-first — `IDENT "(" args ")"` before
+// `IDENT "{" fields "}"` before a bare `IDENT`, `let (a, b) = ..` before
+// `let x = ..`. Where gazelle's comments say "one token of lookahead picks the
+// production", that token is what the ordering below encodes.
+//
+// Two shapes are deliberately copied verbatim rather than simplified:
+//
+//   - `block_body`/`block_tail` keep gazelle's right recursion. Written as
+//     `many(stmt)` followed by an optional trailing expression, a PEG parses the
+//     trailing expression *twice* — once inside the statement alternative that
+//     then fails on its missing `;` — and that doubling compounds through nested
+//     blocks. Deciding after the expression, as gazelle does, parses it once.
+//   - `loop_body` likewise. A loop body admits no trailing expression at all,
+//     which is why it is a separate rule and not `block` with a flag.
+//
+// The lowering is trivial: every production shares one `build` that returns a
+// placeholder, because nothing here builds an AST. That is Stage 5's job. What
+// this file has to be right about is *what parses* and *the shape of the tree*,
+// which is what the `.test` blocks and the corpus differential test check.
+import {
+    Span,
+    case_of,
+    equal as ==,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    map_err,
+    wrapping_sub as -,
+} from builtins;
+import { Cst, text } from "./cst.aipl";
+import {
+    Climb,
+    Grammar,
+    ListOf,
+    Many,
+    Maybe,
+    Mk,
+    Named,
+    OneOf,
+    ParseError,
+    Prec,
+    Production,
+    Rule,
+    Spelling,
+    Term,
+    Then,
+} from "./grammar.aipl";
+import {
+    AiplTok,
+    CharTok,
+    IntLit,
+    Name,
+    RawTemplateHead,
+    RawTemplateMid,
+    RawTemplateTail,
+    StrLit,
+    TemplateHead,
+    TemplateMid,
+    TemplateTail,
+    aipl_rules,
+} from "./lex_aipl.aipl";
+import { LexResult, Token, keep_skipped, lex, span_str } from "./lexer.aipl";
+import { parse_cst } from "./parse.aipl";
+import { strip_test_sections } from "./strip_test_sections.aipl";
+
+// ---------- rule-building shorthand ----------
+//
+// Every one of these pins `Rule<AiplTok>` through an annotated binding: most
+// `Rule` constructors mention no `K`, so without one the type parameter has
+// nothing to resolve from (see the authoring notes in `grammar.aipl`). Writing
+// them once here is what keeps the grammar below readable as a grammar.
+
+// One token spelled exactly `s` — a keyword, an operator, a bracket.
+fn t(s: str) -> Rule<AiplTok> {
+    let r: Rule<AiplTok> = Spelling(s);
+    r
+}
+
+// A reference to the production named `n`.
+fn r(n: str) -> Rule<AiplTok> {
+    let out: Rule<AiplTok> = Named(n);
+    out
+}
+
+fn seq(rs: Rule<AiplTok>[]) -> Rule<AiplTok> {
+    let out: Rule<AiplTok> = Then(rs);
+    out
+}
+
+fn alt(rs: Rule<AiplTok>[]) -> Rule<AiplTok> {
+    let out: Rule<AiplTok> = OneOf(rs);
+    out
+}
+
+fn opt(x: Rule<AiplTok>) -> Rule<AiplTok> {
+    let out: Rule<AiplTok> = Maybe(x);
+    out
+}
+
+fn rep(x: Rule<AiplTok>) -> Rule<AiplTok> {
+    let zero: u64 = 0;
+    let out: Rule<AiplTok> = Many(x, zero);
+    out
+}
+
+// One or more `item`, separated by `s`, no trailing separator — the shape of
+// gazelle's `x_list = x | x_list COMMA x`.
+fn sep1(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { seq([item, rep(seq([t(s), item]))]) }
+
+// The same, with an optional trailing separator — `x_list | x_list COMMA`.
+fn sep1t(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { seq([sep1(item, s), opt(t(s))]) }
+
+// Zero or more, no trailing separator — `x_list | _`.
+fn sep0(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> {
+    let out: Rule<AiplTok> = ListOf(item, s, false);
+    out
+}
+
+// Zero or more, trailing separator allowed — `x_list | x_list COMMA | _`.
+fn sep0t(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> {
+    let out: Rule<AiplTok> = ListOf(item, s, true);
+    out
+}
+
+// ---------- the grammar ----------
+
+pub fn aipl_grammar() -> Grammar<AiplTok, Ast> {
+    prods: [..items(), ..types(), ..statements(), ..expressions(), ..patterns()],
+}.doc("""
+    AIPL's grammar: the productions the driver in `parse.aipl` parses AIPL with,
+    starting at `program`.
+
+    Split across five builder functions purely for reading — the array they
+    concatenate to is one flat production list, and position in it is identity
+    (a linked `NamedIdx` and a `CTree` both name a production by its index).
+""")
+
+// ---------- items ----------
+
+fn items() -> Production<AiplTok, Ast>[] {
+    // `program = item*`, and every byte of the file has to be one: `parse_cst`
+    // refuses input left over after the start rule.
+    let program = rep(r("item"));
+    let item = alt([r("function"), r("struct_decl"), r("variant_decl"), r("import_decl")]);
+
+    // `import { a, b as c, equal as == } from "./x.aipl";` — or `from builtins`.
+    let import_decl = seq([
+        t("import"),
+        t("{"),
+        sep0t(r("import_name"), ","),
+        t("}"),
+        t("from"),
+        alt([Term(StrLit), t("builtins")]),
+        t(";"),
+    ]);
+
+    // A name, an aliased name, or a bare operator spelling. The aliased form is
+    // first: it starts with the same `IDENT` the plain form is.
+    let import_name = alt([
+        seq([Term(Name), t("as"), alt([Term(Name), r("operator")])]),
+        Term(Name),
+        r("operator"),
+    ]);
+
+    // Every operator spelling that may be imported. `=`, `?` and `..` are absent
+    // because they are not operators you can import — the loader's own gate
+    // (`is_operator_name`) is the list this mirrors. Order is immaterial: the
+    // lexer already took the longest munch, so each spelling is one token.
+    let operator = alt([
+        t("+++"),
+        t("=="),
+        t("!="),
+        t("<="),
+        t(">="),
+        t("&&"),
+        t("||"),
+        t("++"),
+        t("--"),
+        t("+="),
+        t("-="),
+        t("*="),
+        t("/="),
+        t("+"),
+        t("-"),
+        t("*"),
+        t("/"),
+        t("%"),
+        t("<"),
+        t(">"),
+        t("!"),
+    ]);
+
+    let function = seq([
+        opt(t("pub")),
+        t("fn"),
+        Term(Name),
+        r("type_params"),
+        t("("),
+        sep0t(r("param"), ","),
+        t(")"),
+        rep(r("effect")),
+        opt(seq([t("->"), r("ty")])),
+        r("fn_body"),
+        rep(r("fn_attr")),
+    ]);
+    let effect = seq([t("!"), Term(Name)]);
+
+    // `<T, U: ord>`. At least one parameter — `<>` is a syntax error, as it is
+    // under gazelle, which is why this is `sep1` and not `sep0`.
+    let type_params = opt(seq([t("<"), sep1(r("type_param"), ","), t(">")]));
+    let type_param = alt([seq([Term(Name), t(":"), alt([Term(Name), t("variant")])]), Term(Name)]);
+
+    // The five parameter shapes, longest first. `mut self: T` takes no default
+    // and no variadic marker, exactly as gazelle spells it.
+    let param = alt([
+        seq([t("mut"), Term(Name), t(":"), r("ty")]),
+        seq([Term(Name), t(":"), r("ty"), t("*"), t("="), r("expr")]),
+        seq([Term(Name), t(":"), r("ty"), t("="), r("expr")]),
+        seq([Term(Name), t(":"), r("ty"), t("*")]),
+        seq([Term(Name), t(":"), r("ty")]),
+    ]);
+
+    // A body is a block, or the struct-literal shorthand. The shorthand is tried
+    // first and can only match when a `:` or `,` follows the first name (or the
+    // body opens with `..`), so `{ x }` still reads as a block returning `x`.
+    let fn_body = alt([seq([t("{"), r("construct_fields"), t("}")]), r("block")]);
+    let construct_fields = alt([
+        seq([t(".."), r("expr"), t(","), sep0t(r("field_init"), ",")]),
+        seq([Term(Name), t(":"), r("expr"), t(","), sep0t(r("field_init"), ",")]),
+        seq([Term(Name), t(":"), r("expr")]),
+        seq([Term(Name), t(","), sep0t(r("field_init"), ",")]),
+    ]);
+    // `.test({ .. })` and `.doc("..")`, told apart by their argument.
+    let fn_attr = seq([t("."), Term(Name), t("("), alt([r("block"), Term(StrLit)]), t(")")]);
+
+    let struct_decl = seq([
+        t("struct"),
+        Term(Name),
+        r("type_params"),
+        t("{"),
+        sep0t(r("field_decl"), ","),
+        t("}"),
+    ]);
+    let field_decl = alt([
+        seq([Term(Name), t(":"), r("ty"), t("="), r("expr")]),
+        seq([Term(Name), t(":"), r("ty")]),
+    ]);
+
+    // `variant V = | A | B(i64)` — a leading `|` is allowed and means nothing,
+    // which is what lets `aipl fmt` align every case under one column.
+    let variant_decl = seq([
+        t("variant"),
+        Term(Name),
+        r("type_params"),
+        t("="),
+        opt(t("|")),
+        sep1(r("variant_case"), "|"),
+    ]);
+    let variant_case = alt([
+        seq([Term(Name), t("("), sep1(r("case_param"), ","), t(")")]),
+        Term(Name),
+    ]);
+
+    // The three payload-slot shapes, and the bare type last: a type *is* an
+    // `IDENT`, so the named forms have to be given their chance first.
+    let case_param = alt([
+        seq([Term(Name), t(":"), r("ty"), t("="), r("expr")]),
+        seq([Term(Name), t(":"), r("ty")]),
+        r("ty"),
+    ]);
+
+    [
+        p("program", program),
+        pl("item", item, "an item"),
+        p("import_decl", import_decl),
+        pl("import_name", import_name, "an import name"),
+        p("operator", operator),
+        p("function", function),
+        p("effect", effect),
+        p("type_params", type_params),
+        p("type_param", type_param),
+        pl("param", param, "a parameter"),
+        p("fn_body", fn_body),
+        p("construct_fields", construct_fields),
+        p("fn_attr", fn_attr),
+        p("struct_decl", struct_decl),
+        p("field_decl", field_decl),
+        p("variant_decl", variant_decl),
+        p("variant_case", variant_case),
+        p("case_param", case_param),
+    ]
+}
+
+// ---------- types ----------
+
+fn types() -> Production<AiplTok, Ast>[] {
+    // The `(`-led forms are ordered longest-first, which is exactly the shift
+    // decision gazelle's comments describe: `(A, B) -> R` over `(A, B)[]` over
+    // `(A, B)!E` over `(A, B)`.
+    let ty = alt([
+        seq([t("("), sep0(r("ty"), ","), t(")"), t("->"), r("ty")]),
+        seq([t("("), sep0(r("ty"), ","), t(")"), t("["), t("]")]),
+        seq([t("("), sep0(r("ty"), ","), t(")"), t("!"), r("base_ty")]),
+        seq([t("("), sep0(r("ty"), ","), t(")")]),
+        seq([t("!"), r("base_ty")]),
+        seq([r("base_ty"), t("!"), r("base_ty")]),
+        r("base_ty"),
+    ]);
+    // Left-recursive postfix under LR; here a core followed by its suffixes.
+    let base_ty = seq([r("ty_core"), rep(alt([t("?"), seq([t("["), t("]")])]))]);
+    let ty_core = alt([
+        seq([t("#"), t("{"), r("ty"), t(":"), r("ty"), t("}")]),
+        seq([t("#"), t("{"), r("ty"), t("}")]),
+        seq([Term(Name), t("<"), sep1(r("ty"), ","), t(">")]),
+        Term(Name),
+    ]);
+
+    [pl("ty", ty, "a type"), p("base_ty", base_ty), p("ty_core", ty_core)]
+}
+
+// ---------- statements ----------
+
+fn statements() -> Production<AiplTok, Ast>[] {
+    // Gazelle's right recursion, kept: after one expression the parser decides
+    // whether a `;` made it a statement or its absence made it the block's
+    // value, so the expression is parsed exactly once.
+    let block = seq([t("{"), r("block_body"), t("}")]);
+    let block_body = opt(alt([
+        seq([r("kw_stmt"), r("block_body")]),
+        seq([r("expr"), r("block_tail")]),
+    ]));
+    let block_tail = opt(seq([t(";"), r("block_body")]));
+
+    // A loop body admits no trailing expression: its value could never be
+    // observed, so every expression in it must be an `expr;` statement.
+    let loop_body = seq([t("{"), r("loop_inner"), t("}")]);
+    let loop_inner = opt(alt([
+        seq([r("kw_stmt"), r("loop_inner")]),
+        seq([r("expr"), t(";"), r("loop_inner")]),
+    ]));
+
+    // Keyword-led statements, so their first tokens stay disjoint from `expr`'s
+    // and the block's choice above is a single-token decision.
+    let kw_stmt = alt([
+        r("let_stmt"),
+        r("mut_stmt"),
+        r("assign_stmt"),
+        r("for_stmt"),
+        r("while_stmt"),
+        r("return_stmt"),
+    ]);
+    let let_stmt = alt([
+        seq([t("let"), t("("), sep1(Term(Name), ","), t(")"), t("="), r("expr"), t(";")]),
+        seq([
+            t("let"),
+            Term(Name),
+            t("{"),
+            sep1t(Term(Name), ","),
+            t("}"),
+            t("="),
+            r("expr"),
+            t(";"),
+        ]),
+        seq([t("let"), Term(Name), t(":"), r("ty"), t("="), r("expr"), t(";")]),
+        seq([t("let"), Term(Name), t("="), r("expr"), t(";")]),
+    ]);
+    let mut_stmt = alt([
+        seq([
+            t("mut"),
+            Term(Name),
+            t("{"),
+            sep1t(Term(Name), ","),
+            t("}"),
+            t("="),
+            r("expr"),
+            t(";"),
+        ]),
+        seq([t("mut"), Term(Name), t(":"), r("ty"), t("="), r("expr"), t(";")]),
+        seq([t("mut"), Term(Name), t("="), r("expr"), t(";")]),
+    ]);
+
+    // `set n = e;`, the increment/decrement sugar, the four compound
+    // assignments, the mutating-method writeback, and the nested-field store.
+    // The method form comes before the field-path form: both open
+    // `set IDENT . IDENT`, and only the next token tells them apart.
+    let assign_stmt = alt([
+        seq([t("set"), Term(Name), t("++"), t(";")]),
+        seq([t("set"), Term(Name), t("--"), t(";")]),
+        seq([t("set"), Term(Name), t("+="), r("expr"), t(";")]),
+        seq([t("set"), Term(Name), t("-="), r("expr"), t(";")]),
+        seq([t("set"), Term(Name), t("*="), r("expr"), t(";")]),
+        seq([t("set"), Term(Name), t("/="), r("expr"), t(";")]),
+        seq([t("set"), Term(Name), t("."), Term(Name), t("("), r("args"), t(")"), t(";")]),
+        seq([t("set"), Term(Name), t("."), sep1(Term(Name), "."), t("="), r("expr"), t(";")]),
+        seq([t("set"), Term(Name), t("="), r("expr"), t(";")]),
+    ]);
+
+    // The three `for` shapes, told apart after `for ( let` by one token: `(` is
+    // the tuple form, a `,` after the name the indexed form.
+    let for_stmt = alt([
+        seq([
+            t("for"),
+            t("("),
+            t("let"),
+            t("("),
+            sep1(Term(Name), ","),
+            t(")"),
+            t(":"),
+            r("expr"),
+            t(")"),
+            r("loop_body"),
+        ]),
+        seq([
+            t("for"),
+            t("("),
+            t("let"),
+            Term(Name),
+            t(","),
+            Term(Name),
+            t(":"),
+            r("expr"),
+            t(")"),
+            r("loop_body"),
+        ]),
+        seq([t("for"), t("("), t("let"), Term(Name), t(":"), r("expr"), t(")"), r("loop_body")]),
+    ]);
+    let while_stmt = seq([t("while"), t("("), r("expr"), t(")"), r("loop_body")]);
+    let return_stmt = seq([t("return"), r("expr"), t(";")]);
+
+    [
+        p("block", block),
+        p("block_body", block_body),
+        p("block_tail", block_tail),
+        p("loop_body", loop_body),
+        p("loop_inner", loop_inner),
+        pl("kw_stmt", kw_stmt, "a statement"),
+        p("let_stmt", let_stmt),
+        p("mut_stmt", mut_stmt),
+        p("assign_stmt", assign_stmt),
+        p("for_stmt", for_stmt),
+        p("while_stmt", while_stmt),
+        p("return_stmt", return_stmt),
+    ]
+}
+
+// ---------- expressions ----------
+
+fn expressions() -> Production<AiplTok, Ast>[] {
+    // `op_precedence`'s table, `..` included at level 4 — tighter than `==`,
+    // looser than `<` and the arithmetic. Every level is left-associative.
+    let expr = Climb(
+        r("unary"),
+        [
+            Prec { power: 1, right: false, ops: ["||"] },
+            Prec { power: 2, right: false, ops: ["&&"] },
+            Prec { power: 3, right: false, ops: ["==", "!="] },
+            Prec { power: 4, right: false, ops: [".."] },
+            Prec { power: 5, right: false, ops: ["<", ">", "<=", ">="] },
+            Prec { power: 6, right: false, ops: ["+", "+++", "-"] },
+            Prec { power: 7, right: false, ops: ["*", "/", "%"] },
+        ],
+    );
+    let unary = alt([seq([t("-"), r("unary")]), seq([t("!"), r("unary")]), r("postfix")]);
+    let postfix = seq([r("atom"), rep(r("suffix"))]);
+
+    // The method call comes before the field access — both open `. IDENT` — and
+    // the two open-ended slices before the plain index.
+    let suffix = alt([
+        seq([t("."), Term(Name), t("("), r("args"), t(")")]),
+        seq([t("."), Term(Name)]),
+        seq([t("."), Term(IntLit)]),
+        seq([t("["), t(".."), r("expr"), t("]")]),
+        seq([t("["), r("expr"), t(".."), t("]")]),
+        seq([t("["), r("expr"), t("]")]),
+        t("?"),
+    ]);
+
+    let atom = alt([
+        seq([
+            t("if"),
+            t("("),
+            t("let"),
+            r("pattern"),
+            t("="),
+            r("expr"),
+            t(")"),
+            r("block"),
+            opt(seq([t("else"), r("else_branch")])),
+        ]),
+        seq([
+            t("if"),
+            t("("),
+            r("expr"),
+            t(")"),
+            r("block"),
+            opt(seq([t("else"), r("else_branch")])),
+        ]),
+        seq([t("match"), t("("), r("expr"), t(")"), t("{"), sep0t(r("match_arm"), ","), t("}")]),
+        seq([t("shim"), Term(Name), t("{"), sep0t(r("shim_binding"), ","), t("}"), r("block")]),
+        Term(IntLit),
+        Term(StrLit),
+        Term(CharTok),
+        t("true"),
+        t("false"),
+        t("none"),
+        seq([Term(Name), t("("), r("args"), t(")")]),
+        seq([Term(Name), t("{"), sep0t(r("field_init"), ","), t("}")]),
+        Term(Name),
+        seq([t("("), r("expr"), t(","), sep1(r("expr"), ","), t(")")]),
+        seq([t("("), r("expr"), t(")")]),
+        seq([t("["), r("args"), t("]")]),
+        seq([t("#"), t("{"), r("brace_body"), t("}")]),
+        r("template"),
+        seq([t("|"), sep0(r("lambda_param"), ","), t("|"), r("block")]),
+    ]);
+
+    // `else` takes a block or another `if` — never an arbitrary expression, so
+    // an if/else-if ladder is the only brace-less `else` form.
+    let else_branch = alt([
+        seq([
+            t("if"),
+            t("("),
+            t("let"),
+            r("pattern"),
+            t("="),
+            r("expr"),
+            t(")"),
+            r("block"),
+            opt(seq([t("else"), r("else_branch")])),
+        ]),
+        seq([
+            t("if"),
+            t("("),
+            r("expr"),
+            t(")"),
+            r("block"),
+            opt(seq([t("else"), r("else_branch")])),
+        ]),
+        r("block"),
+    ]);
+
+    // `` `text {expr} text` `` — the raw and cooked forms produce different
+    // token kinds but the same shape, and the lexer guarantees a head pairs with
+    // a tail of its own flavour.
+    let template = seq([
+        alt([Term(TemplateHead), Term(RawTemplateHead)]),
+        r("expr"),
+        rep(seq([alt([Term(TemplateMid), Term(RawTemplateMid)]), r("expr")])),
+        alt([Term(TemplateTail), Term(RawTemplateTail)]),
+    ]);
+
+    let shim_binding = seq([Term(Name), t("="), Term(Name)]);
+    let args = sep0t(r("arg"), ",");
+
+    // The spread and the keyword argument lead with tokens no expression can, so
+    // both must be tried before `expr` — after which a bare operator value and a
+    // lambda are unambiguous too.
+    let arg = alt([
+        seq([t(".."), r("expr")]),
+        seq([Term(Name), t("="), r("expr")]),
+        r("lambda"),
+        r("op_value"),
+        r("expr"),
+    ]);
+
+    // The operators that may be passed as values. Narrower than the importable
+    // set: `-` and `!` are unary too, and gazelle gives them their own terminals.
+    let op_value = alt([
+        t("+++"),
+        t("=="),
+        t("!="),
+        t("<="),
+        t(">="),
+        t("&&"),
+        t("+"),
+        t("*"),
+        t("/"),
+        t("%"),
+    ]);
+    let lambda = alt([
+        seq([t("|"), sep0(r("lambda_param"), ","), t("|"), r("expr")]),
+        seq([t("||"), r("block")]),
+        seq([t("||"), r("expr")]),
+    ]);
+    let lambda_param = alt([seq([Term(Name), t(":"), r("ty")]), Term(Name)]);
+
+    let field_init = alt([
+        seq([t(".."), r("expr")]),
+        seq([Term(Name), t(":"), r("expr")]),
+        Term(Name),
+    ]);
+
+    // `#{a, b}` a set, `#{k: v}` a dict, `#{}` an empty set, `#{:}` an empty
+    // dict. One rule for all four, so `expr` is reachable from a single place
+    // under the brace.
+    let brace_body = opt(alt([sep1t(r("entry"), ","), t(":")]));
+    let entry = alt([seq([r("expr"), t(":"), r("expr")]), r("expr")]);
+
+    [
+        pl("expr", expr, "an expression"),
+        p("unary", expr_unary(unary)),
+        p("postfix", postfix),
+        p("suffix", suffix),
+        p("atom", atom),
+        p("else_branch", else_branch),
+        p("template", template),
+        p("shim_binding", shim_binding),
+        p("args", args),
+        p("arg", arg),
+        p("op_value", op_value),
+        p("lambda", lambda),
+        p("lambda_param", lambda_param),
+        p("field_init", field_init),
+        p("brace_body", brace_body),
+        p("entry", entry),
+    ]
+}
+
+// `unary` needs no transformation; the wrapper exists only so the `expressions`
+// list above reads as one column of `p(name, rule)` calls.
+fn expr_unary(x: Rule<AiplTok>) -> Rule<AiplTok> { x }
+
+// ---------- patterns ----------
+
+fn patterns() -> Production<AiplTok, Ast>[] {
+    // An alternation of two or more patterns comes first: a single pattern is
+    // the standalone arm, and after one pattern the next token (`=>` or `|`) is
+    // what tells them apart.
+    let match_arm = alt([
+        seq([sep2(r("pattern"), "|"), t("=>"), r("arm_body")]),
+        seq([t("["), r("args"), t("]"), t("=>"), r("arm_body")]),
+        seq([r("pattern"), t("=>"), r("arm_body")]),
+    ]);
+    let arm_body = alt([r("block"), r("expr")]);
+    let pattern = alt([
+        seq([Term(Name), t("."), Term(Name), t("("), r("ctor_payload"), t(")")]),
+        seq([Term(Name), t("."), Term(Name)]),
+        seq([Term(Name), t("("), r("ctor_payload"), t(")")]),
+        Term(Name),
+        t("none"),
+        Term(StrLit),
+        Term(CharTok),
+    ]);
+
+    // `Ctor(a, b)` names each slot; `Ctor(..)` says the case carries a payload
+    // this arm does not read.
+    let ctor_payload = alt([t(".."), sep1(Term(Name), ",")]);
+
+    [
+        p("match_arm", match_arm),
+        p("arm_body", arm_body),
+        pl("pattern", pattern, "a pattern"),
+        p("ctor_payload", ctor_payload),
+    ]
+}
+
+// Two or more `item`, separated by `s` — an alternation of patterns, which is
+// exactly `sep1` with the first repetition required.
+fn sep2(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> {
+    let one: u64 = 1;
+    seq([item, Many(seq([t(s), item]), one)])
+}
+
+// ---------- entry points ----------
+
+pub fn aipl_source(src: str) -> str { strip_test_sections(src) }.doc("""
+    The part of `src` that is AIPL: everything before the first
+    `--- section ---` marker, which is where a test-case file stops being source
+    and starts being expected output. `aipl_parser::parse` strips exactly this,
+    and `aipl_parse_cst` parses exactly this — so a losslessness assertion is
+    against this string, not the whole file.
+""")
+
+pub fn aipl_parse_cst(src: str) -> Cst!ParseError {
+    let text = aipl_source(src);
+    parse_cst(text, lex_lossless(text)?, aipl_grammar(), "program")
+}.doc("""
+    The lossless concrete syntax tree for AIPL source `src`, parsed by the
+    library against `aipl_grammar()`.
+
+    Every byte of `aipl_source(src)` is under exactly one leaf. That needs the
+    lexer's rule set read *losslessly* (`keep_skipped`): the compiler's own
+    lexing skips whitespace outright, having no use for it, and a concrete tree
+    has to be able to put it back.
+""").test({
+    // Losslessness, on something small enough to read: the leaves tile the
+    // source, so concatenating them returns it whole.
+    let src = "fn f() -> i64 { 1 }";
+    assert(aipl_parse_cst(src)?.text(src) == src);
+
+    // Comments and blank lines are covered too — they are the bytes a token
+    // stream throws away, and the ones a formatter would have to put back.
+    let commented = "// lead\nfn f() {\n    // inner\n}\n";
+    assert(aipl_parse_cst(commented)?.text(commented) == commented);
+
+    // And a file whose tail is expected output rather than source: the tree
+    // covers what was parsed, which is everything before the first marker.
+    let cased = "fn main() { }\n\n--- stdout ---\nhi\n";
+    assert(aipl_parse_cst(cased)?.text(aipl_source(cased)) == aipl_source(cased));
+    assert(aipl_source(cased) == "fn main() { }\n\n");
+})
+
+// The whole rule set, read losslessly — every byte accounted for by a token or a
+// trivia record. Lexing and parsing report failure in the same shape but not the
+// same type, so the conversion happens once, here.
+fn lex_lossless(text: str) -> LexResult<AiplTok>!ParseError {
+    let LexResult { tokens, trivia } = text
+        .lex(aipl_rules().keep_skipped())
+        .map_err(|e| ParseError { message: e.message, span: e.span })?;
+    ok(LexResult { tokens: close_interpolations(text, tokens), trivia })
+}
+
+// One byte of a template literal belongs to no token: the `}` that closes an
+// interpolation. It is not part of the expression before it, and the piece after
+// it carries the text *after* it as its value — so `` `a{x}b` `` lexes as a head
+// spanning `` `a{ ``, then `x`, then a tail spanning ``b` ``, leaving the `}`
+// named by nothing. A token stream does not care; a concrete syntax tree cannot
+// have a hole in it.
+//
+// So each piece that follows an interpolation is widened by the one byte in
+// front of it, which is exactly that brace. The kind — and with it the piece's
+// decoded value — is untouched; only the span it claims grows, and only into a
+// byte no other token claims.
+fn close_interpolations(text: str, toks: Token<AiplTok>[]) -> Token<AiplTok>[] {
+    toks.map(|t| if (t.kind.follows_interpolation()) { widen_left(text, t) } else { t })
+}
+
+// Whether a token is one of the four template pieces that are not a head, and so
+// begins one byte past an interpolation's closing brace. Asked by case rather
+// than by looking at the source, since a `}` in front of a token means nothing
+// on its own.
+fn follows_interpolation(self: AiplTok) -> bool {
+    let mid: Case<AiplTok> = TemplateMid;
+    let tail: Case<AiplTok> = TemplateTail;
+    let raw_mid: Case<AiplTok> = RawTemplateMid;
+    let raw_tail: Case<AiplTok> = RawTemplateTail;
+    let c = self.case_of();
+    c == mid || c == tail || c == raw_mid || c == raw_tail
+}
+
+// `t` claiming one more byte at its start. A token already at offset 0 cannot
+// follow anything and is left alone.
+fn widen_left(text: str, t: Token<AiplTok>) -> Token<AiplTok> {
+    let Span { start, end } = t.text.span;
+    if (start == 0) {
+        return t;
+    };
+    Token { kind: t.kind, text: span_str(text, start - 1..end) }
+}
+
+pub fn aipl_parse_report(src: str) -> str {
+    let text = aipl_source(src);
+    match (aipl_parse_cst(src)) {
+        ok(tree) => if (tree.text(text) == text) {
+            ""
+        } else {
+            "lossless: the tree does not reconstruct the source"
+        },
+        err(e) => `error: {e.message}`,
+    }
+}.doc("""
+    What this grammar makes of `src`, in one string: empty when it parses *and*
+    its concrete tree reconstructs the source byte for byte, and otherwise a
+    line beginning `error:` (it did not parse, with the message) or `lossless:`
+    (it did, but the tree lost bytes).
+
+    The FFI entry the corpus differential test calls — one crossing and one
+    parse per file, checking both properties at once. Rejection is half the
+    comparison: a grammar that accepts everything agrees with nothing.
+""").test({
+    // Empty means both properties held.
+    assert(aipl_parse_report("fn f() { }") == "");
+
+    // Losslessness, over the byte-losing shapes: the bytes a token stream drops
+    // are comments, whitespace and blank lines...
+    assert(aipl_parse_report("// lead\nfn f() {\n\n    // inner\n}\n") == "");
+    assert(aipl_parse_report("import {\n    a,\n    b,\n} from builtins;\n") == "");
+
+    // ... and one byte the lexer drops on purpose: the `}` closing a template
+    // interpolation, which `close_interpolations` puts back.
+    assert(aipl_parse_report("fn f() { let s = `a{b}c{d}e`; }\n") == "");
+    assert(aipl_parse_report("fn f() { let s = ```a{b}c```; }\n") == "");
+
+    assert(aipl_parse_report("fn main() { }") == "");
+    assert(aipl_parse_report("fn f() { let x = ; }") == "error: expected an expression, found `;`");
+    // A file whose tail is expected output still reports on the source half.
+    assert(aipl_parse_report("fn main() { }\n--- stdout ---\nx\n") == "");
+})
+
+pub fn aipl_parses(src: str) -> bool {
+    match (aipl_parse_cst(src)) {
+        ok(..) => true,
+        err(..) => false,
+    }
+}.doc("""
+    Whether `src` parses as AIPL. The FFI entry the corpus differential test
+    calls: it compares this against `aipl_parser::parse` succeeding, file by
+    file, over every `.aipl` in the repository.
+""").test({
+    // Items.
+    assert(parses("import { map, equal as == } from builtins;"));
+    assert(parses("import { Cst } from \"./cst.aipl\";"));
+    assert(parses("struct P { x: i64, y: i64 = 0 }"));
+    assert(parses("struct B<T: any, U: variant> { v: T, w: U }"));
+    assert(parses("variant V = A | B(i64) | C(x: i64, y: i64 = 1)"));
+    assert(parses("variant V = | A | B"));
+
+    // Types, including every postfix and bracket form.
+    assert(parses("fn f(a: str[], b: i64?, c: (i64, str), d: (i64) -> str) -> i64!str { 0 }"));
+    assert(parses("fn f(a: #{i64}, b: #{str: i64}, c: Box<T>[]) { }"));
+    assert(parses("fn f() -> !Error { ok(0) }"));
+
+    // Statements.
+    assert(parses("fn f() { let x = 1; mut y: i64 = 2; set y = x; set y++; set y += 1; }"));
+    assert(parses("fn f() { let (a, b) = p; let P { x, y } = p; mut P { x } = p; }"));
+    assert(parses("fn f() { for (let x : xs) { g(x); } for (let i, x : xs) { } }"));
+    assert(parses("fn f() { while (b) { set n--; } return 1; }"));
+    assert(parses("fn f() { set a.b.c = 1; set a.push(1); }"));
+
+    // Expressions: precedence, postfix chains, and every atom shape.
+    assert(parses("fn f() -> i64 { 1 + 2 * 3 == 4 && x }"));
+    assert(parses("fn f() -> i64 { a.b.c(1).d[2][3..4][..5][6..]? }"));
+    assert(parses("fn f() { let s = `a{b}c{d}e`; }"));
+    assert(parses("fn f() { let t = (1, 2, 3); let u = [1, 2, ..rest]; }"));
+    assert(parses("fn f() { let s = #{1, 2}; let d = #{1: 2}; let e = #{}; let g = #{:}; }"));
+    assert(parses("fn f() { g(|x| x, || 1, ||{ 2 }, +, k = 3); }"));
+    assert(parses("fn f() { let h = |x: i64| { x }; }"));
+    assert(parses("fn f() -> i64 { if (a) { 1 } else if (b) { 2 } else { 3 } }"));
+    assert(parses("fn f() { if (let some(v) = o) { g(v); } }"));
+    assert(parses("fn f() { shim prints { print = p } { g(); } }"));
+
+    // Patterns, including alternation and the ignored payload.
+    assert(parses("fn f(v: V) -> i64 { match (v) { A(x) | B(x) => x, C(..) => 1, _ => 0 } }"));
+    assert(parses("fn f(v: V) -> i64 { match (v) { V.A => 1, V.B(x) => x, \"s\" => 2, _ => 0 } }"));
+    assert(parses("fn f(v: V) { match (v) { none => { g(); }, some(x) => { h(x); } }; }"));
+
+    // Attributes and the struct-literal body shorthand.
+    assert(parses("fn f() -> i64 { 1 }.doc(\"d\").test({ assert(f() == 1); })"));
+    assert(parses("fn f(v: i64) -> P { v, next: none }"));
+    assert(parses("fn f(v: P) -> P { ..v, x: 1 }"));
+    assert(parses("fn f(v: i64) -> P { v, }"));
+    // `{ x }` is a block returning `x`, not a one-field shorthand.
+    assert(parses("fn f(x: i64) -> i64 { x }"));
+
+    // Things that must *not* parse.
+    assert(!parses("fn f() { let x = ; }"));
+    assert(!parses("fn f( { }"));
+    assert(!parses("fn f<>() { }"));
+    assert(!parses("fn f() { 1 }}"));
+    assert(!parses("variant V = "));
+    // A loop body takes no trailing expression: its value could never be read.
+    assert(!parses("fn f() { while (b) { 1 } }"));
+})
+
+// ---------- production helpers ----------
+
+// One production with the trivial lowering. Nothing here builds an AST — the
+// tree is the product — so every production shares one `build`.
+fn p(name: str, rule: Rule<AiplTok>) -> Production<AiplTok, Ast> { name, rule, build: Mk(keep) }
+
+// The same, labelled: what an error blames when this production fails having
+// matched nothing. The reified form of the LR parser's `SYMBOL_DISPLAY_NAMES`,
+// which is why only the handful of rules a reader would name are labelled and
+// every plumbing rule stays transparent.
+fn pl(name: str, rule: Rule<AiplTok>, expect_as: str) -> Production<AiplTok, Ast> {
+    name,
+    rule,
+    build: Mk(keep),
+    expect_as,
+}
+
+// The placeholder an AST would be. `Build` has no payload-free arm to mean
+// "nothing to lower", so a production with nothing to lower passes this.
+variant Ast = Ignored
+
+fn keep(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError { ok(Ignored) }
+
+// Test shorthand, so an assertion reads as the source it is about.
+fn parses(src: str) -> bool { aipl_parses(src) }
+--- performance ---
+allocations: 304644
+deallocations: 304644
+reallocations: 3211
+bytes allocated: 25867537
+instructions executed: 53722377
+binary size: 499144
+  code: 340008
+  data: 8340
+  metadata: 150796
+functions:
+  __arr_drop___m1__Cst:
+    calls: 6685
+    bytes: 116
+  __arr_drop___m2__Prec:
+    calls: 98
+    bytes: 120
+  __arr_drop___m2__Production$__m3__AiplTok$Ast:
+    calls: 3038
+    bytes: 188
+  __arr_drop___m2__Rule$__m3__AiplTok:
+    calls: 49294
+    bytes: 116
+  __arr_drop___m4__StepResult$__m3__AiplTok:
+    calls: 5
+    bytes: 140
+  __arr_drop___m4__Token$__m3__AiplTok:
+    calls: 1554
+    bytes: 360
+  __arr_drop___m4__TokenRule$__m3__AiplTok:
+    calls: 98
+    bytes: 756
+  __arr_retain___m1__Cst:
+    calls: 7281
+    bytes: 116
+  __arr_retain___m2__Prec:
+    calls: 0
+    bytes: 120
+  __arr_retain___m2__Production$__m3__AiplTok$Ast:
+    calls: 5341
+    bytes: 188
+  __arr_retain___m2__Rule$__m3__AiplTok:
+    calls: 59143
+    bytes: 116
+  __arr_retain___m4__StepResult$__m3__AiplTok:
+    calls: 7
+    bytes: 140
+  __arr_retain___m4__Token$__m3__AiplTok:
+    calls: 2299
+    bytes: 360
+  __arr_retain___m4__TokenRule$__m3__AiplTok:
+    calls: 3430
+    bytes: 756
+  __builtin_all$char$s0$lam77:
+    calls: 2
+    bytes: 212
+  __builtin_count_while$char$lam34:
+    calls: 714
+    bytes: 220
+  __builtin_count_while$char$s0$lam42:
+    calls: 4
+    bytes: 176
+  __builtin_count_while$char$s0$lam44:
+    calls: 565
+    bytes: 184
+  __builtin_count_while$char$s0$lam55:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam74:
+    calls: 46
+    bytes: 172
+  __builtin_count_while$char$s0$lam76:
+    calls: 1
+    bytes: 172
+  __builtin_find_if$__m2__Prec$lam92:
+    calls: 115
+    bytes: 688
+  __builtin_int_parse:
+    calls: 46
+    bytes: 1028
+  __builtin_try_map$__m2__Production$__m3__AiplTok$Ast$__m2__Production$__m3__AiplTok$Ast$__m2__ParseError$lam24:
+    calls: 49
+    bytes: 972
+  __builtin_try_map$__m2__Rule$__m3__AiplTok$__m2__Rule<__m3__AiplTok>$__m2__ParseError$lam73:
+    calls: 8771
+    bytes: 732
+  __eq_char$opt:
+    calls: 595
+    bytes: 100
+  __eq_str$opt:
+    calls: 95
+    bytes: 100
+  __lambda_12:
+    calls: 0
+    bytes: 136
+  __lambda_13:
+    calls: 224
+    bytes: 104
+  __lambda_14:
+    calls: 0
+    bytes: 144
+  __lambda_15:
+    calls: 0
+    bytes: 164
+  __lambda_16:
+    calls: 0
+    bytes: 144
+  __lambda_17:
+    calls: 3
+    bytes: 164
+  __lambda_18:
+    calls: 0
+    bytes: 48
+  __lambda_19:
+    calls: 2
+    bytes: 64
+  __lambda_22:
+    calls: 2597
+    bytes: 964
+  __lambda_51:
+    calls: 41
+    bytes: 140
+  __m10__trim_prefix:
+    calls: 2
+    bytes: 260
+  __m11__trim_suffix:
+    calls: 0
+    bytes: 332
+  __m12__strip_test_sections:
+    calls: 59
+    bytes: 692
+  __m13__parse_test_section_header:
+    calls: 95
+    bytes: 744
+  __m14__climb$__m3__AiplTok$Ast:
+    calls: 149
+    bytes: 2736
+  __m14__error_at$__m3__AiplTok$Ast:
+    calls: 7
+    bytes: 2824
+  __m14__far_miss:
+    calls: 8006
+    bytes: 940
+  __m14__find_prec:
+    calls: 115
+    bytes: 228
+  __m14__leaf_at$__m3__AiplTok$Ast:
+    calls: 2001
+    bytes: 2928
+  __m14__match_list_of$__m3__AiplTok$Ast:
+    calls: 86
+    bytes: 2636
+  __m14__match_many$__m3__AiplTok$Ast:
+    calls: 578
+    bytes: 1976
+  __m14__match_maybe$__m3__AiplTok$Ast:
+    calls: 299
+    bytes: 868
+  __m14__match_one_of$__m3__AiplTok$Ast:
+    calls: 2072
+    bytes: 1312
+  __m14__match_prod$__m3__AiplTok$Ast:
+    calls: 2964
+    bytes: 4012
+  __m14__match_rule$__m3__AiplTok$Ast:
+    calls: 23263
+    bytes: 12696
+  __m14__match_then$__m3__AiplTok$Ast:
+    calls: 7431
+    bytes: 1720
+  __m14__parse_cst$__m3__AiplTok$Ast:
+    calls: 49
+    bytes: 4388
+  __m14__prev_end$__m3__AiplTok$Ast:
+    calls: 2085
+    bytes: 1468
+  __m14__quoted:
+    calls: 7061
+    bytes: 456
+  __m14__tok_text$__m3__AiplTok$Ast:
+    calls: 8116
+    bytes: 1528
+  __m14__trailing_trivia$__m3__AiplTok$Ast:
+    calls: 84
+    bytes: 1104
+  __m1__leaves:
+    calls: 246
+    bytes: 808
+  __m1__text:
+    calls: 10
+    bytes: 476
+  __m2__link$__m3__AiplTok$Ast:
+    calls: 49
+    bytes: 1188
+  __m2__link_rule$__m3__AiplTok:
+    calls: 39053
+    bytes: 4496
+  __m2__name_index:
+    calls: 11221
+    bytes: 400
+  __m2__prod_names$__m3__AiplTok$Ast:
+    calls: 98
+    bytes: 492
+  __m3__char_lit_emit:
+    calls: 0
+    bytes: 1536
+  __m3__dedent_segments:
+    calls: 1
+    bytes: 272
+  __m3__int_lit:
+    calls: 46
+    bytes: 1212
+  __m3__raw_tpl_kind:
+    calls: 2
+    bytes: 2168
+  __m3__tpl_kind:
+    calls: 6
+    bytes: 2200
+  __m4__between_len:
+    calls: 519
+    bytes: 752
+  __m4__delimited_len:
+    calls: 1035
+    bytes: 1592
+  __m4__finalize_template$__m3__AiplTok:
+    calls: 3
+    bytes: 7976
+  __m4__float_len:
+    calls: 0
+    bytes: 824
+  __m4__interp_scan$__m3__AiplTok:
+    calls: 5
+    bytes: 2248
+  __m4__lex$__m3__AiplTok:
+    calls: 49
+    bytes: 1520
+  __m4__lex_step$__m3__AiplTok:
+    calls: 1381
+    bytes: 25260
+  __m4__nested_len:
+    calls: 887
+    bytes: 940
+  __m4__step_result$__m3__AiplTok:
+    calls: 39291
+    bytes: 13068
+  __m4__template_scan$__m3__AiplTok:
+    calls: 3
+    bytes: 2744
+  __m4__template_step$__m3__AiplTok:
+    calls: 1031
+    bytes: 476
+  __m5__unescape:
+    calls: 9
+    bytes: 1108
+  __m6__process_raw_string:
+    calls: 1
+    bytes: 1712
+  __map7:
+    calls: 0
+    bytes: 2336
+  __rec_drop___m1__Cst:
+    calls: 4948
+    bytes: 48
+  __rec_drop___m2__Rule$__m3__AiplTok:
+    calls: 105742
+    bytes: 324
+  __test$aipl_parse_cst:
+    calls: 1
+    bytes: 1216
+  __test$aipl_parse_report:
+    calls: 1
+    bytes: 1300
+  __test$aipl_parses:
+    calls: 1
+    bytes: 9816
+  __test_try_fail___m2__ParseError:
+    calls: 0
+    bytes: 84
+  __to_str___m2__ParseError:
+    calls: 0
+    bytes: 824
+  __to_str_u64:
+    calls: 0
+    bytes: 204
+  aipl_arr_drop_arr:
+    calls: 86
+    bytes: (external)
+  aipl_arr_extend:
+    calls: 6580
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 533859
+    bytes: (external)
+  aipl_arr_join:
+    calls: 104
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 11310
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 236
+    bytes: (external)
+  aipl_array_dec:
+    calls: 713650
+    bytes: (external)
+  aipl_array_new:
+    calls: 133919
+    bytes: (external)
+  aipl_array_push:
+    calls: 36583
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 15908
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 2397
+    bytes: (external)
+  aipl_assert:
+    calls: 50
+    bytes: (external)
+  aipl_parse_cst:
+    calls: 49
+    bytes: 22636
+  aipl_parse_report:
+    calls: 8
+    bytes: 664
+  aipl_rec_alloc:
+    calls: 110690
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 474260
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 6713
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 363570
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 6713
+    bytes: (external)
+  aipl_test_begin:
+    calls: 3
+    bytes: (external)
+  aipl_test_end:
+    calls: 3
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  expressions:
+    calls: 98
+    bytes: 25768
+  keep:
+    calls: 0
+    bytes: 196
+  lex_lossless:
+    calls: 49
+    bytes: 109616
+  main:
+    calls: 1
+    bytes: 272
+  p:
+    calls: 3773
+    bytes: 424
+  patterns:
+    calls: 98
+    bytes: 5108
+  r:
+    calls: 14357
+    bytes: 92
+  sep1:
+    calls: 1029
+    bytes: 452
+  sep1t:
+    calls: 294
+    bytes: 292
+  seq:
+    calls: 98
+    bytes: 96
+  statements:
+    calls: 98
+    bytes: 18812
+  t:
+    calls: 25774
+    bytes: 92
+  types:
+    calls: 98
+    bytes: 6460
+  widen_left:
+    calls: 5
+    bytes: 968

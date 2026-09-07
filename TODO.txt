@@ -222,6 +222,7 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 parser:
+  minimize rule binding shorthand necessity by improving the type system
   chage Far to use a set of expected
   Mk should accept fns that only need kids
   implement "nested in" which should be good for the formatter

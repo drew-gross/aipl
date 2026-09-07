@@ -51019,25 +51019,25 @@ block185(v1181: i64):
 ;   v13 = $inl74_c
 ;   v27 = i
 ;   v47 = body
-;   v1 = __spread_base$0
+;   v1 = __spread_base$1
 ;   v437 = path
 ;   ss11 = out
-;   v1 = __spread_base$1
+;   v1 = __spread_base$2
 ;   v859 = path
 ;   ss18 = out
-;   v1 = __spread_base$2
 ;   v1 = __spread_base$3
 ;   v1 = __spread_base$4
 ;   v1 = __spread_base$5
 ;   v1 = __spread_base$6
 ;   v1 = __spread_base$7
 ;   v1 = __spread_base$8
+;   v1 = __spread_base$9
 ;   v47 = $inl203_self
 ;   v3077 = $inl20_self
 ;   v3080 = v
 ;   v3085 = $inl21_e
 ;   v3196 = n
-;   v1 = __spread_base$9
+;   v1 = __spread_base$10
 ; __m25__companion_path
 function u0:109(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -76138,7 +76138,7 @@ block316:
 ;   ss0 = toks
 ;   ss1 = trivia
 ;   v24 = n
-;   ss2 = __idx$38750
+;   ss2 = __idx$40397
 ;   v56 = txt
 ;   v58 = k
 ;   v66 = $inl98_self

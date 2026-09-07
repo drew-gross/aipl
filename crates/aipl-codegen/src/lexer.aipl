@@ -32,6 +32,7 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    map,
     map_err,
     not_equal as !=,
     push,
@@ -309,6 +310,36 @@ struct TokenRule<K> {
 // recorded matches of every `trivia: true` rule, in source order. Silent
 // `skip` matches appear in neither.
 struct LexResult<K> { tokens: Token<K>[], trivia: Token<K>[] }
+
+pub fn keep_skipped<K>(self: TokenRule<K>[]) -> TokenRule<K>[] {
+    self.map(|r| if (r.skip) { TokenRule { ..r, skip: false, trivia: true } } else { r })
+}.doc("""
+    `self` with every `skip` rule turned into a `trivia` rule: nothing is
+    dropped, so every byte of a lexed source is accounted for by some token or
+    trivia record.
+
+    A compiler's rule set skips whitespace outright — it has no use for it, and
+    recording it would cost every consumer something only one of them wants. A
+    *lossless* consumer has the opposite need: a parser building a concrete
+    syntax tree, or a formatter reproducing its input, must be able to put every
+    byte back. Both read the one rule set through this, rather than the language
+    keeping two of them.
+""").test({
+    let ws: TokenRule<Kind> = TokenRule { matcher: CharRun(" "), emit: Bare(Ws), skip: true };
+    let word: TokenRule<Kind> = TokenRule { matcher: CharRun("ab"), emit: Of(Ident) };
+
+    // A rule set holds function values, so two of them cannot be compared with
+    // `==` — the assertion is on what they *do*, over one source.
+    assert("a b".lex([ws, word])?.trivia.is_empty());
+    assert("a b".lex([ws, word].keep_skipped())?.trivia.len() == 1);
+    // The tokens are the same either way: only what was dropped changes.
+    assert("a b".lex([ws, word])?.tokens.len() == 2);
+    assert("a b".lex([ws, word].keep_skipped())?.tokens.len() == 2);
+
+    // And the recorded span is the byte the skipping set threw away.
+    let space: Token<Kind>? = "a b".lex([ws, word].keep_skipped())?.trivia[0];
+    assert(space.is_some_and(|tr| tr.text.span == 1..2));
+})
 
 fn lex_err(message: str, span: Span) -> LexError { message, span }
 
@@ -1359,44 +1390,44 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1453
-deallocations: 1453
-reallocations: 38
-bytes allocated: 98184
-instructions executed: 303921
-binary size: 1965576
-  code: 1317764
-  data: 9620
-  metadata: 638192
+allocations: 1531
+deallocations: 1531
+reallocations: 49
+bytes allocated: 104064
+instructions executed: 322032
+binary size: 2013256
+  code: 1348028
+  data: 10036
+  metadata: 655192
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
     bytes: 140
   __arr_drop_Token$Kind:
-    calls: 300
+    calls: 323
     bytes: 472
   __arr_drop_TokenRule$Kind:
-    calls: 26
+    calls: 34
     bytes: 872
   __arr_retain_StepResult$Kind:
     calls: 9
     bytes: 140
   __arr_retain_Token$Kind:
-    calls: 155
+    calls: 168
     bytes: 472
   __arr_retain_TokenRule$Kind:
-    calls: 0
+    calls: 6
     bytes: 872
-  __builtin_count_while$char$lam27:
-    calls: 64
+  __builtin_count_while$char$lam33:
+    calls: 79
     bytes: 220
-  __builtin_count_while$char$s0$lam35:
+  __builtin_count_while$char$s0$lam41:
     calls: 5
     bytes: 176
-  __builtin_count_while$char$s0$lam37:
+  __builtin_count_while$char$s0$lam43:
     calls: 49
     bytes: 184
-  __builtin_count_while$char$s0$lam52:
+  __builtin_count_while$char$s0$lam58:
     calls: 13
     bytes: 172
   __builtin_int_parse:
@@ -1421,7 +1452,7 @@ functions:
     calls: 94
     bytes: 284
   __eq___builtin_Span:
-    calls: 118
+    calls: 119
     bytes: 104
   __eq_char$opt:
     calls: 85
@@ -1430,64 +1461,70 @@ functions:
     calls: 0
     bytes: 128
   __lambda_1:
-    calls: 29
+    calls: 10
     bytes: 96
   __lambda_10:
     calls: 0
-    bytes: 48
+    bytes: 128
   __lambda_11:
     calls: 1
-    bytes: 64
+    bytes: 96
   __lambda_12:
     calls: 0
-    bytes: 48
+    bytes: 128
   __lambda_13:
-    calls: 8
-    bytes: 64
+    calls: 1
+    bytes: 96
   __lambda_14:
     calls: 0
     bytes: 48
   __lambda_15:
-    calls: 2
+    calls: 1
     bytes: 64
   __lambda_16:
     calls: 0
     bytes: 48
   __lambda_17:
-    calls: 2
+    calls: 8
     bytes: 64
   __lambda_18:
     calls: 0
-    bytes: 128
+    bytes: 48
   __lambda_19:
     calls: 2
-    bytes: 96
-  __lambda_2:
-    calls: 0
-    bytes: 128
+    bytes: 64
   __lambda_20:
     calls: 0
-    bytes: 128
+    bytes: 48
   __lambda_21:
-    calls: 1
-    bytes: 96
-  __lambda_3:
     calls: 2
+    bytes: 64
+  __lambda_22:
+    calls: 0
+    bytes: 128
+  __lambda_23:
+    calls: 2
+    bytes: 96
+  __lambda_24:
+    calls: 0
+    bytes: 128
+  __lambda_25:
+    calls: 1
     bytes: 96
   __lambda_4:
     calls: 0
     bytes: 128
-  __lambda_40:
+  __lambda_46:
     calls: 67
     bytes: 140
   __lambda_5:
-    calls: 1
+    calls: 29
     bytes: 96
   __lambda_6:
     calls: 0
     bytes: 128
   __lambda_7:
-    calls: 1
+    calls: 2
     bytes: 96
   __lambda_8:
     calls: 0
@@ -1498,6 +1535,9 @@ functions:
   __m1__unescape:
     calls: 21
     bytes: 1108
+  __test$keep_skipped:
+    calls: 1
+    bytes: 24304
   __test$lex:
     calls: 1
     bytes: 1227536
@@ -1511,31 +1551,37 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 300
+    calls: 330
     bytes: (external)
   aipl_arr_inc:
-    calls: 3318
+    calls: 3546
     bytes: (external)
   aipl_arr_reserve:
-    calls: 300
+    calls: 330
     bytes: (external)
   aipl_array_dec:
-    calls: 4763
+    calls: 5069
     bytes: (external)
   aipl_array_new:
-    calls: 1223
+    calls: 1288
     bytes: (external)
   aipl_array_push:
     calls: 72
     bytes: (external)
+  aipl_array_push_mut:
+    calls: 6
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 3
+    bytes: (external)
   aipl_assert:
-    calls: 78
+    calls: 83
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 3
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 3
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -1564,15 +1610,18 @@ functions:
   interp_scan$Kind:
     calls: 9
     bytes: 2248
+  keep_skipped$Kind:
+    calls: 3
+    bytes: 5664
   lex$Kind:
-    calls: 64
+    calls: 69
     bytes: 1520
   lex_step$Kind:
-    calls: 146
+    calls: 161
     bytes: 27512
   main:
     calls: 1
-    bytes: 168
+    bytes: 240
   nested_len:
     calls: 3
     bytes: 940
@@ -1583,7 +1632,7 @@ functions:
     calls: 3
     bytes: 3040
   step_result$Kind:
-    calls: 417
+    calls: 442
     bytes: 16268
   template_scan$Kind:
     calls: 16

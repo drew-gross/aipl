@@ -7,7 +7,7 @@ each is sized to be finishable in one session.
 
 - [x] 1 `ebnf.aipl` + FIRST sets
 - [x] 2 Highlighter generator (oracle: `tests/highlighting.rs`)
-- [ ] 3 AIPL's grammar, differential-tested against gazelle
+- [x] 3 AIPL's grammar, differential-tested against gazelle
 - [ ] 4 Formatter generator
 - [ ] 5 Retire gazelle
 
@@ -184,9 +184,51 @@ Nothing joined `DOGFOOD_SOURCE_FILES`: the Rust test JIT-compiles the generator
 through `Engine::compile_file` and calls it, so there is no `.clif` for it. The
 `TokenRule` field does move the lexer's IR, which handoff regenerates.
 
-**3 — AIPL's own grammar**, differential-tested against gazelle across the whole
-corpus, in the shape of
-`tests/lexer_dogfood.rs::dogfood_lex_hook_matches_fresh_compile_on_corpus`.
+**3 — AIPL's own grammar. Done.** `grammar_aipl.aipl` is AIPL's syntax as a
+`Grammar<AiplTok, ..>` value, and
+`parser_dogfood::aipl_grammar_matches_gazelle_on_corpus` runs it and gazelle over
+every `.aipl` in the repository: **698 agreed-accept, 25 agreed-reject, 0
+disagreements**, over 734 files including the compiler's own sources. Rejection
+is half the comparison — a grammar that accepted everything would agree on none
+of the corpus's syntax-error fixtures.
+
+**LR to PEG was three mechanical translations**, and one that isn't. Left-recursive
+list rules become `sep1`/`ListOf` (four helpers, because what varies is whether
+the list may be empty and whether a trailing separator is allowed); left-recursive
+postfix rules (`postfix`, `base_ty`) become an atom plus `many(suffix)`; and
+`expr binop expr` with a runtime precedence table becomes `Climb` over
+`op_precedence`'s levels, `..` included. What is *not* mechanical is
+**alternative order**: LR picks with a token of lookahead, a PEG commits to the
+first match, so every choice is written longest-first. Wherever the gazelle
+grammar's comments say "one token of lookahead picks the production", that token
+is what the ordering encodes.
+
+Two shapes were copied verbatim rather than simplified. `block_body`/`block_tail`
+keep gazelle's right recursion: written as `many(stmt)` plus an optional trailing
+expression, a PEG parses that expression *twice* — once inside the statement
+alternative that then fails on its missing `;` — and the doubling compounds
+through nested blocks. Deciding after the expression parses it once.
+
+**Losslessness needed two things from the lexer.** `TokenRule`'s `skip` rules drop
+whitespace outright, so `lexer.aipl` gained `keep_skipped` — one rule set read two
+ways, a compiler's and a lossless consumer's, rather than a language keeping two.
+And one byte belongs to no token at all: the `}` closing a template
+interpolation, which neither the expression before it nor the piece after it
+claims. `close_interpolations` widens each following piece by that byte. A token
+stream does not care; a concrete tree cannot have a hole in it. Fixing it in
+`lex_aipl.aipl` instead would move every template span the formatter and the
+gazelle parser read, so it waits for Stage 5.
+
+**The 11 files where the two disagree are all one thing**, and the test lists them
+with the message fragment that identifies each: gazelle's grammar accepts them
+and its *build action* refuses them — `..` outside an array literal, a `#{ .. }`
+mixing set and dict entries, `.doc({..})`, an unknown type-parameter bound,
+alternation binders that disagree, the body shorthand without a struct return
+type. They are exactly the checks Stage 5 has to reproduce when this grammar
+grows `build` functions, so they are pinned rather than waved through.
+
+Nothing joined `DOGFOOD_SOURCE_FILES` yet: the test JIT-compiles the grammar
+through `Engine::compile_file`. That happens in Stage 5.
 
 **4 — The formatter generator**, targeting the existing `Doc`. `Layout` starts
 from `walker.aipl`'s vocabulary (`ListStyle`, `comma_list_docs`, `match_expr`'s
