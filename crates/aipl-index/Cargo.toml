@@ -1,0 +1,21 @@
+[package]
+name = "aipl-index"
+version = "0.1.0"
+edition = "2021"
+description = "AIPL source index: the symbols, imports and references a tool needs to answer questions about a file"
+license = "MIT"
+
+[dependencies]
+aipl-syntax = { workspace = true }
+aipl-parser = { workspace = true }
+
+# The parser reaches its dogfooded AIPL hooks with no native fallback, so
+# *something* must install them before any parse. Installing them is the host's
+# job, not a library's — a process-global switch is not a thing a crate should
+# flip on its caller's behalf — so this is a dev-dependency: the tests here act
+# as that host, and `FileIndex::parse` documents the requirement for real ones.
+[dev-dependencies]
+aipl-codegen = { workspace = true }
+
+[lints]
+workspace = true

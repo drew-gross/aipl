@@ -23,6 +23,12 @@ pub use aipl_parser::{
 pub use aipl_codegen as codegen;
 pub use aipl_codegen::{parse_spec, FfiValue, SpecFields};
 pub use aipl_fmt as fmt;
+/// Source indexing for tools: the symbols, imports and references a docs
+/// generator, an editor extension or a language server needs. Nothing in the
+/// compiler uses it — it answers questions *about* source rather than compiling
+/// it — but it lives behind the same facade so a tool has one crate to depend
+/// on. Call [`install_parser_hooks`] once before indexing anything.
+pub use aipl_index as index;
 pub use aipl_linker as binary;
 pub use aipl_loader as loader;
 pub use aipl_mono as mono;

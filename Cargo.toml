@@ -40,6 +40,7 @@ aipl-codegen = { path = "crates/aipl-codegen" }
 aipl-loader = { path = "crates/aipl-loader" }
 aipl-linker = { path = "crates/aipl-linker" }
 aipl-fmt = { path = "crates/aipl-fmt" }
+aipl-index = { path = "crates/aipl-index" }
 # External crates.
 cranelift = "0.134.2"
 cranelift-jit = "0.134.2"
@@ -62,6 +63,7 @@ aipl-codegen = { workspace = true }
 aipl-loader = { workspace = true }
 aipl-linker = { workspace = true }
 aipl-fmt = { workspace = true }
+aipl-index = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
