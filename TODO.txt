@@ -249,7 +249,6 @@ utilities:
 skills:
 
 lint:
-  Update the builtin skill: lint against ad-hoc reimplementations is optional, but recommended, don't make the lint if a) the lint will be super complicated, or b) following the lint won't improve the caller code
   xs.fold(0, +) should be sum probably? I guess with wrapping and saturating variants
   any lint that works on bare assignment should work on field assignment (e.g. lint to use --)
   lint to use if let instead of match with empty none case

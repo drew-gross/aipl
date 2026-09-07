@@ -104,12 +104,32 @@ does, not a regression.
 
 ## 4. Lint against ad-hoc reimplementations
 
-**Standard guidance: every new utility gets a lint that flags the longhand it
-replaces.** That is how the builtin actually lands: the utility makes the short
-spelling possible, the lint makes it the one people write. Precedents to copy —
-`push_loop_pipeline` (→ `map`/`filter`), `return_loop_find_if` (→ `find_if`),
-`match_value_or`, `match_is_some_and`, `match_map_ok`/`match_map_err`,
-`len_gt_zero` (→ `is_nonempty`), `incr_by_one` (→ `++`).
+**Recommended, not automatic.** A lint is how a builtin actually lands — the
+utility makes the short spelling possible, the lint makes it the one people
+write — so write one by default. But it is a real cost, and two questions decide
+whether to pay it:
+
+- **Would following it improve the caller?** If the longhand and the rewrite read
+  about the same, the lint buys churn and a squelch marker, not clarity. Skip it.
+- **Is the lint going to be complicated?** Every line of shape-matching is a line
+  that can flag something it shouldn't, and a mis-advised lint is worse than a
+  missing one. Complexity is a reason to weigh, not an automatic no: what makes
+  it worth paying is a *decisive* signal that the shape is the one you mean. In
+  `return_loop_find_index` the extra bulk is all fold-scaffolding — an indexed
+  `for` reaches the lint desugared into a synthetic `__idx$N` counter, a
+  per-iteration rebind and an appended bump — and it earned its keep, because
+  `$` is not an identifier character, so a `__idx$` match provably cannot be a
+  user's own loop. Bulk that buys precision is worth it; bulk spent guessing is
+  not.
+
+When you skip the lint, say so in the builtin's own file comment and why, so the
+next person doesn't re-litigate it.
+
+Precedents to copy — `push_loop_pipeline` (→ `map`/`filter`),
+`return_loop_find_if` (→ `find_if`), `return_loop_find_index` (→ `find_index`,
+and the worked example of matching a *desugared* shape), `match_value_or`,
+`match_is_some_and`, `match_map_ok`/`match_map_err`, `len_gt_zero`
+(→ `is_nonempty`), `incr_by_one` (→ `++`).
 
 **Layout.** One lint per file: `crates/aipl-syntax/src/lint/<name>.rs`, holding a
 `pub(super) fn <name>(..)` and that lint's own helpers. Add `mod <name>;`, a
