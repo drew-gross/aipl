@@ -621,14 +621,15 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
 
     // A template with an interpolation `` `a{x}b` ``: the head runs from the
     // opening backtick through the first `{`, the `{x}` re-lexes with the full
-    // rule set (a lone `Name`), and the tail runs from just past the `}` through
-    // the closing backtick. Head/tail spans include their braces/delimiters.
+    // rule set (a lone `Name`), and the tail runs from the `}` that closed the
+    // interpolation through the closing backtick. Every segment's span runs
+    // brace to brace, so the three tokens tile the literal with no gap.
     assert(
         lex_aipl("`a{x}b`")? == LexResult {
             tokens: [
                 atok("`a{x}b`", TemplateHead("a"), 0..3),
                 atok("`a{x}b`", Name("x"), 3..4),
-                atok("`a{x}b`", TemplateTail("b"), 5..7),
+                atok("`a{x}b`", TemplateTail("b"), 4..7),
             ],
             trivia: [],
         },
@@ -716,9 +717,9 @@ allocations: 3804
 deallocations: 3804
 reallocations: 33
 bytes allocated: 380989
-instructions executed: 956368
-binary size: 429376
-  code: 295388
+instructions executed: 956274
+binary size: 429360
+  code: 295372
   data: 6700
   metadata: 127288
 functions:
@@ -853,7 +854,7 @@ functions:
     bytes: 13068
   __m1__template_scan$AiplTok:
     calls: 3
-    bytes: 2744
+    bytes: 2728
   __m1__template_step$AiplTok:
     calls: 35
     bytes: 476

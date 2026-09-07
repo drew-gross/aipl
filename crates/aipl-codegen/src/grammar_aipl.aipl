@@ -47,16 +47,7 @@
 // the reason `grammar.aipl` documents: `Literal` and `Named` mention no `K`, so
 // a rule made only of them has nothing to pin the type parameter, and the
 // annotation is what every constructor inside resolves from.
-import {
-    Span,
-    case_of,
-    equal as ==,
-    logical_not as !,
-    logical_or as ||,
-    map,
-    map_err,
-    wrapping_sub as -,
-} from builtins;
+import { equal as ==, logical_not as !, map_err } from builtins;
 import { Cst, text } from "./cst.aipl";
 import {
     Climb,
@@ -88,7 +79,7 @@ import {
     TemplateTail,
     aipl_rules,
 } from "./lex_aipl.aipl";
-import { LexResult, Token, keep_skipped, lex, span_str } from "./lexer.aipl";
+import { LexResult, keep_skipped, lex } from "./lexer.aipl";
 import { parse_cst } from "./parse.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 
@@ -793,7 +784,9 @@ pub fn aipl_parse_cst(src: str) -> Cst!ParseError {
     Every byte of `aipl_source(src)` is under exactly one leaf. That needs the
     lexer's rule set read *losslessly* (`keep_skipped`): the compiler's own
     lexing skips whitespace outright, having no use for it, and a concrete tree
-    has to be able to put it back.
+    has to be able to put it back. Nothing else needs putting back — every other
+    byte, the braces around a template interpolation included, already sits
+    inside some token's span.
 """).test({
     // Losslessness, on something small enough to read: the leaves tile the
     // source, so concatenating them returns it whole.
@@ -816,48 +809,9 @@ pub fn aipl_parse_cst(src: str) -> Cst!ParseError {
 // trivia record. Lexing and parsing report failure in the same shape but not the
 // same type, so the conversion happens once, here.
 fn lex_lossless(text: str) -> LexResult<AiplTok>!ParseError {
-    let LexResult { tokens, trivia } = text
+    text
         .lex(aipl_rules().keep_skipped())
-        .map_err(|e| ParseError { message: e.message, span: e.span })?;
-    ok(LexResult { tokens: close_interpolations(text, tokens), trivia })
-}
-
-// One byte of a template literal belongs to no token: the `}` that closes an
-// interpolation. It is not part of the expression before it, and the piece after
-// it carries the text *after* it as its value — so `` `a{x}b` `` lexes as a head
-// spanning `` `a{ ``, then `x`, then a tail spanning ``b` ``, leaving the `}`
-// named by nothing. A token stream does not care; a concrete syntax tree cannot
-// have a hole in it.
-//
-// So each piece that follows an interpolation is widened by the one byte in
-// front of it, which is exactly that brace. The kind — and with it the piece's
-// decoded value — is untouched; only the span it claims grows, and only into a
-// byte no other token claims.
-fn close_interpolations(text: str, toks: Token<AiplTok>[]) -> Token<AiplTok>[] {
-    toks.map(|t| if (t.kind.follows_interpolation()) { widen_left(text, t) } else { t })
-}
-
-// Whether a token is one of the four template pieces that are not a head, and so
-// begins one byte past an interpolation's closing brace. Asked by case rather
-// than by looking at the source, since a `}` in front of a token means nothing
-// on its own.
-fn follows_interpolation(self: AiplTok) -> bool {
-    let mid: Case<AiplTok> = TemplateMid;
-    let tail: Case<AiplTok> = TemplateTail;
-    let raw_mid: Case<AiplTok> = RawTemplateMid;
-    let raw_tail: Case<AiplTok> = RawTemplateTail;
-    let c = self.case_of();
-    c == mid || c == tail || c == raw_mid || c == raw_tail
-}
-
-// `t` claiming one more byte at its start. A token already at offset 0 cannot
-// follow anything and is left alone.
-fn widen_left(text: str, t: Token<AiplTok>) -> Token<AiplTok> {
-    let Span { start, end } = t.text.span;
-    if (start == 0) {
-        return t;
-    };
-    Token { kind: t.kind, text: span_str(text, start - 1..end) }
+        .map_err(|e| ParseError { message: e.message, span: e.span })
 }
 
 pub fn aipl_parse_report(src: str) -> str {
@@ -888,8 +842,8 @@ pub fn aipl_parse_report(src: str) -> str {
     assert(aipl_parse_report("// lead\nfn f() {\n\n    // inner\n}\n") == "");
     assert(aipl_parse_report("import {\n    a,\n    b,\n} from builtins;\n") == "");
 
-    // ... and one byte the lexer drops on purpose: the `}` closing a template
-    // interpolation, which `close_interpolations` puts back.
+    // ... and the braces around a template interpolation, which the segment
+    // tokens on either side of it span between them.
     assert(aipl_parse_report("fn f() { let s = `a{b}c{d}e`; }\n") == "");
     assert(aipl_parse_report("fn f() { let s = ```a{b}c```; }\n") == "");
 
@@ -990,15 +944,15 @@ fn keep(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError { ok(Ignored) }
 // Test shorthand, so an assertion reads as the source it is about.
 fn parses(src: str) -> bool { aipl_parses(src) }
 --- performance ---
-allocations: 295276
-deallocations: 295276
-reallocations: 3219
-bytes allocated: 25329273
-instructions executed: 53081839
-binary size: 528768
-  code: 361044
+allocations: 295227
+deallocations: 295227
+reallocations: 3024
+bytes allocated: 25320569
+instructions executed: 52885216
+binary size: 527928
+  code: 363356
   data: 8340
-  metadata: 159384
+  metadata: 156232
 functions:
   __arr_drop___m1__Cst:
     calls: 6861
@@ -1016,7 +970,7 @@ functions:
     calls: 5
     bytes: 140
   __arr_drop___m4__Token$__m3__AiplTok:
-    calls: 1554
+    calls: 1505
     bytes: 360
   __arr_drop___m4__TokenRule$__m3__AiplTok:
     calls: 98
@@ -1037,51 +991,51 @@ functions:
     calls: 7
     bytes: 140
   __arr_retain___m4__Token$__m3__AiplTok:
-    calls: 2299
+    calls: 1407
     bytes: 360
   __arr_retain___m4__TokenRule$__m3__AiplTok:
     calls: 3430
     bytes: 756
-  __builtin_all$char$s0$lam86:
+  __builtin_all$char$s0$lam77:
     calls: 2
     bytes: 212
-  __builtin_count_while$char$lam40:
+  __builtin_count_while$char$lam26:
     calls: 714
     bytes: 220
-  __builtin_count_while$char$s0$lam48:
+  __builtin_count_while$char$s0$lam34:
     calls: 4
     bytes: 176
-  __builtin_count_while$char$s0$lam50:
+  __builtin_count_while$char$s0$lam36:
     calls: 565
     bytes: 184
-  __builtin_count_while$char$s0$lam64:
+  __builtin_count_while$char$s0$lam51:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam83:
+  __builtin_count_while$char$s0$lam74:
     calls: 46
     bytes: 172
-  __builtin_count_while$char$s0$lam85:
+  __builtin_count_while$char$s0$lam76:
     calls: 1
     bytes: 172
-  __builtin_find_if$__m2__Prec$lam101:
+  __builtin_find_if$__m2__Prec$lam98:
     calls: 115
     bytes: 688
-  __builtin_find_index$str$lam13:
+  __builtin_find_index$str$lam17:
     calls: 49
     bytes: 400
-  __builtin_find_index$str$lam27:
+  __builtin_find_index$str$lam39:
     calls: 2597
     bytes: 400
-  __builtin_find_index$str$lam53:
+  __builtin_find_index$str$lam69:
     calls: 8232
     bytes: 400
   __builtin_int_parse:
     calls: 46
     bytes: 1028
-  __builtin_try_map$__m2__Production$__m3__AiplTok$Ast$__m2__Production$__m3__AiplTok$Ast$__m2__ParseError$lam30:
+  __builtin_try_map$__m2__Production$__m3__AiplTok$Ast$__m2__Production$__m3__AiplTok$Ast$__m2__ParseError$lam42:
     calls: 49
     bytes: 972
-  __builtin_try_map$__m2__Rule$__m3__AiplTok$__m2__Rule<__m3__AiplTok>$__m2__ParseError$lam82:
+  __builtin_try_map$__m2__Rule$__m3__AiplTok$__m2__Rule<__m3__AiplTok>$__m2__ParseError$lam86:
     calls: 7350
     bytes: 732
   __eq_char$opt:
@@ -1090,36 +1044,36 @@ functions:
   __eq_str$opt:
     calls: 95
     bytes: 100
-  __lambda_15:
-    calls: 0
-    bytes: 136
-  __lambda_16:
-    calls: 224
-    bytes: 104
-  __lambda_17:
-    calls: 0
-    bytes: 144
-  __lambda_18:
-    calls: 0
-    bytes: 164
-  __lambda_19:
-    calls: 0
-    bytes: 144
-  __lambda_20:
+  __lambda_10:
     calls: 3
     bytes: 164
-  __lambda_21:
+  __lambda_11:
     calls: 0
     bytes: 48
-  __lambda_22:
+  __lambda_12:
     calls: 2
     bytes: 64
-  __lambda_28:
+  __lambda_40:
     calls: 2597
     bytes: 964
-  __lambda_60:
+  __lambda_47:
     calls: 41
     bytes: 140
+  __lambda_5:
+    calls: 0
+    bytes: 136
+  __lambda_6:
+    calls: 224
+    bytes: 104
+  __lambda_7:
+    calls: 0
+    bytes: 144
+  __lambda_8:
+    calls: 0
+    bytes: 164
+  __lambda_9:
+    calls: 0
+    bytes: 144
   __m10__trim_prefix:
     calls: 2
     bytes: 260
@@ -1242,7 +1196,7 @@ functions:
     bytes: 13068
   __m4__template_scan$__m3__AiplTok:
     calls: 3
-    bytes: 2744
+    bytes: 2728
   __m4__template_step$__m3__AiplTok:
     calls: 1031
     bytes: 476
@@ -1252,9 +1206,6 @@ functions:
   __m6__process_raw_string:
     calls: 1
     bytes: 1712
-  __map7:
-    calls: 0
-    bytes: 2336
   __rec_drop___m1__Cst:
     calls: 4948
     bytes: 48
@@ -1286,7 +1237,7 @@ functions:
     calls: 6750
     bytes: (external)
   aipl_arr_inc:
-    calls: 516256
+    calls: 516011
     bytes: (external)
   aipl_arr_join:
     calls: 104
@@ -1298,7 +1249,7 @@ functions:
     calls: 236
     bytes: (external)
   aipl_array_dec:
-    calls: 690117
+    calls: 689823
     bytes: (external)
   aipl_array_new:
     calls: 130655
@@ -1307,17 +1258,17 @@ functions:
     calls: 33741
     bytes: (external)
   aipl_array_push_mut:
-    calls: 15908
+    calls: 15016
     bytes: (external)
   aipl_array_with_cap:
-    calls: 2397
+    calls: 2348
     bytes: (external)
   aipl_assert:
     calls: 50
     bytes: (external)
   aipl_parse_cst:
     calls: 49
-    bytes: 28664
+    bytes: 143912
   aipl_parse_report:
     calls: 8
     bytes: 664
@@ -1351,9 +1302,6 @@ functions:
   keep:
     calls: 0
     bytes: 196
-  lex_lossless:
-    calls: 49
-    bytes: 109616
   main:
     calls: 1
     bytes: 272
@@ -1369,6 +1317,3 @@ functions:
   types:
     calls: 98
     bytes: 8912
-  widen_left:
-    calls: 5
-    bytes: 968

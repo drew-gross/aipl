@@ -2835,8 +2835,8 @@ deallocations: 20383
 reallocations: 1242
 bytes allocated: 1250638
 instructions executed: 3383032
-binary size: 4103384
-  code: 2540488
+binary size: 4103368
+  code: 2540472
   data: 25252
   metadata: 1537644
 functions:
@@ -3061,7 +3061,7 @@ functions:
     bytes: 13068
   __m9__template_scan$__m8__AiplTok:
     calls: 0
-    bytes: 2744
+    bytes: 2728
   __m9__template_step$__m8__AiplTok:
     calls: 94
     bytes: 476

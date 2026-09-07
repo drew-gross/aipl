@@ -415,8 +415,8 @@ deallocations: 8899
 reallocations: 779
 bytes allocated: 528521
 instructions executed: 1384255
-binary size: 249792
-  code: 159144
+binary size: 249776
+  code: 159128
   data: 4980
   metadata: 85668
 functions:
@@ -641,7 +641,7 @@ functions:
     bytes: 5856
   __m4__template_scan$CalcTok:
     calls: 0
-    bytes: 2744
+    bytes: 2728
   __m4__template_step$CalcTok:
     calls: 0
     bytes: 476

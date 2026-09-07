@@ -299,6 +299,14 @@ or discard it
     // would stay false, the staged-IR regen (step 5) would be skipped, and the
     // final run would then fail on `checked_in_ir_is_current` with the IR never
     // regenerated. Running everything surfaces both together.
+    //
+    // Seeing everything is necessary but not sufficient: each failure has to be
+    // *classified* right too. Two tests catch a stale artifact —
+    // `checked_in_ir_is_current` and, from the other end,
+    // `dogfood_lex_hook_matches_fresh_compile_on_corpus` — and a lexer change
+    // fails both. While only the first was known to `discovery`, the second
+    // counted as a hard failure and stopped a run that had already set
+    // `need_ir`, one step short of the regeneration that would have fixed it.
     if r.step("nextest (discovery)", nextest()) {
         eprintln!("\n{GREEN}{BOLD}HANDOFF OK{OFF} (green with no regeneration needed)");
         r.timing_report();

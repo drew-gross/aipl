@@ -892,8 +892,8 @@ deallocations: 2979
 reallocations: 324
 bytes allocated: 188789
 instructions executed: 449175
-binary size: 310472
-  code: 191128
+binary size: 310456
+  code: 191112
   data: 5924
   metadata: 113420
 functions:
@@ -1073,7 +1073,7 @@ functions:
     bytes: 8036
   __m3__template_scan$Tok:
     calls: 0
-    bytes: 2744
+    bytes: 2728
   __m3__template_step$Tok:
     calls: 0
     bytes: 476

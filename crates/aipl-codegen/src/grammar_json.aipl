@@ -447,8 +447,8 @@ deallocations: 11966
 reallocations: 581
 bytes allocated: 884674
 instructions executed: 1833876
-binary size: 274776
-  code: 176096
+binary size: 274760
+  code: 176080
   data: 6404
   metadata: 92276
 functions:
@@ -670,7 +670,7 @@ functions:
     bytes: 7152
   __m4__template_scan$JsonTok:
     calls: 0
-    bytes: 2744
+    bytes: 2728
   __m4__template_step$JsonTok:
     calls: 0
     bytes: 476

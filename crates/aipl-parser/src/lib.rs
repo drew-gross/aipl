@@ -3726,8 +3726,10 @@ pub enum FmtTokenKind {
     Plain(TokenKind),
     /// `` `text{ `` — opens a template literal, through the first `{`.
     TemplateHead,
-    /// `}text{` between two interpolations (span starts just after the
-    /// previous interpolation's `}`, which the lexer does not emit).
+    /// `}text{` between two interpolations. Its span runs brace to brace — from
+    /// the `}` that closed the previous interpolation through the `{` that opens
+    /// the next — so a template's tokens tile it with no gap. The `}` gets no
+    /// token of its own; it is this one's first byte.
     TemplateMiddle,
     /// `` }text` `` — closes the template literal.
     TemplateTail,

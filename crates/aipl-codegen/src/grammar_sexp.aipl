@@ -302,8 +302,8 @@ deallocations: 26821
 reallocations: 2333
 bytes allocated: 1323471
 instructions executed: 4552028
-binary size: 236056
-  code: 151024
+binary size: 236040
+  code: 151008
   data: 3940
   metadata: 81092
 functions:
@@ -519,7 +519,7 @@ functions:
     bytes: 7152
   __m4__template_scan$SexpKind:
     calls: 0
-    bytes: 2744
+    bytes: 2728
   __m4__template_step$SexpKind:
     calls: 0
     bytes: 476

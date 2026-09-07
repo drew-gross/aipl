@@ -231,6 +231,7 @@ parser:
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
 grammar:
+  make NestedIn
   make an ebnf loader as well as dumper
 
 utilities:

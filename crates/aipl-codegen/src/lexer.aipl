@@ -726,9 +726,16 @@ fn template_step<K>(
 // opening `delim`); the result's tokens are the literal's whole run and its
 // `end` sits just past the closing `delim`. A text segment runs until the
 // closing `delim` (matched in full, like `Between`) or a `{`, which ends the
-// segment and opens an interpolation (see `interp_scan`); head/middle spans
-// include their `{`, and the next segment starts just past the interpolation's
-// `}`. The text segments are collected first (with their spans and the
+// segment and opens an interpolation (see `interp_scan`).
+//
+// **A segment's span runs brace to brace, and its value does not.** The span
+// takes the delimiter or `}` that opens the segment and the delimiter or `{`
+// that closes it; the value is what lies strictly between. Keeping the two
+// starts apart is what makes the token stream *tile* the source — every byte of
+// a template under exactly one token — which a concrete syntax tree needs and a
+// token stream alone does not care about. They were once the same variable, and
+// the `}` closing an interpolation was then the one byte of a template that
+// belonged to no token at all. The text segments are collected first (with their spans and the
 // interpolation token runs between them), then handed to `finalize_template` —
 // which post-processes them as a group and emits each. A nested template inside
 // an interpolation is fully lexed (and its own segments finalized) by the
@@ -752,12 +759,13 @@ fn template_scan<K>(
     mut seg_spans = [];
     mut interp_runs = [];
     mut i = at + delim.len();
+
+    // Where the current segment's span starts, and where its text does: the
+    // opening delimiter and just past it for the first segment, the `}` closing
+    // the previous interpolation and just past it for every one after.
     mut seg_start = at;
+    mut text_start = at + delim.len();
     while (i < src.len()) {
-        // The segment's text: past the opening delim for the first segment,
-        // from just past the previous interpolation's `}` after — through the
-        // current position (a closing delim or an opening `{`), exclusive.
-        let text_start = if (seg_texts.is_empty()) { at + delim.len() } else { seg_start };
         if (src[i..].starts_with(delim)) {
             let end = i + delim.len();
             set seg_texts.push(src[text_start..i]);
@@ -771,7 +779,12 @@ fn template_scan<K>(
             let interp = interp_scan(src, i + 1, i, rules)?;
             set interp_runs.push(interp);
             set i = interp.end;
-            set seg_start = i;
+
+            // `interp.end` sits just past the `}` that closed the
+            // interpolation, and `}` is one byte — so the next segment's span
+            // opens on that brace and its text starts after it.
+            set seg_start = i - 1;
+            set text_start = i;
         } else {
             if (c == '\\' && escapes.is_nonempty() && i + 1 < src.len()) {
                 if (!src[i + 1].is_some_and(|e| escapes.contains(e))) {
@@ -839,8 +852,10 @@ fn finalize_template<K>(
 
 // A template interpolation's `{ ... }` body: lexes expression tokens with the
 // full rule set from `at` (just past the opening `{`, which sits at `open`)
-// until the `}` balancing it; that closing `}` is consumed without a token —
-// it's the template's delimiter, not an expression token. Depth moves by what
+// until the `}` balancing it; that closing `}` is consumed without a token of
+// its own — it's the template's delimiter, not an expression token, and it is
+// the *next* text segment's span that covers it (see `template_scan`). Depth
+// moves by what
 // each step consumed: a step consuming exactly `{` or `}` (a brace lexed as
 // its own token — set/dict literals, blocks) raises/lowers it, while a brace
 // buried inside a bigger token (a delimited string's content, a nested
@@ -1199,7 +1214,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         lex("`v{-5}`", tpls_signed)? == toks([
             tok("`v{-5}`", TplHead("v"), 0..3),
             tok("`v{-5}`", IntTok(-5), 3..5),
-            tok("`v{-5}`", TplTail(""), 6..7),
+            tok("`v{-5}`", TplTail(""), 5..7),
         ]),
     );
 
@@ -1222,16 +1237,16 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         lex("`a{x}b`", tpls)? == toks([
             tok("`a{x}b`", TplHead("a"), 0..3),
             tok("`a{x}b`", Ident("x"), 3..4),
-            tok("`a{x}b`", TplTail("b"), 5..7),
+            tok("`a{x}b`", TplTail("b"), 4..7),
         ]),
     );
     assert(
         lex("`{x}{y}`", tpls)? == toks([
             tok("`{x}{y}`", TplHead(""), 0..2),
             tok("`{x}{y}`", Ident("x"), 2..3),
-            tok("`{x}{y}`", TplMid(""), 4..5),
+            tok("`{x}{y}`", TplMid(""), 3..5),
             tok("`{x}{y}`", Ident("y"), 5..6),
-            tok("`{x}{y}`", TplTail(""), 7..8),
+            tok("`{x}{y}`", TplTail(""), 6..8),
         ]),
     );
     // Text escapes: `\{` doesn't interpolate; an unknown escape is a hard error.
@@ -1249,7 +1264,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
             tok("`a{ {x} }b`", Punct, 4..5),
             tok("`a{ {x} }b`", Ident("x"), 5..6),
             tok("`a{ {x} }b`", Punct, 6..7),
-            tok("`a{ {x} }b`", TplTail("b"), 9..11),
+            tok("`a{ {x} }b`", TplTail("b"), 8..11),
         ]),
     );
     // Templates nest: an inner template between head and tail.
@@ -1257,7 +1272,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         lex("`a{`x`}b`", tpls)? == toks([
             tok("`a{`x`}b`", TplHead("a"), 0..3),
             tok("`a{`x`}b`", Tpl("x"), 3..6),
-            tok("`a{`x`}b`", TplTail("b"), 7..9),
+            tok("`a{`x`}b`", TplTail("b"), 6..9),
         ]),
     );
     // A raw-template delim scans like `Between` and `""` escapes make it verbatim.
@@ -1271,7 +1286,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         lex("```a{x}b```", tpl2)? == toks([
             tok("```a{x}b```", RawTplHead("a"), 0..5),
             tok("```a{x}b```", Ident("x"), 5..6),
-            tok("```a{x}b```", RawTplTail("b"), 7..11),
+            tok("```a{x}b```", RawTplTail("b"), 6..11),
         ]),
     );
 
@@ -1309,7 +1324,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
             tokens: [
                 tok("`a{x // c\n}b`", TplHead("a"), 0..3),
                 tok("`a{x // c\n}b`", Ident("x"), 3..4),
-                tok("`a{x // c\n}b`", TplTail("b"), 11..13),
+                tok("`a{x // c\n}b`", TplTail("b"), 10..13),
             ],
             trivia: [tok("`a{x // c\n}b`", Comment, 5..9)],
         },
@@ -1396,9 +1411,9 @@ allocations: 1531
 deallocations: 1531
 reallocations: 49
 bytes allocated: 104064
-instructions executed: 322032
-binary size: 2013256
-  code: 1348028
+instructions executed: 321528
+binary size: 2013240
+  code: 1348012
   data: 10036
   metadata: 655192
 functions:
@@ -1638,7 +1653,7 @@ functions:
     bytes: 16268
   template_scan$Kind:
     calls: 16
-    bytes: 2744
+    bytes: 2728
   template_step$Kind:
     calls: 27
     bytes: 476

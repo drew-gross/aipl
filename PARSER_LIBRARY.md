@@ -209,15 +209,16 @@ expression, a PEG parses that expression *twice* — once inside the statement
 alternative that then fails on its missing `;` — and the doubling compounds
 through nested blocks. Deciding after the expression parses it once.
 
-**Losslessness needed two things from the lexer.** `TokenRule`'s `skip` rules drop
-whitespace outright, so `lexer.aipl` gained `keep_skipped` — one rule set read two
-ways, a compiler's and a lossless consumer's, rather than a language keeping two.
-And one byte belongs to no token at all: the `}` closing a template
-interpolation, which neither the expression before it nor the piece after it
-claims. `close_interpolations` widens each following piece by that byte. A token
-stream does not care; a concrete tree cannot have a hole in it. Fixing it in
-`lex_aipl.aipl` instead would move every template span the formatter and the
-gazelle parser read, so it waits for Stage 5.
+**Losslessness needed two things from the lexer**, and got both. `TokenRule`'s
+`skip` rules drop whitespace outright, so `lexer.aipl` gained `keep_skipped` —
+one rule set read two ways, a compiler's and a lossless consumer's, rather than a
+language keeping two. And one byte used to belong to no token at all: the `}`
+closing a template interpolation, which the segment scan did not reach and the
+interpolation scan consumed without emitting. A token stream does not care; a
+concrete tree cannot have a hole in it. `template_scan` now keeps a segment's
+*span* start apart from its *value* start — the span runs brace to brace, the
+value is what lies strictly between — which is the same split it already made for
+the opening delimiter, and the tokens tile the literal.
 
 **The 11 files where the two disagree are all one thing**, and the test lists them
 with the message fragment that identifies each: gazelle's grammar accepts them

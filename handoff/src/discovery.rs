@@ -209,6 +209,15 @@ impl Run {
     /// as `dogfood_ir::checked_in_ir_is_current`, not bare. Matching only the
     /// bare name silently reclassifies a regenerable staleness as a hard failure,
     /// and the run then stops at a step it was supposed to fix itself.
+    ///
+    /// There are *two* gates that catch a stale artifact, not one.
+    /// `checked_in_ir_is_current` compares the source against the checked-in
+    /// `.clif` directly; `dogfood_lex_hook_matches_fresh_compile_on_corpus`
+    /// catches the same staleness from the other end, by running the production
+    /// hook and a fresh compile of the lexer source over the corpus and
+    /// comparing tokens. A lexer change fails both, and listing only the first
+    /// let the second stop a run that had already planned the regeneration that
+    /// would fix it.
     pub fn hard_failures(&self) -> Vec<String> {
         static RE: OnceLock<Regex> = OnceLock::new();
         // `concat!`, not a `\` continuation — see the note in [`Run::unfillable`].
@@ -216,7 +225,8 @@ impl Run {
             &RE,
             concat!(
                 r"^([A-Za-z0-9_]+::)?((cases|examples|crates)_.*",
-                r"|every_case_has_a_test|checked_in_ir_is_current|no_staged_ir_pending)$",
+                r"|every_case_has_a_test|checked_in_ir_is_current|no_staged_ir_pending",
+                r"|dogfood_lex_hook_matches_fresh_compile_on_corpus)$",
             ),
         );
         self.failed_names()
@@ -245,9 +255,16 @@ impl Run {
         };
 
         let failed = self.failed_names();
+        // Both artifact gates imply the same remediation. The lexer corpus test
+        // is a staleness signal in its own right: it runs the production hook
+        // and a fresh compile of the *same* lexer source, so the only thing that
+        // can differ between them is the checked-in artifact.
         let gates = re(
             &GATES,
-            r"^([A-Za-z0-9_]+::)?(checked_in_ir_is_current|no_staged_ir_pending)$",
+            concat!(
+                r"^([A-Za-z0-9_]+::)?(checked_in_ir_is_current|no_staged_ir_pending",
+                r"|dogfood_lex_hook_matches_fresh_compile_on_corpus)$",
+            ),
         );
         plan.need_ir = failed.iter().any(|t| gates.is_match(t));
         let case_tests = re(&CASE_TESTS, r"^([A-Za-z0-9_]+::)?every_case_has_a_test$");
@@ -461,6 +478,35 @@ mod tests {
         assert!(run.plan().need_ir);
     }
 
+    /// The lexer corpus test catches a stale artifact from the other end — the
+    /// production hook against a fresh compile of the same source — so it asks
+    /// for the same regeneration and must not stop the run on its own.
+    #[test]
+    fn the_lexer_corpus_gate_asks_for_ir_regeneration() {
+        let run = run(&[(
+            "lexer_dogfood::dogfood_lex_hook_matches_fresh_compile_on_corpus",
+            "",
+        )]);
+        assert!(run.hard_failures().is_empty());
+        assert!(run.plan().need_ir);
+    }
+
+    /// A lexer change fails both artifact gates at once. That is the run that
+    /// used to stop: `need_ir` was already set, and the second gate was
+    /// classified as a hard failure before the regeneration could happen.
+    #[test]
+    fn both_artifact_gates_failing_still_only_asks_for_regeneration() {
+        let run = run(&[
+            ("dogfood_ir::checked_in_ir_is_current", ""),
+            (
+                "lexer_dogfood::dogfood_lex_hook_matches_fresh_compile_on_corpus",
+                "",
+            ),
+        ]);
+        assert!(run.hard_failures().is_empty());
+        assert!(run.plan().need_ir);
+    }
+
     #[test]
     fn every_gate_name_is_excluded_from_hard_failures() {
         for name in [
@@ -471,6 +517,8 @@ mod tests {
             "checked_in_ir_is_current",
             "no_staged_ir_pending",
             "dogfood_ir::checked_in_ir_is_current",
+            "dogfood_lex_hook_matches_fresh_compile_on_corpus",
+            "lexer_dogfood::dogfood_lex_hook_matches_fresh_compile_on_corpus",
         ] {
             assert!(
                 run(&[(name, "")]).hard_failures().is_empty(),
