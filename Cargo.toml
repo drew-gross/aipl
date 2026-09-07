@@ -41,6 +41,7 @@ aipl-loader = { path = "crates/aipl-loader" }
 aipl-linker = { path = "crates/aipl-linker" }
 aipl-fmt = { path = "crates/aipl-fmt" }
 aipl-index = { path = "crates/aipl-index" }
+aipl-docs = { path = "crates/aipl-docs" }
 # External crates.
 cranelift = "0.134.2"
 cranelift-jit = "0.134.2"
@@ -54,6 +55,7 @@ gazelle-parser = "0.9.3"
 gazelle-macros = "0.9.3"
 serde_json = "1"
 regex = "1"
+askama = "0.16"
 
 [dependencies]
 aipl-syntax = { workspace = true }
@@ -64,6 +66,7 @@ aipl-loader = { workspace = true }
 aipl-linker = { workspace = true }
 aipl-fmt = { workspace = true }
 aipl-index = { workspace = true }
+aipl-docs = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

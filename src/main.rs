@@ -54,6 +54,7 @@ fn cli() -> ExitCode {
         Some("run") => run_cmd(&args[2..]),
         Some("ir") => ir_cmd(&args[2..]),
         Some("doc") => doc_cmd(&args[2..]),
+        Some("docs") => docs_cmd(&args[2..]),
         Some("build") => build_cmd(&args[2..]),
         // `fmt` owns its exit code (`--check` reports needs-formatting as 1).
         Some("fmt") => return fmt_cmd(&args[2..]),
@@ -82,9 +83,16 @@ fn usage(prog: &str) -> String {
   {prog} run   <file.aipl> [fn] [args...]   compile and JIT-execute a function (default: main)
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
   {prog} doc   <file.aipl>                  print each fn's `.doc(\"..\")` documentation
+  {prog} docs  [path] [-o <dir>]            write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
   {prog} fmt   <file.aipl> [--check]        rewrite the file in canonical format
   {prog} check [path...]                    run every fn's `.test({{ .. }})` block
+
+`docs` is `doc`'s whole-project counterpart: where `doc` prints one file's
+documentation to stdout, `docs` walks a tree and writes a static HTML site —
+no server and no JavaScript, so it opens straight off the filesystem. With no
+path it documents the working directory, into `./docs` unless `-o` says
+otherwise.
 
 `check` with no path checks every `.aipl` file under the working directory (one
 process, so the engine links once); pass a file to check just that one, or a
@@ -480,6 +488,86 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
         println!();
     }
     Ok(())
+}
+
+/// `docs [path] [-o <dir>]` — write an HTML documentation site for a tree of
+/// AIPL source.
+///
+/// The whole-project counterpart of [`doc_cmd`]: that one prints one file's
+/// `.doc("..")` text, this one indexes every `.aipl` under `path` and writes a
+/// browsable site. Files that do not parse are reported and skipped rather than
+/// failing the run — a project usually has a few deliberate error fixtures, and
+/// documenting the rest of it is still worth doing.
+fn docs_cmd(args: &[String]) -> Result<(), String> {
+    let (args, _dbg) = take_debug_flag(args);
+    let mut root: Option<&str> = None;
+    let mut out: Option<PathBuf> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-o" | "--out" => {
+                let dir = args.get(i + 1).ok_or("-o needs a directory")?;
+                out = Some(PathBuf::from(dir));
+                i += 2;
+            }
+            other if root.is_none() => {
+                root = Some(other);
+                i += 1;
+            }
+            other => return Err(format!("unexpected argument {other:?}")),
+        }
+    }
+    let root = Path::new(root.unwrap_or("."));
+    let out = out.unwrap_or_else(|| PathBuf::from("docs"));
+
+    aipl::install_parser_hooks();
+    // A file path documents just that file; a directory is walked (the same
+    // walk `check` uses, so the two agree on what counts as project source).
+    let mut files = Vec::new();
+    if root.is_file() {
+        files.push(root.to_path_buf());
+    } else {
+        collect_aipl(root, &mut files);
+        files.sort();
+    }
+    if files.is_empty() {
+        return Err(format!("no .aipl files under {}", root.display()));
+    }
+
+    let mut index = aipl::index::Index::new();
+    let mut skipped = 0usize;
+    for path in &files {
+        let src = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        // A file that does not parse says nothing about the rest of the tree.
+        if index.add(path.clone(), &src).is_err() {
+            skipped += 1;
+        }
+    }
+
+    let project = std::fs::canonicalize(root)
+        .ok()
+        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .unwrap_or_else(|| "AIPL".to_string());
+    aipl::docs::write_site(&index, root, &project, &out).map_err(|e| e.to_string())?;
+
+    let documented = files.len() - skipped;
+    println!(
+        "wrote {} to {}",
+        plural(documented, "page"),
+        out.join("index.html").display()
+    );
+    if skipped > 0 {
+        println!("skipped {} that did not parse", plural(skipped, "file"));
+    }
+    Ok(())
+}
+
+fn plural(n: usize, what: &str) -> String {
+    if n == 1 {
+        format!("{n} {what}")
+    } else {
+        format!("{n} {what}s")
+    }
 }
 
 fn build_cmd(args: &[String]) -> Result<(), String> {

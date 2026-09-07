@@ -22,6 +22,10 @@ pub use aipl_parser::{
 // `aipl::codegen::…`, `aipl::mono::…`, etc. paths keep resolving.
 pub use aipl_codegen as codegen;
 pub use aipl_codegen::{parse_spec, FfiValue, SpecFields};
+/// The documentation site generator behind `aipl docs`: static HTML and one
+/// stylesheet, written from an [`index`]. Exposed so a project can generate its
+/// own docs from a build script rather than the CLI.
+pub use aipl_docs as docs;
 pub use aipl_fmt as fmt;
 /// Source indexing for tools: the symbols, imports and references a docs
 /// generator, an editor extension or a language server needs. Nothing in the

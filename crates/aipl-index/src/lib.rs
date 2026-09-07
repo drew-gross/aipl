@@ -292,10 +292,20 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                     let Some(case_span) = spans.next_case(&case.name) else {
                         continue;
                     };
+                    // A named slot shows its name, and a keyword slot (one
+                    // with a default) shows that it has one — `Many(Rule<K>,
+                    // min: u64 = ..)` says far more about how the case is
+                    // constructed than three bare types do. The default's
+                    // *value* is an expression the AST holds unrendered, so it
+                    // is shown as `..` rather than guessed at.
                     let payload = case
                         .payload
                         .iter()
-                        .map(|p| type_name(&p.ty))
+                        .map(|p| match (&p.name, &p.default) {
+                            (Some(n), Some(_)) => format!("{n}: {} = ..", type_name(&p.ty)),
+                            (Some(n), None) => format!("{n}: {}", type_name(&p.ty)),
+                            (None, _) => type_name(&p.ty),
+                        })
                         .collect::<Vec<_>>();
                     let detail = if payload.is_empty() {
                         case.name.clone()
@@ -581,10 +591,20 @@ fn helper(n: i64) !prints -> i64 {
     #[test]
     fn a_case_carries_its_payload_and_its_variant() {
         let idx = index();
+        hosted();
         let circle = idx.define("Circle").expect("Circle");
         assert_eq!(circle.detail, "Circle(i64)");
         assert_eq!(circle.parent.as_deref(), Some("Shape"));
         assert_eq!(idx.define("Rect").expect("Rect").detail, "Rect(i64, i64)");
+        // A named slot shows its name; a keyword slot shows that it has a
+        // default, which is how the case is actually constructed.
+        let named = "variant R = Many(inner: i64, min: u64 = 0) | Plain(str)\n";
+        let idx2 = FileIndex::parse("src/n.aipl", named).expect("indexes");
+        assert_eq!(
+            idx2.define("Many").expect("Many").detail,
+            "Many(inner: i64, min: u64 = ..)"
+        );
+        assert_eq!(idx2.define("Plain").expect("Plain").detail, "Plain(str)");
         // A nullary case is just its name — and the one after a payload case,
         // which is where a naive `|` scan would drift.
         assert_eq!(idx.define("Empty").expect("Empty").detail, "Empty");

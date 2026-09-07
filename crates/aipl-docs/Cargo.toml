@@ -1,0 +1,16 @@
+[package]
+name = "aipl-docs"
+version = "0.1.0"
+edition = "2021"
+description = "AIPL documentation site generator: static HTML from a source index"
+license = "MIT"
+
+[dependencies]
+aipl-index = { workspace = true }
+askama = { workspace = true }
+
+[dev-dependencies]
+aipl-codegen = { workspace = true }
+
+[lints]
+workspace = true

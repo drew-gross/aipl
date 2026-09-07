@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+      <h1><code>{{ display }}</code></h1>
+{% if !imports.is_empty() %}
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+{% for import in imports %}
+          <li><code>{{ import.name }}</code>{% if import.aliased %} <span class="as">as</span> <code>{{ import.local }}</code>{% endif %} <span class="from">from {{ import.from }}</span></li>
+{% endfor %}
+        </ul>
+      </section>
+{% endif %}
+{% if symbols.is_empty() %}
+      <p class="empty">This file declares nothing.</p>
+{% else %}
+{% for symbol in symbols %}
+      <section class="item" id="{{ symbol.anchor }}">
+        <h2>
+          <a class="anchor" href="#{{ symbol.anchor }}">{{ symbol.name }}</a>
+          <span class="kind {{ symbol.kind_class }}">{{ symbol.kind }}</span>
+{% if symbol.is_pub %}          <span class="badge">pub</span>{% endif %}
+        </h2>
+        <pre class="signature"><code>{{ symbol.detail }}</code></pre>
+{% if symbol.has_doc %}
+        <div class="doc">{{ symbol.doc|safe }}</div>
+{% else %}
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+{% endif %}
+{% if !symbol.cases.is_empty() %}
+        <ul class="cases">
+{% for case in symbol.cases %}
+          <li id="{{ case.anchor }}"><code>{{ case.detail }}</code></li>
+{% endfor %}
+        </ul>
+{% endif %}
+      </section>
+{% endfor %}
+{% endif %}
+{% endblock %}

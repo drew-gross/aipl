@@ -1,0 +1,148 @@
+/* Generated alongside the pages by `aipl docs`; edit the generator, not this.
+   No JavaScript and no web fonts: a docs tree should open from the filesystem,
+   over a slow link, and out of a zip file, and all three rule those out. */
+
+:root {
+  --bg: #ffffff;
+  --fg: #1b1b1d;
+  --muted: #5c5f66;
+  --rule: #e2e4e8;
+  --code-bg: #f5f6f8;
+  --link: #0a58ca;
+  --badge-bg: #e7f1ff;
+  --badge-fg: #0a58ca;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17181c;
+    --fg: #e6e7ea;
+    --muted: #9a9da5;
+    --rule: #2c2e35;
+    --code-bg: #21232a;
+    --link: #7ab2ff;
+    --badge-bg: #1d2a3f;
+    --badge-fg: #7ab2ff;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+code, pre, .signature {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+header {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.9rem 1.25rem;
+}
+
+header .home {
+  color: var(--fg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 52rem;
+  padding: 1.5rem 1.25rem 4rem;
+}
+
+footer {
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 1rem 1.25rem;
+}
+
+a { color: var(--link); }
+
+h1 { font-size: 1.6rem; margin: 0 0 0.25rem; }
+h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
+
+.summary, .from, .undocumented, .empty { color: var(--muted); }
+.undocumented, .empty { font-size: 0.9rem; font-style: italic; }
+
+/* --- index --- */
+
+ul.files { list-style: none; margin: 1.5rem 0 0; padding: 0; }
+ul.files > li { border-top: 1px solid var(--rule); padding: 0.9rem 0; }
+a.file { font-weight: 600; text-decoration: none; }
+a.file:hover { text-decoration: underline; }
+
+ul.items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+ul.items a { text-decoration: none; }
+ul.items a:hover { text-decoration: underline; }
+
+/* --- a file's page --- */
+
+section.item {
+  border-top: 1px solid var(--rule);
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  /* So an `#anchor` jump doesn't tuck the heading under the top edge. */
+  scroll-margin-top: 1rem;
+}
+
+section.item h2 { align-items: baseline; display: flex; gap: 0.5rem; }
+a.anchor { color: var(--fg); text-decoration: none; }
+a.anchor:hover { text-decoration: underline; }
+
+pre.signature {
+  background: var(--code-bg);
+  border-radius: 6px;
+  margin: 0 0 0.75rem;
+  overflow-x: auto;
+  padding: 0.6rem 0.8rem;
+}
+
+.doc p { margin: 0 0 0.75rem; }
+.doc pre {
+  background: var(--code-bg);
+  border-radius: 6px;
+  overflow-x: auto;
+  padding: 0.6rem 0.8rem;
+}
+
+.doc code, li code, p code, h1 code {
+  background: var(--code-bg);
+  border-radius: 4px;
+  font-size: 0.9em;
+  padding: 0.1em 0.3em;
+}
+
+pre code { background: none; padding: 0; }
+
+ul.cases { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+ul.cases li { padding: 0.15rem 0; }
+
+.kind, .badge {
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.1rem 0.5rem;
+  text-transform: uppercase;
+}
+
+.kind { background: var(--code-bg); color: var(--muted); }
+.badge { background: var(--badge-bg); color: var(--badge-fg); }
+
+section.imports ul { margin: 0; padding-left: 1.2rem; }
+.as { color: var(--muted); font-style: italic; }

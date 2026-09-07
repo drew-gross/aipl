@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+      <h1>{{ project }}</h1>
+      <p class="summary">{{ file_count }} file{{ file_count|pluralize }}, {{ symbol_count }} item{{ symbol_count|pluralize }}.</p>
+{% if files.is_empty() %}
+      <p class="empty">No <code>.aipl</code> files found.</p>
+{% else %}
+      <ul class="files">
+{% for file in files %}
+        <li>
+          <a class="file" href="{{ file.href }}">{{ file.display }}</a>
+{% if !file.entries.is_empty() %}
+          <ul class="items">
+{% for item in file.entries %}
+            <li>
+              <a href="{{ file.href }}#{{ item.anchor }}"><code>{{ item.name }}</code></a>
+              <span class="kind {{ item.kind_class }}">{{ item.kind }}</span>
+            </li>
+{% endfor %}
+          </ul>
+{% endif %}
+        </li>
+{% endfor %}
+      </ul>
+{% endif %}
+{% endblock %}
