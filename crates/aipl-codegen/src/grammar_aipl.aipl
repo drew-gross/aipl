@@ -53,7 +53,6 @@ import {
     Climb,
     Grammar,
     ListOf,
-    Many,
     Maybe,
     Mk,
     Named,
@@ -65,6 +64,8 @@ import {
     Spelling,
     Term,
     Then,
+    many,
+    many1,
 } from "./grammar.aipl";
 import {
     AiplTok,
@@ -86,62 +87,52 @@ import { strip_test_sections } from "./strip_test_sections.aipl";
 
 // ---------- rule-building shorthand ----------
 //
-// Every one of these pins `Rule<AiplTok>` through an annotated binding: most
-// `Rule` constructors mention no `K`, so without one the type parameter has
-// nothing to resolve from (see the authoring notes in `grammar.aipl`). Writing
-// them once here is what keeps the grammar below readable as a grammar.
+// Two different things, and worth telling apart.
+//
+// **The `sep*` family carries meaning.** Gazelle spells a list as a
+// left-recursive pair of productions and says whether it may be empty, and
+// whether a trailing separator is allowed, in the *wrapper* around it —
+// `x_list | x_list COMMA | _`. Four combinations, and getting one wrong is a
+// grammar that quietly accepts `<>` or rejects `[1, 2,]`. Naming all four is what
+// makes each list below say which it is, in one word, next to the gazelle rule
+// it came from.
+//
+// **`t`/`r`/`seq`/`alt`/`opt` are abbreviation, nothing more.** They are
+// `Spelling`/`Named`/`Then`/`OneOf`/`Maybe` under shorter names. `Spelling`
+// alone appears about two hundred times here, and the difference between
+// `t("import")` and `Spelling("import")` decides whether a production fits on
+// one line or gets broken one token per line. Nothing about the types needs
+// them: a function's return type pins `Rule<AiplTok>`, and it propagates through
+// arbitrarily nested `Spelling`/`Named` that pin nothing themselves.
 
 // One token spelled exactly `s` — a keyword, an operator, a bracket.
-fn t(s: str) -> Rule<AiplTok> {
-    let r: Rule<AiplTok> = Spelling(s);
-    r
-}
+fn t(s: str) -> Rule<AiplTok> { Spelling(s) }
 
 // A reference to the production named `n`.
-fn r(n: str) -> Rule<AiplTok> {
-    let out: Rule<AiplTok> = Named(n);
-    out
-}
+fn r(n: str) -> Rule<AiplTok> { Named(n) }
 
-fn seq(rs: Rule<AiplTok>[]) -> Rule<AiplTok> {
-    let out: Rule<AiplTok> = Then(rs);
-    out
-}
+fn seq(rs: Rule<AiplTok>[]) -> Rule<AiplTok> { Then(rs) }
 
-fn alt(rs: Rule<AiplTok>[]) -> Rule<AiplTok> {
-    let out: Rule<AiplTok> = OneOf(rs);
-    out
-}
+fn alt(rs: Rule<AiplTok>[]) -> Rule<AiplTok> { OneOf(rs) }
 
-fn opt(x: Rule<AiplTok>) -> Rule<AiplTok> {
-    let out: Rule<AiplTok> = Maybe(x);
-    out
-}
-
-fn rep(x: Rule<AiplTok>) -> Rule<AiplTok> {
-    let zero: u64 = 0;
-    let out: Rule<AiplTok> = Many(x, zero);
-    out
-}
+fn opt(x: Rule<AiplTok>) -> Rule<AiplTok> { Maybe(x) }
 
 // One or more `item`, separated by `s`, no trailing separator — the shape of
 // gazelle's `x_list = x | x_list COMMA x`.
-fn sep1(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { seq([item, rep(seq([t(s), item]))]) }
+fn sep1(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { seq([item, many(seq([t(s), item]))]) }
 
 // The same, with an optional trailing separator — `x_list | x_list COMMA`.
 fn sep1t(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { seq([sep1(item, s), opt(t(s))]) }
 
 // Zero or more, no trailing separator — `x_list | _`.
-fn sep0(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> {
-    let out: Rule<AiplTok> = ListOf(item, s, false);
-    out
-}
+fn sep0(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { ListOf(item, s, false) }
 
 // Zero or more, trailing separator allowed — `x_list | x_list COMMA | _`.
-fn sep0t(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> {
-    let out: Rule<AiplTok> = ListOf(item, s, true);
-    out
-}
+fn sep0t(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { ListOf(item, s, true) }
+
+// Two or more — an alternation of patterns, which is `sep1` with the first
+// repetition required.
+fn sep2(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { seq([item, many1(seq([t(s), item]))]) }
 
 // ---------- the grammar ----------
 
@@ -161,7 +152,7 @@ pub fn aipl_grammar() -> Grammar<AiplTok, Ast> {
 fn items() -> Production<AiplTok, Ast>[] {
     // `program = item*`, and every byte of the file has to be one: `parse_cst`
     // refuses input left over after the start rule.
-    let program = rep(r("item"));
+    let program = many(r("item"));
     let item = alt([r("function"), r("struct_decl"), r("variant_decl"), r("import_decl")]);
 
     // `import { a, b as c, equal as == } from "./x.aipl";` — or `from builtins`.
@@ -219,10 +210,10 @@ fn items() -> Production<AiplTok, Ast>[] {
         t("("),
         sep0t(r("param"), ","),
         t(")"),
-        rep(r("effect")),
+        many(r("effect")),
         opt(seq([t("->"), r("ty")])),
         r("fn_body"),
-        rep(r("fn_attr")),
+        many(r("fn_attr")),
     ]);
     let effect = seq([t("!"), Term(Name)]);
 
@@ -328,7 +319,7 @@ fn types() -> Production<AiplTok, Ast>[] {
         r("base_ty"),
     ]);
     // Left-recursive postfix under LR; here a core followed by its suffixes.
-    let base_ty = seq([r("ty_core"), rep(alt([t("?"), seq([t("["), t("]")])]))]);
+    let base_ty = seq([r("ty_core"), many(alt([t("?"), seq([t("["), t("]")])]))]);
     let ty_core = alt([
         seq([t("#"), t("{"), r("ty"), t(":"), r("ty"), t("}")]),
         seq([t("#"), t("{"), r("ty"), t("}")]),
@@ -482,7 +473,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         ],
     );
     let unary = alt([seq([t("-"), r("unary")]), seq([t("!"), r("unary")]), r("postfix")]);
-    let postfix = seq([r("atom"), rep(r("suffix"))]);
+    let postfix = seq([r("atom"), many(r("suffix"))]);
 
     // The method call comes before the field access — both open `. IDENT` — and
     // the two open-ended slices before the plain index.
@@ -566,7 +557,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     let template = seq([
         alt([Term(TemplateHead), Term(RawTemplateHead)]),
         r("expr"),
-        rep(seq([alt([Term(TemplateMid), Term(RawTemplateMid)]), r("expr")])),
+        many(seq([alt([Term(TemplateMid), Term(RawTemplateMid)]), r("expr")])),
         alt([Term(TemplateTail), Term(RawTemplateTail)]),
     ]);
 
@@ -673,13 +664,6 @@ fn patterns() -> Production<AiplTok, Ast>[] {
         pl("pattern", pattern, "a pattern"),
         p("ctor_payload", ctor_payload),
     ]
-}
-
-// Two or more `item`, separated by `s` — an alternation of patterns, which is
-// exactly `sep1` with the first repetition required.
-fn sep2(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> {
-    let one: u64 = 1;
-    seq([item, Many(seq([t(s), item]), one)])
 }
 
 // ---------- entry points ----------
@@ -1290,3 +1274,4 @@ functions:
   widen_left:
     calls: 5
     bytes: 968
+
