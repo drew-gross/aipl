@@ -50,6 +50,7 @@ import {
     logical_or as ||,
     map,
     map_err,
+    not_equal as !=,
     try_map,
     value_or_err,
     wrapping_add as +,
@@ -60,7 +61,6 @@ import { CLeaf, CTree, CTrivia, Cst, is_tree, show, span, text } from "./cst.aip
 import {
     Climb,
     Grammar,
-    ListOf,
     Literal,
     Many,
     Maybe,
@@ -218,10 +218,18 @@ fn match_rule<K: variant, A: any>(
         Literal(s) => ok(match_spelling(p, s, pos, far)),
         Then(rs) => match_then(p, rs, pos, cur, far),
         OneOf(rs) => match_one_of(p, rs, pos, cur, far),
-        Many(sub, min) => match_many(p, sub, min, pos, cur, far),
+        Many(sub, min, sep, trailing_sep) => match_many(
+            p,
+            sub,
+            min,
+            sep,
+            trailing_sep,
+            pos,
+            cur,
+            far,
+        ),
         Maybe(sub) => match_maybe(p, sub, pos, cur, far),
         NamedIdx(i) => match_prod(p, i, pos, far),
-        ListOf(item, sep, trailing) => match_list_of(p, item, sep, trailing, pos, cur, far),
         Climb(atom, precs) => match_climb(p, atom, precs, pos, cur, far),
         // `link` rewrites every one of these; reaching one means the grammar was
         // handed to the driver unlinked, which `parse_cst` makes impossible.
@@ -297,16 +305,26 @@ fn match_one_of<K: variant, A: any>(
     ok(no(f, pos))
 }
 
-// `sub` until it stops matching, at least `min` times.
+// `sub` until it stops matching, at least `min` times — and, with a `sep`, with
+// that separator between consecutive items.
 //
 // A rule that can match empty input would repeat forever here, and AIPL has no
 // `break` to escape with — so a zero-width iteration is refused outright, the
 // same invariant `lexer.aipl` keeps by having no matcher accept empty input.
 // It is a grammar bug, reported as one rather than hung on.
+//
+// The separated case is the same loop with one step in front of each item after
+// the first. What the separator matched is held back until an item follows it,
+// because a separator with nothing after it is only part of the list when
+// `trailing_sep` says so; otherwise the position rewinds to before it and the
+// enclosing rule is the one that complains — which is how `[1, 2,]` can be
+// either the list or a list followed by a stray comma.
 fn match_many<K: variant, A: any>(
     p: Parser<K, A>,
     sub: Rule<K>,
     min: u64,
+    sep: Rule<K>?,
+    trailing_sep: bool,
     pos: u64,
     cur: u64,
     far: Far,
@@ -317,18 +335,38 @@ fn match_many<K: variant, A: any>(
     mut n: u64 = 0;
     mut going = true;
     while (going) {
-        let Step { far, hit, pos, kids } = match_rule(p, sub, cp, cur, f)?;
-        set f = far;
-        if (hit) {
-            if (pos == cp) {
-                return err(ParseError {
-                    message: "a repetition matched empty input, which would repeat forever",
-                    span: 0..0,
-                });
+        // Everything after the first item is preceded by the separator, when
+        // there is one. An unseparated list, and the first item of any list,
+        // take the empty step — so `before` and `after` coincide and the
+        // trailing-separator rule below never fires.
+        let before = cp;
+        let led = if (n == 0) { hit_nothing(cp, f) } else { match_sep(p, sep, cp, cur, f)? };
+        set f = led.far;
+        if (led.hit) {
+            let after = led.pos;
+            let st = match_rule(p, sub, after, cur, f)?;
+            set f = st.far;
+            if (st.hit) {
+                if (st.pos == after) {
+                    return err(ParseError {
+                        message: "a repetition matched empty input, which would repeat forever",
+                        span: 0..0,
+                    });
+                };
+                set acc.extend(led.kids);
+                set acc.extend(st.kids);
+                set cp = st.pos;
+                set n++;
+            } else {
+                // A separator with nothing after it.
+                if (trailing_sep && before != after) {
+                    set acc.extend(led.kids);
+                    set cp = after;
+                } else {
+                    set cp = before;
+                };
+                set going = false;
             };
-            set cp = pos;
-            set acc.extend(kids);
-            set n++;
         } else {
             set going = false;
         };
@@ -338,6 +376,23 @@ fn match_many<K: variant, A: any>(
     };
     ok(Step { hit: true, pos: cp, kids: acc, far: f })
 }
+
+// The separator step: what `sep` matched, or an empty match when there is none.
+fn match_sep<K: variant, A: any>(
+    p: Parser<K, A>,
+    sep: Rule<K>?,
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    match (sep) {
+        some(s) => match_rule(p, s, pos, cur, far),
+        none => ok(hit_nothing(pos, far)),
+    }
+}
+
+// A match that consumed nothing and succeeded — the identity step.
+fn hit_nothing(pos: u64, far: Far) -> Step { hit: true, pos, kids: [], far }
 
 // `sub`, or nothing. Always matches — but its expectations still reach `far`, so
 // an optional part that was *started* and then went wrong still reports.
@@ -385,56 +440,6 @@ fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -
         return ok(no(st.far, pos));
     };
     ok(no(far_miss(far, pos, expect_as), pos))
-}
-
-// Zero or more `item`s separated by `sep`. Always matches, because an empty list
-// is a list; a separator with nothing after it is consumed when `trailing` and
-// left alone otherwise, so `[1, 2,]` is either the list or a list followed by a
-// stray comma the enclosing rule then complains about.
-fn match_list_of<K: variant, A: any>(
-    p: Parser<K, A>,
-    item: Rule<K>,
-    sep: str,
-    trailing: bool,
-    pos: u64,
-    cur: u64,
-    far: Far,
-) -> Step!ParseError {
-    let head = match_rule(p, item, pos, cur, far)?;
-    if (!head.hit) {
-        return ok(Step { hit: true, pos, kids: [], far: head.far });
-    };
-    mut acc = head.kids;
-    mut cp = head.pos;
-    mut f = head.far;
-    mut going = true;
-    while (going) {
-        if (cp < p.toks.len() && tok_text(p, cp) == sep) {
-            let sep_kids = leaf_at(p, cp);
-            let st = match_rule(p, item, cp + 1, cur, f)?;
-            set f = st.far;
-            if (st.hit) {
-                set acc.extend(sep_kids);
-                set acc.extend(st.kids);
-                set cp = st.pos;
-            } else {
-                if (trailing) {
-                    set acc.extend(sep_kids);
-                    set cp++;
-                };
-                set going = false;
-            };
-        } else {
-            // The list ends here because no separator followed. It still
-            // *expected* one — a missing comma is the commonest way a list goes
-            // wrong — so record it before stopping. `ListOf` always matches, so
-            // this only ever widens the expected set; the enclosing rule is what
-            // decides whether stopping here was an error at all.
-            set f = far_miss(f, cp, quoted(sep));
-            set going = false;
-        };
-    }
-    ok(Step { hit: true, pos: cp, kids: acc, far: f })
 }
 
 // The precedence level `text` belongs to, if it binds at least as tightly as
@@ -697,8 +702,10 @@ pub fn parse<K: variant, A: any>(
     );
     assert(msg_of("(a", g_sexp, "list") == "expected Word, `(`, or `)`, found end of input");
 
-    // ---- ListOf: separators, and the trailing-separator rule ----
-    let r_nums: Rule<Tok> = Then([Literal("["), ListOf(Term(Num), ",", false), Literal("]")]);
+    // ---- Many with a separator, and the trailing-separator rule ----
+    let comma: Rule<Tok> = Literal(",");
+    let nums = Many(Term(Num), sep=some(comma), trailing_sep=false);
+    let r_nums: Rule<Tok> = Then([Literal("["), nums, Literal("]")]);
     let g_nums = g_of([one("l", r_nums)]);
     assert(shown("[1, 2, 3]", g_nums, "l")? == "(l [ 1 , 2 , 3 ])");
     // An empty list is a list.
@@ -707,7 +714,8 @@ pub fn parse<K: variant, A: any>(
     // With `trailing: false` the dangling separator is left for the enclosing
     // rule, which is what reports it.
     assert(msg_of("[1, 2,]", g_nums, "l") == "expected Num, found `]`");
-    let r_trail: Rule<Tok> = Then([Literal("["), ListOf(Term(Num), ",", true), Literal("]")]);
+    let trail = Many(Term(Num), sep=some(comma));
+    let r_trail: Rule<Tok> = Then([Literal("["), trail, Literal("]")]);
     assert(shown("[1, 2,]", g_of([one("l", r_trail)]), "l")? == "(l [ 1 , 2 , ])");
 
     // ---- Climb: precedence and associativity ----
@@ -879,21 +887,21 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2902
-deallocations: 2902
-reallocations: 331
-bytes allocated: 185797
-instructions executed: 440611
-binary size: 308760
-  code: 189956
+allocations: 2979
+deallocations: 2979
+reallocations: 324
+bytes allocated: 188789
+instructions executed: 449175
+binary size: 310472
+  code: 191128
   data: 5924
-  metadata: 112880
+  metadata: 113420
 functions:
   __arr_drop_Node:
     calls: 11
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 230
+    calls: 256
     bytes: 116
   __arr_drop___m2__Prec:
     calls: 2
@@ -917,7 +925,7 @@ functions:
     calls: 10
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 249
+    calls: 259
     bytes: 116
   __arr_retain___m2__Prec:
     calls: 0
@@ -1027,9 +1035,12 @@ functions:
   __m2__link$Tok$Node:
     calls: 43
     bytes: 1188
+  __m2__link_opt$Tok:
+    calls: 18
+    bytes: 652
   __m2__link_rule$Tok:
-    calls: 171
-    bytes: 4496
+    calls: 175
+    bytes: 4364
   __m2__prod_names$Tok$Node:
     calls: 107
     bytes: 492
@@ -1073,11 +1084,11 @@ functions:
     calls: 201
     bytes: 48
   __rec_drop___m2__Rule$Tok:
-    calls: 223
-    bytes: 324
+    calls: 228
+    bytes: 304
   __test$parse:
     calls: 1
-    bytes: 76884
+    bytes: 78684
   __test_try_fail___m2__ParseError:
     calls: 0
     bytes: 84
@@ -1091,25 +1102,25 @@ functions:
     calls: 11
     bytes: (external)
   aipl_arr_extend:
-    calls: 416
+    calls: 445
     bytes: (external)
   aipl_arr_inc:
-    calls: 8721
+    calls: 9176
     bytes: (external)
   aipl_arr_join:
     calls: 11
     bytes: (external)
   aipl_arr_reserve:
-    calls: 539
+    calls: 568
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 25
     bytes: (external)
   aipl_array_dec:
-    calls: 10827
+    calls: 11354
     bytes: (external)
   aipl_array_new:
-    calls: 1347
+    calls: 1393
     bytes: (external)
   aipl_array_push:
     calls: 151
@@ -1124,19 +1135,19 @@ functions:
     calls: 43
     bytes: (external)
   aipl_rec_alloc:
-    calls: 440
+    calls: 445
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2716
+    calls: 2775
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 37
+    calls: 43
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2276
+    calls: 2330
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 37
+    calls: 43
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -1174,12 +1185,9 @@ functions:
   main:
     calls: 1
     bytes: 104
-  match_list_of$Tok$Node:
-    calls: 4
-    bytes: 2636
   match_many$Tok$Node:
-    calls: 15
-    bytes: 1976
+    calls: 19
+    bytes: 3668
   match_maybe$Tok$Node:
     calls: 4
     bytes: 868
@@ -1190,8 +1198,8 @@ functions:
     calls: 84
     bytes: 4012
   match_rule$Tok$Node:
-    calls: 269
-    bytes: 4868
+    calls: 276
+    bytes: 4684
   match_then$Tok$Node:
     calls: 31
     bytes: 1720

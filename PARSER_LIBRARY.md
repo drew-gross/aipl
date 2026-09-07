@@ -16,7 +16,7 @@ The stages are strictly sequential.
 **The library itself is built and proven**, and its plan is no longer here:
 `grammar.aipl`, `cst.aipl` and `parse.aipl`, with three end-to-end toy
 grammars — `grammar_sexp.aipl` (recursion and depth), `grammar_json.aipl`
-(several terminal classes, `ListOf`, a heterogeneous AST) and
+(several terminal classes, a separated `Many`, a heterogeneous AST) and
 `grammar_calc.aipl` (`Climb`, lowered and then
 *evaluated*, which is the assertion a wrong tree cannot survive). Every
 `Rule` arm is covered. Those files and their `.test` blocks are the record of how
@@ -127,7 +127,7 @@ function of the grammar value.
 
 `ebnf` dumps a grammar as EBNF — one `name = rule ;` line per production,
 juxtaposition for sequence, `|` for choice, postfix `?`/`*`/`+` for the
-repetitions. `ListOf` and `Climb` are combinators with no EBNF operator, so both
+repetitions. A separated `Many` and a `Climb` are combinators with no EBNF operator, so both
 expand: a list into its `(item (sep item)* sep?)?` longhand, a climb into the
 flat `atom (op atom)*` plus a `(* precedence: "^" (right) > "*" > "+" *)` note,
 since EBNF states neither binding power nor associativity. Total, like `show` —
@@ -193,8 +193,8 @@ is half the comparison — a grammar that accepted everything would agree on non
 of the corpus's syntax-error fixtures.
 
 **LR to PEG was three mechanical translations**, and one that isn't. Left-recursive
-list rules become `sep1`/`ListOf` (four helpers, because what varies is whether
-the list may be empty and whether a trailing separator is allowed); left-recursive
+list rules become one `Many` with a separator (what varies — may the list be
+empty, is a trailing separator allowed — is `min` and `trailing_sep`); left-recursive
 postfix rules (`postfix`, `base_ty`) become an atom plus `Many(suffix)`; and
 `expr binop expr` with a runtime precedence table becomes `Climb` over
 `op_precedence`'s levels, `..` included. What is *not* mechanical is

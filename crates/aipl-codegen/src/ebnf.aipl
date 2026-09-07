@@ -5,9 +5,10 @@
 //
 // **The EBNF dump** (`ebnf`) is the grammar as a reader would write it by hand:
 // one `name = rule ;` line per production, sequence by juxtaposition, `|` for
-// ordered choice, and the postfix `?`/`*`/`+` for the repetitions. `ListOf` and
-// `Climb` are combinators rather than EBNF operators, so both are *expanded*:
-// a list into its `(item (sep item)* sep?)?` longhand, and a climb into the flat
+// ordered choice, and the postfix `?`/`*`/`+` for the repetitions. A separated
+// `Many` and a `Climb` are combinators rather than EBNF operators, so both are
+// *expanded*: a list into its `(item (sep item)* sep?)?` longhand, and a climb
+// into the flat
 // `atom (op atom)*` with the precedence it actually uses stated in a trailing
 // `(* precedence: ... *)` comment — EBNF cannot express binding power or
 // associativity, so the honest thing is to say them rather than to imply them.
@@ -58,12 +59,12 @@ import {
     try_map,
     value_or,
     value_or_err,
+    wrapping_sub as -,
 } from builtins;
 import { Cst } from "./cst.aipl";
 import {
     Climb,
     Grammar,
-    ListOf,
     Literal,
     Many,
     Maybe,
@@ -106,8 +107,9 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
 
     Sequence is juxtaposition, choice is `|`, and repetition is the postfix
     `?` (`Maybe`), `*` (`Many` with minimum 0) and `+` (`Many` with minimum 1);
-    a higher minimum renders as `{n,}`. `ListOf` and `Climb` have no EBNF
-    operator and are expanded — the list into its separator longhand, the climb
+    a higher minimum renders as `{n,}`. A separated `Many` and a `Climb` have no
+    EBNF operator and are expanded — the list into its separator longhand, the
+    climb
     into `atom (op atom)*` plus a `(* precedence: ... *)` note, since EBNF cannot
     express binding power.
 
@@ -127,7 +129,7 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     let no_rules: Rule<Kind>[] = [];
     let r_empty: Rule<Kind> = Then(no_rules);
     let r_never: Rule<Kind> = OneOf(no_rules);
-    let r_list: Rule<Kind> = ListOf(Term(Num), ",", false);
+    let r_list: Rule<Kind> = Many(Term(Num), sep=some(Literal(",")), trailing_sep=false);
     let g = g_of([
         one("alt", r_alt),
         one("seq", r_seq),
@@ -210,15 +212,17 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
                 Seq | Item => `({body})`,
             }
         },
-        Many(sub, min) => {
-            let body = render_rule(sub, names, Item);
-            `{body}{rep_suffix(min)}`
+        Many(sub, min, sep, trailing_sep) => match (sep) {
+            some(s) => render_list(sub, s, min, trailing_sep, names),
+            none => {
+                let body = render_rule(sub, names, Item);
+                `{body}{rep_suffix(min)}`
+            },
         },
         Maybe(sub) => {
             let body = render_rule(sub, names, Item);
             `{body}?`
         },
-        ListOf(item, sep, trailing) => render_list_of(item, sep, trailing, names),
         Climb(atom, precs) => render_climb(atom, precs, names, ctx),
     }
 }
@@ -238,12 +242,25 @@ fn rep_suffix(min: u64) -> str {
     `{open}{min},{close}`
 }
 
-// A separated list, longhand. The outer `?` is not decoration: `ListOf` always
-// matches, because an empty list is a list.
-fn render_list_of<K: variant>(item: Rule<K>, sep: str, trailing: bool, names: str[]) -> str {
+// A separated list, longhand: the first item, then as many `sep item` pairs as
+// the minimum demands and more. The outer `?` on a zero-minimum list is not
+// decoration — an empty list is a list, so the whole thing is optional.
+fn render_list<K: variant>(
+    item: Rule<K>,
+    sep: Rule<K>,
+    min: u64,
+    trailing_sep: bool,
+    names: str[],
+) -> str {
     let it = render_rule(item, names, Item);
-    let s = dq(sep);
-    if (trailing) { `({it} ({s} {it})* {s}?)?` } else { `({it} ({s} {it})*)?` }
+    let s = render_rule(sep, names, Item);
+
+    // One `sep item` pair is already spelled by the leading item, so the
+    // repetition carries one fewer than the minimum.
+    let pairs = if (min == 0) { rep_suffix(min) } else { rep_suffix(min - 1) };
+    let core = `{it} ({s} {it}){pairs}`;
+    let body = if (trailing_sep) { `{core} {s}?` } else { core };
+    if (min == 0) { `({body})?` } else { body }
 }
 
 // A climb, flattened: every operator of every level in one alternation. The
@@ -293,9 +310,8 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
         // Not grouped into one alternation: `_` counts as a bound name, so
         // arms whose payloads differ only in how many slots they ignore are
         // refused as binding different names.
-        Many(sub, _) => climb_precs(sub),
+        Many(sub, _, _, _) => climb_precs(sub),
         Maybe(sub) => climb_precs(sub),
-        ListOf(sub, _, _) => climb_precs(sub),
         Term(..) | Literal(..) | Named(..) | NamedIdx(..) => [],
     }
 }
@@ -470,19 +486,14 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
             }
             ok(First { syms: acc, nullable: empty_ok })
         },
-        Many(sub, min) => {
+        // A separated list begins with its item and never with its separator,
+        // so the separator contributes nothing here.
+        Many(sub, min, sep, trailing_sep) => {
             let First { syms, nullable } = rule_first(sub, sets)?;
             ok(First { syms, nullable: nullable || min == 0 })
         },
         Maybe(sub) => {
             let First { syms } = rule_first(sub, sets)?;
-            ok(First { syms, nullable: true })
-        },
-        // A list begins with its item and never with its separator — the driver
-        // tries the item first and an empty list is a list, which is also why it
-        // is always nullable.
-        ListOf(item, sep, trailing) => {
-            let First { syms } = rule_first(item, sets)?;
             ok(First { syms, nullable: true })
         },
         // A climb begins with its atom: an operator only ever appears after one.
@@ -712,7 +723,7 @@ fn first_msg(r: Rule<Kind>, sets: First<Kind>[]) -> str {
 // sequence, a precedence climb over two levels, an ordered choice with a nested
 // sequence in it, and an optional prefix in front of a one-or-more.
 fn fixture() -> Grammar<Kind, Node> {
-    let r_prog: Rule<Kind> = ListOf(Named("stmt"), ";", true);
+    let r_prog: Rule<Kind> = Many(Named("stmt"), sep=some(Literal(";")));
     let r_stmt: Rule<Kind> = Then([Term(Name), Literal("="), Named("expr")]);
     let r_expr: Rule<Kind> = Climb(
         Named("atom"),
@@ -735,15 +746,15 @@ fn fixture() -> Grammar<Kind, Node> {
     }
 }
 --- performance ---
-allocations: 1364
-deallocations: 1364
+allocations: 1384
+deallocations: 1384
 reallocations: 144
-bytes allocated: 101607
-instructions executed: 143285
-binary size: 104704
-  code: 66040
+bytes allocated: 103295
+instructions executed: 145476
+binary size: 105784
+  code: 66920
   data: 3684
-  metadata: 34980
+  metadata: 35180
 functions:
   __arr_drop_First$Kind:
     calls: 77
@@ -814,9 +825,12 @@ functions:
   __m2__link$Kind$Node:
     calls: 9
     bytes: 1188
+  __m2__link_opt$Kind:
+    calls: 12
+    bytes: 652
   __m2__link_rule$Kind:
-    calls: 133
-    bytes: 4496
+    calls: 139
+    bytes: 4364
   __m2__prod_names$Kind$Node:
     calls: 20
     bytes: 492
@@ -827,14 +841,14 @@ functions:
     calls: 0
     bytes: 72
   __rec_drop___m2__Rule$Kind:
-    calls: 224
-    bytes: 324
+    calls: 233
+    bytes: 304
   __test$can_start:
     calls: 1
     bytes: 900
   __test$ebnf:
     calls: 1
-    bytes: 8132
+    bytes: 8524
   __test$first_sets:
     calls: 1
     bytes: 4592
@@ -887,19 +901,19 @@ functions:
     calls: 23
     bytes: (external)
   aipl_rec_alloc:
-    calls: 224
+    calls: 233
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1665
+    calls: 1743
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 43
+    calls: 52
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1441
+    calls: 1510
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 43
+    calls: 52
     bytes: (external)
   aipl_test_begin:
     calls: 6
@@ -924,7 +938,7 @@ functions:
     bytes: 32
   climb_precs$Kind$tail:
     calls: 84
-    bytes: 1144
+    bytes: 1084
   dq:
     calls: 47
     bytes: 456
@@ -945,7 +959,7 @@ functions:
     bytes: 324
   fixture:
     calls: 2
-    bytes: 4488
+    bytes: 4720
   keep:
     calls: 0
     bytes: 268
@@ -959,14 +973,14 @@ functions:
     calls: 27
     bytes: 3468
   render_rule$Kind:
-    calls: 88
-    bytes: 7164
+    calls: 92
+    bytes: 7400
   rep_suffix:
-    calls: 6
+    calls: 10
     bytes: 724
   rule_first$Kind:
     calls: 228
-    bytes: 5464
+    bytes: 5044
   show_first$Kind:
     calls: 25
     bytes: 1264

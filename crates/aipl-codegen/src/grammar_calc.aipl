@@ -414,11 +414,11 @@ allocations: 8899
 deallocations: 8899
 reallocations: 779
 bytes allocated: 528521
-instructions executed: 1385089
-binary size: 251232
-  code: 160012
+instructions executed: 1384255
+binary size: 249792
+  code: 159144
   data: 4980
-  metadata: 86240
+  metadata: 85668
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -560,7 +560,7 @@ functions:
     bytes: 32
   __m2__climb_precs$CalcTok$tail:
     calls: 12
-    bytes: 1144
+    bytes: 1084
   __m2__dq:
     calls: 20
     bytes: 456
@@ -581,13 +581,13 @@ functions:
     bytes: 3468
   __m2__render_rule$CalcTok:
     calls: 13
-    bytes: 7120
+    bytes: 7356
   __m2__rep_suffix:
     calls: 0
     bytes: 724
   __m2__rule_first$CalcTok:
     calls: 40
-    bytes: 5464
+    bytes: 5044
   __m2__show_first$CalcTok:
     calls: 3
     bytes: 1216
@@ -603,9 +603,12 @@ functions:
   __m3__link$CalcTok$Calc:
     calls: 41
     bytes: 1188
+  __m3__link_opt$CalcTok:
+    calls: 0
+    bytes: 652
   __m3__link_rule$CalcTok:
     calls: 533
-    bytes: 4496
+    bytes: 4364
   __m3__prod_names$CalcTok$Calc:
     calls: 84
     bytes: 492
@@ -660,12 +663,9 @@ functions:
   __m6__lower_node$CalcTok$Calc:
     calls: 387
     bytes: 3316
-  __m6__match_list_of$CalcTok$Calc:
-    calls: 0
-    bytes: 2636
   __m6__match_many$CalcTok$Calc:
     calls: 0
-    bytes: 1976
+    bytes: 3668
   __m6__match_maybe$CalcTok$Calc:
     calls: 0
     bytes: 868
@@ -677,7 +677,7 @@ functions:
     bytes: 4012
   __m6__match_rule$CalcTok$Calc:
     calls: 980
-    bytes: 4416
+    bytes: 4236
   __m6__match_then$CalcTok$Calc:
     calls: 145
     bytes: 1720
@@ -710,7 +710,7 @@ functions:
     bytes: 48
   __rec_drop___m3__Rule$CalcTok:
     calls: 1092
-    bytes: 324
+    bytes: 304
   __test$calc_cst:
     calls: 1
     bytes: 1396

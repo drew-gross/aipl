@@ -161,6 +161,8 @@ HOF:
 math:
 
 syntax:
+  #{} should flex to empty set or empty dict
+  allow default args to be implicitly optional so that you pass T explicitly, but if you pass nothing the callee gets none.
   expr! should return the err held in expr, or exit the test if expr is not an error (only valid in tests for now)
   converge arrays and string (for inlining, ropes, etc.)
   locally mutable args

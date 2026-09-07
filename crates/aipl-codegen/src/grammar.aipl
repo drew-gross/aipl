@@ -93,7 +93,18 @@ variant Rule<K: variant> =
     // `0` is a PEG `*`, and `Many(r, min=1)` a `+`. A rule that can match empty
     // input would spin here forever, so the driver refuses one outright rather
     // than hanging.
-    | Many(Rule<K>, min: u64 = 0)
+    //
+    // With a `sep` it is a *separated* list: `r`, then `sep r` for as long as
+    // the separator keeps appearing. `trailing_sep` decides what happens to a
+    // separator with nothing after it — consumed (`[1, 2,]` is the list) or
+    // rewound and left for the enclosing rule to complain about.
+    //
+    // The two are orthogonal, and between them one rule covers every list a
+    // grammar writes. An LR grammar spells each combination as its own wrapper
+    // production around a left-recursive pair — `x_list | x_list COMMA | _` —
+    // and which of the four you picked is the thing that is easy to get subtly
+    // wrong; here it is two arguments with names.
+    | Many(Rule<K>, min: u64 = 0, sep: Rule<K>? = none, trailing_sep: bool = true)
     // `r`, or nothing. Always matches.
     | Maybe(Rule<K>)
     // A reference to the production called `n`. `link` rewrites every one of
@@ -102,11 +113,6 @@ variant Rule<K: variant> =
     // A reference to production `i`, and the *only* rule that builds a CST node
     // — one `CTree(i, ..)` per reference matched.
     | NamedIdx(u64)
-    // Zero or more `item`s separated by the literal `sep`, with a trailing
-    // separator allowed when `trailing`. Always matches (an empty list is a
-    // list); a separator with no item after it is consumed when `trailing`, and
-    // left for the enclosing rule when not.
-    | ListOf(Rule<K>, str, bool)
     // Precedence climbing — an `atom`, then binary operators drawn from `precs`,
     // nested by binding power. Each application nests under the *enclosing*
     // production's index, so `1 + 2 * 3` yields a node per operand rather than
@@ -170,13 +176,26 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[]) -> Rule<K>!ParseError {
         )),
         Then(rs) => ok(Then(link_rules(rs, names)?)),
         OneOf(rs) => ok(OneOf(link_rules(rs, names)?)),
-        Many(sub, min) => ok(Many(link_rule(sub, names)?, min=min)),
+        Many(sub, min, sep, trailing_sep) => ok(Many(
+            link_rule(sub, names)?,
+            min=min,
+            sep=link_opt(sep, names)?,
+            trailing_sep=trailing_sep,
+        )),
         Maybe(sub) => ok(Maybe(link_rule(sub, names)?)),
-        ListOf(item, sep, trailing) => ok(ListOf(link_rule(item, names)?, sep, trailing)),
         Climb(atom, precs) => ok(Climb(link_rule(atom, names)?, precs)),
         Term(k) => ok(Term(k)),
         Literal(s) => ok(Literal(s)),
         NamedIdx(i) => ok(NamedIdx(i)),
+    }
+}
+
+// A `Many`'s separator, linked — `none` stays `none`. Its own function because
+// `?` cannot reach inside an optional.
+fn link_opt<K: variant>(r: Rule<K>?, names: str[]) -> Rule<K>?!ParseError {
+    match (r) {
+        some(sub) => ok(some(link_rule(sub, names)?)),
+        none => ok(none),
     }
 }
 
@@ -241,7 +260,11 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     let shapes: Grammar<Kind, Node> = Grammar {
         prods: [
             Production { name: "a", rule: Maybe(Named("a")), build: Mk(keep) },
-            Production { name: "b", rule: ListOf(Named("a"), ",", true), build: Mk(keep) },
+            Production {
+                name: "b",
+                rule: Many(Named("a"), sep=some(Literal(","))),
+                build: Mk(keep),
+            },
             Production {
                 name: "c",
                 rule: Climb(Named("a"), [Prec { power: 1, right: false, ops: ["+"] }]),
@@ -252,7 +275,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     };
     let ls = link(shapes)?;
     assert(rule_of(ls, 0) == Maybe(NamedIdx(0)));
-    assert(rule_of(ls, 1) == ListOf(NamedIdx(0), ",", true));
+    assert(rule_of(ls, 1) == Many(NamedIdx(0), sep=some(Literal(","))));
     assert(rule_of(ls, 2) == Climb(NamedIdx(0), [Prec { power: 1, right: false, ops: ["+"] }]));
     assert(rule_of(ls, 3) == Many(NamedIdx(1), min=1));
 
@@ -304,15 +327,15 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     }
 }
 --- performance ---
-allocations: 110
-deallocations: 110
+allocations: 113
+deallocations: 113
 reallocations: 17
-bytes allocated: 9424
-instructions executed: 13660
-binary size: 46504
-  code: 28804
-  data: 1716
-  metadata: 15984
+bytes allocated: 9664
+instructions executed: 14250
+binary size: 48024
+  code: 29892
+  data: 1724
+  metadata: 16408
 functions:
   __arr_drop_Prec:
     calls: 2
@@ -360,11 +383,14 @@ functions:
     calls: 1
     bytes: 284
   __eq_Rule$Kind:
-    calls: 12
-    bytes: 696
+    calls: 13
+    bytes: 548
   __eq_Rule$Kind$arr:
     calls: 3
     bytes: 300
+  __eq_Rule$Kind$opt:
+    calls: 3
+    bytes: 92
   __eq___builtin_Span:
     calls: 2
     bytes: 104
@@ -381,14 +407,14 @@ functions:
     calls: 0
     bytes: 72
   __rec_drop_Rule$Kind:
-    calls: 55
-    bytes: 324
+    calls: 58
+    bytes: 304
   __test$failure_message:
     calls: 1
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 11732
+    bytes: 12376
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -417,19 +443,19 @@ functions:
     calls: 16
     bytes: (external)
   aipl_rec_alloc:
-    calls: 55
+    calls: 58
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 230
+    calls: 242
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 12
+    calls: 14
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 175
+    calls: 184
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 12
+    calls: 14
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -449,9 +475,12 @@ functions:
   link$Kind$Node:
     calls: 5
     bytes: 1188
+  link_opt$Kind:
+    calls: 4
+    bytes: 652
   link_rule$Kind:
-    calls: 25
-    bytes: 4496
+    calls: 26
+    bytes: 4364
   main:
     calls: 1
     bytes: 180
