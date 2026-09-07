@@ -31,7 +31,7 @@
 //     error messages get worse.
 //
 // A terminal here is a `Sym`: a token *kind* (what `Term` matches) or an exact
-// *spelling* (what `Spelling` matches). The two are genuinely different tests —
+// *spelling* (what `Literal` matches). The two are genuinely different tests —
 // a kind ignores the text and a spelling ignores the kind — so a FIRST set holds
 // both and `can_start` asks both.
 //
@@ -64,6 +64,7 @@ import {
     Climb,
     Grammar,
     ListOf,
+    Literal,
     Many,
     Maybe,
     Mk,
@@ -74,7 +75,6 @@ import {
     Prec,
     Production,
     Rule,
-    Spelling,
     Term,
     Then,
     link,
@@ -120,7 +120,7 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     // written: a choice needs them inside a sequence, a sequence only under a
     // postfix, and neither needs them as a whole right-hand side.
     let r_alt: Rule<Kind> = OneOf([Term(Num), Term(Name)]);
-    let r_seq: Rule<Kind> = Then([Term(Num), OneOf([Term(Name), Spelling("+")])]);
+    let r_seq: Rule<Kind> = Then([Term(Num), OneOf([Term(Name), Literal("+")])]);
     let r_star: Rule<Kind> = many(OneOf([Term(Num), Term(Name)]));
     let r_plus: Rule<Kind> = many1(Then([Term(Num), Term(Name)]));
     let two: u64 = 2;
@@ -189,7 +189,7 @@ fn prod_line<K: variant, A: any>(p: Production<K, A>, names: str[]) -> str {
 fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
     match (r) {
         Term(k) => k.case_name(),
-        Spelling(s) => dq(s),
+        Literal(s) => dq(s),
         Named(n) => n,
         NamedIdx(i) => names[i].value_or("?"),
         Then(rs) => {
@@ -298,7 +298,7 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
         Many(sub, _) => climb_precs(sub),
         Maybe(sub) => climb_precs(sub),
         ListOf(sub, _, _) => climb_precs(sub),
-        Term(..) | Spelling(..) | Named(..) | NamedIdx(..) => [],
+        Term(..) | Literal(..) | Named(..) | NamedIdx(..) => [],
     }
 }
 
@@ -354,7 +354,7 @@ fn level_text(precs: Prec[], power: u64) -> str {
 // ---------- FIRST sets ----------
 
 // A terminal a match can begin with: a token *kind*, as `Term` matches it, or an
-// exact *spelling*, as `Spelling` does. Kept apart because the two tests are
+// exact *spelling*, as `Literal` does. Kept apart because the two tests are
 // different — a kind ignores the token's text, a spelling ignores its kind — so
 // a set holding `SKind(Num)` and one holding `SText("1")` are not the same set
 // even where they accept the same token.
@@ -385,7 +385,7 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
     // rather than one pass: `a` cannot know it continues past `b` until `b` is
     // known nullable, and `b` is computed after it.
     let r_a: Rule<Kind> = Then([Named("b"), Named("c")]);
-    let r_b: Rule<Kind> = Maybe(Spelling("x"));
+    let r_b: Rule<Kind> = Maybe(Literal("x"));
     let r_c: Rule<Kind> = Term(Num);
     let fp = g_of([one("a", r_a), one("b", r_b), one("c", r_c)]);
     assert(
@@ -398,7 +398,7 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
 
     // Left recursion: the parse would not terminate, and this does — the sets
     // only grow, so the round that adds nothing ends it.
-    let r_e: Rule<Kind> = OneOf([Then([Named("e"), Spelling("+"), Term(Num)]), Term(Num)]);
+    let r_e: Rule<Kind> = OneOf([Then([Named("e"), Literal("+"), Term(Num)]), Term(Num)]);
     assert(show_first_sets(g_of([one("e", r_e)]))? == "e = Num");
 
     // It fails only the way `link` fails.
@@ -434,7 +434,7 @@ fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseEr
 pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseError {
     match (r) {
         Term(k) => ok(First { syms: [SKind(k)], nullable: false }),
-        Spelling(s) => {
+        Literal(s) => {
             // `SText` mentions no `K`, so nothing in the constructor pins the
             // type parameter — the annotated binding is what does, the same
             // idiom `grammar.aipl` writes its rules with.
@@ -513,7 +513,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     // one alternative with. The optional `!` contributes its spelling without
     // making the sequence nullable, since `atom` after it is not.
     let three: u64 = 3;
-    let r: Rule<Kind> = Then([Maybe(Spelling("!")), NamedIdx(three)]);
+    let r: Rule<Kind> = Then([Maybe(Literal("!")), NamedIdx(three)]);
     assert(
         rule_first(r, sets)?.show_first() == """
             "!" Num Name "("
@@ -521,7 +521,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     );
 
     // A whole-sequence nullability: every element optional, so the rule is too.
-    let r_all_opt: Rule<Kind> = Then([Maybe(Spelling("!")), Maybe(Term(Num))]);
+    let r_all_opt: Rule<Kind> = Then([Maybe(Literal("!")), Maybe(Term(Num))]);
     assert(
         rule_first(r_all_opt, sets)?.show_first() == """
             "!" Num <empty>
@@ -715,7 +715,7 @@ fn first_msg(r: Rule<Kind>, sets: First<Kind>[]) -> str {
 // sequence in it, and an optional prefix in front of a one-or-more.
 fn fixture() -> Grammar<Kind, Node> {
     let r_prog: Rule<Kind> = ListOf(Named("stmt"), ";", true);
-    let r_stmt: Rule<Kind> = Then([Term(Name), Spelling("="), Named("expr")]);
+    let r_stmt: Rule<Kind> = Then([Term(Name), Literal("="), Named("expr")]);
     let r_expr: Rule<Kind> = Climb(
         Named("atom"),
         [Prec { power: 1, right: false, ops: ["+"] }, Prec { power: 2, right: false, ops: ["*"] }],
@@ -723,9 +723,9 @@ fn fixture() -> Grammar<Kind, Node> {
     let r_atom: Rule<Kind> = OneOf([
         Term(Num),
         Term(Name),
-        Then([Spelling("("), Named("expr"), Spelling(")")]),
+        Then([Literal("("), Named("expr"), Literal(")")]),
     ]);
-    let r_opt: Rule<Kind> = Then([Maybe(Spelling("!")), many1(Term(Name))]);
+    let r_opt: Rule<Kind> = Then([Maybe(Literal("!")), many1(Term(Name))]);
     Grammar {
         prods: [
             one("prog", r_prog),

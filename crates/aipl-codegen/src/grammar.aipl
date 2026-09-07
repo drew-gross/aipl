@@ -21,7 +21,7 @@
 //   - An integer literal does not flex through a constructor, so `Many(r, 0)` is
 //     a type error (the `0` types as `i64`, the payload is `u64`). Use the
 //     `many`/`many1` helpers below, which absorb it once.
-//   - Most `Rule` constructors mention no `K` (`Spelling`, `Named`, `Then` over
+//   - Most `Rule` constructors mention no `K` (`Literal`, `Named`, `Then` over
 //     an array of them), so nothing in them pins the type parameter. Write each
 //     production's rule as an *annotated* binding — `let r: Rule<Kind> = ..` —
 //     and every constructor inside it resolves from that annotation. The `.test`
@@ -73,8 +73,14 @@ struct Prec { power: u64, right: bool, ops: str[] }
 //   token's *kind* rather than its text. `k` is a `Case<K>`, which is a case
 //   with no payload: naming a kind takes no value of that kind, so there is no
 //   dummy to invent and none to accidentally read.
-// - `Spelling(s)`: one token whose source text is exactly `s`. Punctuation and
-//   keywords, without having to name the kind that lexed them.
+// - `Literal(s)`: one token whose source text is exactly `s`. Punctuation and
+//   keywords, matched by what they are written as rather than by the kind that
+//   lexed them — the counterpart of `Term`, which asks the kind and ignores the
+//   text. Grammar files conventionally import it aliased (`Literal as Lit`): it
+//   is by far the most-written rule in any real grammar, and the short form is
+//   what keeps a production on one line. A convention, not a requirement —
+//   `grammar_calc.aipl` imports it unaliased, its own AST having a `Lit` case
+//   already, and an import colliding with a local is a hard error.
 // - `Then(rs)`: every rule in order; the matched children concatenate.
 // - `OneOf(rs)`: the first alternative that matches, in order.
 // - `Many(r, min)`: `r` repeated until it stops matching, at least `min` times —
@@ -95,7 +101,7 @@ struct Prec { power: u64, right: bool, ops: str[] }
 //   rather than one flat run.
 variant Rule<K: variant> =
     | Term(Case<K>)
-    | Spelling(str)
+    | Literal(str)
     | Then(Rule<K>[])
     | OneOf(Rule<K>[])
     | Many(Rule<K>, u64)
@@ -185,7 +191,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[]) -> Rule<K>!ParseError {
         ListOf(item, sep, trailing) => ok(ListOf(link_rule(item, names)?, sep, trailing)),
         Climb(atom, precs) => ok(Climb(link_rule(atom, names)?, precs)),
         Term(k) => ok(Term(k)),
-        Spelling(s) => ok(Spelling(s)),
+        Literal(s) => ok(Literal(s)),
         NamedIdx(i) => ok(NamedIdx(i)),
     }
 }
@@ -220,7 +226,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // A tiny grammar over one token kind: `list -> "(" item* ")"`, `item -> atom
     // | list`. Enough to have a reference reach back through another production,
     // which is what linking has to get right.
-    let r_list: Rule<Kind> = Then([Spelling("("), many(Named("item")), Spelling(")")]);
+    let r_list: Rule<Kind> = Then([Literal("("), many(Named("item")), Literal(")")]);
     let r_item: Rule<Kind> = OneOf([Term(Atom), Named("list")]);
     let g: Grammar<Kind, Node> = Grammar {
         prods: [
@@ -239,7 +245,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 
     // The reference nested two levels down inside `list` is rewritten too, and
     // everything around it is left alone.
-    assert(rule_of(linked, 0) == Then([Spelling("("), Many(NamedIdx(1), 0), Spelling(")")]));
+    assert(rule_of(linked, 0) == Then([Literal("("), Many(NamedIdx(1), 0), Literal(")")]));
     // Linking preserves the fields a rewrite doesn't touch.
     assert(prod_names(linked) == ["list", "item"]);
     assert(expect_of(linked, 1) == "an item");
@@ -275,8 +281,8 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // So is a duplicate name — the typo that otherwise reads as a working grammar.
     let dup: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "a", rule: Spelling("x"), build: Mk(keep) },
-            Production { name: "a", rule: Spelling("y"), build: Mk(keep) },
+            Production { name: "a", rule: Literal("x"), build: Mk(keep) },
+            Production { name: "a", rule: Literal("y"), build: Mk(keep) },
         ],
     };
     assert(link(dup) == err(ParseError { message: "duplicate rule name \"a\"", span: 0..0 }));
@@ -303,7 +309,7 @@ fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(NList(kids)) 
 fn rule_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> Rule<K> {
     match (g.prods[i]) {
         some(p) => p.rule,
-        none => Spelling(""),
+        none => Literal(""),
     }
 }
 

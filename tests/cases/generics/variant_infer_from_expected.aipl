@@ -4,7 +4,7 @@ import { print, to_str } from builtins;
 // constructor's own arguments don't pin it — the rule generic structs already
 // had.
 //
-// `Spelling(str)` and `Named(str)` mention no `K`, so they pin nothing. Before,
+// `Literal(str)` and `Named(str)` mention no `K`, so they pin nothing. Before,
 // such a constructor compiled only while exactly one instance of `Rule` existed
 // program-wide, and adding a second broke the first: the two grammars below
 // could not coexist.
@@ -12,7 +12,7 @@ variant Tok = Space | Word(str)
 
 variant Tok2 = Dot | Num(i64)
 
-variant Rule<K: any> = Spelling(str) | Named(str) | Term(K)
+variant Rule<K: any> = Literal(str) | Named(str) | Term(K)
 
 // Resolved from the declared return type.
 //
@@ -24,7 +24,7 @@ fn paren(open: bool) -> Rule<Tok> {
     let o = "(";
     let c = ")";
     let pick = if (open) { o } else { c };
-    Spelling(pick)
+    Literal(pick)
 }
 
 fn dot(first: bool) -> Rule<Tok2> {
@@ -37,7 +37,7 @@ fn dot(first: bool) -> Rule<Tok2> {
 // Resolved from an annotation instead: the binding names the instance, and the
 // annotation is in scope while the value is checked.
 fn via_annotation() -> str {
-    let r: Rule<Tok> = Spelling("[");
+    let r: Rule<Tok> = Literal("[");
     r.to_str()
 }
 
@@ -58,11 +58,11 @@ fn main() !prints {
     print(to_str(Term(Dot)));
 }
 --- stdout ---
-Spelling("(")
-Spelling(")")
+Literal("(")
+Literal(")")
 Named("a")
 Named("b")
-Spelling("[")
+Literal("[")
 Named("n")
 Term(Space)
 Term(Dot)
@@ -71,11 +71,11 @@ Term(Dot)
 allocations: 8
 deallocations: 8
 reallocations: 0
-bytes allocated: 217
+bytes allocated: 214
 instructions executed: 1060
-binary size: 8928
+binary size: 8912
   code: 4492
-  data: 635
+  data: 619
   metadata: 3801
 functions:
   __to_str_Rule$Tok:

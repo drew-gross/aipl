@@ -41,13 +41,13 @@ import { Cst, show, text, token_text } from "./cst.aipl";
 import { ebnf, show_first_sets } from "./ebnf.aipl";
 import {
     Grammar,
+    Literal as Lit,
     Mk,
     Named,
     OneOf,
     ParseError,
     Production,
     Rule,
-    Spelling,
     Term,
     Then,
     failure_message,
@@ -58,7 +58,7 @@ import { Bare, CharRun, LexResult, Of, OneChar, ToEol, TokenRule, lex } from "./
 import { parse, parse_cst } from "./parse.aipl";
 
 // The token kinds. One terminal class carrying its text, and one bare kind for
-// the parentheses — the grammar matches those by `Spelling`, so their kind never
+// the parentheses — the grammar matches those by `Lit`, so their kind never
 // has to be distinguished.
 variant SexpKind = Atom(str) | Punct
 
@@ -97,7 +97,7 @@ fn lower_item(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError {
 }
 
 pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
-    let r_list: Rule<SexpKind> = Then([Spelling("("), many(Named("item")), Spelling(")")]);
+    let r_list: Rule<SexpKind> = Then([Lit("("), many(Named("item")), Lit(")")]);
     let r_item: Rule<SexpKind> = OneOf([Term(Atom), Named("list")]);
     Grammar {
         prods: [

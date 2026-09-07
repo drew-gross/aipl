@@ -52,6 +52,7 @@ import { ebnf, show_first_sets } from "./ebnf.aipl";
 import {
     Climb,
     Grammar,
+    Literal,
     Mk,
     Named,
     OneOf,
@@ -59,7 +60,6 @@ import {
     Prec,
     Production,
     Rule,
-    Spelling,
     Term,
     Then,
     failure_message,
@@ -69,7 +69,10 @@ import { Bare, CharRun, Int, LexResult, OneChar, TokenRule, lex } from "./lexer.
 import { parse, parse_cst } from "./parse.aipl";
 
 // Two token kinds: digit runs, and every one-character operator or bracket. The
-// grammar tells the operators apart by `Spelling`, so their kind never has to.
+// grammar tells the operators apart by `Literal`, so their kind never has to.
+// (Imported unaliased, against the usual `Literal as Lit`: this grammar's own
+// AST already calls a case `Lit`, and an import colliding with a local is a hard
+// error. The alias is a convention, not a requirement.)
 variant CalcTok = Num | Punct
 
 // The AST. `Bin` carries the operator's spelling rather than a case per
@@ -159,10 +162,10 @@ pub fn calc_grammar() -> Grammar<CalcTok, Calc> {
             Prec { power: 3, right: true, ops: ["^"] },
         ],
     );
-    let r_unary: Rule<CalcTok> = OneOf([Then([Spelling("-"), Named("unary")]), Named("atom")]);
+    let r_unary: Rule<CalcTok> = OneOf([Then([Literal("-"), Named("unary")]), Named("atom")]);
     let r_atom: Rule<CalcTok> = OneOf([
         Term(Num),
-        Then([Spelling("("), Named("expr"), Spelling(")")]),
+        Then([Literal("("), Named("expr"), Literal(")")]),
     ]);
     Grammar {
         prods: [

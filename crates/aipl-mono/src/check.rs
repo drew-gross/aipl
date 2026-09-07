@@ -267,7 +267,7 @@ struct Cx<'a> {
     /// local than the function's return type says so — currently an annotated
     /// binding. Consulted before `current_ret` when a generic construction's
     /// own arguments don't pin every type variable, so
-    /// `let r: Rule<Tok> = Spelling("(")` resolves from the annotation.
+    /// `let r: Rule<Tok> = Literal("(")` resolves from the annotation.
     /// Separate from `current_ret` because `return` inside the value still
     /// means the *function's* return type.
     current_expected: std::cell::RefCell<Option<Type>>,
@@ -865,12 +865,12 @@ impl<'a> Cx<'a> {
         }
         // Resolve the type arguments from the constructor's payload. A variable
         // no argument pins — a nullary case, or a case whose payload mentions no
-        // type variable (`Spelling(str)` in a `Rule<K>`) — falls back, in order:
+        // type variable (`Literal(str)` in a `Rule<K>`) — falls back, in order:
         //
         // 1. the enclosing function's expected return type, exactly as the
         //    generic *struct* path does (`ret_generic_args`). This is direct
         //    evidence, and `find_generic_args` looks through arrays and the other
-        //    containers, so a nested `Then([Spelling("("), ..])` types from the
+        //    containers, so a nested `Then([Literal("("), ..])` types from the
         //    outside in — every constructor in the body sees the same return type.
         // 2. the template's sole existing instance, when there is exactly one.
         //    That is a guess which merely happens to be unambiguous, so it is
@@ -1586,7 +1586,7 @@ impl Cx<'_> {
     ) -> Result<Type, Error> {
         // The annotation is the value's expected type, so it must be in scope
         // *while* the value is checked — a generic construction the value's own
-        // arguments don't pin (`let r: Rule<Tok> = Spelling("(")`) has nothing
+        // arguments don't pin (`let r: Rule<Tok> = Literal("(")`) has nothing
         // else to resolve from. Saved and restored rather than set, since
         // bindings nest.
         let prev = self
@@ -4485,7 +4485,7 @@ pub(crate) fn collect_args(
 /// pins any variable nothing else reached.
 ///
 /// Only the bare-variable slot qualifies. A `T[]` or `T?` payload never receives
-/// a bare literal, and a concrete payload (`Spelling(str)`) pins nothing anyway.
+/// a bare literal, and a concrete payload (`Literal(str)`) pins nothing anyway.
 pub(crate) fn literal_pins_nothing(arg: &Expr, pty: &Type, vars: &HashSet<&str>) -> bool {
     matches!(pty, Type::TypeVar(v) if vars.contains(v.as_str()))
         && aipl_syntax::const_int(arg).is_some()

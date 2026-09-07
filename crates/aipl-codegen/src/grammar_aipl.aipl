@@ -38,6 +38,14 @@
 // placeholder, because nothing here builds an AST. That is Stage 5's job. What
 // this file has to be right about is *what parses* and *the shape of the tree*,
 // which is what the `.test` blocks and the corpus differential test check.
+//
+// The rules are written in the library's own vocabulary — `Then`, `OneOf`,
+// `Many`, `Maybe`, `ListOf`, `Term`, `Named`, and `Literal` under the
+// conventional `Lit` alias — so a reader who knows `grammar.aipl` knows this
+// file. Each rule is an *annotated* binding (`let x: Rule<AiplTok> = ..`) for
+// the reason `grammar.aipl` documents: `Literal` and `Named` mention no `K`, so
+// a rule made only of them has nothing to pin the type parameter, and the
+// annotation is what every constructor inside resolves from.
 import {
     Span,
     case_of,
@@ -53,6 +61,7 @@ import {
     Climb,
     Grammar,
     ListOf,
+    Literal as Lit,
     Maybe,
     Mk,
     Named,
@@ -61,7 +70,6 @@ import {
     Prec,
     Production,
     Rule,
-    Spelling,
     Term,
     Then,
     many,
@@ -85,54 +93,30 @@ import { LexResult, Token, keep_skipped, lex, span_str } from "./lexer.aipl";
 import { parse_cst } from "./parse.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 
-// ---------- rule-building shorthand ----------
+// ---------- list shorthand ----------
 //
-// Two different things, and worth telling apart.
+// The only local vocabulary in this file, and it exists because the library has
+// no constructor for these: gazelle spells a list as a left-recursive pair of
+// productions and says whether it may be empty, and whether a trailing separator
+// is allowed, in the *wrapper* around it — `x_list | x_list COMMA | _`. Four
+// combinations, thirty-odd sites, and picking the wrong one is a grammar that
+// quietly accepts `fn f<>()` or rejects `[1, 2,]`. Naming them is what lets each
+// list below say which it is in one word, next to the gazelle rule it came from.
 //
-// **The `sep*` family carries meaning.** Gazelle spells a list as a
-// left-recursive pair of productions and says whether it may be empty, and
-// whether a trailing separator is allowed, in the *wrapper* around it —
-// `x_list | x_list COMMA | _`. Four combinations, and getting one wrong is a
-// grammar that quietly accepts `<>` or rejects `[1, 2,]`. Naming all four is what
-// makes each list below say which it is, in one word, next to the gazelle rule
-// it came from.
-//
-// **`t`/`r`/`seq`/`alt`/`opt` are abbreviation, nothing more.** They are
-// `Spelling`/`Named`/`Then`/`OneOf`/`Maybe` under shorter names. `Spelling`
-// alone appears about two hundred times here, and the difference between
-// `t("import")` and `Spelling("import")` decides whether a production fits on
-// one line or gets broken one token per line. Nothing about the types needs
-// them: a function's return type pins `Rule<AiplTok>`, and it propagates through
-// arbitrarily nested `Spelling`/`Named` that pin nothing themselves.
-
-// One token spelled exactly `s` — a keyword, an operator, a bracket.
-fn t(s: str) -> Rule<AiplTok> { Spelling(s) }
-
-// A reference to the production named `n`.
-fn r(n: str) -> Rule<AiplTok> { Named(n) }
-
-fn seq(rs: Rule<AiplTok>[]) -> Rule<AiplTok> { Then(rs) }
-
-fn alt(rs: Rule<AiplTok>[]) -> Rule<AiplTok> { OneOf(rs) }
-
-fn opt(x: Rule<AiplTok>) -> Rule<AiplTok> { Maybe(x) }
+// The zero-or-more pair *is* `ListOf`, so those sites write `ListOf` directly.
+// Everything else here is the library's own `Literal`/`Named`/`Then`/`OneOf`/
+// `Maybe`, with `Literal` aliased to `Lit` as grammar files conventionally do.
 
 // One or more `item`, separated by `s`, no trailing separator — the shape of
 // gazelle's `x_list = x | x_list COMMA x`.
-fn sep1(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { seq([item, many(seq([t(s), item]))]) }
+fn sep1(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { Then([item, many(Then([Lit(s), item]))]) }
 
 // The same, with an optional trailing separator — `x_list | x_list COMMA`.
-fn sep1t(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { seq([sep1(item, s), opt(t(s))]) }
-
-// Zero or more, no trailing separator — `x_list | _`.
-fn sep0(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { ListOf(item, s, false) }
-
-// Zero or more, trailing separator allowed — `x_list | x_list COMMA | _`.
-fn sep0t(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { ListOf(item, s, true) }
+fn sep1t(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { Then([sep1(item, s), Maybe(Lit(s))]) }
 
 // Two or more — an alternation of patterns, which is `sep1` with the first
 // repetition required.
-fn sep2(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { seq([item, many1(seq([t(s), item]))]) }
+fn sep2(item: Rule<AiplTok>, s: str) -> Rule<AiplTok> { Then([item, many1(Then([Lit(s), item]))]) }
 
 // ---------- the grammar ----------
 
@@ -152,133 +136,160 @@ pub fn aipl_grammar() -> Grammar<AiplTok, Ast> {
 fn items() -> Production<AiplTok, Ast>[] {
     // `program = item*`, and every byte of the file has to be one: `parse_cst`
     // refuses input left over after the start rule.
-    let program = many(r("item"));
-    let item = alt([r("function"), r("struct_decl"), r("variant_decl"), r("import_decl")]);
+    let program: Rule<AiplTok> = many(Named("item"));
+    let item: Rule<AiplTok> = OneOf([
+        Named("function"),
+        Named("struct_decl"),
+        Named("variant_decl"),
+        Named("import_decl"),
+    ]);
 
     // `import { a, b as c, equal as == } from "./x.aipl";` — or `from builtins`.
-    let import_decl = seq([
-        t("import"),
-        t("{"),
-        sep0t(r("import_name"), ","),
-        t("}"),
-        t("from"),
-        alt([Term(StrLit), t("builtins")]),
-        t(";"),
+    let import_decl: Rule<AiplTok> = Then([
+        Lit("import"),
+        Lit("{"),
+        ListOf(Named("import_name"), ",", true),
+        Lit("}"),
+        Lit("from"),
+        OneOf([Term(StrLit), Lit("builtins")]),
+        Lit(";"),
     ]);
 
     // A name, an aliased name, or a bare operator spelling. The aliased form is
     // first: it starts with the same `IDENT` the plain form is.
-    let import_name = alt([
-        seq([Term(Name), t("as"), alt([Term(Name), r("operator")])]),
+    let import_name: Rule<AiplTok> = OneOf([
+        Then([Term(Name), Lit("as"), OneOf([Term(Name), Named("operator")])]),
         Term(Name),
-        r("operator"),
+        Named("operator"),
     ]);
 
     // Every operator spelling that may be imported. `=`, `?` and `..` are absent
     // because they are not operators you can import — the loader's own gate
     // (`is_operator_name`) is the list this mirrors. Order is immaterial: the
     // lexer already took the longest munch, so each spelling is one token.
-    let operator = alt([
-        t("+++"),
-        t("=="),
-        t("!="),
-        t("<="),
-        t(">="),
-        t("&&"),
-        t("||"),
-        t("++"),
-        t("--"),
-        t("+="),
-        t("-="),
-        t("*="),
-        t("/="),
-        t("+"),
-        t("-"),
-        t("*"),
-        t("/"),
-        t("%"),
-        t("<"),
-        t(">"),
-        t("!"),
+    let operator: Rule<AiplTok> = OneOf([
+        Lit("+++"),
+        Lit("=="),
+        Lit("!="),
+        Lit("<="),
+        Lit(">="),
+        Lit("&&"),
+        Lit("||"),
+        Lit("++"),
+        Lit("--"),
+        Lit("+="),
+        Lit("-="),
+        Lit("*="),
+        Lit("/="),
+        Lit("+"),
+        Lit("-"),
+        Lit("*"),
+        Lit("/"),
+        Lit("%"),
+        Lit("<"),
+        Lit(">"),
+        Lit("!"),
     ]);
 
-    let function = seq([
-        opt(t("pub")),
-        t("fn"),
+    let function: Rule<AiplTok> = Then([
+        Maybe(Lit("pub")),
+        Lit("fn"),
         Term(Name),
-        r("type_params"),
-        t("("),
-        sep0t(r("param"), ","),
-        t(")"),
-        many(r("effect")),
-        opt(seq([t("->"), r("ty")])),
-        r("fn_body"),
-        many(r("fn_attr")),
+        Named("type_params"),
+        Lit("("),
+        ListOf(Named("param"), ",", true),
+        Lit(")"),
+        many(Named("effect")),
+        Maybe(Then([Lit("->"), Named("ty")])),
+        Named("fn_body"),
+        many(Named("fn_attr")),
     ]);
-    let effect = seq([t("!"), Term(Name)]);
+    let effect: Rule<AiplTok> = Then([Lit("!"), Term(Name)]);
 
     // `<T, U: ord>`. At least one parameter — `<>` is a syntax error, as it is
     // under gazelle, which is why this is `sep1` and not `sep0`.
-    let type_params = opt(seq([t("<"), sep1(r("type_param"), ","), t(">")]));
-    let type_param = alt([seq([Term(Name), t(":"), alt([Term(Name), t("variant")])]), Term(Name)]);
+    let type_params: Rule<AiplTok> = Maybe(Then([
+        Lit("<"),
+        sep1(Named("type_param"), ","),
+        Lit(">"),
+    ]));
+    let type_param: Rule<AiplTok> = OneOf([
+        Then([Term(Name), Lit(":"), OneOf([Term(Name), Lit("variant")])]),
+        Term(Name),
+    ]);
 
     // The five parameter shapes, longest first. `mut self: T` takes no default
     // and no variadic marker, exactly as gazelle spells it.
-    let param = alt([
-        seq([t("mut"), Term(Name), t(":"), r("ty")]),
-        seq([Term(Name), t(":"), r("ty"), t("*"), t("="), r("expr")]),
-        seq([Term(Name), t(":"), r("ty"), t("="), r("expr")]),
-        seq([Term(Name), t(":"), r("ty"), t("*")]),
-        seq([Term(Name), t(":"), r("ty")]),
+    let param: Rule<AiplTok> = OneOf([
+        Then([Lit("mut"), Term(Name), Lit(":"), Named("ty")]),
+        Then([Term(Name), Lit(":"), Named("ty"), Lit("*"), Lit("="), Named("expr")]),
+        Then([Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr")]),
+        Then([Term(Name), Lit(":"), Named("ty"), Lit("*")]),
+        Then([Term(Name), Lit(":"), Named("ty")]),
     ]);
 
     // A body is a block, or the struct-literal shorthand. The shorthand is tried
     // first and can only match when a `:` or `,` follows the first name (or the
     // body opens with `..`), so `{ x }` still reads as a block returning `x`.
-    let fn_body = alt([seq([t("{"), r("construct_fields"), t("}")]), r("block")]);
-    let construct_fields = alt([
-        seq([t(".."), r("expr"), t(","), sep0t(r("field_init"), ",")]),
-        seq([Term(Name), t(":"), r("expr"), t(","), sep0t(r("field_init"), ",")]),
-        seq([Term(Name), t(":"), r("expr")]),
-        seq([Term(Name), t(","), sep0t(r("field_init"), ",")]),
+    let fn_body: Rule<AiplTok> = OneOf([
+        Then([Lit("{"), Named("construct_fields"), Lit("}")]),
+        Named("block"),
+    ]);
+    let construct_fields: Rule<AiplTok> = OneOf([
+        Then([Lit(".."), Named("expr"), Lit(","), ListOf(Named("field_init"), ",", true)]),
+        Then([
+            Term(Name),
+            Lit(":"),
+            Named("expr"),
+            Lit(","),
+            ListOf(Named("field_init"), ",", true),
+        ]),
+        Then([Term(Name), Lit(":"), Named("expr")]),
+        Then([Term(Name), Lit(","), ListOf(Named("field_init"), ",", true)]),
     ]);
     // `.test({ .. })` and `.doc("..")`, told apart by their argument.
-    let fn_attr = seq([t("."), Term(Name), t("("), alt([r("block"), Term(StrLit)]), t(")")]);
-
-    let struct_decl = seq([
-        t("struct"),
+    let fn_attr: Rule<AiplTok> = Then([
+        Lit("."),
         Term(Name),
-        r("type_params"),
-        t("{"),
-        sep0t(r("field_decl"), ","),
-        t("}"),
+        Lit("("),
+        OneOf([Named("block"), Term(StrLit)]),
+        Lit(")"),
     ]);
-    let field_decl = alt([
-        seq([Term(Name), t(":"), r("ty"), t("="), r("expr")]),
-        seq([Term(Name), t(":"), r("ty")]),
+
+    let struct_decl: Rule<AiplTok> = Then([
+        Lit("struct"),
+        Term(Name),
+        Named("type_params"),
+        Lit("{"),
+        ListOf(Named("field_decl"), ",", true),
+        Lit("}"),
+    ]);
+    let field_decl: Rule<AiplTok> = OneOf([
+        Then([Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr")]),
+        Then([Term(Name), Lit(":"), Named("ty")]),
     ]);
 
     // `variant V = | A | B(i64)` — a leading `|` is allowed and means nothing,
     // which is what lets `aipl fmt` align every case under one column.
-    let variant_decl = seq([
-        t("variant"),
+    let variant_decl: Rule<AiplTok> = Then([
+        Lit("variant"),
         Term(Name),
-        r("type_params"),
-        t("="),
-        opt(t("|")),
-        sep1(r("variant_case"), "|"),
+        Named("type_params"),
+        Lit("="),
+        Maybe(Lit("|")),
+        sep1(Named("variant_case"), "|"),
     ]);
-    let variant_case = alt([
-        seq([Term(Name), t("("), sep1(r("case_param"), ","), t(")")]),
+    let variant_case: Rule<AiplTok> = OneOf([
+        Then([Term(Name), Lit("("), sep1(Named("case_param"), ","), Lit(")")]),
         Term(Name),
     ]);
 
     // The three payload-slot shapes, and the bare type last: a type *is* an
     // `IDENT`, so the named forms have to be given their chance first.
-    let case_param = alt([
-        seq([Term(Name), t(":"), r("ty"), t("="), r("expr")]),
-        seq([Term(Name), t(":"), r("ty")]),
-        r("ty"),
+    let case_param: Rule<AiplTok> = OneOf([
+        Then([Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr")]),
+        Then([Term(Name), Lit(":"), Named("ty")]),
+        Named("ty"),
     ]);
 
     [
@@ -309,21 +320,24 @@ fn types() -> Production<AiplTok, Ast>[] {
     // The `(`-led forms are ordered longest-first, which is exactly the shift
     // decision gazelle's comments describe: `(A, B) -> R` over `(A, B)[]` over
     // `(A, B)!E` over `(A, B)`.
-    let ty = alt([
-        seq([t("("), sep0(r("ty"), ","), t(")"), t("->"), r("ty")]),
-        seq([t("("), sep0(r("ty"), ","), t(")"), t("["), t("]")]),
-        seq([t("("), sep0(r("ty"), ","), t(")"), t("!"), r("base_ty")]),
-        seq([t("("), sep0(r("ty"), ","), t(")")]),
-        seq([t("!"), r("base_ty")]),
-        seq([r("base_ty"), t("!"), r("base_ty")]),
-        r("base_ty"),
+    let ty: Rule<AiplTok> = OneOf([
+        Then([Lit("("), ListOf(Named("ty"), ",", false), Lit(")"), Lit("->"), Named("ty")]),
+        Then([Lit("("), ListOf(Named("ty"), ",", false), Lit(")"), Lit("["), Lit("]")]),
+        Then([Lit("("), ListOf(Named("ty"), ",", false), Lit(")"), Lit("!"), Named("base_ty")]),
+        Then([Lit("("), ListOf(Named("ty"), ",", false), Lit(")")]),
+        Then([Lit("!"), Named("base_ty")]),
+        Then([Named("base_ty"), Lit("!"), Named("base_ty")]),
+        Named("base_ty"),
     ]);
     // Left-recursive postfix under LR; here a core followed by its suffixes.
-    let base_ty = seq([r("ty_core"), many(alt([t("?"), seq([t("["), t("]")])]))]);
-    let ty_core = alt([
-        seq([t("#"), t("{"), r("ty"), t(":"), r("ty"), t("}")]),
-        seq([t("#"), t("{"), r("ty"), t("}")]),
-        seq([Term(Name), t("<"), sep1(r("ty"), ","), t(">")]),
+    let base_ty: Rule<AiplTok> = Then([
+        Named("ty_core"),
+        many(OneOf([Lit("?"), Then([Lit("["), Lit("]")])])),
+    ]);
+    let ty_core: Rule<AiplTok> = OneOf([
+        Then([Lit("#"), Lit("{"), Named("ty"), Lit(":"), Named("ty"), Lit("}")]),
+        Then([Lit("#"), Lit("{"), Named("ty"), Lit("}")]),
+        Then([Term(Name), Lit("<"), sep1(Named("ty"), ","), Lit(">")]),
         Term(Name),
     ]);
 
@@ -336,108 +350,148 @@ fn statements() -> Production<AiplTok, Ast>[] {
     // Gazelle's right recursion, kept: after one expression the parser decides
     // whether a `;` made it a statement or its absence made it the block's
     // value, so the expression is parsed exactly once.
-    let block = seq([t("{"), r("block_body"), t("}")]);
-    let block_body = opt(alt([
-        seq([r("kw_stmt"), r("block_body")]),
-        seq([r("expr"), r("block_tail")]),
+    let block: Rule<AiplTok> = Then([Lit("{"), Named("block_body"), Lit("}")]);
+    let block_body: Rule<AiplTok> = Maybe(OneOf([
+        Then([Named("kw_stmt"), Named("block_body")]),
+        Then([Named("expr"), Named("block_tail")]),
     ]));
-    let block_tail = opt(seq([t(";"), r("block_body")]));
+    let block_tail: Rule<AiplTok> = Maybe(Then([Lit(";"), Named("block_body")]));
 
     // A loop body admits no trailing expression: its value could never be
     // observed, so every expression in it must be an `expr;` statement.
-    let loop_body = seq([t("{"), r("loop_inner"), t("}")]);
-    let loop_inner = opt(alt([
-        seq([r("kw_stmt"), r("loop_inner")]),
-        seq([r("expr"), t(";"), r("loop_inner")]),
+    let loop_body: Rule<AiplTok> = Then([Lit("{"), Named("loop_inner"), Lit("}")]);
+    let loop_inner: Rule<AiplTok> = Maybe(OneOf([
+        Then([Named("kw_stmt"), Named("loop_inner")]),
+        Then([Named("expr"), Lit(";"), Named("loop_inner")]),
     ]));
 
     // Keyword-led statements, so their first tokens stay disjoint from `expr`'s
     // and the block's choice above is a single-token decision.
-    let kw_stmt = alt([
-        r("let_stmt"),
-        r("mut_stmt"),
-        r("assign_stmt"),
-        r("for_stmt"),
-        r("while_stmt"),
-        r("return_stmt"),
+    let kw_stmt: Rule<AiplTok> = OneOf([
+        Named("let_stmt"),
+        Named("mut_stmt"),
+        Named("assign_stmt"),
+        Named("for_stmt"),
+        Named("while_stmt"),
+        Named("return_stmt"),
     ]);
-    let let_stmt = alt([
-        seq([t("let"), t("("), sep1(Term(Name), ","), t(")"), t("="), r("expr"), t(";")]),
-        seq([
-            t("let"),
-            Term(Name),
-            t("{"),
-            sep1t(Term(Name), ","),
-            t("}"),
-            t("="),
-            r("expr"),
-            t(";"),
+    let let_stmt: Rule<AiplTok> = OneOf([
+        Then([
+            Lit("let"),
+            Lit("("),
+            sep1(Term(Name), ","),
+            Lit(")"),
+            Lit("="),
+            Named("expr"),
+            Lit(";"),
         ]),
-        seq([t("let"), Term(Name), t(":"), r("ty"), t("="), r("expr"), t(";")]),
-        seq([t("let"), Term(Name), t("="), r("expr"), t(";")]),
+        Then([
+            Lit("let"),
+            Term(Name),
+            Lit("{"),
+            sep1t(Term(Name), ","),
+            Lit("}"),
+            Lit("="),
+            Named("expr"),
+            Lit(";"),
+        ]),
+        Then([Lit("let"), Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr"), Lit(";")]),
+        Then([Lit("let"), Term(Name), Lit("="), Named("expr"), Lit(";")]),
     ]);
-    let mut_stmt = alt([
-        seq([
-            t("mut"),
+    let mut_stmt: Rule<AiplTok> = OneOf([
+        Then([
+            Lit("mut"),
             Term(Name),
-            t("{"),
+            Lit("{"),
             sep1t(Term(Name), ","),
-            t("}"),
-            t("="),
-            r("expr"),
-            t(";"),
+            Lit("}"),
+            Lit("="),
+            Named("expr"),
+            Lit(";"),
         ]),
-        seq([t("mut"), Term(Name), t(":"), r("ty"), t("="), r("expr"), t(";")]),
-        seq([t("mut"), Term(Name), t("="), r("expr"), t(";")]),
+        Then([Lit("mut"), Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr"), Lit(";")]),
+        Then([Lit("mut"), Term(Name), Lit("="), Named("expr"), Lit(";")]),
     ]);
 
     // `set n = e;`, the increment/decrement sugar, the four compound
     // assignments, the mutating-method writeback, and the nested-field store.
     // The method form comes before the field-path form: both open
     // `set IDENT . IDENT`, and only the next token tells them apart.
-    let assign_stmt = alt([
-        seq([t("set"), Term(Name), t("++"), t(";")]),
-        seq([t("set"), Term(Name), t("--"), t(";")]),
-        seq([t("set"), Term(Name), t("+="), r("expr"), t(";")]),
-        seq([t("set"), Term(Name), t("-="), r("expr"), t(";")]),
-        seq([t("set"), Term(Name), t("*="), r("expr"), t(";")]),
-        seq([t("set"), Term(Name), t("/="), r("expr"), t(";")]),
-        seq([t("set"), Term(Name), t("."), Term(Name), t("("), r("args"), t(")"), t(";")]),
-        seq([t("set"), Term(Name), t("."), sep1(Term(Name), "."), t("="), r("expr"), t(";")]),
-        seq([t("set"), Term(Name), t("="), r("expr"), t(";")]),
+    let assign_stmt: Rule<AiplTok> = OneOf([
+        Then([Lit("set"), Term(Name), Lit("++"), Lit(";")]),
+        Then([Lit("set"), Term(Name), Lit("--"), Lit(";")]),
+        Then([Lit("set"), Term(Name), Lit("+="), Named("expr"), Lit(";")]),
+        Then([Lit("set"), Term(Name), Lit("-="), Named("expr"), Lit(";")]),
+        Then([Lit("set"), Term(Name), Lit("*="), Named("expr"), Lit(";")]),
+        Then([Lit("set"), Term(Name), Lit("/="), Named("expr"), Lit(";")]),
+        Then([
+            Lit("set"),
+            Term(Name),
+            Lit("."),
+            Term(Name),
+            Lit("("),
+            Named("args"),
+            Lit(")"),
+            Lit(";"),
+        ]),
+        Then([
+            Lit("set"),
+            Term(Name),
+            Lit("."),
+            sep1(Term(Name), "."),
+            Lit("="),
+            Named("expr"),
+            Lit(";"),
+        ]),
+        Then([Lit("set"), Term(Name), Lit("="), Named("expr"), Lit(";")]),
     ]);
 
     // The three `for` shapes, told apart after `for ( let` by one token: `(` is
     // the tuple form, a `,` after the name the indexed form.
-    let for_stmt = alt([
-        seq([
-            t("for"),
-            t("("),
-            t("let"),
-            t("("),
+    let for_stmt: Rule<AiplTok> = OneOf([
+        Then([
+            Lit("for"),
+            Lit("("),
+            Lit("let"),
+            Lit("("),
             sep1(Term(Name), ","),
-            t(")"),
-            t(":"),
-            r("expr"),
-            t(")"),
-            r("loop_body"),
+            Lit(")"),
+            Lit(":"),
+            Named("expr"),
+            Lit(")"),
+            Named("loop_body"),
         ]),
-        seq([
-            t("for"),
-            t("("),
-            t("let"),
+        Then([
+            Lit("for"),
+            Lit("("),
+            Lit("let"),
             Term(Name),
-            t(","),
+            Lit(","),
             Term(Name),
-            t(":"),
-            r("expr"),
-            t(")"),
-            r("loop_body"),
+            Lit(":"),
+            Named("expr"),
+            Lit(")"),
+            Named("loop_body"),
         ]),
-        seq([t("for"), t("("), t("let"), Term(Name), t(":"), r("expr"), t(")"), r("loop_body")]),
+        Then([
+            Lit("for"),
+            Lit("("),
+            Lit("let"),
+            Term(Name),
+            Lit(":"),
+            Named("expr"),
+            Lit(")"),
+            Named("loop_body"),
+        ]),
     ]);
-    let while_stmt = seq([t("while"), t("("), r("expr"), t(")"), r("loop_body")]);
-    let return_stmt = seq([t("return"), r("expr"), t(";")]);
+    let while_stmt: Rule<AiplTok> = Then([
+        Lit("while"),
+        Lit("("),
+        Named("expr"),
+        Lit(")"),
+        Named("loop_body"),
+    ]);
+    let return_stmt: Rule<AiplTok> = Then([Lit("return"), Named("expr"), Lit(";")]);
 
     [
         p("block", block),
@@ -460,8 +514,8 @@ fn statements() -> Production<AiplTok, Ast>[] {
 fn expressions() -> Production<AiplTok, Ast>[] {
     // `op_precedence`'s table, `..` included at level 4 — tighter than `==`,
     // looser than `<` and the arithmetic. Every level is left-associative.
-    let expr = Climb(
-        r("unary"),
+    let expr: Rule<AiplTok> = Climb(
+        Named("unary"),
         [
             Prec { power: 1, right: false, ops: ["||"] },
             Prec { power: 2, right: false, ops: ["&&"] },
@@ -472,141 +526,166 @@ fn expressions() -> Production<AiplTok, Ast>[] {
             Prec { power: 7, right: false, ops: ["*", "/", "%"] },
         ],
     );
-    let unary = alt([seq([t("-"), r("unary")]), seq([t("!"), r("unary")]), r("postfix")]);
-    let postfix = seq([r("atom"), many(r("suffix"))]);
+    let unary: Rule<AiplTok> = OneOf([
+        Then([Lit("-"), Named("unary")]),
+        Then([Lit("!"), Named("unary")]),
+        Named("postfix"),
+    ]);
+    let postfix: Rule<AiplTok> = Then([Named("atom"), many(Named("suffix"))]);
 
     // The method call comes before the field access — both open `. IDENT` — and
     // the two open-ended slices before the plain index.
-    let suffix = alt([
-        seq([t("."), Term(Name), t("("), r("args"), t(")")]),
-        seq([t("."), Term(Name)]),
-        seq([t("."), Term(IntLit)]),
-        seq([t("["), t(".."), r("expr"), t("]")]),
-        seq([t("["), r("expr"), t(".."), t("]")]),
-        seq([t("["), r("expr"), t("]")]),
-        t("?"),
+    let suffix: Rule<AiplTok> = OneOf([
+        Then([Lit("."), Term(Name), Lit("("), Named("args"), Lit(")")]),
+        Then([Lit("."), Term(Name)]),
+        Then([Lit("."), Term(IntLit)]),
+        Then([Lit("["), Lit(".."), Named("expr"), Lit("]")]),
+        Then([Lit("["), Named("expr"), Lit(".."), Lit("]")]),
+        Then([Lit("["), Named("expr"), Lit("]")]),
+        Lit("?"),
     ]);
 
-    let atom = alt([
-        seq([
-            t("if"),
-            t("("),
-            t("let"),
-            r("pattern"),
-            t("="),
-            r("expr"),
-            t(")"),
-            r("block"),
-            opt(seq([t("else"), r("else_branch")])),
+    let atom: Rule<AiplTok> = OneOf([
+        Then([
+            Lit("if"),
+            Lit("("),
+            Lit("let"),
+            Named("pattern"),
+            Lit("="),
+            Named("expr"),
+            Lit(")"),
+            Named("block"),
+            Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
-        seq([
-            t("if"),
-            t("("),
-            r("expr"),
-            t(")"),
-            r("block"),
-            opt(seq([t("else"), r("else_branch")])),
+        Then([
+            Lit("if"),
+            Lit("("),
+            Named("expr"),
+            Lit(")"),
+            Named("block"),
+            Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
-        seq([t("match"), t("("), r("expr"), t(")"), t("{"), sep0t(r("match_arm"), ","), t("}")]),
-        seq([t("shim"), Term(Name), t("{"), sep0t(r("shim_binding"), ","), t("}"), r("block")]),
+        Then([
+            Lit("match"),
+            Lit("("),
+            Named("expr"),
+            Lit(")"),
+            Lit("{"),
+            ListOf(Named("match_arm"), ",", true),
+            Lit("}"),
+        ]),
+        Then([
+            Lit("shim"),
+            Term(Name),
+            Lit("{"),
+            ListOf(Named("shim_binding"), ",", true),
+            Lit("}"),
+            Named("block"),
+        ]),
         Term(IntLit),
         Term(StrLit),
         Term(CharTok),
-        t("true"),
-        t("false"),
-        t("none"),
-        seq([Term(Name), t("("), r("args"), t(")")]),
-        seq([Term(Name), t("{"), sep0t(r("field_init"), ","), t("}")]),
+        Lit("true"),
+        Lit("false"),
+        Lit("none"),
+        Then([Term(Name), Lit("("), Named("args"), Lit(")")]),
+        Then([Term(Name), Lit("{"), ListOf(Named("field_init"), ",", true), Lit("}")]),
         Term(Name),
-        seq([t("("), r("expr"), t(","), sep1(r("expr"), ","), t(")")]),
-        seq([t("("), r("expr"), t(")")]),
-        seq([t("["), r("args"), t("]")]),
-        seq([t("#"), t("{"), r("brace_body"), t("}")]),
-        r("template"),
-        seq([t("|"), sep0(r("lambda_param"), ","), t("|"), r("block")]),
+        Then([Lit("("), Named("expr"), Lit(","), sep1(Named("expr"), ","), Lit(")")]),
+        Then([Lit("("), Named("expr"), Lit(")")]),
+        Then([Lit("["), Named("args"), Lit("]")]),
+        Then([Lit("#"), Lit("{"), Named("brace_body"), Lit("}")]),
+        Named("template"),
+        Then([Lit("|"), ListOf(Named("lambda_param"), ",", false), Lit("|"), Named("block")]),
     ]);
 
     // `else` takes a block or another `if` — never an arbitrary expression, so
     // an if/else-if ladder is the only brace-less `else` form.
-    let else_branch = alt([
-        seq([
-            t("if"),
-            t("("),
-            t("let"),
-            r("pattern"),
-            t("="),
-            r("expr"),
-            t(")"),
-            r("block"),
-            opt(seq([t("else"), r("else_branch")])),
+    let else_branch: Rule<AiplTok> = OneOf([
+        Then([
+            Lit("if"),
+            Lit("("),
+            Lit("let"),
+            Named("pattern"),
+            Lit("="),
+            Named("expr"),
+            Lit(")"),
+            Named("block"),
+            Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
-        seq([
-            t("if"),
-            t("("),
-            r("expr"),
-            t(")"),
-            r("block"),
-            opt(seq([t("else"), r("else_branch")])),
+        Then([
+            Lit("if"),
+            Lit("("),
+            Named("expr"),
+            Lit(")"),
+            Named("block"),
+            Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
-        r("block"),
+        Named("block"),
     ]);
 
     // `` `text {expr} text` `` — the raw and cooked forms produce different
     // token kinds but the same shape, and the lexer guarantees a head pairs with
     // a tail of its own flavour.
-    let template = seq([
-        alt([Term(TemplateHead), Term(RawTemplateHead)]),
-        r("expr"),
-        many(seq([alt([Term(TemplateMid), Term(RawTemplateMid)]), r("expr")])),
-        alt([Term(TemplateTail), Term(RawTemplateTail)]),
+    let template: Rule<AiplTok> = Then([
+        OneOf([Term(TemplateHead), Term(RawTemplateHead)]),
+        Named("expr"),
+        many(Then([OneOf([Term(TemplateMid), Term(RawTemplateMid)]), Named("expr")])),
+        OneOf([Term(TemplateTail), Term(RawTemplateTail)]),
     ]);
 
-    let shim_binding = seq([Term(Name), t("="), Term(Name)]);
-    let args = sep0t(r("arg"), ",");
+    let shim_binding: Rule<AiplTok> = Then([Term(Name), Lit("="), Term(Name)]);
+    let args: Rule<AiplTok> = ListOf(Named("arg"), ",", true);
 
     // The spread and the keyword argument lead with tokens no expression can, so
     // both must be tried before `expr` — after which a bare operator value and a
     // lambda are unambiguous too.
-    let arg = alt([
-        seq([t(".."), r("expr")]),
-        seq([Term(Name), t("="), r("expr")]),
-        r("lambda"),
-        r("op_value"),
-        r("expr"),
+    let arg: Rule<AiplTok> = OneOf([
+        Then([Lit(".."), Named("expr")]),
+        Then([Term(Name), Lit("="), Named("expr")]),
+        Named("lambda"),
+        Named("op_value"),
+        Named("expr"),
     ]);
 
     // The operators that may be passed as values. Narrower than the importable
     // set: `-` and `!` are unary too, and gazelle gives them their own terminals.
-    let op_value = alt([
-        t("+++"),
-        t("=="),
-        t("!="),
-        t("<="),
-        t(">="),
-        t("&&"),
-        t("+"),
-        t("*"),
-        t("/"),
-        t("%"),
+    let op_value: Rule<AiplTok> = OneOf([
+        Lit("+++"),
+        Lit("=="),
+        Lit("!="),
+        Lit("<="),
+        Lit(">="),
+        Lit("&&"),
+        Lit("+"),
+        Lit("*"),
+        Lit("/"),
+        Lit("%"),
     ]);
-    let lambda = alt([
-        seq([t("|"), sep0(r("lambda_param"), ","), t("|"), r("expr")]),
-        seq([t("||"), r("block")]),
-        seq([t("||"), r("expr")]),
+    let lambda: Rule<AiplTok> = OneOf([
+        Then([Lit("|"), ListOf(Named("lambda_param"), ",", false), Lit("|"), Named("expr")]),
+        Then([Lit("||"), Named("block")]),
+        Then([Lit("||"), Named("expr")]),
     ]);
-    let lambda_param = alt([seq([Term(Name), t(":"), r("ty")]), Term(Name)]);
+    let lambda_param: Rule<AiplTok> = OneOf([
+        Then([Term(Name), Lit(":"), Named("ty")]),
+        Term(Name),
+    ]);
 
-    let field_init = alt([
-        seq([t(".."), r("expr")]),
-        seq([Term(Name), t(":"), r("expr")]),
+    let field_init: Rule<AiplTok> = OneOf([
+        Then([Lit(".."), Named("expr")]),
+        Then([Term(Name), Lit(":"), Named("expr")]),
         Term(Name),
     ]);
 
     // `#{a, b}` a set, `#{k: v}` a dict, `#{}` an empty set, `#{:}` an empty
     // dict. One rule for all four, so `expr` is reachable from a single place
     // under the brace.
-    let brace_body = opt(alt([sep1t(r("entry"), ","), t(":")]));
-    let entry = alt([seq([r("expr"), t(":"), r("expr")]), r("expr")]);
+    let brace_body: Rule<AiplTok> = Maybe(OneOf([sep1t(Named("entry"), ","), Lit(":")]));
+    let entry: Rule<AiplTok> = OneOf([
+        Then([Named("expr"), Lit(":"), Named("expr")]),
+        Named("expr"),
+    ]);
 
     [
         pl("expr", expr, "an expression"),
@@ -638,25 +717,25 @@ fn patterns() -> Production<AiplTok, Ast>[] {
     // An alternation of two or more patterns comes first: a single pattern is
     // the standalone arm, and after one pattern the next token (`=>` or `|`) is
     // what tells them apart.
-    let match_arm = alt([
-        seq([sep2(r("pattern"), "|"), t("=>"), r("arm_body")]),
-        seq([t("["), r("args"), t("]"), t("=>"), r("arm_body")]),
-        seq([r("pattern"), t("=>"), r("arm_body")]),
+    let match_arm: Rule<AiplTok> = OneOf([
+        Then([sep2(Named("pattern"), "|"), Lit("=>"), Named("arm_body")]),
+        Then([Lit("["), Named("args"), Lit("]"), Lit("=>"), Named("arm_body")]),
+        Then([Named("pattern"), Lit("=>"), Named("arm_body")]),
     ]);
-    let arm_body = alt([r("block"), r("expr")]);
-    let pattern = alt([
-        seq([Term(Name), t("."), Term(Name), t("("), r("ctor_payload"), t(")")]),
-        seq([Term(Name), t("."), Term(Name)]),
-        seq([Term(Name), t("("), r("ctor_payload"), t(")")]),
+    let arm_body: Rule<AiplTok> = OneOf([Named("block"), Named("expr")]);
+    let pattern: Rule<AiplTok> = OneOf([
+        Then([Term(Name), Lit("."), Term(Name), Lit("("), Named("ctor_payload"), Lit(")")]),
+        Then([Term(Name), Lit("."), Term(Name)]),
+        Then([Term(Name), Lit("("), Named("ctor_payload"), Lit(")")]),
         Term(Name),
-        t("none"),
+        Lit("none"),
         Term(StrLit),
         Term(CharTok),
     ]);
 
     // `Ctor(a, b)` names each slot; `Ctor(..)` says the case carries a payload
     // this arm does not read.
-    let ctor_payload = alt([t(".."), sep1(Term(Name), ",")]);
+    let ctor_payload: Rule<AiplTok> = OneOf([Lit(".."), sep1(Term(Name), ",")]);
 
     [
         p("match_arm", match_arm),
@@ -887,11 +966,11 @@ allocations: 304644
 deallocations: 304644
 reallocations: 3211
 bytes allocated: 25867537
-instructions executed: 53722377
-binary size: 499144
-  code: 340008
+instructions executed: 53611245
+binary size: 520192
+  code: 355196
   data: 8340
-  metadata: 150796
+  metadata: 156656
 functions:
   __arr_drop___m1__Cst:
     calls: 6685
@@ -1173,7 +1252,7 @@ functions:
     calls: 6580
     bytes: (external)
   aipl_arr_inc:
-    calls: 533859
+    calls: 518522
     bytes: (external)
   aipl_arr_join:
     calls: 104
@@ -1185,7 +1264,7 @@ functions:
     calls: 236
     bytes: (external)
   aipl_array_dec:
-    calls: 713650
+    calls: 698313
     bytes: (external)
   aipl_array_new:
     calls: 133919
@@ -1204,7 +1283,7 @@ functions:
     bytes: (external)
   aipl_parse_cst:
     calls: 49
-    bytes: 22636
+    bytes: 26564
   aipl_parse_report:
     calls: 8
     bytes: 664
@@ -1234,7 +1313,7 @@ functions:
     bytes: (external)
   expressions:
     calls: 98
-    bytes: 25768
+    bytes: 30488
   keep:
     calls: 0
     bytes: 196
@@ -1249,29 +1328,19 @@ functions:
     bytes: 424
   patterns:
     calls: 98
-    bytes: 5108
-  r:
-    calls: 14357
-    bytes: 92
+    bytes: 5872
   sep1:
     calls: 1029
-    bytes: 452
+    bytes: 448
   sep1t:
     calls: 294
-    bytes: 292
-  seq:
-    calls: 98
-    bytes: 96
+    bytes: 308
   statements:
     calls: 98
-    bytes: 18812
-  t:
-    calls: 25774
-    bytes: 92
+    bytes: 23444
   types:
     calls: 98
-    bytes: 6460
+    bytes: 7872
   widen_left:
     calls: 5
     bytes: 968
-

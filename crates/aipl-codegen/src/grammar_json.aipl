@@ -37,6 +37,7 @@ import { ebnf, show_first_sets } from "./ebnf.aipl";
 import {
     Grammar,
     ListOf,
+    Literal as Lit,
     Maybe,
     Mk,
     Named,
@@ -44,7 +45,6 @@ import {
     ParseError,
     Production,
     Rule,
-    Spelling,
     Term,
     Then,
     failure_message,
@@ -68,7 +68,7 @@ import { parse, parse_cst } from "./parse.aipl";
 import { unescape } from "./unescape.aipl";
 
 // The token kinds: three terminal classes that carry meaning, and one bare kind
-// for the punctuation the grammar matches by `Spelling`.
+// for the punctuation the grammar matches by `Lit`.
 //
 // `Str` keeps its delimiter-stripped contents (the lexer's `Delimited` computes
 // them), but the concrete tree holds *spans*, not values — so lowering reads the
@@ -95,7 +95,7 @@ variant Json =
 // digit run doesn't match `Float` and `1.5` would otherwise lex as `1` then a
 // stray `.`. And `Exact("-")` sits ahead of both, which makes every `-` its own
 // token and `Int` unsigned — so the sign is the *grammar's* business
-// (`Maybe(Spelling("-"))` in `number`), one place, rather than split between a
+// (`Maybe(Lit("-"))` in `number`), one place, rather than split between a
 // sign the lexer swallowed and one it didn't.
 fn json_rules() -> TokenRule<JsonTok>[] {
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
@@ -180,21 +180,13 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
     // `trailing: false` — strict JSON, where `[1, 2,]` is an error. Flipping the
     // flag is the whole difference between this and the dialects that allow it,
     // which is what that parameter exists to express.
-    let r_object: Rule<JsonTok> = Then([
-        Spelling("{"),
-        ListOf(Named("member"), ",", false),
-        Spelling("}"),
-    ]);
-    let r_member: Rule<JsonTok> = Then([Term(Str), Spelling(":"), Named("value")]);
-    let r_array: Rule<JsonTok> = Then([
-        Spelling("["),
-        ListOf(Named("value"), ",", false),
-        Spelling("]"),
-    ]);
+    let r_object: Rule<JsonTok> = Then([Lit("{"), ListOf(Named("member"), ",", false), Lit("}")]);
+    let r_member: Rule<JsonTok> = Then([Term(Str), Lit(":"), Named("value")]);
+    let r_array: Rule<JsonTok> = Then([Lit("["), ListOf(Named("value"), ",", false), Lit("]")]);
     let r_string: Rule<JsonTok> = Term(Str);
-    let r_number: Rule<JsonTok> = Then([Maybe(Spelling("-")), Term(Num)]);
-    let r_bool: Rule<JsonTok> = OneOf([Spelling("true"), Spelling("false")]);
-    let r_null: Rule<JsonTok> = Spelling("null");
+    let r_number: Rule<JsonTok> = Then([Maybe(Lit("-")), Term(Num)]);
+    let r_bool: Rule<JsonTok> = OneOf([Lit("true"), Lit("false")]);
+    let r_null: Rule<JsonTok> = Lit("null");
     Grammar {
         prods: [
             Production {

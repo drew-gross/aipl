@@ -60,6 +60,7 @@ import {
     Climb,
     Grammar,
     ListOf,
+    Literal,
     Many,
     Maybe,
     Mk,
@@ -70,7 +71,6 @@ import {
     Prec,
     Production,
     Rule,
-    Spelling,
     Term,
     Then,
     failure_message,
@@ -217,7 +217,7 @@ fn match_rule<K: variant, A: any>(
 ) -> Step!ParseError {
     match (r) {
         Term(k) => ok(match_term(p, k, pos, far)),
-        Spelling(s) => ok(match_spelling(p, s, pos, far)),
+        Literal(s) => ok(match_spelling(p, s, pos, far)),
         Then(rs) => match_then(p, rs, pos, cur, far),
         OneOf(rs) => match_one_of(p, rs, pos, cur, far),
         Many(sub, min) => match_many(p, sub, min, pos, cur, far),
@@ -630,8 +630,8 @@ pub fn parse<K: variant, A: any>(
     // A start rule no production answers to.
     assert(msg_of("a", g_word, "nope") == "no rule named \"nope\"");
 
-    // ---- Spelling: one token by its text ----
-    let r_open: Rule<Tok> = Spelling("(");
+    // ---- Literal: one token by its text ----
+    let r_open: Rule<Tok> = Literal("(");
     let g_open = g_of([one("o", r_open)]);
     assert(shown("(", g_open, "o")? == "(o ()");
     assert(msg_of("x", g_open, "o") == "expected `(`, found `x`");
@@ -646,7 +646,7 @@ pub fn parse<K: variant, A: any>(
     assert(msg_of("ab cd", g_pair, "p") == "expected Num, found `cd`");
 
     // ---- OneOf: ordered choice, and the expected *set* it leaves behind ----
-    let r_atom: Rule<Tok> = OneOf([Term(Word), Term(Num), Spelling("(")]);
+    let r_atom: Rule<Tok> = OneOf([Term(Word), Term(Num), Literal("(")]);
     let g_atom = g_of([one("a", r_atom)]);
     assert(shown("x", g_atom, "a")? == "(a x)");
     assert(shown("7", g_atom, "a")? == "(a 7)");
@@ -687,7 +687,7 @@ pub fn parse<K: variant, A: any>(
     // which is what makes the CST (and the parse) genuinely recursive ----
     let r_item: Rule<Tok> = OneOf([Term(Word), Named("list")]);
     let g_sexp = g_of([
-        one("list", Then([Spelling("("), many(Named("item")), Spelling(")")])),
+        one("list", Then([Literal("("), many(Named("item")), Literal(")")])),
         one("item", r_item),
     ]);
     assert(shown("(a b)", g_sexp, "list")? == "(list ( (item a) (item b) ))");
@@ -701,7 +701,7 @@ pub fn parse<K: variant, A: any>(
     assert(msg_of("(a", g_sexp, "list") == "expected Word, `(`, or `)`, found end of input");
 
     // ---- ListOf: separators, and the trailing-separator rule ----
-    let r_nums: Rule<Tok> = Then([Spelling("["), ListOf(Term(Num), ",", false), Spelling("]")]);
+    let r_nums: Rule<Tok> = Then([Literal("["), ListOf(Term(Num), ",", false), Literal("]")]);
     let g_nums = g_of([one("l", r_nums)]);
     assert(shown("[1, 2, 3]", g_nums, "l")? == "(l [ 1 , 2 , 3 ])");
     // An empty list is a list.
@@ -710,7 +710,7 @@ pub fn parse<K: variant, A: any>(
     // With `trailing: false` the dangling separator is left for the enclosing
     // rule, which is what reports it.
     assert(msg_of("[1, 2,]", g_nums, "l") == "expected Num, found `]`");
-    let r_trail: Rule<Tok> = Then([Spelling("["), ListOf(Term(Num), ",", true), Spelling("]")]);
+    let r_trail: Rule<Tok> = Then([Literal("["), ListOf(Term(Num), ",", true), Literal("]")]);
     assert(shown("[1, 2,]", g_of([one("l", r_trail)]), "l")? == "(l [ 1 , 2 , ])");
 
     // ---- Climb: precedence and associativity ----
@@ -742,7 +742,7 @@ pub fn parse<K: variant, A: any>(
     // Unlabelled, the message is the grammar's internals; labelled, it is the
     // one word a reader wants — and only when the production got nowhere, so a
     // partly-matched one still reports the finer expectation.
-    let r_stmt: Rule<Tok> = Then([Named("expr"), Spelling(";")]);
+    let r_stmt: Rule<Tok> = Then([Named("expr"), Literal(";")]);
     let r_alt: Rule<Tok> = OneOf([Term(Word), Term(Num)]);
     let plain = g_of([one("stmt", r_stmt), one("expr", r_alt)]);
     assert(msg_of("]", plain, "stmt") == "expected Word or Num, found `]`");
