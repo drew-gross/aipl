@@ -46,6 +46,10 @@
           "name": "comment.line.allow.aipl"
         },
         {
+          "match": "#(?:[^{\\[].*)?$",
+          "name": "comment.line.documentation.aipl"
+        },
+        {
           "match": "\\bfn\\b|\\blet\\b|\\bmut\\b|\\bset\\b|\\bpub\\b",
           "name": "keyword.control.aipl"
         },

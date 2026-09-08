@@ -891,11 +891,11 @@ allocations: 2979
 deallocations: 2979
 reallocations: 324
 bytes allocated: 188789
-instructions executed: 449175
-binary size: 310456
-  code: 191112
+instructions executed: 449347
+binary size: 317280
+  code: 195196
   data: 5924
-  metadata: 113420
+  metadata: 116160
 functions:
   __arr_drop_Node:
     calls: 11
@@ -920,7 +920,7 @@ functions:
     bytes: 188
   __arr_drop___m3__TokenRule$Tok:
     calls: 42
-    bytes: 588
+    bytes: 632
   __arr_retain_Node:
     calls: 10
     bytes: 116
@@ -944,16 +944,19 @@ functions:
     bytes: 188
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
-    bytes: 588
+    bytes: 632
   __builtin_count_while$char$lam37:
     calls: 101
     bytes: 220
   __builtin_count_while$char$s0$lam45:
-    calls: 2
-    bytes: 176
-  __builtin_count_while$char$s0$lam47:
     calls: 0
     bytes: 184
+  __builtin_count_while$char$s0$lam60:
+    calls: 0
+    bytes: 40
+  __builtin_count_while$char$s0$lam60$tail:
+    calls: 2
+    bytes: 256
   __builtin_find_if$__m2__Prec$lam84:
     calls: 11
     bytes: 688
@@ -972,7 +975,7 @@ functions:
   __builtin_try_map$__m2__Production$Tok$Node$__m2__Production$Tok$Node$__m2__ParseError$lam23:
     calls: 43
     bytes: 972
-  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam54:
+  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam52:
     calls: 36
     bytes: 732
   __eq_Node:
@@ -1064,19 +1067,28 @@ functions:
     bytes: 1520
   __m3__lex_step$Tok:
     calls: 151
-    bytes: 21832
+    bytes: 24708
   __m3__nested_len:
     calls: 0
     bytes: 940
   __m3__step_result$Tok:
     calls: 388
-    bytes: 8036
+    bytes: 8364
   __m3__template_scan$Tok:
     calls: 0
     bytes: 2728
   __m3__template_step$Tok:
     calls: 0
     bytes: 476
+  __m3__to_eol_len:
+    calls: 0
+    bytes: 52
+  __m3__to_eol_len$tail:
+    calls: 9
+    bytes: 252
+  __m3__to_eol_unless_len:
+    calls: 0
+    bytes: 368
   __rec_drop_Node:
     calls: 16
     bytes: 72

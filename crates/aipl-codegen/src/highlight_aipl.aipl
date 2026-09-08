@@ -171,42 +171,42 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 7169
-deallocations: 7169
-reallocations: 282
-bytes allocated: 862325
-instructions executed: 692257
-binary size: 218496
-  code: 157840
-  data: 3296
-  metadata: 57360
+allocations: 7292
+deallocations: 7292
+reallocations: 288
+bytes allocated: 880489
+instructions executed: 706748
+binary size: 230336
+  code: 165984
+  data: 3344
+  metadata: 61008
 functions:
   __arr_drop___m1__Entry:
     calls: 2
     bytes: 148
   __arr_drop___m1__Item:
-    calls: 91
+    calls: 93
     bytes: 172
   __arr_drop___m1__Pat:
-    calls: 35
+    calls: 36
     bytes: 116
   __arr_drop___m4__TokenRule$__m6__AiplTok:
     calls: 1
-    bytes: 756
+    bytes: 832
   __arr_retain___m1__Entry:
     calls: 2
     bytes: 148
   __arr_retain___m1__Item:
-    calls: 174
+    calls: 178
     bytes: 172
   __arr_retain___m1__Pat:
-    calls: 32
+    calls: 34
     bytes: 116
   __arr_retain___m4__TokenRule$__m6__AiplTok:
     calls: 0
-    bytes: 756
+    bytes: 832
   __builtin_all$char$s0$lam43:
-    calls: 793
+    calls: 811
     bytes: 212
   __builtin_count_while$char$s0$lam31:
     calls: 0
@@ -262,11 +262,11 @@ functions:
   __m1__caps_fld:
     calls: 4
     bytes: 1344
-  __m1__char_class:
-    calls: 10
-    bytes: 728
+  __m1__char_class_body:
+    calls: 11
+    bytes: 620
   __m1__class_char:
-    calls: 266
+    calls: 268
     bytes: 996
   __m1__decl_pat:
     calls: 2
@@ -276,64 +276,67 @@ functions:
     bytes: 444
   __m1__escape_pat:
     calls: 6
-    bytes: 308
+    bytes: 456
   __m1__fld:
-    calls: 63
+    calls: 65
     bytes: 348
   __m1__json_char:
-    calls: 2500
+    calls: 2555
     bytes: 1228
   __m1__json_str:
-    calls: 153
+    calls: 157
     bytes: 728
   __m1__matcher_pat:
-    calls: 76
-    bytes: 5348
+    calls: 77
+    bytes: 6508
   __m1__obj_fld:
     calls: 5
     bytes: 1576
   __m1__obj_of:
-    calls: 28
+    calls: 29
     bytes: 928
   __m1__pat_json:
-    calls: 33
+    calls: 34
     bytes: 4488
   __m1__re_escape:
-    calls: 99
+    calls: 100
     bytes: 1488
   __m1__run_len:
-    calls: 16
+    calls: 17
     bytes: 1340
   __m2__indent:
-    calls: 123
+    calls: 126
     bytes: 724
   __m5__unescape:
     calls: 0
     bytes: 1108
   __m6__char_lit_emit:
     calls: 0
-    bytes: 1536
+    bytes: 1648
   __m6__dedent_segments:
     calls: 0
     bytes: 272
+  __m6__doc_text:
+    calls: 0
+    bytes: 196
   __m6__int_lit:
     calls: 0
-    bytes: 1212
+    bytes: 1296
   __m6__raw_tpl_kind:
     calls: 0
-    bytes: 2168
+    bytes: 2392
   __m6__tpl_kind:
     calls: 0
-    bytes: 2200
+    bytes: 2424
   __m7__process_raw_string:
     calls: 0
     bytes: 1712
   __rec_drop___m1__Pat:
-    calls: 170
+    calls: 172
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 117484
+    bytes: 123436
   __to_str_u64:
     calls: 7
     bytes: 204
@@ -341,40 +344,40 @@ functions:
     calls: 2
     bytes: (external)
   aipl_arr_inc:
-    calls: 807
+    calls: 828
     bytes: (external)
   aipl_arr_reserve:
-    calls: 144
+    calls: 148
     bytes: (external)
   aipl_arr_slice:
     calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 1341
+    calls: 1374
     bytes: (external)
   aipl_array_new:
-    calls: 191
+    calls: 195
     bytes: (external)
   aipl_array_push:
     calls: 3
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1164
+    calls: 1190
     bytes: (external)
   aipl_array_with_cap:
-    calls: 189
+    calls: 193
     bytes: (external)
   aipl_assert:
     calls: 15
     bytes: (external)
   aipl_rec_alloc:
-    calls: 170
+    calls: 172
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 3393
+    calls: 3511
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 3223
+    calls: 3339
     bytes: (external)
   aipl_test_begin:
     calls: 1

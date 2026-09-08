@@ -22,6 +22,7 @@ import {
     Tail,
     Template,
     ToEol,
+    ToEolUnless,
     Token,
     TokenRule,
     Try,
@@ -30,6 +31,7 @@ import {
 } from "./lexer.aipl";
 import { process_raw_string } from "./process_raw_string.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
+import { trim_prefix } from "./trim_prefix.aipl";
 import { unescape } from "./unescape.aipl";
 
 // AIPL's token kinds — each arm is a kind, carrying that kind's content
@@ -62,6 +64,7 @@ variant AiplTok =
     | LineComment
     | BlockComment
     | AllowMarker
+    | DocComment(str)
     | Name(str)
     | IntLit(i64)
     | StrLit(str, StrStyle)
@@ -136,6 +139,11 @@ variant AiplTok =
 // and `_`) and those that may continue one (adds digits). A keyword rule uses
 // the continue class as its boundary, so `if` doesn't bite the front off `iffy`
 // (see `kw`), and the identifier rule uses both (see `aipl_rules`).
+// A doc comment's text: the line past its `#`, with one optional space of
+// separation removed. `# text` and `#text` carry the same `text`, and a bare
+// `#` an empty line — so a doc block's blank lines survive as blank lines.
+fn doc_text(line: str) -> AiplTok { DocComment(line.trim_prefix('#').trim_prefix(' ')) }
+
 pub fn ident_start() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_" }
 
 pub fn ident_cont() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789" }
@@ -266,6 +274,11 @@ fn s_operator() -> str { "keyword.operator.aipl" }
 
 fn s_punct() -> str { "punctuation.aipl" }
 
+// A doc comment is documentation, not an aside — a highlighter paints it like a
+// doc string rather than like a `//` comment, which is what every editor theme
+// already distinguishes.
+fn s_doc() -> str { "comment.line.documentation.aipl" }
+
 pub fn aipl_rules() -> TokenRule<AiplTok>[] {
     let three_quotes = "\"\"\"";
     [
@@ -300,6 +313,16 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             trivia: true,
             scope: "comment.line.allow.aipl",
         },
+        // `# text` — a doc comment, and a real token rather than trivia: the
+        // grammar accepts one only in front of a declaration, so a `#` anywhere
+        // else is a syntax error rather than something silently ignored. That
+        // is what keeps the `////////` section banners people write inside a
+        // function working — those are `//` comments and stay trivia.
+        //
+        // `#` also leads a set/dict literal (`#{..}`) and the `#[allow]` marker
+        // above, so the matcher declines both leads and they fall through to the
+        // rules that want them.
+        TokenRule { matcher: ToEolUnless("#", "{["), emit: Of(doc_text), scope: s_doc() },
         // Keywords and constants, each its own `kw` rule (identifier-boundary
         // matched, so `iffy`/`noneish` stay `Name`s). Order among them is
         // immaterial — the spellings are disjoint — but all must precede the
@@ -713,34 +736,34 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 3804
-deallocations: 3804
+allocations: 3910
+deallocations: 3910
 reallocations: 33
-bytes allocated: 380989
-instructions executed: 956274
-binary size: 429360
-  code: 295372
-  data: 6700
-  metadata: 127288
+bytes allocated: 387901
+instructions executed: 1000713
+binary size: 465792
+  code: 319052
+  data: 6748
+  metadata: 139992
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
     bytes: 140
   __arr_drop___m1__Token$AiplTok:
     calls: 116
-    bytes: 360
+    bytes: 388
   __arr_drop___m1__TokenRule$AiplTok:
     calls: 20
-    bytes: 756
+    bytes: 832
   __arr_retain___m1__StepResult$AiplTok:
     calls: 1
     bytes: 140
   __arr_retain___m1__Token$AiplTok:
     calls: 63
-    bytes: 360
+    bytes: 388
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
-    bytes: 756
+    bytes: 832
   __builtin_all$char$s0$lam51:
     calls: 4
     bytes: 212
@@ -748,14 +771,17 @@ functions:
     calls: 49
     bytes: 220
   __builtin_count_while$char$s0$lam23:
-    calls: 2
-    bytes: 176
-  __builtin_count_while$char$s0$lam25:
     calls: 28
     bytes: 184
-  __builtin_count_while$char$s0$lam32:
+  __builtin_count_while$char$s0$lam30:
     calls: 0
     bytes: 172
+  __builtin_count_while$char$s0$lam43:
+    calls: 0
+    bytes: 40
+  __builtin_count_while$char$s0$lam43$tail:
+    calls: 3
+    bytes: 256
   __builtin_count_while$char$s0$lam48:
     calls: 4
     bytes: 172
@@ -767,7 +793,7 @@ functions:
     bytes: 1028
   __eq_AiplTok:
     calls: 51
-    bytes: 556
+    bytes: 600
   __eq_StrStyle:
     calls: 4
     bytes: 64
@@ -804,7 +830,7 @@ functions:
   __lambda_2:
     calls: 0
     bytes: 144
-  __lambda_28:
+  __lambda_26:
     calls: 5
     bytes: 140
   __lambda_3:
@@ -833,7 +859,7 @@ functions:
     bytes: 1592
   __m1__finalize_template$AiplTok:
     calls: 3
-    bytes: 7976
+    bytes: 8464
   __m1__float_len:
     calls: 0
     bytes: 824
@@ -845,19 +871,28 @@ functions:
     bytes: 1520
   __m1__lex_step$AiplTok:
     calls: 91
-    bytes: 25260
+    bytes: 28908
   __m1__nested_len:
     calls: 56
     bytes: 940
   __m1__step_result$AiplTok:
-    calls: 1782
-    bytes: 13068
+    calls: 1835
+    bytes: 14224
   __m1__template_scan$AiplTok:
     calls: 3
     bytes: 2728
   __m1__template_step$AiplTok:
     calls: 35
     bytes: 476
+  __m1__to_eol_len:
+    calls: 0
+    bytes: 52
+  __m1__to_eol_len$tail:
+    calls: 111
+    bytes: 252
+  __m1__to_eol_unless_len:
+    calls: 53
+    bytes: 368
   __m2__unescape:
     calls: 8
     bytes: 1108
@@ -875,13 +910,13 @@ functions:
     bytes: 692
   __test$lex_aipl:
     calls: 1
-    bytes: 119020
+    bytes: 130276
   __test$lex_aipl_stripped:
     calls: 1
-    bytes: 6740
+    bytes: 7188
   __test$lex_aipl_tokens:
     calls: 1
-    bytes: 4676
+    bytes: 4956
   __test_try_fail___m1__LexError:
     calls: 0
     bytes: 84
@@ -892,16 +927,16 @@ functions:
     calls: 180
     bytes: (external)
   aipl_arr_inc:
-    calls: 7951
+    calls: 8163
     bytes: (external)
   aipl_arr_reserve:
     calls: 180
     bytes: (external)
   aipl_array_dec:
-    calls: 11750
+    calls: 12068
     bytes: (external)
   aipl_array_new:
-    calls: 3739
+    calls: 3845
     bytes: (external)
   aipl_array_push:
     calls: 13
@@ -917,7 +952,7 @@ functions:
     bytes: (external)
   aipl_rules:
     calls: 20
-    bytes: 85844
+    bytes: 90364
   aipl_test_begin:
     calls: 3
     bytes: (external)
@@ -929,13 +964,16 @@ functions:
     bytes: (external)
   char_lit_emit:
     calls: 4
-    bytes: 1536
+    bytes: 1648
   dedent_segments:
     calls: 1
     bytes: 272
+  doc_text:
+    calls: 0
+    bytes: 196
   int_lit:
     calls: 4
-    bytes: 1212
+    bytes: 1296
   lex_aipl:
     calls: 0
     bytes: 144
@@ -947,7 +985,7 @@ functions:
     bytes: 272
   raw_tpl_kind:
     calls: 1
-    bytes: 2168
+    bytes: 2392
   tpl_kind:
     calls: 3
-    bytes: 2200
+    bytes: 2424

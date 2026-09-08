@@ -3526,6 +3526,7 @@ fn marshal_lex(
             "RawTemplateHead" => return K::RawTemplateHead(str_payload(payload)),
             "RawTemplateMid" => return K::RawTemplateMid(str_payload(payload)),
             "RawTemplateTail" => return K::RawTemplateTail(str_payload(payload)),
+            "DocComment" => return K::DocComment(str_payload(payload)),
             _ => {}
         }
         assert!(

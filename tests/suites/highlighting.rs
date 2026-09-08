@@ -515,6 +515,10 @@ fn expected_category(kind: TokenKind) -> &'static [&'static str] {
         TokenKind::Char => &["string.quoted.single"],
         TokenKind::Operator => &["keyword.operator"],
         TokenKind::Punctuation => &["punctuation"],
+        // A `# ..` doc comment. It is a token rather than trivia, so unlike
+        // `//` and `/* */` it reaches this check, and a theme should paint it
+        // as the comment it is.
+        TokenKind::Comment => &["comment"],
     }
 }
 

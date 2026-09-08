@@ -38,6 +38,16 @@ gazelle! {
             BUILTINS: _,
             // `none` carries a span so we can point at it on type errors.
             NONE: _,
+            // `# text` — one line of a doc comment, carrying that line's text
+            // (the `#` and one optional space already stripped) and its span.
+            //
+            // A terminal rather than trivia, which is what confines it to the
+            // one place it means anything: the grammar accepts `doc_lines`
+            // *only* in front of a declaration, so a `#` line anywhere else is
+            // a syntax error rather than something quietly dropped. That is
+            // also what leaves `//` comments alone — a `////////` banner
+            // between the parts of a function body is trivia and stays trivia.
+            DOC: _,
             // Punctuation
             LPAREN, RPAREN,
             // `{` carries a span so a block with no trailing expression still
@@ -106,8 +116,17 @@ gazelle! {
 
         program = item* => program;
 
-        item = function => function | struct_decl => struct_decl
-             | variant_decl => variant_decl | import_decl => import_decl;
+        // Zero or more `# text` lines in front of a declaration. Right-recursive
+        // so the list stays one production deep; the build action joins the
+        // lines with newlines, which is what makes a blank `#` line a blank line
+        // in the rendered documentation.
+        //
+        // Every item carries the slot, `import` included — an import cannot be
+        // documented, and saying so with a build-action error names the problem
+        // better than a parse error pointing at the `#`.
+        docs = _ => empty | DOC docs => line;
+        item = docs function => function | docs struct_decl => struct_decl
+             | docs variant_decl => variant_decl | docs import_decl => import_decl;
 
         import_decl = IMPORT LBRACE import_names RBRACE FROM STR SEMI => import
                     | IMPORT LBRACE import_names RBRACE FROM BUILTINS SEMI => import_builtins;
@@ -233,6 +252,17 @@ gazelle! {
         variant_cases = variant_case => first
                       | PIPE variant_case => first_leading_pipe
                       | variant_cases PIPE variant_case => rest;
+        // A case takes *no* docs, and cannot while this grammar is LR(1). The
+        // lines would sit before the `|` that separates cases, and after a
+        // complete case list a `DOC` is then ambiguous with one token of
+        // lookahead: it begins another case when a `|` follows it and the next
+        // item's documentation when it does not, and which it is takes two.
+        //
+        // Putting them *after* the `|` resolves it and reads badly enough not to
+        // be worth it (`| # A circle` then the case on the next line). The PEG in
+        // `grammar_aipl.aipl` has no such limit — ordered choice backtracks — so
+        // this is one more thing Stage 5 buys. Per-case docs stay `//` comments
+        // until then.
         variant_case = IDENT => nullary
                      | IDENT LPAREN case_params RPAREN => with_payload;
         // A case's payload slots. Each is a bare type (`Circle(i64)`), a named
@@ -709,6 +739,11 @@ impl aipl::Types for Build {
     type Num = (i64, Span);
     type Str = (String, Span);
     type Char = (u8, Span);
+    /// One `# text` line: its text, and its span.
+    type Doc = (String, Span);
+    /// A run of `# text` lines joined with newlines, and the span of the first
+    /// — `None` when a declaration carries none.
+    type Docs = Option<(String, Span)>;
     type True = Span;
     type False = Span;
     type None = Span;
@@ -919,13 +954,77 @@ impl gazelle::Action<aipl::Program<Self>> for Build {
     }
 }
 
+/// A run of `# text` lines, joined.
+///
+/// Right-recursive in the grammar, so the lines arrive outermost-first and a
+/// simple prepend keeps them in source order. The join is by newline and
+/// nothing else: a blank `#` line contributes an empty line, which is what lets
+/// a doc block have paragraphs.
+impl gazelle::Action<aipl::Docs<Self>> for Build {
+    fn build(&mut self, node: aipl::Docs<Self>) -> Result<Option<(String, Span)>, Self::Error> {
+        Ok(match node {
+            aipl::Docs::Empty => None,
+            aipl::Docs::Line((text, span), rest) => match rest {
+                Some((more, _)) => Some((format!("{text}\n{more}"), span)),
+                None => Some((text, span)),
+            },
+        })
+    }
+}
+
+/// The documentation a declaration ends up with, given its `# text` lines and
+/// any `.doc("..")` it also carries.
+///
+/// Both is an error rather than a precedence rule. The two spellings say the
+/// same thing, so a declaration with both is a half-finished edit, and picking
+/// a winner would leave the other silently dropped — during a migration from
+/// one form to the other, that is precisely the mistake worth catching.
+fn one_doc(
+    lines: Option<(String, Span)>,
+    attr: Option<String>,
+    what: &str,
+) -> Result<Option<String>, Error> {
+    match (lines, attr) {
+        (Some((_, span)), Some(_)) => Err(Error::at(
+            format!(
+                "{what} is documented twice — with `# ..` lines and with \
+                 `.doc(\"..\")`. Keep one; `# ..` is the current form."
+            ),
+            span,
+        )),
+        (Some((text, _)), None) => Ok(Some(text)),
+        (None, attr) => Ok(attr),
+    }
+}
+
 impl gazelle::Action<aipl::Item<Self>> for Build {
     fn build(&mut self, node: aipl::Item<Self>) -> Result<Item, Self::Error> {
         Ok(match node {
-            aipl::Item::Function(f) => Item::Fn(f),
-            aipl::Item::StructDecl(s) => Item::Struct(s),
-            aipl::Item::VariantDecl(v) => Item::Variant(v),
-            aipl::Item::ImportDecl(i) => Item::Import(i),
+            aipl::Item::Function(docs, f) => {
+                let doc = one_doc(docs, f.doc, &format!("fn {:?}", f.name))?;
+                Item::Fn(Function { doc, ..f })
+            }
+            aipl::Item::StructDecl(docs, s) => Item::Struct(StructDecl {
+                doc: docs.map(|(text, _)| text),
+                ..s
+            }),
+            aipl::Item::VariantDecl(docs, v) => Item::Variant(VariantDecl {
+                doc: docs.map(|(text, _)| text),
+                ..v
+            }),
+            aipl::Item::ImportDecl(docs, i) => {
+                // An import brings a name in; it does not declare one, so there
+                // is nothing for documentation to attach to.
+                if let Some((_, span)) = docs {
+                    return Err(Error::at(
+                        "an import cannot be documented — `# ..` lines attach to a \
+                         declaration, and this one is above an `import`"
+                            .to_string(),
+                        span,
+                    ));
+                }
+                Item::Import(i)
+            }
         })
     }
 }
@@ -1111,6 +1210,9 @@ impl gazelle::Action<aipl::StructDecl<Self>> for Build {
         let aipl::StructDecl::StructDecl((name, _), type_params, _, fields) = node;
         Ok(StructDecl {
             name,
+            // The `item` production is what has the docs; this one is reached
+            // through it, so the slot is filled in there.
+            doc: None,
             type_vars: type_params,
             fields,
         })
@@ -1122,6 +1224,7 @@ impl gazelle::Action<aipl::VariantDecl<Self>> for Build {
         let aipl::VariantDecl::VariantDecl((name, _), type_params, cases) = node;
         Ok(VariantDecl {
             name,
+            doc: None,
             type_vars: type_params,
             cases,
         })
@@ -1145,9 +1248,15 @@ impl gazelle::Action<aipl::VariantCase<Self>> for Build {
         Ok(match node {
             aipl::VariantCase::Nullary((name, _)) => VariantCase {
                 name,
+                // No syntax reaches this yet — see the `variant_case` production.
+                doc: None,
                 payload: Vec::new(),
             },
-            aipl::VariantCase::WithPayload((name, _), payload) => VariantCase { name, payload },
+            aipl::VariantCase::WithPayload((name, _), payload) => VariantCase {
+                name,
+                doc: None,
+                payload,
+            },
         })
     }
 }
@@ -3352,6 +3461,10 @@ pub enum LexedTokenKind {
     LineComment,
     BlockComment,
     AllowMarker,
+    /// `# text` — one line of a doc comment, carrying the line's text with the
+    /// `#` and one optional separating space removed. A token, not trivia; see
+    /// the `DOC` terminal.
+    DocComment(String),
     Name(String),
     IntLit(i64),
     StrLit(String, LexedStrStyle),
@@ -3698,6 +3811,10 @@ pub enum TokenKind {
     Operator,
     /// Brackets, separators, sigils: `( ) { } [ ] , ; : . ? =`.
     Punctuation,
+    /// A `# text` doc comment. Unlike `//` and `/* */`, which are trivia and
+    /// never reach a token stream, this one is a token — so a consumer that
+    /// walks tokens (the highlighter's oracle) has to expect it.
+    Comment,
 }
 
 /// Tokenize `input` and classify each token for syntax-highlighter
@@ -3899,6 +4016,9 @@ fn classify_lexed(k: &LexedTokenKind) -> TokenKind {
         | K::RBrace
         | K::LBracket
         | K::RBracket => TokenKind::Punctuation,
+        // A doc comment *is* in the token stream (see the `DOC` terminal), and
+        // to a highlighter it is a comment like any other.
+        K::DocComment(_) => TokenKind::Comment,
         K::Space | K::LineComment | K::BlockComment | K::AllowMarker => {
             unreachable!("trivia kind {k:?} in the token stream")
         }
@@ -4026,6 +4146,7 @@ fn lexed_to_terminals(out: LexedOutput) -> Vec<(aipl::Terminal<Build>, Span)> {
             K::RBrace => T::Rbrace,
             K::LBracket => T::Lbracket(span.clone()),
             K::RBracket => T::Rbracket,
+            K::DocComment(text) => T::Doc((text, span.clone())),
             k @ (K::Space | K::LineComment | K::BlockComment | K::AllowMarker) => {
                 unreachable!("trivia kind {k:?} in the token stream")
             }

@@ -879,6 +879,8 @@ fn rewrite_item(
         }),
         Item::Struct(s) => Item::Struct(StructDecl {
             name: view.get(&s.name).cloned().unwrap_or_else(|| s.name.clone()),
+            // Documentation is plain text — no global references to rewrite.
+            doc: s.doc.clone(),
             type_vars: s.type_vars.clone(),
             // Field types may reference the struct's own type variables (`T`);
             // pass them so they're left un-rewritten.
@@ -894,12 +896,14 @@ fn rewrite_item(
         }),
         Item::Variant(v) => Item::Variant(aipl_syntax::ast::VariantDecl {
             name: view.get(&v.name).cloned().unwrap_or_else(|| v.name.clone()),
+            doc: v.doc.clone(),
             type_vars: v.type_vars.clone(),
             cases: v
                 .cases
                 .iter()
                 .map(|c| aipl_syntax::ast::VariantCase {
                     name: c.name.clone(),
+                    doc: c.doc.clone(),
                     payload: {
                         // A payload default is rewritten exactly as a keyword
                         // parameter's is: the *named* slots declared before it

@@ -160,12 +160,17 @@ pub fn re_escape(s: str) -> str {
     assert(re_escape("") == "");
 })
 
-pub fn char_class(chars: str) -> str {
+pub fn char_class(chars: str) -> str { `[{char_class_body(chars)}]` }
+
+// The inside of a character class — what `char_class` brackets, and what a
+// *negated* class needs instead (`[^..]`, which is not something bracketing an
+// existing class can produce).
+fn char_class_body(chars: str) -> str {
     mut body = "";
     for (let ch : chars) {
         set body = `{body}{class_char(ch)}`;
     }
-    `[{body}]`
+    body
 }.doc("""
     A regex character class accepting exactly the characters of `chars`, in the
     order given. Written out literally rather than collapsed into ranges: the
@@ -221,6 +226,14 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
         // dialect note in the header.
         Keyword(s, _) => Match(`\\b{re_escape(s)}\\b`, scope),
         ToEol(prefix) => Match(`{re_escape(prefix)}.*$`, scope),
+        // The blocked leads are a negated class right after the marker, and the
+        // marker may also end the line — `(?:[^{[]|$)` says both. Rust's `regex`
+        // has no lookahead, so the guard consumes the character it checks;
+        // that is harmless here, since the rest of the line is matched anyway.
+        ToEolUnless(marker, blocked) => Match(
+            `{re_escape(marker)}(?:[^{char_class_body(blocked)}].*)?$`,
+            scope,
+        ),
         Int => Match("-?[0-9]+", scope),
         Float => Match("-?[0-9]+\\.[0-9]+", scope),
         // An escape-aware scan closed by its own opening delimiter. The escape
@@ -531,6 +544,7 @@ fn self_referential(m: Matcher) -> bool {
         | Between(..)
         | Template(..)
         | ToEol(..)
+        | ToEolUnless(..)
         | Int
         | Float => false,
     }
@@ -747,11 +761,11 @@ allocations: 1085
 deallocations: 1085
 reallocations: 33
 bytes allocated: 93191
-instructions executed: 72707
-binary size: 123728
-  code: 77352
+instructions executed: 72776
+binary size: 129312
+  code: 80896
   data: 5034
-  metadata: 41342
+  metadata: 43382
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -764,7 +778,7 @@ functions:
     bytes: 116
   __arr_drop___m3__TokenRule$Kind:
     calls: 2
-    bytes: 500
+    bytes: 544
   __arr_retain_Entry:
     calls: 1
     bytes: 148
@@ -776,7 +790,7 @@ functions:
     bytes: 116
   __arr_retain___m3__TokenRule$Kind:
     calls: 0
-    bytes: 500
+    bytes: 544
   __builtin_all$char$s0$lam21:
     calls: 38
     bytes: 212
@@ -813,9 +827,9 @@ functions:
   __rec_drop_Pat:
     calls: 64
     bytes: 268
-  __test$char_class:
+  __test$char_class_body:
     calls: 1
-    bytes: 996
+    bytes: 1852
   __test$decl_pat:
     calls: 1
     bytes: 1084
@@ -824,10 +838,10 @@ functions:
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 11352
+    bytes: 11896
   __test$matcher_regex:
     calls: 1
-    bytes: 8052
+    bytes: 8316
   __test$re_escape:
     calls: 1
     bytes: 1104
@@ -894,9 +908,9 @@ functions:
   caps_fld:
     calls: 0
     bytes: 1344
-  char_class:
+  char_class_body:
     calls: 15
-    bytes: 728
+    bytes: 620
   class_char:
     calls: 43
     bytes: 996
@@ -905,7 +919,7 @@ functions:
     bytes: 444
   escape_pat:
     calls: 3
-    bytes: 308
+    bytes: 456
   fld:
     calls: 6
     bytes: 348
@@ -917,10 +931,10 @@ functions:
     bytes: 728
   main:
     calls: 1
-    bytes: 664
+    bytes: 676
   matcher_pat:
     calls: 26
-    bytes: 5348
+    bytes: 6508
   obj_fld:
     calls: 1
     bytes: 1576
@@ -935,7 +949,7 @@ functions:
     bytes: 1488
   rule_pats$Kind:
     calls: 2
-    bytes: 10776
+    bytes: 11356
   run_len:
     calls: 5
     bytes: 1340

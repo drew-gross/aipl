@@ -161,6 +161,7 @@ HOF:
 math:
 
 syntax:
+  only allow doc comments at the start of lines
   #{} should flex to empty set or empty dict
   allow default args to be implicitly optional so that you pass T explicitly, but if you pass nothing the callee gets none.
   expr! should return the err held in expr, or exit the test if expr is not an error (only valid in tests for now)
@@ -303,6 +304,7 @@ chain_docs:
 abi:
 
 design:
+  backwards compatibility is less important the age of AI: you can get claude to migrade all your code (note: changes that cause code that used to compile to stop is fine, change that silently change behaviour of existing code is still 100% banned)
   representation is not introspectable
   it's safe to call an untrusted function that doesn't declare any effects
   the most readable implementation is also the fastest
@@ -494,6 +496,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  handoff could regenerate the IR before the discovery run whenever a dogfooded .aipl is newer than the checked-in .clif
   retire AIPL_CASE, add a non-env alternative
   switch the nextest --no-build to the corresponding cargo build so that we get better progress output
   aipl probably needs streaming for proper tee replacement
@@ -575,6 +578,7 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  reflow docs
   make /// docs a thing for things that should be documented (and only for those things)
   make docs renderer part of check
   doc comments for structs/variants

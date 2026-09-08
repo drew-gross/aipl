@@ -122,6 +122,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
             }
             Item::Struct(s) => Item::Struct(StructDecl {
                 name: s.name.clone(),
+                doc: s.doc.clone(),
                 type_vars: s.type_vars.clone(),
                 fields: s
                     .fields
@@ -413,6 +414,7 @@ pub fn lower_tuples(program: &Program) -> Program {
             Item::Variant(v) if v.is_generic() => item.clone(),
             Item::Struct(s) => Item::Struct(StructDecl {
                 name: s.name.clone(),
+                doc: s.doc.clone(),
                 type_vars: s.type_vars.clone(),
                 fields: s
                     .fields
@@ -425,12 +427,14 @@ pub fn lower_tuples(program: &Program) -> Program {
             }),
             Item::Variant(v) => Item::Variant(VariantDecl {
                 name: v.name.clone(),
+                doc: v.doc.clone(),
                 type_vars: v.type_vars.clone(),
                 cases: v
                     .cases
                     .iter()
                     .map(|c| VariantCase {
                         name: c.name.clone(),
+                        doc: c.doc.clone(),
                         payload: c
                             .payload
                             .iter()
@@ -450,6 +454,7 @@ pub fn lower_tuples(program: &Program) -> Program {
         .into_iter()
         .map(|name| {
             Item::Struct(StructDecl {
+                doc: None,
                 type_vars: Vec::new(),
                 fields: fields_map.remove(&name).unwrap(),
                 name,
@@ -844,6 +849,7 @@ impl GenericLowerer {
                 });
             }
             self.synth.push(Item::Struct(StructDecl {
+                doc: None,
                 name: name.clone(),
                 type_vars: Vec::new(),
                 fields,
@@ -863,11 +869,13 @@ impl GenericLowerer {
                     })
                     .collect::<Result<_, Error>>()?;
                 cases.push(VariantCase {
+                    doc: c.doc.clone(),
                     name: c.name.clone(),
                     payload,
                 });
             }
             self.synth.push(Item::Variant(VariantDecl {
+                doc: None,
                 name: name.clone(),
                 type_vars: Vec::new(),
                 cases,
@@ -1065,6 +1073,7 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
             Item::Struct(s) if s.is_generic() => item.clone(),
             Item::Variant(v) if v.is_generic() => item.clone(),
             Item::Struct(s) => Item::Struct(StructDecl {
+                doc: s.doc.clone(),
                 name: s.name.clone(),
                 type_vars: Vec::new(),
                 fields: s
@@ -1080,6 +1089,7 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
                     .collect::<Result<_, Error>>()?,
             }),
             Item::Variant(v) => Item::Variant(VariantDecl {
+                doc: v.doc.clone(),
                 name: v.name.clone(),
                 type_vars: Vec::new(),
                 cases: v
@@ -1087,6 +1097,7 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
                     .iter()
                     .map(|c| {
                         Ok(VariantCase {
+                            doc: c.doc.clone(),
                             name: c.name.clone(),
                             payload: c
                                 .payload
@@ -1469,6 +1480,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         .syn_structs
         .drain()
         .map(|(name, fields)| StructDecl {
+            doc: None,
             name,
             type_vars: Vec::new(),
             fields: fields
@@ -1485,11 +1497,13 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         .syn_variants
         .drain()
         .map(|(name, cases)| VariantDecl {
+            doc: None,
             name,
             type_vars: Vec::new(),
             cases: cases
                 .into_iter()
                 .map(|(name, payload)| VariantCase {
+                    doc: None,
                     name,
                     // A synthesized instance is downstream of every default
                     // (the loader filled them at each construction site), so

@@ -22,7 +22,8 @@
 //! 2. Discovery run. Three outcomes:
 //!    - green → done.
 //!    - only fillable staleness (a section mismatch, a drifted per-case
-//!      `#[test]` list, or IR staleness) → remediate (steps 3-5), then
+//!      `#[test]` list, a stale docs site, or IR staleness) → remediate
+//!      (steps 3-5), then
 //!      re-confirm. Refreshing a section is always recoverable
 //!      (`git reset --hard HEAD`), so even behavioral sections (stdout / exit
 //!      code / errors / check) are refilled and the git diff is the review
@@ -36,6 +37,10 @@
 //! 4. `fill_expected`, scoped with `AIPL_CASE` to the mismatched cases (all of
 //!    them, in one run — see the step), refreshes just those cases' sections
 //!    from actual output rather than the whole corpus.
+//! 4b. `fill_docs` regenerates the checked-in `docs/` site. Before the IR steps,
+//!    because step 5's staged-IR corpus run executes the whole suite — a site
+//!    still stale there fails that run, and handoff would read the failure as
+//!    "the candidate IR is wrong".
 //! 5. Staged dogfood-IR regen: fill → validate → corpus run against the staged
 //!    artifact → auto-promote when that run is green. Then (step "5b") a
 //!    rebuild, if step 3 regenerated the per-case `#[test]` list — the one thing
@@ -423,6 +428,31 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
         }
     }
 
+    // --- 4b. Regenerate the checked-in documentation site ------------------
+
+    // Before the IR steps, not after: the staged-IR corpus run below executes
+    // the *whole* suite, so a docs site still stale at that point fails it —
+    // and handoff reads a failure there as "the candidate IR is wrong", which
+    // sends you diffing `.staged` against live for something that has nothing
+    // to do with the IR. The site is a function of the source, which formatting
+    // and the refills have already settled by here.
+    //
+    // It is a plain regeneration with nothing to validate: a wrong site means
+    // the generator is wrong, and the final run's `checked_in_docs_are_current`
+    // is what says so.
+    if plan.need_docs {
+        r.step(
+            "fill_docs (checked-in docs site)",
+            helper("docs_site::fill_docs"),
+        );
+        let out = helper_output(&mut r, "fill_docs");
+        if !out.contains("review the diff") {
+            r.save_out();
+            let detail = tail(&out, 40);
+            r.fail("fill_docs", &detail);
+        }
+    }
+
     // --- 5. Regenerate + validate + promote dogfood IR ---------------------
 
     if plan.need_ir {
@@ -464,27 +494,6 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
             r.save_out();
             let detail = tail(&out, 40);
             r.fail("promote_staged_ir", &detail);
-        }
-    }
-
-    // --- 5a. Regenerate the checked-in documentation site ------------------
-
-    // After the IR, because it reads the same sources every other step has
-    // finished settling — formatting first (which moves nothing a page shows,
-    // but ordering it last costs nothing) and any refills that changed a doc.
-    // It is a plain regeneration with nothing to validate: the site is a
-    // function of the source, so a wrong one means the generator is wrong, and
-    // the final run's `checked_in_docs_are_current` is what says so.
-    if plan.need_docs {
-        r.step(
-            "fill_docs (checked-in docs site)",
-            helper("docs_site::fill_docs"),
-        );
-        let out = helper_output(&mut r, "fill_docs");
-        if !out.contains("review the diff") {
-            r.save_out();
-            let detail = tail(&out, 40);
-            r.fail("fill_docs", &detail);
         }
     }
 

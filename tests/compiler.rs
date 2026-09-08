@@ -14,6 +14,8 @@ mod check;
 mod codegen;
 #[path = "suites/doc_cmd.rs"]
 mod doc_cmd;
+#[path = "suites/doc_comments.rs"]
+mod doc_comments;
 #[path = "suites/docs_site.rs"]
 mod docs_site;
 #[path = "suites/fmt.rs"]

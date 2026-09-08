@@ -301,11 +301,11 @@ allocations: 26821
 deallocations: 26821
 reallocations: 2333
 bytes allocated: 1323471
-instructions executed: 4552028
-binary size: 236040
-  code: 151008
+instructions executed: 4568253
+binary size: 242840
+  code: 155084
   data: 3940
-  metadata: 81092
+  metadata: 83816
 functions:
   __arr_drop_Sexp:
     calls: 862
@@ -333,7 +333,7 @@ functions:
     bytes: 160
   __arr_drop___m4__TokenRule$SexpKind:
     calls: 24
-    bytes: 560
+    bytes: 604
   __arr_retain_Sexp:
     calls: 873
     bytes: 116
@@ -360,16 +360,19 @@ functions:
     bytes: 160
   __arr_retain___m4__TokenRule$SexpKind:
     calls: 0
-    bytes: 560
+    bytes: 604
   __builtin_count_while$char$lam62:
     calls: 77
     bytes: 220
   __builtin_count_while$char$s0$lam70:
-    calls: 5
-    bytes: 176
-  __builtin_count_while$char$s0$lam72:
     calls: 0
     bytes: 184
+  __builtin_count_while$char$s0$lam90:
+    calls: 0
+    bytes: 40
+  __builtin_count_while$char$s0$lam90$tail:
+    calls: 5
+    bytes: 256
   __builtin_find_if$__m3__Prec$lam109:
     calls: 0
     bytes: 688
@@ -382,7 +385,7 @@ functions:
   __builtin_find_index$str$lam56:
     calls: 48
     bytes: 400
-  __builtin_try_map$__m1__Cst$Sexp$__m3__ParseError$lam81:
+  __builtin_try_map$__m1__Cst$Sexp$__m3__ParseError$lam79:
     calls: 867
     bytes: 748
   __builtin_try_map$__m3__Production$SexpKind$Sexp$__m2__First<SexpKind>$__m3__ParseError$lam50:
@@ -391,7 +394,7 @@ functions:
   __builtin_try_map$__m3__Production$SexpKind$Sexp$__m3__Production$SexpKind$Sexp$__m3__ParseError$lam44:
     calls: 24
     bytes: 972
-  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam84:
+  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam82:
     calls: 48
     bytes: 732
   __eq_Sexp:
@@ -510,19 +513,28 @@ functions:
     bytes: 1520
   __m4__lex_step$SexpKind:
     calls: 936
-    bytes: 21272
+    bytes: 24120
   __m4__nested_len:
     calls: 0
     bytes: 940
   __m4__step_result$SexpKind:
     calls: 3585
-    bytes: 7152
+    bytes: 7500
   __m4__template_scan$SexpKind:
     calls: 0
     bytes: 2728
   __m4__template_step$SexpKind:
     calls: 0
     bytes: 476
+  __m4__to_eol_len:
+    calls: 0
+    bytes: 52
+  __m4__to_eol_len$tail:
+    calls: 900
+    bytes: 252
+  __m4__to_eol_unless_len:
+    calls: 0
+    bytes: 368
   __m6__climb$SexpKind$Sexp:
     calls: 0
     bytes: 2736

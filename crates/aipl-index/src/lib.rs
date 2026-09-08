@@ -83,7 +83,9 @@ pub struct Symbol {
     /// `variant Shape`, `Circle(i64)`. What a hover shows above the docs, and
     /// what a docs page uses as a heading.
     pub detail: String,
-    /// The `.doc("..")` text, verbatim. Only functions can carry one today.
+    /// The declaration's documentation: its `# ..` lines, joined with newlines,
+    /// or the `.doc("..")` a function may still carry instead. `None` when it is
+    /// undocumented.
     pub doc: Option<String>,
     /// Declared `pub`, and so importable by another file. Always false for a
     /// case, whose visibility is its variant's.
@@ -269,7 +271,7 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                     name: s.name.clone(),
                     kind: SymbolKind::Struct,
                     detail: format!("struct {}{}", s.name, type_vars(&s.type_vars)),
-                    doc: None,
+                    doc: s.doc.clone(),
                     is_pub: true,
                     name_span,
                     parent: None,
@@ -283,7 +285,7 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                     name: v.name.clone(),
                     kind: SymbolKind::Variant,
                     detail: format!("variant {}{}", v.name, type_vars(&v.type_vars)),
-                    doc: None,
+                    doc: v.doc.clone(),
                     is_pub: true,
                     name_span,
                     parent: None,
@@ -316,7 +318,7 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                         name: case.name.clone(),
                         kind: SymbolKind::Case,
                         detail,
-                        doc: None,
+                        doc: case.doc.clone(),
                         is_pub: true,
                         name_span: case_span,
                         parent: Some(v.name.clone()),

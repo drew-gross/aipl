@@ -68,6 +68,8 @@
 
           <li><code>ToEol</code> <span class="from">from ./lexer.aipl</span></li>
 
+          <li><code>ToEolUnless</code> <span class="from">from ./lexer.aipl</span></li>
+
           <li><code>Token</code> <span class="from">from ./lexer.aipl</span></li>
 
           <li><code>TokenRule</code> <span class="from">from ./lexer.aipl</span></li>
@@ -81,6 +83,8 @@
           <li><code>process_raw_string</code> <span class="from">from ./process_raw_string.aipl</span></li>
 
           <li><code>strip_test_sections</code> <span class="from">from ./strip_test_sections.aipl</span></li>
+
+          <li><code>trim_prefix</code> <span class="from">from ./trim_prefix.aipl</span></li>
 
           <li><code>unescape</code> <span class="from">from ./unescape.aipl</span></li>
 
@@ -134,6 +138,8 @@
           <li id="item-BlockComment"><code>BlockComment</code></li>
 
           <li id="item-AllowMarker"><code>AllowMarker</code></li>
+
+          <li id="item-DocComment"><code>DocComment(str)</code></li>
 
           <li id="item-Name"><code>Name(str)</code></li>
 
@@ -274,6 +280,19 @@
           <li id="item-RBracket"><code>RBracket</code></li>
 
         </ul>
+
+      </section>
+
+      <section class="item" id="item-doc_text">
+        <h2>
+          <a class="anchor" href="#item-doc_text">doc_text</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn doc_text(line: str) -&#62; AiplTok</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
 
       </section>
 
@@ -505,6 +524,19 @@
 
         </h2>
         <pre class="signature"><code>fn s_punct() -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-s_doc">
+        <h2>
+          <a class="anchor" href="#item-s_doc">s_doc</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn s_doc() -&#62; str</code></pre>
 
         <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
 

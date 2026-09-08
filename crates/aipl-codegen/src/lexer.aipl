@@ -254,6 +254,17 @@ variant Matcher =
     // The `marker` spelling, then everything up to (not including) the next
     // newline. Line comments — usually `skip: true`.
     | ToEol(str)
+    // `marker`, then everything up to (not including) the next newline — but
+    // only when the character right after `marker` is *not* in `blocked`. Line
+    // comments whose marker is also the start of something else: AIPL's `#`
+    // leads a doc comment, and also a set/dict literal (`#{..}`) and the
+    // `#[allow]` lint marker, so `ToEolUnless("#", "{[")` claims the comment
+    // and leaves the other two to the rules that want them.
+    //
+    // The marker alone at end of line still matches — an empty doc line has no
+    // following character to block it, and writing one as `marker` plus a space
+    // is not open to a language that forbids trailing whitespace.
+    | ToEolUnless(marker: str, blocked: str)
     // A digit run that extends past a fraction (`.` plus at least one digit)
     // and/or an exponent (`e`/`E`, an optional sign, at least one digit), JSON
     // style. A bare digit run does *not* match — put a `Float` rule ahead of
@@ -499,6 +510,20 @@ fn to_eol_len(self: str, marker: str) -> u64 {
     }
 }
 
+// `ToEolUnless`: `to_eol_len`, refused when the character right after the marker
+// is one `blocked` claims. End of input or a newline right after the marker is
+// *not* blocked — an empty comment line is a comment.
+fn to_eol_unless_len(self: str, marker: str, blocked: str) -> u64 {
+    let len = self.to_eol_len(marker);
+    if (len == 0) {
+        return 0;
+    };
+    match (self[marker.len()..].first()) {
+        some(c) => if (blocked.contains(c)) { 0 } else { len },
+        none => len,
+    }
+}
+
 // The end of the number whose integer part ends at `int_end`: extends past a
 // fraction (`.` then at least one digit), then past an exponent (`e` or `E`,
 // an optional sign, then at least one digit). Either part may be absent;
@@ -564,6 +589,7 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
         | Keyword(..)
         | Template(..)
         | ToEol(..)
+        | ToEolUnless(..)
         | Float
         | Int => NoValue,
     }
@@ -675,6 +701,12 @@ fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
                 r.unterminated,
             )?,
             ToEol(marker) => step_result(r, src, at, src[at..].to_eol_len(marker))?,
+            ToEolUnless(marker, blocked) => step_result(
+                r,
+                src,
+                at,
+                src[at..].to_eol_unless_len(marker, blocked),
+            )?,
             Float => step_result(r, src, at, src[at..].float_len())?,
             Int => step_result(r, src, at, src[at..].int_len())?,
         };
@@ -1302,6 +1334,34 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
 
     // Trivia: a `trivia: true` rule is consumed like a skip rule, but each match
     // is recorded in the result's side-channel, out of the token stream.
+    // `ToEolUnless`: a marker that also leads something else. `#` opens a doc
+    // comment, except before `{` (a set literal) or `[` (the lint marker),
+    // which the rules after it claim.
+    let doc_r: TokenRule<Kind> = TokenRule { matcher: ToEolUnless("#", "{["), emit: Of(Str) };
+    let punct_r: TokenRule<Kind> = TokenRule { matcher: OneChar("#{}"), emit: Bare(Punct) };
+    let docs = [ws, doc_r, punct_r, ident, digits];
+    assert(
+        lex("# hi\na", docs)? == toks([
+            tok("# hi\na", Str("# hi"), 0..4),
+            tok("# hi\na", Ident("a"), 5..6),
+        ]),
+    );
+    // The blocked leads fall through to the rule that wants them.
+    assert(
+        lex("#{a}", docs)? == toks([
+            tok("#{a}", Punct, 0..1),
+            tok("#{a}", Punct, 1..2),
+            tok("#{a}", Ident("a"), 2..3),
+            tok("#{a}", Punct, 3..4),
+        ]),
+    );
+
+    // A bare marker at end of line is an empty comment, not a blocked one:
+    // there is no following character to block it.
+    assert(
+        lex("#\na", docs)? == toks([tok("#\na", Str("#"), 0..1), tok("#\na", Ident("a"), 2..3)]),
+    );
+
     let cmt_t = TokenRule { matcher: ToEol("//"), emit: Bare(Comment), trivia: true };
     let allow_t = TokenRule { matcher: Exact("#[allow]"), emit: Bare(Allow), trivia: true };
     let trv = [ws, cmt_t, allow_t, ident, digits];
@@ -1407,69 +1467,72 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1531
-deallocations: 1531
-reallocations: 49
-bytes allocated: 104064
-instructions executed: 321528
-binary size: 2013240
-  code: 1348012
-  data: 10036
-  metadata: 655192
+allocations: 1604
+deallocations: 1604
+reallocations: 54
+bytes allocated: 108824
+instructions executed: 340458
+binary size: 2310448
+  code: 1545196
+  data: 10524
+  metadata: 754728
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
     bytes: 140
   __arr_drop_Token$Kind:
-    calls: 323
+    calls: 340
     bytes: 472
   __arr_drop_TokenRule$Kind:
-    calls: 34
-    bytes: 872
+    calls: 35
+    bytes: 916
   __arr_retain_StepResult$Kind:
     calls: 9
     bytes: 140
   __arr_retain_Token$Kind:
-    calls: 168
+    calls: 176
     bytes: 472
   __arr_retain_TokenRule$Kind:
     calls: 6
-    bytes: 872
-  __builtin_count_while$char$lam33:
-    calls: 79
+    bytes: 916
+  __builtin_count_while$char$lam35:
+    calls: 84
     bytes: 220
-  __builtin_count_while$char$s0$lam41:
-    calls: 5
-    bytes: 176
   __builtin_count_while$char$s0$lam43:
     calls: 49
     bytes: 184
-  __builtin_count_while$char$s0$lam58:
+  __builtin_count_while$char$s0$lam55:
+    calls: 0
+    bytes: 40
+  __builtin_count_while$char$s0$lam55$tail:
+    calls: 8
+    bytes: 256
+  __builtin_count_while$char$s0$lam60:
     calls: 13
     bytes: 172
   __builtin_int_parse:
     calls: 13
     bytes: 1028
   __eq_Kind:
-    calls: 100
+    calls: 108
     bytes: 632
   __eq_LexError:
     calls: 15
     bytes: 128
   __eq_LexResult$Kind:
-    calls: 47
+    calls: 50
     bytes: 120
   __eq_SpanStr:
-    calls: 101
+    calls: 109
     bytes: 128
   __eq_Token$Kind:
-    calls: 100
+    calls: 108
     bytes: 120
   __eq_Token$Kind$arr:
-    calls: 94
+    calls: 100
     bytes: 284
   __eq___builtin_Span:
-    calls: 119
+    calls: 127
     bytes: 104
   __eq_char$opt:
     calls: 85
@@ -1526,6 +1589,12 @@ functions:
     calls: 0
     bytes: 128
   __lambda_25:
+    calls: 2
+    bytes: 96
+  __lambda_26:
+    calls: 0
+    bytes: 128
+  __lambda_27:
     calls: 1
     bytes: 96
   __lambda_4:
@@ -1535,7 +1604,7 @@ functions:
     calls: 67
     bytes: 140
   __lambda_5:
-    calls: 29
+    calls: 32
     bytes: 96
   __lambda_6:
     calls: 0
@@ -1554,10 +1623,10 @@ functions:
     bytes: 1108
   __test$keep_skipped:
     calls: 1
-    bytes: 24304
+    bytes: 25276
   __test$lex:
     calls: 1
-    bytes: 1227536
+    bytes: 1418872
   __test$span_str:
     calls: 1
     bytes: 3152
@@ -1568,19 +1637,19 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 330
+    calls: 350
     bytes: (external)
   aipl_arr_inc:
-    calls: 3546
+    calls: 3735
     bytes: (external)
   aipl_arr_reserve:
-    calls: 330
+    calls: 350
     bytes: (external)
   aipl_array_dec:
-    calls: 5069
+    calls: 5331
     bytes: (external)
   aipl_array_new:
-    calls: 1288
+    calls: 1355
     bytes: (external)
   aipl_array_push:
     calls: 72
@@ -1592,7 +1661,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_assert:
-    calls: 83
+    calls: 86
     bytes: (external)
   aipl_test_begin:
     calls: 3
@@ -1629,13 +1698,13 @@ functions:
     bytes: 2248
   keep_skipped$Kind:
     calls: 3
-    bytes: 5664
+    bytes: 5956
   lex$Kind:
-    calls: 69
+    calls: 72
     bytes: 1520
   lex_step$Kind:
-    calls: 161
-    bytes: 27512
+    calls: 171
+    bytes: 30672
   main:
     calls: 1
     bytes: 240
@@ -1649,16 +1718,25 @@ functions:
     calls: 3
     bytes: 3040
   step_result$Kind:
-    calls: 442
-    bytes: 16268
+    calls: 469
+    bytes: 16588
   template_scan$Kind:
     calls: 16
     bytes: 2728
   template_step$Kind:
     calls: 27
     bytes: 476
+  to_eol_len:
+    calls: 0
+    bytes: 52
+  to_eol_len$tail:
+    calls: 27
+    bytes: 252
+  to_eol_unless_len:
+    calls: 8
+    bytes: 368
   toks:
-    calls: 44
+    calls: 47
     bytes: 144
   tpl_kind:
     calls: 17

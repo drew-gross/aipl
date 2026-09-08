@@ -414,11 +414,11 @@ allocations: 8899
 deallocations: 8899
 reallocations: 779
 bytes allocated: 528521
-instructions executed: 1384255
-binary size: 249776
-  code: 159128
+instructions executed: 1386742
+binary size: 256480
+  code: 163124
   data: 4980
-  metadata: 85668
+  metadata: 88376
 functions:
   __arr_drop_Calc:
     calls: 348
@@ -449,7 +449,7 @@ functions:
     bytes: 128
   __arr_drop___m4__TokenRule$CalcTok:
     calls: 41
-    bytes: 500
+    bytes: 544
   __arr_retain_Calc:
     calls: 407
     bytes: 116
@@ -479,7 +479,7 @@ functions:
     bytes: 128
   __arr_retain___m4__TokenRule$CalcTok:
     calls: 0
-    bytes: 500
+    bytes: 544
   __builtin_count_while$char$lam64:
     calls: 132
     bytes: 220
@@ -487,11 +487,14 @@ functions:
     calls: 94
     bytes: 172
   __builtin_count_while$char$s0$lam72:
-    calls: 0
-    bytes: 176
-  __builtin_count_while$char$s0$lam74:
     calls: 104
     bytes: 184
+  __builtin_count_while$char$s0$lam92:
+    calls: 0
+    bytes: 40
+  __builtin_count_while$char$s0$lam92$tail:
+    calls: 0
+    bytes: 256
   __builtin_find_if$__m3__Prec$lam111:
     calls: 102
     bytes: 688
@@ -507,7 +510,7 @@ functions:
   __builtin_int_parse:
     calls: 94
     bytes: 1028
-  __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam83:
+  __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam81:
     calls: 387
     bytes: 748
   __builtin_try_map$__m3__Production$CalcTok$Calc$__m2__First<CalcTok>$__m3__ParseError$lam52:
@@ -516,7 +519,7 @@ functions:
   __builtin_try_map$__m3__Production$CalcTok$Calc$__m3__Production$CalcTok$Calc$__m3__ParseError$lam46:
     calls: 41
     bytes: 972
-  __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule<CalcTok>$__m3__ParseError$lam86:
+  __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule<CalcTok>$__m3__ParseError$lam84:
     calls: 164
     bytes: 732
   __eq_Calc:
@@ -632,19 +635,28 @@ functions:
     bytes: 1520
   __m4__lex_step$CalcTok:
     calls: 338
-    bytes: 20332
+    bytes: 23120
   __m4__nested_len:
     calls: 0
     bytes: 940
   __m4__step_result$CalcTok:
     calls: 648
-    bytes: 5856
+    bytes: 6184
   __m4__template_scan$CalcTok:
     calls: 0
     bytes: 2728
   __m4__template_step$CalcTok:
     calls: 0
     bytes: 476
+  __m4__to_eol_len:
+    calls: 0
+    bytes: 52
+  __m4__to_eol_len$tail:
+    calls: 0
+    bytes: 252
+  __m4__to_eol_unless_len:
+    calls: 0
+    bytes: 368
   __m6__climb$CalcTok$Calc:
     calls: 117
     bytes: 2736

@@ -492,6 +492,9 @@ pub mod ast {
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct StructDecl {
         pub name: String,
+        /// The `# ..` doc comment above the declaration, lines joined with
+        /// newlines. `None` when it carries none.
+        pub doc: Option<String>,
         /// Declared generic type parameters, e.g. `struct Box<T> { .. }` →
         /// `[TypeParam { name: "T", bound: Any }]`. Empty for an ordinary
         /// (non-generic) struct. A struct with type parameters is a *template*:
@@ -525,6 +528,9 @@ pub mod ast {
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct VariantDecl {
         pub name: String,
+        /// The `# ..` doc comment above the declaration, lines joined with
+        /// newlines. `None` when it carries none.
+        pub doc: Option<String>,
         /// Declared generic type parameters, e.g. `variant Opt<T> = Some(T) |
         /// Nothing` → `[TypeParam { name: "T", bound: Any }]`. Empty for an
         /// ordinary variant. Like [`StructDecl::type_vars`], a variant with type
@@ -543,6 +549,9 @@ pub mod ast {
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct VariantCase {
         pub name: String,
+        /// The `# ..` doc comment above the declaration, lines joined with
+        /// newlines. `None` when it carries none.
+        pub doc: Option<String>,
         /// The payload slots, in declaration order; empty for a nullary case
         /// (e.g. `Empty`).
         pub payload: Vec<CaseParam>,

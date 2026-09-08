@@ -446,11 +446,11 @@ allocations: 11966
 deallocations: 11966
 reallocations: 581
 bytes allocated: 884674
-instructions executed: 1833876
-binary size: 274760
-  code: 176080
+instructions executed: 1838685
+binary size: 281560
+  code: 180156
   data: 6404
-  metadata: 92276
+  metadata: 95000
 functions:
   __arr_drop_Json:
     calls: 125
@@ -478,7 +478,7 @@ functions:
     bytes: 160
   __arr_drop___m4__TokenRule$JsonTok:
     calls: 38
-    bytes: 560
+    bytes: 604
   __arr_retain_Json:
     calls: 135
     bytes: 116
@@ -505,16 +505,19 @@ functions:
     bytes: 160
   __arr_retain___m4__TokenRule$JsonTok:
     calls: 0
-    bytes: 560
+    bytes: 604
   __builtin_count_while$char$lam63:
     calls: 39
     bytes: 220
   __builtin_count_while$char$s0$lam71:
-    calls: 0
-    bytes: 176
-  __builtin_count_while$char$s0$lam73:
     calls: 308
     bytes: 184
+  __builtin_count_while$char$s0$lam91:
+    calls: 0
+    bytes: 40
+  __builtin_count_while$char$s0$lam91$tail:
+    calls: 0
+    bytes: 256
   __builtin_find_if$__m3__Prec$lam110:
     calls: 0
     bytes: 688
@@ -527,7 +530,7 @@ functions:
   __builtin_find_index$str$lam57:
     calls: 342
     bytes: 400
-  __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam82:
+  __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam80:
     calls: 142
     bytes: 748
   __builtin_try_map$__m3__Production$JsonTok$Json$__m2__First<JsonTok>$__m3__ParseError$lam52:
@@ -536,7 +539,7 @@ functions:
   __builtin_try_map$__m3__Production$JsonTok$Json$__m3__Production$JsonTok$Json$__m3__ParseError$lam46:
     calls: 38
     bytes: 972
-  __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule<JsonTok>$__m3__ParseError$lam85:
+  __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule<JsonTok>$__m3__ParseError$lam83:
     calls: 228
     bytes: 732
   __eq_Json:
@@ -661,19 +664,28 @@ functions:
     bytes: 1520
   __m4__lex_step$JsonTok:
     calls: 233
-    bytes: 21272
+    bytes: 24120
   __m4__nested_len:
     calls: 0
     bytes: 940
   __m4__step_result$JsonTok:
     calls: 1357
-    bytes: 7152
+    bytes: 7500
   __m4__template_scan$JsonTok:
     calls: 0
     bytes: 2728
   __m4__template_step$JsonTok:
     calls: 0
     bytes: 476
+  __m4__to_eol_len:
+    calls: 0
+    bytes: 52
+  __m4__to_eol_len$tail:
+    calls: 0
+    bytes: 252
+  __m4__to_eol_unless_len:
+    calls: 0
+    bytes: 368
   __m5__unescape:
     calls: 31
     bytes: 1108
