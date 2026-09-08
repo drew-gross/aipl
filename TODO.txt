@@ -223,6 +223,7 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 parser:
+  after gazelle is retired, allow doc comments for variant cases
   minimize rule binding shorthand necessity by improving the type system
   chage Far to use a set of expected
   Mk should accept fns that only need kids

@@ -19,6 +19,15 @@
 //!    goes after `cargo fmt` (which can invalidate what it built) and before
 //!    `format_corpus` (which, since the dogfooded `.aipl` sources became
 //!    run-time reads, no longer can).
+//! 1b. If any dogfooded `.aipl` is newer than `dogfood.clif`/`fmt.clif`,
+//!    regenerate and promote the artifact *before* anything runs against it.
+//!    A stale artifact does not fail tidily — the compiler runs on it, so the
+//!    fresh Rust half and the stale AIPL half disagree and misbehave wherever
+//!    they touch, which reads as an unrelated case failing its `.test`. That is
+//!    the one category a refill cannot fix, so the gate stops — before the
+//!    regeneration that would have fixed it. Doing it here costs no extra suite
+//!    run: the discovery run below becomes the corpus validation that step 5
+//!    would otherwise have run separately.
 //! 2. Discovery run. Three outcomes:
 //!    - green → done.
 //!    - only fillable staleness (a section mismatch, a drifted per-case
@@ -138,6 +147,43 @@ fn nextest_build() -> Cmd {
 
 /// One `#[ignore]`d author helper, by exact name. nextest selects ignored tests
 /// with `--run-ignored only` rather than libtest's `-- --ignored <name>`.
+/// Whether any dogfooded `.aipl` is newer than the artifact compiled from it.
+///
+/// The sources are every `.aipl` under `crates/aipl-codegen/src/`, which is a
+/// superset of `DOGFOOD_SOURCE_FILES` and `FMT_SOURCE_FILES` — deliberately, so
+/// that adding a file to either list cannot leave this check silently blind to
+/// it. A file in that directory that neither list names costs at most one
+/// needless regeneration, on the run that edits it and not after: generation is
+/// deterministic, so an artifact rebuilt from sources that did not really change
+/// comes out byte-identical and the promote leaves nothing in the diff — it
+/// costs the seconds, not the churn.
+///
+/// Unreadable metadata answers "not behind": a missing artifact is a different
+/// problem, reported by the run itself, and a missing source is the loud panic
+/// `read_dogfood_sources` already raises.
+fn ir_is_behind_sources(repo: &Path) -> bool {
+    let dir = repo.join("crates/aipl-codegen/src");
+    let artifact = |name: &str| {
+        std::fs::metadata(dir.join(name))
+            .and_then(|m| m.modified())
+            .ok()
+    };
+    let (Some(dogfood), Some(fmt)) = (artifact("dogfood.clif"), artifact("fmt.clif")) else {
+        return false;
+    };
+    let oldest = dogfood.min(fmt);
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return false;
+    };
+    entries.flatten().any(|e| {
+        let path = e.path();
+        path.extension().is_some_and(|x| x == "aipl")
+            && e.metadata()
+                .and_then(|m| m.modified())
+                .is_ok_and(|t| t > oldest)
+    })
+}
+
 fn helper(name: &str) -> Cmd {
     Cmd::new("cargo")
         .args([
@@ -233,6 +279,10 @@ or discard it
         );
     }
 
+    // Set when step 1b promotes a fresh artifact, so the closing report can say
+    // so and step 5 knows there is nothing left to regenerate.
+    let mut regenerated_ir = false;
+
     // --- 1. Format + build (cheap, up front, span-shifting) ---------------
 
     if !r.step("cargo fmt (Rust)", Cmd::new("cargo").args(["fmt"])) {
@@ -295,6 +345,73 @@ or discard it
         r.fail("compile", &detail);
     }
 
+    // --- 1b. Bring the dogfood IR up to date, before anything reads it ------
+
+    // Why here and not step 5, where the *reported* IR staleness is remediated:
+    // the compiler runs on the checked-in `.clif`, so an edited dogfooded
+    // `.aipl` leaves the freshly-built Rust and the artifact it drives out of
+    // step with each other. What that produces is not a tidy
+    // `checked_in_ir_is_current` failure — it is arbitrary misbehaviour in
+    // whatever the desynchronized half touches, which has twice now surfaced as
+    // an unrelated case failing its in-language `.test` and stopped the gate
+    // before the regeneration that would have fixed it. A failing `.test` is
+    // exactly the category a refill cannot fix, so the classifier is right to
+    // stop; the answer is not to reclassify it but to make it not happen.
+    //
+    // Cheap in runs, because it *moves* work rather than adding it: a stale
+    // artifact was going to be regenerated at step 5 anyway, and promoting it
+    // here means the discovery run below is itself the corpus run that validates
+    // the candidate. So this trades step 5's separate staged-corpus run for the
+    // discovery run that was happening regardless — three full suite runs become
+    // two.
+    //
+    // The trade is that a *bad* candidate is promoted before it is proven, where
+    // step 5 would have proven it first. Discovery still catches one — it is the
+    // whole corpus against the new artifact — and the failure names the
+    // artifact, since `git checkout` on the two `.clif` files is the undo.
+    //
+    // mtime, not content: a `git checkout` that rewrites a source without
+    // changing it costs one needless regeneration, and the alternative (hashing
+    // every dogfooded source on every run) costs something on every run instead.
+    if ir_is_behind_sources(&repo) {
+        r.step(
+            "fill_staged_ir (sources newer than the IR)",
+            helper("dogfood_ir::fill_staged_ir"),
+        );
+        let out = helper_output(&mut r, "fill_staged_ir");
+        if !wrote_staged(&out) {
+            r.save_out();
+            let detail = tail(&out, 40);
+            r.fail("fill_staged_ir", &detail);
+        }
+        if !r.step(
+            "validate_staged_ir (entry-level pre-check)",
+            helper("dogfood_ir::validate_staged_ir"),
+        ) {
+            r.save_out();
+            let detail = tail(&r.out.merged, 40);
+            r.fail("validate_staged_ir", &detail);
+        }
+        r.step("promote_staged_ir", helper("dogfood_ir::promote_staged_ir"));
+        let out = helper_output(&mut r, "promote_staged_ir");
+        if !out.contains("promoted") {
+            r.save_out();
+            let detail = tail(&out, 40);
+            r.fail("promote_staged_ir", &detail);
+        }
+        regenerated_ir = true;
+        // The promoted artifact is what the run below loads, and the tree has to
+        // be rebuilt against it before anything reads it.
+        if !r.step(
+            "nextest --no-run (rebuild after IR promote)",
+            nextest_build(),
+        ) {
+            r.save_out();
+            let detail = excerpt(&r.out.merged, 30, |l| l.starts_with("error"));
+            r.fail("compile", &detail);
+        }
+    }
+
     // --- 2. Discovery run --------------------------------------------------
 
     // `--no-fail-fast` so this executes *every* test and reports all remediable
@@ -313,7 +430,14 @@ or discard it
     // counted as a hard failure and stopped a run that had already set
     // `need_ir`, one step short of the regeneration that would have fixed it.
     if r.step("nextest (discovery)", nextest()) {
-        eprintln!("\n{GREEN}{BOLD}HANDOFF OK{OFF} (green with no regeneration needed)");
+        // Step 1b may already have regenerated; saying "no regeneration needed"
+        // then would contradict a step the reader just watched run.
+        let note = if regenerated_ir {
+            "(green; the IR was regenerated first)"
+        } else {
+            "(green with no regeneration needed)"
+        };
+        eprintln!("\n{GREEN}{BOLD}HANDOFF OK{OFF} {note}");
         r.timing_report();
         std::process::exit(0);
     }
@@ -455,7 +579,9 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
 
     // --- 5. Regenerate + validate + promote dogfood IR ---------------------
 
-    if plan.need_ir {
+    // Skipped when step 1b already promoted: the artifact is current, and the
+    // discovery run that just passed over it was the corpus validation.
+    if plan.need_ir && !regenerated_ir {
         r.step("fill_staged_ir", helper("dogfood_ir::fill_staged_ir"));
         let out = helper_output(&mut r, "fill_staged_ir");
         if !wrote_staged(&out) {
@@ -543,7 +669,7 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
             eprintln!("  refilled sections: {}", plan.changed_sections.join(", "));
         }
     }
-    if plan.need_ir {
+    if plan.need_ir || regenerated_ir {
         eprintln!("  regenerated + promoted dogfood IR");
     }
     if plan.need_case_tests {
