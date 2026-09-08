@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/ebnf.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/ebnf.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>case_name</code> <span class="from">from builtins</span></li>
+
+          <li><code>contains</code> <span class="from">from builtins</span></li>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>extend</code> <span class="from">from builtins</span></li>
+
+          <li><code>first</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_empty</code> <span class="from">from builtins</span></li>
+
+          <li><code>join</code> <span class="from">from builtins</span></li>
+
+          <li><code>len</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>sort_by</code> <span class="from">from builtins</span></li>
+
+          <li><code>try_map</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
+
+          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>Climb</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Literal</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Many</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Maybe</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Mk</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Named</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>NamedIdx</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>OneOf</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ParseError</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Prec</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Production</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Rule</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>link</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>prod_names</code> <span class="from">from ./grammar.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-Ctx">
+        <h2>
+          <a class="anchor" href="#item-Ctx">Ctx</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Ctx</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Alt"><code>Alt</code></li>
+
+          <li id="item-Seq"><code>Seq</code></li>
+
+          <li id="item-Item"><code>Item</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-dq">
+        <h2>
+          <a class="anchor" href="#item-dq">dq</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn dq(s: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-ebnf">
+        <h2>
+          <a class="anchor" href="#item-ebnf">ebnf</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn ebnf&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; str</code></pre>
+
+        <div class="doc"><p><code>g</code> rendered as EBNF: one <code>name = rule ;</code> line per production, in grammar order, with no trailing newline.</p><p>Sequence is juxtaposition, choice is <code>|</code>, and repetition is the postfix <code>?</code> (<code>Maybe</code>), <code>*</code> (<code>Many</code> with minimum 0) and <code>+</code> (<code>Many</code> with minimum 1); a higher minimum renders as <code>{n,}</code>. A separated <code>Many</code> and a <code>Climb</code> have no EBNF operator and are expanded — the list into its separator longhand, the climb into <code>atom (op atom)*</code> plus a <code>(* precedence: ... *)</code> note, since EBNF cannot express binding power.</p><p>Total, like <code>cst.aipl</code>'s <code>show</code>: a grammar may be dumped linked or unlinked, and a reference that resolves to nothing renders as <code>?</code> rather than failing.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-prod_line">
+        <h2>
+          <a class="anchor" href="#item-prod_line">prod_line</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn prod_line&#60;K: variant, A: any&#62;(p: Production&#60;K, A&#62;, names: str[]) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-render_rule">
+        <h2>
+          <a class="anchor" href="#item-render_rule">render_rule</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn render_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[], ctx: Ctx) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-rep_suffix">
+        <h2>
+          <a class="anchor" href="#item-rep_suffix">rep_suffix</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn rep_suffix(min: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-render_list">
+        <h2>
+          <a class="anchor" href="#item-render_list">render_list</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn render_list&#60;K: variant&#62;(item: Rule&#60;K&#62;, sep: Rule&#60;K&#62;, min: u64, trailing_sep: bool, names: str[]) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-render_climb">
+        <h2>
+          <a class="anchor" href="#item-render_climb">render_climb</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn render_climb&#60;K: variant&#62;(atom: Rule&#60;K&#62;, precs: Prec[], names: str[], ctx: Ctx) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-all_ops">
+        <h2>
+          <a class="anchor" href="#item-all_ops">all_ops</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn all_ops(precs: Prec[]) -&#62; str[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-climb_precs">
+        <h2>
+          <a class="anchor" href="#item-climb_precs">climb_precs</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn climb_precs&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; Prec[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-first_precs">
+        <h2>
+          <a class="anchor" href="#item-first_precs">first_precs</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn first_precs&#60;K: variant&#62;(rs: Rule&#60;K&#62;[]) -&#62; Prec[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-prec_note">
+        <h2>
+          <a class="anchor" href="#item-prec_note">prec_note</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn prec_note(precs: Prec[]) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-powers_desc">
+        <h2>
+          <a class="anchor" href="#item-powers_desc">powers_desc</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn powers_desc(precs: Prec[]) -&#62; u64[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-level_text">
+        <h2>
+          <a class="anchor" href="#item-level_text">level_text</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn level_text(precs: Prec[], power: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Sym">
+        <h2>
+          <a class="anchor" href="#item-Sym">Sym</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Sym&#60;K: variant&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-SKind"><code>SKind(Case&#60;K&#62;)</code></li>
+
+          <li id="item-SText"><code>SText(str)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-First">
+        <h2>
+          <a class="anchor" href="#item-First">First</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct First&#60;K: variant&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-first_sets">
+        <h2>
+          <a class="anchor" href="#item-first_sets">first_sets</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn first_sets&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; First&#60;K&#62;[]!ParseError</code></pre>
+
+        <div class="doc"><p>The FIRST set of every production of <code>g</code>, in grammar order: the terminals a match of that production can begin with, and whether it can match nothing.</p><p><code>g</code> is linked here, so it may be handed over unlinked; linking is idempotent. Fails only the way <code>link</code> fails — an unresolved reference, or a duplicate rule name.</p><p>Computed as a fixed point, so a reference reaching back through the production it started from is fine, left recursion included: the sets only grow, and the loop stops on the round that changes nothing.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-linked_first_sets">
+        <h2>
+          <a class="anchor" href="#item-linked_first_sets">linked_first_sets</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn linked_first_sets&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; First&#60;K&#62;[]!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-rule_first">
+        <h2>
+          <a class="anchor" href="#item-rule_first">rule_first</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn rule_first&#60;K: variant&#62;(r: Rule&#60;K&#62;, sets: First&#60;K&#62;[]) -&#62; First&#60;K&#62;!ParseError</code></pre>
+
+        <div class="doc"><p>What an arbitrary rule can begin with, given <code>sets</code> — the FIRST sets of the grammar's productions, as <code>first_sets</code> returns them.</p><p>This is the piece a driver would prune a <code>OneOf</code> with: <code>first_sets</code> once per grammar, then this per alternative. Fails on a <code>Named</code> reference, which means the rule came from an unlinked grammar, and on a <code>NamedIdx</code> pointing past the end of <code>sets</code>.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-union_syms">
+        <h2>
+          <a class="anchor" href="#item-union_syms">union_syms</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn union_syms&#60;K: variant&#62;(a: Sym&#60;K&#62;[], b: Sym&#60;K&#62;[]) -&#62; Sym&#60;K&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-can_start">
+        <h2>
+          <a class="anchor" href="#item-can_start">can_start</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn can_start&#60;K: variant&#62;(self: First&#60;K&#62;, kind: Case&#60;K&#62;, text: str) -&#62; bool</code></pre>
+
+        <div class="doc"><p>Whether a token of kind <code>kind</code> spelled <code>text</code> could begin a match of <code>self</code> — the test a driver skips an alternative on.</p><p>A nullable rule accepts anything, because it can match without consuming the token at all; otherwise the token's kind is looked for among the set's kinds and its spelling among the set's spellings. Conservative in the direction that matters: it is never false for a token that could in fact start a match, so pruning on it cannot lose a parse.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-show_first">
+        <h2>
+          <a class="anchor" href="#item-show_first">show_first</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn show_first&#60;K: variant&#62;(self: First&#60;K&#62;) -&#62; str</code></pre>
+
+        <div class="doc"><p><code>self</code> as one readable line: each terminal in set order — a kind by its case name, a spelling in double quotes — with <code>&lt;empty&gt;</code> appended when the rule is nullable. A debug rendering, like <code>cst.aipl</code>'s <code>show</code>.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-show_sym">
+        <h2>
+          <a class="anchor" href="#item-show_sym">show_sym</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn show_sym&#60;K: variant&#62;(self: Sym&#60;K&#62;) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-show_first_sets">
+        <h2>
+          <a class="anchor" href="#item-show_first_sets">show_first_sets</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn show_first_sets&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; str!ParseError</code></pre>
+
+        <div class="doc"><p><code>first_sets</code> rendered one <code>name = terminals</code> line per production, in grammar order, with no trailing newline — the FIRST-set counterpart of <code>ebnf</code>, and what makes a whole grammar's sets one readable assertion.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-keep">
+        <h2>
+          <a class="anchor" href="#item-keep">keep</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn keep(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-one">
+        <h2>
+          <a class="anchor" href="#item-one">one</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn one(name: str, rule: Rule&#60;Kind&#62;) -&#62; Production&#60;Kind, Node&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-g_of">
+        <h2>
+          <a class="anchor" href="#item-g_of">g_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn g_of(ps: Production&#60;Kind, Node&#62;[]) -&#62; Grammar&#60;Kind, Node&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-first_msg">
+        <h2>
+          <a class="anchor" href="#item-first_msg">first_msg</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn first_msg(r: Rule&#60;Kind&#62;, sets: First&#60;Kind&#62;[]) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fixture">
+        <h2>
+          <a class="anchor" href="#item-fixture">fixture</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fixture() -&#62; Grammar&#60;Kind, Node&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

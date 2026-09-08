@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/grammar_sexp.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/grammar_sexp.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>first</code> <span class="from">from builtins</span></li>
+
+          <li><code>join</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>map_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>map_ok</code> <span class="from">from builtins</span></li>
+
+          <li><code>repeat</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
+
+          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>show</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>text</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>token_text</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>ebnf</code> <span class="from">from ./ebnf.aipl</span></li>
+
+          <li><code>show_first_sets</code> <span class="from">from ./ebnf.aipl</span></li>
+
+          <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Literal</code> <span class="as">as</span> <code>Lit</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Many</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Mk</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Named</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>OneOf</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ParseError</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Production</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Rule</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>failure_message</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>prod_names</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Bare</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>CharRun</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>LexResult</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Of</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>OneChar</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>ToEol</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>TokenRule</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>lex</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>parse</code> <span class="from">from ./parse.aipl</span></li>
+
+          <li><code>parse_cst</code> <span class="from">from ./parse.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-SexpKind">
+        <h2>
+          <a class="anchor" href="#item-SexpKind">SexpKind</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant SexpKind</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Atom"><code>Atom(str)</code></li>
+
+          <li id="item-Punct"><code>Punct</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-Sexp">
+        <h2>
+          <a class="anchor" href="#item-Sexp">Sexp</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Sexp</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-SAtom"><code>SAtom(str)</code></li>
+
+          <li id="item-SList"><code>SList(Sexp[])</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-sexp_rules">
+        <h2>
+          <a class="anchor" href="#item-sexp_rules">sexp_rules</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn sexp_rules() -&#62; TokenRule&#60;SexpKind&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_list">
+        <h2>
+          <a class="anchor" href="#item-lower_list">lower_list</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_list(src: str, node: Cst, kids: Sexp[]) -&#62; Sexp!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_item">
+        <h2>
+          <a class="anchor" href="#item-lower_item">lower_item</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_item(src: str, node: Cst, kids: Sexp[]) -&#62; Sexp!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-sexp_grammar">
+        <h2>
+          <a class="anchor" href="#item-sexp_grammar">sexp_grammar</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn sexp_grammar() -&#62; Grammar&#60;SexpKind, Sexp&#62;</code></pre>
+
+        <div class="doc"><p>The S-expression grammar: <code>list -&gt; &quot;(&quot; item* &quot;)&quot;</code> and <code>item -&gt; Atom | list</code>, with <code>item</code> as the start rule so a bare atom is as much a program as a list is.</p><p><code>item</code> is labelled and <code>list</code> is transparent, so a failure inside a list reports as &quot;an s-expression&quot; rather than as the grammar's internals — the collapse <code>expect_as</code> exists for.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-lex_sexp">
+        <h2>
+          <a class="anchor" href="#item-lex_sexp">lex_sexp</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lex_sexp(src: str) -&#62; LexResult&#60;SexpKind&#62;!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-sexp_cst">
+        <h2>
+          <a class="anchor" href="#item-sexp_cst">sexp_cst</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn sexp_cst(src: str) -&#62; Cst!ParseError</code></pre>
+
+        <div class="doc"><p>The lossless concrete tree for <code>src</code> — every byte of it under exactly one leaf, comments and whitespace included. Use this when the tree is the point; <code>parse_sexp</code> when only the <code>Sexp</code> is.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-parse_sexp">
+        <h2>
+          <a class="anchor" href="#item-parse_sexp">parse_sexp</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn parse_sexp(src: str) -&#62; Sexp!ParseError</code></pre>
+
+        <div class="doc"><p>The <code>Sexp</code> <code>src</code> denotes: lex, parse to a concrete tree, lower it through the grammar's <code>build</code> functions.</p><p>Fails with a <code>ParseError</code> carrying the span of the offending token, from either half of the front end — a lex error is reported in the same shape.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-render_sexp">
+        <h2>
+          <a class="anchor" href="#item-render_sexp">render_sexp</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn render_sexp(self: Sexp) -&#62; str</code></pre>
+
+        <div class="doc"><p><code>self</code> printed back as S-expression source, in the one canonical spelling: atoms as themselves, a list as its elements joined by single spaces.</p><p>Round-trips with <code>parse_sexp</code> — <code>parse_sexp(render_sexp(v)) == v</code> for every <code>v</code> — which is what makes the pair a usable end-to-end check of the library.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-depth">
+        <h2>
+          <a class="anchor" href="#item-depth">depth</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn depth(self: Sexp) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-msg_of">
+        <h2>
+          <a class="anchor" href="#item-msg_of">msg_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn msg_of(src: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-shown">
+        <h2>
+          <a class="anchor" href="#item-shown">shown</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn shown(src: str) -&#62; str!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/highlight.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/highlight.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>concat</code> <span class="as">as</span> <code>+++</code> <span class="from">from builtins</span></li>
+
+          <li><code>contains</code> <span class="from">from builtins</span></li>
+
+          <li><code>drop_last</code> <span class="from">from builtins</span></li>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_empty</code> <span class="from">from builtins</span></li>
+
+          <li><code>join</code> <span class="from">from builtins</span></li>
+
+          <li><code>len</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>split</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add_assign</code> <span class="as">as</span> <code>+=</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
+
+          <li><code>indent</code> <span class="from">from ./indent.aipl</span></li>
+
+          <li><code>Bare</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Between</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>CharRun</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Delimited</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Exact</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Float</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Int</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Keyword</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Matcher</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Nested</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>OneChar</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Template</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>ToEol</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>TokenRule</code> <span class="from">from ./lexer.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-Pat">
+        <h2>
+          <a class="anchor" href="#item-Pat">Pat</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Pat</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Match"><code>Match(str, str)</code></li>
+
+          <li id="item-Caps"><code>Caps(str, str[])</code></li>
+
+          <li id="item-Region"><code>Region(begin: str, end: str, inner: Pat[], scope: str = .., begin_scope: str = .., content_scope: str = ..)</code></li>
+
+          <li id="item-Include"><code>Include(str)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-Entry">
+        <h2>
+          <a class="anchor" href="#item-Entry">Entry</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Entry</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Tm">
+        <h2>
+          <a class="anchor" href="#item-Tm">Tm</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Tm</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-re_meta">
+        <h2>
+          <a class="anchor" href="#item-re_meta">re_meta</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn re_meta() -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-class_meta">
+        <h2>
+          <a class="anchor" href="#item-class_meta">class_meta</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn class_meta() -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-ob">
+        <h2>
+          <a class="anchor" href="#item-ob">ob</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn ob() -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-cb">
+        <h2>
+          <a class="anchor" href="#item-cb">cb</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn cb() -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-re_escape">
+        <h2>
+          <a class="anchor" href="#item-re_escape">re_escape</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn re_escape(s: str) -&#62; str</code></pre>
+
+        <div class="doc"><p><code>s</code> as a regex matching exactly <code>s</code>: every character the engine reads specially is backslash-escaped. Used for a rule's fixed spelling — an operator, a keyword, a delimiter.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-char_class">
+        <h2>
+          <a class="anchor" href="#item-char_class">char_class</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn char_class(chars: str) -&#62; str</code></pre>
+
+        <div class="doc"><p>A regex character class accepting exactly the characters of <code>chars</code>, in the order given. Written out literally rather than collapsed into ranges: the class is data, the character set comes from a lexer rule that spells it out too, and a range is only a shorter way to say the same thing.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-class_char">
+        <h2>
+          <a class="anchor" href="#item-class_char">class_char</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn class_char(ch: char) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-matcher_pat">
+        <h2>
+          <a class="anchor" href="#item-matcher_pat">matcher_pat</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -&#62; Pat</code></pre>
+
+        <div class="doc"><p>The TextMate pattern recognizing what <code>m</code> matches, painted <code>scope</code>. A matcher that scans between delimiters becomes a <code>Region</code>, and <code>esc_scope</code> is what its escape sequences are painted (<code>constant.character.escape.*</code>); every other matcher becomes a plain <code>Match</code>.</p><p>Total over <code>Matcher</code>, so a new matcher shape in <code>lexer.aipl</code> fails to compile here until it has a highlighting answer.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-matcher_regex">
+        <h2>
+          <a class="anchor" href="#item-matcher_regex">matcher_regex</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn matcher_regex(m: Matcher) -&#62; str?</code></pre>
+
+        <div class="doc"><p>The plain regex <code>m</code> matches, or <code>none</code> when <code>m</code> scans between delimiters and needs a whole region rather than one expression. The way to reuse a rule's own character classes in a pattern written by hand — a <code>fn NAME</code> declaration accepting exactly the names the identifier rule accepts.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-escape_pat">
+        <h2>
+          <a class="anchor" href="#item-escape_pat">escape_pat</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn escape_pat(escapes: str, scope: str) -&#62; Pat</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-template_inner">
+        <h2>
+          <a class="anchor" href="#item-template_inner">template_inner</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn template_inner(escapes: str, esc_scope: str) -&#62; Pat[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-entry_name">
+        <h2>
+          <a class="anchor" href="#item-entry_name">entry_name</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn entry_name(scope: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Expansion">
+        <h2>
+          <a class="anchor" href="#item-Expansion">Expansion</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Expansion</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Item">
+        <h2>
+          <a class="anchor" href="#item-Item">Item</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Item</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-rule_pats">
+        <h2>
+          <a class="anchor" href="#item-rule_pats">rule_pats</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn rule_pats&#60;K: any&#62;(rules: TokenRule&#60;K&#62;[], esc_scope: str) -&#62; Expansion</code></pre>
+
+        <div class="doc"><p>The patterns <code>rules</code> describes, in rule order — one per rule, except that a run of consecutive rules sharing a scope collapses into a single ordered alternation, which is what turns twenty <code>Keyword</code> rules into one <code>\\bfn\\b|\\blet\\b|..</code>. Rules with no scope (whitespace, anything a highlighter should not paint) are dropped.</p><p>Order is preserved exactly, and regex alternation is ordered too, so a rule list written longest-spelling-first stays maximal munch. <code>esc_scope</code> paints the escape sequences inside delimited literals.</p><p>A self-referential region — a nestable block comment — comes back as an <code>Include</code> plus the named entry it refers to, since that shape cannot be written inline.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-items_of">
+        <h2>
+          <a class="anchor" href="#item-items_of">items_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn items_of&#60;K: any&#62;(rules: TokenRule&#60;K&#62;[], esc_scope: str) -&#62; Item[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-merge_runs">
+        <h2>
+          <a class="anchor" href="#item-merge_runs">merge_runs</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn merge_runs(items: Item[]) -&#62; Item[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-run_len">
+        <h2>
+          <a class="anchor" href="#item-run_len">run_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn run_len(items: Item[], i: u64) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-self_referential">
+        <h2>
+          <a class="anchor" href="#item-self_referential">self_referential</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn self_referential(m: Matcher) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-decl_pat">
+        <h2>
+          <a class="anchor" href="#item-decl_pat">decl_pat</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn decl_pat(keyword: str, name_re: str, kw_scope: str, name_scope: str) -&#62; Pat</code></pre>
+
+        <div class="doc"><p>A declaration: <code>keyword</code> then a name matching <code>name_re</code>, with the two halves painted <code>kw_scope</code> and <code>name_scope</code>. This is the one genuinely *syntactic* thing a highlighter does — a name means something different for standing after <code>fn</code> — and the only one a regex- and line-based target can express.</p><p>Pass <code>name_re</code> from the identifier rule's own matcher (<code>matcher_regex</code>) so the names a declaration accepts stay the names the lexer accepts. It must contain no capture groups of its own, which a character-class run never does.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-word_pat">
+        <h2>
+          <a class="anchor" href="#item-word_pat">word_pat</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn word_pat(words: str[], scope: str) -&#62; Pat</code></pre>
+
+        <div class="doc"><p>An alternation of whole words, all painted <code>scope</code> — for a class the lexer does not distinguish because it is decided after lexing, like the builtin type names that are lexically just identifiers.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-tm_json">
+        <h2>
+          <a class="anchor" href="#item-tm_json">tm_json</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn tm_json(g: Tm) -&#62; str</code></pre>
+
+        <div class="doc"><p><code>g</code> as the <code>.tmLanguage.json</code> text an editor extension ships: two-space indented, one trailing newline. Generated files are read in diffs, so the layout is fixed and deterministic rather than minified.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-SCHEMA">
+        <h2>
+          <a class="anchor" href="#item-SCHEMA">SCHEMA</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn SCHEMA() -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-pat_json">
+        <h2>
+          <a class="anchor" href="#item-pat_json">pat_json</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn pat_json(p: Pat) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-entry_json">
+        <h2>
+          <a class="anchor" href="#item-entry_json">entry_json</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn entry_json(e: Entry) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fld">
+        <h2>
+          <a class="anchor" href="#item-fld">fld</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fld(key: str, value: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-arr_fld">
+        <h2>
+          <a class="anchor" href="#item-arr_fld">arr_fld</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn arr_fld(key: str, items: str[]) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-obj_fld">
+        <h2>
+          <a class="anchor" href="#item-obj_fld">obj_fld</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn obj_fld(key: str, entries: str[]) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-caps_fld">
+        <h2>
+          <a class="anchor" href="#item-caps_fld">caps_fld</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn caps_fld(key: str, scopes: str[], base: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-inline_arr">
+        <h2>
+          <a class="anchor" href="#item-inline_arr">inline_arr</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn inline_arr(items: str[]) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-obj_of">
+        <h2>
+          <a class="anchor" href="#item-obj_of">obj_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn obj_of(fields: str[]) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-json_str">
+        <h2>
+          <a class="anchor" href="#item-json_str">json_str</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn json_str(s: str) -&#62; str</code></pre>
+
+        <div class="doc"><p><code>s</code> as a JSON string literal, quotes included: backslashes and double quotes escaped, and the three whitespace control characters spelled as <code>\\n</code>, <code>\\t</code> and <code>\\r</code>. Nothing else in a generated grammar needs escaping — the regexes carry backslashes by the handful, which is the case that matters.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-json_char">
+        <h2>
+          <a class="anchor" href="#item-json_char">json_char</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn json_char(ch: char) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Kind">
+        <h2>
+          <a class="anchor" href="#item-Kind">Kind</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Kind</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Punct"><code>Punct</code></li>
+
+        </ul>
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/grammar.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/grammar.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>Span</code> <span class="from">from builtins</span></li>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>find_index</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>not_equal</code> <span class="as">as</span> <code>!=</code> <span class="from">from builtins</span></li>
+
+          <li><code>try_map</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-ParseError">
+        <h2>
+          <a class="anchor" href="#item-ParseError">ParseError</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-failure_message">
+        <h2>
+          <a class="anchor" href="#item-failure_message">failure_message</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn failure_message(self: str!ParseError) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Prec">
+        <h2>
+          <a class="anchor" href="#item-Prec">Prec</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Prec</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Rule">
+        <h2>
+          <a class="anchor" href="#item-Rule">Rule</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Rule&#60;K: variant&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Term"><code>Term(Case&#60;K&#62;)</code></li>
+
+          <li id="item-Literal"><code>Literal(str)</code></li>
+
+          <li id="item-Then"><code>Then(Rule&#60;K&#62;[])</code></li>
+
+          <li id="item-OneOf"><code>OneOf(Rule&#60;K&#62;[])</code></li>
+
+          <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = .., sep: Rule&#60;K&#62;? = .., trailing_sep: bool = ..)</code></li>
+
+          <li id="item-Maybe"><code>Maybe(Rule&#60;K&#62;)</code></li>
+
+          <li id="item-Named"><code>Named(str)</code></li>
+
+          <li id="item-NamedIdx"><code>NamedIdx(u64)</code></li>
+
+          <li id="item-Climb"><code>Climb(Rule&#60;K&#62;, Prec[])</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-Build">
+        <h2>
+          <a class="anchor" href="#item-Build">Build</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Build&#60;A: any&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Mk"><code>Mk((str, Cst, A[]) -&#62; A!ParseError)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-Production">
+        <h2>
+          <a class="anchor" href="#item-Production">Production</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Production&#60;K: variant, A: any&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Grammar">
+        <h2>
+          <a class="anchor" href="#item-Grammar">Grammar</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Grammar&#60;K: variant, A: any&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-prod_names">
+        <h2>
+          <a class="anchor" href="#item-prod_names">prod_names</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn prod_names&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; str[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-link_rule">
+        <h2>
+          <a class="anchor" href="#item-link_rule">link_rule</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn link_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[]) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-link_opt">
+        <h2>
+          <a class="anchor" href="#item-link_opt">link_opt</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn link_opt&#60;K: variant&#62;(r: Rule&#60;K&#62;?, names: str[]) -&#62; Rule&#60;K&#62;?!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-link_rules">
+        <h2>
+          <a class="anchor" href="#item-link_rules">link_rules</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[]) -&#62; Rule&#60;K&#62;[]!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-link">
+        <h2>
+          <a class="anchor" href="#item-link">link</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn link&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; Grammar&#60;K, A&#62;!ParseError</code></pre>
+
+        <div class="doc"><p><code>g</code> with every rule reference resolved: each <code>Named(name)</code> rewritten to the <code>NamedIdx(index)</code> of the production it names, so the driver resolves a reference by indexing rather than by comparing strings. Fails when a reference names no production, or when two productions share a name.</p><p>Idempotent — a <code>NamedIdx</code> passes through — so a grammar may be linked once and reused, or handed to <code>parse</code> unlinked and linked per call.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-keep">
+        <h2>
+          <a class="anchor" href="#item-keep">keep</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn keep(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-rule_of">
+        <h2>
+          <a class="anchor" href="#item-rule_of">rule_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn rule_of&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, i: u64) -&#62; Rule&#60;K&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-expect_of">
+        <h2>
+          <a class="anchor" href="#item-expect_of">expect_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn expect_of&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, i: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

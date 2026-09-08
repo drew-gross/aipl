@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/doc.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/doc.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>any</code> <span class="from">from builtins</span></li>
+
+          <li><code>concat</code> <span class="as">as</span> <code>+++</code> <span class="from">from builtins</span></li>
+
+          <li><code>contains</code> <span class="from">from builtins</span></li>
+
+          <li><code>drop_last</code> <span class="from">from builtins</span></li>
+
+          <li><code>ends_with</code> <span class="from">from builtins</span></li>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>greater_than</code> <span class="as">as</span> <code>&#62;</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_space</code> <span class="from">from builtins</span></li>
+
+          <li><code>join</code> <span class="from">from builtins</span></li>
+
+          <li><code>len</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>push</code> <span class="from">from builtins</span></li>
+
+          <li><code>repeat</code> <span class="from">from builtins</span></li>
+
+          <li><code>right_fold</code> <span class="from">from builtins</span></li>
+
+          <li><code>saturating_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
+
+          <li><code>split</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add_assign</code> <span class="as">as</span> <code>+=</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
+
+          <li><code>reindent_block</code> <span class="from">from ./reindent_block.aipl</span></li>
+
+          <li><code>trim_end_while</code> <span class="from">from ./trim_end_while.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-Doc">
+        <h2>
+          <a class="anchor" href="#item-Doc">Doc</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Doc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Text"><code>Text(str)</code></li>
+
+          <li id="item-Concat"><code>Concat(Doc[])</code></li>
+
+          <li id="item-Line"><code>Line</code></li>
+
+          <li id="item-SoftLine"><code>SoftLine</code></li>
+
+          <li id="item-HardLine"><code>HardLine</code></li>
+
+          <li id="item-BlankLine"><code>BlankLine</code></li>
+
+          <li id="item-Indent"><code>Indent(Doc)</code></li>
+
+          <li id="item-Group"><code>Group(bool, Doc)</code></li>
+
+          <li id="item-IfBroken"><code>IfBroken(str)</code></li>
+
+          <li id="item-BreakParent"><code>BreakParent</code></li>
+
+          <li id="item-RawBlock"><code>RawBlock(str)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-Work">
+        <h2>
+          <a class="anchor" href="#item-Work">Work</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Work</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-WNil"><code>WNil</code></li>
+
+          <li id="item-WCons"><code>WCons(u64, bool, Doc, Work)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-group">
+        <h2>
+          <a class="anchor" href="#item-group">group</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn group(self: Doc) -&#62; Doc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-has_hard">
+        <h2>
+          <a class="anchor" href="#item-has_hard">has_hard</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn has_hard(self: Doc) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-print_doc">
+        <h2>
+          <a class="anchor" href="#item-print_doc">print_doc</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn print_doc(doc: Doc, width: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-go">
+        <h2>
+          <a class="anchor" href="#item-go">go</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -&#62; str[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-group_flat">
+        <h2>
+          <a class="anchor" href="#item-group_flat">group_flat</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn group_flat(forced: bool, width: u64, col: u64, sp: u64, inner: Doc, rest: Work) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fits">
+        <h2>
+          <a class="anchor" href="#item-fits">fits</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fits(budget: u64, work: Work) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fits_after">
+        <h2>
+          <a class="anchor" href="#item-fits_after">fits_after</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fits_after(budget: u64, n: u64, rest: Work) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fits_atom">
+        <h2>
+          <a class="anchor" href="#item-fits_atom">fits_atom</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fits_atom(budget: u64, s: str, flat: bool, rest: Work) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-prepend">
+        <h2>
+          <a class="anchor" href="#item-prepend">prepend</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -&#62; Work</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-col_after">
+        <h2>
+          <a class="anchor" href="#item-col_after">col_after</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn col_after(col: u64, text: str) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-newline_str">
+        <h2>
+          <a class="anchor" href="#item-newline_str">newline_str</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn newline_str(sp: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-blank_str">
+        <h2>
+          <a class="anchor" href="#item-blank_str">blank_str</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn blank_str(sp: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-cleanup">
+        <h2>
+          <a class="anchor" href="#item-cleanup">cleanup</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn cleanup(out: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

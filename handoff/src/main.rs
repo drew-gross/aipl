@@ -467,6 +467,27 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
         }
     }
 
+    // --- 5a. Regenerate the checked-in documentation site ------------------
+
+    // After the IR, because it reads the same sources every other step has
+    // finished settling — formatting first (which moves nothing a page shows,
+    // but ordering it last costs nothing) and any refills that changed a doc.
+    // It is a plain regeneration with nothing to validate: the site is a
+    // function of the source, so a wrong one means the generator is wrong, and
+    // the final run's `checked_in_docs_are_current` is what says so.
+    if plan.need_docs {
+        r.step(
+            "fill_docs (checked-in docs site)",
+            helper("docs_site::fill_docs"),
+        );
+        let out = helper_output(&mut r, "fill_docs");
+        if !out.contains("review the diff") {
+            r.save_out();
+            let detail = tail(&out, 40);
+            r.fail("fill_docs", &detail);
+        }
+    }
+
     // --- 5b. Rebuild what the regeneration invalidated ---------------------
 
     // `fill_case_tests` regenerates tests/support/case_tests.rs, which
@@ -518,6 +539,9 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
     }
     if plan.need_case_tests {
         eprintln!("  regenerated the per-case #[test] list");
+    }
+    if plan.need_docs {
+        eprintln!("  regenerated the checked-in docs site");
     }
     if plan.behavioral_changed {
         eprintln!(

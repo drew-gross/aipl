@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/cst.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/cst.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>Span</code> <span class="from">from builtins</span></li>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>filter</code> <span class="from">from builtins</span></li>
+
+          <li><code>filter_map</code> <span class="from">from builtins</span></li>
+
+          <li><code>first</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_empty</code> <span class="from">from builtins</span></li>
+
+          <li><code>join</code> <span class="from">from builtins</span></li>
+
+          <li><code>last</code> <span class="from">from builtins</span></li>
+
+          <li><code>len</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or</code> <span class="from">from builtins</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-Cst">
+        <h2>
+          <a class="anchor" href="#item-Cst">Cst</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Cst</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-CLeaf"><code>CLeaf(Span)</code></li>
+
+          <li id="item-CTrivia"><code>CTrivia(Span)</code></li>
+
+          <li id="item-CTree"><code>CTree(u64, Cst[])</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-is_tree">
+        <h2>
+          <a class="anchor" href="#item-is_tree">is_tree</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn is_tree(self: Cst) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-leaves">
+        <h2>
+          <a class="anchor" href="#item-leaves">leaves</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn leaves(self: Cst) -&#62; Span[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-text">
+        <h2>
+          <a class="anchor" href="#item-text">text</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn text(self: Cst, src: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-token_leaves">
+        <h2>
+          <a class="anchor" href="#item-token_leaves">token_leaves</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn token_leaves(self: Cst) -&#62; Span[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-token_text">
+        <h2>
+          <a class="anchor" href="#item-token_text">token_text</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn token_text(self: Cst, src: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-span">
+        <h2>
+          <a class="anchor" href="#item-span">span</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn span(self: Cst) -&#62; Span</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-nodes">
+        <h2>
+          <a class="anchor" href="#item-nodes">nodes</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn nodes(self: Cst) -&#62; Cst[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-own_tokens">
+        <h2>
+          <a class="anchor" href="#item-own_tokens">own_tokens</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn own_tokens(self: Cst) -&#62; Span[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-own_token_text">
+        <h2>
+          <a class="anchor" href="#item-own_token_text">own_token_text</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn own_token_text(self: Cst, src: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-is_leaf">
+        <h2>
+          <a class="anchor" href="#item-is_leaf">is_leaf</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_leaf(self: Cst) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-leaf_span">
+        <h2>
+          <a class="anchor" href="#item-leaf_span">leaf_span</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn leaf_span(self: Cst) -&#62; Span</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-show">
+        <h2>
+          <a class="anchor" href="#item-show">show</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn show(self: Cst, src: str, names: str[]) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

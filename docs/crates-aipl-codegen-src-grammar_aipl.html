@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/grammar_aipl.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/grammar_aipl.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
+
+          <li><code>map_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>text</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>Climb</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Literal</code> <span class="as">as</span> <code>Lit</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Many</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Maybe</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Mk</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Named</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>OneOf</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ParseError</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Prec</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Production</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Rule</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>AiplTok</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>CharTok</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>IntLit</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>Name</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>RawTemplateHead</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>RawTemplateMid</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>RawTemplateTail</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>StrLit</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>TemplateHead</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>TemplateMid</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>TemplateTail</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>aipl_rules</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>LexResult</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>keep_skipped</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>lex</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>parse_cst</code> <span class="from">from ./parse.aipl</span></li>
+
+          <li><code>strip_test_sections</code> <span class="from">from ./strip_test_sections.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-aipl_grammar">
+        <h2>
+          <a class="anchor" href="#item-aipl_grammar">aipl_grammar</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn aipl_grammar() -&#62; Grammar&#60;AiplTok, Ast&#62;</code></pre>
+
+        <div class="doc"><p>AIPL's grammar: the productions the driver in <code>parse.aipl</code> parses AIPL with, starting at <code>program</code>.</p><p>Split across five builder functions purely for reading — the array they concatenate to is one flat production list, and position in it is identity (a linked <code>NamedIdx</code> and a <code>CTree</code> both name a production by its index).</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-items">
+        <h2>
+          <a class="anchor" href="#item-items">items</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn items() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-types">
+        <h2>
+          <a class="anchor" href="#item-types">types</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn types() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-statements">
+        <h2>
+          <a class="anchor" href="#item-statements">statements</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn statements() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-expressions">
+        <h2>
+          <a class="anchor" href="#item-expressions">expressions</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn expressions() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-expr_unary">
+        <h2>
+          <a class="anchor" href="#item-expr_unary">expr_unary</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn expr_unary(x: Rule&#60;AiplTok&#62;) -&#62; Rule&#60;AiplTok&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-patterns">
+        <h2>
+          <a class="anchor" href="#item-patterns">patterns</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn patterns() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-aipl_source">
+        <h2>
+          <a class="anchor" href="#item-aipl_source">aipl_source</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn aipl_source(src: str) -&#62; str</code></pre>
+
+        <div class="doc"><p>The part of <code>src</code> that is AIPL: everything before the first <code>--- section ---</code> marker, which is where a test-case file stops being source and starts being expected output. <code>aipl_parser::parse</code> strips exactly this, and <code>aipl_parse_cst</code> parses exactly this — so a losslessness assertion is against this string, not the whole file.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-aipl_parse_cst">
+        <h2>
+          <a class="anchor" href="#item-aipl_parse_cst">aipl_parse_cst</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn aipl_parse_cst(src: str) -&#62; Cst!ParseError</code></pre>
+
+        <div class="doc"><p>The lossless concrete syntax tree for AIPL source <code>src</code>, parsed by the library against <code>aipl_grammar()</code>.</p><p>Every byte of <code>aipl_source(src)</code> is under exactly one leaf. That needs the lexer's rule set read *losslessly* (<code>keep_skipped</code>): the compiler's own lexing skips whitespace outright, having no use for it, and a concrete tree has to be able to put it back. Nothing else needs putting back — every other byte, the braces around a template interpolation included, already sits inside some token's span.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-lex_lossless">
+        <h2>
+          <a class="anchor" href="#item-lex_lossless">lex_lossless</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lex_lossless(text: str) -&#62; LexResult&#60;AiplTok&#62;!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-aipl_parse_report">
+        <h2>
+          <a class="anchor" href="#item-aipl_parse_report">aipl_parse_report</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn aipl_parse_report(src: str) -&#62; str</code></pre>
+
+        <div class="doc"><p>What this grammar makes of <code>src</code>, in one string: empty when it parses *and* its concrete tree reconstructs the source byte for byte, and otherwise a line beginning <code>error:</code> (it did not parse, with the message) or <code>lossless:</code> (it did, but the tree lost bytes).</p><p>The FFI entry the corpus differential test calls — one crossing and one parse per file, checking both properties at once. Rejection is half the comparison: a grammar that accepts everything agrees with nothing.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-aipl_parses">
+        <h2>
+          <a class="anchor" href="#item-aipl_parses">aipl_parses</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn aipl_parses(src: str) -&#62; bool</code></pre>
+
+        <div class="doc"><p>Whether <code>src</code> parses as AIPL. The FFI entry the corpus differential test calls: it compares this against <code>aipl_parser::parse</code> succeeding, file by file, over every <code>.aipl</code> in the repository.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-p">
+        <h2>
+          <a class="anchor" href="#item-p">p</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn p(name: str, rule: Rule&#60;AiplTok&#62;) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-pl">
+        <h2>
+          <a class="anchor" href="#item-pl">pl</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn pl(name: str, rule: Rule&#60;AiplTok&#62;, expect_as: str) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Ast">
+        <h2>
+          <a class="anchor" href="#item-Ast">Ast</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Ast</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Ignored"><code>Ignored</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-keep">
+        <h2>
+          <a class="anchor" href="#item-keep">keep</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn keep(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-parses">
+        <h2>
+          <a class="anchor" href="#item-parses">parses</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn parses(src: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

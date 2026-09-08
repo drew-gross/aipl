@@ -1,9 +1,5 @@
 /target
 
-# `aipl docs` writes here by default. This repo's own generated site is not
-# checked in — regenerate it with `cargo run -- docs`.
-/docs
-
 # Claude Code: share project config and skills; keep personal overrides and
 # local worktrees out.
 /.claude/settings.local.json

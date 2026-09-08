@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/grammar_json.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/grammar_json.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>first</code> <span class="from">from builtins</span></li>
+
+          <li><code>join</code> <span class="from">from builtins</span></li>
+
+          <li><code>len</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>map_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>map_ok</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
+
+          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>show</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>span</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>text</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>token_leaves</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>token_text</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>ebnf</code> <span class="from">from ./ebnf.aipl</span></li>
+
+          <li><code>show_first_sets</code> <span class="from">from ./ebnf.aipl</span></li>
+
+          <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Literal</code> <span class="as">as</span> <code>Lit</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Many</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Maybe</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Mk</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Named</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>OneOf</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ParseError</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Production</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Rule</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>failure_message</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>prod_names</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Bare</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>CharRun</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Delimited</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Exact</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Float</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Int</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Keyword</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>LexResult</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Of</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>OneChar</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>TokenRule</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>lex</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>parse</code> <span class="from">from ./parse.aipl</span></li>
+
+          <li><code>parse_cst</code> <span class="from">from ./parse.aipl</span></li>
+
+          <li><code>unescape</code> <span class="from">from ./unescape.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-JsonTok">
+        <h2>
+          <a class="anchor" href="#item-JsonTok">JsonTok</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant JsonTok</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Str"><code>Str(str)</code></li>
+
+          <li id="item-Num"><code>Num</code></li>
+
+          <li id="item-Kw"><code>Kw</code></li>
+
+          <li id="item-Punct"><code>Punct</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-Json">
+        <h2>
+          <a class="anchor" href="#item-Json">Json</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Json</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-JNull"><code>JNull</code></li>
+
+          <li id="item-JBool"><code>JBool(bool)</code></li>
+
+          <li id="item-JNumber"><code>JNumber(str)</code></li>
+
+          <li id="item-JString"><code>JString(str)</code></li>
+
+          <li id="item-JArray"><code>JArray(Json[])</code></li>
+
+          <li id="item-JObject"><code>JObject(Json[])</code></li>
+
+          <li id="item-JMember"><code>JMember(str, Json)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-json_rules">
+        <h2>
+          <a class="anchor" href="#item-json_rules">json_rules</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn json_rules() -&#62; TokenRule&#60;JsonTok&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_value">
+        <h2>
+          <a class="anchor" href="#item-lower_value">lower_value</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_value(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_object">
+        <h2>
+          <a class="anchor" href="#item-lower_object">lower_object</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_object(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_array">
+        <h2>
+          <a class="anchor" href="#item-lower_array">lower_array</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_array(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_member">
+        <h2>
+          <a class="anchor" href="#item-lower_member">lower_member</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_member(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_string">
+        <h2>
+          <a class="anchor" href="#item-lower_string">lower_string</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_string(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_number">
+        <h2>
+          <a class="anchor" href="#item-lower_number">lower_number</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_number(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_bool">
+        <h2>
+          <a class="anchor" href="#item-lower_bool">lower_bool</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_bool(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_null">
+        <h2>
+          <a class="anchor" href="#item-lower_null">lower_null</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_null(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-unquote">
+        <h2>
+          <a class="anchor" href="#item-unquote">unquote</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn unquote(s: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-json_grammar">
+        <h2>
+          <a class="anchor" href="#item-json_grammar">json_grammar</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn json_grammar() -&#62; Grammar&#60;JsonTok, Json&#62;</code></pre>
+
+        <div class="doc"><p>The JSON grammar, with <code>value</code> as the start rule.</p><p>Only <code>value</code> carries an <code>expect_as</code>, so a failure anywhere inside reports as &quot;a JSON value&quot; rather than as the six alternatives it is made of — the collapse that keeps a PEG's error messages readable.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-lex_json">
+        <h2>
+          <a class="anchor" href="#item-lex_json">lex_json</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lex_json(src: str) -&#62; LexResult&#60;JsonTok&#62;!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-json_cst">
+        <h2>
+          <a class="anchor" href="#item-json_cst">json_cst</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn json_cst(src: str) -&#62; Cst!ParseError</code></pre>
+
+        <div class="doc"><p>The lossless concrete tree for <code>src</code> — every byte of it under exactly one leaf, whitespace included. Use this when the tree is the point; <code>parse_json</code> when only the <code>Json</code> is.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-parse_json">
+        <h2>
+          <a class="anchor" href="#item-parse_json">parse_json</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn parse_json(src: str) -&#62; Json!ParseError</code></pre>
+
+        <div class="doc"><p>The <code>Json</code> <code>src</code> denotes: lex, parse to a concrete tree, lower it through the grammar's <code>build</code> functions.</p><p>Numbers arrive as their source spelling (<code>JNumber(&quot;1e9&quot;)</code>), since JSON's number syntax is wider than any one AIPL type — parsing one is the consumer's policy.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-render_json">
+        <h2>
+          <a class="anchor" href="#item-render_json">render_json</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn render_json(self: Json) -&#62; str</code></pre>
+
+        <div class="doc"><p><code>self</code> printed back as JSON source, in one canonical compact spelling: no spaces, no trailing separators, strings escaped.</p><p>Round-trips with <code>parse_json</code> — <code>parse_json(render_json(v)) == v</code> for every <code>v</code> a parse produced — which is what makes the pair a usable end-to-end check of the library.</p><p>A bare <code>JMember</code> renders as the <code>&quot;key&quot;:value</code> it is; it is only meaningful inside a <code>JObject</code>, which is where a parse ever puts one.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-escape_json">
+        <h2>
+          <a class="anchor" href="#item-escape_json">escape_json</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn escape_json(s: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-msg_of">
+        <h2>
+          <a class="anchor" href="#item-msg_of">msg_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn msg_of(src: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-shown">
+        <h2>
+          <a class="anchor" href="#item-shown">shown</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn shown(src: str) -&#62; str!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/lexer.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/lexer.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>Span</code> <span class="from">from builtins</span></li>
+
+          <li><code>concat</code> <span class="as">as</span> <code>+++</code> <span class="from">from builtins</span></li>
+
+          <li><code>contains</code> <span class="from">from builtins</span></li>
+
+          <li><code>count_while</code> <span class="from">from builtins</span></li>
+
+          <li><code>drop_first</code> <span class="from">from builtins</span></li>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>extend</code> <span class="from">from builtins</span></li>
+
+          <li><code>first</code> <span class="from">from builtins</span></li>
+
+          <li><code>int_parse</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_digit</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_empty</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_nonempty</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_some_and</code> <span class="from">from builtins</span></li>
+
+          <li><code>len</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>map_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>not_equal</code> <span class="as">as</span> <code>!=</code> <span class="from">from builtins</span></li>
+
+          <li><code>push</code> <span class="from">from builtins</span></li>
+
+          <li><code>starts_with</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add_assign</code> <span class="as">as</span> <code>+=</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_decrement</code> <span class="as">as</span> <code>--</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
+
+          <li><code>unescape</code> <span class="from">from ./unescape.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-TokenValue">
+        <h2>
+          <a class="anchor" href="#item-TokenValue">TokenValue</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant TokenValue</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-NoValue"><code>NoValue</code></li>
+
+          <li id="item-StrVal"><code>StrVal(str)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-SpanStr">
+        <h2>
+          <a class="anchor" href="#item-SpanStr">SpanStr</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct SpanStr</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-span_str">
+        <h2>
+          <a class="anchor" href="#item-span_str">span_str</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn span_str(src: str, at: Span) -&#62; SpanStr</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Token">
+        <h2>
+          <a class="anchor" href="#item-Token">Token</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Token&#60;K: any&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Seg">
+        <h2>
+          <a class="anchor" href="#item-Seg">Seg</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Seg</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Plain"><code>Plain</code></li>
+
+          <li id="item-Head"><code>Head</code></li>
+
+          <li id="item-Middle"><code>Middle</code></li>
+
+          <li id="item-Tail"><code>Tail</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-Emit">
+        <h2>
+          <a class="anchor" href="#item-Emit">Emit</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Emit&#60;K: any&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Bare"><code>Bare(K)</code></li>
+
+          <li id="item-Of"><code>Of((str) -&#62; K)</code></li>
+
+          <li id="item-OfSeg"><code>OfSeg((str, Seg) -&#62; K)</code></li>
+
+          <li id="item-Try"><code>Try((str) -&#62; K!str)</code></li>
+
+          <li id="item-TrySeg"><code>TrySeg((str, Seg) -&#62; K!str)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-LexError">
+        <h2>
+          <a class="anchor" href="#item-LexError">LexError</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Matcher">
+        <h2>
+          <a class="anchor" href="#item-Matcher">Matcher</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Matcher</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-CharRun"><code>CharRun(cont: str, first: str = ..)</code></li>
+
+          <li id="item-OneChar"><code>OneChar(str)</code></li>
+
+          <li id="item-Exact"><code>Exact(str)</code></li>
+
+          <li id="item-Keyword"><code>Keyword(str, str)</code></li>
+
+          <li id="item-Delimited"><code>Delimited(str, str)</code></li>
+
+          <li id="item-Between"><code>Between(str, str)</code></li>
+
+          <li id="item-Nested"><code>Nested(str, str)</code></li>
+
+          <li id="item-Template"><code>Template(str, str, (str[]) -&#62; str[])</code></li>
+
+          <li id="item-ToEol"><code>ToEol(str)</code></li>
+
+          <li id="item-Float"><code>Float</code></li>
+
+          <li id="item-Int"><code>Int</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-TokenRule">
+        <h2>
+          <a class="anchor" href="#item-TokenRule">TokenRule</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct TokenRule&#60;K: any&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-LexResult">
+        <h2>
+          <a class="anchor" href="#item-LexResult">LexResult</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct LexResult&#60;K: any&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-keep_skipped">
+        <h2>
+          <a class="anchor" href="#item-keep_skipped">keep_skipped</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn keep_skipped&#60;K: any&#62;(self: TokenRule&#60;K&#62;[]) -&#62; TokenRule&#60;K&#62;[]</code></pre>
+
+        <div class="doc"><p><code>self</code> with every <code>skip</code> rule turned into a <code>trivia</code> rule: nothing is dropped, so every byte of a lexed source is accounted for by some token or trivia record.</p><p>A compiler's rule set skips whitespace outright — it has no use for it, and recording it would cost every consumer something only one of them wants. A *lossless* consumer has the opposite need: a parser building a concrete syntax tree, or a formatter reproducing its input, must be able to put every byte back. Both read the one rule set through this, rather than the language keeping two of them.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-lex_err">
+        <h2>
+          <a class="anchor" href="#item-lex_err">lex_err</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lex_err(message: str, span: Span) -&#62; LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-char_run_len">
+        <h2>
+          <a class="anchor" href="#item-char_run_len">char_run_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn char_run_len(self: str, head: str, cont: str) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-one_char_len">
+        <h2>
+          <a class="anchor" href="#item-one_char_len">one_char_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn one_char_len(self: str, chars: str) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-exact_len">
+        <h2>
+          <a class="anchor" href="#item-exact_len">exact_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn exact_len(self: str, spelling: str) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-keyword_len">
+        <h2>
+          <a class="anchor" href="#item-keyword_len">keyword_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn keyword_len(self: str, spelling: str, boundary: str) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-delimited_len">
+        <h2>
+          <a class="anchor" href="#item-delimited_len">delimited_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -&#62; u64!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-unterminated_msg">
+        <h2>
+          <a class="anchor" href="#item-unterminated_msg">unterminated_msg</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn unterminated_msg(msg: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-between_len">
+        <h2>
+          <a class="anchor" href="#item-between_len">between_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn between_len(self: str, at: u64, open: str, close: str, msg: str) -&#62; u64!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-nested_len">
+        <h2>
+          <a class="anchor" href="#item-nested_len">nested_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -&#62; u64!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-to_eol_len">
+        <h2>
+          <a class="anchor" href="#item-to_eol_len">to_eol_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn to_eol_len(self: str, marker: str) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-number_end">
+        <h2>
+          <a class="anchor" href="#item-number_end">number_end</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn number_end(self: str, int_end: u64) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-float_len">
+        <h2>
+          <a class="anchor" href="#item-float_len">float_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn float_len(self: str) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-int_len">
+        <h2>
+          <a class="anchor" href="#item-int_len">int_len</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn int_len(self: str) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-token_value">
+        <h2>
+          <a class="anchor" href="#item-token_value">token_value</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn token_value(m: Matcher, text: str) -&#62; TokenValue</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-apply_emit">
+        <h2>
+          <a class="anchor" href="#item-apply_emit">apply_emit</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, matched: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-seg_only">
+        <h2>
+          <a class="anchor" href="#item-seg_only">seg_only</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn seg_only(span: Span) -&#62; LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-StepResult">
+        <h2>
+          <a class="anchor" href="#item-StepResult">StepResult</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct StepResult&#60;K: any&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-step_result">
+        <h2>
+          <a class="anchor" href="#item-step_result">step_result</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn step_result&#60;K: any&#62;(r: TokenRule&#60;K&#62;, src: str, at: u64, n: u64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lex_step">
+        <h2>
+          <a class="anchor" href="#item-lex_step">lex_step</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lex_step&#60;K: any&#62;(src: str, at: u64, rules: TokenRule&#60;K&#62;[]) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-seg_emit">
+        <h2>
+          <a class="anchor" href="#item-seg_emit">seg_emit</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn seg_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, text: str, seg: Seg, span: Span) -&#62; K!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-seg_needs_ofseg">
+        <h2>
+          <a class="anchor" href="#item-seg_needs_ofseg">seg_needs_ofseg</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn seg_needs_ofseg(span: Span) -&#62; LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-template_step">
+        <h2>
+          <a class="anchor" href="#item-template_step">template_step</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn template_step&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-template_scan">
+        <h2>
+          <a class="anchor" href="#item-template_scan">template_scan</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn template_scan&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-finalize_template">
+        <h2>
+          <a class="anchor" href="#item-finalize_template">finalize_template</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn finalize_template&#60;K: any&#62;(src: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, seg_texts: str[], seg_spans: Span[], interp_runs: StepResult&#60;K&#62;[], end: u64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-interp_scan">
+        <h2>
+          <a class="anchor" href="#item-interp_scan">interp_scan</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn interp_scan&#60;K: any&#62;(src: str, at: u64, open: u64, rules: TokenRule&#60;K&#62;[]) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Kind">
+        <h2>
+          <a class="anchor" href="#item-Kind">Kind</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Kind</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Ws"><code>Ws</code></li>
+
+          <li id="item-Ident"><code>Ident(str)</code></li>
+
+          <li id="item-IntTok"><code>IntTok(i64)</code></li>
+
+          <li id="item-Digits"><code>Digits</code></li>
+
+          <li id="item-Op"><code>Op</code></li>
+
+          <li id="item-Kw"><code>Kw</code></li>
+
+          <li id="item-Punct"><code>Punct</code></li>
+
+          <li id="item-Dot"><code>Dot</code></li>
+
+          <li id="item-FloatTok"><code>FloatTok</code></li>
+
+          <li id="item-Str"><code>Str(str)</code></li>
+
+          <li id="item-Raw"><code>Raw(str)</code></li>
+
+          <li id="item-Block"><code>Block(str)</code></li>
+
+          <li id="item-Comment"><code>Comment</code></li>
+
+          <li id="item-Allow"><code>Allow</code></li>
+
+          <li id="item-Tpl"><code>Tpl(str)</code></li>
+
+          <li id="item-TplHead"><code>TplHead(str)</code></li>
+
+          <li id="item-TplMid"><code>TplMid(str)</code></li>
+
+          <li id="item-TplTail"><code>TplTail(str)</code></li>
+
+          <li id="item-RawTpl"><code>RawTpl(str)</code></li>
+
+          <li id="item-RawTplHead"><code>RawTplHead(str)</code></li>
+
+          <li id="item-RawTplMid"><code>RawTplMid(str)</code></li>
+
+          <li id="item-RawTplTail"><code>RawTplTail(str)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-tpl_kind">
+        <h2>
+          <a class="anchor" href="#item-tpl_kind">tpl_kind</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn tpl_kind(text: str, seg: Seg) -&#62; Kind</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-esc_str">
+        <h2>
+          <a class="anchor" href="#item-esc_str">esc_str</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn esc_str(text: str) -&#62; Kind</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-int_tok">
+        <h2>
+          <a class="anchor" href="#item-int_tok">int_tok</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn int_tok(text: str) -&#62; Kind!str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-nonempty_str">
+        <h2>
+          <a class="anchor" href="#item-nonempty_str">nonempty_str</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn nonempty_str(text: str) -&#62; Kind!str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-checked_seg">
+        <h2>
+          <a class="anchor" href="#item-checked_seg">checked_seg</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn checked_seg(text: str, seg: Seg) -&#62; Kind!str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-rawtpl_kind">
+        <h2>
+          <a class="anchor" href="#item-rawtpl_kind">rawtpl_kind</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn rawtpl_kind(text: str, seg: Seg) -&#62; Kind</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-tok">
+        <h2>
+          <a class="anchor" href="#item-tok">tok</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn tok(src: str, kind: Kind, span: Span) -&#62; Token&#60;Kind&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-toks">
+        <h2>
+          <a class="anchor" href="#item-toks">toks</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn toks(tokens: Token&#60;Kind&#62;[]) -&#62; LexResult&#60;Kind&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lex">
+        <h2>
+          <a class="anchor" href="#item-lex">lex</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn lex&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; LexResult&#60;K&#62;!LexError</code></pre>
+
+        <div class="doc"><p>Lexes <code>self</code> into a <code>LexResult</code>: the flat token list, plus the trivia side-channel, as described by the ordered <code>rules</code>. At each position the first rule whose matcher matches claims the token (so order is priority — keywords before identifiers, floats before ints); a <code>skip: true</code> rule consumes its match without producing anything (whitespace), and a <code>trivia: true</code> rule records its matches in the side-channel instead of the token stream (comments, lint markers). A <code>Template</code> rule emits several tokens per literal — head/middle/tail segments around the tokens of each <code>{...}</code> interpolation, which are lexed by this same rule set. Lexing fails with an <code>err</code> — a <code>LexError</code> carrying a message and the offending span — when a byte matches no rule or a matcher sees invalid input outright (an unterminated <code>Delimited</code> token).</p></div>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

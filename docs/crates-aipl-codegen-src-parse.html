@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/parse.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/parse.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>case_name</code> <span class="from">from builtins</span></li>
+
+          <li><code>case_of</code> <span class="from">from builtins</span></li>
+
+          <li><code>contains</code> <span class="from">from builtins</span></li>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>extend</code> <span class="from">from builtins</span></li>
+
+          <li><code>filter</code> <span class="from">from builtins</span></li>
+
+          <li><code>find_if</code> <span class="from">from builtins</span></li>
+
+          <li><code>find_index</code> <span class="from">from builtins</span></li>
+
+          <li><code>first</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_empty</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_nonempty</code> <span class="from">from builtins</span></li>
+
+          <li><code>join</code> <span class="from">from builtins</span></li>
+
+          <li><code>len</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than_or_equal</code> <span class="as">as</span> <code>&#60;=</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>map_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>not_equal</code> <span class="as">as</span> <code>!=</code> <span class="from">from builtins</span></li>
+
+          <li><code>try_map</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
+
+          <li><code>CLeaf</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>CTree</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>CTrivia</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>is_tree</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>show</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>span</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>text</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>Climb</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Literal</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Many</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Maybe</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Mk</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Named</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>NamedIdx</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>OneOf</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ParseError</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Prec</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Production</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Rule</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>failure_message</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>link</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>prod_names</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Bare</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>CharRun</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>LexResult</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Of</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>OneChar</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>ToEol</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Token</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>TokenRule</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>lex</code> <span class="from">from ./lexer.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-Far">
+        <h2>
+          <a class="anchor" href="#item-Far">Far</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Far</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Step">
+        <h2>
+          <a class="anchor" href="#item-Step">Step</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Step</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Parser">
+        <h2>
+          <a class="anchor" href="#item-Parser">Parser</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Parser&#60;K: variant, A: any&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-far_miss">
+        <h2>
+          <a class="anchor" href="#item-far_miss">far_miss</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn far_miss(far: Far, pos: u64, label: str) -&#62; Far</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-no">
+        <h2>
+          <a class="anchor" href="#item-no">no</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn no(far: Far, pos: u64) -&#62; Step</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-miss">
+        <h2>
+          <a class="anchor" href="#item-miss">miss</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn miss(far: Far, pos: u64, label: str) -&#62; Step</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-tok_text">
+        <h2>
+          <a class="anchor" href="#item-tok_text">tok_text</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn tok_text&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-prev_end">
+        <h2>
+          <a class="anchor" href="#item-prev_end">prev_end</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn prev_end&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-leaf_at">
+        <h2>
+          <a class="anchor" href="#item-leaf_at">leaf_at</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn leaf_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; Cst[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-trailing_trivia">
+        <h2>
+          <a class="anchor" href="#item-trailing_trivia">trailing_trivia</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn trailing_trivia&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;) -&#62; Cst[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-with_trailing">
+        <h2>
+          <a class="anchor" href="#item-with_trailing">with_trailing</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn with_trailing&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, root: Cst) -&#62; Cst</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-quoted">
+        <h2>
+          <a class="anchor" href="#item-quoted">quoted</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn quoted(s: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_rule">
+        <h2>
+          <a class="anchor" href="#item-match_rule">match_rule</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_rule&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, r: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_term">
+        <h2>
+          <a class="anchor" href="#item-match_term">match_term</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_term&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, k: Case&#60;K&#62;, pos: u64, far: Far) -&#62; Step</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_spelling">
+        <h2>
+          <a class="anchor" href="#item-match_spelling">match_spelling</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_spelling&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, s: str, pos: u64, far: Far) -&#62; Step</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_then">
+        <h2>
+          <a class="anchor" href="#item-match_then">match_then</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_then&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: Rule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_one_of">
+        <h2>
+          <a class="anchor" href="#item-match_one_of">match_one_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_one_of&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: Rule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_many">
+        <h2>
+          <a class="anchor" href="#item-match_many">match_many</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_sep">
+        <h2>
+          <a class="anchor" href="#item-match_sep">match_sep</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: Rule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-hit_nothing">
+        <h2>
+          <a class="anchor" href="#item-hit_nothing">hit_nothing</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn hit_nothing(pos: u64, far: Far) -&#62; Step</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_maybe">
+        <h2>
+          <a class="anchor" href="#item-match_maybe">match_maybe</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_maybe&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_prod">
+        <h2>
+          <a class="anchor" href="#item-match_prod">match_prod</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_prod&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64, pos: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-find_prec">
+        <h2>
+          <a class="anchor" href="#item-find_prec">find_prec</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn find_prec(precs: Prec[], text: str, min_power: u64) -&#62; Prec?</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_climb">
+        <h2>
+          <a class="anchor" href="#item-match_climb">match_climb</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: Rule&#60;K&#62;, precs: Prec[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-climb">
+        <h2>
+          <a class="anchor" href="#item-climb">climb</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: Rule&#60;K&#62;, precs: Prec[], pos: u64, min_power: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-error_at">
+        <h2>
+          <a class="anchor" href="#item-error_at">error_at</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn error_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, far: Far) -&#62; ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-parse_cst">
+        <h2>
+          <a class="anchor" href="#item-parse_cst">parse_cst</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn parse_cst&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, g: Grammar&#60;K, A&#62;, start: str) -&#62; Cst!ParseError</code></pre>
+
+        <div class="doc"><p>Parses <code>src</code> — already lexed into <code>lexed</code> — against grammar <code>g</code>, beginning at the production named <code>start</code>, and returns the lossless concrete syntax tree.</p><p><code>g</code> is linked here, so it may be handed over unlinked; linking is idempotent, so a caller parsing repeatedly can <code>link</code> once and pay nothing again. Every token must be consumed: input left over after the start rule succeeds is an error, not a partial parse.</p><p>Fails with a <code>ParseError</code> carrying the span of the offending token — the *furthest* position anything was expected at, not the last one tried — or the empty span at the end of the source when the input simply ran out.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-lower">
+        <h2>
+          <a class="anchor" href="#item-lower">lower</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn lower&#60;K: variant, A: any&#62;(src: str, node: Cst, g: Grammar&#60;K, A&#62;) -&#62; A!ParseError</code></pre>
+
+        <div class="doc"><p>Lowers a parsed tree to the caller's AST by calling each node's production <code>build</code>, depth first: a node's children are lowered before it, and only its *interior* children are passed (<code>nodes</code>) — a leaf has no lowered value, and its text is reachable from the node's own span.</p><p>Fails with whatever a <code>build</code> refused with, unchanged.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-lower_node">
+        <h2>
+          <a class="anchor" href="#item-lower_node">lower_node</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_node&#60;K: variant, A: any&#62;(src: str, node: Cst, prods: Production&#60;K, A&#62;[]) -&#62; A!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-parse">
+        <h2>
+          <a class="anchor" href="#item-parse">parse</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn parse&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, g: Grammar&#60;K, A&#62;, start: str) -&#62; A!ParseError</code></pre>
+
+        <div class="doc"><p><code>parse_cst</code> followed by <code>lower</code>: the source's AST, with the concrete tree built and discarded in between. Use <code>parse_cst</code> when the tree itself is the point (a formatter, a highlighter), and this when only the AST is.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-tok_rules">
+        <h2>
+          <a class="anchor" href="#item-tok_rules">tok_rules</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn tok_rules() -&#62; TokenRule&#60;Tok&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-trivia_rules">
+        <h2>
+          <a class="anchor" href="#item-trivia_rules">trivia_rules</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn trivia_rules() -&#62; TokenRule&#60;Tok&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lex_toks">
+        <h2>
+          <a class="anchor" href="#item-lex_toks">lex_toks</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lex_toks(src: str, rules: TokenRule&#60;Tok&#62;[]) -&#62; LexResult&#60;Tok&#62;!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Node">
+        <h2>
+          <a class="anchor" href="#item-Node">Node</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Node</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-NLeaf"><code>NLeaf(str)</code></li>
+
+          <li id="item-NNode"><code>NNode(Node[])</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-build_node">
+        <h2>
+          <a class="anchor" href="#item-build_node">build_node</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn build_node(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-refuse">
+        <h2>
+          <a class="anchor" href="#item-refuse">refuse</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn refuse(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-one">
+        <h2>
+          <a class="anchor" href="#item-one">one</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn one(name: str, rule: Rule&#60;Tok&#62;) -&#62; Production&#60;Tok, Node&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-labelled_prod">
+        <h2>
+          <a class="anchor" href="#item-labelled_prod">labelled_prod</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn labelled_prod(name: str, rule: Rule&#60;Tok&#62;, expect_as: str) -&#62; Production&#60;Tok, Node&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-g_of">
+        <h2>
+          <a class="anchor" href="#item-g_of">g_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn g_of(ps: Production&#60;Tok, Node&#62;[]) -&#62; Grammar&#60;Tok, Node&#62;</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-shown">
+        <h2>
+          <a class="anchor" href="#item-shown">shown</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn shown(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-msg_of">
+        <h2>
+          <a class="anchor" href="#item-msg_of">msg_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn msg_of(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-parsed">
+        <h2>
+          <a class="anchor" href="#item-parsed">parsed</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn parsed(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; Node!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

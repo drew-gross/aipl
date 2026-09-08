@@ -1,0 +1,2331 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/walker.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/walker.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>Span</code> <span class="from">from builtins</span></li>
+
+          <li><code>contains</code> <span class="from">from builtins</span></li>
+
+          <li><code>count</code> <span class="from">from builtins</span></li>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>first</code> <span class="from">from builtins</span></li>
+
+          <li><code>intersperse</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_empty</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_err_and</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_nonempty</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_some_and</code> <span class="from">from builtins</span></li>
+
+          <li><code>join</code> <span class="from">from builtins</span></li>
+
+          <li><code>len</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than_or_equal</code> <span class="as">as</span> <code>&#60;=</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>map_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>max</code> <span class="from">from builtins</span></li>
+
+          <li><code>min</code> <span class="from">from builtins</span></li>
+
+          <li><code>not_equal</code> <span class="as">as</span> <code>!=</code> <span class="from">from builtins</span></li>
+
+          <li><code>push</code> <span class="from">from builtins</span></li>
+
+          <li><code>saturating_decrement</code> <span class="as">as</span> <code>--</code> <span class="from">from builtins</span></li>
+
+          <li><code>saturating_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
+
+          <li><code>sort_by</code> <span class="from">from builtins</span></li>
+
+          <li><code>starts_with</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
+
+          <li><code>BlankLine</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>BreakParent</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Concat</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Doc</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Group</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>HardLine</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>IfBroken</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Indent</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Line</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>RawBlock</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>SoftLine</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Text</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>group</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>print_doc</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>is_operator_name</code> <span class="from">from ./is_operator_name.aipl</span></li>
+
+          <li><code>AiplTok</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+          <li><code>lex_aipl</code> <span class="from">from ./lex_aipl.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-FmtKind">
+        <h2>
+          <a class="anchor" href="#item-FmtKind">FmtKind</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant FmtKind</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Keyword"><code>Keyword</code></li>
+
+          <li id="item-Constant"><code>Constant</code></li>
+
+          <li id="item-BuiltinType"><code>BuiltinType</code></li>
+
+          <li id="item-Ident"><code>Ident</code></li>
+
+          <li id="item-Num"><code>Num</code></li>
+
+          <li id="item-StrTok"><code>StrTok</code></li>
+
+          <li id="item-CharTok"><code>CharTok</code></li>
+
+          <li id="item-Op"><code>Op</code></li>
+
+          <li id="item-Punct"><code>Punct</code></li>
+
+          <li id="item-TplHead"><code>TplHead</code></li>
+
+          <li id="item-TplMid"><code>TplMid</code></li>
+
+          <li id="item-TplTail"><code>TplTail</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-FmtTok">
+        <h2>
+          <a class="anchor" href="#item-FmtTok">FmtTok</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct FmtTok</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-W">
+        <h2>
+          <a class="anchor" href="#item-W">W</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct W</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WDoc">
+        <h2>
+          <a class="anchor" href="#item-WDoc">WDoc</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WDoc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WStr">
+        <h2>
+          <a class="anchor" href="#item-WStr">WStr</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WStr</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WDocs">
+        <h2>
+          <a class="anchor" href="#item-WDocs">WDocs</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WDocs</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-FmtError">
+        <h2>
+          <a class="anchor" href="#item-FmtError">FmtError</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-new_walker">
+        <h2>
+          <a class="anchor" href="#item-new_walker">new_walker</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn new_walker(src: str, toks: FmtTok[], comments: Span[]) -&#62; W</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-peek">
+        <h2>
+          <a class="anchor" href="#item-peek">peek</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn peek(self: W) -&#62; FmtTok?</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-peek_text_n">
+        <h2>
+          <a class="anchor" href="#item-peek_text_n">peek_text_n</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn peek_text_n(self: W, n: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-peek_text">
+        <h2>
+          <a class="anchor" href="#item-peek_text">peek_text</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn peek_text(self: W) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-at_end">
+        <h2>
+          <a class="anchor" href="#item-at_end">at_end</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn at_end(self: W) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-more_before">
+        <h2>
+          <a class="anchor" href="#item-more_before">more_before</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn more_before(self: W, end: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-bump">
+        <h2>
+          <a class="anchor" href="#item-bump">bump</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn bump(self: W) -&#62; WStr</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-expect">
+        <h2>
+          <a class="anchor" href="#item-expect">expect</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn expect(self: W, want: str) -&#62; WStr!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-err_here">
+        <h2>
+          <a class="anchor" href="#item-err_here">err_here</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn err_here(self: W, msg: str) -&#62; FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-next_start">
+        <h2>
+          <a class="anchor" href="#item-next_start">next_start</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn next_start(self: W) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-gap_has_blank">
+        <h2>
+          <a class="anchor" href="#item-gap_has_blank">gap_has_blank</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn gap_has_blank(self: W, span: Span) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-same_line">
+        <h2>
+          <a class="anchor" href="#item-same_line">same_line</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn same_line(self: W, span: Span) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lead">
+        <h2>
+          <a class="anchor" href="#item-lead">lead</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lead(self: W) -&#62; WDoc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lead_loop">
+        <h2>
+          <a class="anchor" href="#item-lead_loop">lead_loop</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lead_loop(w0: W, limit: u64, acc0: Doc[]) -&#62; WDoc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-trailing_comment">
+        <h2>
+          <a class="anchor" href="#item-trailing_comment">trailing_comment</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn trailing_comment(self: W) -&#62; WDoc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-take_comment">
+        <h2>
+          <a class="anchor" href="#item-take_comment">take_comment</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn take_comment(self: W, c: Span) -&#62; W</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-ListStyle">
+        <h2>
+          <a class="anchor" href="#item-ListStyle">ListStyle</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant ListStyle</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Parens"><code>Parens</code></li>
+
+          <li id="item-Brackets"><code>Brackets</code></li>
+
+          <li id="item-HashBraces"><code>HashBraces</code></li>
+
+          <li id="item-SpacedBraces"><code>SpacedBraces</code></li>
+
+          <li id="item-Angles"><code>Angles</code></li>
+
+          <li id="item-TyParens"><code>TyParens</code></li>
+
+          <li id="item-SpacedBracesNoTrailing"><code>SpacedBracesNoTrailing</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-ListShape">
+        <h2>
+          <a class="anchor" href="#item-ListShape">ListShape</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct ListShape</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-shape">
+        <h2>
+          <a class="anchor" href="#item-shape">shape</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn shape(self: ListStyle) -&#62; ListShape</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-comma_list_docs">
+        <h2>
+          <a class="anchor" href="#item-comma_list_docs">comma_list_docs</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn comma_list_docs(items: Doc[], style: ListStyle) -&#62; Doc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-format_program">
+        <h2>
+          <a class="anchor" href="#item-format_program">format_program</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn format_program(src: str, width: u64) -&#62; str!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fmt_kind">
+        <h2>
+          <a class="anchor" href="#item-fmt_kind">fmt_kind</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fmt_kind(k: AiplTok) -&#62; FmtKind</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-is_builtin_type_name">
+        <h2>
+          <a class="anchor" href="#item-is_builtin_type_name">is_builtin_type_name</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_builtin_type_name(n: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-is_int_type_name">
+        <h2>
+          <a class="anchor" href="#item-is_int_type_name">is_int_type_name</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_int_type_name(self: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-tok_text">
+        <h2>
+          <a class="anchor" href="#item-tok_text">tok_text</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn tok_text(self: W, i: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-peek_is">
+        <h2>
+          <a class="anchor" href="#item-peek_is">peek_is</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn peek_is(self: W, k: FmtKind) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-peek_is_n">
+        <h2>
+          <a class="anchor" href="#item-peek_is_n">peek_is_n</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn peek_is_n(self: W, n: u64, k: FmtKind) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-comment_before_cursor">
+        <h2>
+          <a class="anchor" href="#item-comment_before_cursor">comment_before_cursor</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn comment_before_cursor(self: W) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-advance">
+        <h2>
+          <a class="anchor" href="#item-advance">advance</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn advance(self: W, end: u64) -&#62; W</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-skip_comment">
+        <h2>
+          <a class="anchor" href="#item-skip_comment">skip_comment</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn skip_comment(self: W) -&#62; W</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-is_empty_doc">
+        <h2>
+          <a class="anchor" href="#item-is_empty_doc">is_empty_doc</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_empty_doc(self: Doc) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-sep_entry">
+        <h2>
+          <a class="anchor" href="#item-sep_entry">sep_entry</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn sep_entry(blank: bool, not_first: bool) -&#62; Doc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-without_trailing_break">
+        <h2>
+          <a class="anchor" href="#item-without_trailing_break">without_trailing_break</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn without_trailing_break(self: Doc) -&#62; Doc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-drop_trailing_break">
+        <h2>
+          <a class="anchor" href="#item-drop_trailing_break">drop_trailing_break</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn drop_trailing_break(self: Doc[]) -&#62; Doc[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-is_line_break">
+        <h2>
+          <a class="anchor" href="#item-is_line_break">is_line_break</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_line_break(self: Doc) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-with_last">
+        <h2>
+          <a class="anchor" href="#item-with_last">with_last</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn with_last(self: Doc[], d: Doc) -&#62; Doc[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WImport">
+        <h2>
+          <a class="anchor" href="#item-WImport">WImport</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WImport</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-ImportName">
+        <h2>
+          <a class="anchor" href="#item-ImportName">ImportName</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct ImportName</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WKeys">
+        <h2>
+          <a class="anchor" href="#item-WKeys">WKeys</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WKeys</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-import_item">
+        <h2>
+          <a class="anchor" href="#item-import_item">import_item</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn import_item(self: W) -&#62; WImport!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-import_names">
+        <h2>
+          <a class="anchor" href="#item-import_names">import_names</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn import_names(self: W, acc0: ImportName[]) -&#62; WKeys!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-import_alias">
+        <h2>
+          <a class="anchor" href="#item-import_alias">import_alias</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn import_alias(self: W, first: str) -&#62; WStr</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-import_name_precedes">
+        <h2>
+          <a class="anchor" href="#item-import_name_precedes">import_name_precedes</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn import_name_precedes(a: str, b: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-sorted_import_names">
+        <h2>
+          <a class="anchor" href="#item-sorted_import_names">sorted_import_names</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn sorted_import_names(names: ImportName[]) -&#62; Doc[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-import_source_precedes">
+        <h2>
+          <a class="anchor" href="#item-import_source_precedes">import_source_precedes</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn import_source_precedes(a: str, b: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-ty">
+        <h2>
+          <a class="anchor" href="#item-ty">ty</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn ty(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-paren_ty">
+        <h2>
+          <a class="anchor" href="#item-paren_ty">paren_ty</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn paren_ty(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-ty_list">
+        <h2>
+          <a class="anchor" href="#item-ty_list">ty_list</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn ty_list(self: W, end: str, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-base_ty">
+        <h2>
+          <a class="anchor" href="#item-base_ty">base_ty</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn base_ty(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-set_or_dict_ty">
+        <h2>
+          <a class="anchor" href="#item-set_or_dict_ty">set_or_dict_ty</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn set_or_dict_ty(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-dict_value_ty">
+        <h2>
+          <a class="anchor" href="#item-dict_value_ty">dict_value_ty</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn dict_value_ty(self: W) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-named_ty">
+        <h2>
+          <a class="anchor" href="#item-named_ty">named_ty</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn named_ty(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-type_suffixes">
+        <h2>
+          <a class="anchor" href="#item-type_suffixes">type_suffixes</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn type_suffixes(self: W, acc0: Doc[]) -&#62; WDocs</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-array_suffixes">
+        <h2>
+          <a class="anchor" href="#item-array_suffixes">array_suffixes</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn array_suffixes(self: W, acc0: Doc[]) -&#62; WDocs</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-type_params">
+        <h2>
+          <a class="anchor" href="#item-type_params">type_params</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn type_params(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-type_param_list">
+        <h2>
+          <a class="anchor" href="#item-type_param_list">type_param_list</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn type_param_list(self: W, acc0: Doc[]) -&#62; WDocs</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-param_bound">
+        <h2>
+          <a class="anchor" href="#item-param_bound">param_bound</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn param_bound(self: W, name: str) -&#62; WDoc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-VCase">
+        <h2>
+          <a class="anchor" href="#item-VCase">VCase</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct VCase</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WCases">
+        <h2>
+          <a class="anchor" href="#item-WCases">WCases</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WCases</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-variant_item">
+        <h2>
+          <a class="anchor" href="#item-variant_item">variant_item</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn variant_item(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-variant_cases">
+        <h2>
+          <a class="anchor" href="#item-variant_cases">variant_cases</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn variant_cases(self: W, acc0: VCase[]) -&#62; WCases!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-variant_payload">
+        <h2>
+          <a class="anchor" href="#item-variant_payload">variant_payload</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn variant_payload(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-case_params">
+        <h2>
+          <a class="anchor" href="#item-case_params">case_params</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn case_params(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-variant_body">
+        <h2>
+          <a class="anchor" href="#item-variant_body">variant_body</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn variant_body(cases: VCase[]) -&#62; Doc[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-ImportEntry">
+        <h2>
+          <a class="anchor" href="#item-ImportEntry">ImportEntry</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct ImportEntry</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WProgram">
+        <h2>
+          <a class="anchor" href="#item-WProgram">WProgram</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WProgram</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-program">
+        <h2>
+          <a class="anchor" href="#item-program">program</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn program(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-program_items">
+        <h2>
+          <a class="anchor" href="#item-program_items">program_items</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -&#62; WProgram!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-sorted_imports">
+        <h2>
+          <a class="anchor" href="#item-sorted_imports">sorted_imports</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn sorted_imports(entries: ImportEntry[]) -&#62; Doc[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-item">
+        <h2>
+          <a class="anchor" href="#item-item">item</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn item(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fn_item">
+        <h2>
+          <a class="anchor" href="#item-fn_item">fn_item</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fn_item(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fn_body">
+        <h2>
+          <a class="anchor" href="#item-fn_body">fn_body</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fn_body(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-construct_body">
+        <h2>
+          <a class="anchor" href="#item-construct_body">construct_body</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn construct_body(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fn_effects">
+        <h2>
+          <a class="anchor" href="#item-fn_effects">fn_effects</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fn_effects(self: W, acc0: Doc[]) -&#62; WDocs</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fn_return">
+        <h2>
+          <a class="anchor" href="#item-fn_return">fn_return</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fn_return(self: W, acc: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-fn_attrs">
+        <h2>
+          <a class="anchor" href="#item-fn_attrs">fn_attrs</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn fn_attrs(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-params_until">
+        <h2>
+          <a class="anchor" href="#item-params_until">params_until</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn params_until(self: W, end: str, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-spaced_default">
+        <h2>
+          <a class="anchor" href="#item-spaced_default">spaced_default</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn spaced_default(self: W, acc: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-struct_item">
+        <h2>
+          <a class="anchor" href="#item-struct_item">struct_item</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn struct_item(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-struct_fields">
+        <h2>
+          <a class="anchor" href="#item-struct_fields">struct_fields</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn struct_fields(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WEntries">
+        <h2>
+          <a class="anchor" href="#item-WEntries">WEntries</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WEntries</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-block">
+        <h2>
+          <a class="anchor" href="#item-block">block</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn block(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-block_layout">
+        <h2>
+          <a class="anchor" href="#item-block_layout">block_layout</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn block_layout(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-block_entries">
+        <h2>
+          <a class="anchor" href="#item-block_entries">block_entries</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -&#62; WEntries!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-trim_last_break">
+        <h2>
+          <a class="anchor" href="#item-trim_last_break">trim_last_break</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn trim_last_break(self: Doc[]) -&#62; Doc[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-range_has_semi">
+        <h2>
+          <a class="anchor" href="#item-range_has_semi">range_has_semi</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn range_has_semi(self: W, span: Span) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-statement">
+        <h2>
+          <a class="anchor" href="#item-statement">statement</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn statement(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-let_stmt">
+        <h2>
+          <a class="anchor" href="#item-let_stmt">let_stmt</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn let_stmt(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-mut_stmt">
+        <h2>
+          <a class="anchor" href="#item-mut_stmt">mut_stmt</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn mut_stmt(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-struct_pattern">
+        <h2>
+          <a class="anchor" href="#item-struct_pattern">struct_pattern</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn struct_pattern(self: W, kw: str, name: str) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-binding_ann">
+        <h2>
+          <a class="anchor" href="#item-binding_ann">binding_ann</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn binding_ann(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-is_compound_assign">
+        <h2>
+          <a class="anchor" href="#item-is_compound_assign">is_compound_assign</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_compound_assign(self: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-is_step_by_one">
+        <h2>
+          <a class="anchor" href="#item-is_step_by_one">is_step_by_one</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_step_by_one(self: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-set_stmt">
+        <h2>
+          <a class="anchor" href="#item-set_stmt">set_stmt</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn set_stmt(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-set_member">
+        <h2>
+          <a class="anchor" href="#item-set_member">set_member</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn set_member(self: W, name: str) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-member_path">
+        <h2>
+          <a class="anchor" href="#item-member_path">member_path</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn member_path(self: W, acc0: str) -&#62; WStr</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-for_stmt">
+        <h2>
+          <a class="anchor" href="#item-for_stmt">for_stmt</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn for_stmt(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-tuple_binder">
+        <h2>
+          <a class="anchor" href="#item-tuple_binder">tuple_binder</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn tuple_binder(self: W) -&#62; WStr</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-while_stmt">
+        <h2>
+          <a class="anchor" href="#item-while_stmt">while_stmt</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn while_stmt(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WNames">
+        <h2>
+          <a class="anchor" href="#item-WNames">WNames</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WNames</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-ident_list">
+        <h2>
+          <a class="anchor" href="#item-ident_list">ident_list</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn ident_list(self: W, end: str, acc0: str[]) -&#62; WNames</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-Seg">
+        <h2>
+          <a class="anchor" href="#item-Seg">Seg</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct Seg</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WSegs">
+        <h2>
+          <a class="anchor" href="#item-WSegs">WSegs</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WSegs</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-WSeg">
+        <h2>
+          <a class="anchor" href="#item-WSeg">WSeg</a>
+          <span class="kind kind-struct">struct</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>struct WSeg</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-expr">
+        <h2>
+          <a class="anchor" href="#item-expr">expr</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn expr(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-range_tail">
+        <h2>
+          <a class="anchor" href="#item-range_tail">range_tail</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn range_tail(self: W, acc0: Doc) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-binop_expr">
+        <h2>
+          <a class="anchor" href="#item-binop_expr">binop_expr</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn binop_expr(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-binop_tail">
+        <h2>
+          <a class="anchor" href="#item-binop_tail">binop_tail</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn binop_tail(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-is_binop">
+        <h2>
+          <a class="anchor" href="#item-is_binop">is_binop</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_binop(t: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-unary">
+        <h2>
+          <a class="anchor" href="#item-unary">unary</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn unary(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-postfix">
+        <h2>
+          <a class="anchor" href="#item-postfix">postfix</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn postfix(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-postfix_segs">
+        <h2>
+          <a class="anchor" href="#item-postfix_segs">postfix_segs</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn postfix_segs(self: W, acc0: Seg[]) -&#62; WSegs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-dot_seg">
+        <h2>
+          <a class="anchor" href="#item-dot_seg">dot_seg</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn dot_seg(self: W) -&#62; WSeg!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-index_seg">
+        <h2>
+          <a class="anchor" href="#item-index_seg">index_seg</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn index_seg(self: W) -&#62; WSeg!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-slice_to">
+        <h2>
+          <a class="anchor" href="#item-slice_to">slice_to</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn slice_to(self: W) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-index_or_from">
+        <h2>
+          <a class="anchor" href="#item-index_or_from">index_or_from</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn index_or_from(self: W) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-call_count">
+        <h2>
+          <a class="anchor" href="#item-call_count">call_count</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn call_count(segs: Seg[]) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-chain_docs">
+        <h2>
+          <a class="anchor" href="#item-chain_docs">chain_docs</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn chain_docs(segs: Seg[]) -&#62; Doc[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-atom">
+        <h2>
+          <a class="anchor" href="#item-atom">atom</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn atom(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-str_atom">
+        <h2>
+          <a class="anchor" href="#item-str_atom">str_atom</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn str_atom(self: WStr) -&#62; WDoc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-paren_atom">
+        <h2>
+          <a class="anchor" href="#item-paren_atom">paren_atom</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn paren_atom(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-tuple_rest">
+        <h2>
+          <a class="anchor" href="#item-tuple_rest">tuple_rest</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn tuple_rest(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-array_atom">
+        <h2>
+          <a class="anchor" href="#item-array_atom">array_atom</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn array_atom(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-set_or_dict_atom">
+        <h2>
+          <a class="anchor" href="#item-set_or_dict_atom">set_or_dict_atom</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn set_or_dict_atom(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-dict_entries">
+        <h2>
+          <a class="anchor" href="#item-dict_entries">dict_entries</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn dict_entries(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-dict_value">
+        <h2>
+          <a class="anchor" href="#item-dict_value">dict_value</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn dict_value(self: W, lead: Doc, k: Doc) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-name_atom">
+        <h2>
+          <a class="anchor" href="#item-name_atom">name_atom</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn name_atom(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-struct_atom">
+        <h2>
+          <a class="anchor" href="#item-struct_atom">struct_atom</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn struct_atom(self: W, name: str) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-struct_inits">
+        <h2>
+          <a class="anchor" href="#item-struct_inits">struct_inits</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn struct_inits(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-struct_field_value">
+        <h2>
+          <a class="anchor" href="#item-struct_field_value">struct_field_value</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn struct_field_value(self: W, lead: Doc, fname: str) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-if_expr">
+        <h2>
+          <a class="anchor" href="#item-if_expr">if_expr</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn if_expr(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-if_let_clause">
+        <h2>
+          <a class="anchor" href="#item-if_let_clause">if_let_clause</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn if_let_clause(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_expr">
+        <h2>
+          <a class="anchor" href="#item-match_expr">match_expr</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_expr(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-shim_expr">
+        <h2>
+          <a class="anchor" href="#item-shim_expr">shim_expr</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn shim_expr(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-shim_bindings">
+        <h2>
+          <a class="anchor" href="#item-shim_bindings">shim_bindings</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn shim_bindings(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-match_arms">
+        <h2>
+          <a class="anchor" href="#item-match_arms">match_arms</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn match_arms(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-pattern_alts">
+        <h2>
+          <a class="anchor" href="#item-pattern_alts">pattern_alts</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn pattern_alts(self: W, first: Doc) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-pattern">
+        <h2>
+          <a class="anchor" href="#item-pattern">pattern</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn pattern(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-qualified_case">
+        <h2>
+          <a class="anchor" href="#item-qualified_case">qualified_case</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn qualified_case(self: W, name: str) -&#62; WStr</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-call_args_until">
+        <h2>
+          <a class="anchor" href="#item-call_args_until">call_args_until</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn call_args_until(self: W, end: str, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-call_arg">
+        <h2>
+          <a class="anchor" href="#item-call_arg">call_arg</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn call_arg(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-is_arg_end">
+        <h2>
+          <a class="anchor" href="#item-is_arg_end">is_arg_end</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_arg_end(t: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lambda">
+        <h2>
+          <a class="anchor" href="#item-lambda">lambda</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lambda(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lambda_params">
+        <h2>
+          <a class="anchor" href="#item-lambda_params">lambda_params</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lambda_params(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lambda_param_ty">
+        <h2>
+          <a class="anchor" href="#item-lambda_param_ty">lambda_param_ty</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lambda_param_ty(self: W, name: str) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-template_verbatim">
+        <h2>
+          <a class="anchor" href="#item-template_verbatim">template_verbatim</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn template_verbatim(self: W) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-template_scan">
+        <h2>
+          <a class="anchor" href="#item-template_scan">template_scan</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn template_scan(self: W, start: u64, depth0: u64) -&#62; WDoc!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-drop_comments_before">
+        <h2>
+          <a class="anchor" href="#item-drop_comments_before">drop_comments_before</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn drop_comments_before(self: W, end: u64) -&#62; W</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-cur_comment">
+        <h2>
+          <a class="anchor" href="#item-cur_comment">cur_comment</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn cur_comment(self: W) -&#62; Span</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-cur_tok">
+        <h2>
+          <a class="anchor" href="#item-cur_tok">cur_tok</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn cur_tok(self: W) -&#62; FmtTok</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-comment_starts_before">
+        <h2>
+          <a class="anchor" href="#item-comment_starts_before">comment_starts_before</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn comment_starts_before(self: W, end: u64) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-hugs_sole_arg">
+        <h2>
+          <a class="anchor" href="#item-hugs_sole_arg">hugs_sole_arg</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn hugs_sole_arg(self: W) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-hug_close">
+        <h2>
+          <a class="anchor" href="#item-hug_close">hug_close</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn hug_close(self: W, start: u64) -&#62; u64?</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-hug_fills_call">
+        <h2>
+          <a class="anchor" href="#item-hug_fills_call">hug_fills_call</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn hug_fills_call(self: W, open_at: u64, close: u64) -&#62; bool</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-call_arg_list">
+        <h2>
+          <a class="anchor" href="#item-call_arg_list">call_arg_list</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn call_arg_list(args: Doc[], hug: bool) -&#62; Doc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-toks_of">
+        <h2>
+          <a class="anchor" href="#item-toks_of">toks_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn toks_of(src: str) -&#62; FmtTok[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-walker_of">
+        <h2>
+          <a class="anchor" href="#item-walker_of">walker_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn walker_of(src: str) -&#62; W</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-rendered">
+        <h2>
+          <a class="anchor" href="#item-rendered">rendered</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn rendered(self: WDoc!FmtError, width: u64) -&#62; str!FmtError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-at">
+        <h2>
+          <a class="anchor" href="#item-at">at</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn at(self: Doc, width: u64) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

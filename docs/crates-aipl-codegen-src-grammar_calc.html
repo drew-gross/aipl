@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/grammar_calc.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/grammar_calc.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>first</code> <span class="from">from builtins</span></li>
+
+          <li><code>int_parse</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_nonempty</code> <span class="from">from builtins</span></li>
+
+          <li><code>last</code> <span class="from">from builtins</span></li>
+
+          <li><code>len</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+
+          <li><code>map_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>map_ok</code> <span class="from">from builtins</span></li>
+
+          <li><code>saturating_divide</code> <span class="as">as</span> <code>/</code> <span class="from">from builtins</span></li>
+
+          <li><code>saturating_remainder</code> <span class="as">as</span> <code>%</code> <span class="from">from builtins</span></li>
+
+          <li><code>to_str</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_mul</code> <span class="as">as</span> <code>*</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_mul_assign</code> <span class="as">as</span> <code>*=</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
+
+          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>own_token_text</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>show</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>span</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>text</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>ebnf</code> <span class="from">from ./ebnf.aipl</span></li>
+
+          <li><code>show_first_sets</code> <span class="from">from ./ebnf.aipl</span></li>
+
+          <li><code>Climb</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Literal</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Mk</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Named</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>OneOf</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ParseError</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Prec</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Production</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Rule</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>failure_message</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>prod_names</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Bare</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>CharRun</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>Int</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>LexResult</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>OneChar</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>TokenRule</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>lex</code> <span class="from">from ./lexer.aipl</span></li>
+
+          <li><code>parse</code> <span class="from">from ./parse.aipl</span></li>
+
+          <li><code>parse_cst</code> <span class="from">from ./parse.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-CalcTok">
+        <h2>
+          <a class="anchor" href="#item-CalcTok">CalcTok</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant CalcTok</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Num"><code>Num</code></li>
+
+          <li id="item-Punct"><code>Punct</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-Calc">
+        <h2>
+          <a class="anchor" href="#item-Calc">Calc</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Calc</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-Lit"><code>Lit(i64)</code></li>
+
+          <li id="item-Neg"><code>Neg(Calc)</code></li>
+
+          <li id="item-Bin"><code>Bin(str, Calc, Calc)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-calc_rules">
+        <h2>
+          <a class="anchor" href="#item-calc_rules">calc_rules</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn calc_rules() -&#62; TokenRule&#60;CalcTok&#62;[]</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_expr">
+        <h2>
+          <a class="anchor" href="#item-lower_expr">lower_expr</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_expr(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_unary">
+        <h2>
+          <a class="anchor" href="#item-lower_unary">lower_unary</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_unary(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-lower_atom">
+        <h2>
+          <a class="anchor" href="#item-lower_atom">lower_atom</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lower_atom(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-calc_grammar">
+        <h2>
+          <a class="anchor" href="#item-calc_grammar">calc_grammar</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn calc_grammar() -&#62; Grammar&#60;CalcTok, Calc&#62;</code></pre>
+
+        <div class="doc"><p>The calculator grammar: <code>+ - * / % ^</code> over integer literals, with <code>^</code> right-associative and unary <code>-</code> binding tighter than any of them.</p><p>Only <code>atom</code> is labelled, so a failure deep in an expression reports as &quot;an expression&quot; rather than as the three productions it is made of.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-lex_calc">
+        <h2>
+          <a class="anchor" href="#item-lex_calc">lex_calc</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lex_calc(src: str) -&#62; LexResult&#60;CalcTok&#62;!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-calc_cst">
+        <h2>
+          <a class="anchor" href="#item-calc_cst">calc_cst</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn calc_cst(src: str) -&#62; Cst!ParseError</code></pre>
+
+        <div class="doc"><p>The lossless concrete tree for <code>src</code>. Use this when the tree is the point; <code>parse_calc</code> when only the <code>Calc</code> is.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-parse_calc">
+        <h2>
+          <a class="anchor" href="#item-parse_calc">parse_calc</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn parse_calc(src: str) -&#62; Calc!ParseError</code></pre>
+
+        <div class="doc"><p>The <code>Calc</code> <code>src</code> denotes: lex, parse to a concrete tree, lower it through the grammar's <code>build</code> functions.</p><p>Fails with a <code>ParseError</code> from either half of the front end, or from a lowering that refused — an integer literal too big for an <code>i64</code>.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-render_calc">
+        <h2>
+          <a class="anchor" href="#item-render_calc">render_calc</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn render_calc(self: Calc) -&#62; str</code></pre>
+
+        <div class="doc"><p><code>self</code> printed back as source, fully parenthesized — every application gets brackets, so the text shows the tree and needs no precedence rules to read.</p><p>Round-trips with <code>parse_calc</code>: <code>parse_calc(render_calc(v)) == v</code>.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-eval_calc">
+        <h2>
+          <a class="anchor" href="#item-eval_calc">eval_calc</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn eval_calc(self: Calc) -&#62; i64</code></pre>
+
+        <div class="doc"><p><code>self</code> evaluated as integer arithmetic. Division is saturating and <code>^</code> is integer exponentiation with a negative exponent yielding 0, so evaluation is total — a calculator's arithmetic policy is its own, not the parser's.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-pow">
+        <h2>
+          <a class="anchor" href="#item-pow">pow</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn pow(base: i64, exp: i64) -&#62; i64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-eval">
+        <h2>
+          <a class="anchor" href="#item-eval">eval</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn eval(src: str) -&#62; i64!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-msg_of">
+        <h2>
+          <a class="anchor" href="#item-msg_of">msg_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn msg_of(src: str) -&#62; str</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-shown">
+        <h2>
+          <a class="anchor" href="#item-shown">shown</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn shown(src: str) -&#62; str!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-depth_of">
+        <h2>
+          <a class="anchor" href="#item-depth_of">depth_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn depth_of(src: str) -&#62; u64!ParseError</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+      <section class="item" id="item-depth">
+        <h2>
+          <a class="anchor" href="#item-depth">depth</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn depth(self: Calc) -&#62; u64</code></pre>
+
+        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

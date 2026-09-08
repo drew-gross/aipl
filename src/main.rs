@@ -83,7 +83,7 @@ fn usage(prog: &str) -> String {
   {prog} run   <file.aipl> [fn] [args...]   compile and JIT-execute a function (default: main)
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
   {prog} doc   <file.aipl>                  print each fn's `.doc(\"..\")` documentation
-  {prog} docs  [path] [-o <dir>]            write an HTML documentation site
+  {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
   {prog} fmt   <file.aipl> [--check]        rewrite the file in canonical format
   {prog} check [path...]                    run every fn's `.test({{ .. }})` block
@@ -490,18 +490,26 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-/// `docs [path] [-o <dir>]` — write an HTML documentation site for a tree of
-/// AIPL source.
+/// `docs [path...] [-o <dir>] [--name <title>]` — write an HTML documentation
+/// site for a project's AIPL source.
 ///
 /// The whole-project counterpart of [`doc_cmd`]: that one prints one file's
-/// `.doc("..")` text, this one indexes every `.aipl` under `path` and writes a
-/// browsable site. Files that do not parse are reported and skipped rather than
-/// failing the run — a project usually has a few deliberate error fixtures, and
-/// documenting the rest of it is still worth doing.
+/// `.doc("..")` text to stdout, this one indexes every `.aipl` under each
+/// `path` and writes a browsable static site. Several paths document one site,
+/// which is how a project keeps its library and its examples together
+/// (`aipl docs crates examples`).
+///
+/// Paths in the site are shown relative to the working directory, whatever the
+/// arguments were, so a page reads `crates/aipl-codegen/src/grammar.aipl`.
+///
+/// Files that do not parse are reported and skipped rather than failing the
+/// run — a project usually has a few deliberate error fixtures, and documenting
+/// the rest of it is still worth doing.
 fn docs_cmd(args: &[String]) -> Result<(), String> {
     let (args, _dbg) = take_debug_flag(args);
-    let mut root: Option<&str> = None;
+    let mut paths: Vec<&str> = Vec::new();
     let mut out: Option<PathBuf> = None;
+    let mut name: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -510,28 +518,40 @@ fn docs_cmd(args: &[String]) -> Result<(), String> {
                 out = Some(PathBuf::from(dir));
                 i += 2;
             }
-            other if root.is_none() => {
-                root = Some(other);
+            "--name" => {
+                name = Some(args.get(i + 1).ok_or("--name needs a title")?.clone());
+                i += 2;
+            }
+            flag if flag.starts_with('-') => {
+                return Err(format!("unexpected argument {flag:?}"));
+            }
+            path => {
+                paths.push(path);
                 i += 1;
             }
-            other => return Err(format!("unexpected argument {other:?}")),
         }
     }
-    let root = Path::new(root.unwrap_or("."));
+    if paths.is_empty() {
+        paths.push(".");
+    }
     let out = out.unwrap_or_else(|| PathBuf::from("docs"));
 
     aipl::install_parser_hooks();
-    // A file path documents just that file; a directory is walked (the same
+    // A file argument documents just that file; a directory is walked (the same
     // walk `check` uses, so the two agree on what counts as project source).
     let mut files = Vec::new();
-    if root.is_file() {
-        files.push(root.to_path_buf());
-    } else {
-        collect_aipl(root, &mut files);
-        files.sort();
+    for path in &paths {
+        let path = Path::new(path);
+        if path.is_file() {
+            files.push(path.to_path_buf());
+        } else {
+            collect_aipl(path, &mut files);
+        }
     }
+    files.sort();
+    files.dedup();
     if files.is_empty() {
-        return Err(format!("no .aipl files under {}", root.display()));
+        return Err(format!("no .aipl files under {}", paths.join(", ")));
     }
 
     let mut index = aipl::index::Index::new();
@@ -544,11 +564,17 @@ fn docs_cmd(args: &[String]) -> Result<(), String> {
         }
     }
 
-    let project = std::fs::canonicalize(root)
-        .ok()
-        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
-        .unwrap_or_else(|| "AIPL".to_string());
-    aipl::docs::write_site(&index, root, &project, &out).map_err(|e| e.to_string())?;
+    // Paths are displayed relative to the working directory rather than to any
+    // one argument, so `aipl docs crates examples` shows both trees under the
+    // names they are known by.
+    let here = Path::new(".");
+    let project = name.unwrap_or_else(|| {
+        std::env::current_dir()
+            .ok()
+            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .unwrap_or_else(|| "AIPL".to_string())
+    });
+    aipl::docs::write_site(&index, here, &project, &out).map_err(|e| e.to_string())?;
 
     let documented = files.len() - skipped;
     println!(

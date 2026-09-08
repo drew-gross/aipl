@@ -218,6 +218,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
+  Why the formatter isn't already a thin wrapper
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 parser:
@@ -576,6 +577,8 @@ the arg contract being different for builtins caused problems for retain elision
 docs:
   make /// docs a thing for things that should be documented (and only for those things)
   make docs renderer part of check
+  doc comments for structs/variants
+  hide private functions
 
 cache the compiled module on disk instead of using clif ir (expensive to parse)
 
@@ -584,9 +587,8 @@ Maybe address this later and unify formatter and parser lexing (maybe allow form
 none.value_or_err doesn't type check. Maybe it should? Unclear.
 Known limitation recorded in #7: cross-iteration struct aliases still see the newer value, since the per-set buffer is a reused stack slot. <--- fix this
 
-value_or can't unwrap struct optionals — needs match. <--- fix this
-
-Why the formatter isn't already a thin wrapper
+optional:
+  value_or can't unwrap struct optionals — needs match. <--- fix this
 
 The parser consumes decoded token values (StrLit(value, style)) because it only builds an AST — it never reproduces source. The formatter has the opposite obligation: reproduce every token's source spelling byte-for-byte. That's lossy from the value:
 
