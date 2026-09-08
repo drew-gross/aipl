@@ -31,6 +31,8 @@
 // backtracking — and neither matters at the sizes here.
 import {
     Span,
+    all,
+    any,
     case_name,
     case_of,
     contains,
@@ -725,22 +727,8 @@ fn seq_labels<K: variant, A: any>(
 fn rule_nullable<K: variant>(r: Rule<K>, firsts: First<K>[]) -> bool {
     match (r) {
         Term(..) | Literal(..) | Named(..) | NestedIn(..) => false,
-        Then(rs) => {
-            for (let sub : rs) {
-                if (!rule_nullable(sub, firsts)) {
-                    return false;
-                };
-            }
-            true
-        },
-        OneOf(rs) => {
-            for (let sub : rs) {
-                if (rule_nullable(sub, firsts)) {
-                    return true;
-                };
-            }
-            false
-        },
+        Then(rs) => rs.all(|sub| rule_nullable(sub, firsts)),
+        OneOf(rs) => rs.any(|sub| rule_nullable(sub, firsts)),
         Many(sub, min, _, _) => min == 0 || rule_nullable(sub, firsts),
         Maybe(..) => true,
         Climb(atom, _) => rule_nullable(atom, firsts),
@@ -1397,10 +1385,10 @@ deallocations: 7893
 reallocations: 617
 bytes allocated: 487507
 instructions executed: 1058928
-binary size: 526952
-  code: 318248
+binary size: 527824
+  code: 318700
   data: 8556
-  metadata: 200148
+  metadata: 200568
 functions:
   __arr_drop_Node:
     calls: 21
@@ -1468,6 +1456,18 @@ functions:
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
     bytes: 632
+  __builtin_all$__m3__Rule$Tok$lam117:
+    calls: 0
+    bytes: 36
+  __builtin_all$__m3__Rule$Tok$lam117$tail:
+    calls: 0
+    bytes: 384
+  __builtin_any$__m3__Rule$Tok$lam120:
+    calls: 0
+    bytes: 36
+  __builtin_any$__m3__Rule$Tok$lam120$tail:
+    calls: 0
+    bytes: 380
   __builtin_count_while$char$lam47:
     calls: 162
     bytes: 220
@@ -1480,7 +1480,7 @@ functions:
   __builtin_count_while$char$s0$lam71$tail:
     calls: 3
     bytes: 256
-  __builtin_find_if$__m3__Prec$lam123:
+  __builtin_find_if$__m3__Prec$lam129:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam21:
@@ -1857,7 +1857,7 @@ functions:
     bytes: 36
   rule_nullable$Tok$tail:
     calls: 22
-    bytes: 2116
+    bytes: 1732
   seq_labels$Tok$Node:
     calls: 0
     bytes: 44

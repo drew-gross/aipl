@@ -1,0 +1,158 @@
+import { equal as ==, greater_than as >, print, to_str, wrapping_increment as ++ } from builtins;
+
+// Near misses. Each is a loop that looks like a fold to yes/no and is not one,
+// or is one the rewrite could not spell — so the lint stays quiet.
+
+// A second statement in the loop: work neither builtin has anywhere to put.
+fn counted(xs: i64[], lo: i64) -> bool {
+    mut seen = 0;
+    for (let x : xs) {
+        set seen++;
+        if (x > lo) {
+            return true;
+        };
+    }
+    seen > 99
+}
+
+// An `else` branch — same reason.
+fn with_else(xs: i64[], lo: i64) !prints -> bool {
+    for (let x : xs) {
+        if (x > lo) {
+            return true;
+        } else {
+            print("looked");
+        };
+    }
+    false
+}
+
+// The fall-through is not the opposite literal, so this is not a fold: both
+// exits answer the same thing and the loop is a constant, not an `any`.
+fn always_true(xs: i64[], lo: i64) -> bool {
+    for (let x : xs) {
+        if (x > lo) {
+            return true;
+        };
+    }
+    true
+}
+
+// The fall-through does work, so it is not an answer at all.
+fn falls_through_to_work(xs: i64[], lo: i64) !prints -> bool {
+    for (let x : xs) {
+        if (x > lo) {
+            return true;
+        };
+    }
+    print("none matched");
+    false
+}
+
+// Returns an element rather than a verdict: that is `find_if`, and
+// `return_loop_find_if` is the lint that says so — squelched here so this file
+// stays about the one lint it is a fixture for, and kept because the two lints
+// matching disjoint shapes is the thing being shown.
+fn first_big(xs: i64[], lo: i64) -> i64? {
+    for (let x : xs) {
+        if (x > lo) {
+            return some(x); #[allow]
+        };
+    }
+    none
+}
+
+// The `all` direction with a condition that is not syntactically negated.
+// `xs.all(|x| x != 0)` is the rewrite, and it needs the comparison inverted —
+// which is not something a diagnostic should attempt, so this is left alone.
+fn none_zero(xs: i64[]) -> bool {
+    for (let x : xs) {
+        if (x == 0) {
+            return false;
+        };
+    }
+    true
+}
+
+// A condition that propagates with `?` cannot move into a lambda unchanged.
+fn any_big_checked(xs: i64[], lo: i64) -> bool!Error {
+    for (let x : xs) {
+        if (checked(x)? > lo) {
+            return ok(true);
+        };
+    }
+    ok(false)
+}
+
+fn checked(x: i64) -> i64!Error { ok(x) }
+
+fn main() !prints {
+    print(counted([1, 9], 5).to_str());
+    print(with_else([1, 9], 5).to_str());
+    print(always_true([1], 5).to_str());
+    print(falls_through_to_work([1], 5).to_str());
+    print(first_big([1, 9], 5).to_str());
+    print(none_zero([1, 2]).to_str());
+}
+--- stdout ---
+true
+looked
+true
+true
+none matched
+false
+some(9)
+true
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 0
+bytes allocated: 396
+instructions executed: 776
+binary size: 5128
+  code: 2892
+  data: 115
+  metadata: 2121
+functions:
+  __to_str_bool:
+    calls: 5
+    bytes: 232
+  __to_str_i64$opt:
+    calls: 1
+    bytes: 388
+  aipl_array_dec:
+    calls: 6
+    bytes: (external)
+  aipl_array_new:
+    calls: 6
+    bytes: (external)
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 7
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  always_true:
+    calls: 1
+    bytes: 216
+  counted:
+    calls: 1
+    bytes: 248
+  falls_through_to_work:
+    calls: 1
+    bytes: 272
+  first_big:
+    calls: 1
+    bytes: 280
+  main:
+    calls: 1
+    bytes: 804
+  none_zero:
+    calls: 1
+    bytes: 188
+  with_else:
+    calls: 1
+    bytes: 264

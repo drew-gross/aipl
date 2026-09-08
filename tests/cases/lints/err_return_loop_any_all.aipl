@@ -1,0 +1,76 @@
+import { greater_than as >, logical_not as !, print } from builtins;
+
+// Every shape that fires. The expected block below is generated, never
+// hand-written.
+
+// The `any` direction: an early `return true`, falling through to `false`.
+fn has_big(xs: i64[], lo: i64) -> bool {
+    for (let x : xs) {
+        if (x > lo) {
+            return true;
+        };
+    }
+    false
+}
+
+// The `all` direction: an early `return false` under a negated condition,
+// falling through to `true`. The negation lifts off, so the advice names the
+// predicate rather than asking the reader to invert anything.
+fn all_big(xs: i64[], lo: i64) -> bool {
+    for (let x : xs) {
+        if (!(x > lo)) {
+            return false;
+        };
+    }
+    true
+}
+
+// The fall-through may be an explicit `return`, since a reader cannot tell that
+// apart from the block's tail either.
+fn has_big_explicit(xs: i64[], lo: i64) -> bool {
+    for (let x : xs) {
+        if (x > lo) {
+            return true;
+        };
+    }
+    return false;
+}
+
+// A receiver whose span does not cover its text gets the `<iterable>`
+// placeholder rather than a misquoted rewrite.
+fn any_doubled(xs: i64[], lo: i64) -> bool {
+    for (let x : xs.map(|v| v)) {
+        if (x > lo) {
+            return true;
+        };
+    }
+    false
+}
+
+fn main() !prints {
+    print("this file is a lint fixture");
+}
+--- errors ---
+error: this loop reports whether any element passes a test — write "return xs.any(|x| ..);" and drop the loop, importing `any` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_return_loop_any_all.aipl:10:20
+   |
+10 |             return true;
+   |                    ^^^^
+
+error: this loop reports whether every element passes a test — write "return xs.all(|x| ..);" (the condition with its "!" removed) and drop the loop, importing `all` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_return_loop_any_all.aipl:22:20
+   |
+22 |             return false;
+   |                    ^^^^^
+
+error: this loop reports whether any element passes a test — write "return xs.any(|x| ..);" and drop the loop, importing `any` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_return_loop_any_all.aipl:33:20
+   |
+33 |             return true;
+   |                    ^^^^
+
+error: this loop reports whether any element passes a test — write "return <iterable>.any(|x| ..);" and drop the loop, importing `any` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_return_loop_any_all.aipl:44:20
+   |
+44 |             return true;
+   |                    ^^^^

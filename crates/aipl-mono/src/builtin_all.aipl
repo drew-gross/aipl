@@ -9,9 +9,11 @@ import { equal as ==, filter, less_than_or_equal as <=, logical_not as ! } from 
 # that fails it; an empty array is vacuously true. Generic over the element type
 # and callable as a method: `xs.all(pred)`.
 pub fn all<T: any>(self: T[], pred: (T) -> bool) -> bool {
+    // As in `builtin_any.aipl`: this loop is what `all` *is*, so the lint's
+    // advice would be a recursive call rather than a simplification.
     for (let x : self) {
         if (!pred(x)) {
-            return false;
+            return false; #[allow]
         };
     }
     true

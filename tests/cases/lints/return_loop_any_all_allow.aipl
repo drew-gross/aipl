@@ -1,0 +1,115 @@
+import { all, any, greater_than as >, logical_not as !, print, to_str } from builtins;
+
+// `#[allow]` keeps the loop — the escape hatch every lint carries.
+//
+// The marker goes on the `return true;` / `return false;`, which is where this
+// lint points. That is deliberate: `#[allow]` is line-scoped, so a hit spanning
+// the loop could never be squelched — the marker would have to go on the
+// `for (..) {` header, and `aipl fmt` moves one written there onto a line of its
+// own, where it squelches nothing. The early return is a short statement that
+// always occupies one line, and it is the line that makes this loop a fold to a
+// single yes/no.
+fn has_big(xs: i64[], lo: i64) -> bool {
+    for (let x : xs) {
+        if (x > lo) {
+            return true; #[allow]
+        };
+    }
+    false
+}
+
+fn all_big(xs: i64[], lo: i64) -> bool {
+    for (let x : xs) {
+        if (!(x > lo)) {
+            return false; #[allow]
+        };
+    }
+    true
+}
+
+// The rewrites the lint asks for, so both spellings are checked side by side and
+// proven to agree — including on the empty receiver, where the two builtins
+// disagree with each other (`any` is false, `all` is true) and a reader most
+// wants the short form to be the one they can trust.
+fn has_big_short(xs: i64[], lo: i64) -> bool { xs.any(|x| x > lo) }
+
+fn all_big_short(xs: i64[], lo: i64) -> bool { xs.all(|x| x > lo) }
+
+fn main() !prints {
+    let empty: i64[] = [];
+    print(has_big([1, 5, 9], 4).to_str());
+    print(has_big_short([1, 5, 9], 4).to_str());
+    print(has_big([1, 2], 5).to_str());
+    print(has_big_short([1, 2], 5).to_str());
+    print(all_big([6, 7], 5).to_str());
+    print(all_big_short([6, 7], 5).to_str());
+    print(all_big([6, 1], 5).to_str());
+    print(all_big_short([6, 1], 5).to_str());
+    print(has_big(empty, 5).to_str());
+    print(has_big_short(empty, 5).to_str());
+    print(all_big(empty, 5).to_str());
+    print(all_big_short(empty, 5).to_str());
+}
+--- stdout ---
+true
+true
+false
+false
+true
+true
+false
+false
+false
+false
+true
+true
+--- performance ---
+allocations: 21
+deallocations: 21
+reallocations: 0
+bytes allocated: 678
+instructions executed: 1292
+binary size: 5512
+  code: 3228
+  data: 47
+  metadata: 2237
+functions:
+  __builtin_all$i64$lam11:
+    calls: 1
+    bytes: 204
+  __builtin_all$i64$lam5:
+    calls: 1
+    bytes: 204
+  __builtin_all$i64$lam7:
+    calls: 1
+    bytes: 204
+  __builtin_any$i64$lam1:
+    calls: 1
+    bytes: 192
+  __builtin_any$i64$lam3:
+    calls: 1
+    bytes: 192
+  __builtin_any$i64$lam9:
+    calls: 1
+    bytes: 192
+  __to_str_bool:
+    calls: 12
+    bytes: 232
+  aipl_array_dec:
+    calls: 9
+    bytes: (external)
+  aipl_array_new:
+    calls: 9
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 12
+    bytes: (external)
+  all_big:
+    calls: 3
+    bytes: 228
+  has_big:
+    calls: 3
+    bytes: 216
+  main:
+    calls: 1
+    bytes: 1364

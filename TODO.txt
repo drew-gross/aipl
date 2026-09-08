@@ -228,6 +228,7 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 parser:
+  make NestedIn just a flavor of Many
   trailing separater = Allowed | Disallowed | Required
   union_labels should just be set union. Why is this a vec?
   do we need NamedIdx when we have Named?
@@ -259,8 +260,11 @@ utilities:
   string_with_span -> strings already are represented as pointer+slice half the time, exposing that representation should make a lot of parser/grammer stuff cleaner
 
 skills:
+  make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
+  we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway
+  err_lints being all one big file is kinda annoying, lets group by kind
   for (let sub : rs) { if (cond(sub)) return true } else return false => line require this to return any
   xs.fold(0, +) should be sum probably? I guess with wrapping and saturating variants
   any lint that works on bare assignment should work on field assignment (e.g. lint to use --)

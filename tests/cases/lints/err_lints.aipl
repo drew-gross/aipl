@@ -24,7 +24,8 @@ import {
 // it (`allow_squelch`, `eta_lambda_allow`, `field_init_shorthand_allow`,
 // `slice_from_zero_allow`, `incr_by_one_allow`, `fn_body_type_stutter_allow`,
 // `len_gt_zero_allow`, `is_empty_longhand_allow`, `push_loop_pipeline_allow`,
-// `return_loop_find_if_allow`, `return_loop_find_index_allow`), and its own
+// `return_loop_find_if_allow`, `return_loop_find_index_allow`,
+// `return_loop_any_all_allow`), and its own
 // passing case
 // for the shapes it must *not* flag (`slice_whole_allow`,
 // `slice_from_zero_open_end`, `field_init_range_value`,
@@ -32,7 +33,8 @@ import {
 // `fn_body_type_stutter_not_flagged`, `len_gt_zero_not_flagged`,
 // `len_gt_zero_user_lt`, `is_empty_longhand_not_flagged`,
 // `is_empty_longhand_user_len`, `push_loop_pipeline_not_flagged`,
-// `return_loop_find_if_not_flagged`, `return_loop_find_index_not_flagged`).
+// `return_loop_find_if_not_flagged`, `return_loop_find_index_not_flagged`,
+// `return_loop_any_all_not_flagged`).
 
 struct Point { x: i64, y: i64 }
 
@@ -120,97 +122,97 @@ fn main() !prints {
 }
 --- errors ---
 error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:97:13
-   |
-97 |     print(s[0..]);
-   |             ^
-
-error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:98:15
-   |
-98 |     print(s[..s.len()]);
-   |               ^^^^^
-
-error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_lints.aipl:99:13
    |
-99 |     print(s[0..s.len()]);
+99 |     print(s[0..]);
    |             ^
 
+error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
+   --> ./tests/cases/lints/err_lints.aipl:100:15
+    |
+100 |     print(s[..s.len()]);
+    |               ^^^^^
+
+error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
+   --> ./tests/cases/lints/err_lints.aipl:101:13
+    |
+101 |     print(s[0..s.len()]);
+    |             ^
+
 error: slice end is the receiver's whole length — use the open-ended "s[3..]" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:91:16
+  --> ./tests/cases/lints/err_lints.aipl:93:16
    |
-91 |     print(s[3..s.len()]);
+93 |     print(s[3..s.len()]);
    |                ^^^^^
 
 error: slice end is the receiver's whole length — use the open-ended "s[4..]" (or append #[allow] to this line to keep it)
-   --> ./tests/cases/lints/err_lints.aipl:108:16
+   --> ./tests/cases/lints/err_lints.aipl:110:16
     |
-108 |     print(s[4..s.len()]);
+110 |     print(s[4..s.len()]);
     |                ^^^^^
 
 error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
-   --> ./tests/cases/lints/err_lints.aipl:103:13
+   --> ./tests/cases/lints/err_lints.aipl:105:13
     |
-103 |     print(s[0..2]);
+105 |     print(s[0..2]);
     |             ^
 
 error: lambda only forwards its argument(s) to "to_str" — pass "to_str" directly (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:58:43
+  --> ./tests/cases/lints/err_lints.aipl:60:43
    |
-58 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
+60 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
    |                                           ^^^^^^^^^^^^
 
 error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:42:47
+  --> ./tests/cases/lints/err_lints.aipl:44:47
    |
-42 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+44 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
    |                                               ^
 
 error: field "y" is set to the identifier of the same name — use the shorthand "y" (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:42:53
+  --> ./tests/cases/lints/err_lints.aipl:44:53
    |
-42 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+44 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
    |                                                     ^
 
 error: adding 1 to "n" — use the increment form "set n++;", importing `wrapping_increment as ++` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:64:9
+  --> ./tests/cases/lints/err_lints.aipl:66:9
    |
-64 |     set n = n + 1;
+66 |     set n = n + 1;
    |         ^^^^^^^^^
 
 error: subtracting 1 from "n" — use the decrement form "set n--;", importing `wrapping_decrement as --` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:73:9
+  --> ./tests/cases/lints/err_lints.aipl:75:9
    |
-73 |     set n = n - 1;
+75 |     set n = n - 1;
    |         ^^^^^^^^^
 
 error: a length compared against 0 — use "xs.is_nonempty()", importing `is_nonempty` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:80:35
+  --> ./tests/cases/lints/err_lints.aipl:82:35
    |
-80 | fn any_items(xs: i64[]) -> bool { 0 < xs.len() }
+82 | fn any_items(xs: i64[]) -> bool { 0 < xs.len() }
    |                                   ^^^^^^^^^^
 
 error: a length compared against 0 — use "is_nonempty" on the receiver, importing `is_nonempty` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:84:34
+  --> ./tests/cases/lints/err_lints.aipl:86:34
    |
-84 | fn also_any(xs: i64[]) -> bool { len(xs) > 0 }
+86 | fn also_any(xs: i64[]) -> bool { len(xs) > 0 }
    |                                  ^^^^^^^^^^^
 
 error: fn "make" returns "Point" and its body is a "Point" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:42:36
+  --> ./tests/cases/lints/err_lints.aipl:44:36
    |
-42 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+44 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
    |                                    ^^^^^^^^^^^^^^^^^^
 
 error: fn "tag" returns "Tag" and its body is a "Tag" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:48:26
+  --> ./tests/cases/lints/err_lints.aipl:50:26
    |
-48 | fn tag(id: i64) -> Tag { Tag { id: id + 0 } }
+50 | fn tag(id: i64) -> Tag { Tag { id: id + 0 } }
    |                          ^^^^^^^^^^^^^^^^
 
 error: fn "tag_short" returns "Tag" and its body is a "Tag" literal, naming the type twice — write the field directly as the body, "{ id, }" — the trailing comma is what keeps it a struct literal rather than a block (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:53:32
+  --> ./tests/cases/lints/err_lints.aipl:55:32
    |
-53 | fn tag_short(id: i64) -> Tag { Tag { id } }
+55 | fn tag_short(id: i64) -> Tag { Tag { id } }
    |                                ^^^^^^^^

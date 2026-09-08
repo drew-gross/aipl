@@ -25,6 +25,7 @@ mod match_value_or;
 mod match_value_or_err;
 mod push_array_literal;
 mod push_loop_pipeline;
+mod return_loop_any_all;
 mod return_loop_find_if;
 mod return_loop_find_index;
 mod slice_from_zero;
@@ -52,6 +53,7 @@ use self::match_value_or::match_value_or;
 use self::match_value_or_err::match_value_or_err;
 use self::push_array_literal::push_array_literal;
 use self::push_loop_pipeline::{pipeline_names, push_loop_pipeline};
+use self::return_loop_any_all::{any_all_names, return_loop_any_all};
 use self::return_loop_find_if::{find_if_name, return_loop_find_if};
 use self::return_loop_find_index::{find_index_name, return_loop_find_index};
 use self::slice_from_zero::slice_from_zero;
@@ -119,6 +121,13 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     let find_if = find_if_name(program);
     each_expr(program, &mut |e| {
         return_loop_find_if(e, src, find_if.as_deref(), &mut hits)
+    });
+    // The same loop shape folded to a single yes/no instead — disjoint from
+    // both of the above, which hand back an element or its index rather than a
+    // bool literal.
+    let any_all = any_all_names(program);
+    each_expr(program, &mut |e| {
+        return_loop_any_all(e, src, &any_all, &mut hits)
     });
     // The same loop returning the *position* instead. Disjoint from the one
     // above: a loop returns the element or its index, never both.

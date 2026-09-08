@@ -64,11 +64,14 @@ fn first_big_logged(xs: i64[], lo: i64) !prints -> i64? {
 }
 
 // `any`'s shape: the same scan reporting only *that* a match existed. The
-// element never comes back, so `find_if` is not what this says.
+// element never comes back, so `find_if` is not what this says — and
+// `return_loop_any_all` is the lint that does claim it, squelched here so this
+// file stays a fixture for `return_loop_find_if` alone. The two lints matching
+// disjoint shapes is the point of keeping it.
 fn has_big(xs: i64[], lo: i64) -> bool {
     for (let x : xs) {
         if (lo < x) {
-            return true;
+            return true; #[allow]
         };
     }
     false

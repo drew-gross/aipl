@@ -1,4 +1,5 @@
 import {
+    any,
     concat as +++,
     equal as ==,
     len,
@@ -60,12 +61,7 @@ fn fill_section(contents: str, section: str, body: str) -> str {
 # `\n`), unlike Rust's `str::lines()` — harmless here since an empty line
 # never parses as a header.
 fn contains_section(contents: str, section: str) -> bool {
-    for (let line : contents.lines()) {
-        if (parse_test_section_header(line) == some(section)) {
-            return true;
-        };
-    }
-    false
+    contents.lines().any(|line| parse_test_section_header(line) == some(section))
 }
 
 # Replaces the body of the `--- section ---` block in `contents` with `body`
@@ -268,11 +264,14 @@ deallocations: 59
 reallocations: 0
 bytes allocated: 5328
 instructions executed: 10410
-binary size: 13192
+binary size: 13176
   code: 6212
   data: 2784
-  metadata: 4196
+  metadata: 4180
 functions:
+  __builtin_any$str$lam2:
+    calls: 10
+    bytes: 528
   __eq_str$opt:
     calls: 42
     bytes: 100
@@ -300,12 +299,9 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  contains_section:
-    calls: 10
-    bytes: 584
   fill_or_add_section:
     calls: 10
-    bytes: 2268
+    bytes: 2324
   main:
     calls: 1
     bytes: 128

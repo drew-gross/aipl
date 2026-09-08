@@ -1186,11 +1186,11 @@ allocations: 1130784
 deallocations: 1130784
 reallocations: 7375
 bytes allocated: 99213692
-instructions executed: 159723556
-binary size: 717344
-  code: 477500
+instructions executed: 159725338
+binary size: 718256
+  code: 477952
   data: 13212
-  metadata: 226632
+  metadata: 227092
 functions:
   __arr_drop___m11__StepResult$__m10__AiplTok:
     calls: 5
@@ -1264,15 +1264,27 @@ functions:
   __arr_retain___m9__Rule$__m10__AiplTok:
     calls: 121389
     bytes: 116
+  __builtin_all$__m9__Rule$__m10__AiplTok$lam137:
+    calls: 0
+    bytes: 36
+  __builtin_all$__m9__Rule$__m10__AiplTok$lam137$tail:
+    calls: 270
+    bytes: 384
   __builtin_all$char$s0$lam121:
     calls: 74
     bytes: 212
-  __builtin_any$__m3__Doc$lam142:
+  __builtin_any$__m3__Doc$lam148:
     calls: 0
     bytes: 32
-  __builtin_any$__m3__Doc$lam142$tail:
+  __builtin_any$__m3__Doc$lam148$tail:
     calls: 132
     bytes: 324
+  __builtin_any$__m9__Rule$__m10__AiplTok$lam140:
+    calls: 0
+    bytes: 36
+  __builtin_any$__m9__Rule$__m10__AiplTok$lam140$tail:
+    calls: 108
+    bytes: 380
   __builtin_count_while$char$lam54:
     calls: 1046
     bytes: 220
@@ -1297,7 +1309,7 @@ functions:
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m9__Prec$lam146:
+  __builtin_find_if$__m9__Prec$lam152:
     calls: 144
     bytes: 688
   __builtin_find_index$str$lam15:
@@ -1515,7 +1527,7 @@ functions:
     bytes: 36
   __m18__rule_nullable$__m10__AiplTok$tail:
     calls: 7938
-    bytes: 2116
+    bytes: 1732
   __m18__seq_labels$__m10__AiplTok$Ast:
     calls: 0
     bytes: 44
@@ -1679,7 +1691,7 @@ functions:
     calls: 82848
     bytes: (external)
   aipl_arr_inc:
-    calls: 3014756
+    calls: 3015512
     bytes: (external)
   aipl_arr_join:
     calls: 42716
@@ -1691,7 +1703,7 @@ functions:
     calls: 144477
     bytes: (external)
   aipl_array_dec:
-    calls: 3859596
+    calls: 3860352
     bytes: (external)
   aipl_array_new:
     calls: 621838
