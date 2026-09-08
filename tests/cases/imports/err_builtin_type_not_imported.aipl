@@ -12,7 +12,7 @@ struct Tok { span: Span }
 
 variant Node = At(Span) | Nowhere
 
-fn lo(s: Span) -> u64 { s.start }
+fn lo(s: Span) -> u64 { s.start } #[allow]
 
 fn main() -> i64 { 0 }
 --- errors ---

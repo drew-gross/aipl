@@ -8,7 +8,7 @@ import { Span, equal as ==, print, to_str, wrapping_add as +, wrapping_mul as * 
 // `==`, so `s == 1..4` compares against the whole range.
 //
 // Its bounds are `u64` — a byte offset or index is never negative.
-fn width(s: Span) -> u64 { s.end }
+fn width(s: Span) -> u64 { s.end } #[allow]
 
 fn main() !prints {
     let s = 1..4;

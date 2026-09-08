@@ -174,11 +174,11 @@ allocations: 7292
 deallocations: 7292
 reallocations: 288
 bytes allocated: 880489
-instructions executed: 706748
-binary size: 230336
-  code: 165984
+instructions executed: 706744
+binary size: 230240
+  code: 165916
   data: 3344
-  metadata: 61008
+  metadata: 60980
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -335,7 +335,7 @@ functions:
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 123436
+    bytes: 123368
   __to_str_u64:
     calls: 7
     bytes: 204

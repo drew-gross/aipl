@@ -1,0 +1,67 @@
+import { equal as ==, print, wrapping_add as + } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+struct Named { label: str, at: Point }
+
+// A parameter may be destructured in place of being named, exactly as a `let`
+// may: the pattern names the struct, so nothing is written twice and there is no
+// `: T` to follow. The fields are bound at the top of the body, which is the
+// same desugaring `let Point { x, y } = v;` gets.
+fn sum(Point { x, y }) -> i64 { x + y }
+
+// Mixed with ordinary parameters, in any position.
+fn shifted(Point { x, y }, by: i64) -> i64 { x + y + by }
+
+// A trailing comma is allowed, as it is in every other braced list.
+fn first(Point { x }) -> i64 { x }
+
+// The struct's own fields may be structs; a pattern binds them whole.
+fn describe(Named { label, at }) -> str { `{label}={sum(at)}` }
+
+// The named form still works and means the same thing.
+fn sum_named(p: Point) -> i64 { p.x + p.y } #[allow]
+
+fn main() !prints {
+    let p = Point { x: 3, y: 4 };
+    print(`{sum(p)}`);
+    print(`{sum(p) == sum_named(p)}`);
+    print(`{shifted(p, 5)}`);
+    print(`{first(p)}`);
+    print(describe(Named { label: "p", at: p }));
+}
+--- stdout ---
+7
+true
+12
+3
+p=7
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 265
+instructions executed: 312
+binary size: 3576
+  code: 1788
+  data: 47
+  metadata: 1741
+functions:
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_i64:
+    calls: 4
+    bytes: 204
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1352

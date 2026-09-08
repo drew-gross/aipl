@@ -1,6 +1,7 @@
+use super::{field_reads, has_tuple_field, mentions_any, shared_fields, uses_of, Uses};
 use crate::ast::{Expr, ExprKind, Item, Program, Type};
 use crate::{each_subexpr, Error};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// `let p = value; ... p.a ... p.b ...` where **every** mention of `p` is a
 /// field read — say so with a pattern instead: `let T { a, b } = value;`.
@@ -63,55 +64,14 @@ pub(super) fn destructure_binding(program: &Program, hits: &mut Vec<Error>) {
     }
 }
 
-/// Every `base.field` read in `e`, counted per `(field, base)` pair.
-///
-/// Counted rather than collected because the second condition needs to subtract
-/// one subtree's reads from another's: the pair is "shared" only if it occurs
-/// somewhere other than inside the binding's own value.
-fn field_reads(e: &Expr) -> HashMap<(String, String), usize> {
-    let mut out: HashMap<(String, String), usize> = HashMap::new();
-    each_subexpr(e, &mut |x| {
-        if let ExprKind::Field(base, f) = &x.kind {
-            if let ExprKind::Ident(b) = &base.kind {
-                *out.entry((f.clone(), b.clone())).or_default() += 1;
-            }
-        }
-    });
-    out
-}
-
-/// Field names read off more than one base, once the reads inside `value` are
-/// discounted — see [`destructure_binding`]'s second condition. `all` is the
-/// whole function's reads and `value` is the binding's own right-hand side, a
-/// subtree of it.
-fn shared_fields(all: &HashMap<(String, String), usize>, value: &Expr) -> HashSet<String> {
-    let in_value = field_reads(value);
-    let mut bases: HashMap<&str, HashSet<&str>> = HashMap::new();
-    for ((field, base), n) in all {
-        if *n
-            > in_value
-                .get(&(field.clone(), base.clone()))
-                .copied()
-                .unwrap_or(0)
-        {
-            bases.entry(field).or_default().insert(base);
-        }
-    }
-    bases
-        .into_iter()
-        .filter(|(_, b)| b.len() > 1)
-        .map(|(f, _)| f.to_string())
-        .collect()
-}
-
 fn one_binding(e: &Expr, all: &HashMap<(String, String), usize>, hits: &mut Vec<Error>) {
     let ExprKind::Let(name, ann, value, body) = &e.kind else {
         return;
     };
     // The parser's own desugarings bind temporaries whose only use *is* a field
-    // read — a `let T { .. }` pattern lowers to exactly that, so linting them
-    // would advise rewriting the rewrite, on a name the user never wrote and
-    // cannot put an `#[allow]` on.
+    // read — a `let T { .. }` pattern lowers to exactly that, and so does a
+    // destructured parameter, so linting them would advise rewriting the
+    // rewrite, on a name the user never wrote and cannot put an `#[allow]` on.
     if name.starts_with("__") {
         return;
     }
@@ -127,22 +87,12 @@ fn one_binding(e: &Expr, all: &HashMap<(String, String), usize>, hits: &mut Vec<
     {
         return;
     }
-    let (mut mentions, mut field_reads) = (0usize, 0usize);
-    let mut fields: Vec<String> = Vec::new();
-    let mut shadowed = false;
-    each_subexpr(body, &mut |x| {
-        match &x.kind {
-            ExprKind::Ident(n) if n == name => mentions += 1,
-            ExprKind::Field(base, f) if is_name(base, name) => {
-                field_reads += 1;
-                if !fields.iter().any(|k| k == f) {
-                    fields.push(f.clone());
-                }
-            }
-            _ => {}
-        }
-        shadowed |= rebinds(x, name);
-    });
+    let Uses {
+        mentions,
+        field_reads,
+        fields,
+        shadowed,
+    } = uses_of(body, name);
     // A rebinding of the same name inside the body splits the mentions between
     // two different values, and this walk cannot tell which is which. Rather
     // than track scopes for a case that is rare and confusing to read anyway,
@@ -153,19 +103,8 @@ fn one_binding(e: &Expr, all: &HashMap<(String, String), usize>, hits: &mut Vec<
     // Is one of these field names also read off some *other* value that is still
     // around once the pattern binds it? Then the bare name would mean two things
     // and the binding names are what tell them apart today.
-    let shared = shared_fields(all, value);
-    if fields.iter().any(|f| shared.contains(f)) {
-        return;
-    }
-    // A tuple is read by position (`t._0`), and no struct pattern can take one
-    // apart — there is no type name to write. `let (a, b) = t;` is the form for
-    // it, but it has to name *every* position, and this pass sees only the ones
-    // that were read. So tuples are left alone rather than advised into a
-    // pattern that would not compile.
-    if fields.iter().any(|f| {
-        f.strip_prefix('_')
-            .is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
-    }) {
+    let shared = shared_fields(all, Some(value));
+    if fields.iter().any(|f| shared.contains(f)) || has_tuple_field(&fields) {
         return;
     }
     // The binding's own name is exempt in the body — it is the name going away,
@@ -199,35 +138,4 @@ fn one_binding(e: &Expr, all: &HashMap<(String, String), usize>, hits: &mut Vec<
         ),
         value.span.clone(),
     ));
-}
-
-/// Whether `e` mentions any of `names` as a bare identifier, ignoring `skip`.
-fn mentions_any(e: &Expr, names: &[String], skip: Option<&str>) -> bool {
-    let mut found = false;
-    each_subexpr(e, &mut |x| {
-        if let ExprKind::Ident(n) = &x.kind {
-            found |= Some(n.as_str()) != skip && names.iter().any(|f| f == n);
-        }
-    });
-    found
-}
-
-fn is_name(e: &Expr, name: &str) -> bool {
-    matches!(&e.kind, ExprKind::Ident(n) if n == name)
-}
-
-/// Whether `e` introduces a binding called `name`, in any of the positions that
-/// can: the two `let` forms, a lambda parameter, a loop variable, and a match
-/// arm's payload binders.
-fn rebinds(e: &Expr, name: &str) -> bool {
-    match &e.kind {
-        ExprKind::Let(n, _, _, _) | ExprKind::LetMut(n, _, _, _) | ExprKind::For(n, _, _) => {
-            n == name
-        }
-        ExprKind::Lambda(params, _) => params.iter().any(|p| p.name == name),
-        ExprKind::Match(_, arms) => arms
-            .iter()
-            .any(|a| a.pattern.bindings().iter().any(|b| b == name)),
-        _ => false,
-    }
 }

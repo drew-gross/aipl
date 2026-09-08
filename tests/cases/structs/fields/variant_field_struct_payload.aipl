@@ -9,8 +9,8 @@ variant Shape = Dot(Point) | Empty
 
 struct Cell { shape: Shape, id: i64 }
 
-fn weight(c: Cell) -> i64 {
-    match (c.shape) {
+fn weight(Cell { shape }) -> i64 {
+    match (shape) {
         Dot(p) => p.x + p.y,
         Empty => 0,
     }

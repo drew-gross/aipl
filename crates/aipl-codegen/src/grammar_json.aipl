@@ -502,11 +502,11 @@ allocations: 22836
 deallocations: 22836
 reallocations: 1147
 bytes allocated: 1752794
-instructions executed: 3517891
-binary size: 349672
-  code: 223396
+instructions executed: 3518405
+binary size: 349560
+  code: 223332
   data: 7532
-  metadata: 118744
+  metadata: 118696
 functions:
   __arr_drop_Json:
     calls: 147
@@ -861,7 +861,7 @@ functions:
     bytes: 1176
   __m4__wrapped$lam58:
     calls: 19
-    bytes: 4544
+    bytes: 4480
   __m5__col_after:
     calls: 134
     bytes: 544

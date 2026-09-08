@@ -7,7 +7,7 @@ import { wrapping_add as +, wrapping_mul as * } from builtins;
 
 struct Rect { width: i64, height: i64 }
 
-fn area(r: Rect) -> i64 { r.width * r.height }
+fn area(Rect { width, height }) -> i64 { width * height }
 
 fn double(n: i64) -> i64 { n + n }
 

@@ -575,18 +575,18 @@ pub fn word_pat(words: str[], scope: str) -> Pat {
 # `g` as the `.tmLanguage.json` text an editor extension ships: two-space
 # indented, one trailing newline. Generated files are read in diffs, so the
 # layout is fixed and deterministic rather than minified.
-pub fn tm_json(g: Tm) -> str {
+pub fn tm_json(Tm { note, name, scope_name, file_types, top, repo }) -> str {
     mut fields = [fld("$schema", json_str(SCHEMA()))];
-    if (!g.note.is_empty()) {
-        set fields = [..fields, fld("comment", json_str(g.note))];
+    if (!note.is_empty()) {
+        set fields = [..fields, fld("comment", json_str(note))];
     };
     set fields = [
         ..fields,
-        fld("name", json_str(g.name)),
-        fld("scopeName", json_str(g.scope_name)),
-        fld("fileTypes", inline_arr(g.file_types.map(json_str))),
-        arr_fld("patterns", g.top.map(pat_json)),
-        obj_fld("repository", g.repo.map(entry_json)),
+        fld("name", json_str(name)),
+        fld("scopeName", json_str(scope_name)),
+        fld("fileTypes", inline_arr(file_types.map(json_str))),
+        arr_fld("patterns", top.map(pat_json)),
+        obj_fld("repository", repo.map(entry_json)),
     ];
     `{obj_of(fields)}\n`
 }.test({
@@ -656,9 +656,9 @@ fn pat_json(p: Pat) -> str {
     }
 }
 
-fn entry_json(e: Entry) -> str {
-    let body = arr_fld("patterns", e.pats.map(pat_json));
-    `{json_str(e.name)}: {ob()}\n{body.indent(2)}\n{cb()}`
+fn entry_json(Entry { pats, name }) -> str {
+    let body = arr_fld("patterns", pats.map(pat_json));
+    `{json_str(name)}: {ob()}\n{body.indent(2)}\n{cb()}`
 }
 
 # One `"key": value` line, where `value` is already JSON.
@@ -753,10 +753,10 @@ deallocations: 1085
 reallocations: 33
 bytes allocated: 93191
 instructions executed: 72776
-binary size: 129312
-  code: 80896
+binary size: 129240
+  code: 80852
   data: 5034
-  metadata: 43382
+  metadata: 43354
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -841,7 +841,7 @@ functions:
     bytes: 7888
   __test$tm_json:
     calls: 1
-    bytes: 5932
+    bytes: 5888
   __test$word_pat:
     calls: 1
     bytes: 1196

@@ -3,7 +3,9 @@ import { equal as ==, wrapping_sub as - } from builtins;
 // Field init order differs from declaration order; behavior should match.
 struct Point { x: i64, y: i64 }
 
-fn sub(p: Point) -> i64 { p.x - p.y }.test({
+fn sub(p: Point) -> i64 {
+    p.x - p.y #[allow]
+}.test({
     assert(sub(Point { y: 5, x: 100 }) == 95);
 })
 --- performance ---

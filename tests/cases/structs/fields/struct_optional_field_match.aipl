@@ -8,8 +8,8 @@ import { equal as ==, wrapping_add as +, wrapping_sub as - } from builtins;
 // whole point of the case.
 struct Cell { v: i64? }
 
-fn describe(c: Cell) -> i64 {
-    match (c.v) {
+fn describe(Cell { v }) -> i64 {
+    match (v) {
         some(x) => x, #[allow]
         none => 0 - 1,
     }

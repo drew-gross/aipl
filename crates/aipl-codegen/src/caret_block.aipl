@@ -10,7 +10,7 @@ import {
     to_str,
     wrapping_add as +,
 } from builtins;
-import { line_at } from "./line_at.aipl";
+import { LineAt, line_at } from "./line_at.aipl";
 
 # The error renderer's caret-block formatter: the compiler calls this through the
 # FFI (see `install_parser_hooks`) when rendering an error with a span. Given
@@ -21,9 +21,9 @@ import { line_at } from "./line_at.aipl";
 #     {pad} |
 #     {line_no} | <source line>
 #     {pad} | <indent>^^^
-pub fn caret_block(source: str, span: Span, filename: str) -> str {
-    // `at.span` is the line's byte range, so the source line is one slice.
-    let at = line_at(source, span.start);
+pub fn caret_block(source: str, Span { start, end }, filename: str) -> str {
+    // The located line's own byte range, so the source line is one slice.
+    let LineAt { span, line } = line_at(source, start);
 
     // Clamped to the line's own width. `line_at` answers a past-the-end offset
     // with the *last* line (it clamps, and is tested to), so without this the
@@ -32,21 +32,21 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
     // of thousands of spaces on one line, which a terminal wraps into screenfuls
     // of apparent blank lines. A span that does not belong to `source` is the
     // way that happens in practice, so this is a bound, not a formality.
-    let line_len = at.span.end - at.span.start;
-    let col = min(span.start - at.span.start, line_len);
+    let line_len = span.end - span.start;
+    let col = min(start - span.start, line_len);
 
     // The underline runs from the error's start to the earlier of its end and
     // the line's end, and is at least one column wide. `-` is `saturating_sub`,
     // so an empty or backwards span yields 0 rather than wrapping around on
     // these unsigned offsets, and `max` then widens it to 1.
-    let width = min(at.span.end, span.end) - span.start;
+    let width = min(span.end, end) - start;
     let underline_len = max(width, 1);
-    let line_no = at.line + 1;
+    let line_no = line + 1;
     let blank = " ".repeat(line_no.to_str().len());
     ```
         {blank}--> {filename}:{line_no}:{col + 1}
         {blank} |
-        {line_no} | {source[at.span]}
+        {line_no} | {source[span]}
         {blank} | {" ".repeat(col)}{"^".repeat(underline_len)}
     ```
 }.test({
@@ -106,7 +106,7 @@ pub fn caret_block(source: str, span: Span, filename: str) -> str {
     // belonging to some other file looks like once it is rendered against this
     // one. `line_at` clamps to the last line and the column clamps to that
     // line's width, so the block stays the size of the source. Unclamped, the
-    // caret row alone was `span.start` bytes of spaces.
+    // caret row alone was the error's whole start offset in spaces.
     assert(
         caret_block("a\nb", Span { start: 5000, end: 5006 }, "input") == """
              --> input:2:2
@@ -122,9 +122,9 @@ allocations: 187
 deallocations: 187
 reallocations: 0
 bytes allocated: 13008
-instructions executed: 5187
-binary size: 9824
-  code: 4440
+instructions executed: 5107
+binary size: 9816
+  code: 4432
   data: 1884
   metadata: 3500
 functions:
@@ -157,7 +157,7 @@ functions:
     bytes: (external)
   caret_block:
     calls: 8
-    bytes: 1832
+    bytes: 1824
   main:
     calls: 1
     bytes: 112

@@ -6,8 +6,8 @@ variant Kind = Ident | Int | Punct
 
 struct Token { kind: Kind, start: i64 }
 
-fn describe(t: Token) -> str {
-    match (t.kind) {
+fn describe(Token { kind }) -> str {
+    match (kind) {
         Ident => "ident",
         Int => "int",
         Punct => "punct",

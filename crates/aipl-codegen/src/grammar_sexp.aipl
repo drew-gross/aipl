@@ -356,11 +356,11 @@ allocations: 31649
 deallocations: 31649
 reallocations: 2713
 bytes allocated: 1637198
-instructions executed: 5539025
-binary size: 309048
-  code: 196980
+instructions executed: 5541017
+binary size: 308936
+  code: 196916
   data: 4972
-  metadata: 107096
+  metadata: 107048
 functions:
   __arr_drop_Sexp:
     calls: 876
@@ -709,7 +709,7 @@ functions:
     bytes: 1176
   __m4__wrapped$lam56:
     calls: 18
-    bytes: 4544
+    bytes: 4480
   __m5__col_after:
     calls: 77
     bytes: 544

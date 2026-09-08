@@ -78,6 +78,8 @@ highlighter:
   range collapsing in charachter classes
 
 misc cleanup:
+  p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
+  DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
   what is `walker.aipl`'s space-splitting test tokenizer? Can it be removed?
   lead_toks can be count_while I think?
   use an enum for the builtins
@@ -159,6 +161,7 @@ HOF:
 math:
 
 syntax:
+  allow destructuring self while having it still be self e.g. fn foo(self: Span { start, end }). Maybe do this for other args too for doc purposes?
   limitation: a struct default must be a literal
   a lambda bound to a let is not a value (this would let test helpers move into the test, big cleanup)
   only allow doc comments at the start of lines
@@ -171,7 +174,6 @@ syntax:
   allow default args to refer to each other (requires 1 to be set to break the cycle)
   add match (v) val if expr => r syntax
   destructuring with renames (let Foo { field as f, .. } = ...)
-  allow passing int literals to u64 arguments
   module level constants
   for (let i, c : dct) syntax for dicts
   allow match arm grouping to bind vars with the same type and name, or ignore bindings

@@ -1,0 +1,49 @@
+import { equal as ==, print, wrapping_add as + } from builtins;
+
+struct Pos { line: i64, col: i64 }
+
+// The marker squelches it, on the line the hit is reported at: the start of the
+// body. A parameter has no span of its own to blame, and the alternative — the
+// parameter's own line — is not squelchable, since `aipl fmt` may move a marker
+// written inside a broken parameter list onto a line of its own, where it
+// silences nothing.
+fn squelched(p: Pos) -> i64 {
+    p.line + p.col #[allow]
+}
+
+// The same, with a one-line body: the body starts on the signature's own line,
+// so the marker lands there.
+fn squelched_inline(p: Pos) -> i64 { p.line } #[allow]
+
+// The rewrite the lint advises, beside it, so both spellings run and are proven
+// to agree.
+fn rewritten(Pos { line, col }) -> i64 { line + col }
+
+fn main() !prints {
+    let p = Pos { line: 2, col: 3 };
+    print(`{squelched(p) == rewritten(p)}`);
+    print(`{squelched_inline(p) == 2}`);
+}
+--- stdout ---
+true
+true
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 40
+instructions executed: 134
+binary size: 1864
+  code: 736
+  data: 47
+  metadata: 1081
+functions:
+  __to_str_bool:
+    calls: 2
+    bytes: 232
+  aipl_write_bytes:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 504

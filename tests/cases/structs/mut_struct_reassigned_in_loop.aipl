@@ -42,7 +42,7 @@ struct St { acc: str[], done: bool }
 
 fn pushed(self: str[], x: str) -> str[] { [..self, x] }
 
-fn step(s: St) -> St { acc: s.acc.pushed("k"), done: true }
+fn step(s: St) -> St { acc: s.acc.pushed("k"), done: true } #[allow]
 
 fn run() -> u64 {
     mut s = St { acc: [], done: false };

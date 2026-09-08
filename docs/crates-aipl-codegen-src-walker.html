@@ -598,7 +598,7 @@
             <a class="anchor" href="#item-take_comment">take_comment</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn take_comment(self: W, c: Span) -&#62; W</code></pre>
+          <pre class="signature"><code>fn take_comment(self: W, __spat$14492: Span) -&#62; W</code></pre>
 
           <div class="doc"><p>Consume comment <code>c</code>: step past it and mark it as the last thing emitted. The Rust <code>pop_front</code> + <code>last_end</code> update, as one move.</p></div>
 
@@ -1321,6 +1321,20 @@
 
 
 
+        <section class="item" id="item-one_param">
+          <h3>
+            <a class="anchor" href="#item-one_param">one_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn one_param(self: W) -&#62; WDoc!FmtError</code></pre>
+
+          <div class="doc"><p>One parameter: its leading comments, then either a name with its type and the <code>mut</code> / <code>*</code> / <code>= default</code> markers, or the <code>Point { x, y }</code> destructuring form.</p><p>The destructuring form names no parameter, so it has no <code>: T</code> after it — the pattern names the struct instead, exactly as <code>let Point { x, y } = v;</code> does, and it is laid out the same flat way that statement is.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-spaced_default">
           <h3>
             <a class="anchor" href="#item-spaced_default">spaced_default</a>
@@ -1424,7 +1438,7 @@
             <a class="anchor" href="#item-range_has_semi">range_has_semi</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_semi(self: W, span: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_semi(self: W, __spat$51078: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 

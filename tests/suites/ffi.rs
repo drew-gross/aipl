@@ -272,10 +272,15 @@ fn call_values_marshals_struct_param() {
     // caller-allocated buffer; the callee receives a pointer to it — the same
     // ABI used for struct locals and returns, but on the input side. This is
     // the shape `caret_block` uses for its `Span` parameter.
+    //
+    // The `#[allow]`s keep the named parameters that `destructure_param` would
+    // otherwise turn into patterns: a *struct parameter* is what these fixtures
+    // marshal, and a pattern still passes one, so writing it that way would
+    // hide the thing under test behind a desugaring.
     let src = "\
 import { wrapping_add as +, wrapping_sub as - } from builtins;
 struct Span { start: i64, end: i64 }
-pub fn span_len(span: Span) -> i64 { span.end - span.start }
+pub fn span_len(span: Span) -> i64 { span.end - span.start } #[allow]
 pub fn span_sum(a: Span, b: Span) -> i64 { a.start + a.end + b.start + b.end }";
     let e = Engine::compile(src).unwrap();
     use aipl::FfiValue::{Int, Struct};
@@ -843,9 +848,9 @@ fn call_values_marshals_composite_params() {
 import { len, wrapping_add as +, wrapping_sub as - } from builtins;
 struct Span { start: i64, end: i64 }
 struct Note { message: str, span: Span, tags: i64[] }
-pub fn note_size(n: Note) -> u64 { len(n.message) + len(n.tags) }
-pub fn note_width(n: Note) -> i64 { n.span.end - n.span.start }
-pub fn note_text(n: Note) -> str { n.message }
+pub fn note_size(n: Note) -> u64 { len(n.message) + len(n.tags) } #[allow]
+pub fn note_width(n: Note) -> i64 { n.span.end - n.span.start } #[allow]
+pub fn note_text(n: Note) -> str { n.message } #[allow]
 pub fn span_end(s: Span?) -> i64 {
     match (s) {
         some(v) => v.end,

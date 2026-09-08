@@ -1,0 +1,45 @@
+import { wrapping_add as + } from builtins;
+
+struct Pos { line: i64, col: i64 }
+
+// Every mention of `p` is a field read, so the parameter can be the pattern —
+// and then the signature says what the function needs, instead of naming a type
+// and leaving the body to be read for how much of it is used.
+fn f(p: Pos) -> i64 { p.line + p.col }
+
+// One field is enough; the pattern names only what is read.
+fn g(p: Pos) -> i64 { p.col }
+
+// Neither `pub` nor a wide struct is an exception. A public function's
+// parameter name is not documentation enough to keep the longhand, and a
+// pattern that lists six fields is still the honest statement of what the
+// function reads.
+pub fn area(p: Pos) -> i64 { p.line + p.col }
+
+struct Wide { a: i64, b: i64, c: i64, d: i64 }
+
+fn wide(w: Wide) -> i64 { w.a + w.b + w.c + w.d }
+--- errors ---
+error: only the fields of parameter "p" are read — destructure it instead: "Pos { line, col }" in place of "p: Pos" (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_destructure_param.aipl:8:23
+  |
+8 | fn f(p: Pos) -> i64 { p.line + p.col }
+  |                       ^^^^^^^^^^^^^^
+
+error: only the fields of parameter "p" are read — destructure it instead: "Pos { col }" in place of "p: Pos" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_destructure_param.aipl:11:23
+   |
+11 | fn g(p: Pos) -> i64 { p.col }
+   |                       ^^^^^
+
+error: only the fields of parameter "p" are read — destructure it instead: "Pos { line, col }" in place of "p: Pos" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_destructure_param.aipl:17:30
+   |
+17 | pub fn area(p: Pos) -> i64 { p.line + p.col }
+   |                              ^^^^^^^^^^^^^^
+
+error: only the fields of parameter "w" are read — destructure it instead: "Wide { a, b, c, d }" in place of "w: Wide" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_destructure_param.aipl:21:27
+   |
+21 | fn wide(w: Wide) -> i64 { w.a + w.b + w.c + w.d }
+   |                           ^^^^^^^^^^^^^^^^^^^^^

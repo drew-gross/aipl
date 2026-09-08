@@ -10,7 +10,7 @@ struct Point { x: i64, y: i64 }
 
 fn add(x: i64, y: i64) -> i64 { x + y }
 
-fn use_point(p: Point) -> i64 { p.x }
+fn use_point(p: Point) -> i64 { p.x } #[allow]
 
 fn sum(self: i64, others: i64*) -> i64 { self }
 

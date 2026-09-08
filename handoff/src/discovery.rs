@@ -300,9 +300,19 @@ impl Run {
         // so we refill just the failing cases instead of paying for a
         // whole-corpus fill. Deduped: one case may report several mismatched
         // sections, and one scoped fill refreshes all of that case's sections.
+        //
+        // The path may not contain a newline, and that bound is load-bearing
+        // rather than tidiness. Some *other* test's message can contain an
+        // unclosed `[` — a doc comment describing a half-open range as
+        // `[start, end)`, rendered into the HTML that `checked_in_docs_are_current`
+        // prints on a mismatch — and without it the scan runs from there across
+        // every intervening line to the next real case bracket, handing
+        // `AIPL_CASE` one enormous non-existent case name. The refill then fails
+        // with "matched no test cases", which reads like a corpus problem and is
+        // not one.
         let case_path = re(
             &CASE_PATH,
-            r"\[([^\]]+)\]: ((`[a-z ]+`|error) mismatch|missing required)",
+            r"\[([^\]\n]+)\]: ((`[a-z ]+`|error) mismatch|missing required)",
         );
         let mut cases: BTreeSet<String> = case_path
             .captures_iter(&out)
@@ -501,6 +511,30 @@ mod tests {
         assert!(run.hard_failures().is_empty());
         assert!(run.plan().need_docs);
         assert!(!run.plan().is_empty());
+    }
+
+    /// An unclosed `[` in one test's message must not reach across the output
+    /// and swallow the next real case bracket.
+    ///
+    /// This is not hypothetical: `checked_in_docs_are_current` prints the whole
+    /// rendered page on a mismatch, and a doc comment describing a half-open
+    /// range as `[start, end)` puts an unclosed bracket in it. The refill then
+    /// ran with a case name hundreds of characters long and failed with
+    /// "AIPL_CASE matched no test cases", which points at the corpus rather than
+    /// at the parser that invented the name.
+    #[test]
+    fn an_unclosed_bracket_does_not_swallow_a_later_case() {
+        let run = run(&[
+            (
+                "docs_site::checked_in_docs_are_current",
+                "left: \"a half-open range [start, end) rendered into a page\"",
+            ),
+            (
+                "cases_structs_point",
+                "[cases/structs/point.aipl]: `stdout` mismatch",
+            ),
+        ]);
+        assert_eq!(run.plan().fail_cases, ["cases/structs/point.aipl"]);
     }
 
     #[test]

@@ -61,7 +61,7 @@ fn spine(n: i64) -> Both {
     b
 }
 
-fn step(b: Both) -> Both { head: Cons(b.head.sum(), b.head), nums: b.nums }
+fn step(b: Both) -> Both { head: Cons(b.head.sum(), b.head), nums: b.nums } #[allow]
 
 // `set b = step(b);` in a loop is the shape that used to corrupt a composite
 // `mut` binding — one hidden-sret buffer per call site, with `b` pointing into

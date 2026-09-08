@@ -9,7 +9,7 @@ struct Name { first: str, last: str }
 
 struct Contact { name: Name, nick: str? }
 
-fn full_first(c: Contact) -> str { c.name.first }.test({
+fn full_first(Contact { name }) -> str { name.first }.test({
     let c = Contact {
         name: Name { first: "Ad" +++ "a", last: "Love" +++ "lace" },
         nick: some("Count" +++ "ess"),

@@ -465,11 +465,11 @@ allocations: 13770
 deallocations: 13770
 reallocations: 1004
 bytes allocated: 841191
-instructions executed: 2055591
-binary size: 322768
-  code: 205528
+instructions executed: 2056477
+binary size: 322656
+  code: 205464
   data: 5636
-  metadata: 111604
+  metadata: 111556
 functions:
   __arr_drop_Calc:
     calls: 404
@@ -827,7 +827,7 @@ functions:
     bytes: 1176
   __m4__wrapped$lam58:
     calls: 0
-    bytes: 4544
+    bytes: 4480
   __m5__col_after:
     calls: 76
     bytes: 544

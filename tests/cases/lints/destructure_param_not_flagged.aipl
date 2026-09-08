@@ -1,0 +1,70 @@
+import { print, wrapping_add as + } from builtins;
+
+struct Pos { line: i64, col: i64 }
+
+fn take(p: Pos) -> i64 { p.line + p.col } #[allow]
+
+// The shapes a parameter pattern cannot replace, each for its own reason.
+
+// `self` is what makes a function method-callable, so a pattern there would
+// change how it is called.
+fn total(self: Pos) -> i64 { self.line + self.col }
+
+// A keyword parameter's name *is* the call-site spelling, so destructuring it
+// would break every caller.
+fn keyworded(n: i64, at: Pos = Pos { line: 0, col: 0 }) -> i64 { n + at.line + at.col }
+
+// `mut` is written through rather than read.
+fn bumped(mut self: Pos) {
+    set self.line = self.line + 1;
+}
+
+// One mention that is not a field read is enough: the value itself is passed,
+// and a pattern keeps only the fields.
+fn passed(p: Pos) -> i64 { p.line + take(p) }
+
+// A field read off two values: `line` would name two things, and the parameter
+// names are what tell them apart.
+fn between(a: Pos, b: Pos) -> i64 { a.line + b.line + a.col + b.col }
+
+// The name the pattern would introduce is taken.
+fn shadowing(p: Pos) -> i64 {
+    let line = 5;
+    p.line + p.col + line
+}
+
+fn main() !prints {
+    let p = Pos { line: 1, col: 2 };
+    print(`{total(p)} {keyworded(1)} {passed(p)} {between(p, p)}`);
+    print(`{shadowing(p)}`);
+    mut q = p;
+    set q.bumped();
+    print(`{q.line}`);
+}
+--- stdout ---
+3 1 4 6
+8
+2
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 0
+bytes allocated: 630
+instructions executed: 332
+binary size: 2944
+  code: 1524
+  data: 1
+  metadata: 1419
+functions:
+  __to_str_i64:
+    calls: 6
+    bytes: 204
+  aipl_i64_len:
+    calls: 12
+    bytes: (external)
+  aipl_write_i64:
+    calls: 6
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1320

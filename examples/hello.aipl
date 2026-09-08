@@ -13,7 +13,7 @@ struct Point { x: i64, y: i64 }
 
 fn main() -> i64 { sum(Point { x: 10, y: 32 }) + (if (fib(30) <= 0) { 1 } else { 0 }) }
 
-fn sum(p: Point) -> i64 { p.x + p.y }
+fn sum(Point { x, y }) -> i64 { x + y }
 
 # Naive recursive Fibonacci: shallow depth, exponentially many calls.
 fn fib(n: i64) -> i64 { if (n <= 1) { n } else { fib(n - 1) + fib(n - 2) } }

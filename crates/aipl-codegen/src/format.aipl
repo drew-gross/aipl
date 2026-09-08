@@ -529,17 +529,17 @@ fn tail_toks(ps: Piece[], lead: u64) -> u64 {
 # breaks gain a trailing one it never had in the source. With an empty separator
 # every token or child starts a new item instead, which is the juxtaposed list. A
 # comment never starts one — it belongs to the item it was written against.
-fn list_items(mid: Piece[], st: ListStyle, space: (str, str) -> bool) -> Doc[] {
+fn list_items(mid: Piece[], ListStyle { sep }, space: (str, str) -> bool) -> Doc[] {
     mut items: Doc[] = [];
     mut cur: Piece[] = [];
     for (let p : mid) {
-        if (st.sep != "" && p.is_sep(st.sep)) {
+        if (sep != "" && p.is_sep(sep)) {
             if (cur.is_nonempty()) {
                 set items.push(inline_doc(cur, space));
                 set cur = [];
             };
         } else {
-            if (st.sep == "" && p.starts_item() && cur.is_nonempty()) {
+            if (sep == "" && p.starts_item() && cur.is_nonempty()) {
                 set items.push(inline_doc(cur, space));
                 set cur = [];
             };
@@ -629,11 +629,11 @@ allocations: 1688
 deallocations: 1688
 reallocations: 174
 bytes allocated: 122921
-instructions executed: 147712
-binary size: 173512
-  code: 109240
+instructions executed: 147388
+binary size: 173160
+  code: 109044
   data: 4588
-  metadata: 59684
+  metadata: 59528
 functions:
   __arr_drop_Piece:
     calls: 119
@@ -901,7 +901,7 @@ functions:
     bytes: 740
   list_items$lam13:
     calls: 13
-    bytes: 1728
+    bytes: 1660
   main:
     calls: 1
     bytes: 712
@@ -943,7 +943,7 @@ functions:
     bytes: 2900
   wrapped$lam12:
     calls: 1
-    bytes: 4544
+    bytes: 4480
   wrapped$lam49:
     calls: 2
-    bytes: 4544
+    bytes: 4480

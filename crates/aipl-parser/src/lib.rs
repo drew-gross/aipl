@@ -302,11 +302,17 @@ gazelle! {
         // makes it one — see `ast::Param::default`). After a complete `ty`,
         // one token of lookahead (`EQ` vs `OP` vs FOLLOW(param)) picks the
         // production, so the three forms never conflict.
+        // `Point { x, y }` destructures the argument in place of naming it,
+        // exactly as `let Point { x, y } = ..` does — the pattern names the
+        // struct, so nothing is written twice. Unambiguous after `IDENT`: one
+        // token of lookahead (`{` against `:`) picks it, and no other parameter
+        // form has a brace there.
         param = IDENT COLON ty => param
               | MUT IDENT COLON ty => mut_param
               | IDENT COLON ty OP => variadic_param
               | IDENT COLON ty EQ expr => with_default
-              | IDENT COLON ty OP EQ expr => variadic_with_default;
+              | IDENT COLON ty OP EQ expr => variadic_with_default
+              | IDENT LBRACE struct_field_bindings RBRACE => destructured;
 
         return_ty = ARROW ty => present | _ => absent;
 
@@ -765,9 +771,9 @@ impl aipl::Types for Build {
     type Term = Expr;
     type Expr = Expr;
     type Ty = Type;
-    type Param = Param;
-    type ParamList = Vec<Param>;
-    type Params = Vec<Param>;
+    type Param = ParsedParam;
+    type ParamList = Vec<ParsedParam>;
+    type Params = Vec<ParsedParam>;
     type BaseTy = Type;
     type ReturnTy = Option<Type>;
     type FnAttr = (Expr, Span);
@@ -1487,6 +1493,27 @@ impl gazelle::Action<aipl::Function<Self>> for Build {
                 Expr::new(ExprKind::Construct(ty_name, fields), span)
             }
         };
+        // `Point { x, y }` in parameter position: the parameter itself is a
+        // scrutinee the caller never named, and its fields are bound off it at
+        // the top of the body — the shape `let Point { x, y } = v;` produces,
+        // minus the `let`, the value being already bound by being an argument.
+        // Both loops run in reverse so the bindings come out in source order.
+        let mut body = body;
+        for p in params.iter().rev() {
+            for field in p.fields.iter().rev() {
+                let base = Expr::new(ExprKind::Ident(p.param.name.clone()), p.span.clone());
+                let read = Expr::new(
+                    ExprKind::Field(Box::new(base), field.clone()),
+                    p.span.clone(),
+                );
+                let span = join_spans(&p.span, &body.span);
+                body = Expr::new(
+                    ExprKind::Let(field.clone(), None, Box::new(read), Box::new(body)),
+                    span,
+                );
+            }
+        }
+        let params: Vec<Param> = params.into_iter().map(|p| p.param).collect();
         Ok(Function {
             name,
             is_pub,
@@ -1595,8 +1622,28 @@ impl gazelle::Action<aipl::Effect<Self>> for Build {
     }
 }
 
+/// A parameter as written, before the destructuring form is taken apart.
+///
+/// `fields` is empty for every ordinary parameter and holds the pattern's field
+/// names for `Point { x, y }`, whose `Param` is the synthetic scrutinee the
+/// `Function` action then binds those fields off. It lives here rather than on
+/// [`aipl_syntax::ast::Param`] because nothing downstream of the parser should
+/// have to know the form existed — the desugaring is complete by the time a
+/// `Function` is built, exactly as it is for `let T { .. } = v;`.
+///
+/// `pub` only because it surfaces as a gazelle `Action` associated type; not
+/// part of the crate's intended API.
+pub struct ParsedParam {
+    param: Param,
+    fields: Vec<String>,
+    /// Where the parameter was written — the pattern, for the destructuring
+    /// form, so a field name the struct does not have is reported there rather
+    /// than at the body it would be bound in.
+    span: Span,
+}
+
 impl gazelle::Action<aipl::Params<Self>> for Build {
-    fn build(&mut self, node: aipl::Params<Self>) -> Result<Vec<Param>, Self::Error> {
+    fn build(&mut self, node: aipl::Params<Self>) -> Result<Vec<ParsedParam>, Self::Error> {
         Ok(match node {
             aipl::Params::Present(list) | aipl::Params::PresentTrailing(list) => list,
             aipl::Params::Empty => Vec::new(),
@@ -1605,7 +1652,7 @@ impl gazelle::Action<aipl::Params<Self>> for Build {
 }
 
 impl gazelle::Action<aipl::ParamList<Self>> for Build {
-    fn build(&mut self, node: aipl::ParamList<Self>) -> Result<Vec<Param>, Self::Error> {
+    fn build(&mut self, node: aipl::ParamList<Self>) -> Result<Vec<ParsedParam>, Self::Error> {
         Ok(match node {
             aipl::ParamList::First(p) => vec![p],
             aipl::ParamList::Rest(mut prev, p) => {
@@ -1640,8 +1687,26 @@ fn variadic_seq_ty(elem: Type, op: BinOp, op_span: Span) -> Result<Type, Error> 
 }
 
 impl gazelle::Action<aipl::Param<Self>> for Build {
-    fn build(&mut self, node: aipl::Param<Self>) -> Result<Param, Self::Error> {
-        Ok(match node {
+    fn build(&mut self, node: aipl::Param<Self>) -> Result<ParsedParam, Self::Error> {
+        // The destructuring form is the one that is not simply a `Param`: it
+        // introduces a scrutinee the caller never named and a field list for the
+        // body to bind off it.
+        if let aipl::Param::Destructured((struct_name, span), _, fields) = node {
+            let name = format!("{}{}", aipl_syntax::DESTRUCTURE_BASE_PREFIX, span.start);
+            return Ok(ParsedParam {
+                param: Param {
+                    name,
+                    ty: Type::Named(struct_name),
+                    mutable: false,
+                    variadic: false,
+                    default: None,
+                },
+                fields,
+                span,
+            });
+        }
+        let span = param_name_span(&node);
+        let param = match node {
             aipl::Param::Param((name, _), ty) => Param {
                 name,
                 ty,
@@ -1688,7 +1753,28 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
                 variadic: true,
                 default: Some(default),
             },
+            // Handled above: it is the one form that is not just a `Param`.
+            aipl::Param::Destructured(..) => unreachable!(),
+        };
+        Ok(ParsedParam {
+            param,
+            fields: Vec::new(),
+            span,
         })
+    }
+}
+
+/// The span of an ordinary parameter's name. Every form leads with the name (or
+/// with `mut` and then the name), so this is one match rather than a span
+/// threaded through each arm.
+fn param_name_span(node: &aipl::Param<Build>) -> Span {
+    match node {
+        aipl::Param::Param((_, s), _)
+        | aipl::Param::MutParam((_, s), _)
+        | aipl::Param::WithDefault((_, s), _, _)
+        | aipl::Param::VariadicParam((_, s), _, _)
+        | aipl::Param::VariadicWithDefault((_, s), _, _, _) => s.clone(),
+        aipl::Param::Destructured((_, s), _, _) => s.clone(),
     }
 }
 

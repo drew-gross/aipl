@@ -600,13 +600,13 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
 # `Try` does too but may fail with a message (paired with the token `span` to
 # make a `LexError`). `OfSeg`/`TrySeg` belong to a `Template` rule and are a lex
 # error here.
-fn apply_emit<K>(e: Emit<K>, matched: SpanStr, value: TokenValue) -> K!LexError {
+fn apply_emit<K>(e: Emit<K>, SpanStr { text, span }, value: TokenValue) -> K!LexError {
     // A matcher either hands over a computed value (a delimited string, already
     // stripped) or nothing; take the stripped string when present, else the raw
     // matched text. One content string, so `Of`/`Try` serve every matcher.
     let content = match (value) {
         StrVal(s) => s,
-        NoValue => matched.text,
+        NoValue => text,
     };
     match (e) {
         Bare(k) => ok(k),
@@ -614,8 +614,8 @@ fn apply_emit<K>(e: Emit<K>, matched: SpanStr, value: TokenValue) -> K!LexError 
         // A fallible emit yields `K!str` — a kind or an error *message*; pair the
         // message with the token's span to make the `LexError` the lexer
         // surfaces.
-        Try(f) => f(content).map_err(|message| LexError { message, span: matched.span }),
-        OfSeg(..) | TrySeg(..) => err(seg_only(matched.span)),
+        Try(f) => f(content).map_err(|message| LexError { message, span }),
+        OfSeg(..) | TrySeg(..) => err(seg_only(span)),
     }
 }
 
@@ -1469,7 +1469,7 @@ allocations: 1604
 deallocations: 1604
 reallocations: 54
 bytes allocated: 108824
-instructions executed: 340458
+instructions executed: 340670
 binary size: 2310448
   code: 1545196
   data: 10524
