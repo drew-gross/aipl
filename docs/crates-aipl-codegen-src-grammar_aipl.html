@@ -75,6 +75,20 @@
 
 
 
+        <section class="item" id="item-lex_lossless">
+          <h3>
+            <a class="anchor" href="#item-lex_lossless">lex_lossless</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lex_lossless(text: str) -&#62; LexResult&#60;AiplTok&#62;!ParseError</code></pre>
+
+          <div class="doc"><p>The whole rule set, read losslessly — every byte accounted for by a token or a trivia record. Lexing and parsing report failure in the same shape but not the same type, so the conversion happens once, here.</p><p>Public because the two halves are worth having apart: a caller parsing many sources prepares the grammar once (<code>prepare</code>) and then pays only this and <code>parse_prepared</code> per file. <code>aipl_parse_cst</code> is the one-shot convenience.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-aipl_parse_report">
           <h3>
             <a class="anchor" href="#item-aipl_parse_report">aipl_parse_report</a>
@@ -222,20 +236,6 @@
           <pre class="signature"><code>fn ty_space(l: str, r: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>The spacing rule for the productions annotated so far: spaces around <code>-&gt;</code>, a space after the <code>:</code> of a dict type, and nothing anywhere else.</p><p>Everything else a reader would call spacing in a type is a list separating its items, which the <code>Wrap</code> layouts do, or a suffix written against its core, which <code>Tight</code> does. That is the shape the rule takes in a real language: a handful of tokens that want air, and silence for the rest.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lex_lossless">
-          <h3>
-            <a class="anchor" href="#item-lex_lossless">lex_lossless</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lex_lossless(text: str) -&#62; LexResult&#60;AiplTok&#62;!ParseError</code></pre>
-
-          <div class="doc"><p>The whole rule set, read losslessly — every byte accounted for by a token or a trivia record. Lexing and parsing report failure in the same shape but not the same type, so the conversion happens once, here.</p></div>
 
 
         </section>
@@ -404,6 +404,20 @@
           <pre class="signature"><code>fn why(src: str) -&#62; str</code></pre>
 
           <div class="doc"><p>Why a source failed to parse, for the diagnostic assertions.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-why_prepared">
+          <h3>
+            <a class="anchor" href="#item-why_prepared">why_prepared</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn why_prepared(src: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The same, against an analysed grammar — the path that prunes on FIRST sets. <code>parse.aipl</code> proves pruning is invisible against toy grammars; this asks the same question of the real one, where the sets are large and nearly every production reference is a candidate to skip.</p></div>
 
 
         </section>

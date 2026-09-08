@@ -228,6 +228,9 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 parser:
+  trailing separater = Allowed | Disallowed | Required
+  union_labels should just be set union. Why is this a vec?
+  do we need NamedIdx when we have Named?
   after gazelle is retired, allow doc comments for variant cases
   minimize rule binding shorthand necessity by improving the type system
   chage Far to use a set of expected
@@ -258,6 +261,7 @@ utilities:
 skills:
 
 lint:
+  for (let sub : rs) { if (cond(sub)) return true } else return false => line require this to return any
   xs.fold(0, +) should be sum probably? I guess with wrapping and saturating variants
   any lint that works on bare assignment should work on field assignment (e.g. lint to use --)
   lint to use if let instead of match with empty none case

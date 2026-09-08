@@ -21,16 +21,16 @@ delete gazelle** — split into the pieces that can each be finished and judged 
 their own:
 
 - [x] 5a Decide the bridge: how an AIPL parse becomes a Rust `Program`
-- [ ] 5b Wire FIRST-set pruning into the driver, and re-measure
+- [x] 5b Wire FIRST-set pruning into the driver, and re-measure
 - [ ] 5c Extend the differential test from acceptance to tree/AST equality
 - [ ] 5d Lower AIPL's grammar to the AST
 - [ ] 5e Error-message parity against the corpus fixtures
 - [ ] 5f Side-channels: `#[allow]` spans, trailing whitespace, doc attachment
 - [ ] 5g The bootstrap procedure, and the `DOGFOOD_SOURCE_FILES` switch
 
-**5a is decided: lower in AIPL and marshal the result.** 5b and 5c are worth
-doing whatever, and between them they answer whether the switch is viable at all
-— so they come next.
+**5a is decided: lower in AIPL and marshal the result**, and 5b is measured. 5c
+is next: it is the oracle 5d needs, and worth having before the lowering rather
+than after it.
 
 ## Context
 
@@ -193,19 +193,65 @@ only ever reads one out. The refusal now says so on the top-level path too
 (previously reachable only for a boxed value nested inside a composite, so a
 boxed parameter got a generic shape-mismatch message instead).
 
-### 5b — FIRST-set pruning, then re-measure
+### 5b — FIRST-set pruning. Done, and the answer was not the expected one
 
-**Measured: 72.8s** for the AIPL parser to accept the corpus
-(`cargo test --test dogfood -- aipl_grammar_matches_gazelle`), against a gazelle
-parse that is a small fraction of a 165s full-suite run which also does all the
-codegen. That gap has to close before any of the rest is worth building.
+**Baseline: 72.8s** for the AIPL parser to accept the corpus
+(`cargo test --test dogfood -- aipl_grammar_matches_gazelle`). Run-to-run
+variance on that measurement is about +/-3s, which is worth knowing before
+reading small differences into it.
 
-`parse.aipl`'s own header names both causes: trivia attachment is
-O(tokens x trivia), and with no memoization a heavily-backtracking grammar can go
-exponential. FIRST sets are built (`ebnf.aipl`, stage 1) and deliberately not
-wired into the driver. Wiring them is the fix, and the re-measurement is the
-deliverable — a number that does not move says the approach needs rethinking
-rather than more code.
+Pruning is wired at `match_prod` — the point a reference is followed, so skipping
+removes a whole subtree rather than one token compare, and it costs a table
+lookup and a membership test with nothing allocated. `atom` is twenty
+alternatives behind one production reference each, and one token of lookahead
+rules out nearly all of them.
+
+Three findings, two of them negative:
+
+- **Pruning silently degrades error messages, and the driver's own tests caught
+  it** — seven assertions, immediately. `match_prod` already collapses a
+  *labelled* production to its label, so pruning one is exactly what attempting
+  it would have done. A *transparent* production has no label and what it would
+  have recorded is its insides' expectations at that position, which pruning
+  skips straight past. `label_sets` (in `parse.aipl`) puts them back: the FIRST
+  set computed over labels rather than terminals, a labelled sub-production
+  contributing its label and a transparent one its insides, as a fixed point for
+  the same reason `first_sets` is one. Pruning is now asserted invisible —
+  against the toys in `parse.aipl` and against the real 54-production grammar in
+  `grammar_aipl.aipl`.
+- **`can_start` cost about what it saved.** The natural spelling —
+  `syms.contains(SKind(k)) || syms.contains(SText(text))` — *builds* a `Sym` per
+  call and walks the set twice, and it is asked once per production reference.
+  Rewritten as one allocation-free pass, pruning went from a small loss to ~11%.
+- **The analysis costs more than pruning saves, for a single parse.** Computing
+  the FIRST and label sets is two fixed points over the grammar, and doing it per
+  source made the corpus run *slower* (79s against 72.8s). It depends only on the
+  grammar, so it should be paid once.
+
+Hence `Prepared` / `prepare` / `parse_prepared`. `prepare` links and analyses;
+`parse_prepared` parses against that. `parse_cst` deliberately links and stops
+there — an unanalysed grammar has empty sets, the driver finds nothing to prune
+on, and a one-shot parse pays nothing for a lookahead table it would use once.
+
+**Measured, 300 parses of a small source, fixed overhead subtracted:**
+
+| | per parse |
+|---|---|
+| `parse_cst` (link only, no pruning) | ~12.0 ms |
+| `parse_prepared`, no pruning | 5.97 ms |
+| `parse_prepared`, pruning | 5.33 ms |
+
+So the win is **~2.2x, and almost all of it is not redoing the link and the
+analysis**; pruning is a further ~11%. That reorders what matters: the driver was
+not slow because it backtracked, it was slow because every parse rebuilt
+everything the grammar already knew about itself.
+
+**The corpus number is unchanged (76.0s, inside the noise band)** and cannot
+improve, because the differential test makes one FFI call per file and nothing
+can hold a `Prepared` across calls — it contains function values, which do not
+marshal. **That is an architectural item for 5g**: the production path must
+prepare once and reuse, and there is currently no way for it to do so. Until
+that is answered, the 2.2x is available in principle and unreachable in practice.
 
 ### 5c — Differential test: from acceptance to equality
 

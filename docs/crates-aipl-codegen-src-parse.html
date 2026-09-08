@@ -75,6 +75,48 @@
 
 
 
+        <section class="item" id="item-Prepared">
+          <h3>
+            <a class="anchor" href="#item-Prepared">Prepared</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Prepared&#60;K: variant, A: any&#62;</code></pre>
+
+          <div class="doc"><p>A grammar linked, and optionally analysed, ready to parse with.</p><p>Everything here is a function of the grammar *alone* — the linked rules, the FIRST sets, the expectation labels — so a caller parsing more than one source builds this once with <code>prepare</code> and hands it to <code>parse_prepared</code> for each.</p><p><code>firsts</code> and <code>labels</code> are empty when the grammar was linked but not analysed, which is what <code>parse_cst</code> does. The driver reads that as &quot;nothing to prune on&quot; and matches every production it reaches; the parse is identical, only slower. Analysis is a cost worth paying exactly once per grammar and never once per source.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-prepare">
+          <h3>
+            <a class="anchor" href="#item-prepare">prepare</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn prepare&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; Prepared&#60;K, A&#62;!ParseError</code></pre>
+
+          <div class="doc"><p><code>g</code> linked and analysed — build it once, parse with it many times. Fails the way <code>link</code> does: an unresolved reference, or a duplicate rule name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-parse_prepared">
+          <h3>
+            <a class="anchor" href="#item-parse_prepared">parse_prepared</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn parse_prepared&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, prep: Prepared&#60;K, A&#62;, start: str) -&#62; Cst!ParseError</code></pre>
+
+          <div class="doc"><p><code>parse_cst</code> against an already-prepared grammar — the same parse, without re-linking and re-analysing the grammar for every source.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower">
           <h3>
             <a class="anchor" href="#item-lower">lower</a>
@@ -440,6 +482,104 @@
 
 
 
+        <section class="item" id="item-can_reach">
+          <h3>
+            <a class="anchor" href="#item-can_reach">can_reach</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn can_reach&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64, pos: u64) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether production <code>i</code> could begin with the token at <code>pos</code> — its FIRST set asked about that token's kind and spelling.</p><p>True at end of input, where there is no token to rule anything out: a nullable production still matches there, and the cost of trying the rest is one failed token compare. <code>can_start</code> is conservative in the safe direction anyway, so the only thing a wrong answer here could cost is the pruning itself.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-pruned">
+          <h3>
+            <a class="anchor" href="#item-pruned">pruned</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn pruned&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64, pos: u64, expect_as: str, far: Far) -&#62; Step</code></pre>
+
+          <div class="doc"><p>The <code>Step</code> a pruned production yields — the one its rule would have produced, without running it.</p><p>A pruned production cannot consume the token at <code>pos</code>, so it cannot fail any deeper than <code>pos</code>; that is exactly the branch of <code>match_prod</code> where a label replaces what the production's insides expected. So for a *labelled* production this is observationally identical to attempting it.</p><p>A transparent one has no label to record, and what it would have recorded is its insides' expectations at <code>pos</code> — which pruning skips over. That is a real difference and it is confined to the expected-set of an error reported at this exact position; see <code>label_sets</code> in <code>ebnf.aipl</code> for the exact version.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-label_sets">
+          <h3>
+            <a class="anchor" href="#item-label_sets">label_sets</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn label_sets&#60;K: variant, A: any&#62;(prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[]) -&#62; str[][]</code></pre>
+
+          <div class="doc"><p>The expectation labels each production would record on failing at its own first token, in grammar order — the FIRST set computed over *labels* rather than terminals, so a labelled sub-production contributes its label and a transparent one contributes its insides.</p><p>This exists so pruning is invisible. <code>match_prod</code>'s label branch already makes a pruned *labelled* production observationally identical to an attempted one; a transparent production has no label, and what it would have recorded is exactly this. Without it, skipping a production silently drops entries from the &quot;expected a, b, or c&quot; set of any error reported at that position — which the driver's own tests catch, seven of them.</p><p>A fixed point for the same reason <code>first_sets</code> is one: a transparent production referencing another is not answerable until that one is. Order is preserved through the unions, since the expected set reads back in the order the alternatives would have been tried.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-rule_labels">
+          <h3>
+            <a class="anchor" href="#item-rule_labels">rule_labels</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn rule_labels&#60;K: variant, A: any&#62;(r: Rule&#60;K&#62;, prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: str[][]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The labels <code>r</code> would record at its own first token, given the round's <code>labels</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-seq_labels">
+          <h3>
+            <a class="anchor" href="#item-seq_labels">seq_labels</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn seq_labels&#60;K: variant, A: any&#62;(rs: Rule&#60;K&#62;[], prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: str[][]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p><code>rule_labels</code> across a sequence: each element in turn, stopping after the first that cannot match nothing.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-rule_nullable">
+          <h3>
+            <a class="anchor" href="#item-rule_nullable">rule_nullable</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn rule_nullable&#60;K: variant&#62;(r: Rule&#60;K&#62;, firsts: First&#60;K&#62;[]) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>r</code> can match nothing at all — read off the FIRST sets for a reference, and structural everywhere else. Only <code>seq_labels</code> needs it, to know how far along a sequence the first token can still be expected.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-union_labels">
+          <h3>
+            <a class="anchor" href="#item-union_labels">union_labels</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn union_labels(a: str[], b: str[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p><code>a</code> then whatever in <code>b</code> is not already there — order preserved, since the expected set reads back in the order alternatives were tried.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-find_prec">
           <h3>
             <a class="anchor" href="#item-find_prec">find_prec</a>
@@ -670,6 +810,34 @@
             <span class="kind kind-fn">fn</span>
           </h3>
           <pre class="signature"><code>fn parsed(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; Node!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-shown_prepared">
+          <h3>
+            <a class="anchor" href="#item-shown_prepared">shown_prepared</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn shown_prepared(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str!ParseError</code></pre>
+
+          <div class="doc"><p>The same as <code>shown</code>, against an *analysed* grammar — so the assertions can be made twice and compared. This is the path that prunes.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-msg_of_prepared">
+          <h3>
+            <a class="anchor" href="#item-msg_of_prepared">msg_of_prepared</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn msg_of_prepared(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

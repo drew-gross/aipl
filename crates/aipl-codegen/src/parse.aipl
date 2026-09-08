@@ -42,6 +42,7 @@ import {
     first,
     is_empty,
     is_nonempty,
+    is_some_and,
     join,
     len,
     less_than as <,
@@ -53,6 +54,7 @@ import {
     map_err,
     not_equal as !=,
     try_map,
+    value_or,
     value_or_err,
     wrapping_add as +,
     wrapping_increment as ++,
@@ -70,6 +72,7 @@ import {
     text,
     token_leaves,
 } from "./cst.aipl";
+import { First, can_start, first_sets } from "./ebnf.aipl";
 import {
     Climb,
     Grammar,
@@ -128,6 +131,14 @@ struct Parser<K: variant, A: any> {
     trivia: Token<K>[],
     prods: Production<K, A>[],
     end: u64,
+    // The FIRST set of each production, in `prods` order — what `match_prod`
+    // asks before descending. Computed once per parse (`first_sets`, a fixed
+    // point over the grammar) and never during one.
+    firsts: First<K>[],
+    // The expectation labels each production would record on failing at its own
+    // first token — what makes pruning invisible to error messages. See
+    // `label_sets`.
+    labels: str[][],
 }
 
 # `far` updated with "`label` was expected at `pos`". Deeper wins outright;
@@ -546,6 +557,19 @@ fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -
         message: `no production at index {i}`,
         span: 0..0,
     })?;
+
+    // Ask the FIRST set before descending. A production that cannot begin with
+    // the token sitting here cannot match here, and under ordered choice that is
+    // the common case: `atom`'s twenty alternatives are twenty productions, of
+    // which one token of lookahead rules out nearly all.
+    //
+    // This is the one place worth asking. A `Named` reference is where the
+    // driver recurses, so pruning here removes whole subtrees rather than single
+    // token compares — and it costs a table lookup and a membership test, with
+    // no rule walked and nothing allocated.
+    if (!can_reach(p, i, pos)) {
+        return ok(pruned(p, i, pos, expect_as, far));
+    };
     let st = match_rule(p, rule, pos, i, far)?;
     if (st.hit) {
         return ok(Step { hit: true, pos: st.pos, kids: [CTree(i, st.kids)], far: st.far });
@@ -554,6 +578,190 @@ fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -
         return ok(no(st.far, pos));
     };
     ok(no(far_miss(far, pos, expect_as), pos))
+}
+
+# Whether production `i` could begin with the token at `pos` — its FIRST set
+# asked about that token's kind and spelling.
+#
+# True at end of input, where there is no token to rule anything out: a nullable
+# production still matches there, and the cost of trying the rest is one failed
+# token compare. `can_start` is conservative in the safe direction anyway, so the
+# only thing a wrong answer here could cost is the pruning itself.
+fn can_reach<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64) -> bool {
+    match (p.toks[pos]) {
+        some(t) => match (p.firsts[i]) {
+            some(f) => f.can_start(t.kind.case_of(), t.text.text),
+            // A grammar whose FIRST sets and productions disagree in length is
+            // not one this can prune; let the match decide.
+            none => true,
+        },
+        none => true,
+    }
+}
+
+# The `Step` a pruned production yields — the one its rule would have produced,
+# without running it.
+#
+# A pruned production cannot consume the token at `pos`, so it cannot fail any
+# deeper than `pos`; that is exactly the branch of `match_prod` where a label
+# replaces what the production's insides expected. So for a *labelled*
+# production this is observationally identical to attempting it.
+#
+# A transparent one has no label to record, and what it would have recorded is
+# its insides' expectations at `pos` — which pruning skips over. That is a real
+# difference and it is confined to the expected-set of an error reported at this
+# exact position; see `label_sets` in `ebnf.aipl` for the exact version.
+fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str, far: Far) -> Step {
+    if (!expect_as.is_empty()) {
+        return no(far_miss(far, pos, expect_as), pos);
+    };
+    mut f = far;
+    for (let l : p.labels[i].value_or([])) {
+        set f = far_miss(f, pos, l);
+    }
+    no(f, pos)
+}
+
+# The expectation labels each production would record on failing at its own first
+# token, in grammar order — the FIRST set computed over *labels* rather than
+# terminals, so a labelled sub-production contributes its label and a transparent
+# one contributes its insides.
+#
+# This exists so pruning is invisible. `match_prod`'s label branch already makes
+# a pruned *labelled* production observationally identical to an attempted one; a
+# transparent production has no label, and what it would have recorded is exactly
+# this. Without it, skipping a production silently drops entries from the
+# "expected a, b, or c" set of any error reported at that position — which the
+# driver's own tests catch, seven of them.
+#
+# A fixed point for the same reason `first_sets` is one: a transparent production
+# referencing another is not answerable until that one is. Order is preserved
+# through the unions, since the expected set reads back in the order the
+# alternatives would have been tried.
+fn label_sets<K: variant, A: any>(prods: Production<K, A>[], firsts: First<K>[]) -> str[][] {
+    let empty: str[] = [];
+    mut labels = prods.map(|pr| empty);
+    mut going = true;
+    while (going) {
+        let prev = labels;
+        let next = prods.map(|pr| rule_labels(pr.rule, prods, firsts, prev));
+        if (next == prev) {
+            set going = false;
+        } else {
+            set labels = next;
+        };
+    }
+    labels
+}
+
+# The labels `r` would record at its own first token, given the round's `labels`.
+fn rule_labels<K: variant, A: any>(
+    r: Rule<K>,
+    prods: Production<K, A>[],
+    firsts: First<K>[],
+    labels: str[][],
+) -> str[] {
+    match (r) {
+        Term(k) => [k.case_name()],
+        Literal(s) => [quoted(s)],
+        // A sequence is tried from its front, and past every element that can
+        // match nothing — the same walk `rule_first` makes over terminals.
+        Then(rs) => seq_labels(rs, prods, firsts, labels),
+        OneOf(rs) => {
+            mut out: str[] = [];
+            for (let sub : rs) {
+                set out = union_labels(out, rule_labels(sub, prods, firsts, labels));
+            }
+            out
+        },
+        // A repetition and an option both try their body at offset 0; a
+        // separator is only ever reached after an item.
+        Many(sub, _, _, _) => rule_labels(sub, prods, firsts, labels),
+        Maybe(sub) => rule_labels(sub, prods, firsts, labels),
+        Climb(atom, _) => rule_labels(atom, prods, firsts, labels),
+        NestedIdx(_, open, body, close, _) => seq_labels(
+            [open, body, close],
+            prods,
+            firsts,
+            labels,
+        ),
+        // The collapse `expect_as` exists for: a labelled production is one word
+        // in a message, and its insides never surface.
+        NamedIdx(i) => match (prods[i]) {
+            some(pr) => if (pr.expect_as.is_empty()) {
+                labels[i].value_or([])
+            } else {
+                [pr.expect_as]
+            },
+            none => [],
+        },
+        // Unlinked — `parse_cst` links first, so neither is reachable from a
+        // parse; an unlinked grammar simply prunes nothing.
+        Named(..) | NestedIn(..) => [],
+    }
+}
+
+# `rule_labels` across a sequence: each element in turn, stopping after the first
+# that cannot match nothing.
+fn seq_labels<K: variant, A: any>(
+    rs: Rule<K>[],
+    prods: Production<K, A>[],
+    firsts: First<K>[],
+    labels: str[][],
+) -> str[] {
+    mut out: str[] = [];
+    for (let sub : rs) {
+        set out = union_labels(out, rule_labels(sub, prods, firsts, labels));
+        if (!rule_nullable(sub, firsts)) {
+            return out;
+        };
+    }
+    out
+}
+
+# Whether `r` can match nothing at all — read off the FIRST sets for a reference,
+# and structural everywhere else. Only `seq_labels` needs it, to know how far
+# along a sequence the first token can still be expected.
+fn rule_nullable<K: variant>(r: Rule<K>, firsts: First<K>[]) -> bool {
+    match (r) {
+        Term(..) | Literal(..) | Named(..) | NestedIn(..) => false,
+        Then(rs) => {
+            for (let sub : rs) {
+                if (!rule_nullable(sub, firsts)) {
+                    return false;
+                };
+            }
+            true
+        },
+        OneOf(rs) => {
+            for (let sub : rs) {
+                if (rule_nullable(sub, firsts)) {
+                    return true;
+                };
+            }
+            false
+        },
+        Many(sub, min, _, _) => min == 0 || rule_nullable(sub, firsts),
+        Maybe(..) => true,
+        Climb(atom, _) => rule_nullable(atom, firsts),
+        NestedIdx(_, open, body, close, _) => rule_nullable(open, firsts) && rule_nullable(
+            body,
+            firsts,
+        ) && rule_nullable(close, firsts),
+        NamedIdx(i) => firsts[i].is_some_and(|f| f.nullable),
+    }
+}
+
+# `a` then whatever in `b` is not already there — order preserved, since the
+# expected set reads back in the order alternatives were tried.
+fn union_labels(a: str[], b: str[]) -> str[] {
+    mut out = a;
+    for (let l : b) {
+        if (!out.contains(l)) {
+            set out = [..out, l];
+        };
+    }
+    out
 }
 
 # The precedence level `text` belongs to, if it binds at least as tightly as
@@ -693,15 +901,58 @@ pub fn parse_cst<K: variant, A: any>(
     g: Grammar<K, A>,
     start: str,
 ) -> Cst!ParseError {
-    let linked: Grammar<K, A> = link(g)?;
-    let i = prod_names(linked)
+    // Deliberately *not* `prepare`: analysing a grammar costs more than pruning
+    // saves when the result is used for a single parse. Measured on the corpus —
+    // ~750 one-shot parses — analysing every time is an 8% loss, while the same
+    // analysis reused across parses is a 2x win. So a one-shot parse links and
+    // nothing more, and the driver simply finds no FIRST set to prune on.
+    let none_yet: First<K>[] = [];
+    let no_labels: str[][] = [];
+    let prep = Prepared { grammar: link(g)?, firsts: none_yet, labels: no_labels };
+    parse_prepared(src, lexed, prep, start)
+}
+
+# A grammar linked, and optionally analysed, ready to parse with.
+#
+# Everything here is a function of the grammar *alone* — the linked rules, the
+# FIRST sets, the expectation labels — so a caller parsing more than one source
+# builds this once with `prepare` and hands it to `parse_prepared` for each.
+#
+# `firsts` and `labels` are empty when the grammar was linked but not analysed,
+# which is what `parse_cst` does. The driver reads that as "nothing to prune on"
+# and matches every production it reaches; the parse is identical, only slower.
+# Analysis is a cost worth paying exactly once per grammar and never once per
+# source.
+struct Prepared<K: variant, A: any> { grammar: Grammar<K, A>, firsts: First<K>[], labels: str[][] }
+
+# `g` linked and analysed — build it once, parse with it many times. Fails the
+# way `link` does: an unresolved reference, or a duplicate rule name.
+pub fn prepare<K: variant, A: any>(g: Grammar<K, A>) -> Prepared<K, A>!ParseError {
+    let grammar: Grammar<K, A> = link(g)?;
+    let firsts = first_sets(grammar)?;
+    let labels = label_sets(grammar.prods, firsts);
+    ok(Prepared { grammar, firsts, labels })
+}
+
+# `parse_cst` against an already-prepared grammar — the same parse, without
+# re-linking and re-analysing the grammar for every source.
+pub fn parse_prepared<K: variant, A: any>(
+    src: str,
+    lexed: LexResult<K>,
+    prep: Prepared<K, A>,
+    start: str,
+) -> Cst!ParseError {
+    let Prepared { grammar, firsts, labels } = prep;
+    let i = prod_names(grammar)
         .find_index(|n| n == start)
         .value_or_err(ParseError { message: `no rule named "{start}"`, span: 0..0 })?;
     let p = Parser {
         toks: lexed.tokens,
         trivia: lexed.trivia,
-        prods: linked.prods,
+        prods: grammar.prods,
         end: src.len(),
+        firsts,
+        labels,
     };
     let Step { hit, far, pos, kids } = match_prod(p, i, 0, Far { pos: 0, expected: [] })?;
     if (!hit) {
@@ -827,10 +1078,11 @@ pub fn parse<K: variant, A: any>(
     // ---- Named/NamedIdx: a reference reaching back through another production,
     // which is what makes the CST (and the parse) genuinely recursive ----
     let r_item: Rule<Tok> = OneOf([Term(Word), Named("list")]);
-    let g_sexp = g_of([
-        one("list", Then([Literal("("), Many(Named("item")), Literal(")")])),
-        one("item", r_item),
-    ]);
+
+    // Annotated, like every other rule here: nothing inside `Then` mentions `K`,
+    // and there is more than one `Rule` instance in scope for it to fall back on.
+    let r_list: Rule<Tok> = Then([Literal("("), Many(Named("item")), Literal(")")]);
+    let g_sexp = g_of([one("list", r_list), one("item", r_item)]);
     assert(shown("(a b)", g_sexp, "list")? == "(list ( (item a) (item b) ))");
     assert(
         shown(
@@ -942,18 +1194,14 @@ pub fn parse<K: variant, A: any>(
     // The same S-expression grammar with its brackets written as a `NestedIn`
     // rather than a flat `Then`. It parses the same input to the same *lowered*
     // value, because a group is transparent to everything but the formatter.
-    let g_grp = g_of([
-        one(
-            "list",
-            NestedIn(
-                Literal("("),
-                Many(NamedIdx(1), sep=some(Literal(","))),
-                Literal(")"),
-                style=ListStyle { spaced: true },
-            ),
-        ),
-        one("item", OneOf([Term(Word), Named("list")])),
-    ]);
+    let g_list: Rule<Tok> = NestedIn(
+        Literal("("),
+        Many(NamedIdx(1), sep=some(Literal(","))),
+        Literal(")"),
+        style=ListStyle { spaced: true },
+    );
+    let g_item: Rule<Tok> = OneOf([Term(Word), Named("list")]);
+    let g_grp = g_of([one("list", g_list), one("item", g_item)]);
 
     // The tree shows the brackets as a group — `[..]` in `show` — with the items
     // between them, and the source still comes back whole.
@@ -1008,6 +1256,34 @@ pub fn parse<K: variant, A: any>(
 
     // A failure that has nothing to do with a bracket says nothing about one.
     assert(msg_of("a", g_grp, "list") == "expected `(`, found `a`");
+
+    // ---- Pruning is invisible ----
+    //
+    // `prepare` analyses the grammar so `match_prod` can skip a production whose
+    // FIRST set rules out the token in front of it. That must change *nothing* a
+    // caller can see: the same trees, and — the part that is easy to get wrong —
+    // the same expected-sets in the same order.
+    //
+    // The expectations are the whole reason `label_sets` exists. Pruning a
+    // labelled production is exactly its label, which `match_prod` would have
+    // applied anyway; pruning a *transparent* one skips the insides that would
+    // have recorded what they expected here, and those have to be put back. Seven
+    // of the assertions below caught that when they were not.
+    assert(shown_prepared("(a b)", g_sexp, "list")? == shown("(a b)", g_sexp, "list")?);
+    assert(shown_prepared("(a (b) c)", g_sexp, "list")? == shown("(a (b) c)", g_sexp, "list")?);
+    assert(shown_prepared("(a, b)", g_grp, "list")? == shown("(a, b)", g_grp, "list")?);
+    assert(msg_of_prepared("123", g_word, "w") == msg_of("123", g_word, "w"));
+    assert(msg_of_prepared("x", g_open, "o") == msg_of("x", g_open, "o"));
+    assert(msg_of_prepared("]", g_atom, "a") == msg_of("]", g_atom, "a"));
+    assert(msg_of_prepared("]", plain, "stmt") == msg_of("]", plain, "stmt"));
+    assert(msg_of_prepared("]", labelled, "stmt") == msg_of("]", labelled, "stmt"));
+    assert(msg_of_prepared("a", g_grp, "list") == msg_of("a", g_grp, "list"));
+    assert(msg_of_prepared("(a, b", g_grp, "list") == msg_of("(a, b", g_grp, "list"));
+
+    // Spelled out once rather than only compared, so a regression that broke
+    // *both* paths the same way could not pass unnoticed.
+    assert(msg_of_prepared("]", g_atom, "a") == "expected Word, Num, or `(`, found `]`");
+    assert(msg_of_prepared("]", labelled, "stmt") == "expected an expression, found `]`");
 })
 
 // ---------- test-only fixtures ----------
@@ -1103,98 +1379,125 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     let lexed = lex_toks(src, tok_rules())?;
     parse(src, lexed, g, start)
 }
+
+# The same as `shown`, against an *analysed* grammar — so the assertions can be
+# made twice and compared. This is the path that prunes.
+fn shown_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str!ParseError {
+    let lexed = lex_toks(src, tok_rules())?;
+    let tree = parse_prepared(src, lexed, prepare(g)?, start)?;
+    ok(tree.show(src, prod_names(g)))
+}
+
+fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
+    shown_prepared(src, g, start).failure_message()
+}
 --- performance ---
-allocations: 4883
-deallocations: 4883
-reallocations: 417
-bytes allocated: 302077
-instructions executed: 655181
-binary size: 432376
-  code: 262172
-  data: 7324
-  metadata: 162880
+allocations: 7893
+deallocations: 7893
+reallocations: 617
+bytes allocated: 487507
+instructions executed: 1058928
+binary size: 526952
+  code: 318248
+  data: 8556
+  metadata: 200148
 functions:
   __arr_drop_Node:
     calls: 21
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 428
+    calls: 542
     bytes: 116
-  __arr_drop___m2__ListStyle:
-    calls: 165
+  __arr_drop___m2__First$Tok:
+    calls: 68
+    bytes: 116
+  __arr_drop___m2__Sym$Tok:
+    calls: 146
+    bytes: 140
+  __arr_drop___m3__ListStyle:
+    calls: 289
     bytes: 120
-  __arr_drop___m2__Prec:
+  __arr_drop___m3__Prec:
     calls: 2
     bytes: 120
-  __arr_drop___m2__Production$Tok$Node:
-    calls: 92
+  __arr_drop___m3__Production$Tok$Node:
+    calls: 149
     bytes: 188
-  __arr_drop___m2__Rule$Tok:
-    calls: 118
+  __arr_drop___m3__Rule$Tok:
+    calls: 231
     bytes: 116
-  __arr_drop___m3__StepResult$Tok:
+  __arr_drop___m4__StepResult$Tok:
     calls: 0
     bytes: 140
-  __arr_drop___m3__Token$Tok:
-    calls: 253
+  __arr_drop___m4__Token$Tok:
+    calls: 351
     bytes: 188
-  __arr_drop___m3__TokenRule$Tok:
-    calls: 50
+  __arr_drop___m4__TokenRule$Tok:
+    calls: 72
     bytes: 632
   __arr_retain_Node:
     calls: 18
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 374
+    calls: 478
     bytes: 116
-  __arr_retain___m2__ListStyle:
-    calls: 54
+  __arr_retain___m2__First$Tok:
+    calls: 100
+    bytes: 116
+  __arr_retain___m2__Sym$Tok:
+    calls: 115
+    bytes: 140
+  __arr_retain___m3__ListStyle:
+    calls: 105
     bytes: 120
-  __arr_retain___m2__Prec:
+  __arr_retain___m3__Prec:
     calls: 0
     bytes: 120
-  __arr_retain___m2__Production$Tok$Node:
-    calls: 94
+  __arr_retain___m3__Production$Tok$Node:
+    calls: 174
     bytes: 188
-  __arr_retain___m2__Rule$Tok:
-    calls: 169
+  __arr_retain___m3__Rule$Tok:
+    calls: 317
     bytes: 116
-  __arr_retain___m3__StepResult$Tok:
+  __arr_retain___m4__StepResult$Tok:
     calls: 0
     bytes: 140
-  __arr_retain___m3__Token$Tok:
-    calls: 159
+  __arr_retain___m4__Token$Tok:
+    calls: 213
     bytes: 188
-  __arr_retain___m3__TokenRule$Tok:
+  __arr_retain___m4__TokenRule$Tok:
     calls: 0
     bytes: 632
   __builtin_count_while$char$lam47:
-    calls: 128
+    calls: 162
     bytes: 220
   __builtin_count_while$char$s0$lam55:
     calls: 0
     bytes: 184
-  __builtin_count_while$char$s0$lam67:
+  __builtin_count_while$char$s0$lam71:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam67$tail:
+  __builtin_count_while$char$s0$lam71$tail:
     calls: 3
     bytes: 256
-  __builtin_find_if$__m2__Prec$lam104:
+  __builtin_find_if$__m3__Prec$lam123:
     calls: 11
     bytes: 688
-  __builtin_find_index$str$lam24:
-    calls: 73
+  __builtin_find_index$str$lam21:
+    calls: 130
+    bytes: 400
+  __builtin_find_index$str$lam28:
+    calls: 72
     bytes: 400
   __builtin_find_index$str$lam37:
-    calls: 28
+    calls: 47
     bytes: 400
-  __builtin_find_index$str$lam8:
-    calls: 50
-    bytes: 400
-  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam77:
+  __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam84:
     calls: 18
     bytes: 748
+  __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam90:
+    calls: 32
+    bytes: 920
   __eq_Node:
     calls: 13
     bytes: 136
@@ -1204,19 +1507,37 @@ functions:
   __eq___builtin_Span:
     calls: 1
     bytes: 104
-  __eq___m2__ListStyle:
+  __eq___m2__First$Tok:
+    calls: 48
+    bytes: 128
+  __eq___m2__First$Tok$arr:
+    calls: 32
+    bytes: 284
+  __eq___m2__Sym$Tok:
+    calls: 77
+    bytes: 144
+  __eq___m2__Sym$Tok$arr:
+    calls: 48
+    bytes: 284
+  __eq___m3__ListStyle:
     calls: 1
     bytes: 200
-  __eq___m2__ListStyle$arr:
+  __eq___m3__ListStyle$arr:
     calls: 1
     bytes: 284
-  __eq___m2__ParseError:
+  __eq___m3__ParseError:
     calls: 1
     bytes: 128
   __eq_char$opt:
     calls: 0
     bytes: 100
-  __filter73$own0:
+  __eq_str$arr:
+    calls: 44
+    bytes: 364
+  __eq_str$arr$arr:
+    calls: 30
+    bytes: 300
+  __filter80$own0:
     calls: 18
     bytes: 544
   __lambda_0:
@@ -1228,17 +1549,17 @@ functions:
   __lambda_2:
     calls: 0
     bytes: 128
-  __lambda_25:
+  __lambda_22:
     calls: 0
     bytes: 128
-  __lambda_26:
-    calls: 45
+  __lambda_23:
+    calls: 67
     bytes: 96
-  __lambda_27:
+  __lambda_24:
     calls: 0
     bytes: 128
-  __lambda_28:
-    calls: 25
+  __lambda_25:
+    calls: 27
     bytes: 96
   __lambda_3:
     calls: 0
@@ -1253,7 +1574,7 @@ functions:
     calls: 66
     bytes: 3684
   __m1__show:
-    calls: 126
+    calls: 184
     bytes: 2792
   __m1__span:
     calls: 1
@@ -1268,154 +1589,169 @@ functions:
     calls: 12
     bytes: 476
   __m1__token_leaves:
-    calls: 3
+    calls: 5
     bytes: 3648
-  __m2__failure_message:
-    calls: 20
+  __m2__can_start$Tok:
+    calls: 26
+    bytes: 600
+  __m2__first_sets$Tok$Node:
+    calls: 12
+    bytes: 356
+  __m2__linked_first_sets$Tok$Node:
+    calls: 12
+    bytes: 1084
+  __m2__rule_first$Tok:
+    calls: 149
+    bytes: 5948
+  __m2__union_syms$Tok:
+    calls: 84
+    bytes: 736
+  __m3__failure_message:
+    calls: 36
     bytes: 404
-  __m2__group_styles$Tok:
+  __m3__group_styles$Tok:
     calls: 0
     bytes: 32
-  __m2__group_styles$Tok$tail:
-    calls: 526
+  __m3__group_styles$Tok$tail:
+    calls: 953
     bytes: 3116
-  __m2__link$Tok$Node:
-    calls: 52
+  __m3__link$Tok$Node:
+    calls: 86
     bytes: 2328
-  __m2__link_nest$Tok:
-    calls: 9
+  __m3__link_nest$Tok:
+    calls: 18
     bytes: 1300
-  __m2__link_opt$Tok:
-    calls: 27
+  __m3__link_opt$Tok:
+    calls: 42
     bytes: 660
-  __m2__link_rule$Tok:
-    calls: 256
+  __m3__link_rule$Tok:
+    calls: 459
     bytes: 5108
-  __m2__link_rules$Tok:
-    calls: 45
+  __m3__link_rules$Tok:
+    calls: 87
     bytes: 832
-  __m2__nest_styles$Tok:
-    calls: 9
+  __m3__nest_styles$Tok:
+    calls: 18
     bytes: 956
-  __m2__prod_names$Tok$Node:
-    calls: 125
+  __m3__prod_names$Tok$Node:
+    calls: 187
     bytes: 492
-  __m3__between_len:
+  __m4__between_len:
     calls: 0
     bytes: 752
-  __m3__delimited_len:
+  __m4__delimited_len:
     calls: 0
     bytes: 1592
-  __m3__finalize_template$Tok:
+  __m4__finalize_template$Tok:
     calls: 0
     bytes: 4852
-  __m3__float_len:
+  __m4__float_len:
     calls: 0
     bytes: 824
-  __m3__interp_scan$Tok:
+  __m4__interp_scan$Tok:
     calls: 0
     bytes: 2248
-  __m3__lex$Tok:
-    calls: 50
+  __m4__lex$Tok:
+    calls: 72
     bytes: 1520
-  __m3__lex_step$Tok:
-    calls: 201
+  __m4__lex_step$Tok:
+    calls: 265
     bytes: 24708
-  __m3__nested_len:
+  __m4__nested_len:
     calls: 0
     bytes: 940
-  __m3__step_result$Tok:
-    calls: 526
+  __m4__step_result$Tok:
+    calls: 706
     bytes: 8364
-  __m3__template_scan$Tok:
+  __m4__template_scan$Tok:
     calls: 0
     bytes: 2728
-  __m3__template_step$Tok:
+  __m4__template_step$Tok:
     calls: 0
     bytes: 476
-  __m3__to_eol_len:
+  __m4__to_eol_len:
     calls: 0
     bytes: 52
-  __m3__to_eol_len$tail:
+  __m4__to_eol_len$tail:
     calls: 15
     bytes: 252
-  __m3__to_eol_unless_len:
+  __m4__to_eol_unless_len:
     calls: 0
     bytes: 368
-  __m5__line_at:
-    calls: 3
+  __m6__line_at:
+    calls: 5
     bytes: 532
   __rec_drop_Node:
     calls: 30
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 273
+    calls: 349
     bytes: 132
-  __rec_drop___m2__Rule$Tok:
-    calls: 318
+  __rec_drop___m3__Rule$Tok:
+    calls: 530
     bytes: 436
   __test$parse:
     calls: 1
-    bytes: 113384
-  __test_try_fail___m2__ParseError:
+    bytes: 142112
+  __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
-  __to_str___m2__ParseError:
+  __to_str___m3__ParseError:
     calls: 0
     bytes: 824
   __to_str_u64:
-    calls: 3
+    calls: 5
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 106
+    calls: 192
     bytes: (external)
   aipl_arr_extend:
-    calls: 750
+    calls: 1069
     bytes: (external)
   aipl_arr_inc:
-    calls: 16855
+    calls: 28106
     bytes: (external)
   aipl_arr_join:
-    calls: 106
+    calls: 150
     bytes: (external)
   aipl_arr_reserve:
-    calls: 891
+    calls: 1418
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 213
+    calls: 382
     bytes: (external)
   aipl_array_dec:
-    calls: 20670
+    calls: 34343
     bytes: (external)
   aipl_array_new:
-    calls: 2597
+    calls: 4179
     bytes: (external)
   aipl_array_push:
-    calls: 193
+    calls: 401
     bytes: (external)
   aipl_array_push_mut:
-    calls: 712
+    calls: 1287
     bytes: (external)
   aipl_array_with_cap:
-    calls: 488
+    calls: 726
     bytes: (external)
   aipl_assert:
-    calls: 52
+    calls: 64
     bytes: (external)
   aipl_rec_alloc:
-    calls: 621
+    calls: 909
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 4817
+    calls: 8113
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 93
+    calls: 144
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 4196
+    calls: 7204
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 93
+    calls: 144
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -1427,10 +1763,10 @@ functions:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 6
+    calls: 10
     bytes: (external)
   aipl_write_u64:
-    calls: 3
+    calls: 5
     bytes: (external)
   build_node:
     calls: 17
@@ -1439,22 +1775,22 @@ functions:
     calls: 15
     bytes: 3160
   error_at$Tok$Node:
-    calls: 18
+    calls: 34
     bytes: 2920
   far_miss:
-    calls: 69
+    calls: 113
     bytes: 1084
   far_unclosed:
-    calls: 3
+    calls: 5
     bytes: 320
   find_prec:
     calls: 22
     bytes: 228
   leaf_at$Tok$Node:
-    calls: 133
+    calls: 173
     bytes: 1888
   lex_toks:
-    calls: 50
+    calls: 72
     bytes: 696
   lower_node$Tok$Node:
     calls: 18
@@ -1463,56 +1799,89 @@ functions:
     calls: 1
     bytes: 104
   match_many$Tok$Node:
-    calls: 28
+    calls: 38
     bytes: 4560
   match_maybe$Tok$Node:
     calls: 4
     bytes: 1076
   match_nested$Tok$Node:
-    calls: 10
+    calls: 15
     bytes: 5908
   match_one_of$Tok$Node:
-    calls: 52
+    calls: 78
     bytes: 1692
   match_prod$Tok$Node:
-    calls: 111
-    bytes: 4524
+    calls: 166
+    bytes: 6752
   match_rule$Tok$Node:
-    calls: 383
+    calls: 532
     bytes: 6300
   match_then$Tok$Node:
-    calls: 31
+    calls: 42
     bytes: 2128
   parse$Tok$Node:
     calls: 5
     bytes: 380
   parse_cst$Tok$Node:
-    calls: 50
-    bytes: 5140
+    calls: 60
+    bytes: 624
+  parse_prepared$Tok$Node:
+    calls: 72
+    bytes: 5152
   parsed:
     calls: 5
     bytes: 452
+  prepare$Tok$Node:
+    calls: 12
+    bytes: 2068
   prev_end$Tok$Node:
-    calls: 193
+    calls: 245
     bytes: 772
+  pruned$Tok$Node:
+    calls: 11
+    bytes: 1336
   quoted:
-    calls: 43
+    calls: 92
     bytes: 456
   refuse:
     calls: 1
     bytes: 348
+  rule_labels$Tok$Node:
+    calls: 0
+    bytes: 44
+  rule_labels$Tok$Node$tail:
+    calls: 130
+    bytes: 4216
+  rule_nullable$Tok:
+    calls: 0
+    bytes: 36
+  rule_nullable$Tok$tail:
+    calls: 22
+    bytes: 2116
+  seq_labels$Tok$Node:
+    calls: 0
+    bytes: 44
+  seq_labels$Tok$Node$tail:
+    calls: 22
+    bytes: 860
   shown:
-    calls: 42
+    calls: 52
     bytes: 844
+  shown_prepared:
+    calls: 12
+    bytes: 1304
   tok_rules:
-    calls: 47
+    calls: 69
     bytes: 2736
   tok_text$Tok$Node:
-    calls: 117
+    calls: 165
     bytes: 832
   trailing_trivia$Tok$Node:
-    calls: 60
+    calls: 72
     bytes: 760
   trivia_rules:
     calls: 3
     bytes: 3368
+  union_labels:
+    calls: 78
+    bytes: 800

@@ -589,8 +589,30 @@ fn union_syms<K: variant>(a: Sym<K>[], b: Sym<K>[]) -> Sym<K>[] {
 # that matters: it is never false for a token that could in fact start a match,
 # so pruning on it cannot lose a parse.
 pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
-    let spelled: Sym<K> = SText(text);
-    self.nullable || self.syms.contains(SKind(kind)) || self.syms.contains(spelled)
+    if (self.nullable) {
+        return true;
+    };
+
+    // One pass, comparing in place. The obvious spelling — `syms.contains(SKind(kind))
+    // || syms.contains(SText(text))` — reads better but *builds* a `Sym` per call
+    // and walks the set twice, and this is asked once per production reference in
+    // a parse. Constructing the needle turned out to cost about what the whole
+    // test saves.
+    for (let s : self.syms) {
+        match (s) {
+            SKind(k) => {
+                if (k == kind) {
+                    return true;
+                };
+            },
+            SText(t) => {
+                if (t == text) {
+                    return true;
+                };
+            },
+        };
+    }
+    false
 }.test({
     let syms: Sym<Kind>[] = [SKind(Num), SText("(")];
     let f: First<Kind> = First { syms, nullable: false };
@@ -774,11 +796,11 @@ allocations: 1726
 deallocations: 1726
 reallocations: 144
 bytes allocated: 127319
-instructions executed: 163345
-binary size: 122480
-  code: 77192
+instructions executed: 162804
+binary size: 122576
+  code: 77240
   data: 3684
-  metadata: 41604
+  metadata: 41652
 functions:
   __arr_drop_First$Kind:
     calls: 77
@@ -832,7 +854,7 @@ functions:
     calls: 17
     bytes: 284
   __eq_Sym$Kind:
-    calls: 114
+    calls: 103
     bytes: 144
   __eq_Sym$Kind$arr:
     calls: 36
@@ -913,7 +935,7 @@ functions:
     calls: 66
     bytes: (external)
   aipl_arr_inc:
-    calls: 3802
+    calls: 3796
     bytes: (external)
   aipl_arr_join:
     calls: 34
@@ -928,7 +950,7 @@ functions:
     calls: 21
     bytes: (external)
   aipl_array_dec:
-    calls: 4903
+    calls: 4897
     bytes: (external)
   aipl_array_new:
     calls: 594
@@ -977,7 +999,7 @@ functions:
     bytes: (external)
   can_start$Kind:
     calls: 5
-    bytes: 552
+    bytes: 600
   climb_precs$Kind:
     calls: 0
     bytes: 32
