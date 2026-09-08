@@ -50,7 +50,7 @@
           </h3>
           <pre class="signature"><code>pub fn format_cst&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, node: Cst, space: (str, str) -&#62; bool) -&#62; Doc!ParseError</code></pre>
 
-          <div class="doc"><p>The <code>Doc</code> that lays <code>node</code> out, given the grammar it was parsed with.</p><p><code>space</code> answers the one question a grammar cannot: whether a space belongs between two adjacent tokens. It is asked with the spellings on either side of the gap — <code>space(&quot;+&quot;, &quot;1&quot;)</code> while laying out <code>1 + 1</code>, <code>space(&quot;(&quot;, &quot;a&quot;)</code> while laying out <code>(a)</code> — so a language brings one small function instead of a layout function per production. Where a production wants no spaces at all, that is <code>Tight</code> and the rule is never consulted.</p><p>Fails only on a tree that does not belong to <code>g</code> — a node naming a production index the grammar has no entry for, which a tree from <code>parse_cst</code> cannot be.</p></div>
+          <div class="doc"><p>The <code>Doc</code> that lays <code>node</code> out, given the grammar it was parsed with.</p><p><code>space</code> answers the one question a grammar cannot: whether a space belongs between two adjacent tokens. It is asked with the spellings on either side of the gap — <code>space(&quot;+&quot;, &quot;1&quot;)</code> while laying out <code>1 + 1</code>, <code>space(&quot;(&quot;, &quot;a&quot;)</code> while laying out <code>(a)</code> — so a language brings one small function instead of a layout function per production. Where a production wants no spaces at all, that is <code>Tight</code> and the rule is never consulted.</p><p><code>g</code> is linked here, so it may be handed over unlinked, exactly as <code>parse_cst</code> takes it. That is not a convenience: a group's style lives in <code>groups</code>, which only <code>link</code> fills, so an unlinked grammar would lay every bracket pair out against a table that is not there. Linking is idempotent, so a caller that linked already pays one walk and nothing else.</p><p>Fails only on a tree that does not belong to <code>g</code> — a node naming a production or a group index the grammar has no entry for, which a tree from <code>parse_cst</code> cannot be.</p></div>
 
 
         </section>
@@ -98,6 +98,20 @@
         <p class="note">Not importable from another file.</p>
 
 
+        <section class="item" id="item-fmt_node">
+          <h3>
+            <a class="anchor" href="#item-fmt_node">fmt_node</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn fmt_node&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, node: Cst, space: (str, str) -&#62; bool) -&#62; Doc!ParseError</code></pre>
+
+          <div class="doc"><p><code>format_cst</code> once the grammar is linked — the recursive half, so a call links once rather than once per node.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-pieces">
           <h3>
             <a class="anchor" href="#item-pieces">pieces</a>
@@ -134,48 +148,6 @@
           <pre class="signature"><code>fn edge(src: str, sp: Span?) -&#62; str</code></pre>
 
           <div class="doc"><p>The text of a token span, or <code>&quot;&quot;</code> for a child that matched no tokens.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-tok_text">
-          <h3>
-            <a class="anchor" href="#item-tok_text">tok_text</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn tok_text(self: Piece) -&#62; str</code></pre>
-
-          <div class="doc"><p>The spelling of a token piece; <code>&quot;&quot;</code> for anything else.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-run_text">
-          <h3>
-            <a class="anchor" href="#item-run_text">run_text</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn run_text(ps: Piece[]) -&#62; str</code></pre>
-
-          <div class="doc"><p>A run of token pieces folded into one string — how a bracket written as several tokens (<code>#{</code>) comes back out as one.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-is_tok">
-          <h3>
-            <a class="anchor" href="#item-is_tok">is_tok</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn is_tok(self: Piece) -&#62; bool</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -266,42 +238,28 @@
 
 
 
+        <section class="item" id="item-group_doc">
+          <h3>
+            <a class="anchor" href="#item-group_doc">group_doc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn group_doc&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, gi: u64, open: Cst[], body: Cst[], close: Cst[], space: (str, str) -&#62; bool) -&#62; Doc!ParseError</code></pre>
+
+          <div class="doc"><p>A <code>CGroup</code> laid out: its brackets around its contents, on one line while they fit and otherwise one item per indented line.</p><p>The brackets are read off the node, not inferred from it. That is the whole difference <code>NestedIn</code> makes here: the group says which of its kids opened it and which closed it, so <code>#{a}</code> (a two-token bracket), <code>|a, b|</code> (the same token both ends) and <code>match (e) { .. }</code> (two pairs in one production) are all just groups, with nothing to guess and nothing to be wrong about.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-wrapped">
           <h3>
             <a class="anchor" href="#item-wrapped">wrapped</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn wrapped(ps: Piece[], st: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc</code></pre>
+          <pre class="signature"><code>fn wrapped(open: Piece[], mid: Piece[], close: Piece[], st: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc</code></pre>
 
-          <div class="doc"><p><code>Wrap</code>: a bracketed list, on one line while it fits and otherwise one item per indented line.</p><p>The brackets are read off the tokens rather than named in the style: the leading run of matched tokens opens the list and the trailing run closes it. That is what lets one annotation cover <code>(a, b)</code>, <code>[a]</code>, <code>#{a}</code> and <code>&lt;T&gt;</code> alike, and it is also what makes an alternative with no brackets recognizable — a production whose alternatives are not all lists (AIPL's <code>ty</code> is one) falls back to <code>Inline</code> for the ones that aren't, rather than inventing break points.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lead_toks">
-          <h3>
-            <a class="anchor" href="#item-lead_toks">lead_toks</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lead_toks(ps: Piece[]) -&#62; u64</code></pre>
-
-          <div class="doc"><p>How many of <code>ps</code> at the front are tokens — the run that opens a list.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-tail_toks">
-          <h3>
-            <a class="anchor" href="#item-tail_toks">tail_toks</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn tail_toks(ps: Piece[], lead: u64) -&#62; u64</code></pre>
-
-          <div class="doc"><p>How many of <code>ps</code> at the end are tokens — the run that closes a list — without reaching back into the <code>lead</code> that already opened it.</p></div>
+          <div class="doc"><p>A bracketed list: <code>open</code>, the items, <code>close</code> — flat while it fits, otherwise one item per indented line with the brackets on their own.</p><p>The bracket runs are laid out <code>Inline</code> rather than concatenated raw, so a comment written against a bracket survives and the language's spacing rule still gets asked about a bracket spelled as several tokens.</p></div>
 
 
         </section>
@@ -313,7 +271,7 @@
             <a class="anchor" href="#item-list_items">list_items</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$19569: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
+          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$21237: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
 
           <div class="doc"><p>The items between a pair of brackets, each laid out inline.</p><p>A token spelled like the style's separator ends the item it follows and is dropped; the style writes the separators back, which is what lets a list that breaks gain a trailing one it never had in the source. With an empty separator every token or child starts a new item instead, which is the juxtaposed list. A comment never starts one — it belongs to the item it was written against.</p></div>
 
@@ -327,9 +285,23 @@
             <a class="anchor" href="#item-grammar_of">grammar_of</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn grammar_of(layouts: Layout[]) -&#62; Grammar&#60;FKind, str&#62;</code></pre>
+          <pre class="signature"><code>fn grammar_of(layouts: Layout[], groups: ListStyle[]) -&#62; Grammar&#60;FKind, str&#62;</code></pre>
 
-          <div class="doc"><p>A grammar of one production per layout, in order, so a hand-built <code>CTree(i, ..)</code> picks a layout by its index.</p></div>
+          <div class="doc"><p>A grammar of one production per layout, in order, so a hand-built <code>CTree(i, ..)</code> picks a layout by its index — followed by one throwaway production per group style, so a hand-built <code>CGroup(i, ..)</code> picks a style by its index too.</p><p>The styles cannot simply be handed over: <code>groups</code> is <code>link</code>'s output, rebuilt from the rules every time, so the only way to put a style in the table is to write a rule that has one. The carrier productions are never matched against anything; they exist to be linked.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-group_prod">
+          <h3>
+            <a class="anchor" href="#item-group_prod">group_prod</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn group_prod(i: u64, st: ListStyle) -&#62; Production&#60;FKind, str&#62;</code></pre>
+
+          <div class="doc"><p>A production whose whole purpose is to carry one group style into <code>groups</code>.</p></div>
 
 
         </section>
@@ -341,9 +313,9 @@
             <a class="anchor" href="#item-prod_of">prod_of</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn prod_of(l: Layout) -&#62; Production&#60;FKind, str&#62;</code></pre>
+          <pre class="signature"><code>fn prod_of(i: u64, l: Layout) -&#62; Production&#60;FKind, str&#62;</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>Distinct names because <code>format_cst</code> links, and <code>link</code> refuses a grammar with two productions of one name.</p></div>
 
 
         </section>

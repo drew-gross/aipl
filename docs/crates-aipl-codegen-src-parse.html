@@ -146,6 +146,20 @@
 
 
 
+        <section class="item" id="item-far_unclosed">
+          <h3>
+            <a class="anchor" href="#item-far_unclosed">far_unclosed</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn far_unclosed(far: Far, open: Span[]) -&#62; Far</code></pre>
+
+          <div class="doc"><p><code>far</code> with the opening bracket that went unclosed at its position. Set by a <code>NestedIn</code> whose <code>open</code> matched and whose <code>close</code> did not, which is the only time anything knows a bracket was left hanging.</p><p>It rides on the furthest failure rather than aborting the parse, because under ordered choice a group failing to close is an ordinary non-match: <code>(a)</code> is parsed by trying the tuple <code>(a, b)</code> first and letting it fail at the comma. So this only reaches the reader when *no* alternative worked, which is exactly when a hanging bracket is the likely cause.</p><p><code>match_nested</code> sets it only when the close was wanted past the last token — see there for why a closer failure is not evidence of anything. The first bracket to be blamed at a position keeps it. Groups fail from the inside out, so the first to record is the innermost one — and closing that is the edit the reader has to make first, even when an outer bracket is hanging too.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-no">
           <h3>
             <a class="anchor" href="#item-no">no</a>
@@ -154,6 +168,20 @@
           <pre class="signature"><code>fn no(far: Far, pos: u64) -&#62; Step</code></pre>
 
           <div class="doc"><p>A non-match that leaves <code>pos</code> where the rule started (the caller backtracks).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-first_token">
+          <h3>
+            <a class="anchor" href="#item-first_token">first_token</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn first_token(kids: Cst[]) -&#62; Span[]</code></pre>
+
+          <div class="doc"><p>The span of the first token in <code>kids</code> — where a group's opening bracket was written, for the message when it is never closed. Empty when there is none.</p><p>A one-element array rather than a <code>Span?</code> because that is what <code>Far</code> can hold: a struct field may be an optional of an integer or an array, but not of another struct, and <code>Span</code> is one.</p></div>
 
 
         </section>
@@ -266,6 +294,20 @@
           <pre class="signature"><code>fn match_rule&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, r: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
           <div class="doc"><p>Match <code>r</code> at <code>pos</code>. <code>cur</code> is the index of the production being matched, which only <code>Climb</code> needs (each operator application nests under it).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_nested">
+          <h3>
+            <a class="anchor" href="#item-match_nested">match_nested</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_nested&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, gi: u64, open: Rule&#60;K&#62;, body: Rule&#60;K&#62;, close: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p>A bracketed group: <code>open</code>, then <code>body</code>, then <code>close</code>, matched in order and kept as one <code>CGroup</code> naming style <code>gi</code>. It parses exactly as <code>Then</code> of the three would; what it adds is on either side of that.</p><p>On the way in, the three runs stay separate in the tree, so the formatter knows which tokens are brackets without inferring it from where they sit. On the way out, a <code>close</code> that fails after <code>open</code> matched records the opening bracket's span on the furthest failure — the parse still backtracks like any non-match, but if nothing else works the message can say which bracket was left open.</p></div>
 
 
         </section>
@@ -445,9 +487,23 @@
             <a class="anchor" href="#item-error_at">error_at</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn error_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, far: Far) -&#62; ParseError</code></pre>
+          <pre class="signature"><code>fn error_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, src: str, far: Far) -&#62; ParseError</code></pre>
 
           <div class="doc"><p>The error a furthest failure describes: what was expected there, and what was found instead. The span is the offending token's (or the empty span at the end of the source), which is what <code>caret_block.aipl</code> renders the underline from.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-unclosed_hint">
+          <h3>
+            <a class="anchor" href="#item-unclosed_hint">unclosed_hint</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn unclosed_hint(src: str, open: Span[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>The parenthetical naming the bracket that was never closed, or the empty string when no group got that far. The span stays on the *failure*, which is where the reader has to type something; the opener is named by line because pointing at two places at once is what a single-span error cannot do.</p><p>This is the whole reason <code>NestedIn</code> exists on the parsing side: a flat <code>Then([Lit(&quot;(&quot;), .., Lit(&quot;)&quot;)])</code> fails at the close having forgotten there was an open, and reports &quot;expected <code>)</code>, found end of input&quot; a hundred lines away from the <code>(</code> that caused it.</p></div>
 
 
         </section>

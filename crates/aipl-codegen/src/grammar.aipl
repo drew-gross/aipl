@@ -28,7 +28,20 @@
 //     production's rule as an *annotated* binding — `let r: Rule<Kind> = ..` —
 //     and every constructor inside it resolves from that annotation. The `.test`
 //     blocks here and in `parse.aipl` are written in that idiom throughout.
-import { Span, equal as ==, find_index, map, not_equal as !=, try_map, value_or_err } from builtins;
+import {
+    Span,
+    equal as ==,
+    extend,
+    find_index,
+    join,
+    len,
+    map,
+    not_equal as !=,
+    push,
+    value_or_err,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
 import { Cst } from "./cst.aipl";
 
 # Why a parse failed: a message, and the span of the offending source (absolute
@@ -113,6 +126,34 @@ variant Rule<K: variant> =
     // A reference to production `i`, and the *only* rule that builds a CST node
     // — one `CTree(i, ..)` per reference matched.
     | NamedIdx(u64)
+    // A bracketed group: `open`, then `body`, then `close`. It parses exactly as
+    // `Then([open, body, close])` would, and everything else about it is what
+    // that spelling throws away — that these two rules are a *pair*, and that
+    // what sits between them is a list laid out in `style`.
+    //
+    // Two things need that, for reasons that have nothing to do with each other.
+    // A parse that matches `open` and then fails to match `close` knows where
+    // the bracket was opened, which is the one fact an unclosed-bracket message
+    // needs and a flat `Then` cannot recover — it fails at the close having
+    // forgotten there was an open. And a formatter needs to know which run of
+    // tokens is a bracket in order to break a long list inside it; inferring
+    // that from a production's leading and trailing tokens works only when the
+    // production *is* one bracketed list, which forces a grammar to be carved up
+    // one bracket pair per production.
+    //
+    // A group that is not a list is a list of one item — `(expr)` and `if (c)`
+    // are `style`s with nothing to separate — so there is one case here, not two.
+    // `link` rewrites every one of these to a `NestedIdx`, moving the style into
+    // the grammar's `groups` table where a CST node can name it by index.
+    | NestedIn(Rule<K>, Rule<K>, Rule<K>, style: ListStyle = ListStyle {})
+    // A group whose style is `groups[i]`, and the only rule that builds a
+    // `CGroup` node. The linked form of `NestedIn`.
+    //
+    // It carries the style as well as the index, redundantly on purpose: the
+    // index is what a `CGroup` names, and the style is what lets `link` rebuild
+    // the same table from an already-linked grammar. Without it, linking twice
+    // would empty `groups` and leave every `CGroup` pointing at nothing.
+    | NestedIdx(u64, Rule<K>, Rule<K>, Rule<K>, style: ListStyle = ListStyle {})
     // Precedence climbing — an `atom`, then binary operators drawn from `precs`,
     // nested by binding power. Each application nests under the *enclosing*
     // production's index, so `1 + 2 * 3` yields a node per operand rather than
@@ -143,12 +184,19 @@ variant Build<A: any> = Mk((str, Cst, A[]) -> A!ParseError)
 # `(a, b)`), and whether a separator is written after the last item once it
 # breaks.
 #
-# The brackets themselves are not here. They are in the source, and the
-# formatter reads them off the tokens the production matched — a style is only
-# the handful of decisions the tokens cannot answer. An empty `sep` is the
-# juxtaposed list, where items are separated by nothing but the space between
-# them: `(a b c)`, and every S-expression ever written.
-struct ListStyle { sep: str = ",", spaced: bool = false, trailing: bool = true }
+# The brackets themselves are not here: they are the `open` and `close` rules of
+# the `NestedIn` this style belongs to, matched from the source like anything
+# else. A style is only the handful of decisions the brackets cannot answer. An
+# empty `sep` is the juxtaposed list, where items are separated by nothing but
+# the space between them: `(a b c)`, and every S-expression ever written. A group
+# holding one thing rather than a list — `(expr)` — is the same shape with no
+# separator ever reached.
+# `wraps: false` is the group that is a bracket pair and nothing more. A block
+# `{ .. }` is one: it is a pair the parser should know about, so an unclosed brace
+# is reported against the brace that opened it, but its contents are statements
+# rather than a list and breaking them at a width is not what a formatter does
+# with them. Such a group lays out `Inline`, like any other run of children.
+struct ListStyle { sep: str = ",", spaced: bool = false, trailing: bool = true, wraps: bool = true }
 
 # How a production's matched children are joined into a `Doc` — the formatting
 # half of a language description, read by `format.aipl` exactly as `Rule` is
@@ -156,9 +204,16 @@ struct ListStyle { sep: str = ",", spaced: bool = false, trailing: bool = true }
 #
 # The vocabulary is deliberately small, and it is not the whole of a formatter:
 # comment attachment, call hugging and chain breaking are judgement about
-# *this* language and do not fall out of any grammar. What these three do cover
-# is the mechanical majority — the productions whose layout is fully determined
-# by the tokens they matched.
+# *this* language and do not fall out of any grammar. What these two do cover is
+# the mechanical majority — the productions whose layout is fully determined by
+# the tokens they matched.
+#
+# Wrapping is not here, and that is the point of `NestedIn`. Where a list breaks
+# is a property of the bracket pair holding it, not of the production the pair
+# happens to sit in, so it is written at the brackets and read back off the
+# `CGroup` node they build. A production may hold several groups, each with its
+# own style — `match (e) { .. }` is two — which is exactly what a single field on
+# the production could not say.
 variant Layout =
     // The children in order with nothing inserted between them: `-x`, `a.b`,
     // `i64?[]`. The layout for a production whose parts are written together.
@@ -168,14 +223,6 @@ variant Layout =
     // what a production that only passes a child through wants — a lone child
     // has no gaps to decide.
     | Inline
-    // A bracketed list: one line while it fits, otherwise one item per indented
-    // line. The leading and trailing runs of matched tokens are the brackets,
-    // and between them a token spelled like the style's separator ends an item.
-    //
-    // A production whose alternatives are not *all* bracketed falls back to
-    // `Inline` for the ones that aren't, so a single annotation still covers the
-    // whole production.
-    | Wrap(ListStyle)
 
 # One named production: its rule, and what each downstream pass needs from it.
 #
@@ -210,49 +257,136 @@ struct Production<K: variant, A: any> {
 # A whole language: its productions, in order. Position is identity — a
 # `NamedIdx` and a `CTree` both name a production by its index here — so the
 # order of this array is part of a linked grammar's meaning.
-struct Grammar<K: variant, A: any> { prods: Production<K, A>[] }
+#
+# `groups` is the same idea for bracket pairs: `link` collects every `NestedIn`'s
+# `ListStyle` into it, in the order the rules mention them, and rewrites the rule
+# to a `NestedIdx` naming the entry. A `CGroup` node then carries an index rather
+# than a style, which keeps the CST as free of layout as it is of production
+# names. It is empty on an unlinked grammar and written only by `link`, so no
+# grammar file ever spells it out.
+struct Grammar<K: variant, A: any> { prods: Production<K, A>[], groups: ListStyle[] = [] }
 
 # The production names of `g`, in index order — the table `show` renders a
 # tree against, and what `link` resolves references through.
 pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods.map(|p| p.name) }
 
-# One rule with every `Named(n)` in it rewritten to `NamedIdx(i)`. Fails when a
-# reference names no production — the error a grammar author most wants caught
-# before a parse rather than during one.
-fn link_rule<K: variant>(r: Rule<K>, names: str[]) -> Rule<K>!ParseError {
+# Every group style in `r`, in the order the rules mention them: a group's own
+# style first, then the styles inside its brackets. That order is the contract
+# with `link_rule`, which hands out indices by walking the same tree the same
+# way — get the two out of step and a `CGroup` names another group's style.
+#
+# Both spellings answer, so an already-linked rule reports the same list as the
+# rule it was linked from, which is what makes `link` idempotent.
+fn group_styles<K: variant>(r: Rule<K>) -> ListStyle[] {
+    match (r) {
+        // The two spellings answer alike but cannot share an arm: alternatives
+        // must bind the same names, and the linked form has an index in front.
+        NestedIn(open, body, close, style) => nest_styles(open, body, close, style),
+        NestedIdx(_, open, body, close, style) => nest_styles(open, body, close, style),
+        // `map(group_styles)` is refused — a function *value* cannot be generic —
+        // and the forwarding lambda that remains is what the lint objects to, so
+        // the two rule each other out and the squelch is the only spelling left.
+        Then(rs) | OneOf(rs) => rs.map(|sub| group_styles(sub)).join(), #[allow]
+        Many(sub, _, sep, _) => [..group_styles(sub), ..opt_group_styles(sep)],
+        Maybe(sub) => group_styles(sub),
+        Climb(atom, _) => group_styles(atom),
+        Term(..) | Literal(..) | Named(..) | NamedIdx(..) => [],
+    }
+}
+
+# One group's styles: its own first, then what its brackets hold.
+fn nest_styles<K: variant>(
+    open: Rule<K>,
+    body: Rule<K>,
+    close: Rule<K>,
+    style: ListStyle,
+) -> ListStyle[] { [style, ..group_styles(open), ..group_styles(body), ..group_styles(close)] }
+
+# `group_styles` reaching inside an optional, which `map` cannot.
+fn opt_group_styles<K: variant>(r: Rule<K>?) -> ListStyle[] {
+    match (r) {
+        some(sub) => group_styles(sub),
+        none => [],
+    }
+}
+
+# How many groups `r` holds — the amount `base` advances past it.
+fn group_count<K: variant>(r: Rule<K>) -> u64 { group_styles(r).len() }
+
+# One rule with every `Named(n)` in it rewritten to `NamedIdx(i)` and every
+# `NestedIn` to a `NestedIdx` naming its entry in the grammar's `groups` table.
+# Fails when a reference names no production — the error a grammar author most
+# wants caught before a parse rather than during one.
+#
+# `base` is the index the first group in `r` takes; the rest follow in
+# `group_styles` order. It is threaded by arithmetic rather than by a running
+# counter because a rule is a tree and `try_map` has nowhere to keep one.
+fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseError {
     match (r) {
         Named(n) => ok(NamedIdx(
             names
                 .find_index(|x| x == n)
                 .value_or_err(ParseError { message: `no rule named "{n}"`, span: 0..0 })?,
         )),
-        Then(rs) => ok(Then(link_rules(rs, names)?)),
-        OneOf(rs) => ok(OneOf(link_rules(rs, names)?)),
+        Then(rs) => ok(Then(link_rules(rs, names, base)?)),
+        OneOf(rs) => ok(OneOf(link_rules(rs, names, base)?)),
         Many(sub, min, sep, trailing_sep) => ok(Many(
-            link_rule(sub, names)?,
+            link_rule(sub, names, base)?,
             min=min,
-            sep=link_opt(sep, names)?,
+            sep=link_opt(sep, names, base + group_count(sub))?,
             trailing_sep=trailing_sep,
         )),
-        Maybe(sub) => ok(Maybe(link_rule(sub, names)?)),
-        Climb(atom, precs) => ok(Climb(link_rule(atom, names)?, precs)),
+        Maybe(sub) => ok(Maybe(link_rule(sub, names, base)?)),
+        Climb(atom, precs) => ok(Climb(link_rule(atom, names, base)?, precs)),
+        NestedIn(open, body, close, style) => link_nest(open, body, close, style, names, base),
+        NestedIdx(_, open, body, close, style) => link_nest(open, body, close, style, names, base),
         Term(k) => ok(Term(k)),
         Literal(s) => ok(Literal(s)),
         NamedIdx(i) => ok(NamedIdx(i)),
     }
 }
 
+# One group, linked: it takes `base` itself and its insides follow, matching the
+# order `group_styles` reports them in. Relinking an already-linked group lands
+# here too and reassigns the same index, which is what keeps `link` idempotent.
+fn link_nest<K: variant>(
+    open: Rule<K>,
+    body: Rule<K>,
+    close: Rule<K>,
+    style: ListStyle,
+    names: str[],
+    base: u64,
+) -> Rule<K>!ParseError {
+    let ob = base + 1;
+    let bb = ob + group_count(open);
+    ok(NestedIdx(
+        base,
+        link_rule(open, names, ob)?,
+        link_rule(body, names, bb)?,
+        link_rule(close, names, bb + group_count(body))?,
+        style=style,
+    ))
+}
+
 # A `Many`'s separator, linked — `none` stays `none`. Its own function because
 # `?` cannot reach inside an optional.
-fn link_opt<K: variant>(r: Rule<K>?, names: str[]) -> Rule<K>?!ParseError {
+fn link_opt<K: variant>(r: Rule<K>?, names: str[], base: u64) -> Rule<K>?!ParseError {
     match (r) {
-        some(sub) => ok(some(link_rule(sub, names)?)),
+        some(sub) => ok(some(link_rule(sub, names, base)?)),
         none => ok(none),
     }
 }
 
-fn link_rules<K: variant>(rs: Rule<K>[], names: str[]) -> Rule<K>[]!ParseError {
-    rs.try_map(|r| link_rule(r, names))
+# Each rule in `rs`, linked, with `base` advancing past the groups each one
+# holds.
+fn link_rules<K: variant>(rs: Rule<K>[], names: str[], base: u64) -> Rule<K>[]!ParseError {
+    mut out: Rule<K>[] = [];
+    mut b = base;
+    for (let r : rs) {
+        set out.push(link_rule(r, names, b)?);
+        set b += group_count(r);
+    }
+    ok(out)
 }
 
 # `g` with every rule reference resolved: each `Named(name)` rewritten to the
@@ -274,8 +408,17 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
             };
         };
     }
-    let prods = g.prods.try_map(|p| ok(Production { ..p, rule: link_rule(p.rule, names)? }))?;
-    ok(Grammar { prods })
+
+    // Group indices are handed out across the whole grammar, production by
+    // production, so `base` carries over rather than restarting — one flat table
+    // for the same reason `prods` is one: an index is the whole address.
+    mut prods: Production<K, A>[] = [];
+    mut groups: ListStyle[] = [];
+    for (let p : g.prods) {
+        set prods.push(Production { ..p, rule: link_rule(p.rule, names, groups.len())? });
+        set groups.extend(group_styles(p.rule));
+    }
+    ok(Grammar { prods, groups })
 }.test({
     // A tiny grammar over one token kind: `list -> "(" item* ")"`, `item -> atom
     // | list`. Enough to have a reference reach back through another production,
@@ -357,6 +500,74 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
         ],
     };
     assert(link(dup) == err(ParseError { message: "duplicate rule name \"a\"", span: 0..0 }));
+
+    // Groups are numbered across the whole grammar, a group before its insides,
+    // in the order the rules mention them. `p` holds one directly and one nested
+    // inside it; `q` follows, so its own group starts where `p` left off.
+    let inner: Rule<Kind> = NestedIn(
+        Literal("["),
+        Named("q"),
+        Literal("]"),
+        style=ListStyle { sep: ";" },
+    );
+    let outer: Rule<Kind> = NestedIn(Literal("("), inner, Literal(")"), style=ListStyle {});
+    let nests: Grammar<Kind, Node> = Grammar {
+        prods: [
+            Production { name: "p", rule: outer, build: Mk(keep), layout: Inline },
+            Production {
+                name: "q",
+                rule: NestedIn(
+                    Literal("{"),
+                    Term(Atom),
+                    Literal("}"),
+                    style=ListStyle { spaced: true },
+                ),
+                build: Mk(keep),
+                layout: Inline,
+            },
+        ],
+    };
+    let ns = link(nests)?;
+
+    // Three groups: `p`'s outer, `p`'s inner, then `q`'s.
+    assert(ns.groups == [ListStyle {}, ListStyle { sep: ";" }, ListStyle { spaced: true }]);
+    assert(
+        rule_of(ns, 0) == NestedIdx(
+            0,
+            Literal("("),
+            NestedIdx(1, Literal("["), NamedIdx(1), Literal("]"), style=ListStyle { sep: ";" }),
+            Literal(")"),
+            style=ListStyle {},
+        ),
+    );
+    assert(
+        rule_of(ns, 1) == NestedIdx(
+            2,
+            Literal("{"),
+            Term(Atom),
+            Literal("}"),
+            style=ListStyle { spaced: true },
+        ),
+    );
+
+    // Idempotent for groups too: the linked form still reports its own style, so
+    // linking again rebuilds the same table rather than emptying it.
+    assert(link(ns)?.groups == ns.groups);
+    assert(rule_of(link(ns)?, 0) == rule_of(ns, 0));
+
+    // A group's insides are linked like anything else, and an unresolved
+    // reference inside one is still the grammar error it would be outside.
+    let bad_nest: Grammar<Kind, Node> = Grammar {
+        prods: [
+            Production {
+                name: "a",
+                rule: NestedIn(Literal("("), Named("nope"), Literal(")")),
+                build: Mk(keep),
+                layout: Inline,
+            },
+        ],
+    };
+    assert(link(bad_nest) == err(ParseError { message: "no rule named \"nope\"", span: 0..0 }));
 })
 
 // ---------- test-only fixtures ----------
@@ -391,54 +602,60 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     }
 }
 --- performance ---
-allocations: 113
-deallocations: 113
-reallocations: 17
-bytes allocated: 10864
-instructions executed: 15831
-binary size: 50848
-  code: 32352
-  data: 1724
-  metadata: 16772
+allocations: 377
+deallocations: 377
+reallocations: 30
+bytes allocated: 28720
+instructions executed: 33803
+binary size: 78400
+  code: 48304
+  data: 2508
+  metadata: 27588
 functions:
+  __arr_drop_ListStyle:
+    calls: 32
+    bytes: 120
   __arr_drop_Prec:
     calls: 2
     bytes: 120
   __arr_drop_Production$Kind$Node:
-    calls: 12
-    bytes: 240
+    calls: 20
+    bytes: 188
   __arr_drop_Rule$Kind:
     calls: 15
     bytes: 116
+  __arr_retain_ListStyle:
+    calls: 13
+    bytes: 120
   __arr_retain_Prec:
     calls: 0
     bytes: 120
   __arr_retain_Production$Kind$Node:
-    calls: 13
-    bytes: 240
+    calls: 22
+    bytes: 188
   __arr_retain_Rule$Kind:
     calls: 16
     bytes: 116
   __builtin_find_index$str$lam1:
     calls: 1
     bytes: 412
-  __builtin_find_index$str$lam14:
-    calls: 7
+  __builtin_find_index$str$lam11:
+    calls: 9
     bytes: 400
   __builtin_find_index$str$lam3:
     calls: 1
     bytes: 412
   __builtin_find_index$str$lam8:
-    calls: 11
+    calls: 18
     bytes: 400
-  __builtin_try_map$Production$Kind$Node$Production$Kind$Node$ParseError$lam11:
-    calls: 4
-    bytes: 1168
-  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam17:
-    calls: 4
-    bytes: 732
-  __eq_ParseError:
+  __eq_ListStyle:
+    calls: 11
+    bytes: 200
+  __eq_ListStyle$arr:
     calls: 2
+    bytes: 284
+  __eq_ParseError:
+    calls: 3
     bytes: 128
   __eq_Prec:
     calls: 1
@@ -447,8 +664,8 @@ functions:
     calls: 1
     bytes: 284
   __eq_Rule$Kind:
-    calls: 13
-    bytes: 548
+    calls: 29
+    bytes: 796
   __eq_Rule$Kind$arr:
     calls: 3
     bytes: 300
@@ -456,7 +673,7 @@ functions:
     calls: 3
     bytes: 92
   __eq___builtin_Span:
-    calls: 2
+    calls: 3
     bytes: 104
   __eq_str$arr:
     calls: 3
@@ -464,62 +681,74 @@ functions:
   __eq_u64$opt:
     calls: 2
     bytes: 100
-  __lambda_9:
-    calls: 9
-    bytes: 1328
   __rec_drop_Node:
     calls: 0
     bytes: 72
   __rec_drop_Rule$Kind:
-    calls: 58
-    bytes: 304
+    calls: 116
+    bytes: 436
   __test$failure_message:
     calls: 1
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 13880
+    bytes: 24224
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
   __to_str_ParseError:
     calls: 0
     bytes: 824
+  aipl_arr_drop_arr:
+    calls: 4
+    bytes: (external)
+  aipl_arr_extend:
+    calls: 65
+    bytes: (external)
   aipl_arr_inc:
-    calls: 75
+    calls: 497
+    bytes: (external)
+  aipl_arr_join:
+    calls: 4
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 35
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 125
+    calls: 751
     bytes: (external)
   aipl_array_new:
-    calls: 23
+    calls: 203
     bytes: (external)
   aipl_array_push:
-    calls: 18
+    calls: 24
     bytes: (external)
   aipl_array_push_mut:
-    calls: 19
+    calls: 36
     bytes: (external)
   aipl_array_with_cap:
-    calls: 9
+    calls: 17
     bytes: (external)
   aipl_assert:
-    calls: 16
+    calls: 22
     bytes: (external)
   aipl_rec_alloc:
-    calls: 58
+    calls: 116
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 242
+    calls: 660
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 14
+    calls: 56
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 184
+    calls: 544
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 14
+    calls: 56
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -533,24 +762,39 @@ functions:
   failure_message:
     calls: 2
     bytes: 404
+  group_styles$Kind:
+    calls: 0
+    bytes: 32
+  group_styles$Kind$tail:
+    calls: 157
+    bytes: 3116
   keep:
     calls: 0
     bytes: 268
   link$Kind$Node:
-    calls: 5
-    bytes: 1188
+    calls: 9
+    bytes: 2328
+  link_nest$Kind:
+    calls: 10
+    bytes: 1300
   link_opt$Kind:
     calls: 4
-    bytes: 652
+    bytes: 660
   link_rule$Kind:
-    calls: 26
-    bytes: 4364
+    calls: 62
+    bytes: 5108
+  link_rules$Kind:
+    calls: 4
+    bytes: 832
   main:
     calls: 1
     bytes: 180
+  nest_styles$Kind:
+    calls: 15
+    bytes: 956
   prod_names$Kind$Node:
-    calls: 9
-    bytes: 564
+    calls: 13
+    bytes: 492
   rule_of$Kind$Node:
-    calls: 7
-    bytes: 1040
+    calls: 11
+    bytes: 820

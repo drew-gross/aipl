@@ -270,14 +270,84 @@
 
 
 
-        <section class="item" id="item-pw">
+        <section class="item" id="item-nest">
           <h3>
-            <a class="anchor" href="#item-pw">pw</a>
+            <a class="anchor" href="#item-nest">nest</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn pw(name: str, rule: Rule&#60;AiplTok&#62;, style: ListStyle) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
+          <pre class="signature"><code>fn nest(open: str, body: Rule&#60;AiplTok&#62;, close: str, style: ListStyle) -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
-          <div class="doc"><p>A production that is a bracketed list: <code>(a, b)</code>, <code>&lt;T: any&gt;</code>, <code>#{k: v}</code>.</p></div>
+          <div class="doc"><p>A bracketed group: <code>open</code>, whatever it holds, <code>close</code>, and how that lays out. Shorter than the <code>NestedIn</code> it builds, because a grammar this size writes a lot of them and the four arguments matter more than the constructor's name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-nest2">
+          <h3>
+            <a class="anchor" href="#item-nest2">nest2</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn nest2(open1: str, open2: str, body: Rule&#60;AiplTok&#62;, close: str, style: ListStyle) -&#62; Rule&#60;AiplTok&#62;</code></pre>
+
+          <div class="doc"><p>The same for a bracket written as two tokens (<code>#{</code>), which is a bracket like any other — the group says where it ends, so nothing downstream counts tokens to find out.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-strict">
+          <h3>
+            <a class="anchor" href="#item-strict">strict</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn strict() -&#62; ListStyle</code></pre>
+
+          <div class="doc"><p>A comma-separated list that takes no trailing comma when it breaks, which most of AIPL's bracketed positions want.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-loose">
+          <h3>
+            <a class="anchor" href="#item-loose">loose</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn loose() -&#62; ListStyle</code></pre>
+
+          <div class="doc"><p>A comma-separated list that gains a trailing comma once it breaks — argument lists, array literals, struct literals.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-braced">
+          <h3>
+            <a class="anchor" href="#item-braced">braced</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn braced() -&#62; ListStyle</code></pre>
+
+          <div class="doc"><p>The same, in braces that read as words and so take inner spaces while flat: <code>{ a, b }</code> against <code>(a, b)</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-pair">
+          <h3>
+            <a class="anchor" href="#item-pair">pair</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn pair() -&#62; ListStyle</code></pre>
+
+          <div class="doc"><p>A pair that is a pair and nothing else: a block's braces, a condition's parentheses. Recorded so an unclosed one is reported against the token that opened it; laid out as though it were not a group at all, because statements and conditions are not lists.</p></div>
 
 
         </section>
@@ -320,6 +390,20 @@
           <pre class="signature"><code>fn parses(src: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>Test shorthand, so an assertion reads as the source it is about.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-why">
+          <h3>
+            <a class="anchor" href="#item-why">why</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn why(src: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>Why a source failed to parse, for the diagnostic assertions.</p></div>
 
 
         </section>

@@ -9,6 +9,7 @@ each is sized to be finishable in one session.
 - [x] 2 Highlighter generator (oracle: `tests/highlighting.rs`)
 - [x] 3 AIPL's grammar, differential-tested against gazelle
 - [x] 4 Formatter generator (the mechanical part)
+- [x] 4a `NestedIn` — bracket pairs as a rule, not a production annotation
 - [ ] 5 Retire gazelle
 
 The stages are strictly sequential.
@@ -112,6 +113,22 @@ without aggressive collapsing the messages get *worse* than today's. Rendering i
 already dogfooded — `caret_block.aipl:13` produces the `--> path:line:col | ^^^`
 block — so `struct ParseError { message: str, span: Span }` mirrors
 `lexer.aipl:100`'s `LexError` and feeds straight in.
+
+**Unclosed brackets** are the one diagnostic a PEG cannot reconstruct after the
+fact, and `NestedIn` is what supplies it. A flat `Then([Lit("("), .., Lit(")")])`
+fails at the close having forgotten an open ever matched, so the best it can say
+is "expected `)`, found end of input" — with no hint that the `(` responsible is
+two screens up. A group knows, and records the opener's span on the furthest
+failure, giving ``expected `}`, found end of input (`{` at line 1 is never
+closed)``.
+
+It is deliberately narrow. The hint is attached **only when the close was wanted
+past the last token**: anywhere else there is a real token sitting where the
+bracket should be, and `[1, 2,]` — which fails at the trailing comma with the `]`
+in plain sight — must not be told its `[` is unclosed. When several brackets are
+hanging, the innermost wins, that being the one to close first. Under ordered
+choice a group failing to close is still an ordinary backtracking non-match, so
+the hint only ever reaches a reader when no alternative worked at all.
 
 ## The stages
 
@@ -287,6 +304,8 @@ seven alternatives, and no single pair of brackets to describe. Extracting
 `ty_parens` removed the duplication and made the layout expressible at once.
 The corpus differential still agrees with gazelle on every file.
 
+That extraction was also the warning, and stage 4a is the fix — see below.
+
 **What this does not do**, and the estimate in this plan was right about it.
 There is no `Stack` arm yet, so a hard-broken statement block is not expressible
 and AIPL's statements and items are unannotated. Comment *attachment* (which
@@ -318,6 +337,41 @@ none is on the library's critical path:
   lines `format_program` runs — so both sides of the comparison read an input
   the same way, and the walker's kind-dispatched branches (doc comments, string
   atoms, the three template positions) have unit tests for the first time.
+
+**4a — `NestedIn`. Done.** Stage 4 put wrapping on the *production*
+(`Layout::Wrap(ListStyle)`) and read the brackets back off the matched tokens —
+the leading run opens, the trailing run closes. That works for a production that
+*is* one bracketed list, and forces the grammar to be carved up one bracket pair
+per production to get there. `ty_parens` was the first bill. `atom` was the one
+that could not be paid: eleven of its twenty alternatives hold brackets in six
+styles, three of them (`match (e) { .. }`, `shim N { .. } block`, `|a, b| block`)
+with brackets that are not the leading and trailing runs at all. A token scan
+reads `match (e) { .. }` as an open bracket spelled `match(`.
+
+So a bracket pair is now a **rule**, not an annotation: `NestedIn(open, body,
+close, style)`, parsing exactly as `Then` of the three and keeping what that
+spelling throws away. `Layout` shrank to `Tight | Inline`, `ListStyle` moved onto
+the group, and `lead_toks`/`tail_toks`/`run_text` — the whole inference — are
+gone. `atom` now holds eight groups in four styles and needs no production of its
+own for any of them.
+
+Three things fell out that were not the motivation:
+
+- **Unclosed-bracket errors** (see *Errors* above), which no flat sequence can
+  produce.
+- **`ListStyle { wraps: false }`** — the pair that is only a pair. A block's
+  braces, an `if`'s parentheses, `a[i]`: recorded so the parser can blame them,
+  laid out inline because statements and conditions are not lists. Without it,
+  every bracket pair would have had to pretend to be a list to be reported on.
+- **The formatter links its own grammar.** A group's style lives in
+  `Grammar.groups`, which only `link` fills, so `format_cst` links exactly as
+  `parse_cst` does rather than silently laying out against an absent table.
+
+The CST gained one case, `CGroup(u64, Cst[], Cst[], Cst[])` — group index, then
+the open, body and close runs. It is **transparent**: `nodes` and `own_tokens`
+splice straight through it, so converting a `Then` into a `NestedIn` leaves every
+`build` function reading the children it read before. Only the formatter sees a
+group, which is the pass that needs to know where the brackets are.
 
 **5 — Retire gazelle.**
 

@@ -48,13 +48,12 @@ import {
     Many,
     Mk,
     Named,
+    NestedIn,
     OneOf,
     ParseError,
     Production,
     Rule,
     Term,
-    Then,
-    Wrap,
     failure_message,
     prod_names,
 } from "./grammar.aipl";
@@ -108,19 +107,20 @@ fn lower_item(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError {
 # reports as "an s-expression" rather than as the grammar's internals — the
 # collapse `expect_as` exists for.
 pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
-    let r_list: Rule<SexpKind> = Then([Lit("("), Many(Named("item")), Lit(")")]);
+    // A list is bracketed and its elements are separated by nothing but the space
+    // between them — the juxtaposed list, and no trailing anything to write when
+    // it breaks. The style rides on the bracket pair, which is the thing it
+    // describes.
+    let r_list: Rule<SexpKind> = NestedIn(
+        Lit("("),
+        Many(Named("item")),
+        Lit(")"),
+        style=ListStyle { sep: "", trailing: false },
+    );
     let r_item: Rule<SexpKind> = OneOf([Term(Atom), Named("list")]);
     Grammar {
         prods: [
-            // A list is bracketed and its elements are separated by nothing
-            // but the space between them — the juxtaposed `Wrap`, and no
-            // trailing anything to write when it breaks.
-            Production {
-                name: "list",
-                rule: r_list,
-                build: Mk(lower_list),
-                layout: Wrap(ListStyle { sep: "", trailing: false }),
-            },
+            Production { name: "list", rule: r_list, build: Mk(lower_list), layout: Inline },
             Production {
                 name: "item",
                 rule: r_item,
@@ -167,10 +167,10 @@ pub fn sexp_cst(src: str) -> Cst!ParseError {
     //
     // The `~ ` leaves are the recorded whitespace, sitting in front of the token
     // that follows them — which is what makes the leaves tile the source.
-    assert(shown("(a b)")? == "(item (list ( (item a) (item ~  b) )))");
+    assert(shown("(a b)")? == "(item (list [( (item a) (item ~  b) )]))");
     assert(shown("a")? == "(item a)");
-    assert(shown("()")? == "(item (list ( )))");
-    assert(shown("(a (b))")? == "(item (list ( (item a) (item (list ~  ( (item b) ))) )))");
+    assert(shown("()")? == "(item (list [( )]))");
+    assert(shown("(a (b))")? == "(item (list [( (item a) (item (list [~  ( (item b) )])) )]))");
 
     // Losslessness: every byte of the source is under exactly one leaf, so the
     // leaves concatenate back to it — including the leading comment, the run
@@ -182,7 +182,7 @@ pub fn sexp_cst(src: str) -> Cst!ParseError {
     // in front of the token that follows it, and what follows the last token
     // attaches to the root.
     let small = "(a) ; tail";
-    assert(shown(small)? == "(item (list ( (item a) )) ~  ~; tail)");
+    assert(shown(small)? == "(item (list [( (item a) )]) ~  ~; tail)");
 })
 
 # The `Sexp` `src` denotes: lex, parse to a concrete tree, lower it through
@@ -222,7 +222,11 @@ pub fn parse_sexp(src: str) -> Sexp!ParseError {
     assert(parse_sexp(spaced)? == SList([SAtom("a"), SAtom("b")]));
 
     // ---- errors ----
-    assert(msg_of("(a") == "expected an s-expression or `)`, found end of input");
+    assert(
+        msg_of(
+            "(a",
+        ) == "expected an s-expression or `)`, found end of input (`(` at line 1 is never closed)",
+    );
     assert(msg_of(")") == "expected an s-expression, found `)`");
     assert(msg_of("") == "expected an s-expression, found end of input");
     // Every token must be consumed: two expressions is not one.
@@ -352,15 +356,15 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 31649
-deallocations: 31649
-reallocations: 2713
-bytes allocated: 1637198
-instructions executed: 5541017
-binary size: 308936
-  code: 196916
-  data: 4972
-  metadata: 107048
+allocations: 47552
+deallocations: 47552
+reallocations: 2395
+bytes allocated: 2339597
+instructions executed: 6027357
+binary size: 361304
+  code: 228380
+  data: 5116
+  metadata: 127808
 functions:
   __arr_drop_Sexp:
     calls: 876
@@ -369,13 +373,13 @@ functions:
     calls: 0
     bytes: 140
   __arr_drop___m11__Token$SexpKind:
-    calls: 1150
+    calls: 1162
     bytes: 160
   __arr_drop___m11__TokenRule$SexpKind:
     calls: 38
     bytes: 604
   __arr_drop___m1__Cst:
-    calls: 4298
+    calls: 9136
     bytes: 116
   __arr_drop___m2__First$SexpKind:
     calls: 7
@@ -383,17 +387,20 @@ functions:
   __arr_drop___m2__Sym$SexpKind:
     calls: 14
     bytes: 140
+  __arr_drop___m3__ListStyle:
+    calls: 300
+    bytes: 120
   __arr_drop___m3__Production$SexpKind$Sexp:
-    calls: 132
-    bytes: 240
+    calls: 156
+    bytes: 188
   __arr_drop___m3__Rule$SexpKind:
-    calls: 302
+    calls: 161
     bytes: 116
   __arr_drop___m4__Piece:
-    calls: 198
+    calls: 195
     bytes: 228
   __arr_drop___m5__Doc:
-    calls: 202
+    calls: 280
     bytes: 116
   __arr_retain_Sexp:
     calls: 893
@@ -402,13 +409,13 @@ functions:
     calls: 0
     bytes: 140
   __arr_retain___m11__Token$SexpKind:
-    calls: 1076
+    calls: 1088
     bytes: 160
   __arr_retain___m11__TokenRule$SexpKind:
     calls: 0
     bytes: 604
   __arr_retain___m1__Cst:
-    calls: 3940
+    calls: 5613
     bytes: 116
   __arr_retain___m2__First$SexpKind:
     calls: 11
@@ -416,75 +423,72 @@ functions:
   __arr_retain___m2__Sym$SexpKind:
     calls: 10
     bytes: 140
+  __arr_retain___m3__ListStyle:
+    calls: 100
+    bytes: 120
   __arr_retain___m3__Production$SexpKind$Sexp:
-    calls: 114
-    bytes: 240
+    calls: 150
+    bytes: 188
   __arr_retain___m3__Rule$SexpKind:
-    calls: 304
+    calls: 150
     bytes: 116
   __arr_retain___m4__Piece:
-    calls: 263
+    calls: 225
     bytes: 228
   __arr_retain___m5__Doc:
-    calls: 317
+    calls: 428
     bytes: 116
-  __builtin_all$char$s0$lam114:
-    calls: 43
+  __builtin_all$char$s0$lam156:
+    calls: 51
     bytes: 212
-  __builtin_any$__m5__Doc$lam117:
+  __builtin_any$__m5__Doc$lam164:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam117$tail:
-    calls: 76
+  __builtin_any$__m5__Doc$lam164$tail:
+    calls: 111
     bytes: 324
-  __builtin_count_while$char$lam75:
-    calls: 166
+  __builtin_count_while$char$lam87:
+    calls: 178
     bytes: 220
-  __builtin_count_while$char$s0$lam109:
-    calls: 0
-    bytes: 40
-  __builtin_count_while$char$s0$lam109$tail:
-    calls: 13
-    bytes: 256
   __builtin_count_while$char$s0$lam120:
     calls: 0
-    bytes: 172
-  __builtin_count_while$char$s0$lam141:
+    bytes: 40
+  __builtin_count_while$char$s0$lam120$tail:
+    calls: 13
+    bytes: 256
+  __builtin_count_while$char$s0$lam136:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam83:
+  __builtin_count_while$char$s0$lam159:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam95:
     calls: 0
     bytes: 184
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m3__Prec$lam145:
+  __builtin_find_if$__m3__Prec$lam163:
     calls: 0
     bytes: 688
-  __builtin_find_index$str$lam23:
+  __builtin_find_index$str$lam27:
     calls: 37
     bytes: 400
-  __builtin_find_index$str$lam43:
-    calls: 76
+  __builtin_find_index$str$lam52:
+    calls: 100
     bytes: 400
-  __builtin_find_index$str$lam69:
-    calls: 76
+  __builtin_find_index$str$lam77:
+    calls: 100
     bytes: 400
   __builtin_intersperse$__m5__Doc:
-    calls: 24
+    calls: 34
     bytes: 408
-  __builtin_try_map$__m1__Cst$Sexp$__m3__ParseError$lam92:
+  __builtin_try_map$__m1__Cst$Sexp$__m3__ParseError$lam104:
     calls: 883
     bytes: 748
-  __builtin_try_map$__m3__Production$SexpKind$Sexp$__m2__First<SexpKind>$__m3__ParseError$lam52:
+  __builtin_try_map$__m3__Production$SexpKind$Sexp$__m2__First<SexpKind>$__m3__ParseError$lam58:
     calls: 3
-    bytes: 1032
-  __builtin_try_map$__m3__Production$SexpKind$Sexp$__m3__Production$SexpKind$Sexp$__m3__ParseError$lam46:
-    calls: 38
-    bytes: 1168
-  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam101:
-    calls: 76
-    bytes: 732
+    bytes: 920
   __eq_Sexp:
     calls: 234
     bytes: 136
@@ -506,15 +510,15 @@ functions:
   __eq_char$opt:
     calls: 0
     bytes: 100
-  __lambda_17:
+  __filter100$own0:
+    calls: 883
+    bytes: 544
+  __lambda_21:
     calls: 0
     bytes: 128
-  __lambda_18:
+  __lambda_22:
     calls: 84
     bytes: 96
-  __lambda_44:
-    calls: 76
-    bytes: 1328
   __m11__between_len:
     calls: 0
     bytes: 752
@@ -534,13 +538,13 @@ functions:
     calls: 38
     bytes: 1520
   __m11__lex_step$SexpKind:
-    calls: 1077
+    calls: 1089
     bytes: 24120
   __m11__nested_len:
     calls: 0
     bytes: 940
   __m11__step_result$SexpKind:
-    calls: 3952
+    calls: 3964
     bytes: 7500
   __m11__template_scan$SexpKind:
     calls: 0
@@ -559,13 +563,16 @@ functions:
     bytes: 368
   __m13__climb$SexpKind$Sexp:
     calls: 0
-    bytes: 2736
+    bytes: 3160
   __m13__error_at$SexpKind$Sexp:
     calls: 4
-    bytes: 1816
+    bytes: 2780
   __m13__far_miss:
     calls: 1800
-    bytes: 940
+    bytes: 1084
+  __m13__far_unclosed:
+    calls: 1
+    bytes: 320
   __m13__find_prec:
     calls: 0
     bytes: 228
@@ -574,36 +581,39 @@ functions:
     bytes: 1720
   __m13__lower_node$SexpKind$Sexp:
     calls: 883
-    bytes: 3844
+    bytes: 3416
   __m13__match_many$SexpKind$Sexp:
     calls: 448
-    bytes: 3668
+    bytes: 4560
   __m13__match_maybe$SexpKind$Sexp:
     calls: 0
-    bytes: 868
+    bytes: 1076
+  __m13__match_nested$SexpKind$Sexp:
+    calls: 898
+    bytes: 5908
   __m13__match_one_of$SexpKind$Sexp:
     calls: 980
-    bytes: 1312
+    bytes: 1692
   __m13__match_prod$SexpKind$Sexp:
     calls: 1878
-    bytes: 4820
+    bytes: 4524
   __m13__match_rule$SexpKind$Sexp:
     calls: 6493
-    bytes: 4432
+    bytes: 6044
   __m13__match_then$SexpKind$Sexp:
-    calls: 898
-    bytes: 1720
+    calls: 0
+    bytes: 2128
   __m13__parse$SexpKind$Sexp:
     calls: 19
     bytes: 380
   __m13__parse_cst$SexpKind$Sexp:
     calls: 37
-    bytes: 4388
+    bytes: 5140
   __m13__prev_end$SexpKind$Sexp:
     calls: 1043
     bytes: 648
   __m13__quoted:
-    calls: 453
+    calls: 454
     bytes: 456
   __m13__tok_text$SexpKind$Sexp:
     calls: 1348
@@ -611,24 +621,39 @@ functions:
   __m13__trailing_trivia$SexpKind$Sexp:
     calls: 66
     bytes: 704
+  __m14__line_at:
+    calls: 1
+    bytes: 532
+  __m1__flat_kids:
+    calls: 0
+    bytes: 32
+  __m1__flat_kids$tail:
+    calls: 1306
+    bytes: 3832
   __m1__leaves:
-    calls: 14
-    bytes: 808
+    calls: 23
+    bytes: 3684
   __m1__show:
-    calls: 36
-    bytes: 1652
+    calls: 41
+    bytes: 2792
   __m1__span:
     calls: 0
     bytes: 460
+  __m1__splice:
+    calls: 0
+    bytes: 32
+  __m1__splice$tail:
+    calls: 3090
+    bytes: 612
   __m1__token_leaves:
-    calls: 481
-    bytes: 784
+    calls: 1377
+    bytes: 3648
   __m2__climb_precs$SexpKind:
     calls: 0
     bytes: 32
   __m2__climb_precs$SexpKind$tail:
     calls: 8
-    bytes: 1084
+    bytes: 1744
   __m2__dq:
     calls: 4
     bytes: 456
@@ -640,22 +665,22 @@ functions:
     bytes: 420
   __m2__first_sets$SexpKind$Sexp:
     calls: 1
-    bytes: 324
+    bytes: 356
   __m2__linked_first_sets$SexpKind$Sexp:
     calls: 1
-    bytes: 1168
+    bytes: 1084
   __m2__prec_note:
     calls: 2
     bytes: 3468
   __m2__render_rule$SexpKind:
-    calls: 8
-    bytes: 7356
+    calls: 9
+    bytes: 8120
   __m2__rep_suffix:
     calls: 1
     bytes: 724
   __m2__rule_first$SexpKind:
-    calls: 15
-    bytes: 5044
+    calls: 18
+    bytes: 5948
   __m2__show_first$SexpKind:
     calls: 2
     bytes: 1216
@@ -668,48 +693,60 @@ functions:
   __m3__failure_message:
     calls: 5
     bytes: 404
+  __m3__group_styles$SexpKind:
+    calls: 0
+    bytes: 32
+  __m3__group_styles$SexpKind$tail:
+    calls: 900
+    bytes: 3116
   __m3__link$SexpKind$Sexp:
-    calls: 38
-    bytes: 1188
+    calls: 50
+    bytes: 2328
+  __m3__link_nest$SexpKind:
+    calls: 50
+    bytes: 1300
   __m3__link_opt$SexpKind:
-    calls: 38
-    bytes: 652
+    calls: 50
+    bytes: 660
   __m3__link_rule$SexpKind:
-    calls: 304
-    bytes: 4364
+    calls: 400
+    bytes: 5108
+  __m3__link_rules$SexpKind:
+    calls: 50
+    bytes: 832
+  __m3__nest_styles$SexpKind:
+    calls: 50
+    bytes: 956
   __m3__prod_names$SexpKind$Sexp:
-    calls: 82
-    bytes: 564
+    calls: 94
+    bytes: 492
   __m4__breaks_after:
     calls: 6
     bytes: 444
-  __m4__format_cst$SexpKind$Sexp$s1$lam25:
-    calls: 71
-    bytes: 5056
-  __m4__gap_wanted$lam93:
-    calls: 106
+  __m4__fmt_node$SexpKind$Sexp$s1$lam59:
+    calls: 89
+    bytes: 4512
+  __m4__format_cst$SexpKind$Sexp$s1$lam34:
+    calls: 12
+    bytes: 384
+  __m4__gap_wanted$lam132:
+    calls: 148
     bytes: 144
-  __m4__inline_doc$lam55:
-    calls: 85
-    bytes: 2668
-  __m4__lead_toks:
+  __m4__group_doc$SexpKind$Sexp$s1$lam108:
     calls: 18
-    bytes: 740
-  __m4__pieces$SexpKind$Sexp$s1$lam53:
-    calls: 71
-    bytes: 2140
+    bytes: 2308
+  __m4__inline_doc$lam107:
+    calls: 148
+    bytes: 2668
+  __m4__pieces$SexpKind$Sexp$s1$lam105:
+    calls: 125
+    bytes: 3404
   __m4__render_cst$SexpKind$Sexp$s1$lam8:
     calls: 12
     bytes: 5268
-  __m4__run_text:
-    calls: 24
-    bytes: 892
-  __m4__tail_toks:
+  __m4__wrapped$lam133:
     calls: 18
-    bytes: 1176
-  __m4__wrapped$lam56:
-    calls: 18
-    bytes: 4480
+    bytes: 4272
   __m5__col_after:
     calls: 77
     bytes: 544
@@ -717,40 +754,40 @@ functions:
     calls: 0
     bytes: 36
   __m5__fits$tail:
-    calls: 210
+    calls: 223
     bytes: 2684
   __m5__fits_atom:
     calls: 0
     bytes: 52
   __m5__fits_atom$tail:
-    calls: 61
+    calls: 51
     bytes: 312
   __m5__has_hard:
     calls: 0
     bytes: 32
   __m5__has_hard$tail:
-    calls: 175
+    calls: 220
     bytes: 688
   __m6__reindent_block:
     calls: 0
     bytes: 4016
-  __map37:
+  __map46:
     calls: 0
     bytes: 380
   __rec_drop_Sexp:
     calls: 476
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 2086
-    bytes: 48
+    calls: 2545
+    bytes: 132
   __rec_drop___m3__Rule$SexpKind:
-    calls: 752
-    bytes: 304
+    calls: 852
+    bytes: 436
   __rec_drop___m5__Doc:
-    calls: 240
+    calls: 334
     bytes: 184
   __rec_drop___m5__Work:
-    calls: 459
+    calls: 586
     bytes: 84
   __test$format_sexp:
     calls: 1
@@ -763,10 +800,10 @@ functions:
     bytes: 2996
   __test$sexp_cst:
     calls: 1
-    bytes: 2356
+    bytes: 2360
   __test$sexp_grammar:
     calls: 1
-    bytes: 2084
+    bytes: 2076
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -774,61 +811,58 @@ functions:
     calls: 0
     bytes: 824
   __to_str_u64:
-    calls: 0
+    calls: 1
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 183
+    calls: 3840
     bytes: (external)
   aipl_arr_extend:
-    calls: 4530
+    calls: 4616
     bytes: (external)
   aipl_arr_inc:
-    calls: 119080
+    calls: 193194
     bytes: (external)
   aipl_arr_join:
-    calls: 183
+    calls: 3850
     bytes: (external)
   aipl_arr_reserve:
-    calls: 6003
+    calls: 5489
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 398
-    bytes: (external)
-  aipl_arr_slice:
-    calls: 36
+    calls: 4475
     bytes: (external)
   aipl_array_dec:
-    calls: 144336
+    calls: 233539
     bytes: (external)
   aipl_array_new:
-    calls: 17826
+    calls: 26861
     bytes: (external)
   aipl_array_push:
-    calls: 1547
+    calls: 1586
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3672
+    calls: 6983
     bytes: (external)
   aipl_array_with_cap:
-    calls: 2698
+    calls: 5475
     bytes: (external)
   aipl_assert:
     calls: 38
     bytes: (external)
   aipl_rec_alloc:
-    calls: 4013
+    calls: 4793
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 41447
+    calls: 59532
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 565
+    calls: 1032
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 37434
+    calls: 54739
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 565
+    calls: 1032
     bytes: (external)
   aipl_test_begin:
     calls: 5
@@ -839,12 +873,18 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
   depth:
     calls: 200
     bytes: 312
   format_sexp:
     calls: 12
-    bytes: 412
+    bytes: 444
   lex_sexp:
     calls: 38
     bytes: 3368
@@ -859,16 +899,16 @@ functions:
     bytes: 392
   parse_sexp:
     calls: 20
-    bytes: 444
+    bytes: 460
   render_sexp:
     calls: 427
     bytes: 732
   sexp_cst:
     calls: 18
-    bytes: 444
+    bytes: 460
   sexp_grammar:
     calls: 56
-    bytes: 2196
+    bytes: 2092
   shown:
     calls: 5
-    bytes: 492
+    bytes: 508

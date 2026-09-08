@@ -89,6 +89,10 @@
 
             <li id="item-NamedIdx"><code>NamedIdx(u64)</code></li>
 
+            <li id="item-NestedIn"><code>NestedIn(Rule&#60;K&#62;, Rule&#60;K&#62;, Rule&#60;K&#62;, style: ListStyle = ..)</code></li>
+
+            <li id="item-NestedIdx"><code>NestedIdx(u64, Rule&#60;K&#62;, Rule&#60;K&#62;, Rule&#60;K&#62;, style: ListStyle = ..)</code></li>
+
             <li id="item-Climb"><code>Climb(Rule&#60;K&#62;, Prec[])</code></li>
 
           </ul>
@@ -124,7 +128,7 @@
           </h3>
           <pre class="signature"><code>struct ListStyle</code></pre>
 
-          <div class="doc"><p>How a bracketed list lays out: what separates its items, whether the brackets take inner spaces while the list stays on one line (<code>{ a, b }</code> against <code>(a, b)</code>), and whether a separator is written after the last item once it breaks.</p><p>The brackets themselves are not here. They are in the source, and the formatter reads them off the tokens the production matched — a style is only the handful of decisions the tokens cannot answer. An empty <code>sep</code> is the juxtaposed list, where items are separated by nothing but the space between them: <code>(a b c)</code>, and every S-expression ever written.</p></div>
+          <div class="doc"><p>How a bracketed list lays out: what separates its items, whether the brackets take inner spaces while the list stays on one line (<code>{ a, b }</code> against <code>(a, b)</code>), and whether a separator is written after the last item once it breaks.</p><p>The brackets themselves are not here: they are the <code>open</code> and <code>close</code> rules of the <code>NestedIn</code> this style belongs to, matched from the source like anything else. A style is only the handful of decisions the brackets cannot answer. An empty <code>sep</code> is the juxtaposed list, where items are separated by nothing but the space between them: <code>(a b c)</code>, and every S-expression ever written. A group holding one thing rather than a list — <code>(expr)</code> — is the same shape with no separator ever reached. <code>wraps: false</code> is the group that is a bracket pair and nothing more. A block <code>{ .. }</code> is one: it is a pair the parser should know about, so an unclosed brace is reported against the brace that opened it, but its contents are statements rather than a list and breaking them at a width is not what a formatter does with them. Such a group lays out <code>Inline</code>, like any other run of children.</p></div>
 
 
         </section>
@@ -138,7 +142,7 @@
           </h3>
           <pre class="signature"><code>variant Layout</code></pre>
 
-          <div class="doc"><p>How a production's matched children are joined into a <code>Doc</code> — the formatting half of a language description, read by <code>format.aipl</code> exactly as <code>Rule</code> is read by <code>parse.aipl</code>.</p><p>The vocabulary is deliberately small, and it is not the whole of a formatter: comment attachment, call hugging and chain breaking are judgement about *this* language and do not fall out of any grammar. What these three do cover is the mechanical majority — the productions whose layout is fully determined by the tokens they matched.</p></div>
+          <div class="doc"><p>How a production's matched children are joined into a <code>Doc</code> — the formatting half of a language description, read by <code>format.aipl</code> exactly as <code>Rule</code> is read by <code>parse.aipl</code>.</p><p>The vocabulary is deliberately small, and it is not the whole of a formatter: comment attachment, call hugging and chain breaking are judgement about *this* language and do not fall out of any grammar. What these two do cover is the mechanical majority — the productions whose layout is fully determined by the tokens they matched.</p><p>Wrapping is not here, and that is the point of <code>NestedIn</code>. Where a list breaks is a property of the bracket pair holding it, not of the production the pair happens to sit in, so it is written at the brackets and read back off the <code>CGroup</code> node they build. A production may hold several groups, each with its own style — <code>match (e) { .. }</code> is two — which is exactly what a single field on the production could not say.</p></div>
 
 
           <ul class="cases">
@@ -146,8 +150,6 @@
             <li id="item-Tight"><code>Tight</code></li>
 
             <li id="item-Inline"><code>Inline</code></li>
-
-            <li id="item-Wrap"><code>Wrap(ListStyle)</code></li>
 
           </ul>
 
@@ -176,7 +178,7 @@
           </h3>
           <pre class="signature"><code>struct Grammar&#60;K: variant, A: any&#62;</code></pre>
 
-          <div class="doc"><p>A whole language: its productions, in order. Position is identity — a <code>NamedIdx</code> and a <code>CTree</code> both name a production by its index here — so the order of this array is part of a linked grammar's meaning.</p></div>
+          <div class="doc"><p>A whole language: its productions, in order. Position is identity — a <code>NamedIdx</code> and a <code>CTree</code> both name a production by its index here — so the order of this array is part of a linked grammar's meaning.</p><p><code>groups</code> is the same idea for bracket pairs: <code>link</code> collects every <code>NestedIn</code>'s <code>ListStyle</code> into it, in the order the rules mention them, and rewrites the rule to a <code>NestedIdx</code> naming the entry. A <code>CGroup</code> node then carries an index rather than a style, which keeps the CST as free of layout as it is of production names. It is empty on an unlinked grammar and written only by <code>link</code>, so no grammar file ever spells it out.</p></div>
 
 
         </section>
@@ -218,14 +220,84 @@
         <p class="note">Not importable from another file.</p>
 
 
+        <section class="item" id="item-group_styles">
+          <h3>
+            <a class="anchor" href="#item-group_styles">group_styles</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn group_styles&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; ListStyle[]</code></pre>
+
+          <div class="doc"><p>Every group style in <code>r</code>, in the order the rules mention them: a group's own style first, then the styles inside its brackets. That order is the contract with <code>link_rule</code>, which hands out indices by walking the same tree the same way — get the two out of step and a <code>CGroup</code> names another group's style.</p><p>Both spellings answer, so an already-linked rule reports the same list as the rule it was linked from, which is what makes <code>link</code> idempotent.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-nest_styles">
+          <h3>
+            <a class="anchor" href="#item-nest_styles">nest_styles</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn nest_styles&#60;K: variant&#62;(open: Rule&#60;K&#62;, body: Rule&#60;K&#62;, close: Rule&#60;K&#62;, style: ListStyle) -&#62; ListStyle[]</code></pre>
+
+          <div class="doc"><p>One group's styles: its own first, then what its brackets hold.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-opt_group_styles">
+          <h3>
+            <a class="anchor" href="#item-opt_group_styles">opt_group_styles</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn opt_group_styles&#60;K: variant&#62;(r: Rule&#60;K&#62;?) -&#62; ListStyle[]</code></pre>
+
+          <div class="doc"><p><code>group_styles</code> reaching inside an optional, which <code>map</code> cannot.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-group_count">
+          <h3>
+            <a class="anchor" href="#item-group_count">group_count</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn group_count&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; u64</code></pre>
+
+          <div class="doc"><p>How many groups <code>r</code> holds — the amount <code>base</code> advances past it.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-link_rule">
           <h3>
             <a class="anchor" href="#item-link_rule">link_rule</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn link_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[]) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
+          <pre class="signature"><code>fn link_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[], base: u64) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
 
-          <div class="doc"><p>One rule with every <code>Named(n)</code> in it rewritten to <code>NamedIdx(i)</code>. Fails when a reference names no production — the error a grammar author most wants caught before a parse rather than during one.</p></div>
+          <div class="doc"><p>One rule with every <code>Named(n)</code> in it rewritten to <code>NamedIdx(i)</code> and every <code>NestedIn</code> to a <code>NestedIdx</code> naming its entry in the grammar's <code>groups</code> table. Fails when a reference names no production — the error a grammar author most wants caught before a parse rather than during one.</p><p><code>base</code> is the index the first group in <code>r</code> takes; the rest follow in <code>group_styles</code> order. It is threaded by arithmetic rather than by a running counter because a rule is a tree and <code>try_map</code> has nowhere to keep one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-link_nest">
+          <h3>
+            <a class="anchor" href="#item-link_nest">link_nest</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn link_nest&#60;K: variant&#62;(open: Rule&#60;K&#62;, body: Rule&#60;K&#62;, close: Rule&#60;K&#62;, style: ListStyle, names: str[], base: u64) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
+
+          <div class="doc"><p>One group, linked: it takes <code>base</code> itself and its insides follow, matching the order <code>group_styles</code> reports them in. Relinking an already-linked group lands here too and reassigns the same index, which is what keeps <code>link</code> idempotent.</p></div>
 
 
         </section>
@@ -237,7 +309,7 @@
             <a class="anchor" href="#item-link_opt">link_opt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn link_opt&#60;K: variant&#62;(r: Rule&#60;K&#62;?, names: str[]) -&#62; Rule&#60;K&#62;?!ParseError</code></pre>
+          <pre class="signature"><code>fn link_opt&#60;K: variant&#62;(r: Rule&#60;K&#62;?, names: str[], base: u64) -&#62; Rule&#60;K&#62;?!ParseError</code></pre>
 
           <div class="doc"><p>A <code>Many</code>'s separator, linked — <code>none</code> stays <code>none</code>. Its own function because <code>?</code> cannot reach inside an optional.</p></div>
 
@@ -251,9 +323,9 @@
             <a class="anchor" href="#item-link_rules">link_rules</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[]) -&#62; Rule&#60;K&#62;[]!ParseError</code></pre>
+          <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[], base: u64) -&#62; Rule&#60;K&#62;[]!ParseError</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>Each rule in <code>rs</code>, linked, with <code>base</code> advancing past the groups each one holds.</p></div>
 
 
         </section>

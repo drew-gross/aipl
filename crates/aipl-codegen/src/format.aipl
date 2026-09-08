@@ -29,24 +29,19 @@ import {
     is_all_whitespace,
     is_empty,
     is_nonempty,
-    is_some_and,
-    join,
     last,
     len,
     less_than as <,
     logical_and as &&,
     logical_not as !,
-    logical_or as ||,
     map,
     not_equal as !=,
     push,
-    saturating_decrement as --,
-    saturating_sub as -,
     value_or_err,
     wrapping_add as +,
     wrapping_increment as ++,
 } from builtins;
-import { CLeaf, CTree, CTrivia, Cst, span, token_leaves } from "./cst.aipl";
+import { CGroup, CLeaf, CTree, CTrivia, Cst, span, token_leaves } from "./cst.aipl";
 import {
     Concat,
     Doc,
@@ -65,13 +60,14 @@ import {
     Layout,
     ListStyle,
     Mk,
+    NestedIn,
     ParseError,
     Production,
     Rule,
     Term,
     Tight,
-    Wrap,
     failure_message,
+    link,
 } from "./grammar.aipl";
 
 # One child of a node, reduced to what layout needs from it.
@@ -101,9 +97,25 @@ variant Piece =
 # function per production. Where a production wants no spaces at all, that is
 # `Tight` and the rule is never consulted.
 #
+# `g` is linked here, so it may be handed over unlinked, exactly as `parse_cst`
+# takes it. That is not a convenience: a group's style lives in `groups`, which
+# only `link` fills, so an unlinked grammar would lay every bracket pair out
+# against a table that is not there. Linking is idempotent, so a caller that
+# linked already pays one walk and nothing else.
+#
 # Fails only on a tree that does not belong to `g` — a node naming a production
-# index the grammar has no entry for, which a tree from `parse_cst` cannot be.
+# or a group index the grammar has no entry for, which a tree from `parse_cst`
+# cannot be.
 pub fn format_cst<K: variant, A: any>(
+    g: Grammar<K, A>,
+    src: str,
+    node: Cst,
+    space: (str, str) -> bool,
+) -> Doc!ParseError { fmt_node(link(g)?, src, node, space) }
+
+# `format_cst` once the grammar is linked — the recursive half, so a call links
+# once rather than once per node.
+fn fmt_node<K: variant, A: any>(
     g: Grammar<K, A>,
     src: str,
     node: Cst,
@@ -123,24 +135,26 @@ pub fn format_cst<K: variant, A: any>(
                 match (layout) {
                     Tight => tight(ps),
                     Inline => inline_doc(ps, space),
-                    Wrap(st) => wrapped(ps, st, space),
                 },
             )
         },
+        // A group reached directly, rather than as a child of the production
+        // holding it — the same layout either way.
+        CGroup(gi, open, body, close) => group_doc(g, src, gi, open, body, close, space),
     }
 }.test({
-    // Three productions, one per layout, and a tree written out by hand: the
-    // driver reads a production's `layout` and never its `rule`, so a grammar
-    // carrying the simplest rule there is exercises it exactly.
-    let g = grammar_of([Wrap(ListStyle { spaced: true }), Inline, Tight]);
+    // Two productions, one per layout, one group style, and a tree written out
+    // by hand: the driver reads a production's `layout` and never its `rule`, so
+    // a grammar carrying the simplest rule there is exercises it exactly.
+    let g = grammar_of([Inline, Inline, Tight], [ListStyle { spaced: true }]);
 
     //                  1
     //        012345678901234
     let src = "{ a: 1, b: -2 }";
-    let tree = CTree(
+    let grp = CGroup(
         0,
+        [CLeaf(0..1)],
         [
-            CLeaf(0..1),
             CTrivia(1..2),
             kv(2),
             CTrivia(4..5),
@@ -150,18 +164,22 @@ pub fn format_cst<K: variant, A: any>(
             kv(8),
             CTrivia(10..11),
             CTree(2, [CLeaf(11..12), CLeaf(12..13)]),
-            CTrivia(13..14),
-            CLeaf(14..15),
         ],
+        [CTrivia(13..14), CLeaf(14..15)],
     );
+    let tree = CTree(0, [grp]);
 
-    // `Wrap` outside, `Inline` for `a:` (a space after the colon, none before
-    // it), `Tight` for `-2` (no space, whatever the rule says).
+    // The group wraps, `Inline` lays out `a:` (a space after the colon, none
+    // before it), and `Tight` gives `-2` (no space, whatever the rule says).
     assert(rendered(g, src, tree, 80)? == "{ a: 1, b: -2 }");
 
     // The same tree at a width it cannot fit: one item per indented line, plus
     // the trailing separator the style asks for.
     assert(rendered(g, src, tree, 12)? == "{\n    a: 1,\n    b: -2,\n}");
+
+    // A group handed in on its own lays out the same as one reached through its
+    // parent — the layout belongs to the brackets, not to what encloses them.
+    assert(rendered(g, src, grp, 80)? == "{ a: 1, b: -2 }");
 
     // A leaf handed straight in is its own text.
     assert(rendered(g, src, CLeaf(2..3), 80)? == "a");
@@ -169,6 +187,16 @@ pub fn format_cst<K: variant, A: any>(
     // A tree that does not belong to the grammar is the one way this fails.
     let stray: Cst[] = [];
     assert(rendered(g, src, CTree(9, stray), 80).failure_message() == "no production at index 9");
+
+    // So is a group naming a style the table has no entry for.
+    assert(
+        rendered(
+            g,
+            src,
+            CGroup(9, stray, stray, stray),
+            80,
+        ).failure_message() == "no group at index 9",
+    );
 })
 
 # `src` laid out at `width` — `format_cst` and `print_doc`, which is what every
@@ -180,7 +208,7 @@ pub fn render_cst<K: variant, A: any>(
     space: (str, str) -> bool,
     width: u64,
 ) -> str!ParseError { ok(print_doc(format_cst(g, src, node, space)?, width)) }.test({
-    let g = grammar_of([Inline]);
+    let g = grammar_of([Inline], []);
     let src = "a b";
     let tree = CTree(0, [CLeaf(0..1), CTrivia(1..2), CLeaf(2..3)]);
     assert(render_cst(g, src, tree, always_space, 80)? == "a b");
@@ -210,8 +238,8 @@ fn pieces<K: variant, A: any>(
                     set out.push(PNote(src[sp], breaks_after(src, sp.end)));
                 };
             },
-            CTree(..) => {
-                let d = format_cst(g, src, k, space)?;
+            CTree(..) | CGroup(..) => {
+                let d = fmt_node(g, src, k, space)?;
                 let ts = k.token_leaves();
                 set out.push(PNode(d, edge(src, ts.first()), edge(src, ts.last())));
             },
@@ -258,25 +286,6 @@ fn edge(src: str, sp: Span?) -> str {
     assert(edge("abc", some(1..2)) == "b");
     assert(edge("abc", none) == "");
 })
-
-# The spelling of a token piece; `""` for anything else.
-fn tok_text(self: Piece) -> str {
-    match (self) {
-        PTok(t) => t,
-        PNode(..) | PNote(..) => "",
-    }
-}
-
-# A run of token pieces folded into one string — how a bracket written as
-# several tokens (`#{`) comes back out as one.
-fn run_text(ps: Piece[]) -> str { ps.map(tok_text).join(sep="") }
-
-fn is_tok(self: Piece) -> bool {
-    match (self) {
-        PTok(..) => true,
-        PNode(..) | PNote(..) => false,
-    }
-}
 
 # Whether `self` is the separator token `sep`. Only a token can be one, so a
 # child that happens to render as `,` is not mistaken for it.
@@ -391,33 +400,67 @@ fn gap_wanted(prev: str, next: str, space: (str, str) -> bool) -> bool {
     prev != "" && next != "" && space(prev, next)
 }
 
-# `Wrap`: a bracketed list, on one line while it fits and otherwise one item per
-# indented line.
+# A `CGroup` laid out: its brackets around its contents, on one line while they
+# fit and otherwise one item per indented line.
 #
-# The brackets are read off the tokens rather than named in the style: the
-# leading run of matched tokens opens the list and the trailing run closes it.
-# That is what lets one annotation cover `(a, b)`, `[a]`, `#{a}` and `<T>` alike,
-# and it is also what makes an alternative with no brackets recognizable — a
-# production whose alternatives are not all lists (AIPL's `ty` is one) falls back
-# to `Inline` for the ones that aren't, rather than inventing break points.
-fn wrapped(ps: Piece[], st: ListStyle, space: (str, str) -> bool) -> Doc {
-    let lead = lead_toks(ps);
-    let tail = tail_toks(ps, lead);
-    if (lead == 0 || tail == 0) {
-        return inline_doc(ps, space);
+# The brackets are read off the node, not inferred from it. That is the whole
+# difference `NestedIn` makes here: the group says which of its kids opened it
+# and which closed it, so `#{a}` (a two-token bracket), `|a, b|` (the same token
+# both ends) and `match (e) { .. }` (two pairs in one production) are all just
+# groups, with nothing to guess and nothing to be wrong about.
+fn group_doc<K: variant, A: any>(
+    g: Grammar<K, A>,
+    src: str,
+    gi: u64,
+    open: Cst[],
+    body: Cst[],
+    close: Cst[],
+    space: (str, str) -> bool,
+) -> Doc!ParseError {
+    let st = g.groups[gi].value_or_err(ParseError {
+        message: `no group at index {gi}`,
+        span: 0..0,
+    })?;
+    ok(wrapped(
+        pieces(g, src, open, space)?,
+        pieces(g, src, body, space)?,
+        pieces(g, src, close, space)?,
+        st,
+        space,
+    ))
+}
+
+# A bracketed list: `open`, the items, `close` — flat while it fits, otherwise
+# one item per indented line with the brackets on their own.
+#
+# The bracket runs are laid out `Inline` rather than concatenated raw, so a
+# comment written against a bracket survives and the language's spacing rule
+# still gets asked about a bracket spelled as several tokens.
+fn wrapped(
+    open: Piece[],
+    mid: Piece[],
+    close: Piece[],
+    st: ListStyle,
+    space: (str, str) -> bool,
+) -> Doc {
+    // A pair that is only a pair — a block's braces — is laid out like any other
+    // run of children. The group still told the *parser* where the brackets are,
+    // which is the half of `NestedIn` that has nothing to do with layout.
+    if (!st.wraps) {
+        return inline_doc([..open, ..mid, ..close], space);
     };
-    let open = run_text(ps[..lead]);
-    let close = run_text(ps[ps.len() - tail..]);
-    let items = list_items(ps[lead..ps.len() - tail], st, space);
+    let od = inline_doc(open, space);
+    let cd = inline_doc(close, space);
+    let items = list_items(mid, st, space);
     if (items.is_empty()) {
-        return Text(`{open}{close}`);
+        return Concat([od, cd]);
     };
 
     // A style that reads as words takes a space inside its brackets while flat
     // (`{ a, b }`); the rest hug their contents (`(a, b)`).
     let edge = if (st.spaced) { Line } else { SoftLine };
     let step = if (st.sep == "") { Line } else { Concat([Text(st.sep), Line]) };
-    mut parts = [Text(open), Indent(Concat([edge, ..items.intersperse(step)]))];
+    mut parts = [od, Indent(Concat([edge, ..items.intersperse(step)]))];
 
     // A separator after the last item, written only once the list breaks. A
     // juxtaposed list has no separator to write.
@@ -425,101 +468,81 @@ fn wrapped(ps: Piece[], st: ListStyle, space: (str, str) -> bool) -> Doc {
         set parts.push(IfBroken(st.sep));
     };
     set parts.push(edge);
-    set parts.push(Text(close));
+    set parts.push(cd);
     group(Concat(parts))
 }.test({
     let parens = ListStyle { spaced: false };
-    let three = [
-        PTok("("),
-        node_of("a"),
-        PTok(","),
-        node_of("b"),
-        PTok(","),
-        node_of("c"),
-        PTok(")"),
-    ];
+    let lp = [PTok("(")];
+    let rp = [PTok(")")];
+    let three = [node_of("a"), PTok(","), node_of("b"), PTok(","), node_of("c")];
 
-    assert(wrapped(three, parens, never_space).at(80) == "(a, b, c)");
-    assert(wrapped(three, parens, never_space).at(5) == "(\n    a,\n    b,\n    c,\n)");
+    assert(wrapped(lp, three, rp, parens, never_space).at(80) == "(a, b, c)");
+    assert(wrapped(lp, three, rp, parens, never_space).at(5) == "(\n    a,\n    b,\n    c,\n)");
 
     // An empty list is its brackets and nothing else — no space to break at.
-    assert(wrapped([PTok("("), PTok(")")], parens, never_space).at(80) == "()");
+    let nothing: Piece[] = [];
+    assert(wrapped(lp, nothing, rp, parens, never_space).at(80) == "()");
     let braces = ListStyle { spaced: true };
-    assert(wrapped([PTok("{"), PTok("}")], braces, never_space).at(80) == "{}");
+    assert(wrapped([PTok("{")], nothing, [PTok("}")], braces, never_space).at(80) == "{}");
 
-    // Brackets are read off the tokens, so a two-token one is no different.
+    // A bracket spelled as two tokens is one bracket: the group said so, and
+    // nothing here counts token runs to find out.
     assert(
-        wrapped([PTok("#"), PTok("{"), node_of("a"), PTok("}")], parens, never_space).at(
+        wrapped([PTok("#"), PTok("{")], [node_of("a")], [PTok("}")], parens, never_space).at(
             80,
         ) == "#{a}",
     );
 
+    // The same token at both ends is no harder, which is what a lead/tail scan
+    // could never tell apart from a list of one item.
+    let pipes = [PTok("|")];
+    assert(
+        wrapped(pipes, [node_of("a"), PTok(","), node_of("b")], pipes, parens, never_space).at(
+            80,
+        ) == "|a, b|",
+    );
+
     // Words-style braces gain inner spaces flat, and lose them broken.
-    let pair = [PTok("{"), node_of("a"), PTok(","), node_of("b"), PTok("}")];
-    assert(wrapped(pair, braces, never_space).at(80) == "{ a, b }");
-    assert(wrapped(pair, braces, never_space).at(5) == "{\n    a,\n    b,\n}");
+    let pair = [node_of("a"), PTok(","), node_of("b")];
+    let lb = [PTok("{")];
+    let rb = [PTok("}")];
+    assert(wrapped(lb, pair, rb, braces, never_space).at(80) == "{ a, b }");
+    assert(wrapped(lb, pair, rb, braces, never_space).at(5) == "{\n    a,\n    b,\n}");
 
     // `trailing: false` is the dialect where `[1, 2,]` is an error.
     assert(
-        wrapped(pair, ListStyle { trailing: false }, never_space).at(5) == "{\n    a,\n    b\n}",
+        wrapped(lb, pair, rb, ListStyle { trailing: false }, never_space).at(
+            5,
+        ) == "{\n    a,\n    b\n}",
     );
 
     // An empty separator is the juxtaposed list — a break between items and
     // never a trailing anything.
     let words = ListStyle { sep: "", trailing: false };
-    let sexp = [PTok("("), node_of("a"), node_of("b"), PTok(")")];
-    assert(wrapped(sexp, words, never_space).at(80) == "(a b)");
-    assert(wrapped(sexp, words, never_space).at(3) == "(\n    a\n    b\n)");
+    let sexp = [node_of("a"), node_of("b")];
+    assert(wrapped(lp, sexp, rp, words, never_space).at(80) == "(a b)");
+    assert(wrapped(lp, sexp, rp, words, never_space).at(3) == "(\n    a\n    b\n)");
 
-    // No brackets on this alternative, so there is no list to wrap.
-    let bare = [node_of("a"), PTok("!"), node_of("b")];
-    assert(wrapped(bare, parens, never_space).at(80) == "a!b");
-    assert(wrapped(bare, parens, always_space).at(80) == "a ! b");
-})
+    // A group holding one thing is a list of one item: flat it is just the
+    // brackets around it, and there is no separator to reach.
+    assert(wrapped(lp, [node_of("a")], rp, parens, never_space).at(80) == "(a)");
 
-# How many of `ps` at the front are tokens — the run that opens a list.
-fn lead_toks(ps: Piece[]) -> u64 {
-    mut n: u64 = 0;
-    for (let p : ps) {
-        if (!p.is_tok()) {
-            return n;
-        };
-        set n++;
-    }
-    n
-}.test({
-    let nothing: Piece[] = [];
-    let a = PNode(Text("a"), "a", "a");
-    assert(lead_toks(nothing) == 0);
-    assert(lead_toks([PTok("#"), PTok("{"), a]) == 2);
-    assert(lead_toks([a, PTok(")")]) == 0);
-    // All tokens: the whole run leads, and `tail_toks` then finds none.
-    assert(lead_toks([PTok("("), PTok(")")]) == 2);
-})
+    // A pair that is only a pair lays out inline, brackets and all — no break
+    // points invented, whatever the width.
+    let plain = ListStyle { wraps: false };
+    assert(wrapped(lp, three, rp, plain, never_space).at(80) == "(a,b,c)");
+    assert(wrapped(lp, three, rp, plain, never_space).at(3) == "(a,b,c)");
 
-# How many of `ps` at the end are tokens — the run that closes a list — without
-# reaching back into the `lead` that already opened it.
-fn tail_toks(ps: Piece[], lead: u64) -> u64 {
-    mut n: u64 = 0;
-    mut i = ps.len();
-    while (lead < i) {
-        set i--;
-        if (!ps[i].is_some_and(is_tok)) {
-            return n;
-        };
-        set n++;
-    }
-    n
-}.test({
-    let nothing: Piece[] = [];
-    let a = PNode(Text("a"), "a", "a");
-    assert(tail_toks([PTok("("), a, PTok(")")], 1) == 1);
-    assert(tail_toks([PTok("("), a], 1) == 0);
-
-    // `(` and `)` with nothing between them: the lead took both, so no tail is
-    // left, and `wrapped` reads that as "not a list".
-    assert(tail_toks([PTok("("), PTok(")")], 2) == 0);
-    assert(tail_toks(nothing, 0) == 0);
+    // A comment written against the closing bracket rides with it rather than
+    // being dropped. Where exactly it sits is not pretty — the space is the one
+    // `inline_doc` puts after every non-breaking comment — but which side of the
+    // bracket it lands on is meaning, and that is what is asserted here. The old
+    // token-run scan had no place to put it at all.
+    assert(
+        wrapped(lp, [node_of("a")], [PNote("/*c*/", false), PTok(")")], parens, never_space).at(
+            80,
+        ) == "(a/*c*/ )",
+    );
 })
 
 # The items between a pair of brackets, each laid out inline.
@@ -581,13 +604,42 @@ fn list_items(mid: Piece[], ListStyle { sep }, space: (str, str) -> bool) -> Doc
 // declares, and the bare view drops one of the two silently.
 variant FKind = FWord
 
-# A grammar of one production per layout, in order, so a hand-built `CTree(i, ..)`
-# picks a layout by its index.
-fn grammar_of(layouts: Layout[]) -> Grammar<FKind, str> { prods: layouts.map(prod_of) }
+# A grammar of one production per layout, in order, so a hand-built
+# `CTree(i, ..)` picks a layout by its index — followed by one throwaway
+# production per group style, so a hand-built `CGroup(i, ..)` picks a style by
+# its index too.
+#
+# The styles cannot simply be handed over: `groups` is `link`'s output, rebuilt
+# from the rules every time, so the only way to put a style in the table is to
+# write a rule that has one. The carrier productions are never matched against
+# anything; they exist to be linked.
+fn grammar_of(layouts: Layout[], groups: ListStyle[]) -> Grammar<FKind, str> {
+    mut prods: Production<FKind, str>[] = [];
+    for (let i, l : layouts) {
+        set prods.push(prod_of(i, l));
+    }
+    for (let i, st : groups) {
+        set prods.push(group_prod(i, st));
+    }
+    Grammar { prods }
+}
 
-fn prod_of(l: Layout) -> Production<FKind, str> {
+# A production whose whole purpose is to carry one group style into `groups`.
+fn group_prod(i: u64, st: ListStyle) -> Production<FKind, str> {
     let word: Rule<FKind> = Term(FWord);
-    Production { name: "p", rule: word, build: Mk(nothing), layout: l }
+    Production {
+        name: `g{i}`,
+        rule: NestedIn(word, word, word, style=st),
+        build: Mk(nothing),
+        layout: Inline,
+    }
+}
+
+# Distinct names because `format_cst` links, and `link` refuses a grammar with
+# two productions of one name.
+fn prod_of(i: u64, l: Layout) -> Production<FKind, str> {
+    let word: Rule<FKind> = Term(FWord);
+    Production { name: `p{i}`, rule: word, build: Mk(nothing), layout: l }
 }
 
 # A `build` that lowers nothing: the formatter never lowers, and a `Production`
@@ -625,154 +677,181 @@ fn node_of(t: str) -> Piece { PNode(Text(t), t, t) }
 
 fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
 --- performance ---
-allocations: 1688
-deallocations: 1688
-reallocations: 174
-bytes allocated: 122921
-instructions executed: 147388
-binary size: 173160
-  code: 109044
-  data: 4588
-  metadata: 59528
+allocations: 2532
+deallocations: 2532
+reallocations: 195
+bytes allocated: 181179
+instructions executed: 218619
+binary size: 213840
+  code: 134456
+  data: 4852
+  metadata: 74532
 functions:
   __arr_drop_Piece:
-    calls: 119
+    calls: 118
     bytes: 228
   __arr_drop___m1__Cst:
-    calls: 5
+    calls: 8
     bytes: 116
   __arr_drop___m2__Doc:
-    calls: 181
+    calls: 273
     bytes: 116
-  __arr_drop___m8__Layout:
-    calls: 2
-    bytes: 144
+  __arr_drop___m8__ListStyle:
+    calls: 15
+    bytes: 120
   __arr_drop___m8__Production$FKind$str:
-    calls: 2
-    bytes: 240
+    calls: 31
+    bytes: 188
+  __arr_drop___m8__Rule$FKind:
+    calls: 0
+    bytes: 116
   __arr_retain_Piece:
-    calls: 119
+    calls: 123
     bytes: 228
   __arr_retain___m1__Cst:
     calls: 0
     bytes: 116
   __arr_retain___m2__Doc:
-    calls: 297
+    calls: 415
     bytes: 116
-  __arr_retain___m8__Layout:
-    calls: 0
-    bytes: 144
+  __arr_retain___m8__ListStyle:
+    calls: 6
+    bytes: 120
   __arr_retain___m8__Production$FKind$str:
-    calls: 4
-    bytes: 240
-  __builtin_all$char$s0$lam57:
-    calls: 12
+    calls: 52
+    bytes: 188
+  __arr_retain___m8__Rule$FKind:
+    calls: 0
+    bytes: 116
+  __builtin_all$char$s0$lam83:
+    calls: 17
     bytes: 212
-  __builtin_any$__m2__Doc$lam44:
+  __builtin_any$__m2__Doc$lam33:
     calls: 0
     bytes: 32
-  __builtin_any$__m2__Doc$lam44$tail:
-    calls: 56
+  __builtin_any$__m2__Doc$lam33$tail:
+    calls: 103
     bytes: 324
-  __builtin_count_while$char$s0$lam61:
+  __builtin_count_while$char$s0$lam66:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam71:
+  __builtin_count_while$char$s0$lam92:
     calls: 0
     bytes: 172
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
+  __builtin_find_index$str$lam37:
+    calls: 26
+    bytes: 400
+  __builtin_find_index$str$lam57:
+    calls: 0
+    bytes: 400
   __builtin_intersperse$__m2__Doc:
-    calls: 20
+    calls: 28
     bytes: 408
   __eq_str$arr:
     calls: 4
     bytes: 364
   __m1__leaves:
     calls: 1
-    bytes: 808
+    bytes: 3684
   __m1__span:
     calls: 1
     bytes: 460
   __m1__token_leaves:
-    calls: 18
-    bytes: 784
+    calls: 99
+    bytes: 3648
   __m2__col_after:
-    calls: 120
+    calls: 152
     bytes: 544
   __m2__fits:
     calls: 0
     bytes: 36
   __m2__fits$tail:
-    calls: 159
+    calls: 250
     bytes: 2684
   __m2__fits_atom:
     calls: 0
     bytes: 52
   __m2__fits_atom$tail:
-    calls: 59
+    calls: 85
     bytes: 312
   __m2__has_hard:
     calls: 0
     bytes: 32
   __m2__has_hard$tail:
-    calls: 168
+    calls: 259
     bytes: 688
   __m2__print_doc:
-    calls: 35
+    calls: 39
     bytes: 4968
   __m3__reindent_block:
     calls: 0
     bytes: 4016
-  __map0:
+  __m8__failure_message:
+    calls: 2
+    bytes: 404
+  __m8__group_styles$FKind:
     calls: 0
-    bytes: 856
-  __map2:
+    bytes: 32
+  __m8__group_styles$FKind$tail:
+    calls: 74
+    bytes: 3116
+  __m8__link$FKind$str:
+    calls: 8
+    bytes: 2788
+  __m8__link_nest$FKind:
+    calls: 6
+    bytes: 1300
+  __m8__link_opt$FKind:
     calls: 0
-    bytes: 856
+    bytes: 660
+  __m8__link_rule$FKind:
+    calls: 44
+    bytes: 5108
+  __m8__link_rules$FKind:
+    calls: 0
+    bytes: 832
+  __m8__nest_styles$FKind:
+    calls: 6
+    bytes: 956
   __rec_drop___m1__Cst:
-    calls: 25
-    bytes: 48
+    calls: 27
+    bytes: 132
   __rec_drop___m2__Doc:
-    calls: 234
+    calls: 337
     bytes: 184
   __rec_drop___m2__Work:
-    calls: 464
+    calls: 662
     bytes: 84
   __rec_drop___m8__Rule$FKind:
-    calls: 4
-    bytes: 304
+    calls: 50
+    bytes: 436
   __test$breaks_after:
     calls: 1
     bytes: 484
   __test$edge:
     calls: 1
     bytes: 444
-  __test$format_cst:
+  __test$fmt_node:
     calls: 1
-    bytes: 4288
+    bytes: 4224
   __test$inline_doc:
     calls: 1
     bytes: 4236
-  __test$lead_toks:
-    calls: 1
-    bytes: 2136
   __test$list_items:
     calls: 1
-    bytes: 6800
+    bytes: 6864
   __test$render_cst:
     calls: 1
-    bytes: 2004
-  __test$tail_toks:
-    calls: 1
-    bytes: 2156
+    bytes: 1248
   __test$tight:
     calls: 1
     bytes: 4364
   __test$wrapped:
     calls: 1
-    bytes: 8712
+    bytes: 10488
   __test_try_fail___m8__ParseError:
     calls: 0
     bytes: 84
@@ -780,170 +859,179 @@ functions:
     calls: 0
     bytes: 824
   __to_str_u64:
-    calls: 1
+    calls: 7
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 6
+    calls: 31
     bytes: (external)
   aipl_arr_extend:
-    calls: 10
+    calls: 66
     bytes: (external)
   aipl_arr_inc:
-    calls: 1007
+    calls: 2214
     bytes: (external)
   aipl_arr_join:
-    calls: 7
+    calls: 32
     bytes: (external)
   aipl_arr_reserve:
-    calls: 10
+    calls: 50
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 12
-    bytes: (external)
-  aipl_arr_slice:
-    calls: 30
+    calls: 88
     bytes: (external)
   aipl_array_dec:
-    calls: 1847
+    calls: 3549
     bytes: (external)
   aipl_array_new:
-    calls: 402
+    calls: 721
     bytes: (external)
   aipl_array_push:
-    calls: 327
+    calls: 482
     bytes: (external)
   aipl_array_push_mut:
-    calls: 203
+    calls: 308
     bytes: (external)
   aipl_array_with_cap:
-    calls: 74
+    calls: 90
     bytes: (external)
   aipl_assert:
-    calls: 48
+    calls: 45
     bytes: (external)
   aipl_rec_alloc:
-    calls: 727
+    calls: 1076
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 5362
+    calls: 8151
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 449
+    calls: 672
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 4635
+    calls: 7075
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 449
+    calls: 672
     bytes: (external)
   aipl_test_begin:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_test_end:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 2
+    calls: 14
     bytes: (external)
   aipl_write_u64:
-    calls: 1
+    calls: 7
     bytes: (external)
   at:
-    calls: 30
+    calls: 33
     bytes: 76
   breaks_after:
     calls: 5
     bytes: 444
   edge:
-    calls: 14
+    calls: 24
     bytes: 188
-  format_cst$FKind$str$s1$lam23:
+  fmt_node$FKind$str$s1$lam23:
     calls: 1
-    bytes: 4292
-  format_cst$FKind$str$s1$lam24:
+    bytes: 3792
+  fmt_node$FKind$str$s1$lam31:
     calls: 1
-    bytes: 4292
-  format_cst$FKind$str$s1$lam30:
-    calls: 10
-    bytes: 4292
-  gap_wanted$lam25:
+    bytes: 3792
+  fmt_node$FKind$str$s1$lam34:
+    calls: 17
+    bytes: 3792
+  format_cst$FKind$str$s1$lam18:
+    calls: 1
+    bytes: 384
+  format_cst$FKind$str$s1$lam19:
+    calls: 1
+    bytes: 384
+  format_cst$FKind$str$s1$lam22:
+    calls: 6
+    bytes: 384
+  gap_wanted$lam20:
     calls: 13
     bytes: 200
-  gap_wanted$lam42:
-    calls: 34
+  gap_wanted$lam32:
+    calls: 72
     bytes: 144
-  gap_wanted$lam45:
-    calls: 5
-    bytes: 140
-  gap_wanted$lam54:
-    calls: 16
-    bytes: 468
-  inline_doc$lam10:
-    calls: 6
-    bytes: 2668
-  inline_doc$lam26:
-    calls: 29
-    bytes: 2668
-  inline_doc$lam27:
+  gap_wanted$lam62:
     calls: 2
+    bytes: 140
+  gap_wanted$lam75:
+    calls: 32
+    bytes: 468
+  grammar_of:
+    calls: 2
+    bytes: 1876
+  group_doc$FKind$str$s1$lam41:
+    calls: 0
+    bytes: 2308
+  group_doc$FKind$str$s1$lam48:
+    calls: 0
+    bytes: 2308
+  group_doc$FKind$str$s1$lam52:
+    calls: 4
+    bytes: 2308
+  inline_doc$lam21:
+    calls: 58
     bytes: 2668
-  inline_doc$lam48:
-    calls: 8
+  inline_doc$lam40:
+    calls: 1
+    bytes: 2668
+  inline_doc$lam51:
+    calls: 20
+    bytes: 2668
+  inline_doc$lam6:
+    calls: 6
     bytes: 2668
   kv:
     calls: 2
     bytes: 288
-  lead_toks:
+  list_items$lam8:
     calls: 18
-    bytes: 740
-  list_items$lam13:
-    calls: 13
     bytes: 1660
   main:
     calls: 1
-    bytes: 712
+    bytes: 576
   nothing:
     calls: 0
     bytes: 228
   piece_doc:
-    calls: 12
+    calls: 14
     bytes: 820
-  pieces$FKind$str$s1$lam31:
+  pieces$FKind$str$s1$lam38:
     calls: 1
-    bytes: 2032
-  pieces$FKind$str$s1$lam40:
-    calls: 1
-    bytes: 2032
+    bytes: 3196
   pieces$FKind$str$s1$lam46:
-    calls: 8
-    bytes: 2032
-  render_cst$FKind$str$s1$lam22:
-    calls: 4
-    bytes: 404
-  render_cst$FKind$str$s1$lam4:
+    calls: 1
+    bytes: 3196
+  pieces$FKind$str$s1$lam49:
+    calls: 20
+    bytes: 3196
+  render_cst$FKind$str$s1$lam0:
     calls: 1
     bytes: 404
-  render_cst$FKind$str$s1$lam5:
+  render_cst$FKind$str$s1$lam1:
     calls: 1
+    bytes: 404
+  render_cst$FKind$str$s1$lam17:
+    calls: 6
     bytes: 404
   rendered:
-    calls: 4
+    calls: 6
     bytes: 120
-  run_text:
-    calls: 20
-    bytes: 892
-  tail_toks:
-    calls: 18
-    bytes: 1176
-  wrapped$lam11:
-    calls: 11
-    bytes: 2900
-  wrapped$lam12:
-    calls: 1
-    bytes: 4480
-  wrapped$lam49:
-    calls: 2
-    bytes: 4480
+  wrapped$lam63:
+    calls: 0
+    bytes: 4272
+  wrapped$lam7:
+    calls: 15
+    bytes: 2680
+  wrapped$lam76:
+    calls: 3
+    bytes: 4272

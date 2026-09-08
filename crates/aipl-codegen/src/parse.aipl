@@ -30,6 +30,7 @@
 // exponential. Both are answered later in the plan — FIRST sets remove most
 // backtracking — and neither matters at the sizes here.
 import {
+    Span,
     case_name,
     case_of,
     contains,
@@ -57,17 +58,31 @@ import {
     wrapping_increment as ++,
     wrapping_sub as -,
 } from builtins;
-import { CLeaf, CTree, CTrivia, Cst, is_tree, show, span, text } from "./cst.aipl";
+import {
+    CGroup,
+    CLeaf,
+    CTree,
+    CTrivia,
+    Cst,
+    nodes,
+    show,
+    span,
+    text,
+    token_leaves,
+} from "./cst.aipl";
 import {
     Climb,
     Grammar,
     Inline,
+    ListStyle,
     Literal,
     Many,
     Maybe,
     Mk,
     Named,
     NamedIdx,
+    NestedIdx,
+    NestedIn,
     OneOf,
     ParseError,
     Prec,
@@ -80,6 +95,7 @@ import {
     prod_names,
 } from "./grammar.aipl";
 import { Bare, CharRun, LexResult, Of, OneChar, ToEol, Token, TokenRule, lex } from "./lexer.aipl";
+import { line_at } from "./line_at.aipl";
 
 # The furthest failure seen so far: the token position nothing could be matched
 # at, and the deduped labels of everything that *was* expected there.
@@ -89,7 +105,7 @@ import { Bare, CharRun, LexResult, Of, OneChar, ToEol, Token, TokenRule, lex } f
 # ordered choice a more specific alternative can fail deeper than the one that
 # was really meant, so a label collapsing a family of rules to one word ("an
 # expression") is what keeps the message readable.
-struct Far { pos: u64, expected: str[] }
+struct Far { pos: u64, expected: str[], unclosed: Span[] = [] }
 
 # One rule's result at one position: whether it matched, where it left off, the
 # CST children it contributed to its parent, and the furthest failure so far.
@@ -127,11 +143,50 @@ fn far_miss(far: Far, pos: u64, label: str) -> Far {
     if (far.expected.contains(label)) {
         return far;
     };
-    Far { pos, expected: [..far.expected, label] }
+
+    // A deeper position starts fresh, so its `unclosed` resets with it; an
+    // equally deep one keeps whatever bracket was already blamed there.
+    Far { ..far, expected: [..far.expected, label] }
+}
+
+# `far` with the opening bracket that went unclosed at its position. Set by a
+# `NestedIn` whose `open` matched and whose `close` did not, which is the only
+# time anything knows a bracket was left hanging.
+#
+# It rides on the furthest failure rather than aborting the parse, because under
+# ordered choice a group failing to close is an ordinary non-match: `(a)` is
+# parsed by trying the tuple `(a, b)` first and letting it fail at the comma. So
+# this only reaches the reader when *no* alternative worked, which is exactly
+# when a hanging bracket is the likely cause.
+#
+# `match_nested` sets it only when the close was wanted past the last token —
+# see there for why a closer failure is not evidence of anything.
+# The first bracket to be blamed at a position keeps it. Groups fail from the
+# inside out, so the first to record is the innermost one — and closing that is
+# the edit the reader has to make first, even when an outer bracket is hanging
+# too.
+fn far_unclosed(far: Far, open: Span[]) -> Far {
+    if (far.unclosed.is_nonempty()) {
+        return far;
+    };
+    Far { ..far, unclosed: open }
 }
 
 # A non-match that leaves `pos` where the rule started (the caller backtracks).
 fn no(far: Far, pos: u64) -> Step { hit: false, pos, kids: [], far }
+
+# The span of the first token in `kids` — where a group's opening bracket was
+# written, for the message when it is never closed. Empty when there is none.
+#
+# A one-element array rather than a `Span?` because that is what `Far` can hold:
+# a struct field may be an optional of an integer or an array, but not of another
+# struct, and `Span` is one.
+fn first_token(kids: Cst[]) -> Span[] {
+    match (kids.map(token_leaves).join().first()) {
+        some(sp) => [sp],
+        none => [],
+    }
+}
 
 # A non-match that also records what was expected.
 fn miss(far: Far, pos: u64, label: str) -> Step { no(far_miss(far, pos, label), pos) }
@@ -195,6 +250,9 @@ fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
         CTree(i, kids) => CTree(i, [..kids, ..trailing_trivia(p)]),
         CLeaf(sp) => CLeaf(sp),
         CTrivia(sp) => CTrivia(sp),
+        // The root is a production's node, never a group — `match_prod` is what
+        // `parse_cst` starts with — so there is nothing to append to here.
+        CGroup(gi, open, body, close) => CGroup(gi, open, body, close),
     }
 }
 
@@ -231,11 +289,66 @@ fn match_rule<K: variant, A: any>(
         ),
         Maybe(sub) => match_maybe(p, sub, pos, cur, far),
         NamedIdx(i) => match_prod(p, i, pos, far),
+        NestedIdx(gi, open, body, close, _) => match_nested(
+            p,
+            gi,
+            open,
+            body,
+            close,
+            pos,
+            cur,
+            far,
+        ),
         Climb(atom, precs) => match_climb(p, atom, precs, pos, cur, far),
         // `link` rewrites every one of these; reaching one means the grammar was
         // handed to the driver unlinked, which `parse_cst` makes impossible.
         Named(n) => err(ParseError { message: `unlinked rule reference "{n}"`, span: 0..0 }),
+        NestedIn(..) => err(ParseError { message: "unlinked group", span: 0..0 }),
     }
+}
+
+# A bracketed group: `open`, then `body`, then `close`, matched in order and kept
+# as one `CGroup` naming style `gi`. It parses exactly as `Then` of the three
+# would; what it adds is on either side of that.
+#
+# On the way in, the three runs stay separate in the tree, so the formatter knows
+# which tokens are brackets without inferring it from where they sit. On the way
+# out, a `close` that fails after `open` matched records the opening bracket's
+# span on the furthest failure — the parse still backtracks like any non-match,
+# but if nothing else works the message can say which bracket was left open.
+fn match_nested<K: variant, A: any>(
+    p: Parser<K, A>,
+    gi: u64,
+    open: Rule<K>,
+    body: Rule<K>,
+    close: Rule<K>,
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    let so = match_rule(p, open, pos, cur, far)?;
+    if (!so.hit) {
+        return ok(no(so.far, pos));
+    };
+    let sb = match_rule(p, body, so.pos, cur, so.far)?;
+    if (!sb.hit) {
+        return ok(no(sb.far, pos));
+    };
+    let sc = match_rule(p, close, sb.pos, cur, sb.far)?;
+    if (!sc.hit) {
+        // Only when the close was wanted past the last token. Anywhere else
+        // there *is* a token sitting where the bracket should be, and "never
+        // closed" would be a lie: `[1, 2,]` fails at the trailing comma with the
+        // `]` in plain sight, and blaming the `[` would send the reader to the
+        // wrong end of the list. Running out of input is the case where the
+        // bracket really is hanging, and the case where the opener can be a
+        // screenful away.
+        if (p.toks.len() <= sb.pos) {
+            return ok(no(far_unclosed(sc.far, first_token(so.kids)), pos));
+        };
+        return ok(no(sc.far, pos));
+    };
+    ok(Step { hit: true, pos: sc.pos, kids: [CGroup(gi, so.kids, sb.kids, sc.kids)], far: sc.far })
 }
 
 # Any one token whose kind is the case `k` — `Term(Name)` matches every
@@ -521,7 +634,7 @@ fn climb<K: variant, A: any>(
 # The error a furthest failure describes: what was expected there, and what was
 # found instead. The span is the offending token's (or the empty span at the end
 # of the source), which is what `caret_block.aipl` renders the underline from.
-fn error_at<K: variant, A: any>(p: Parser<K, A>, far: Far) -> ParseError {
+fn error_at<K: variant, A: any>(p: Parser<K, A>, src: str, far: Far) -> ParseError {
     let found = if (far.pos < p.toks.len()) {
         quoted(tok_text(p, far.pos))
     } else {
@@ -531,14 +644,34 @@ fn error_at<K: variant, A: any>(p: Parser<K, A>, far: Far) -> ParseError {
         some(t) => t.text.span,
         none => p.end..p.end,
     };
+    let hint = unclosed_hint(src, far.unclosed);
     if (far.expected.is_empty()) {
-        return ParseError { message: `unexpected {found}`, span };
+        return ParseError { message: `unexpected {found}{hint}`, span };
     };
 
     // `a`, `a or b`, `a, b, or c` — the Oxford list `join`'s two extra
     // separators write directly.
     let expected = far.expected.join(sep=", ", final_sep=", or ", only_sep=" or ");
-    ParseError { message: `expected {expected}, found {found}`, span }
+    ParseError { message: `expected {expected}, found {found}{hint}`, span }
+}
+
+# The parenthetical naming the bracket that was never closed, or the empty string
+# when no group got that far. The span stays on the *failure*, which is where the
+# reader has to type something; the opener is named by line because pointing at
+# two places at once is what a single-span error cannot do.
+#
+# This is the whole reason `NestedIn` exists on the parsing side: a flat
+# `Then([Lit("("), .., Lit(")")])` fails at the close having forgotten there was
+# an open, and reports "expected `)`, found end of input" a hundred lines away
+# from the `(` that caused it.
+fn unclosed_hint(src: str, open: Span[]) -> str {
+    match (open.first()) {
+        some(sp) => {
+            let line = line_at(src, sp.start).line + 1;
+            ` ({quoted(src[sp])} at line {line} is never closed)`
+        },
+        none => "",
+    }
 }
 
 // ---------- entry points ----------
@@ -572,10 +705,10 @@ pub fn parse_cst<K: variant, A: any>(
     };
     let Step { hit, far, pos, kids } = match_prod(p, i, 0, Far { pos: 0, expected: [] })?;
     if (!hit) {
-        return err(error_at(p, far));
+        return err(error_at(p, src, far));
     };
     if (pos < p.toks.len()) {
-        return err(error_at(p, far_miss(far, pos, "end of input")));
+        return err(error_at(p, src, far_miss(far, pos, "end of input")));
     };
     let root = kids
         .first()
@@ -596,7 +729,9 @@ pub fn lower<K: variant, A: any>(src: str, node: Cst, g: Grammar<K, A>) -> A!Par
 fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]) -> A!ParseError {
     match (node) {
         CTree(i, kids) => {
-            let vals = kids.filter(is_tree).try_map(|k| lower_node(src, k, prods))?;
+            // `nodes` splices groups away, so a production that wraps a bracket
+            // pair hands its `build` the same children it would without one.
+            let vals = node.nodes().try_map(|k| lower_node(src, k, prods))?;
             let Production { build } = prods[i].value_or_err(ParseError {
                 message: `no production at index {i}`,
                 span: node.span(),
@@ -607,6 +742,12 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
         },
         CLeaf(span) => err(ParseError { message: "a token leaf has no lowered value", span }),
         CTrivia(span) => err(ParseError { message: "trivia has no lowered value", span }),
+        // Unreachable from a tree `parse_cst` built: `nodes` splices every group
+        // away before this recurses, so lowering never lands on one.
+        CGroup(..) => err(ParseError {
+            message: "a group has no lowered value",
+            span: node.span(),
+        }),
     }
 }
 
@@ -795,6 +936,78 @@ pub fn parse<K: variant, A: any>(
     // A grammar handed over unlinked parses anyway; linking twice changes
     // nothing.
     assert(shown("(a b)", link(g_sexp)?, "list")? == "(list ( (item a) (item b) ))");
+
+    // ---- Groups ----
+    //
+    // The same S-expression grammar with its brackets written as a `NestedIn`
+    // rather than a flat `Then`. It parses the same input to the same *lowered*
+    // value, because a group is transparent to everything but the formatter.
+    let g_grp = g_of([
+        one(
+            "list",
+            NestedIn(
+                Literal("("),
+                Many(NamedIdx(1), sep=some(Literal(","))),
+                Literal(")"),
+                style=ListStyle { spaced: true },
+            ),
+        ),
+        one("item", OneOf([Term(Word), Named("list")])),
+    ]);
+
+    // The tree shows the brackets as a group — `[..]` in `show` — with the items
+    // between them, and the source still comes back whole.
+    assert(shown("(a, b)", g_grp, "list")? == "(list [( (item a) , (item b) )])");
+    assert(parsed("(a, b)", g_grp, "list")? == NNode([NLeaf("a"), NLeaf("b")]));
+
+    // Nested groups nest, and lowering still sees one child per item.
+    assert(parsed("(a, (b))", g_grp, "list")? == NNode([NLeaf("a"), NNode([NNode([NLeaf("b")])])]));
+
+    // The style rode into the grammar's `groups` table, keyed by the index the
+    // `CGroup` carries.
+    assert(link(g_grp)?.groups == [ListStyle { spaced: true }]);
+
+    // Losslessness holds through a group: trivia inside the brackets attaches to
+    // the token that follows it, exactly as it does inside a production.
+    let gsrc = "( a, // c\n  b )";
+    let gtree = parse_cst(gsrc, lex_toks(gsrc, trivia_rules())?, g_grp, "list")?;
+    assert(gtree.text(gsrc) == gsrc);
+
+    // ---- The unclosed bracket ----
+    //
+    // The payoff for the parser: a group that opens and never closes names the
+    // bracket that did it. A flat `Then` fails at the close having forgotten
+    // there was an open, so all it can say is the first half of this.
+    assert(
+        msg_of(
+            "(a, b",
+            g_grp,
+            "list",
+        ) == "expected `,` or `)`, found end of input (`(` at line 1 is never closed)",
+    );
+
+    // The line is the *opener's*, not the failure's — which is the whole point
+    // when the two are far apart.
+    assert(
+        msg_of(
+            "(a,\nb,\nc",
+            g_grp,
+            "list",
+        ) == "expected `,` or `)`, found end of input (`(` at line 1 is never closed)",
+    );
+
+    // An inner bracket left open blames the inner one, being the deepest failure
+    // — put the two on different lines and it is the inner line that is named.
+    assert(
+        msg_of(
+            "(a,\n(b",
+            g_grp,
+            "list",
+        ) == "expected `,` or `)`, found end of input (`(` at line 2 is never closed)",
+    );
+
+    // A failure that has nothing to do with a bracket says nothing about one.
+    assert(msg_of("a", g_grp, "list") == "expected `(`, found `a`");
 })
 
 // ---------- test-only fixtures ----------
@@ -891,166 +1104,202 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 2979
-deallocations: 2979
-reallocations: 324
-bytes allocated: 193013
-instructions executed: 464288
-binary size: 322720
-  code: 200012
-  data: 5924
-  metadata: 116784
+allocations: 4883
+deallocations: 4883
+reallocations: 417
+bytes allocated: 302077
+instructions executed: 655181
+binary size: 432376
+  code: 262172
+  data: 7324
+  metadata: 162880
 functions:
   __arr_drop_Node:
-    calls: 11
+    calls: 21
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 256
+    calls: 428
     bytes: 116
+  __arr_drop___m2__ListStyle:
+    calls: 165
+    bytes: 120
   __arr_drop___m2__Prec:
     calls: 2
     bytes: 120
   __arr_drop___m2__Production$Tok$Node:
-    calls: 73
-    bytes: 240
+    calls: 92
+    bytes: 188
   __arr_drop___m2__Rule$Tok:
-    calls: 99
+    calls: 118
     bytes: 116
   __arr_drop___m3__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_drop___m3__Token$Tok:
-    calls: 194
+    calls: 253
     bytes: 188
   __arr_drop___m3__TokenRule$Tok:
-    calls: 42
+    calls: 50
     bytes: 632
   __arr_retain_Node:
-    calls: 10
+    calls: 18
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 259
+    calls: 374
     bytes: 116
+  __arr_retain___m2__ListStyle:
+    calls: 54
+    bytes: 120
   __arr_retain___m2__Prec:
     calls: 0
     bytes: 120
   __arr_retain___m2__Production$Tok$Node:
-    calls: 67
-    bytes: 240
+    calls: 94
+    bytes: 188
   __arr_retain___m2__Rule$Tok:
-    calls: 142
+    calls: 169
     bytes: 116
   __arr_retain___m3__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_retain___m3__Token$Tok:
-    calls: 116
+    calls: 159
     bytes: 188
   __arr_retain___m3__TokenRule$Tok:
     calls: 0
     bytes: 632
-  __builtin_count_while$char$lam37:
-    calls: 101
+  __builtin_count_while$char$lam47:
+    calls: 128
     bytes: 220
-  __builtin_count_while$char$s0$lam45:
+  __builtin_count_while$char$s0$lam55:
     calls: 0
     bytes: 184
-  __builtin_count_while$char$s0$lam60:
+  __builtin_count_while$char$s0$lam67:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam60$tail:
-    calls: 2
+  __builtin_count_while$char$s0$lam67$tail:
+    calls: 3
     bytes: 256
-  __builtin_find_if$__m2__Prec$lam84:
+  __builtin_find_if$__m2__Prec$lam104:
     calls: 11
     bytes: 688
-  __builtin_find_index$str$lam20:
-    calls: 55
+  __builtin_find_index$str$lam24:
+    calls: 73
     bytes: 400
-  __builtin_find_index$str$lam31:
-    calls: 19
+  __builtin_find_index$str$lam37:
+    calls: 28
     bytes: 400
   __builtin_find_index$str$lam8:
-    calls: 42
+    calls: 50
     bytes: 400
-  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam69:
-    calls: 10
+  __builtin_try_map$__m1__Cst$Node$__m2__ParseError$lam77:
+    calls: 18
     bytes: 748
-  __builtin_try_map$__m2__Production$Tok$Node$__m2__Production$Tok$Node$__m2__ParseError$lam23:
-    calls: 43
-    bytes: 1168
-  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam52:
-    calls: 36
-    bytes: 732
   __eq_Node:
-    calls: 7
+    calls: 13
     bytes: 136
   __eq_Node$arr:
-    calls: 4
+    calls: 8
     bytes: 300
   __eq___builtin_Span:
     calls: 1
     bytes: 104
+  __eq___m2__ListStyle:
+    calls: 1
+    bytes: 200
+  __eq___m2__ListStyle$arr:
+    calls: 1
+    bytes: 284
   __eq___m2__ParseError:
     calls: 1
     bytes: 128
   __eq_char$opt:
     calls: 0
     bytes: 100
+  __filter73$own0:
+    calls: 18
+    bytes: 544
   __lambda_0:
     calls: 0
     bytes: 128
   __lambda_1:
-    calls: 3
+    calls: 5
     bytes: 96
   __lambda_2:
     calls: 0
     bytes: 128
-  __lambda_21:
-    calls: 55
-    bytes: 1328
-  __lambda_24:
-    calls: 0
-    bytes: 128
   __lambda_25:
-    calls: 31
-    bytes: 96
-  __lambda_26:
     calls: 0
     bytes: 128
+  __lambda_26:
+    calls: 45
+    bytes: 96
   __lambda_27:
+    calls: 0
+    bytes: 128
+  __lambda_28:
     calls: 25
     bytes: 96
   __lambda_3:
     calls: 0
     bytes: 96
+  __m1__flat_kids:
+    calls: 0
+    bytes: 32
+  __m1__flat_kids$tail:
+    calls: 21
+    bytes: 3832
   __m1__leaves:
-    calls: 33
-    bytes: 808
+    calls: 66
+    bytes: 3684
   __m1__show:
-    calls: 117
-    bytes: 1652
+    calls: 126
+    bytes: 2792
   __m1__span:
     calls: 1
     bytes: 460
+  __m1__splice:
+    calls: 0
+    bytes: 32
+  __m1__splice$tail:
+    calls: 50
+    bytes: 612
   __m1__text:
-    calls: 7
+    calls: 12
     bytes: 476
+  __m1__token_leaves:
+    calls: 3
+    bytes: 3648
   __m2__failure_message:
-    calls: 16
+    calls: 20
     bytes: 404
+  __m2__group_styles$Tok:
+    calls: 0
+    bytes: 32
+  __m2__group_styles$Tok$tail:
+    calls: 526
+    bytes: 3116
   __m2__link$Tok$Node:
-    calls: 43
-    bytes: 1188
+    calls: 52
+    bytes: 2328
+  __m2__link_nest$Tok:
+    calls: 9
+    bytes: 1300
   __m2__link_opt$Tok:
-    calls: 18
-    bytes: 652
+    calls: 27
+    bytes: 660
   __m2__link_rule$Tok:
-    calls: 175
-    bytes: 4364
+    calls: 256
+    bytes: 5108
+  __m2__link_rules$Tok:
+    calls: 45
+    bytes: 832
+  __m2__nest_styles$Tok:
+    calls: 9
+    bytes: 956
   __m2__prod_names$Tok$Node:
-    calls: 107
-    bytes: 564
+    calls: 125
+    bytes: 492
   __m3__between_len:
     calls: 0
     bytes: 752
@@ -1067,16 +1316,16 @@ functions:
     calls: 0
     bytes: 2248
   __m3__lex$Tok:
-    calls: 42
+    calls: 50
     bytes: 1520
   __m3__lex_step$Tok:
-    calls: 151
+    calls: 201
     bytes: 24708
   __m3__nested_len:
     calls: 0
     bytes: 940
   __m3__step_result$Tok:
-    calls: 388
+    calls: 526
     bytes: 8364
   __m3__template_scan$Tok:
     calls: 0
@@ -1088,23 +1337,26 @@ functions:
     calls: 0
     bytes: 52
   __m3__to_eol_len$tail:
-    calls: 9
+    calls: 15
     bytes: 252
   __m3__to_eol_unless_len:
     calls: 0
     bytes: 368
+  __m5__line_at:
+    calls: 3
+    bytes: 532
   __rec_drop_Node:
-    calls: 16
+    calls: 30
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 201
-    bytes: 48
+    calls: 273
+    bytes: 132
   __rec_drop___m2__Rule$Tok:
-    calls: 228
-    bytes: 304
+    calls: 318
+    bytes: 436
   __test$parse:
     calls: 1
-    bytes: 81428
+    bytes: 113384
   __test_try_fail___m2__ParseError:
     calls: 0
     bytes: 84
@@ -1112,58 +1364,58 @@ functions:
     calls: 0
     bytes: 824
   __to_str_u64:
-    calls: 0
+    calls: 3
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 11
+    calls: 106
     bytes: (external)
   aipl_arr_extend:
-    calls: 445
+    calls: 750
     bytes: (external)
   aipl_arr_inc:
-    calls: 9176
+    calls: 16855
     bytes: (external)
   aipl_arr_join:
-    calls: 11
+    calls: 106
     bytes: (external)
   aipl_arr_reserve:
-    calls: 568
+    calls: 891
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 25
+    calls: 213
     bytes: (external)
   aipl_array_dec:
-    calls: 11354
+    calls: 20670
     bytes: (external)
   aipl_array_new:
-    calls: 1393
+    calls: 2597
     bytes: (external)
   aipl_array_push:
-    calls: 151
+    calls: 193
     bytes: (external)
   aipl_array_push_mut:
-    calls: 427
+    calls: 712
     bytes: (external)
   aipl_array_with_cap:
-    calls: 331
+    calls: 488
     bytes: (external)
   aipl_assert:
-    calls: 43
+    calls: 52
     bytes: (external)
   aipl_rec_alloc:
-    calls: 445
+    calls: 621
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2775
+    calls: 4817
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 43
+    calls: 93
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2330
+    calls: 4196
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 43
+    calls: 93
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -1174,81 +1426,93 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
   build_node:
-    calls: 9
+    calls: 17
     bytes: 440
   climb$Tok$Node:
     calls: 15
-    bytes: 2736
+    bytes: 3160
   error_at$Tok$Node:
-    calls: 14
-    bytes: 1956
+    calls: 18
+    bytes: 2920
   far_miss:
-    calls: 54
-    bytes: 940
+    calls: 69
+    bytes: 1084
+  far_unclosed:
+    calls: 3
+    bytes: 320
   find_prec:
     calls: 22
     bytes: 228
   leaf_at$Tok$Node:
-    calls: 96
+    calls: 133
     bytes: 1888
   lex_toks:
-    calls: 42
+    calls: 50
     bytes: 696
   lower_node$Tok$Node:
-    calls: 10
-    bytes: 3844
+    calls: 18
+    bytes: 3416
   main:
     calls: 1
     bytes: 104
   match_many$Tok$Node:
-    calls: 19
-    bytes: 3668
+    calls: 28
+    bytes: 4560
   match_maybe$Tok$Node:
     calls: 4
-    bytes: 868
+    bytes: 1076
+  match_nested$Tok$Node:
+    calls: 10
+    bytes: 5908
   match_one_of$Tok$Node:
-    calls: 35
-    bytes: 1312
+    calls: 52
+    bytes: 1692
   match_prod$Tok$Node:
-    calls: 84
-    bytes: 4820
+    calls: 111
+    bytes: 4524
   match_rule$Tok$Node:
-    calls: 276
-    bytes: 4684
+    calls: 383
+    bytes: 6300
   match_then$Tok$Node:
     calls: 31
-    bytes: 1720
+    bytes: 2128
   parse$Tok$Node:
-    calls: 3
+    calls: 5
     bytes: 380
   parse_cst$Tok$Node:
-    calls: 42
-    bytes: 4388
+    calls: 50
+    bytes: 5140
   parsed:
-    calls: 3
+    calls: 5
     bytes: 452
   prev_end$Tok$Node:
-    calls: 148
+    calls: 193
     bytes: 772
   quoted:
-    calls: 26
+    calls: 43
     bytes: 456
   refuse:
     calls: 1
     bytes: 348
   shown:
-    calls: 37
+    calls: 42
     bytes: 844
   tok_rules:
-    calls: 40
+    calls: 47
     bytes: 2736
   tok_text$Tok$Node:
-    calls: 81
+    calls: 117
     bytes: 832
   trailing_trivia$Tok$Node:
-    calls: 52
+    calls: 60
     bytes: 760
   trivia_rules:
-    calls: 2
+    calls: 3
     bytes: 3368

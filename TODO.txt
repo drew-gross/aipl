@@ -76,6 +76,7 @@ value_or for structs:
 
 highlighter:
   range collapsing in charachter classes
+  fold regions and bracket pair coloring
 
 misc cleanup:
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
@@ -229,8 +230,7 @@ parser:
   minimize rule binding shorthand necessity by improving the type system
   chage Far to use a set of expected
   Mk should accept fns that only need kids
-  implement "nested in" which should be good for the formatter
-  implement the plan
+  do parser recovery
   remove power from prec and use order within the list
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 

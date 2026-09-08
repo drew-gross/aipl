@@ -26,7 +26,7 @@
           </h3>
           <pre class="signature"><code>variant Cst</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>An interior node is <code>CTree(prod, kids)</code>; a <code>CGroup</code> is the bracket pair a <code>NestedIn</code> matched, holding its opening kids, the kids between the brackets, and its closing kids as three runs.</p><p>A group is *transparent*: it is not a production, it lowers to nothing of its own, and <code>nodes</code> and <code>own_tokens</code> splice straight through it — so converting a <code>Then([Lit(&quot;(&quot;), x, Lit(&quot;)&quot;)])</code> into a <code>NestedIn</code> leaves every <code>build</code> function reading exactly the children it read before. The only pass that sees a group is the formatter, which is the pass that needs to know where the brackets are.</p></div>
 
 
           <ul class="cases">
@@ -36,6 +36,8 @@
             <li id="item-CTrivia"><code>CTrivia(Span)</code></li>
 
             <li id="item-CTree"><code>CTree(u64, Cst[])</code></li>
+
+            <li id="item-CGroup"><code>CGroup(u64, Cst[], Cst[], Cst[])</code></li>
 
           </ul>
 
@@ -188,6 +190,34 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-flat_kids">
+          <h3>
+            <a class="anchor" href="#item-flat_kids">flat_kids</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn flat_kids(self: Cst) -&#62; Cst[]</code></pre>
+
+          <div class="doc"><p>The direct kids of <code>self</code> with every group spliced in place — the one function that makes a group transparent, and what <code>nodes</code> and <code>own_tokens</code> are both written against. A group's three runs concatenate in source order, and a group nested directly inside another flattens with it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-splice">
+          <h3>
+            <a class="anchor" href="#item-splice">splice</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn splice(self: Cst) -&#62; Cst[]</code></pre>
+
+          <div class="doc"><p>One kid as the kids it stands for: a group as its contents, anything else as itself.</p></div>
+
+
+        </section>
+
 
 
         <section class="item" id="item-is_leaf">

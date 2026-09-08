@@ -31,7 +31,16 @@ import {
     value_or,
 } from builtins;
 
-variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[])
+# An interior node is `CTree(prod, kids)`; a `CGroup` is the bracket pair a
+# `NestedIn` matched, holding its opening kids, the kids between the brackets,
+# and its closing kids as three runs.
+#
+# A group is *transparent*: it is not a production, it lowers to nothing of its
+# own, and `nodes` and `own_tokens` splice straight through it — so converting a
+# `Then([Lit("("), x, Lit(")")])` into a `NestedIn` leaves every `build` function
+# reading exactly the children it read before. The only pass that sees a group is
+# the formatter, which is the pass that needs to know where the brackets are.
+variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[]) | CGroup(u64, Cst[], Cst[], Cst[])
 
 # Whether `self` is an interior node. The parser's lowering pass hands a
 # production's `build` only the values of its *interior* children — a leaf has
@@ -40,7 +49,9 @@ variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[])
 pub fn is_tree(self: Cst) -> bool {
     match (self) {
         CTree(..) => true,
-        CLeaf(..) | CTrivia(..) => false,
+        // A group is not one: it is spliced away by `flat_kids` before anything
+        // asks, and reaching this with one means a caller walked raw kids.
+        CLeaf(..) | CTrivia(..) | CGroup(..) => false,
     }
 }
 
@@ -52,6 +63,11 @@ pub fn leaves(self: Cst) -> Span[] {
     match (self) {
         CLeaf(sp) | CTrivia(sp) => [sp],
         CTree(_, kids) => kids.map(leaves).join(),
+        CGroup(_, open, body, close) => [
+            ..open.map(leaves).join(),
+            ..body.map(leaves).join(),
+            ..close.map(leaves).join(),
+        ],
     }
 }
 
@@ -71,6 +87,11 @@ pub fn token_leaves(self: Cst) -> Span[] {
         CLeaf(sp) => [sp],
         CTrivia(..) => [],
         CTree(_, kids) => kids.map(token_leaves).join(),
+        CGroup(_, open, body, close) => [
+            ..open.map(token_leaves).join(),
+            ..body.map(token_leaves).join(),
+            ..close.map(token_leaves).join(),
+        ],
     }
 }
 
@@ -100,10 +121,30 @@ pub fn span(self: Cst) -> Span {
 # the child list a production's `build` is lowered against, so its order and
 # length are part of the contract between a grammar and its lowering functions:
 # one entry per `Named` reference the rule matched, in the order it matched them.
-pub fn nodes(self: Cst) -> Cst[] {
+pub fn nodes(self: Cst) -> Cst[] { self.flat_kids().filter(is_tree) }
+
+# The direct kids of `self` with every group spliced in place — the one function
+# that makes a group transparent, and what `nodes` and `own_tokens` are both
+# written against. A group's three runs concatenate in source order, and a group
+# nested directly inside another flattens with it.
+fn flat_kids(self: Cst) -> Cst[] {
     match (self) {
         CLeaf(..) | CTrivia(..) => [],
-        CTree(_, kids) => kids.filter(is_tree),
+        CTree(_, kids) => kids.map(splice).join(),
+        CGroup(_, open, body, close) => [
+            ..open.map(splice).join(),
+            ..body.map(splice).join(),
+            ..close.map(splice).join(),
+        ],
+    }
+}
+
+# One kid as the kids it stands for: a group as its contents, anything else as
+# itself.
+fn splice(self: Cst) -> Cst[] {
+    match (self) {
+        CGroup(..) => self.flat_kids(),
+        CLeaf(..) | CTrivia(..) | CTree(..) => [self],
     }
 }
 
@@ -116,12 +157,7 @@ pub fn nodes(self: Cst) -> Cst[] {
 # between them is a direct leaf, so `own_token_text` is the operator and nothing
 # else — where `token_text` would hand back the whole expression's tokens run
 # together. Trivia is dropped here as it is there.
-pub fn own_tokens(self: Cst) -> Span[] {
-    match (self) {
-        CLeaf(..) | CTrivia(..) => [],
-        CTree(_, kids) => kids.filter_map(is_leaf, leaf_span),
-    }
-}
+pub fn own_tokens(self: Cst) -> Span[] { self.flat_kids().filter_map(is_leaf, leaf_span) }
 
 # The source text of `self`'s direct token leaves, run together with nothing
 # between them — the operator of a binary node, the keyword that opened a form.
@@ -133,7 +169,7 @@ pub fn own_token_text(self: Cst, src: str) -> str {
 fn is_leaf(self: Cst) -> bool {
     match (self) {
         CLeaf(..) => true,
-        CTree(..) | CTrivia(..) => false,
+        CTree(..) | CTrivia(..) | CGroup(..) => false,
     }
 }
 
@@ -142,7 +178,7 @@ fn is_leaf(self: Cst) -> bool {
 fn leaf_span(self: Cst) -> Span {
     match (self) {
         CLeaf(sp) => sp,
-        CTrivia(..) | CTree(..) => 0..0,
+        CTrivia(..) | CTree(..) | CGroup(..) => 0..0,
     }
 }
 
@@ -159,6 +195,12 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
             let parts = kids.map(|k| k.show(src, names));
             let name = names[i].value_or("?");
             if (parts.is_empty()) { `({name})` } else { `({name} {parts.join(sep=" ")})` }
+        },
+        // A group has no name to print, so it renders as its own brackets: what
+        // it holds, between `[` and `]`, whatever the source spelled them.
+        CGroup(_, open, body, close) => {
+            let parts = [..open, ..body, ..close].map(|k| k.show(src, names));
+            `[{parts.join(sep=" ")}]`
         },
     }
 }.test({
@@ -225,77 +267,141 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // An index past the end of the name table still renders.
     let far: u64 = 9;
     assert(CTree(far, []).show(src, names) == "(?)");
+
+    // ---------- groups ----------
+    //
+    //                1
+    //      0123456789012
+    let gs = "(1 + 2) * (3)";
+    let inner = CTree(1, [CLeaf(1..2), CTrivia(2..3), CLeaf(3..4), CTrivia(4..5), CLeaf(5..6)]);
+    let grp = CGroup(0, [CLeaf(0..1)], [inner], [CLeaf(6..7)]);
+    let outer = CTree(
+        0,
+        [
+            grp,
+            CTrivia(7..8),
+            CLeaf(8..9),
+            CTrivia(9..10),
+            CGroup(0, [CLeaf(10..11)], [CTree(1, [CLeaf(11..12)])], [CLeaf(12..13)]),
+        ],
+    );
+
+    // Losslessness holds through a group exactly as through a node: the three
+    // runs contribute their leaves in source order.
+    assert(outer.text(gs) == gs);
+    assert(grp.span() == 0..7);
+    assert(grp.token_text(gs) == "(1+2)");
+
+    // Transparency: the group is not itself a child, and what it holds is. The
+    // `*` between the two groups is a direct leaf of the parent, and the two
+    // bracketed expressions are its two interior children — exactly what the
+    // same tree written with `Then` and no group would have handed a `build`.
+    assert(!grp.is_tree());
+    assert(outer.nodes() == [inner, CTree(1, [CLeaf(11..12)])]);
+    assert(outer.own_token_text(gs) == "()*()");
+
+    // A group directly inside a group flattens with it, so nesting the brackets
+    // does not nest the child list.
+    let doubled = CTree(0, [CGroup(0, [CLeaf(0..1)], [grp], [CLeaf(6..7)])]);
+    assert(doubled.nodes() == [inner]);
+
+    // A group renders as its own brackets, having no production name to print.
+    assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 188
-deallocations: 188
-reallocations: 18
-bytes allocated: 10123
-instructions executed: 10680
-binary size: 31048
-  code: 17992
-  data: 1788
-  metadata: 11268
+allocations: 576
+deallocations: 576
+reallocations: 40
+bytes allocated: 29070
+instructions executed: 29320
+binary size: 59656
+  code: 35348
+  data: 2261
+  metadata: 22047
 functions:
   __arr_drop_Cst:
-    calls: 8
+    calls: 129
     bytes: 116
   __arr_retain_Cst:
-    calls: 2
+    calls: 62
     bytes: 116
   __eq_Cst:
-    calls: 3
-    bytes: 196
+    calls: 17
+    bytes: 360
   __eq_Cst$arr:
-    calls: 4
+    calls: 9
     bytes: 300
   __eq___builtin_Span:
-    calls: 13
+    calls: 25
     bytes: 104
   __eq___builtin_Span$arr:
     calls: 4
     bytes: 284
+  __filter0$own0:
+    calls: 1
+    bytes: 544
+  __filter1$own0:
+    calls: 1
+    bytes: 544
+  __filter5$own0:
+    calls: 1
+    bytes: 544
+  __filter6$own0:
+    calls: 1
+    bytes: 544
+  __filter7$own0:
+    calls: 1
+    bytes: 544
+  __filter8$own0:
+    calls: 1
+    bytes: 544
   __rec_drop_Cst:
-    calls: 30
-    bytes: 48
+    calls: 54
+    bytes: 132
   __test$show:
     calls: 1
-    bytes: 10920
+    bytes: 13296
   aipl_arr_drop_arr:
-    calls: 12
+    calls: 85
+    bytes: (external)
+  aipl_arr_extend:
+    calls: 24
     bytes: (external)
   aipl_arr_inc:
-    calls: 278
+    calls: 1243
     bytes: (external)
   aipl_arr_join:
-    calls: 14
+    calls: 88
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 12
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 42
+    calls: 167
     bytes: (external)
   aipl_array_dec:
-    calls: 404
+    calls: 1720
     bytes: (external)
   aipl_array_new:
-    calls: 76
+    calls: 274
     bytes: (external)
   aipl_array_push_mut:
-    calls: 77
+    calls: 236
     bytes: (external)
   aipl_array_with_cap:
-    calls: 36
+    calls: 114
     bytes: (external)
   aipl_assert:
-    calls: 30
+    calls: 38
     bytes: (external)
   aipl_rec_alloc:
-    calls: 30
+    calls: 54
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 106
+    calls: 540
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 76
+    calls: 486
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -306,27 +412,39 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  flat_kids:
+    calls: 0
+    bytes: 32
+  flat_kids$tail:
+    calls: 19
+    bytes: 3832
   leaves:
-    calls: 34
-    bytes: 808
+    calls: 78
+    bytes: 3684
   main:
     calls: 1
     bytes: 100
   own_token_text:
-    calls: 2
-    bytes: 1152
+    calls: 3
+    bytes: 1232
   show:
-    calls: 14
-    bytes: 1652
+    calls: 23
+    bytes: 2792
   span:
-    calls: 4
+    calls: 5
     bytes: 460
+  splice:
+    calls: 0
+    bytes: 32
+  splice$tail:
+    calls: 68
+    bytes: 612
   text:
-    calls: 4
+    calls: 5
     bytes: 476
   token_leaves:
-    calls: 22
-    bytes: 784
+    calls: 38
+    bytes: 3648
   token_text:
-    calls: 4
+    calls: 5
     bytes: 476

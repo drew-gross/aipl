@@ -461,15 +461,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 13770
-deallocations: 13770
-reallocations: 1004
-bytes allocated: 841191
-instructions executed: 2056477
-binary size: 322656
-  code: 205464
-  data: 5636
-  metadata: 111556
+allocations: 19968
+deallocations: 19968
+reallocations: 1022
+bytes allocated: 1169375
+instructions executed: 2314882
+binary size: 374856
+  code: 236856
+  data: 5684
+  metadata: 132316
 functions:
   __arr_drop_Calc:
     calls: 404
@@ -484,7 +484,7 @@ functions:
     calls: 54
     bytes: 544
   __arr_drop___m1__Cst:
-    calls: 1370
+    calls: 3129
     bytes: 116
   __arr_drop___m2__First$CalcTok:
     calls: 13
@@ -492,14 +492,17 @@ functions:
   __arr_drop___m2__Sym$CalcTok:
     calls: 38
     bytes: 140
+  __arr_drop___m3__ListStyle:
+    calls: 441
+    bytes: 120
   __arr_drop___m3__Prec:
     calls: 65
     bytes: 120
   __arr_drop___m3__Production$CalcTok$Calc:
-    calls: 227
-    bytes: 240
+    calls: 254
+    bytes: 188
   __arr_drop___m3__Rule$CalcTok:
-    calls: 746
+    calls: 827
     bytes: 116
   __arr_drop___m4__Piece:
     calls: 140
@@ -520,7 +523,7 @@ functions:
     calls: 0
     bytes: 544
   __arr_retain___m1__Cst:
-    calls: 1333
+    calls: 1679
     bytes: 116
   __arr_retain___m2__First$CalcTok:
     calls: 23
@@ -528,14 +531,17 @@ functions:
   __arr_retain___m2__Sym$CalcTok:
     calls: 36
     bytes: 140
+  __arr_retain___m3__ListStyle:
+    calls: 378
+    bytes: 120
   __arr_retain___m3__Prec:
     calls: 0
     bytes: 120
   __arr_retain___m3__Production$CalcTok$Calc:
-    calls: 270
-    bytes: 240
+    calls: 315
+    bytes: 188
   __arr_retain___m3__Rule$CalcTok:
-    calls: 756
+    calls: 882
     bytes: 116
   __arr_retain___m4__Piece:
     calls: 181
@@ -543,50 +549,50 @@ functions:
   __arr_retain___m5__Doc:
     calls: 228
     bytes: 116
-  __builtin_all$char$s0$lam116:
+  __builtin_all$char$s0$lam159:
     calls: 12
     bytes: 212
-  __builtin_any$__m5__Doc$lam120:
+  __builtin_any$__m5__Doc$lam167:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam120$tail:
+  __builtin_any$__m5__Doc$lam167$tail:
     calls: 0
     bytes: 324
-  __builtin_count_while$char$lam77:
+  __builtin_count_while$char$lam90:
     calls: 156
     bytes: 220
-  __builtin_count_while$char$s0$lam111:
-    calls: 0
-    bytes: 40
-  __builtin_count_while$char$s0$lam111$tail:
-    calls: 0
-    bytes: 256
   __builtin_count_while$char$s0$lam123:
     calls: 0
-    bytes: 172
-  __builtin_count_while$char$s0$lam144:
+    bytes: 40
+  __builtin_count_while$char$s0$lam123$tail:
+    calls: 0
+    bytes: 256
+  __builtin_count_while$char$s0$lam133:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam66:
+  __builtin_count_while$char$s0$lam162:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam75:
     calls: 106
     bytes: 172
-  __builtin_count_while$char$s0$lam85:
+  __builtin_count_while$char$s0$lam98:
     calls: 138
     bytes: 184
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m3__Prec$lam148:
+  __builtin_find_if$__m3__Prec$lam166:
     calls: 141
     bytes: 688
-  __builtin_find_index$str$lam20:
+  __builtin_find_index$str$lam24:
     calls: 53
     bytes: 400
-  __builtin_find_index$str$lam45:
-    calls: 162
+  __builtin_find_index$str$lam54:
+    calls: 189
     bytes: 400
-  __builtin_find_index$str$lam71:
-    calls: 216
+  __builtin_find_index$str$lam80:
+    calls: 252
     bytes: 400
   __builtin_int_parse:
     calls: 106
@@ -594,18 +600,12 @@ functions:
   __builtin_intersperse$__m5__Doc:
     calls: 0
     bytes: 408
-  __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam94:
+  __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam107:
     calls: 447
     bytes: 748
-  __builtin_try_map$__m3__Production$CalcTok$Calc$__m2__First<CalcTok>$__m3__ParseError$lam54:
+  __builtin_try_map$__m3__Production$CalcTok$Calc$__m2__First<CalcTok>$__m3__ParseError$lam60:
     calls: 4
-    bytes: 1032
-  __builtin_try_map$__m3__Production$CalcTok$Calc$__m3__Production$CalcTok$Calc$__m3__ParseError$lam48:
-    calls: 54
-    bytes: 1168
-  __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule<CalcTok>$__m3__ParseError$lam103:
-    calls: 216
-    bytes: 732
+    bytes: 920
   __eq_Calc:
     calls: 37
     bytes: 252
@@ -624,12 +624,12 @@ functions:
   __eq_char$opt:
     calls: 138
     bytes: 100
-  __lambda_29:
+  __filter103$own0:
+    calls: 447
+    bytes: 544
+  __lambda_38:
     calls: 107
     bytes: 140
-  __lambda_46:
-    calls: 162
-    bytes: 1328
   __m11__between_len:
     calls: 0
     bytes: 752
@@ -674,13 +674,16 @@ functions:
     bytes: 368
   __m13__climb$CalcTok$Calc:
     calls: 160
-    bytes: 2736
+    bytes: 3160
   __m13__error_at$CalcTok$Calc:
     calls: 4
-    bytes: 1644
+    bytes: 2612
   __m13__far_miss:
     calls: 193
-    bytes: 940
+    bytes: 1084
+  __m13__far_unclosed:
+    calls: 0
+    bytes: 320
   __m13__find_prec:
     calls: 241
     bytes: 228
@@ -689,31 +692,34 @@ functions:
     bytes: 1508
   __m13__lower_node$CalcTok$Calc:
     calls: 447
-    bytes: 3844
+    bytes: 3416
   __m13__match_many$CalcTok$Calc:
     calls: 0
-    bytes: 3668
+    bytes: 4560
   __m13__match_maybe$CalcTok$Calc:
     calls: 0
-    bytes: 868
+    bytes: 1076
+  __m13__match_nested$CalcTok$Calc:
+    calls: 0
+    bytes: 5908
   __m13__match_one_of$CalcTok$Calc:
     calls: 342
-    bytes: 1312
+    bytes: 1692
   __m13__match_prod$CalcTok$Calc:
     calls: 417
-    bytes: 4820
+    bytes: 4524
   __m13__match_rule$CalcTok$Calc:
     calls: 1375
-    bytes: 4236
+    bytes: 5848
   __m13__match_then$CalcTok$Calc:
     calls: 206
-    bytes: 1720
+    bytes: 2128
   __m13__parse$CalcTok$Calc:
     calls: 42
     bytes: 380
   __m13__parse_cst$CalcTok$Calc:
     calls: 53
-    bytes: 4388
+    bytes: 5140
   __m13__prev_end$CalcTok$Calc:
     calls: 384
     bytes: 500
@@ -726,27 +732,42 @@ functions:
   __m13__trailing_trivia$CalcTok$Calc:
     calls: 98
     bytes: 648
+  __m14__line_at:
+    calls: 0
+    bytes: 532
+  __m1__flat_kids:
+    calls: 0
+    bytes: 32
+  __m1__flat_kids$tail:
+    calls: 755
+    bytes: 3832
   __m1__leaves:
     calls: 36
-    bytes: 808
+    bytes: 3684
   __m1__own_token_text:
     calls: 308
-    bytes: 1152
+    bytes: 1232
   __m1__show:
     calls: 12
-    bytes: 1652
+    bytes: 2792
   __m1__span:
     calls: 2
     bytes: 460
+  __m1__splice:
+    calls: 0
+    bytes: 32
+  __m1__splice$tail:
+    calls: 1345
+    bytes: 612
   __m1__token_leaves:
     calls: 530
-    bytes: 784
+    bytes: 3648
   __m2__climb_precs$CalcTok:
     calls: 0
     bytes: 32
   __m2__climb_precs$CalcTok$tail:
     calls: 12
-    bytes: 1084
+    bytes: 1744
   __m2__dq:
     calls: 20
     bytes: 456
@@ -758,22 +779,22 @@ functions:
     bytes: 420
   __m2__first_sets$CalcTok$Calc:
     calls: 1
-    bytes: 324
+    bytes: 356
   __m2__linked_first_sets$CalcTok$Calc:
     calls: 1
-    bytes: 1168
+    bytes: 1084
   __m2__prec_note:
     calls: 3
     bytes: 3468
   __m2__render_rule$CalcTok:
     calls: 13
-    bytes: 7356
+    bytes: 8120
   __m2__rep_suffix:
     calls: 0
     bytes: 724
   __m2__rule_first$CalcTok:
     calls: 40
-    bytes: 5044
+    bytes: 5948
   __m2__show_first$CalcTok:
     calls: 3
     bytes: 1216
@@ -786,48 +807,60 @@ functions:
   __m3__failure_message:
     calls: 7
     bytes: 404
+  __m3__group_styles$CalcTok:
+    calls: 0
+    bytes: 32
+  __m3__group_styles$CalcTok$tail:
+    calls: 1701
+    bytes: 3116
   __m3__link$CalcTok$Calc:
-    calls: 54
-    bytes: 1188
+    calls: 63
+    bytes: 2328
+  __m3__link_nest$CalcTok:
+    calls: 0
+    bytes: 1300
   __m3__link_opt$CalcTok:
     calls: 0
-    bytes: 652
+    bytes: 660
   __m3__link_rule$CalcTok:
-    calls: 702
-    bytes: 4364
+    calls: 819
+    bytes: 5108
+  __m3__link_rules$CalcTok:
+    calls: 252
+    bytes: 832
+  __m3__nest_styles$CalcTok:
+    calls: 0
+    bytes: 956
   __m3__prod_names$CalcTok$Calc:
-    calls: 110
-    bytes: 564
+    calls: 119
+    bytes: 492
   __m4__breaks_after:
     calls: 0
     bytes: 444
-  __m4__format_cst$CalcTok$Calc$s1$lam22:
+  __m4__fmt_node$CalcTok$Calc$s1$lam61:
     calls: 99
-    bytes: 5056
-  __m4__gap_wanted$lam95:
+    bytes: 4512
+  __m4__format_cst$CalcTok$Calc$s1$lam31:
+    calls: 9
+    bytes: 384
+  __m4__gap_wanted$lam129:
     calls: 103
     bytes: 192
-  __m4__inline_doc$lam57:
+  __m4__group_doc$CalcTok$Calc$s1$lam111:
+    calls: 0
+    bytes: 2308
+  __m4__inline_doc$lam110:
     calls: 67
     bytes: 2668
-  __m4__lead_toks:
-    calls: 0
-    bytes: 740
-  __m4__pieces$CalcTok$Calc$s1$lam55:
+  __m4__pieces$CalcTok$Calc$s1$lam108:
     calls: 99
-    bytes: 2140
+    bytes: 3404
   __m4__render_cst$CalcTok$Calc$s1$lam7:
     calls: 9
     bytes: 5268
-  __m4__run_text:
+  __m4__wrapped$lam130:
     calls: 0
-    bytes: 892
-  __m4__tail_toks:
-    calls: 0
-    bytes: 1176
-  __m4__wrapped$lam58:
-    calls: 0
-    bytes: 4480
+    bytes: 4272
   __m5__col_after:
     calls: 76
     bytes: 544
@@ -852,7 +885,7 @@ functions:
   __m6__reindent_block:
     calls: 0
     bytes: 4016
-  __map39:
+  __map48:
     calls: 0
     bytes: 380
   __rec_drop_Calc:
@@ -860,10 +893,10 @@ functions:
     bytes: 132
   __rec_drop___m1__Cst:
     calls: 1069
-    bytes: 48
+    bytes: 132
   __rec_drop___m3__Rule$CalcTok:
-    calls: 1547
-    bytes: 304
+    calls: 1664
+    bytes: 436
   __rec_drop___m5__Doc:
     calls: 175
     bytes: 184
@@ -875,7 +908,7 @@ functions:
     bytes: 1396
   __test$calc_grammar:
     calls: 1
-    bytes: 2084
+    bytes: 2076
   __test$eval_calc:
     calls: 1
     bytes: 2116
@@ -901,40 +934,40 @@ functions:
     calls: 0
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 339
+    calls: 1472
     bytes: (external)
   aipl_arr_extend:
-    calls: 1134
+    calls: 1323
     bytes: (external)
   aipl_arr_inc:
-    calls: 36774
+    calls: 61422
     bytes: (external)
   aipl_arr_join:
-    calls: 339
+    calls: 1472
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1532
+    calls: 1721
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 473
+    calls: 2700
     bytes: (external)
   aipl_arr_slice:
     calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 46408
+    calls: 77137
     bytes: (external)
   aipl_array_new:
-    calls: 5317
+    calls: 9399
     bytes: (external)
   aipl_array_push:
-    calls: 1412
+    calls: 1520
     bytes: (external)
   aipl_array_push_mut:
-    calls: 2340
+    calls: 4185
     bytes: (external)
   aipl_array_with_cap:
-    calls: 1959
+    calls: 2654
     bytes: (external)
   aipl_assert:
     calls: 51
@@ -943,19 +976,19 @@ functions:
     calls: 62
     bytes: (external)
   aipl_rec_alloc:
-    calls: 3180
+    calls: 3297
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 23358
+    calls: 32279
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 452
+    calls: 461
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 20178
+    calls: 28982
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 452
+    calls: 461
     bytes: (external)
   aipl_test_begin:
     calls: 6
@@ -971,10 +1004,10 @@ functions:
     bytes: (external)
   calc_cst:
     calls: 11
-    bytes: 444
+    bytes: 460
   calc_grammar:
     calls: 65
-    bytes: 3908
+    bytes: 3652
   depth:
     calls: 10
     bytes: 288
@@ -992,7 +1025,7 @@ functions:
     bytes: 1036
   format_calc:
     calls: 9
-    bytes: 412
+    bytes: 444
   is_calc_op:
     calls: 206
     bytes: 332
@@ -1013,7 +1046,7 @@ functions:
     bytes: 460
   parse_calc:
     calls: 43
-    bytes: 444
+    bytes: 460
   pow:
     calls: 0
     bytes: 36
@@ -1025,4 +1058,4 @@ functions:
     bytes: 924
   shown:
     calls: 1
-    bytes: 492
+    bytes: 508
