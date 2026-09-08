@@ -22,7 +22,7 @@ their own:
 
 - [x] 5a Decide the bridge: how an AIPL parse becomes a Rust `Program`
 - [x] 5b Wire FIRST-set pruning into the driver, and re-measure
-- [ ] 5c Extend the differential test from acceptance to tree/AST equality
+- [ ] 5c Extend the differential test from acceptance to tree/AST equality (attempted once — read its notes first)
 - [ ] 5d Lower AIPL's grammar to the AST
 - [ ] 5e Error-message parity against the corpus fixtures
 - [ ] 5f Side-channels: `#[allow]` spans, trailing whitespace, doc attachment
@@ -255,11 +255,62 @@ that is answered, the 2.2x is available in principle and unreachable in practice
 
 ### 5c — Differential test: from acceptance to equality
 
-Extend `parser_dogfood.rs` to compare trees, not just accept/reject. Doing this
+Extend the differential to compare trees, not just accept/reject. Doing this
 *before* 5d makes it the oracle for the lowering rather than an afterthought, and
 it is the only thing that will catch a `build` that produces a plausible but
 wrong AST. Worth doing whatever 5a decides, since either bridge needs the same
 comparison.
+
+**Attempted once and abandoned.** The design was right and the delivery was
+wrong; the notes below are what the next attempt should start from rather than
+rediscover.
+
+**The comparison to make: gazelle's expression spans are a subset of the CST's
+node spans.** The two sides cannot be compared directly — one is a `Cst`, the
+other an `aipl_syntax::Program` — and writing a renderer for each so their output
+can be diffed is most of the work of 5d, done twice. Spans avoid that entirely:
+both sides already carry them on every node, and `each_expr` already walks
+gazelle's. If the two disagree about how `a + b * c` groups, gazelle's span for
+the multiplication has no counterpart on the AIPL side and the test says so.
+
+Make it a **subset**, not an equality. The CST keeps productions the AST has no
+node for (`postfix`, `atom`, the plumbing ordered choice needs), so it always has
+strictly more spans. Extra spans are noise; a missing one is a real
+disagreement.
+
+Two details that cost time:
+
+- **Compare *token* spans, not `Cst::span`.** Trivia attaches in front of the
+  token that follows it, so a node's plain span reaches back over the whitespace
+  before it, while gazelle's spans are token-tight. Every comparison is off by
+  the leading whitespace until this is fixed.
+- **Only expressions.** That is where precedence and ordered choice decide shape,
+  and so where the two descriptions can differ while still agreeing about
+  acceptance. Declarations have one spelling each and nothing to get wrong.
+
+**Do not run it over the whole corpus.** That is what killed the attempt, twice:
+
+- Deriving a node's own span from `token_leaves()` walks its entire subtree, and
+  doing that at every node is quadratic in the tree. On a corpus-sized file it is
+  indistinguishable from a hang. Find the leftmost and rightmost token with two
+  short-circuiting searches instead — depth, not subtree size.
+- Even with that fixed it did not finish. A second FFI call per file re-parses
+  it, doubling a differential that already takes ~76s, and a file's spans cross
+  as a `Vec<FfiValue::Int>` with an element per number. The remaining cost was
+  never localized — most likely the array building in the CST walk, which
+  concatenates at every level, or marshalling a six-figure boxed array.
+- **Measuring a prefix of the corpus does not predict the whole.** `files.sort()`
+  puts the small `tests/cases/` files first and the large compiler sources
+  (`walker.aipl` and its neighbours) last, so a timing taken over the first
+  several dozen files is drawn entirely from the cheap end. 40 files at ~75 ms
+  each projected to under two minutes; the real run passed thirty and was killed.
+
+**So scope it as a fixture, not a sweep.** Ten or twenty sources chosen to
+exercise precedence, associativity, ordered choice and groups, with their spans
+asserted against gazelle — a fixed cost that catches the same class of bug. The
+corpus-wide version only becomes worth revisiting if a way is found to get the
+tree across the FFI once and cheaply, which is the same "no way to hold prepared
+state across calls" problem 5g already has to answer.
 
 ### 5d — Lower AIPL's grammar to the AST
 
