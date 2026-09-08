@@ -9,6 +9,9 @@
 {% for file in files %}
         <li>
           <a class="file" href="{{ file.href }}">{{ file.display }}</a>
+{% if file.private_count > 0 %}
+          <span class="private-count"><a href="{{ file.href }}#private">{{ file.private_count }} private</a></span>
+{% endif %}
 {% if !file.entries.is_empty() %}
           <ul class="items">
 {% for item in file.entries %}

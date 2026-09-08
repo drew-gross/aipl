@@ -14,59 +14,46 @@
 
       <h1><code>crates/aipl-codegen/src/find_trailing_whitespace.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>Span</code> <span class="from">from builtins</span></li>
-
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>greater_than</code> <span class="as">as</span> <code>&#62;</code> <span class="from">from builtins</span></li>
-
-          <li><code>is_some</code> <span class="from">from builtins</span></li>
-
-          <li><code>len</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-find_trailing_whitespace">
+          <h3>
+            <a class="anchor" href="#item-find_trailing_whitespace">find_trailing_whitespace</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn find_trailing_whitespace(src: str) -&#62; Span?</code></pre>
 
-      <section class="item" id="item-line_end_span">
-        <h2>
-          <a class="anchor" href="#item-line_end_span">line_end_span</a>
-          <span class="kind kind-fn">fn</span>
+          <div class="doc"><p>The byte <code>Span</code> of the first line's trailing space/tab run in <code>src</code> as <code>some(span)</code>, or <code>none</code> if no line has trailing whitespace. A single CR before a LF is part of a CRLF line ending, not content. The locator for the parser's trailing-whitespace check.</p></div>
 
-        </h2>
-        <pre class="signature"><code>fn line_end_span(prev: char, prev2: char, boundary: u64, ws_start: u64, line_start: u64) -&#62; Span?</code></pre>
 
-        <div class="doc"><p>The span of a line's trailing space/tab run, given the bytes around its ending, or <code>none</code> if the line has none. <code>boundary</code> is the index of the line-ending '\n' (or the input length, at EOF); <code>prev</code>/<code>prev2</code> are the two bytes before it; <code>ws_start</code> is where the current run of spaces/tabs began; <code>line_start</code> is the line's first byte. A single '\r' right before the boundary is part of a CRLF (or lone-CR) ending, so the last content byte is the one before it.</p></div>
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-find_trailing_whitespace">
-        <h2>
-          <a class="anchor" href="#item-find_trailing_whitespace">find_trailing_whitespace</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn find_trailing_whitespace(src: str) -&#62; Span?</code></pre>
 
-        <div class="doc"><p>The byte <code>Span</code> of the first line's trailing space/tab run in <code>src</code> as <code>some(span)</code>, or <code>none</code> if no line has trailing whitespace. A single CR before a LF is part of a CRLF line ending, not content. The locator for the parser's trailing-whitespace check.</p></div>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-line_end_span">
+          <h3>
+            <a class="anchor" href="#item-line_end_span">line_end_span</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn line_end_span(prev: char, prev2: char, boundary: u64, ws_start: u64, line_start: u64) -&#62; Span?</code></pre>
+
+          <div class="doc"><p>The span of a line's trailing space/tab run, given the bytes around its ending, or <code>none</code> if the line has none. <code>boundary</code> is the index of the line-ending '\n' (or the input length, at EOF); <code>prev</code>/<code>prev2</code> are the two bytes before it; <code>ws_start</code> is where the current run of spaces/tabs began; <code>line_start</code> is the line's first byte. A single '\r' right before the boundary is part of a CRLF (or lone-CR) ending, so the last content byte is the one before it.</p></div>
+
+
+        </section>
 
 
       </section>
-
 
 
     </main>

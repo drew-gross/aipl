@@ -14,693 +14,614 @@
 
       <h1><code>crates/aipl-codegen/src/parse.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>case_name</code> <span class="from">from builtins</span></li>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
-          <li><code>case_of</code> <span class="from">from builtins</span></li>
 
-          <li><code>contains</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-Far">
+          <h3>
+            <a class="anchor" href="#item-Far">Far</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Far</code></pre>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>The furthest failure seen so far: the token position nothing could be matched at, and the deduped labels of everything that *was* expected there.</p><p>This is the reified form of what an LR table gives you for free — the state's expected-symbol set — and it is why <code>Production.expect_as</code> exists: under ordered choice a more specific alternative can fail deeper than the one that was really meant, so a label collapsing a family of rules to one word (&quot;an expression&quot;) is what keeps the message readable.</p></div>
 
-          <li><code>extend</code> <span class="from">from builtins</span></li>
 
-          <li><code>filter</code> <span class="from">from builtins</span></li>
+        </section>
 
-          <li><code>find_if</code> <span class="from">from builtins</span></li>
 
-          <li><code>find_index</code> <span class="from">from builtins</span></li>
 
-          <li><code>first</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-Step">
+          <h3>
+            <a class="anchor" href="#item-Step">Step</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Step</code></pre>
 
-          <li><code>is_empty</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>One rule's result at one position: whether it matched, where it left off, the CST children it contributed to its parent, and the furthest failure so far.</p><p><code>hit: false</code> is an ordinary non-match — the caller backtracks and tries something else — and is *not* an error. A <code>ParseError</code> is reserved for what no alternative could fix: a malformed grammar, or a <code>build</code> that refused.</p></div>
 
-          <li><code>is_nonempty</code> <span class="from">from builtins</span></li>
 
-          <li><code>join</code> <span class="from">from builtins</span></li>
+        </section>
 
-          <li><code>len</code> <span class="from">from builtins</span></li>
 
-          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
 
-          <li><code>less_than_or_equal</code> <span class="as">as</span> <code>&#60;=</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-Parser">
+          <h3>
+            <a class="anchor" href="#item-Parser">Parser</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Parser&#60;K: variant, A: any&#62;</code></pre>
 
-          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>What the driver parses against: the tokens, the trivia the lexer set aside, the linked productions, and <code>end</code> — one byte past the source's last byte.</p><p>The source itself is *not* here. Every token carries its own text (a <code>SpanStr</code>, see <code>lexer.aipl</code>), so matching a rule spelling reads the token and nothing else. <code>end</code> is all that remains of the source: the empty span at end of input, which <code>error_at</code> reports when a rule ran off the token list and there is no token to point at.</p></div>
 
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
 
-          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
+        </section>
 
-          <li><code>map</code> <span class="from">from builtins</span></li>
 
-          <li><code>map_err</code> <span class="from">from builtins</span></li>
 
-          <li><code>not_equal</code> <span class="as">as</span> <code>!=</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-parse_cst">
+          <h3>
+            <a class="anchor" href="#item-parse_cst">parse_cst</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn parse_cst&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, g: Grammar&#60;K, A&#62;, start: str) -&#62; Cst!ParseError</code></pre>
 
-          <li><code>try_map</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>Parses <code>src</code> — already lexed into <code>lexed</code> — against grammar <code>g</code>, beginning at the production named <code>start</code>, and returns the lossless concrete syntax tree.</p><p><code>g</code> is linked here, so it may be handed over unlinked; linking is idempotent, so a caller parsing repeatedly can <code>link</code> once and pay nothing again. Every token must be consumed: input left over after the start rule succeeds is an error, not a partial parse.</p><p>Fails with a <code>ParseError</code> carrying the span of the offending token — the *furthest* position anything was expected at, not the last one tried — or the empty span at the end of the source when the input simply ran out.</p></div>
 
-          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
 
-          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
+        </section>
 
-          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
 
-          <li><code>wrapping_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
 
-          <li><code>CLeaf</code> <span class="from">from ./cst.aipl</span></li>
+        <section class="item" id="item-lower">
+          <h3>
+            <a class="anchor" href="#item-lower">lower</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lower&#60;K: variant, A: any&#62;(src: str, node: Cst, g: Grammar&#60;K, A&#62;) -&#62; A!ParseError</code></pre>
 
-          <li><code>CTree</code> <span class="from">from ./cst.aipl</span></li>
+          <div class="doc"><p>Lowers a parsed tree to the caller's AST by calling each node's production <code>build</code>, depth first: a node's children are lowered before it, and only its *interior* children are passed (<code>nodes</code>) — a leaf has no lowered value, and its text is reachable from the node's own span.</p><p>Fails with whatever a <code>build</code> refused with, unchanged.</p></div>
 
-          <li><code>CTrivia</code> <span class="from">from ./cst.aipl</span></li>
 
-          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
+        </section>
 
-          <li><code>is_tree</code> <span class="from">from ./cst.aipl</span></li>
 
-          <li><code>show</code> <span class="from">from ./cst.aipl</span></li>
 
-          <li><code>span</code> <span class="from">from ./cst.aipl</span></li>
+        <section class="item" id="item-parse">
+          <h3>
+            <a class="anchor" href="#item-parse">parse</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn parse&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, g: Grammar&#60;K, A&#62;, start: str) -&#62; A!ParseError</code></pre>
 
-          <li><code>text</code> <span class="from">from ./cst.aipl</span></li>
+          <div class="doc"><p><code>parse_cst</code> followed by <code>lower</code>: the source's AST, with the concrete tree built and discarded in between. Use <code>parse_cst</code> when the tree itself is the point (a formatter, a highlighter), and this when only the AST is.</p></div>
 
-          <li><code>Climb</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+        </section>
 
-          <li><code>Inline</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>Literal</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>Many</code> <span class="from">from ./grammar.aipl</span></li>
+        <section class="item" id="item-Node">
+          <h3>
+            <a class="anchor" href="#item-Node">Node</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Node</code></pre>
 
-          <li><code>Maybe</code> <span class="from">from ./grammar.aipl</span></li>
+          <p class="undocumented">Undocumented.</p>
 
-          <li><code>Mk</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>Named</code> <span class="from">from ./grammar.aipl</span></li>
+          <ul class="cases">
 
-          <li><code>NamedIdx</code> <span class="from">from ./grammar.aipl</span></li>
+            <li id="item-NLeaf"><code>NLeaf(str)</code></li>
 
-          <li><code>OneOf</code> <span class="from">from ./grammar.aipl</span></li>
+            <li id="item-NNode"><code>NNode(Node[])</code></li>
 
-          <li><code>ParseError</code> <span class="from">from ./grammar.aipl</span></li>
+          </ul>
 
-          <li><code>Prec</code> <span class="from">from ./grammar.aipl</span></li>
-
-          <li><code>Production</code> <span class="from">from ./grammar.aipl</span></li>
-
-          <li><code>Rule</code> <span class="from">from ./grammar.aipl</span></li>
-
-          <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
-
-          <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
-
-          <li><code>failure_message</code> <span class="from">from ./grammar.aipl</span></li>
-
-          <li><code>link</code> <span class="from">from ./grammar.aipl</span></li>
-
-          <li><code>prod_names</code> <span class="from">from ./grammar.aipl</span></li>
-
-          <li><code>Bare</code> <span class="from">from ./lexer.aipl</span></li>
-
-          <li><code>CharRun</code> <span class="from">from ./lexer.aipl</span></li>
-
-          <li><code>LexResult</code> <span class="from">from ./lexer.aipl</span></li>
-
-          <li><code>Of</code> <span class="from">from ./lexer.aipl</span></li>
-
-          <li><code>OneChar</code> <span class="from">from ./lexer.aipl</span></li>
-
-          <li><code>ToEol</code> <span class="from">from ./lexer.aipl</span></li>
-
-          <li><code>Token</code> <span class="from">from ./lexer.aipl</span></li>
-
-          <li><code>TokenRule</code> <span class="from">from ./lexer.aipl</span></li>
-
-          <li><code>lex</code> <span class="from">from ./lexer.aipl</span></li>
-
-        </ul>
-      </section>
-
-
-
-      <section class="item" id="item-Far">
-        <h2>
-          <a class="anchor" href="#item-Far">Far</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct Far</code></pre>
-
-        <div class="doc"><p>The furthest failure seen so far: the token position nothing could be matched at, and the deduped labels of everything that *was* expected there.</p><p>This is the reified form of what an LR table gives you for free — the state's expected-symbol set — and it is why <code>Production.expect_as</code> exists: under ordered choice a more specific alternative can fail deeper than the one that was really meant, so a label collapsing a family of rules to one word (&quot;an expression&quot;) is what keeps the message readable.</p></div>
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-Step">
-        <h2>
-          <a class="anchor" href="#item-Step">Step</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct Step</code></pre>
 
-        <div class="doc"><p>One rule's result at one position: whether it matched, where it left off, the CST children it contributed to its parent, and the furthest failure so far.</p><p><code>hit: false</code> is an ordinary non-match — the caller backtracks and tries something else — and is *not* an error. A <code>ParseError</code> is reserved for what no alternative could fix: a malformed grammar, or a <code>build</code> that refused.</p></div>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-far_miss">
+          <h3>
+            <a class="anchor" href="#item-far_miss">far_miss</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn far_miss(far: Far, pos: u64, label: str) -&#62; Far</code></pre>
+
+          <div class="doc"><p><code>far</code> updated with &quot;<code>label</code> was expected at <code>pos</code>&quot;. Deeper wins outright; equally deep joins the expected set (deduped); shallower is discarded. An empty label is a *transparent* production and records nothing.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-no">
+          <h3>
+            <a class="anchor" href="#item-no">no</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn no(far: Far, pos: u64) -&#62; Step</code></pre>
+
+          <div class="doc"><p>A non-match that leaves <code>pos</code> where the rule started (the caller backtracks).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-miss">
+          <h3>
+            <a class="anchor" href="#item-miss">miss</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn miss(far: Far, pos: u64, label: str) -&#62; Step</code></pre>
+
+          <div class="doc"><p>A non-match that also records what was expected.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tok_text">
+          <h3>
+            <a class="anchor" href="#item-tok_text">tok_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tok_text&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; str</code></pre>
+
+          <div class="doc"><p>The source text of token <code>i</code>, or <code>&quot;&quot;</code> past the end. Empty is a safe sentinel because no matcher in <code>lexer.aipl</code> ever produces an empty token.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-prev_end">
+          <h3>
+            <a class="anchor" href="#item-prev_end">prev_end</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn prev_end&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; u64</code></pre>
+
+          <div class="doc"><p>Where token <code>i - 1</code> ended — the start of the run of trivia that belongs in front of token <code>i</code>. Derived from the token positions rather than remembered, so backtracking can't leave it stale: re-consuming a token re-attaches exactly the same trivia.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-leaf_at">
+          <h3>
+            <a class="anchor" href="#item-leaf_at">leaf_at</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn leaf_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; Cst[]</code></pre>
+
+          <div class="doc"><p>The CST children consuming token <code>i</code> contributes: every trivia record between the previous token and this one, then the token's own leaf. Attaching trivia *before* its following token is what makes the leaf spans tile the source with no gaps, which is the whole losslessness property.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-trailing_trivia">
+          <h3>
+            <a class="anchor" href="#item-trailing_trivia">trailing_trivia</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn trailing_trivia&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;) -&#62; Cst[]</code></pre>
+
+          <div class="doc"><p>The trivia after the last token — a trailing comment or newline, which no token consumption can pick up. Appended to the root node so the tree still covers the source to its last byte.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-with_trailing">
+          <h3>
+            <a class="anchor" href="#item-with_trailing">with_trailing</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn with_trailing&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, root: Cst) -&#62; Cst</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-quoted">
+          <h3>
+            <a class="anchor" href="#item-quoted">quoted</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn quoted(s: str) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_rule">
+          <h3>
+            <a class="anchor" href="#item-match_rule">match_rule</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_rule&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, r: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p>Match <code>r</code> at <code>pos</code>. <code>cur</code> is the index of the production being matched, which only <code>Climb</code> needs (each operator application nests under it).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_term">
+          <h3>
+            <a class="anchor" href="#item-match_term">match_term</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_term&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, k: Case&#60;K&#62;, pos: u64, far: Far) -&#62; Step</code></pre>
+
+          <div class="doc"><p>Any one token whose kind is the case <code>k</code> — <code>Term(Name)</code> matches every identifier, whatever text it carries. <code>k</code> is a <code>Case&lt;K&gt;</code>: a case with no payload, so naming a kind needs no value of that kind.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_spelling">
+          <h3>
+            <a class="anchor" href="#item-match_spelling">match_spelling</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_spelling&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, s: str, pos: u64, far: Far) -&#62; Step</code></pre>
+
+          <div class="doc"><p>One token spelled exactly <code>s</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_then">
+          <h3>
+            <a class="anchor" href="#item-match_then">match_then</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_then&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: Rule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p>Every rule in order; children concatenate. A failure anywhere rewinds the whole sequence to where it started — the caller decides what to try next.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_one_of">
+          <h3>
+            <a class="anchor" href="#item-match_one_of">match_one_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_one_of&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: Rule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p>The first alternative that matches. Every alternative's expectations are kept in <code>far</code> whether it matched or not, which is what makes &quot;expected <code>(</code>, an identifier, or a number&quot; possible from a choice that failed on all three.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_many">
+          <h3>
+            <a class="anchor" href="#item-match_many">match_many</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p><code>sub</code> until it stops matching, at least <code>min</code> times — and, with a <code>sep</code>, with that separator between consecutive items.</p><p>A rule that can match empty input would repeat forever here, and AIPL has no <code>break</code> to escape with — so a zero-width iteration is refused outright, the same invariant <code>lexer.aipl</code> keeps by having no matcher accept empty input. It is a grammar bug, reported as one rather than hung on.</p><p>The separated case is the same loop with one step in front of each item after the first. What the separator matched is held back until an item follows it, because a separator with nothing after it is only part of the list when <code>trailing_sep</code> says so; otherwise the position rewinds to before it and the enclosing rule is the one that complains — which is how <code>[1, 2,]</code> can be either the list or a list followed by a stray comma.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_sep">
+          <h3>
+            <a class="anchor" href="#item-match_sep">match_sep</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: Rule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p>The separator step: what <code>sep</code> matched, or an empty match when there is none.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-hit_nothing">
+          <h3>
+            <a class="anchor" href="#item-hit_nothing">hit_nothing</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hit_nothing(pos: u64, far: Far) -&#62; Step</code></pre>
+
+          <div class="doc"><p>A match that consumed nothing and succeeded — the identity step.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_maybe">
+          <h3>
+            <a class="anchor" href="#item-match_maybe">match_maybe</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_maybe&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p><code>sub</code>, or nothing. Always matches — but its expectations still reach <code>far</code>, so an optional part that was *started* and then went wrong still reports.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_prod">
+          <h3>
+            <a class="anchor" href="#item-match_prod">match_prod</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_prod&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64, pos: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p>A reference to production <code>i</code> — and the only rule that builds a node. The production's own rule matches, and its children go into one <code>CTree(i, ..)</code>.</p><p>A labelled production that fails *without getting anywhere* reports as its label instead of as the expectations from inside it — the collapse <code>SYMBOL_DISPLAY_NAMES</code> performs for the LR parser, where <code>expr</code>/<code>term</code>/<code>atom</code> all render as &quot;expression&quot;. It matters more here than there: under ordered choice every alternative of a failed <code>OneOf</code> leaves its own expectation behind, so an uncollapsed message lists the grammar's internals.</p><p>&quot;Without getting anywhere&quot; is the operative test. When the production failed *deeper* than it started, that deeper expectation is the useful one and the label is not applied; when it failed at its own first token, the label replaces what it expected there — but only what *this* production contributed, since the incoming <code>far</code> (a sibling alternative's expectations at the same position) is what the label is merged into. A transparent production (empty <code>expect_as</code>) never collapses anything: its insides are the message.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-find_prec">
+          <h3>
+            <a class="anchor" href="#item-find_prec">find_prec</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn find_prec(precs: Prec[], text: str, min_power: u64) -&#62; Prec?</code></pre>
+
+          <div class="doc"><p>The precedence level <code>text</code> belongs to, if it binds at least as tightly as <code>min_power</code>. Levels are scanned in order, so a spelling listed twice takes the first. The empty string never matches — that is what <code>tok_text</code> returns past the end of the tokens, so running out of input simply ends the climb.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_climb">
+          <h3>
+            <a class="anchor" href="#item-match_climb">match_climb</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: Rule&#60;K&#62;, precs: Prec[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-climb">
+          <h3>
+            <a class="anchor" href="#item-climb">climb</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: Rule&#60;K&#62;, precs: Prec[], pos: u64, min_power: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p>Precedence climbing: an atom, then any operator binding at least as tightly as <code>min_power</code>, whose right-hand side is climbed at one power higher (or the same power, for a right-associative level).</p><p>Each application nests *both* operands under the enclosing production's index while leaving the outermost one flat, so <code>match_prod</code>'s own wrap completes the tree: <code>1 + 2 * 3</code> becomes <code>(expr (expr 1) + (expr (expr 2) * (expr 3)))</code> — one node per operand, shaped by precedence rather than a flat run the lowering would have to re-parse.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-error_at">
+          <h3>
+            <a class="anchor" href="#item-error_at">error_at</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn error_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, far: Far) -&#62; ParseError</code></pre>
+
+          <div class="doc"><p>The error a furthest failure describes: what was expected there, and what was found instead. The span is the offending token's (or the empty span at the end of the source), which is what <code>caret_block.aipl</code> renders the underline from.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_node">
+          <h3>
+            <a class="anchor" href="#item-lower_node">lower_node</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_node&#60;K: variant, A: any&#62;(src: str, node: Cst, prods: Production&#60;K, A&#62;[]) -&#62; A!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tok_rules">
+          <h3>
+            <a class="anchor" href="#item-tok_rules">tok_rules</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tok_rules() -&#62; TokenRule&#60;Tok&#62;[]</code></pre>
+
+          <div class="doc"><p>Lower-case words, digit runs, and one-character punctuation. Whitespace is skipped, so most assertions above are about grammar rather than layout; <code>trivia_rules</code> is the same set with whitespace and comments *recorded*, which is what the losslessness assertion needs.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-trivia_rules">
+          <h3>
+            <a class="anchor" href="#item-trivia_rules">trivia_rules</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn trivia_rules() -&#62; TokenRule&#60;Tok&#62;[]</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lex_toks">
+          <h3>
+            <a class="anchor" href="#item-lex_toks">lex_toks</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lex_toks(src: str, rules: TokenRule&#60;Tok&#62;[]) -&#62; LexResult&#60;Tok&#62;!ParseError</code></pre>
+
+          <div class="doc"><p>Lexing and parsing report failure in the same shape but not the same type, so the tests convert once here rather than at every call.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-build_node">
+          <h3>
+            <a class="anchor" href="#item-build_node">build_node</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn build_node(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
+
+          <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-refuse">
+          <h3>
+            <a class="anchor" href="#item-refuse">refuse</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn refuse(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
+
+          <div class="doc"><p>A <code>build</code> that always refuses, for the error-propagation assertion.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-one">
+          <h3>
+            <a class="anchor" href="#item-one">one</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn one(name: str, rule: Rule&#60;Tok&#62;) -&#62; Production&#60;Tok, Node&#62;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-labelled_prod">
+          <h3>
+            <a class="anchor" href="#item-labelled_prod">labelled_prod</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn labelled_prod(name: str, rule: Rule&#60;Tok&#62;, expect_as: str) -&#62; Production&#60;Tok, Node&#62;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-g_of">
+          <h3>
+            <a class="anchor" href="#item-g_of">g_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn g_of(ps: Production&#60;Tok, Node&#62;[]) -&#62; Grammar&#60;Tok, Node&#62;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-shown">
+          <h3>
+            <a class="anchor" href="#item-shown">shown</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn shown(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str!ParseError</code></pre>
+
+          <div class="doc"><p>Parse and render, so an assertion is one readable string rather than a nested <code>CTree</code> literal.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-msg_of">
+          <h3>
+            <a class="anchor" href="#item-msg_of">msg_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn msg_of(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The message a failed parse reports — and a distinguishable string when it unexpectedly succeeded, so a broken assertion says which way it broke.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-parsed">
+          <h3>
+            <a class="anchor" href="#item-parsed">parsed</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn parsed(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; Node!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-Parser">
-        <h2>
-          <a class="anchor" href="#item-Parser">Parser</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct Parser&#60;K: variant, A: any&#62;</code></pre>
-
-        <div class="doc"><p>What the driver parses against: the tokens, the trivia the lexer set aside, the linked productions, and <code>end</code> — one byte past the source's last byte.</p><p>The source itself is *not* here. Every token carries its own text (a <code>SpanStr</code>, see <code>lexer.aipl</code>), so matching a rule spelling reads the token and nothing else. <code>end</code> is all that remains of the source: the empty span at end of input, which <code>error_at</code> reports when a rule ran off the token list and there is no token to point at.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-far_miss">
-        <h2>
-          <a class="anchor" href="#item-far_miss">far_miss</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn far_miss(far: Far, pos: u64, label: str) -&#62; Far</code></pre>
-
-        <div class="doc"><p><code>far</code> updated with &quot;<code>label</code> was expected at <code>pos</code>&quot;. Deeper wins outright; equally deep joins the expected set (deduped); shallower is discarded. An empty label is a *transparent* production and records nothing.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-no">
-        <h2>
-          <a class="anchor" href="#item-no">no</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn no(far: Far, pos: u64) -&#62; Step</code></pre>
-
-        <div class="doc"><p>A non-match that leaves <code>pos</code> where the rule started (the caller backtracks).</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-miss">
-        <h2>
-          <a class="anchor" href="#item-miss">miss</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn miss(far: Far, pos: u64, label: str) -&#62; Step</code></pre>
-
-        <div class="doc"><p>A non-match that also records what was expected.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-tok_text">
-        <h2>
-          <a class="anchor" href="#item-tok_text">tok_text</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn tok_text&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; str</code></pre>
-
-        <div class="doc"><p>The source text of token <code>i</code>, or <code>&quot;&quot;</code> past the end. Empty is a safe sentinel because no matcher in <code>lexer.aipl</code> ever produces an empty token.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-prev_end">
-        <h2>
-          <a class="anchor" href="#item-prev_end">prev_end</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn prev_end&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; u64</code></pre>
-
-        <div class="doc"><p>Where token <code>i - 1</code> ended — the start of the run of trivia that belongs in front of token <code>i</code>. Derived from the token positions rather than remembered, so backtracking can't leave it stale: re-consuming a token re-attaches exactly the same trivia.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-leaf_at">
-        <h2>
-          <a class="anchor" href="#item-leaf_at">leaf_at</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn leaf_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; Cst[]</code></pre>
-
-        <div class="doc"><p>The CST children consuming token <code>i</code> contributes: every trivia record between the previous token and this one, then the token's own leaf. Attaching trivia *before* its following token is what makes the leaf spans tile the source with no gaps, which is the whole losslessness property.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-trailing_trivia">
-        <h2>
-          <a class="anchor" href="#item-trailing_trivia">trailing_trivia</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn trailing_trivia&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;) -&#62; Cst[]</code></pre>
-
-        <div class="doc"><p>The trivia after the last token — a trailing comment or newline, which no token consumption can pick up. Appended to the root node so the tree still covers the source to its last byte.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-with_trailing">
-        <h2>
-          <a class="anchor" href="#item-with_trailing">with_trailing</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn with_trailing&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, root: Cst) -&#62; Cst</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-quoted">
-        <h2>
-          <a class="anchor" href="#item-quoted">quoted</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn quoted(s: str) -&#62; str</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-match_rule">
-        <h2>
-          <a class="anchor" href="#item-match_rule">match_rule</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn match_rule&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, r: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
-
-        <div class="doc"><p>Match <code>r</code> at <code>pos</code>. <code>cur</code> is the index of the production being matched, which only <code>Climb</code> needs (each operator application nests under it).</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-match_term">
-        <h2>
-          <a class="anchor" href="#item-match_term">match_term</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn match_term&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, k: Case&#60;K&#62;, pos: u64, far: Far) -&#62; Step</code></pre>
-
-        <div class="doc"><p>Any one token whose kind is the case <code>k</code> — <code>Term(Name)</code> matches every identifier, whatever text it carries. <code>k</code> is a <code>Case&lt;K&gt;</code>: a case with no payload, so naming a kind needs no value of that kind.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-match_spelling">
-        <h2>
-          <a class="anchor" href="#item-match_spelling">match_spelling</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn match_spelling&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, s: str, pos: u64, far: Far) -&#62; Step</code></pre>
-
-        <div class="doc"><p>One token spelled exactly <code>s</code>.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-match_then">
-        <h2>
-          <a class="anchor" href="#item-match_then">match_then</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn match_then&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: Rule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
-
-        <div class="doc"><p>Every rule in order; children concatenate. A failure anywhere rewinds the whole sequence to where it started — the caller decides what to try next.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-match_one_of">
-        <h2>
-          <a class="anchor" href="#item-match_one_of">match_one_of</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn match_one_of&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: Rule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
-
-        <div class="doc"><p>The first alternative that matches. Every alternative's expectations are kept in <code>far</code> whether it matched or not, which is what makes &quot;expected <code>(</code>, an identifier, or a number&quot; possible from a choice that failed on all three.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-match_many">
-        <h2>
-          <a class="anchor" href="#item-match_many">match_many</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
-
-        <div class="doc"><p><code>sub</code> until it stops matching, at least <code>min</code> times — and, with a <code>sep</code>, with that separator between consecutive items.</p><p>A rule that can match empty input would repeat forever here, and AIPL has no <code>break</code> to escape with — so a zero-width iteration is refused outright, the same invariant <code>lexer.aipl</code> keeps by having no matcher accept empty input. It is a grammar bug, reported as one rather than hung on.</p><p>The separated case is the same loop with one step in front of each item after the first. What the separator matched is held back until an item follows it, because a separator with nothing after it is only part of the list when <code>trailing_sep</code> says so; otherwise the position rewinds to before it and the enclosing rule is the one that complains — which is how <code>[1, 2,]</code> can be either the list or a list followed by a stray comma.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-match_sep">
-        <h2>
-          <a class="anchor" href="#item-match_sep">match_sep</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn match_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: Rule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
-
-        <div class="doc"><p>The separator step: what <code>sep</code> matched, or an empty match when there is none.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-hit_nothing">
-        <h2>
-          <a class="anchor" href="#item-hit_nothing">hit_nothing</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn hit_nothing(pos: u64, far: Far) -&#62; Step</code></pre>
-
-        <div class="doc"><p>A match that consumed nothing and succeeded — the identity step.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-match_maybe">
-        <h2>
-          <a class="anchor" href="#item-match_maybe">match_maybe</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn match_maybe&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
-
-        <div class="doc"><p><code>sub</code>, or nothing. Always matches — but its expectations still reach <code>far</code>, so an optional part that was *started* and then went wrong still reports.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-match_prod">
-        <h2>
-          <a class="anchor" href="#item-match_prod">match_prod</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn match_prod&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64, pos: u64, far: Far) -&#62; Step!ParseError</code></pre>
-
-        <div class="doc"><p>A reference to production <code>i</code> — and the only rule that builds a node. The production's own rule matches, and its children go into one <code>CTree(i, ..)</code>.</p><p>A labelled production that fails *without getting anywhere* reports as its label instead of as the expectations from inside it — the collapse <code>SYMBOL_DISPLAY_NAMES</code> performs for the LR parser, where <code>expr</code>/<code>term</code>/<code>atom</code> all render as &quot;expression&quot;. It matters more here than there: under ordered choice every alternative of a failed <code>OneOf</code> leaves its own expectation behind, so an uncollapsed message lists the grammar's internals.</p><p>&quot;Without getting anywhere&quot; is the operative test. When the production failed *deeper* than it started, that deeper expectation is the useful one and the label is not applied; when it failed at its own first token, the label replaces what it expected there — but only what *this* production contributed, since the incoming <code>far</code> (a sibling alternative's expectations at the same position) is what the label is merged into. A transparent production (empty <code>expect_as</code>) never collapses anything: its insides are the message.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-find_prec">
-        <h2>
-          <a class="anchor" href="#item-find_prec">find_prec</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn find_prec(precs: Prec[], text: str, min_power: u64) -&#62; Prec?</code></pre>
-
-        <div class="doc"><p>The precedence level <code>text</code> belongs to, if it binds at least as tightly as <code>min_power</code>. Levels are scanned in order, so a spelling listed twice takes the first. The empty string never matches — that is what <code>tok_text</code> returns past the end of the tokens, so running out of input simply ends the climb.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-match_climb">
-        <h2>
-          <a class="anchor" href="#item-match_climb">match_climb</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn match_climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: Rule&#60;K&#62;, precs: Prec[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-climb">
-        <h2>
-          <a class="anchor" href="#item-climb">climb</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: Rule&#60;K&#62;, precs: Prec[], pos: u64, min_power: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
-
-        <div class="doc"><p>Precedence climbing: an atom, then any operator binding at least as tightly as <code>min_power</code>, whose right-hand side is climbed at one power higher (or the same power, for a right-associative level).</p><p>Each application nests *both* operands under the enclosing production's index while leaving the outermost one flat, so <code>match_prod</code>'s own wrap completes the tree: <code>1 + 2 * 3</code> becomes <code>(expr (expr 1) + (expr (expr 2) * (expr 3)))</code> — one node per operand, shaped by precedence rather than a flat run the lowering would have to re-parse.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-error_at">
-        <h2>
-          <a class="anchor" href="#item-error_at">error_at</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn error_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, far: Far) -&#62; ParseError</code></pre>
-
-        <div class="doc"><p>The error a furthest failure describes: what was expected there, and what was found instead. The span is the offending token's (or the empty span at the end of the source), which is what <code>caret_block.aipl</code> renders the underline from.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-parse_cst">
-        <h2>
-          <a class="anchor" href="#item-parse_cst">parse_cst</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn parse_cst&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, g: Grammar&#60;K, A&#62;, start: str) -&#62; Cst!ParseError</code></pre>
-
-        <div class="doc"><p>Parses <code>src</code> — already lexed into <code>lexed</code> — against grammar <code>g</code>, beginning at the production named <code>start</code>, and returns the lossless concrete syntax tree.</p><p><code>g</code> is linked here, so it may be handed over unlinked; linking is idempotent, so a caller parsing repeatedly can <code>link</code> once and pay nothing again. Every token must be consumed: input left over after the start rule succeeds is an error, not a partial parse.</p><p>Fails with a <code>ParseError</code> carrying the span of the offending token — the *furthest* position anything was expected at, not the last one tried — or the empty span at the end of the source when the input simply ran out.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-lower">
-        <h2>
-          <a class="anchor" href="#item-lower">lower</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn lower&#60;K: variant, A: any&#62;(src: str, node: Cst, g: Grammar&#60;K, A&#62;) -&#62; A!ParseError</code></pre>
-
-        <div class="doc"><p>Lowers a parsed tree to the caller's AST by calling each node's production <code>build</code>, depth first: a node's children are lowered before it, and only its *interior* children are passed (<code>nodes</code>) — a leaf has no lowered value, and its text is reachable from the node's own span.</p><p>Fails with whatever a <code>build</code> refused with, unchanged.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-lower_node">
-        <h2>
-          <a class="anchor" href="#item-lower_node">lower_node</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn lower_node&#60;K: variant, A: any&#62;(src: str, node: Cst, prods: Production&#60;K, A&#62;[]) -&#62; A!ParseError</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-parse">
-        <h2>
-          <a class="anchor" href="#item-parse">parse</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn parse&#60;K: variant, A: any&#62;(src: str, lexed: LexResult&#60;K&#62;, g: Grammar&#60;K, A&#62;, start: str) -&#62; A!ParseError</code></pre>
-
-        <div class="doc"><p><code>parse_cst</code> followed by <code>lower</code>: the source's AST, with the concrete tree built and discarded in between. Use <code>parse_cst</code> when the tree itself is the point (a formatter, a highlighter), and this when only the AST is.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-tok_rules">
-        <h2>
-          <a class="anchor" href="#item-tok_rules">tok_rules</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn tok_rules() -&#62; TokenRule&#60;Tok&#62;[]</code></pre>
-
-        <div class="doc"><p>Lower-case words, digit runs, and one-character punctuation. Whitespace is skipped, so most assertions above are about grammar rather than layout; <code>trivia_rules</code> is the same set with whitespace and comments *recorded*, which is what the losslessness assertion needs.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-trivia_rules">
-        <h2>
-          <a class="anchor" href="#item-trivia_rules">trivia_rules</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn trivia_rules() -&#62; TokenRule&#60;Tok&#62;[]</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-lex_toks">
-        <h2>
-          <a class="anchor" href="#item-lex_toks">lex_toks</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn lex_toks(src: str, rules: TokenRule&#60;Tok&#62;[]) -&#62; LexResult&#60;Tok&#62;!ParseError</code></pre>
-
-        <div class="doc"><p>Lexing and parsing report failure in the same shape but not the same type, so the tests convert once here rather than at every call.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-Node">
-        <h2>
-          <a class="anchor" href="#item-Node">Node</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Node</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-        <ul class="cases">
-
-          <li id="item-NLeaf"><code>NLeaf(str)</code></li>
-
-          <li id="item-NNode"><code>NNode(Node[])</code></li>
-
-        </ul>
-
-      </section>
-
-      <section class="item" id="item-build_node">
-        <h2>
-          <a class="anchor" href="#item-build_node">build_node</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn build_node(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
-
-        <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-refuse">
-        <h2>
-          <a class="anchor" href="#item-refuse">refuse</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn refuse(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
-
-        <div class="doc"><p>A <code>build</code> that always refuses, for the error-propagation assertion.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-one">
-        <h2>
-          <a class="anchor" href="#item-one">one</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn one(name: str, rule: Rule&#60;Tok&#62;) -&#62; Production&#60;Tok, Node&#62;</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-labelled_prod">
-        <h2>
-          <a class="anchor" href="#item-labelled_prod">labelled_prod</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn labelled_prod(name: str, rule: Rule&#60;Tok&#62;, expect_as: str) -&#62; Production&#60;Tok, Node&#62;</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-g_of">
-        <h2>
-          <a class="anchor" href="#item-g_of">g_of</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn g_of(ps: Production&#60;Tok, Node&#62;[]) -&#62; Grammar&#60;Tok, Node&#62;</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-shown">
-        <h2>
-          <a class="anchor" href="#item-shown">shown</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn shown(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str!ParseError</code></pre>
-
-        <div class="doc"><p>Parse and render, so an assertion is one readable string rather than a nested <code>CTree</code> literal.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-msg_of">
-        <h2>
-          <a class="anchor" href="#item-msg_of">msg_of</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn msg_of(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str</code></pre>
-
-        <div class="doc"><p>The message a failed parse reports — and a distinguishable string when it unexpectedly succeeded, so a broken assertion says which way it broke.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-parsed">
-        <h2>
-          <a class="anchor" href="#item-parsed">parsed</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn parsed(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; Node!ParseError</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
 
 
     </main>

@@ -10,3 +10,4 @@
 #
 # To read one anyway: `git diff --text -- '*.clif'`.
 *.clif -diff
+docs/** -diff

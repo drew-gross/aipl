@@ -14,49 +14,36 @@
 
       <h1><code>crates/aipl-codegen/src/line_at.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>Span</code> <span class="from">from builtins</span></li>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
 
-          <li><code>greater_than_or_equal</code> <span class="as">as</span> <code>&#62;=</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-LineAt">
+          <h3>
+            <a class="anchor" href="#item-LineAt">LineAt</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct LineAt</code></pre>
 
-          <li><code>len</code> <span class="from">from builtins</span></li>
+          <p class="undocumented">Undocumented.</p>
 
-          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
 
-          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+        </section>
 
 
 
-      <section class="item" id="item-LineAt">
-        <h2>
-          <a class="anchor" href="#item-LineAt">LineAt</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct LineAt</code></pre>
+        <section class="item" id="item-line_at">
+          <h3>
+            <a class="anchor" href="#item-line_at">line_at</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn line_at(source: str, offset: u64) -&#62; LineAt</code></pre>
 
-        <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>The error renderer's line locator: the compiler calls this through the FFI (see <code>install_parser_hooks</code>) when rendering an error with a span. Given <code>source</code> and a byte <code>offset</code>, it returns the 0-based line index and the line's byte range — from its first byte up to the '\n' terminator (or source.len() for the last line). The range is a <code>Span</code>, so a caller can slice the line straight out of the source with <code>source[at.span]</code>.</p></div>
 
 
-      </section>
-
-      <section class="item" id="item-line_at">
-        <h2>
-          <a class="anchor" href="#item-line_at">line_at</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn line_at(source: str, offset: u64) -&#62; LineAt</code></pre>
-
-        <div class="doc"><p>The error renderer's line locator: the compiler calls this through the FFI (see <code>install_parser_hooks</code>) when rendering an error with a span. Given <code>source</code> and a byte <code>offset</code>, it returns the 0-based line index and the line's byte range — from its first byte up to the '\n' terminator (or source.len() for the last line). The range is a <code>Span</code>, so a caller can slice the line straight out of the source with <code>source[at.span]</code>.</p></div>
+        </section>
 
 
       </section>

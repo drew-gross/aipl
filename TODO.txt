@@ -233,7 +233,6 @@ parser:
   Mk should accept fns that only need kids
   implement "nested in" which should be good for the formatter
   implement the plan
-  can use SpanStr instead of spans in many places once we have it, it's COW/SSO so it should be fast
   remove power from prec and use order within the list
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
@@ -586,9 +585,7 @@ docs:
   make /// docs a thing for things that should be documented (and only for those things)
   make docs renderer part of check
   doc comments for structs/variants
-  hide private functions (or separate section)
   make the types and etc. into links
-  reove imports
 
 cache the compiled module on disk instead of using clif ir (expensive to parse)
 

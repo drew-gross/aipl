@@ -2,9 +2,20 @@
 //! written to a directory.
 //!
 //! The first consumer of [`aipl_index`], and deliberately a thin one — it asks
-//! the index for symbols, docs and imports, and spends its own effort on
+//! the index for symbols and their documentation, and spends its own effort on
 //! presentation. Anything it needed that the index could not answer would be a
 //! gap in the index rather than something to work around here.
+//!
+//! It does *not* show a file's imports, though the index carries them. An
+//! import list is about how a file is wired, which is a question for the
+//! source; a docs page answers what a file offers. Nothing was learned from
+//! reading them on the rendered site, and they pushed the declarations — the
+//! reason to be on the page — below the fold.
+//!
+//! **Public and private declarations are separate sections**, public first. A
+//! private declaration is not importable, so it is not part of what a file
+//! offers to anyone else; it stays on the page because a reader of *this* file
+//! still wants it, and it stays out of the way for everyone else.
 //!
 //! # What it produces
 //!
@@ -87,6 +98,7 @@ pub fn write_site(index: &Index, root: &Path, project: &str, out: &Path) -> Resu
             display: display_path(&file.path, root),
             href: format!("{slug}.html"),
             entries: page.entries(),
+            private_count: page.private.len(),
         });
         write(out.join(format!("{slug}.html")), &render(&page)?)?;
     }
@@ -175,7 +187,12 @@ struct IndexPage {
 struct FileListing {
     display: String,
     href: String,
+    /// Public declarations only. The index is a table of contents for what a
+    /// project offers; a file's private helpers are one click away on its own
+    /// page, and listing them here buried the rest.
     entries: Vec<Entry>,
+    /// How many were left out, so the page never silently hides a declaration.
+    private_count: usize,
 }
 
 struct Entry {
@@ -191,15 +208,10 @@ struct FilePage {
     title: String,
     project: String,
     display: String,
-    imports: Vec<ImportRow>,
-    symbols: Vec<SymbolSection>,
-}
-
-struct ImportRow {
-    name: String,
-    local: String,
-    aliased: bool,
-    from: String,
+    /// Importable from another file, and so the part of this file that is
+    /// anyone else's business. Shown first.
+    public: Vec<SymbolSection>,
+    private: Vec<SymbolSection>,
 }
 
 struct SymbolSection {
@@ -207,6 +219,9 @@ struct SymbolSection {
     anchor: String,
     kind: &'static str,
     kind_class: &'static str,
+    /// Which of the page's two sections this belongs in. Not rendered on the
+    /// item itself — the section heading says it once, so a `pub` badge on
+    /// every public item would be noise.
     is_pub: bool,
     detail: String,
     /// Pre-rendered HTML — see [`doc_html`]. The template marks it `|safe`,
@@ -251,29 +266,23 @@ impl FilePage {
                 cases: Vec::new(),
             });
         }
-        let imports = file
-            .imports
-            .iter()
-            .map(|i| ImportRow {
-                name: i.name.clone(),
-                local: i.local.clone(),
-                aliased: i.local != i.name,
-                from: i.from.clone().unwrap_or_else(|| "builtins".to_string()),
-            })
-            .collect();
         let _ = slug;
+        // Split after building rather than while: a case attaches to the
+        // declaration before it, and that is a fact about source order, not
+        // about visibility.
+        let (public, private) = symbols.into_iter().partition(|s: &SymbolSection| s.is_pub);
         FilePage {
             title: format!("{display} — {project}"),
             project: project.to_string(),
             display,
-            imports,
-            symbols,
+            public,
+            private,
         }
     }
 
     /// The one-line-per-item summary the index page shows for this file.
     fn entries(&self) -> Vec<Entry> {
-        self.symbols
+        self.public
             .iter()
             .map(|s| Entry {
                 name: s.name.clone(),
@@ -525,7 +534,7 @@ fn private_helper() -> i64 { 1 }
     }
 
     #[test]
-    fn a_page_shows_signatures_kinds_and_visibility() {
+    fn a_page_shows_signatures_and_kinds() {
         let (_d, out) = site();
         let page = read(&out, "src-shapes.html");
         assert!(page.contains("pub fn area(s: Shape) -&#62; i64"), "{page}");
@@ -533,9 +542,52 @@ fn private_helper() -> i64 { 1 }
         assert!(page.contains("variant Shape"));
         // A case is listed under its variant rather than as a section of its own.
         assert!(page.contains("Circle(r: i64)"));
-        // `pub` is badged; the private helper is not.
-        assert_eq!(page.matches("<span class=\"badge\">pub</span>").count(), 3);
-        assert!(page.contains("private_helper"));
+    }
+
+    /// The two sections, and which side of the line each declaration lands on.
+    /// `SRC` has three public declarations and one private helper.
+    #[test]
+    fn public_and_private_are_separate_sections() {
+        let (_d, out) = site();
+        let page = read(&out, "src-shapes.html");
+        let public = page.find(">Public<").expect("a public section");
+        let private = page.find(">Private<").expect("a private section");
+        assert!(public < private, "public comes first:\n{page}");
+        // The private helper is on the page, below the divide; the public ones
+        // are above it.
+        assert!(page.find("private_helper").expect("the helper") > private);
+        for name in ["area", "Point", "Shape"] {
+            let at = page.find(name).unwrap_or_else(|| panic!("{name}:\n{page}"));
+            assert!(at < private, "{name} should be public:\n{page}");
+        }
+    }
+
+    /// A file with nothing private gets no empty second section.
+    #[test]
+    fn a_section_with_nothing_in_it_is_not_rendered() {
+        aipl_codegen::install_parser_hooks();
+        let dir = tempdir::Dir::new("aipl-docs-pub");
+        std::fs::write(dir.path().join("p.aipl"), "pub fn f() -> i64 { 1 }\n").expect("write");
+        let mut index = Index::new();
+        index
+            .add(dir.path().join("p.aipl"), "pub fn f() -> i64 { 1 }\n")
+            .expect("indexes");
+        let out = dir.path().join("out");
+        write_site(&index, dir.path(), "demo", &out).expect("writes");
+        let page = read(&out, "p.html");
+        assert!(page.contains(">Public<"), "{page}");
+        assert!(!page.contains(">Private<"), "{page}");
+    }
+
+    /// Imports are indexed but deliberately not rendered.
+    #[test]
+    fn imports_are_not_shown() {
+        let (_d, out) = site();
+        let page = read(&out, "src-shapes.html");
+        assert!(!page.contains("Imports"), "{page}");
+        // `print` is imported by `SRC` and declared by nothing in it, so its
+        // name appearing at all would mean the import list came back.
+        assert!(!page.contains("print"), "{page}");
     }
 
     /// The doc renderer: paragraphs on blank lines, indented blocks kept as

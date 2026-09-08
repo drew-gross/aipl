@@ -14,32 +14,22 @@
 
       <h1><code>crates/aipl-codegen/src/int_fits.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>greater_than_or_equal</code> <span class="as">as</span> <code>&#62;=</code> <span class="from">from builtins</span></li>
-
-          <li><code>less_than_or_equal</code> <span class="as">as</span> <code>&#60;=</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-int_fits">
+          <h3>
+            <a class="anchor" href="#item-int_fits">int_fits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn int_fits(v: i64, name: str) -&#62; bool</code></pre>
 
-      <section class="item" id="item-int_fits">
-        <h2>
-          <a class="anchor" href="#item-int_fits">int_fits</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn int_fits(v: i64, name: str) -&#62; bool</code></pre>
+          <div class="doc"><p>Whether the integer value <code>v</code> (an <code>i64</code> literal) is representable in the integer type named <code>name</code> (<code>&quot;i8&quot;</code>..<code>&quot;u64&quot;</code>). <code>u64</code> accepts any non-negative value — a literal can't exceed <code>i64::MAX</code>, which fits <code>u64</code>. Any non-integer name is <code>false</code>. This is the compiler's flexible-literal range check (a bare literal flowing into a narrow-int context), dogfooded through the FFI.</p></div>
 
-        <div class="doc"><p>Whether the integer value <code>v</code> (an <code>i64</code> literal) is representable in the integer type named <code>name</code> (<code>&quot;i8&quot;</code>..<code>&quot;u64&quot;</code>). <code>u64</code> accepts any non-negative value — a literal can't exceed <code>i64::MAX</code>, which fits <code>u64</code>. Any non-integer name is <code>false</code>. This is the compiler's flexible-literal range check (a bare literal flowing into a narrow-int context), dogfooded through the FFI.</p></div>
+
+        </section>
 
 
       </section>

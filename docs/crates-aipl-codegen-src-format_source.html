@@ -14,64 +14,50 @@
 
       <h1><code>crates/aipl-codegen/src/format_source.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>concat</code> <span class="as">as</span> <code>+++</code> <span class="from">from builtins</span></li>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
 
-          <li><code>clean_trailing_whitespace</code> <span class="from">from ./clean_trailing_whitespace.aipl</span></li>
+        <section class="item" id="item-FmtInput">
+          <h3>
+            <a class="anchor" href="#item-FmtInput">FmtInput</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct FmtInput</code></pre>
 
-          <li><code>split_test_sections</code> <span class="from">from ./split_test_sections.aipl</span></li>
+          <div class="doc"><p>The formatter's input, split into the part it lays out and the part it copies.</p></div>
 
-          <li><code>trim_end_while</code> <span class="from">from ./trim_end_while.aipl</span></li>
 
-          <li><code>FmtError</code> <span class="from">from ./walker.aipl</span></li>
-
-          <li><code>format_program</code> <span class="from">from ./walker.aipl</span></li>
-
-        </ul>
-      </section>
+        </section>
 
 
 
-      <section class="item" id="item-FmtInput">
-        <h2>
-          <a class="anchor" href="#item-FmtInput">FmtInput</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct FmtInput</code></pre>
+        <section class="item" id="item-fmt_prepare">
+          <h3>
+            <a class="anchor" href="#item-fmt_prepare">fmt_prepare</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn fmt_prepare(src: str) -&#62; FmtInput</code></pre>
 
-        <div class="doc"><p>The formatter's input, split into the part it lays out and the part it copies.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-fmt_prepare">
-        <h2>
-          <a class="anchor" href="#item-fmt_prepare">fmt_prepare</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn fmt_prepare(src: str) -&#62; FmtInput</code></pre>
-
-        <div class="doc"><p>The first half of <code>format_source</code>: <code>src</code> split into the code to format (trailing whitespace already stripped) and its trailing <code>--- section ---</code> blocks, which are copied to the output verbatim rather than laid out.</p><p>The caller parses <code>cleaned</code> before handing it to <code>fmt_layout</code>.</p></div>
+          <div class="doc"><p>The first half of <code>format_source</code>: <code>src</code> split into the code to format (trailing whitespace already stripped) and its trailing <code>--- section ---</code> blocks, which are copied to the output verbatim rather than laid out.</p><p>The caller parses <code>cleaned</code> before handing it to <code>fmt_layout</code>.</p></div>
 
 
-      </section>
+        </section>
 
-      <section class="item" id="item-fmt_layout">
-        <h2>
-          <a class="anchor" href="#item-fmt_layout">fmt_layout</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn fmt_layout(cleaned: str, width: u64) -&#62; str!FmtError</code></pre>
 
-        <div class="doc"><p>The second half of <code>format_source</code>: lay <code>cleaned</code> out at <code>width</code>, then normalize to exactly one trailing newline — including for an empty program, which formats to just that. The printer only keeps a trailing newline when the layout happens to end with one, so the guarantee is made here rather than there.</p><p>The caller verifies the result carries the same tokens as <code>cleaned</code>, then appends the sections <code>fmt_prepare</code> set aside.</p></div>
+
+        <section class="item" id="item-fmt_layout">
+          <h3>
+            <a class="anchor" href="#item-fmt_layout">fmt_layout</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn fmt_layout(cleaned: str, width: u64) -&#62; str!FmtError</code></pre>
+
+          <div class="doc"><p>The second half of <code>format_source</code>: lay <code>cleaned</code> out at <code>width</code>, then normalize to exactly one trailing newline — including for an empty program, which formats to just that. The printer only keeps a trailing newline when the layout happens to end with one, so the guarantee is made here rather than there.</p><p>The caller verifies the result carries the same tokens as <code>cleaned</code>, then appends the sections <code>fmt_prepare</code> set aside.</p></div>
+
+
+        </section>
 
 
       </section>

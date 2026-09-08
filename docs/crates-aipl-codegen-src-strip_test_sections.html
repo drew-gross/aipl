@@ -14,32 +14,22 @@
 
       <h1><code>crates/aipl-codegen/src/strip_test_sections.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>not_equal</code> <span class="as">as</span> <code>!=</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
-
-          <li><code>parse_test_section_header</code> <span class="from">from ./parse_test_section_header.aipl</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-strip_test_sections">
+          <h3>
+            <a class="anchor" href="#item-strip_test_sections">strip_test_sections</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn strip_test_sections(src: str) -&#62; str</code></pre>
 
-      <section class="item" id="item-strip_test_sections">
-        <h2>
-          <a class="anchor" href="#item-strip_test_sections">strip_test_sections</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn strip_test_sections(src: str) -&#62; str</code></pre>
+          <div class="doc"><p>Returns the portion of <code>src</code> before the first <code>--- name ---</code> test-section marker line, or all of <code>src</code> if there is none. The cases test harness appends expected-output sections after the AIPL code with these markers; the compiler strips them so <code>aipl run/ir/build</code> can be pointed at a fixture directly. (<code>parse_test_section_header</code> classifies each line.)</p></div>
 
-        <div class="doc"><p>Returns the portion of <code>src</code> before the first <code>--- name ---</code> test-section marker line, or all of <code>src</code> if there is none. The cases test harness appends expected-output sections after the AIPL code with these markers; the compiler strips them so <code>aipl run/ir/build</code> can be pointed at a fixture directly. (<code>parse_test_section_header</code> classifies each line.)</p></div>
+
+        </section>
 
 
       </section>

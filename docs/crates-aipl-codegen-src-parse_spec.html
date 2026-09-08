@@ -14,114 +14,88 @@
 
       <h1><code>crates/aipl-codegen/src/parse_spec.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>concat</code> <span class="as">as</span> <code>+++</code> <span class="from">from builtins</span></li>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
-          <li><code>contains</code> <span class="from">from builtins</span></li>
 
-          <li><code>drop_n</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-Entry">
+          <h3>
+            <a class="anchor" href="#item-Entry">Entry</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Entry</code></pre>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>One <code>--- file: p ---</code> / <code>--- expect file: p ---</code> companion: a path and the body that follows it.</p></div>
 
-          <li><code>int_parse</code> <span class="from">from builtins</span></li>
 
-          <li><code>is_empty</code> <span class="from">from builtins</span></li>
-
-          <li><code>is_err_and</code> <span class="from">from builtins</span></li>
-
-          <li><code>len</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
-
-          <li><code>push</code> <span class="from">from builtins</span></li>
-
-          <li><code>starts_with</code> <span class="from">from builtins</span></li>
-
-          <li><code>trim</code> <span class="from">from builtins</span></li>
-
-          <li><code>value_or</code> <span class="from">from builtins</span></li>
-
-          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
-
-          <li><code>lines</code> <span class="as">as</span> <code>split_lines</code> <span class="from">from ./lines.aipl</span></li>
-
-          <li><code>parse_test_section_header</code> <span class="from">from ./parse_test_section_header.aipl</span></li>
-
-          <li><code>trim_end_while</code> <span class="from">from ./trim_end_while.aipl</span></li>
-
-        </ul>
-      </section>
+        </section>
 
 
 
-      <section class="item" id="item-Entry">
-        <h2>
-          <a class="anchor" href="#item-Entry">Entry</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct Entry</code></pre>
+        <section class="item" id="item-Spec">
+          <h3>
+            <a class="anchor" href="#item-Spec">Spec</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Spec</code></pre>
 
-        <div class="doc"><p>One <code>--- file: p ---</code> / <code>--- expect file: p ---</code> companion: a path and the body that follows it.</p></div>
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-parse_spec">
+          <h3>
+            <a class="anchor" href="#item-parse_spec">parse_spec</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn parse_spec(src: str) -&#62; Spec!str</code></pre>
+
+          <div class="doc"><p>Parses a case file into its <code>Spec</code>: the entry-point source (everything before the first <code>--- name ---</code> marker) plus one field per section. Section bodies have their trailing newlines stripped. Unknown section names, a malformed <code>exit code</code>, and an invalid companion path are errors rather than silent omissions — a mistyped marker would otherwise drop an expectation and the case would pass for the wrong reason.</p></div>
+
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-Spec">
-        <h2>
-          <a class="anchor" href="#item-Spec">Spec</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct Spec</code></pre>
 
-        <p class="undocumented">Undocumented.</p>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
 
-      </section>
+        <section class="item" id="item-finalize">
+          <h3>
+            <a class="anchor" href="#item-finalize">finalize</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn finalize(spec: Spec, name: str, buf: str) -&#62; Spec!str</code></pre>
 
-      <section class="item" id="item-parse_spec">
-        <h2>
-          <a class="anchor" href="#item-parse_spec">parse_spec</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn parse_spec(src: str) -&#62; Spec!str</code></pre>
-
-        <div class="doc"><p>Parses a case file into its <code>Spec</code>: the entry-point source (everything before the first <code>--- name ---</code> marker) plus one field per section. Section bodies have their trailing newlines stripped. Unknown section names, a malformed <code>exit code</code>, and an invalid companion path are errors rather than silent omissions — a mistyped marker would otherwise drop an expectation and the case would pass for the wrong reason.</p></div>
+          <div class="doc"><p>Fold one finished section into the spec. <code>name</code> is <code>&quot;&quot;</code> for the preamble.</p></div>
 
 
-      </section>
+        </section>
 
-      <section class="item" id="item-finalize">
-        <h2>
-          <a class="anchor" href="#item-finalize">finalize</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn finalize(spec: Spec, name: str, buf: str) -&#62; Spec!str</code></pre>
 
-        <div class="doc"><p>Fold one finished section into the spec. <code>name</code> is <code>&quot;&quot;</code> for the preamble.</p></div>
+        <section class="item" id="item-companion_path">
+          <h3>
+            <a class="anchor" href="#item-companion_path">companion_path</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn companion_path(name: str, prefix: str) -&#62; str!str</code></pre>
+
+          <div class="doc"><p>The path a <code>file:</code>-style marker carries, validated. <code>\</code> is a path-separator nuisance in this markup, so the source side is held to <code>/</code> and the harness canonicalizes on disk.</p></div>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-companion_path">
-        <h2>
-          <a class="anchor" href="#item-companion_path">companion_path</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn companion_path(name: str, prefix: str) -&#62; str!str</code></pre>
-
-        <div class="doc"><p>The path a <code>file:</code>-style marker carries, validated. <code>\</code> is a path-separator nuisance in this markup, so the source side is held to <code>/</code> and the harness canonicalizes on disk.</p></div>
-
-
-      </section>
-
 
 
     </main>

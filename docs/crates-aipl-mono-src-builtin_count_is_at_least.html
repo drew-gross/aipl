@@ -14,32 +14,22 @@
 
       <h1><code>crates/aipl-mono/src/builtin_count_is_at_least.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>count</code> <span class="from">from builtins</span></li>
-
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>greater_than_or_equal</code> <span class="as">as</span> <code>&#62;=</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-count_is_at_least">
+          <h3>
+            <a class="anchor" href="#item-count_is_at_least">count_is_at_least</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn count_is_at_least&#60;T: any&#62;(self: T[], x: T, limit: u64) -&#62; bool</code></pre>
 
-      <section class="item" id="item-count_is_at_least">
-        <h2>
-          <a class="anchor" href="#item-count_is_at_least">count_is_at_least</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn count_is_at_least&#60;T: any&#62;(self: T[], x: T, limit: u64) -&#62; bool</code></pre>
+          <div class="doc"><p>Fused form of <code>count(x) &gt;= limit</code> — see <code>count</code>. Counts only as far as the answer needs, so a an early match decides it without walking the rest.</p><p>Written by the compiler's operation-fusion pass, which rewrites <code>xs.count(x) &gt;= n</code> (and the mirrored <code>n &lt;= xs.count(x)</code>) into this. Also callable directly.</p></div>
 
-        <div class="doc"><p>Fused form of <code>count(x) &gt;= limit</code> — see <code>count</code>. Counts only as far as the answer needs, so a an early match decides it without walking the rest.</p><p>Written by the compiler's operation-fusion pass, which rewrites <code>xs.count(x) &gt;= n</code> (and the mirrored <code>n &lt;= xs.count(x)</code>) into this. Also callable directly.</p></div>
+
+        </section>
 
 
       </section>

@@ -14,6 +14,7 @@ import {
     Span,
     contains,
     count,
+    count_if,
     equal as ==,
     first,
     intersperse,
@@ -1680,7 +1681,7 @@ fn postfix(self: W) -> WDoc!FmtError {
     // fit, breaks before every call segment — the receiver ends up alone on the
     // first line and each `.method(..)` starts its own indented line. Fewer than
     // two calls: no chain break (a lone call's own argument list may still break).
-    if (call_count(segs.segs) < 2) {
+    if (segs.segs.count_if(|s| s.is_call) < 2) {
         return ok(WDoc { w: segs.w, doc: Concat([head.doc, ..segs.segs.map(|s| s.doc)]) });
     };
     ok(WDoc { w: segs.w, doc: group(Concat([head.doc, Indent(Concat(chain_docs(segs.segs)))])) })
@@ -1760,16 +1761,6 @@ fn index_or_from(self: W) -> WDocs!FmtError {
     };
     let b = dots.expr()?;
     ok(WDocs { w: b.w, docs: [a.doc, Text(".."), b.doc] })
-}
-
-fn call_count(segs: Seg[]) -> u64 {
-    mut n: u64 = 0;
-    for (let s : segs) {
-        if (s.is_call) {
-            set n++;
-        };
-    }
-    n
 }
 
 # The chain layout: a `SoftLine` before every call segment, so a break puts each
@@ -2972,7 +2963,7 @@ functions:
   __builtin_count_while$char$s0$lam103:
     calls: 2
     bytes: 172
-  __builtin_count_while$char$s0$lam109:
+  __builtin_count_while$char$s0$lam111:
     calls: 22
     bytes: 172
   __builtin_count_while$char$s0$lam74:

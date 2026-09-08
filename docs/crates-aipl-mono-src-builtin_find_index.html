@@ -14,49 +14,46 @@
 
       <h1><code>crates/aipl-mono/src/builtin_find_index.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>filter</code> <span class="from">from builtins</span></li>
-
-          <li><code>greater_than</code> <span class="as">as</span> <code>&#62;</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-find_index">
+          <h3>
+            <a class="anchor" href="#item-find_index">find_index</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn find_index&#60;T: any&#62;(self: T[], pred: (T) -&#62; bool) -&#62; u64?</code></pre>
 
-      <section class="item" id="item-find_index">
-        <h2>
-          <a class="anchor" href="#item-find_index">find_index</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn find_index&#60;T: any&#62;(self: T[], pred: (T) -&#62; bool) -&#62; u64?</code></pre>
+          <div class="doc"><p>The position of the first element of <code>self</code> satisfying <code>pred</code>, or <code>none</code> when none does, stopping at the first match. Generic over the element type and callable as a method: <code>xs.find_index(pred)</code>. A <code>str</code> receiver iterates its chars, since <code>str</code> and <code>char[]</code> share a representation.</p><p>The counterpart of <code>find_if</code>, which hands back the element rather than its position. Reach for this one when the position is the answer — to index a parallel array with it, or to record a reference as an offset instead of a name. See <code>any</code> for the same scan reporting only whether a match existed.</p></div>
 
-        <div class="doc"><p>The position of the first element of <code>self</code> satisfying <code>pred</code>, or <code>none</code> when none does, stopping at the first match. Generic over the element type and callable as a method: <code>xs.find_index(pred)</code>. A <code>str</code> receiver iterates its chars, since <code>str</code> and <code>char[]</code> share a representation.</p><p>The counterpart of <code>find_if</code>, which hands back the element rather than its position. Reach for this one when the position is the answer — to index a parallel array with it, or to record a reference as an offset instead of a name. See <code>any</code> for the same scan reporting only whether a match existed.</p></div>
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-is_nine">
-        <h2>
-          <a class="anchor" href="#item-is_nine">is_nine</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn is_nine(self: i64) -&#62; bool</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <p class="undocumented">Undocumented.</p>
+
+        <section class="item" id="item-is_nine">
+          <h3>
+            <a class="anchor" href="#item-is_nine">is_nine</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_nine(self: i64) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
-
 
 
     </main>

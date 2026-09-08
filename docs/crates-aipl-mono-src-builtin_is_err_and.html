@@ -14,86 +14,88 @@
 
       <h1><code>crates/aipl-mono/src/builtin_is_err_and.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
-
-          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-is_err_and">
+          <h3>
+            <a class="anchor" href="#item-is_err_and">is_err_and</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_err_and&#60;T: any, E: any&#62;(self: T!E, pred: (E) -&#62; bool) -&#62; bool</code></pre>
 
-      <section class="item" id="item-is_err_and">
-        <h2>
-          <a class="anchor" href="#item-is_err_and">is_err_and</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn is_err_and&#60;T: any, E: any&#62;(self: T!E, pred: (E) -&#62; bool) -&#62; bool</code></pre>
-
-        <div class="doc"><p>True when <code>self</code> is <code>err(e)</code> and <code>pred(e)</code> holds; <code>false</code> for <code>ok</code> (the predicate is not called). The result-world mirror of <code>is_some_and</code>, generic over both the ok and error types and callable as a method: <code>r.is_err_and(pred)</code>.</p></div>
+          <div class="doc"><p>True when <code>self</code> is <code>err(e)</code> and <code>pred(e)</code> holds; <code>false</code> for <code>ok</code> (the predicate is not called). The result-world mirror of <code>is_some_and</code>, generic over both the ok and error types and callable as a method: <code>r.is_err_and(pred)</code>.</p></div>
 
 
-      </section>
+        </section>
 
-      <section class="item" id="item-LenError">
-        <h2>
-          <a class="anchor" href="#item-LenError">LenError</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct LenError</code></pre>
 
-        <p class="undocumented">Undocumented.</p>
+
+        <section class="item" id="item-LenError">
+          <h3>
+            <a class="anchor" href="#item-LenError">LenError</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct LenError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-check_len">
-        <h2>
-          <a class="anchor" href="#item-check_len">check_len</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn check_len(s: str) -&#62; str!LenError</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <div class="doc"><p>A result whose error side is a struct, so the tests above cover reading a single field out of a multi-field payload.</p></div>
+
+        <section class="item" id="item-check_len">
+          <h3>
+            <a class="anchor" href="#item-check_len">check_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn check_len(s: str) -&#62; str!LenError</code></pre>
+
+          <div class="doc"><p>A result whose error side is a struct, so the tests above cover reading a single field out of a multi-field payload.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_not_a_digit">
+          <h3>
+            <a class="anchor" href="#item-is_not_a_digit">is_not_a_digit</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_not_a_digit(self: str) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-digit_of">
+          <h3>
+            <a class="anchor" href="#item-digit_of">digit_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn digit_of(s: str) -&#62; i64!str</code></pre>
+
+          <div class="doc"><p>Two ways to fail, so the tests can tell one error message from another.</p></div>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-is_not_a_digit">
-        <h2>
-          <a class="anchor" href="#item-is_not_a_digit">is_not_a_digit</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn is_not_a_digit(self: str) -&#62; bool</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-digit_of">
-        <h2>
-          <a class="anchor" href="#item-digit_of">digit_of</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn digit_of(s: str) -&#62; i64!str</code></pre>
-
-        <div class="doc"><p>Two ways to fail, so the tests can tell one error message from another.</p></div>
-
-
-      </section>
-
 
 
     </main>

@@ -14,50 +14,26 @@
 
       <h1><code>crates/aipl-codegen/src/caret_block.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>Span</code> <span class="from">from builtins</span></li>
-
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>len</code> <span class="from">from builtins</span></li>
-
-          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
-
-          <li><code>max</code> <span class="from">from builtins</span></li>
-
-          <li><code>min</code> <span class="from">from builtins</span></li>
-
-          <li><code>repeat</code> <span class="from">from builtins</span></li>
-
-          <li><code>saturating_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
-
-          <li><code>to_str</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
-
-          <li><code>line_at</code> <span class="from">from ./line_at.aipl</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-caret_block">
+          <h3>
+            <a class="anchor" href="#item-caret_block">caret_block</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn caret_block(source: str, span: Span, filename: str) -&#62; str</code></pre>
 
-      <section class="item" id="item-caret_block">
-        <h2>
-          <a class="anchor" href="#item-caret_block">caret_block</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn caret_block(source: str, span: Span, filename: str) -&#62; str</code></pre>
-
-        <div class="doc"><p>The error renderer's caret-block formatter: the compiler calls this through the FFI (see <code>install_parser_hooks</code>) when rendering an error with a span. Given <code>source</code> and <code>span</code> (a half-open byte range <code>[start, end)</code>), it returns the rustc-style location + underline block (no leading <code>error:</code>/<code>note:</code> label):</p><pre><code>{pad}--&gt; input:line:col
+          <div class="doc"><p>The error renderer's caret-block formatter: the compiler calls this through the FFI (see <code>install_parser_hooks</code>) when rendering an error with a span. Given <code>source</code> and <code>span</code> (a half-open byte range <code>[start, end)</code>), it returns the rustc-style location + underline block (no leading <code>error:</code>/<code>note:</code> label):</p><pre><code>{pad}--&gt; input:line:col
 {pad} |
 {line_no} | &lt;source line&gt;
 {pad} | &lt;indent&gt;^^^
 </code></pre></div>
+
+
+        </section>
 
 
       </section>

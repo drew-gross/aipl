@@ -14,798 +14,786 @@
 
       <h1><code>crates/aipl-codegen/src/lexer.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>Span</code> <span class="from">from builtins</span></li>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
-          <li><code>concat</code> <span class="as">as</span> <code>+++</code> <span class="from">from builtins</span></li>
 
-          <li><code>contains</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-TokenValue">
+          <h3>
+            <a class="anchor" href="#item-TokenValue">TokenValue</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant TokenValue</code></pre>
 
-          <li><code>count_while</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>What a token carries beyond its span: the processed *value* of the matched text, computed at lex time by the matcher that claimed it (see each matcher's doc). <code>StrVal</code> holds delimiter-stripped, *un-decoded* text (strings, raw strings, template segments) — the library strips the delimiters but leaves escapes verbatim for the rule's <code>emit</code> to decode with its own decoder (escape meaning is a language's policy, not the library's). Everything a rule can recover by slicing its span — identifiers, punctuation, keywords, comments, and the <code>Int</code>/<code>Float</code> numeric runs (whose *parsing* is the rule's <code>emit</code>'s job, via the <code>int_parse</code> builtin or its own) — carries <code>NoValue</code>. (A char literal is not a library concern: a consumer that wants one lexes it as a single-quoted <code>Delimited</code> string and validates the one-char shape in its <code>emit</code> — see <code>lex_aipl.aipl</code>.)</p></div>
 
-          <li><code>drop_first</code> <span class="from">from builtins</span></li>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+          <ul class="cases">
 
-          <li><code>extend</code> <span class="from">from builtins</span></li>
+            <li id="item-NoValue"><code>NoValue</code></li>
 
-          <li><code>first</code> <span class="from">from builtins</span></li>
+            <li id="item-StrVal"><code>StrVal(str)</code></li>
 
-          <li><code>int_parse</code> <span class="from">from builtins</span></li>
+          </ul>
 
-          <li><code>is_digit</code> <span class="from">from builtins</span></li>
+        </section>
 
-          <li><code>is_empty</code> <span class="from">from builtins</span></li>
 
-          <li><code>is_nonempty</code> <span class="from">from builtins</span></li>
 
-          <li><code>is_some_and</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-SpanStr">
+          <h3>
+            <a class="anchor" href="#item-SpanStr">SpanStr</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct SpanStr</code></pre>
 
-          <li><code>len</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>Matched text together with where it was matched: the two halves every consumer of a token needs, carried in one value so they cannot be separated.</p><p>A <code>SpanStr</code> is built by <code>span_str</code> and nothing else, which is what makes its one invariant hold: **<code>text</code> is exactly <code>src[span]</code>** for the source it was sliced from. Consumers rely on that in both directions — a diagnostic renders <code>span</code> against the source it already has, and a parser reads <code>text</code> without needing the source at all.</p><p>It is a plain struct, not a language feature: <code>str</code> alone cannot carry the offset (a <code>str</code> is text, and two equal strings from different places are equal), so the span rides alongside. That costs 16 bytes over a bare <code>str</code>, and buys every function downstream one parameter instead of two.</p></div>
 
-          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
 
-          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
+        </section>
 
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
 
-          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
 
-          <li><code>map</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-span_str">
+          <h3>
+            <a class="anchor" href="#item-span_str">span_str</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn span_str(src: str, at: Span) -&#62; SpanStr</code></pre>
 
-          <li><code>map_err</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p><code>src[at]</code> paired with <code>at</code> — the only way a <code>SpanStr</code> is made, so its text-matches-span invariant holds by construction. Slicing clamps, so an out-of-range or inverted <code>at</code> yields the empty text rather than failing; <code>span</code> is kept verbatim either way, since it is what a caret block underlines.</p></div>
 
-          <li><code>not_equal</code> <span class="as">as</span> <code>!=</code> <span class="from">from builtins</span></li>
 
-          <li><code>push</code> <span class="from">from builtins</span></li>
+        </section>
 
-          <li><code>starts_with</code> <span class="from">from builtins</span></li>
 
-          <li><code>value_or</code> <span class="from">from builtins</span></li>
 
-          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-Token">
+          <h3>
+            <a class="anchor" href="#item-Token">Token</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Token&#60;K: any&#62;</code></pre>
 
-          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>What a token is: its <code>kind</code> — a caller-defined value carrying whatever the matched token means, produced by the rule's <code>emit</code> (see <code>Emit</code>) — and its <code>text</code>, the raw source it covers plus the span it covers (see <code>SpanStr</code>). <code>Token</code> is generic over the kind type <code>K</code>, so a language pins <code>K</code> to its own <code>variant</code> whose arms *are* the token kinds, each carrying that kind's content (<code>Int(i64)</code>, <code>Str(str)</code>, a bare <code>Plus</code>, …) — rather than a stringly-typed label plus a separate value.</p><p>The text is carried rather than recovered by slicing (<code>src[t.span]</code>, as it used to be) so that holding a token is enough: a parser does not thread the source alongside its token list just to read a token back.</p></div>
 
-          <li><code>wrapping_add_assign</code> <span class="as">as</span> <code>+=</code> <span class="from">from builtins</span></li>
 
-          <li><code>wrapping_decrement</code> <span class="as">as</span> <code>--</code> <span class="from">from builtins</span></li>
+        </section>
 
-          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
 
-          <li><code>wrapping_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
 
-          <li><code>unescape</code> <span class="from">from ./unescape.aipl</span></li>
+        <section class="item" id="item-Seg">
+          <h3>
+            <a class="anchor" href="#item-Seg">Seg</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Seg</code></pre>
 
-        </ul>
-      </section>
+          <div class="doc"><p>Where in a template literal a text segment sits, handed to a <code>Template</code> rule's <code>OfSeg</code> emit so one rule can produce a *different* kind per position: <code>Plain</code> (a literal with no interpolations), <code>Head</code> (open delim through the first <code>{</code>), <code>Middle</code> (between two interpolations), <code>Tail</code> (through the close).</p></div>
 
 
+          <ul class="cases">
 
-      <section class="item" id="item-TokenValue">
-        <h2>
-          <a class="anchor" href="#item-TokenValue">TokenValue</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant TokenValue</code></pre>
+            <li id="item-Plain"><code>Plain</code></li>
 
-        <div class="doc"><p>What a token carries beyond its span: the processed *value* of the matched text, computed at lex time by the matcher that claimed it (see each matcher's doc). <code>StrVal</code> holds delimiter-stripped, *un-decoded* text (strings, raw strings, template segments) — the library strips the delimiters but leaves escapes verbatim for the rule's <code>emit</code> to decode with its own decoder (escape meaning is a language's policy, not the library's). Everything a rule can recover by slicing its span — identifiers, punctuation, keywords, comments, and the <code>Int</code>/<code>Float</code> numeric runs (whose *parsing* is the rule's <code>emit</code>'s job, via the <code>int_parse</code> builtin or its own) — carries <code>NoValue</code>. (A char literal is not a library concern: a consumer that wants one lexes it as a single-quoted <code>Delimited</code> string and validates the one-char shape in its <code>emit</code> — see <code>lex_aipl.aipl</code>.)</p></div>
+            <li id="item-Head"><code>Head</code></li>
 
+            <li id="item-Middle"><code>Middle</code></li>
 
-        <ul class="cases">
+            <li id="item-Tail"><code>Tail</code></li>
 
-          <li id="item-NoValue"><code>NoValue</code></li>
+          </ul>
 
-          <li id="item-StrVal"><code>StrVal(str)</code></li>
+        </section>
 
-        </ul>
 
-      </section>
 
-      <section class="item" id="item-SpanStr">
-        <h2>
-          <a class="anchor" href="#item-SpanStr">SpanStr</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct SpanStr</code></pre>
+        <section class="item" id="item-Emit">
+          <h3>
+            <a class="anchor" href="#item-Emit">Emit</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Emit&#60;K: any&#62;</code></pre>
 
-        <div class="doc"><p>Matched text together with where it was matched: the two halves every consumer of a token needs, carried in one value so they cannot be separated.</p><p>A <code>SpanStr</code> is built by <code>span_str</code> and nothing else, which is what makes its one invariant hold: **<code>text</code> is exactly <code>src[span]</code>** for the source it was sliced from. Consumers rely on that in both directions — a diagnostic renders <code>span</code> against the source it already has, and a parser reads <code>text</code> without needing the source at all.</p><p>It is a plain struct, not a language feature: <code>str</code> alone cannot carry the offset (a <code>str</code> is text, and two equal strings from different places are equal), so the span rides alongside. That costs 16 bytes over a bare <code>str</code>, and buys every function downstream one parameter instead of two.</p></div>
+          <div class="doc"><p>How a rule turns its matched token into a kind <code>K</code>: a fixed set of options.</p><p>Four of the five are handed the token's *content string* — the delimiter-stripped text for a string matcher (<code>Delimited</code>/<code>Between</code>/<code>Nested</code>), or the raw matched text for everything else (identifiers, whose text is their content, and numeric <code>Int</code>/<code>Float</code> runs, whose emit parses the digits itself). The two never overlap — a matcher either strips delimiters or has none — so one notion serves both, always handing over the meaningful content.</p></div>
 
 
-      </section>
+          <ul class="cases">
 
-      <section class="item" id="item-span_str">
-        <h2>
-          <a class="anchor" href="#item-span_str">span_str</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn span_str(src: str, at: Span) -&#62; SpanStr</code></pre>
+            <li id="item-Bare"><code>Bare(K)</code></li>
 
-        <div class="doc"><p><code>src[at]</code> paired with <code>at</code> — the only way a <code>SpanStr</code> is made, so its text-matches-span invariant holds by construction. Slicing clamps, so an out-of-range or inverted <code>at</code> yields the empty text rather than failing; <code>span</code> is kept verbatim either way, since it is what a caret block underlines.</p></div>
+            <li id="item-Of"><code>Of((str) -&#62; K)</code></li>
 
+            <li id="item-OfSeg"><code>OfSeg((str, Seg) -&#62; K)</code></li>
 
-      </section>
+            <li id="item-Try"><code>Try((str) -&#62; K!str)</code></li>
 
-      <section class="item" id="item-Token">
-        <h2>
-          <a class="anchor" href="#item-Token">Token</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct Token&#60;K: any&#62;</code></pre>
+            <li id="item-TrySeg"><code>TrySeg((str, Seg) -&#62; K!str)</code></li>
 
-        <div class="doc"><p>What a token is: its <code>kind</code> — a caller-defined value carrying whatever the matched token means, produced by the rule's <code>emit</code> (see <code>Emit</code>) — and its <code>text</code>, the raw source it covers plus the span it covers (see <code>SpanStr</code>). <code>Token</code> is generic over the kind type <code>K</code>, so a language pins <code>K</code> to its own <code>variant</code> whose arms *are* the token kinds, each carrying that kind's content (<code>Int(i64)</code>, <code>Str(str)</code>, a bare <code>Plus</code>, …) — rather than a stringly-typed label plus a separate value.</p><p>The text is carried rather than recovered by slicing (<code>src[t.span]</code>, as it used to be) so that holding a token is enough: a parser does not thread the source alongside its token list just to read a token back.</p></div>
+          </ul>
 
+        </section>
 
-      </section>
 
-      <section class="item" id="item-Seg">
-        <h2>
-          <a class="anchor" href="#item-Seg">Seg</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Seg</code></pre>
 
-        <div class="doc"><p>Where in a template literal a text segment sits, handed to a <code>Template</code> rule's <code>OfSeg</code> emit so one rule can produce a *different* kind per position: <code>Plain</code> (a literal with no interpolations), <code>Head</code> (open delim through the first <code>{</code>), <code>Middle</code> (between two interpolations), <code>Tail</code> (through the close).</p></div>
+        <section class="item" id="item-LexError">
+          <h3>
+            <a class="anchor" href="#item-LexError">LexError</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct LexError</code></pre>
 
+          <div class="doc"><p>Why a lex failed: what went wrong, and the span of the offending source (absolute into the lexed string — slice it to show the offender).</p></div>
 
-        <ul class="cases">
 
-          <li id="item-Plain"><code>Plain</code></li>
+        </section>
 
-          <li id="item-Head"><code>Head</code></li>
 
-          <li id="item-Middle"><code>Middle</code></li>
 
-          <li id="item-Tail"><code>Tail</code></li>
+        <section class="item" id="item-Matcher">
+          <h3>
+            <a class="anchor" href="#item-Matcher">Matcher</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Matcher</code></pre>
 
-        </ul>
+          <div class="doc"><p>One token shape, as plain data. Char classes and fixed spellings are both spelled as strings (class membership via <code>contains</code>, a spelling matched whole); none of them ever match empty input, so <code>lex</code> always makes progress.</p><p>Tokens carry values (see <code>TokenValue</code>), computed by the claiming matcher: <code>Delimited</code> a <code>StrVal</code> of the delimiter-stripped contents, *un-decoded* (the rule's <code>emit</code> decodes — escape handling is the caller's, not the library's); <code>Between</code>/<code>Nested</code> a verbatim <code>StrVal</code> of the contents (a raw string's de-denting is the caller's post-pass). <code>Template</code> (its segments), <code>Int</code>/<code>Float</code> (their digit text), and everything else — plus every trivia record — carry <code>NoValue</code>, so an <code>Of</code> emit recovers the raw matched text and interprets it. The library provides no string-escape decoder: what a <code>\X</code> means is a language's own policy, so a consumer's <code>emit</code> decodes with its own (e.g. <code>lex_aipl.aipl</code>'s <code>unescape</code>, mapping <code>\n</code>/<code>\t</code>/<code>\r</code> to control chars and any other <code>\X</code> to X itself). A char literal is likewise not a matcher: a consumer lexes it as a single-quoted <code>Delimited</code> string and enforces the one-char shape in a <code>Try</code> emit (see <code>lex_aipl.aipl</code>'s <code>char_lit_emit</code>).</p></div>
 
-      </section>
 
-      <section class="item" id="item-Emit">
-        <h2>
-          <a class="anchor" href="#item-Emit">Emit</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Emit&#60;K: any&#62;</code></pre>
+          <ul class="cases">
 
-        <div class="doc"><p>How a rule turns its matched token into a kind <code>K</code>: a fixed set of options.</p><p>Four of the five are handed the token's *content string* — the delimiter-stripped text for a string matcher (<code>Delimited</code>/<code>Between</code>/<code>Nested</code>), or the raw matched text for everything else (identifiers, whose text is their content, and numeric <code>Int</code>/<code>Float</code> runs, whose emit parses the digits itself). The two never overlap — a matcher either strips delimiters or has none — so one notion serves both, always handing over the meaningful content.</p></div>
+            <li id="item-CharRun"><code>CharRun(cont: str, first: str = ..)</code></li>
 
+            <li id="item-OneChar"><code>OneChar(str)</code></li>
 
-        <ul class="cases">
+            <li id="item-Exact"><code>Exact(str)</code></li>
 
-          <li id="item-Bare"><code>Bare(K)</code></li>
+            <li id="item-Keyword"><code>Keyword(str, str)</code></li>
 
-          <li id="item-Of"><code>Of((str) -&#62; K)</code></li>
+            <li id="item-Delimited"><code>Delimited(str, str)</code></li>
 
-          <li id="item-OfSeg"><code>OfSeg((str, Seg) -&#62; K)</code></li>
+            <li id="item-Between"><code>Between(str, str)</code></li>
 
-          <li id="item-Try"><code>Try((str) -&#62; K!str)</code></li>
+            <li id="item-Nested"><code>Nested(str, str)</code></li>
 
-          <li id="item-TrySeg"><code>TrySeg((str, Seg) -&#62; K!str)</code></li>
+            <li id="item-Template"><code>Template(str, str, (str[]) -&#62; str[])</code></li>
 
-        </ul>
+            <li id="item-ToEol"><code>ToEol(str)</code></li>
 
-      </section>
+            <li id="item-ToEolUnless"><code>ToEolUnless(marker: str, blocked: str)</code></li>
 
-      <section class="item" id="item-LexError">
-        <h2>
-          <a class="anchor" href="#item-LexError">LexError</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct LexError</code></pre>
+            <li id="item-Float"><code>Float</code></li>
 
-        <div class="doc"><p>Why a lex failed: what went wrong, and the span of the offending source (absolute into the lexed string — slice it to show the offender).</p></div>
+            <li id="item-Int"><code>Int</code></li>
 
+          </ul>
 
-      </section>
+        </section>
 
-      <section class="item" id="item-Matcher">
-        <h2>
-          <a class="anchor" href="#item-Matcher">Matcher</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Matcher</code></pre>
 
-        <div class="doc"><p>One token shape, as plain data. Char classes and fixed spellings are both spelled as strings (class membership via <code>contains</code>, a spelling matched whole); none of them ever match empty input, so <code>lex</code> always makes progress.</p><p>Tokens carry values (see <code>TokenValue</code>), computed by the claiming matcher: <code>Delimited</code> a <code>StrVal</code> of the delimiter-stripped contents, *un-decoded* (the rule's <code>emit</code> decodes — escape handling is the caller's, not the library's); <code>Between</code>/<code>Nested</code> a verbatim <code>StrVal</code> of the contents (a raw string's de-denting is the caller's post-pass). <code>Template</code> (its segments), <code>Int</code>/<code>Float</code> (their digit text), and everything else — plus every trivia record — carry <code>NoValue</code>, so an <code>Of</code> emit recovers the raw matched text and interprets it. The library provides no string-escape decoder: what a <code>\X</code> means is a language's own policy, so a consumer's <code>emit</code> decodes with its own (e.g. <code>lex_aipl.aipl</code>'s <code>unescape</code>, mapping <code>\n</code>/<code>\t</code>/<code>\r</code> to control chars and any other <code>\X</code> to X itself). A char literal is likewise not a matcher: a consumer lexes it as a single-quoted <code>Delimited</code> string and enforces the one-char shape in a <code>Try</code> emit (see <code>lex_aipl.aipl</code>'s <code>char_lit_emit</code>).</p></div>
 
+        <section class="item" id="item-TokenRule">
+          <h3>
+            <a class="anchor" href="#item-TokenRule">TokenRule</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct TokenRule&#60;K: any&#62;</code></pre>
 
-        <ul class="cases">
+          <div class="doc"><p>One prioritized entry of a rule set: the shape to match, how to turn a match into a kind (<code>emit</code>), and what becomes of its matches. A plain rule emits a token; <code>skip: true</code> consumes matches silently (whitespace); <code>trivia: true</code> consumes them but records each in the result's trivia side-channel — for matches a later pass wants located but not parsed, like comments (a formatter re-attaches them) or lint markers (<code>#[allow]</code>). Set at most one of the two flags (<code>skip</code> wins when both are set). Generic over the kind type <code>K</code> — every rule of one set builds the same <code>K</code>. <code>unterminated</code> overrides the message used when this rule's token runs off the end of the source (a <code>Delimited</code>/<code>Between</code>/<code>Nested</code>/<code>Template</code> scan that never closes). Empty means &quot;use the matcher's built-in default&quot; (a generic &quot;unterminated delimited token&quot; / &quot;unterminated template literal&quot;) — so a rule can name its token in the diagnostic (<code>&quot;unterminated string literal&quot;</code>) without every rule having to.</p><p><code>scope</code> is the TextMate scope a syntax highlighter should paint this rule's matches — <code>&quot;keyword.control.aipl&quot;</code>, <code>&quot;string.quoted.double.aipl&quot;</code>. <code>lex</code> ignores it entirely: it is carried here so that one rule set describes a language's lexical structure *once*, for the lexer and the highlighter both (<code>highlight.aipl</code> generates the second from it), rather than the two drifting apart as separate descriptions. Empty means &quot;not highlighted&quot;, which is what a <code>skip</code> rule wants. The same hint on the syntactic half is <code>Production.scope</code> in <code>grammar.aipl</code>.</p></div>
 
-          <li id="item-CharRun"><code>CharRun(cont: str, first: str = ..)</code></li>
 
-          <li id="item-OneChar"><code>OneChar(str)</code></li>
+        </section>
 
-          <li id="item-Exact"><code>Exact(str)</code></li>
 
-          <li id="item-Keyword"><code>Keyword(str, str)</code></li>
 
-          <li id="item-Delimited"><code>Delimited(str, str)</code></li>
+        <section class="item" id="item-LexResult">
+          <h3>
+            <a class="anchor" href="#item-LexResult">LexResult</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct LexResult&#60;K: any&#62;</code></pre>
 
-          <li id="item-Between"><code>Between(str, str)</code></li>
+          <div class="doc"><p>What <code>lex</code> returns: the emitted tokens, and the trivia side-channel — the recorded matches of every <code>trivia: true</code> rule, in source order. Silent <code>skip</code> matches appear in neither.</p></div>
 
-          <li id="item-Nested"><code>Nested(str, str)</code></li>
 
-          <li id="item-Template"><code>Template(str, str, (str[]) -&#62; str[])</code></li>
+        </section>
 
-          <li id="item-ToEol"><code>ToEol(str)</code></li>
 
-          <li id="item-ToEolUnless"><code>ToEolUnless(marker: str, blocked: str)</code></li>
 
-          <li id="item-Float"><code>Float</code></li>
+        <section class="item" id="item-keep_skipped">
+          <h3>
+            <a class="anchor" href="#item-keep_skipped">keep_skipped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn keep_skipped&#60;K: any&#62;(self: TokenRule&#60;K&#62;[]) -&#62; TokenRule&#60;K&#62;[]</code></pre>
 
-          <li id="item-Int"><code>Int</code></li>
+          <div class="doc"><p><code>self</code> with every <code>skip</code> rule turned into a <code>trivia</code> rule: nothing is dropped, so every byte of a lexed source is accounted for by some token or trivia record.</p><p>A compiler's rule set skips whitespace outright — it has no use for it, and recording it would cost every consumer something only one of them wants. A *lossless* consumer has the opposite need: a parser building a concrete syntax tree, or a formatter reproducing its input, must be able to put every byte back. Both read the one rule set through this, rather than the language keeping two of them.</p></div>
 
-        </ul>
 
-      </section>
+        </section>
 
-      <section class="item" id="item-TokenRule">
-        <h2>
-          <a class="anchor" href="#item-TokenRule">TokenRule</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct TokenRule&#60;K: any&#62;</code></pre>
 
-        <div class="doc"><p>One prioritized entry of a rule set: the shape to match, how to turn a match into a kind (<code>emit</code>), and what becomes of its matches. A plain rule emits a token; <code>skip: true</code> consumes matches silently (whitespace); <code>trivia: true</code> consumes them but records each in the result's trivia side-channel — for matches a later pass wants located but not parsed, like comments (a formatter re-attaches them) or lint markers (<code>#[allow]</code>). Set at most one of the two flags (<code>skip</code> wins when both are set). Generic over the kind type <code>K</code> — every rule of one set builds the same <code>K</code>. <code>unterminated</code> overrides the message used when this rule's token runs off the end of the source (a <code>Delimited</code>/<code>Between</code>/<code>Nested</code>/<code>Template</code> scan that never closes). Empty means &quot;use the matcher's built-in default&quot; (a generic &quot;unterminated delimited token&quot; / &quot;unterminated template literal&quot;) — so a rule can name its token in the diagnostic (<code>&quot;unterminated string literal&quot;</code>) without every rule having to.</p><p><code>scope</code> is the TextMate scope a syntax highlighter should paint this rule's matches — <code>&quot;keyword.control.aipl&quot;</code>, <code>&quot;string.quoted.double.aipl&quot;</code>. <code>lex</code> ignores it entirely: it is carried here so that one rule set describes a language's lexical structure *once*, for the lexer and the highlighter both (<code>highlight.aipl</code> generates the second from it), rather than the two drifting apart as separate descriptions. Empty means &quot;not highlighted&quot;, which is what a <code>skip</code> rule wants. The same hint on the syntactic half is <code>Production.scope</code> in <code>grammar.aipl</code>.</p></div>
 
+        <section class="item" id="item-StepResult">
+          <h3>
+            <a class="anchor" href="#item-StepResult">StepResult</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct StepResult&#60;K: any&#62;</code></pre>
 
-      </section>
+          <div class="doc"><p>One lexing step's outcome: the token(s) the winning rule produced — one usually, none for a <code>skip</code> rule, a whole head/expr/middle/tail run for a <code>Template</code> — any trivia recorded along the way, and the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p></div>
 
-      <section class="item" id="item-LexResult">
-        <h2>
-          <a class="anchor" href="#item-LexResult">LexResult</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct LexResult&#60;K: any&#62;</code></pre>
 
-        <div class="doc"><p>What <code>lex</code> returns: the emitted tokens, and the trivia side-channel — the recorded matches of every <code>trivia: true</code> rule, in source order. Silent <code>skip</code> matches appear in neither.</p></div>
+        </section>
 
 
-      </section>
 
-      <section class="item" id="item-keep_skipped">
-        <h2>
-          <a class="anchor" href="#item-keep_skipped">keep_skipped</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn keep_skipped&#60;K: any&#62;(self: TokenRule&#60;K&#62;[]) -&#62; TokenRule&#60;K&#62;[]</code></pre>
+        <section class="item" id="item-Kind">
+          <h3>
+            <a class="anchor" href="#item-Kind">Kind</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Kind</code></pre>
 
-        <div class="doc"><p><code>self</code> with every <code>skip</code> rule turned into a <code>trivia</code> rule: nothing is dropped, so every byte of a lexed source is accounted for by some token or trivia record.</p><p>A compiler's rule set skips whitespace outright — it has no use for it, and recording it would cost every consumer something only one of them wants. A *lossless* consumer has the opposite need: a parser building a concrete syntax tree, or a formatter reproducing its input, must be able to put every byte back. Both read the one rule set through this, rather than the language keeping two of them.</p></div>
+          <div class="doc"><p>A concrete token-kind variant for the <code>.test</code> block below — one example of the per-language <code>K</code> a caller pins <code>Token&lt;K&gt;</code>/<code>TokenRule&lt;K&gt;</code> to. Each arm is a kind; value-bearing kinds carry their content (<code>Int(i64)</code>, <code>Str(str)</code>, the template segments), text-recovered kinds are bare (their text is sliced from the span). A real consumer writes its own such variant.</p></div>
 
 
-      </section>
+          <ul class="cases">
 
-      <section class="item" id="item-lex_err">
-        <h2>
-          <a class="anchor" href="#item-lex_err">lex_err</a>
-          <span class="kind kind-fn">fn</span>
+            <li id="item-Ws"><code>Ws</code></li>
 
-        </h2>
-        <pre class="signature"><code>fn lex_err(message: str, span: Span) -&#62; LexError</code></pre>
+            <li id="item-Ident"><code>Ident(str)</code></li>
 
-        <p class="undocumented">Undocumented.</p>
+            <li id="item-IntTok"><code>IntTok(i64)</code></li>
 
+            <li id="item-Digits"><code>Digits</code></li>
 
-      </section>
+            <li id="item-Op"><code>Op</code></li>
 
-      <section class="item" id="item-char_run_len">
-        <h2>
-          <a class="anchor" href="#item-char_run_len">char_run_len</a>
-          <span class="kind kind-fn">fn</span>
+            <li id="item-Kw"><code>Kw</code></li>
 
-        </h2>
-        <pre class="signature"><code>fn char_run_len(self: str, head: str, cont: str) -&#62; u64</code></pre>
+            <li id="item-Punct"><code>Punct</code></li>
 
-        <div class="doc"><p><code>CharRun</code>: length of the maximal run at the start of <code>self</code> — a <code>head</code> char, then <code>cont</code> chars. 0 when the first char isn't in <code>head</code>. (<code>head</code> rather than <code>first</code>, which is now a builtin this file calls.)</p></div>
+            <li id="item-Dot"><code>Dot</code></li>
 
+            <li id="item-FloatTok"><code>FloatTok</code></li>
 
-      </section>
+            <li id="item-Str"><code>Str(str)</code></li>
 
-      <section class="item" id="item-one_char_len">
-        <h2>
-          <a class="anchor" href="#item-one_char_len">one_char_len</a>
-          <span class="kind kind-fn">fn</span>
+            <li id="item-Raw"><code>Raw(str)</code></li>
 
-        </h2>
-        <pre class="signature"><code>fn one_char_len(self: str, chars: str) -&#62; u64</code></pre>
+            <li id="item-Block"><code>Block(str)</code></li>
 
-        <div class="doc"><p><code>OneChar</code>: 1 when <code>self</code> opens with a char in <code>chars</code>, else 0 — <code>char_run_len</code>'s single-character counterpart, and the reason a rule never has to spell that shape as a run with nothing to continue it. An empty set never matches.</p></div>
+            <li id="item-Comment"><code>Comment</code></li>
 
+            <li id="item-Allow"><code>Allow</code></li>
 
-      </section>
+            <li id="item-Tpl"><code>Tpl(str)</code></li>
 
-      <section class="item" id="item-exact_len">
-        <h2>
-          <a class="anchor" href="#item-exact_len">exact_len</a>
-          <span class="kind kind-fn">fn</span>
+            <li id="item-TplHead"><code>TplHead(str)</code></li>
 
-        </h2>
-        <pre class="signature"><code>fn exact_len(self: str, spelling: str) -&#62; u64</code></pre>
+            <li id="item-TplMid"><code>TplMid(str)</code></li>
 
-        <div class="doc"><p><code>Exact</code>: length of <code>spelling</code> when it prefixes <code>self</code>, else 0. An empty spelling never matches.</p></div>
+            <li id="item-TplTail"><code>TplTail(str)</code></li>
+
+            <li id="item-RawTpl"><code>RawTpl(str)</code></li>
+
+            <li id="item-RawTplHead"><code>RawTplHead(str)</code></li>
+
+            <li id="item-RawTplMid"><code>RawTplMid(str)</code></li>
+
+            <li id="item-RawTplTail"><code>RawTplTail(str)</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-lex">
+          <h3>
+            <a class="anchor" href="#item-lex">lex</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lex&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; LexResult&#60;K&#62;!LexError</code></pre>
+
+          <div class="doc"><p>Lexes <code>self</code> into a <code>LexResult</code>: the flat token list, plus the trivia side-channel, as described by the ordered <code>rules</code>. At each position the first rule whose matcher matches claims the token (so order is priority — keywords before identifiers, floats before ints); a <code>skip: true</code> rule consumes its match without producing anything (whitespace), and a <code>trivia: true</code> rule records its matches in the side-channel instead of the token stream (comments, lint markers). A <code>Template</code> rule emits several tokens per literal — head/middle/tail segments around the tokens of each <code>{...}</code> interpolation, which are lexed by this same rule set. Lexing fails with an <code>err</code> — a <code>LexError</code> carrying a message and the offending span — when a byte matches no rule or a matcher sees invalid input outright (an unterminated <code>Delimited</code> token).</p></div>
+
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-keyword_len">
-        <h2>
-          <a class="anchor" href="#item-keyword_len">keyword_len</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn keyword_len(self: str, spelling: str, boundary: str) -&#62; u64</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <div class="doc"><p><code>Keyword</code>: the length of <code>spelling</code> when it prefixes <code>self</code>, but only when the char after it is absent (end of source) or outside <code>boundary</code> — a keyword must not end in the middle of an identifier. 0 when it doesn't match (or the char after is a boundary char, as in <code>iffy</code> for <code>if</code>).</p></div>
+
+        <section class="item" id="item-lex_err">
+          <h3>
+            <a class="anchor" href="#item-lex_err">lex_err</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lex_err(message: str, span: Span) -&#62; LexError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-char_run_len">
+          <h3>
+            <a class="anchor" href="#item-char_run_len">char_run_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn char_run_len(self: str, head: str, cont: str) -&#62; u64</code></pre>
+
+          <div class="doc"><p><code>CharRun</code>: length of the maximal run at the start of <code>self</code> — a <code>head</code> char, then <code>cont</code> chars. 0 when the first char isn't in <code>head</code>. (<code>head</code> rather than <code>first</code>, which is now a builtin this file calls.)</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-one_char_len">
+          <h3>
+            <a class="anchor" href="#item-one_char_len">one_char_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn one_char_len(self: str, chars: str) -&#62; u64</code></pre>
+
+          <div class="doc"><p><code>OneChar</code>: 1 when <code>self</code> opens with a char in <code>chars</code>, else 0 — <code>char_run_len</code>'s single-character counterpart, and the reason a rule never has to spell that shape as a run with nothing to continue it. An empty set never matches.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-exact_len">
+          <h3>
+            <a class="anchor" href="#item-exact_len">exact_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn exact_len(self: str, spelling: str) -&#62; u64</code></pre>
+
+          <div class="doc"><p><code>Exact</code>: length of <code>spelling</code> when it prefixes <code>self</code>, else 0. An empty spelling never matches.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-keyword_len">
+          <h3>
+            <a class="anchor" href="#item-keyword_len">keyword_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn keyword_len(self: str, spelling: str, boundary: str) -&#62; u64</code></pre>
+
+          <div class="doc"><p><code>Keyword</code>: the length of <code>spelling</code> when it prefixes <code>self</code>, but only when the char after it is absent (end of source) or outside <code>boundary</code> — a keyword must not end in the middle of an identifier. 0 when it doesn't match (or the char after is a boundary char, as in <code>iffy</code> for <code>if</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-delimited_len">
+          <h3>
+            <a class="anchor" href="#item-delimited_len">delimited_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -&#62; u64!LexError</code></pre>
+
+          <div class="doc"><p><code>Delimited</code>: a <code>delims</code> char opens the token, which spans to just past the next occurrence of the same char. ok(0) when the first char isn't a delimiter. With a non-empty <code>escapes</code> set, a backslash escapes its next char: an allowed char is content (an escaped delimiter doesn't close), a disallowed one is a hard error, and a dangling backslash at the end of the source leaves the token unterminated. A token still open at the end of the source is a hard error (<code>at</code> is the token's absolute start, so error spans land in the real source).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-unterminated_msg">
+          <h3>
+            <a class="anchor" href="#item-unterminated_msg">unterminated_msg</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn unterminated_msg(msg: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The message for an unterminated scan: a rule's own <code>unterminated</code> override, or the generic default when it left the field empty.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-between_len">
+          <h3>
+            <a class="anchor" href="#item-between_len">between_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn between_len(self: str, at: u64, open: str, close: str, msg: str) -&#62; u64!LexError</code></pre>
+
+          <div class="doc"><p><code>Between</code>: the <code>open</code> spelling opens the token, which runs to just past the next full occurrence of <code>close</code>. ok(0) when <code>self</code> doesn't start with <code>open</code>. The close scan starts past the open and matches the whole <code>close</code> spelling, so a partial close inside (a lone <code>&quot;</code>/<code>&quot;&quot;</code> under a <code>&quot;&quot;&quot;</code> close) is content, not a terminator, and open/close may be multi-char and differ. No escapes — contents are verbatim. A token still open at the end of the source is a hard error (<code>at</code> places the span in the real source).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-nested_len">
+          <h3>
+            <a class="anchor" href="#item-nested_len">nested_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -&#62; u64!LexError</code></pre>
+
+          <div class="doc"><p><code>Nested</code>: the depth-tracked <code>Between</code>. The <code>open</code> spelling opens the token at depth 1; each further <code>open</code> raises the depth and each <code>close</code> lowers it, so the token ends just past the <code>close</code> that returns the depth to 0. ok(0) when <code>self</code> doesn't start with <code>open</code>. <code>open</code> is tested before <code>close</code> so an overlap can't misclassify, but the two must be distinct for nesting to mean anything. No escapes — contents are verbatim. Still open (depth &gt; 0) at the end of the source is a hard error (<code>at</code> places the span in the real source).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-to_eol_len">
+          <h3>
+            <a class="anchor" href="#item-to_eol_len">to_eol_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn to_eol_len(self: str, marker: str) -&#62; u64</code></pre>
+
+          <div class="doc"><p><code>ToEol</code>: the marker, then everything up to (not including) the next newline. 0 when <code>self</code> doesn't start with the (non-empty) marker.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-to_eol_unless_len">
+          <h3>
+            <a class="anchor" href="#item-to_eol_unless_len">to_eol_unless_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn to_eol_unless_len(self: str, marker: str, blocked: str) -&#62; u64</code></pre>
+
+          <div class="doc"><p><code>ToEolUnless</code>: <code>to_eol_len</code>, refused when the character right after the marker is one <code>blocked</code> claims. End of input or a newline right after the marker is *not* blocked — an empty comment line is a comment.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-number_end">
+          <h3>
+            <a class="anchor" href="#item-number_end">number_end</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn number_end(self: str, int_end: u64) -&#62; u64</code></pre>
+
+          <div class="doc"><p>The end of the number whose integer part ends at <code>int_end</code>: extends past a fraction (<code>.</code> then at least one digit), then past an exponent (<code>e</code> or <code>E</code>, an optional sign, then at least one digit). Either part may be absent; <code>int_end</code> comes back unchanged when neither matches.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-float_len">
+          <h3>
+            <a class="anchor" href="#item-float_len">float_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn float_len(self: str) -&#62; u64</code></pre>
+
+          <div class="doc"><p><code>Float</code>: a digit run that extends past a fraction and/or exponent. A bare digit run is 0 (no match) — it belongs to the int rule.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-int_len">
+          <h3>
+            <a class="anchor" href="#item-int_len">int_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn int_len(self: str) -&#62; u64</code></pre>
+
+          <div class="doc"><p><code>Int</code>: the length of an optional leading <code>-</code> then a digit run. 0 (no match) when there's no digit run — including a <code>-</code> *not* immediately followed by a digit (a <code>-</code> before a space or a letter is left for a <code>-</code> operator rule, so <code>- 5</code>/<code>-x</code> don't match). That decline is the entire sign-vs-operator disambiguation: with an <code>Int</code> rule before the <code>-</code> operator rule, <code>-5</code> is a signed literal while <code>- 5</code>/<code>-x</code> are the operator; put the operator first and every <code>-</code> is the operator and <code>Int</code> is unsigned.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-token_value">
+          <h3>
+            <a class="anchor" href="#item-token_value">token_value</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn token_value(m: Matcher, text: str) -&#62; TokenValue</code></pre>
+
+          <div class="doc"><p>The value a token of matcher <code>m</code> carries, computed from its matched <code>text</code> (<code>src[at..at+n]</code>, delimiters included) — see the value table on <code>Matcher</code>. Only the string-valued matchers carry a computed value; everything a rule can recover by slicing its span (<code>Int</code>/<code>Float</code> numeric runs, identifiers, …) is <code>NoValue</code>, so the rule's <code>emit</code> interprets the text itself. <code>Template</code> returns <code>NoValue</code> here only because its tokens are built inside <code>template_scan</code>, which attaches each segment's value itself.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-apply_emit">
+          <h3>
+            <a class="anchor" href="#item-apply_emit">apply_emit</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, matched: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
+
+          <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its content string — the matcher-computed <code>value</code> (a delimited string, stripped) when there is one, else the raw matched <code>text</code>. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-seg_only">
+          <h3>
+            <a class="anchor" href="#item-seg_only">seg_only</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn seg_only(span: Span) -&#62; LexError</code></pre>
+
+          <div class="doc"><p>A <code>LexError</code> for a segment emit (<code>OfSeg</code>/<code>TrySeg</code>) used on a non-<code>Template</code> rule — those only make sense per template segment (see <code>seg_emit</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-step_result">
+          <h3>
+            <a class="anchor" href="#item-step_result">step_result</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn step_result&#60;K: any&#62;(r: TokenRule&#60;K&#62;, src: str, at: u64, n: u64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+          <div class="doc"><p>A simple (single-token) matcher's outcome: a decline when the matched length <code>n</code> is 0, otherwise <code>n</code> chars consumed producing the rule's one token — recorded as trivia for a <code>trivia</code> rule, or nothing at all for a <code>skip</code> rule. The token's kind comes from the rule's <code>emit</code> applied to the matcher-computed value, which can fail on an emit/value-shape mismatch.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lex_step">
+          <h3>
+            <a class="anchor" href="#item-lex_step">lex_step</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lex_step&#60;K: any&#62;(src: str, at: u64, rules: TokenRule&#60;K&#62;[]) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+          <div class="doc"><p>One lexing step at absolute position <code>at</code>: tries each rule in order (first match wins) and returns the winning rule's outcome — see <code>StepResult</code>. Every arm but <code>Template</code> computes how far its matcher reaches (0 for no match — no matcher matches empty input, so a nonzero length always means progress) and wraps it via <code>step_result</code>; a <code>Template</code>'s multi-token run doesn't fit a single length, so its arm builds the outcome directly. Mutually recursive with <code>template_scan</code>: an interpolation re-enters this full rule set, so template literals nest.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-seg_emit">
+          <h3>
+            <a class="anchor" href="#item-seg_emit">seg_emit</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn seg_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, text: str, seg: Seg, span: Span) -&#62; K!LexError</code></pre>
+
+          <div class="doc"><p>Apply a <code>Template</code> rule's <code>emit</code> to one segment's raw text and its position. The emit must be an <code>OfSeg</code> (or its fallible sibling <code>TrySeg</code>) — a template produces several kinds per literal, one per segment position, which only a segment emit can distinguish; any other option is a lex error. A <code>TrySeg</code> that returns <code>err(msg)</code> carries the segment's <code>span</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-seg_needs_ofseg">
+          <h3>
+            <a class="anchor" href="#item-seg_needs_ofseg">seg_needs_ofseg</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn seg_needs_ofseg(span: Span) -&#62; LexError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-template_step">
+          <h3>
+            <a class="anchor" href="#item-template_step">template_step</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn template_step&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+          <div class="doc"><p>The <code>Template</code> arm of <code>lex_step</code>'s dispatch: a decline when <code>src[at..]</code> doesn't open with <code>delim</code> (mirroring every other matcher's 0), else the literal's whole token run.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-template_scan">
+          <h3>
+            <a class="anchor" href="#item-template_scan">template_scan</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn template_scan&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+          <div class="doc"><p><code>Template</code>: scans a whole template literal at <code>at</code> (the caller verified the opening <code>delim</code>); the result's tokens are the literal's whole run and its <code>end</code> sits just past the closing <code>delim</code>. A text segment runs until the closing <code>delim</code> (matched in full, like <code>Between</code>) or a <code>{</code>, which ends the segment and opens an interpolation (see <code>interp_scan</code>).</p><p>**A segment's span runs brace to brace, and its value does not.** The span takes the delimiter or <code>}</code> that opens the segment and the delimiter or <code>{</code> that closes it; the value is what lies strictly between. Keeping the two starts apart is what makes the token stream *tile* the source — every byte of a template under exactly one token — which a concrete syntax tree needs and a token stream alone does not care about. They were once the same variable, and the <code>}</code> closing an interpolation was then the one byte of a template that belonged to no token at all. The text segments are collected first (with their spans and the interpolation token runs between them), then handed to <code>finalize_template</code> — which post-processes them as a group and emits each. A nested template inside an interpolation is fully lexed (and its own segments finalized) by the recursive <code>interp_scan</code>, so each <code>template_scan</code> only ever handles its own direct segments. <code>escapes</code> still governs *scanning* as in <code>delimited_len</code>, including the hard error on an unknown escape and the dangling backslash falling through to run the literal out unterminated.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-finalize_template">
+          <h3>
+            <a class="anchor" href="#item-finalize_template">finalize_template</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn finalize_template&#60;K: any&#62;(src: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, seg_texts: str[], seg_spans: Span[], interp_runs: StepResult&#60;K&#62;[], end: u64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+          <div class="doc"><p>Emit a template literal's tokens: apply the caller's <code>finalize</code> to all of its text segments as a group (it returns one finalized text per segment), then emit each finalized segment — its position <code>Plain</code> for a lone segment, else <code>Head</code>/<code>Middle</code>/<code>Tail</code> — via the rule's <code>OfSeg</code>/<code>TrySeg</code> emit, interleaved with the interpolation token runs (<code>interp_runs[k]</code> following segment <code>k</code>). <code>end</code> sits just past the closing delim.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-interp_scan">
+          <h3>
+            <a class="anchor" href="#item-interp_scan">interp_scan</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn interp_scan&#60;K: any&#62;(src: str, at: u64, open: u64, rules: TokenRule&#60;K&#62;[]) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+
+          <div class="doc"><p>A template interpolation's <code>{ ... }</code> body: lexes expression tokens with the full rule set from <code>at</code> (just past the opening <code>{</code>, which sits at <code>open</code>) until the <code>}</code> balancing it; that closing <code>}</code> is consumed without a token of its own — it's the template's delimiter, not an expression token, and it is the *next* text segment's span that covers it (see <code>template_scan</code>). Depth moves by what each step consumed: a step consuming exactly <code>{</code> or <code>}</code> (a brace lexed as its own token — set/dict literals, blocks) raises/lowers it, while a brace buried inside a bigger token (a delimited string's content, a nested template) doesn't. The result's <code>end</code> sits just past the closing <code>}</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tpl_kind">
+          <h3>
+            <a class="anchor" href="#item-tpl_kind">tpl_kind</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tpl_kind(text: str, seg: Seg) -&#62; Kind</code></pre>
+
+          <div class="doc"><p>The <code>.test</code> block's template <code>OfSeg</code> emit: the library hands each segment's *raw* text, so this emit decodes it (with the imported <code>unescape</code>) before mapping to a <code>Kind</code> arm — escape handling is the caller's job.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-esc_str">
+          <h3>
+            <a class="anchor" href="#item-esc_str">esc_str</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn esc_str(text: str) -&#62; Kind</code></pre>
+
+          <div class="doc"><p>The <code>Of</code> emit for the escaped-string test below: the library hands the raw (un-decoded) delimiter-stripped contents, so the emit decodes them itself.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-int_tok">
+          <h3>
+            <a class="anchor" href="#item-int_tok">int_tok</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn int_tok(text: str) -&#62; Kind!str</code></pre>
+
+          <div class="doc"><p>The <code>Try</code> emit for the <code>Int</code> test below: the library hands the raw digit run, so this emit parses it — here with the <code>int_parse</code> builtin, reporting an i64 overflow as an error *message* (the library attaches the token's span). Parsing policy, and what overflow means, is the caller's — a bignum lexer would parse into a wide type and never fail here.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-nonempty_str">
+          <h3>
+            <a class="anchor" href="#item-nonempty_str">nonempty_str</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn nonempty_str(text: str) -&#62; Kind!str</code></pre>
+
+          <div class="doc"><p>A <code>Try</code> emit: the escaped-string decoder above, plus a content rule the caller enforces — a string literal may not be empty. A whole-token verdict, so the token's span is the right place for the error.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-checked_seg">
+          <h3>
+            <a class="anchor" href="#item-checked_seg">checked_seg</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn checked_seg(text: str, seg: Seg) -&#62; Kind!str</code></pre>
+
+          <div class="doc"><p>A <code>TrySeg</code> emit: like <code>tpl_kind</code>, but the caller rejects a <code>TODO</code> segment. The error carries the whole template's span.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-rawtpl_kind">
+          <h3>
+            <a class="anchor" href="#item-rawtpl_kind">rawtpl_kind</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn rawtpl_kind(text: str, seg: Seg) -&#62; Kind</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tok">
+          <h3>
+            <a class="anchor" href="#item-tok">tok</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tok(src: str, kind: Kind, span: Span) -&#62; Token&#60;Kind&#62;</code></pre>
+
+          <div class="doc"><p>Test-block shorthands over the concrete <code>Kind</code> (each kind arm carries its own content): an expected token, and a token-only result (no trivia).</p><p><code>tok</code> slices its text out of <code>src</code> — the same source the <code>lex</code> call under test was given — rather than taking it as a literal. An expectation therefore cannot claim text the source does not hold at that span, which is the one thing a hand-written <code>SpanStr</code> could get wrong while still looking right.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-toks">
+          <h3>
+            <a class="anchor" href="#item-toks">toks</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn toks(tokens: Token&#60;Kind&#62;[]) -&#62; LexResult&#60;Kind&#62;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-delimited_len">
-        <h2>
-          <a class="anchor" href="#item-delimited_len">delimited_len</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -&#62; u64!LexError</code></pre>
-
-        <div class="doc"><p><code>Delimited</code>: a <code>delims</code> char opens the token, which spans to just past the next occurrence of the same char. ok(0) when the first char isn't a delimiter. With a non-empty <code>escapes</code> set, a backslash escapes its next char: an allowed char is content (an escaped delimiter doesn't close), a disallowed one is a hard error, and a dangling backslash at the end of the source leaves the token unterminated. A token still open at the end of the source is a hard error (<code>at</code> is the token's absolute start, so error spans land in the real source).</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-unterminated_msg">
-        <h2>
-          <a class="anchor" href="#item-unterminated_msg">unterminated_msg</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn unterminated_msg(msg: str) -&#62; str</code></pre>
-
-        <div class="doc"><p>The message for an unterminated scan: a rule's own <code>unterminated</code> override, or the generic default when it left the field empty.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-between_len">
-        <h2>
-          <a class="anchor" href="#item-between_len">between_len</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn between_len(self: str, at: u64, open: str, close: str, msg: str) -&#62; u64!LexError</code></pre>
-
-        <div class="doc"><p><code>Between</code>: the <code>open</code> spelling opens the token, which runs to just past the next full occurrence of <code>close</code>. ok(0) when <code>self</code> doesn't start with <code>open</code>. The close scan starts past the open and matches the whole <code>close</code> spelling, so a partial close inside (a lone <code>&quot;</code>/<code>&quot;&quot;</code> under a <code>&quot;&quot;&quot;</code> close) is content, not a terminator, and open/close may be multi-char and differ. No escapes — contents are verbatim. A token still open at the end of the source is a hard error (<code>at</code> places the span in the real source).</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-nested_len">
-        <h2>
-          <a class="anchor" href="#item-nested_len">nested_len</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -&#62; u64!LexError</code></pre>
-
-        <div class="doc"><p><code>Nested</code>: the depth-tracked <code>Between</code>. The <code>open</code> spelling opens the token at depth 1; each further <code>open</code> raises the depth and each <code>close</code> lowers it, so the token ends just past the <code>close</code> that returns the depth to 0. ok(0) when <code>self</code> doesn't start with <code>open</code>. <code>open</code> is tested before <code>close</code> so an overlap can't misclassify, but the two must be distinct for nesting to mean anything. No escapes — contents are verbatim. Still open (depth &gt; 0) at the end of the source is a hard error (<code>at</code> places the span in the real source).</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-to_eol_len">
-        <h2>
-          <a class="anchor" href="#item-to_eol_len">to_eol_len</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn to_eol_len(self: str, marker: str) -&#62; u64</code></pre>
-
-        <div class="doc"><p><code>ToEol</code>: the marker, then everything up to (not including) the next newline. 0 when <code>self</code> doesn't start with the (non-empty) marker.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-to_eol_unless_len">
-        <h2>
-          <a class="anchor" href="#item-to_eol_unless_len">to_eol_unless_len</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn to_eol_unless_len(self: str, marker: str, blocked: str) -&#62; u64</code></pre>
-
-        <div class="doc"><p><code>ToEolUnless</code>: <code>to_eol_len</code>, refused when the character right after the marker is one <code>blocked</code> claims. End of input or a newline right after the marker is *not* blocked — an empty comment line is a comment.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-number_end">
-        <h2>
-          <a class="anchor" href="#item-number_end">number_end</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn number_end(self: str, int_end: u64) -&#62; u64</code></pre>
-
-        <div class="doc"><p>The end of the number whose integer part ends at <code>int_end</code>: extends past a fraction (<code>.</code> then at least one digit), then past an exponent (<code>e</code> or <code>E</code>, an optional sign, then at least one digit). Either part may be absent; <code>int_end</code> comes back unchanged when neither matches.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-float_len">
-        <h2>
-          <a class="anchor" href="#item-float_len">float_len</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn float_len(self: str) -&#62; u64</code></pre>
-
-        <div class="doc"><p><code>Float</code>: a digit run that extends past a fraction and/or exponent. A bare digit run is 0 (no match) — it belongs to the int rule.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-int_len">
-        <h2>
-          <a class="anchor" href="#item-int_len">int_len</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn int_len(self: str) -&#62; u64</code></pre>
-
-        <div class="doc"><p><code>Int</code>: the length of an optional leading <code>-</code> then a digit run. 0 (no match) when there's no digit run — including a <code>-</code> *not* immediately followed by a digit (a <code>-</code> before a space or a letter is left for a <code>-</code> operator rule, so <code>- 5</code>/<code>-x</code> don't match). That decline is the entire sign-vs-operator disambiguation: with an <code>Int</code> rule before the <code>-</code> operator rule, <code>-5</code> is a signed literal while <code>- 5</code>/<code>-x</code> are the operator; put the operator first and every <code>-</code> is the operator and <code>Int</code> is unsigned.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-token_value">
-        <h2>
-          <a class="anchor" href="#item-token_value">token_value</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn token_value(m: Matcher, text: str) -&#62; TokenValue</code></pre>
-
-        <div class="doc"><p>The value a token of matcher <code>m</code> carries, computed from its matched <code>text</code> (<code>src[at..at+n]</code>, delimiters included) — see the value table on <code>Matcher</code>. Only the string-valued matchers carry a computed value; everything a rule can recover by slicing its span (<code>Int</code>/<code>Float</code> numeric runs, identifiers, …) is <code>NoValue</code>, so the rule's <code>emit</code> interprets the text itself. <code>Template</code> returns <code>NoValue</code> here only because its tokens are built inside <code>template_scan</code>, which attaches each segment's value itself.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-apply_emit">
-        <h2>
-          <a class="anchor" href="#item-apply_emit">apply_emit</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, matched: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
-
-        <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its content string — the matcher-computed <code>value</code> (a delimited string, stripped) when there is one, else the raw matched <code>text</code>. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-seg_only">
-        <h2>
-          <a class="anchor" href="#item-seg_only">seg_only</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn seg_only(span: Span) -&#62; LexError</code></pre>
-
-        <div class="doc"><p>A <code>LexError</code> for a segment emit (<code>OfSeg</code>/<code>TrySeg</code>) used on a non-<code>Template</code> rule — those only make sense per template segment (see <code>seg_emit</code>).</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-StepResult">
-        <h2>
-          <a class="anchor" href="#item-StepResult">StepResult</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct StepResult&#60;K: any&#62;</code></pre>
-
-        <div class="doc"><p>One lexing step's outcome: the token(s) the winning rule produced — one usually, none for a <code>skip</code> rule, a whole head/expr/middle/tail run for a <code>Template</code> — any trivia recorded along the way, and the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-step_result">
-        <h2>
-          <a class="anchor" href="#item-step_result">step_result</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn step_result&#60;K: any&#62;(r: TokenRule&#60;K&#62;, src: str, at: u64, n: u64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
-
-        <div class="doc"><p>A simple (single-token) matcher's outcome: a decline when the matched length <code>n</code> is 0, otherwise <code>n</code> chars consumed producing the rule's one token — recorded as trivia for a <code>trivia</code> rule, or nothing at all for a <code>skip</code> rule. The token's kind comes from the rule's <code>emit</code> applied to the matcher-computed value, which can fail on an emit/value-shape mismatch.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-lex_step">
-        <h2>
-          <a class="anchor" href="#item-lex_step">lex_step</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn lex_step&#60;K: any&#62;(src: str, at: u64, rules: TokenRule&#60;K&#62;[]) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
-
-        <div class="doc"><p>One lexing step at absolute position <code>at</code>: tries each rule in order (first match wins) and returns the winning rule's outcome — see <code>StepResult</code>. Every arm but <code>Template</code> computes how far its matcher reaches (0 for no match — no matcher matches empty input, so a nonzero length always means progress) and wraps it via <code>step_result</code>; a <code>Template</code>'s multi-token run doesn't fit a single length, so its arm builds the outcome directly. Mutually recursive with <code>template_scan</code>: an interpolation re-enters this full rule set, so template literals nest.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-seg_emit">
-        <h2>
-          <a class="anchor" href="#item-seg_emit">seg_emit</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn seg_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, text: str, seg: Seg, span: Span) -&#62; K!LexError</code></pre>
-
-        <div class="doc"><p>Apply a <code>Template</code> rule's <code>emit</code> to one segment's raw text and its position. The emit must be an <code>OfSeg</code> (or its fallible sibling <code>TrySeg</code>) — a template produces several kinds per literal, one per segment position, which only a segment emit can distinguish; any other option is a lex error. A <code>TrySeg</code> that returns <code>err(msg)</code> carries the segment's <code>span</code>.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-seg_needs_ofseg">
-        <h2>
-          <a class="anchor" href="#item-seg_needs_ofseg">seg_needs_ofseg</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn seg_needs_ofseg(span: Span) -&#62; LexError</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-template_step">
-        <h2>
-          <a class="anchor" href="#item-template_step">template_step</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn template_step&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
-
-        <div class="doc"><p>The <code>Template</code> arm of <code>lex_step</code>'s dispatch: a decline when <code>src[at..]</code> doesn't open with <code>delim</code> (mirroring every other matcher's 0), else the literal's whole token run.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-template_scan">
-        <h2>
-          <a class="anchor" href="#item-template_scan">template_scan</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn template_scan&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
-
-        <div class="doc"><p><code>Template</code>: scans a whole template literal at <code>at</code> (the caller verified the opening <code>delim</code>); the result's tokens are the literal's whole run and its <code>end</code> sits just past the closing <code>delim</code>. A text segment runs until the closing <code>delim</code> (matched in full, like <code>Between</code>) or a <code>{</code>, which ends the segment and opens an interpolation (see <code>interp_scan</code>).</p><p>**A segment's span runs brace to brace, and its value does not.** The span takes the delimiter or <code>}</code> that opens the segment and the delimiter or <code>{</code> that closes it; the value is what lies strictly between. Keeping the two starts apart is what makes the token stream *tile* the source — every byte of a template under exactly one token — which a concrete syntax tree needs and a token stream alone does not care about. They were once the same variable, and the <code>}</code> closing an interpolation was then the one byte of a template that belonged to no token at all. The text segments are collected first (with their spans and the interpolation token runs between them), then handed to <code>finalize_template</code> — which post-processes them as a group and emits each. A nested template inside an interpolation is fully lexed (and its own segments finalized) by the recursive <code>interp_scan</code>, so each <code>template_scan</code> only ever handles its own direct segments. <code>escapes</code> still governs *scanning* as in <code>delimited_len</code>, including the hard error on an unknown escape and the dangling backslash falling through to run the literal out unterminated.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-finalize_template">
-        <h2>
-          <a class="anchor" href="#item-finalize_template">finalize_template</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn finalize_template&#60;K: any&#62;(src: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, seg_texts: str[], seg_spans: Span[], interp_runs: StepResult&#60;K&#62;[], end: u64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
-
-        <div class="doc"><p>Emit a template literal's tokens: apply the caller's <code>finalize</code> to all of its text segments as a group (it returns one finalized text per segment), then emit each finalized segment — its position <code>Plain</code> for a lone segment, else <code>Head</code>/<code>Middle</code>/<code>Tail</code> — via the rule's <code>OfSeg</code>/<code>TrySeg</code> emit, interleaved with the interpolation token runs (<code>interp_runs[k]</code> following segment <code>k</code>). <code>end</code> sits just past the closing delim.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-interp_scan">
-        <h2>
-          <a class="anchor" href="#item-interp_scan">interp_scan</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn interp_scan&#60;K: any&#62;(src: str, at: u64, open: u64, rules: TokenRule&#60;K&#62;[]) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
-
-        <div class="doc"><p>A template interpolation's <code>{ ... }</code> body: lexes expression tokens with the full rule set from <code>at</code> (just past the opening <code>{</code>, which sits at <code>open</code>) until the <code>}</code> balancing it; that closing <code>}</code> is consumed without a token of its own — it's the template's delimiter, not an expression token, and it is the *next* text segment's span that covers it (see <code>template_scan</code>). Depth moves by what each step consumed: a step consuming exactly <code>{</code> or <code>}</code> (a brace lexed as its own token — set/dict literals, blocks) raises/lowers it, while a brace buried inside a bigger token (a delimited string's content, a nested template) doesn't. The result's <code>end</code> sits just past the closing <code>}</code>.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-Kind">
-        <h2>
-          <a class="anchor" href="#item-Kind">Kind</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Kind</code></pre>
-
-        <div class="doc"><p>A concrete token-kind variant for the <code>.test</code> block below — one example of the per-language <code>K</code> a caller pins <code>Token&lt;K&gt;</code>/<code>TokenRule&lt;K&gt;</code> to. Each arm is a kind; value-bearing kinds carry their content (<code>Int(i64)</code>, <code>Str(str)</code>, the template segments), text-recovered kinds are bare (their text is sliced from the span). A real consumer writes its own such variant.</p></div>
-
-
-        <ul class="cases">
-
-          <li id="item-Ws"><code>Ws</code></li>
-
-          <li id="item-Ident"><code>Ident(str)</code></li>
-
-          <li id="item-IntTok"><code>IntTok(i64)</code></li>
-
-          <li id="item-Digits"><code>Digits</code></li>
-
-          <li id="item-Op"><code>Op</code></li>
-
-          <li id="item-Kw"><code>Kw</code></li>
-
-          <li id="item-Punct"><code>Punct</code></li>
-
-          <li id="item-Dot"><code>Dot</code></li>
-
-          <li id="item-FloatTok"><code>FloatTok</code></li>
-
-          <li id="item-Str"><code>Str(str)</code></li>
-
-          <li id="item-Raw"><code>Raw(str)</code></li>
-
-          <li id="item-Block"><code>Block(str)</code></li>
-
-          <li id="item-Comment"><code>Comment</code></li>
-
-          <li id="item-Allow"><code>Allow</code></li>
-
-          <li id="item-Tpl"><code>Tpl(str)</code></li>
-
-          <li id="item-TplHead"><code>TplHead(str)</code></li>
-
-          <li id="item-TplMid"><code>TplMid(str)</code></li>
-
-          <li id="item-TplTail"><code>TplTail(str)</code></li>
-
-          <li id="item-RawTpl"><code>RawTpl(str)</code></li>
-
-          <li id="item-RawTplHead"><code>RawTplHead(str)</code></li>
-
-          <li id="item-RawTplMid"><code>RawTplMid(str)</code></li>
-
-          <li id="item-RawTplTail"><code>RawTplTail(str)</code></li>
-
-        </ul>
-
-      </section>
-
-      <section class="item" id="item-tpl_kind">
-        <h2>
-          <a class="anchor" href="#item-tpl_kind">tpl_kind</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn tpl_kind(text: str, seg: Seg) -&#62; Kind</code></pre>
-
-        <div class="doc"><p>The <code>.test</code> block's template <code>OfSeg</code> emit: the library hands each segment's *raw* text, so this emit decodes it (with the imported <code>unescape</code>) before mapping to a <code>Kind</code> arm — escape handling is the caller's job.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-esc_str">
-        <h2>
-          <a class="anchor" href="#item-esc_str">esc_str</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn esc_str(text: str) -&#62; Kind</code></pre>
-
-        <div class="doc"><p>The <code>Of</code> emit for the escaped-string test below: the library hands the raw (un-decoded) delimiter-stripped contents, so the emit decodes them itself.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-int_tok">
-        <h2>
-          <a class="anchor" href="#item-int_tok">int_tok</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn int_tok(text: str) -&#62; Kind!str</code></pre>
-
-        <div class="doc"><p>The <code>Try</code> emit for the <code>Int</code> test below: the library hands the raw digit run, so this emit parses it — here with the <code>int_parse</code> builtin, reporting an i64 overflow as an error *message* (the library attaches the token's span). Parsing policy, and what overflow means, is the caller's — a bignum lexer would parse into a wide type and never fail here.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-nonempty_str">
-        <h2>
-          <a class="anchor" href="#item-nonempty_str">nonempty_str</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn nonempty_str(text: str) -&#62; Kind!str</code></pre>
-
-        <div class="doc"><p>A <code>Try</code> emit: the escaped-string decoder above, plus a content rule the caller enforces — a string literal may not be empty. A whole-token verdict, so the token's span is the right place for the error.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-checked_seg">
-        <h2>
-          <a class="anchor" href="#item-checked_seg">checked_seg</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn checked_seg(text: str, seg: Seg) -&#62; Kind!str</code></pre>
-
-        <div class="doc"><p>A <code>TrySeg</code> emit: like <code>tpl_kind</code>, but the caller rejects a <code>TODO</code> segment. The error carries the whole template's span.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-rawtpl_kind">
-        <h2>
-          <a class="anchor" href="#item-rawtpl_kind">rawtpl_kind</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn rawtpl_kind(text: str, seg: Seg) -&#62; Kind</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-tok">
-        <h2>
-          <a class="anchor" href="#item-tok">tok</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn tok(src: str, kind: Kind, span: Span) -&#62; Token&#60;Kind&#62;</code></pre>
-
-        <div class="doc"><p>Test-block shorthands over the concrete <code>Kind</code> (each kind arm carries its own content): an expected token, and a token-only result (no trivia).</p><p><code>tok</code> slices its text out of <code>src</code> — the same source the <code>lex</code> call under test was given — rather than taking it as a literal. An expectation therefore cannot claim text the source does not hold at that span, which is the one thing a hand-written <code>SpanStr</code> could get wrong while still looking right.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-toks">
-        <h2>
-          <a class="anchor" href="#item-toks">toks</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn toks(tokens: Token&#60;Kind&#62;[]) -&#62; LexResult&#60;Kind&#62;</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-lex">
-        <h2>
-          <a class="anchor" href="#item-lex">lex</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn lex&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; LexResult&#60;K&#62;!LexError</code></pre>
-
-        <div class="doc"><p>Lexes <code>self</code> into a <code>LexResult</code>: the flat token list, plus the trivia side-channel, as described by the ordered <code>rules</code>. At each position the first rule whose matcher matches claims the token (so order is priority — keywords before identifiers, floats before ints); a <code>skip: true</code> rule consumes its match without producing anything (whitespace), and a <code>trivia: true</code> rule records its matches in the side-channel instead of the token stream (comments, lint markers). A <code>Template</code> rule emits several tokens per literal — head/middle/tail segments around the tokens of each <code>{...}</code> interpolation, which are lexed by this same rule set. Lexing fails with an <code>err</code> — a <code>LexError</code> carrying a message and the offending span — when a byte matches no rule or a matcher sees invalid input outright (an unterminated <code>Delimited</code> token).</p></div>
-
-
-      </section>
-
 
 
     </main>

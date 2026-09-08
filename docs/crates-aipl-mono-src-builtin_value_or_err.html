@@ -14,123 +14,130 @@
 
       <h1><code>crates/aipl-mono/src/builtin_value_or_err.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>to_digit</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-value_or_err">
+          <h3>
+            <a class="anchor" href="#item-value_or_err">value_or_err</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn value_or_err&#60;T: any, E: any&#62;(self: T?, e: E) -&#62; T!E</code></pre>
 
-      <section class="item" id="item-value_or_err">
-        <h2>
-          <a class="anchor" href="#item-value_or_err">value_or_err</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn value_or_err&#60;T: any, E: any&#62;(self: T?, e: E) -&#62; T!E</code></pre>
+          <div class="doc"><p>Turns an optional into a result: <code>some(v)</code> becomes <code>ok(v)</code>, <code>none</code> becomes <code>err(e)</code>. Generic over both the value and the error type, and callable as a method: <code>x.value_or_err(e)</code>. <code>e</code> is evaluated either way. Pairs with <code>?</code> to give a <code>none</code> a message and propagate it out of a result-returning function.</p></div>
 
-        <div class="doc"><p>Turns an optional into a result: <code>some(v)</code> becomes <code>ok(v)</code>, <code>none</code> becomes <code>err(e)</code>. Generic over both the value and the error type, and callable as a method: <code>x.value_or_err(e)</code>. <code>e</code> is evaluated either way. Pairs with <code>?</code> to give a <code>none</code> a message and propagate it out of a result-returning function.</p></div>
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-digit_of">
-        <h2>
-          <a class="anchor" href="#item-digit_of">digit_of</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn digit_of(s: str) -&#62; i64!str</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <div class="doc"><p><code>?</code> on the result <code>value_or_err</code> builds: the <code>none</code> cases leave <code>digit_of</code> early carrying a message, so the body reads as the happy path alone.</p></div>
+
+        <section class="item" id="item-digit_of">
+          <h3>
+            <a class="anchor" href="#item-digit_of">digit_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn digit_of(s: str) -&#62; i64!str</code></pre>
+
+          <div class="doc"><p><code>?</code> on the result <code>value_or_err</code> builds: the <code>none</code> cases leave <code>digit_of</code> early carrying a message, so the body reads as the happy path alone.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-maybe_int">
+          <h3>
+            <a class="anchor" href="#item-maybe_int">maybe_int</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn maybe_int(present: bool) -&#62; i64?</code></pre>
+
+          <div class="doc"><p>Test helpers. The optionals come from functions rather than a bare <code>none</code> literal so each one's element type is pinned by a declared return type.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-maybe_str">
+          <h3>
+            <a class="anchor" href="#item-maybe_str">maybe_str</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn maybe_str(present: bool) -&#62; str?</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-unwrap">
+          <h3>
+            <a class="anchor" href="#item-unwrap">unwrap</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn unwrap(r: i64!str, default: i64) -&#62; i64</code></pre>
+
+          <div class="doc"><p>Reading one side of a result at a time, since <code>==</code> doesn't span the two.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-unwrap_str">
+          <h3>
+            <a class="anchor" href="#item-unwrap_str">unwrap_str</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn unwrap_str(r: str!str, default: str) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-message">
+          <h3>
+            <a class="anchor" href="#item-message">message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn message(r: i64!str) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-code">
+          <h3>
+            <a class="anchor" href="#item-code">code</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn code(r: char!i64) -&#62; i64</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-maybe_int">
-        <h2>
-          <a class="anchor" href="#item-maybe_int">maybe_int</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn maybe_int(present: bool) -&#62; i64?</code></pre>
-
-        <div class="doc"><p>Test helpers. The optionals come from functions rather than a bare <code>none</code> literal so each one's element type is pinned by a declared return type.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-maybe_str">
-        <h2>
-          <a class="anchor" href="#item-maybe_str">maybe_str</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn maybe_str(present: bool) -&#62; str?</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-unwrap">
-        <h2>
-          <a class="anchor" href="#item-unwrap">unwrap</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn unwrap(r: i64!str, default: i64) -&#62; i64</code></pre>
-
-        <div class="doc"><p>Reading one side of a result at a time, since <code>==</code> doesn't span the two.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-unwrap_str">
-        <h2>
-          <a class="anchor" href="#item-unwrap_str">unwrap_str</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn unwrap_str(r: str!str, default: str) -&#62; str</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-message">
-        <h2>
-          <a class="anchor" href="#item-message">message</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn message(r: i64!str) -&#62; str</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-code">
-        <h2>
-          <a class="anchor" href="#item-code">code</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn code(r: char!i64) -&#62; i64</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
 
 
     </main>

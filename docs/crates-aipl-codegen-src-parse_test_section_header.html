@@ -14,42 +14,22 @@
 
       <h1><code>crates/aipl-codegen/src/parse_test_section_header.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>ends_with</code> <span class="from">from builtins</span></li>
-
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>greater_than_or_equal</code> <span class="as">as</span> <code>&#62;=</code> <span class="from">from builtins</span></li>
-
-          <li><code>len</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
-
-          <li><code>starts_with</code> <span class="from">from builtins</span></li>
-
-          <li><code>trim</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-parse_test_section_header">
+          <h3>
+            <a class="anchor" href="#item-parse_test_section_header">parse_test_section_header</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn parse_test_section_header(line: str) -&#62; str?</code></pre>
 
-      <section class="item" id="item-parse_test_section_header">
-        <h2>
-          <a class="anchor" href="#item-parse_test_section_header">parse_test_section_header</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn parse_test_section_header(line: str) -&#62; str?</code></pre>
+          <div class="doc"><p>If <code>line</code> is a <code>--- name ---</code> test-section marker, returns <code>some(name)</code> with the trimmed inner name; otherwise — or when the inner name is empty — returns <code>none</code>. A line is a marker iff it starts with <code>---</code> with **no leading whitespace** (the marker must begin at column 0), and, once trailing whitespace is trimmed, ends with <code>---</code> and is at least 6 bytes long. The cases test harness uses these markers to delimit sections; the compiler treats any such marker as a hard cutoff (see <code>strip_test_sections</code>).</p></div>
 
-        <div class="doc"><p>If <code>line</code> is a <code>--- name ---</code> test-section marker, returns <code>some(name)</code> with the trimmed inner name; otherwise — or when the inner name is empty — returns <code>none</code>. A line is a marker iff it starts with <code>---</code> with **no leading whitespace** (the marker must begin at column 0), and, once trailing whitespace is trimmed, ends with <code>---</code> and is at least 6 bytes long. The cases test harness uses these markers to delimit sections; the compiler treats any such marker as a hard cutoff (see <code>strip_test_sections</code>).</p></div>
+
+        </section>
 
 
       </section>

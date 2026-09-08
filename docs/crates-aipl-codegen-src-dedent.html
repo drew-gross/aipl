@@ -14,44 +14,22 @@
 
       <h1><code>crates/aipl-codegen/src/dedent.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>count_while</code> <span class="from">from builtins</span></li>
-
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>filter</code> <span class="from">from builtins</span></li>
-
-          <li><code>is_all_whitespace</code> <span class="from">from builtins</span></li>
-
-          <li><code>join</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
-
-          <li><code>map</code> <span class="from">from builtins</span></li>
-
-          <li><code>minimum</code> <span class="from">from builtins</span></li>
-
-          <li><code>value_or</code> <span class="from">from builtins</span></li>
-
-          <li><code>lines</code> <span class="from">from ./lines.aipl</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-dedent">
+          <h3>
+            <a class="anchor" href="#item-dedent">dedent</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn dedent(self: str) -&#62; str</code></pre>
 
-      <section class="item" id="item-dedent">
-        <h2>
-          <a class="anchor" href="#item-dedent">dedent</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn dedent(self: str) -&#62; str</code></pre>
+          <div class="doc"><p>Strips the common leading-space indentation shared by every non-blank line — the de-denting the parser applies to raw-string contents. Blank lines (empty or all-whitespace) don't constrain the common indent and are emitted empty; the original line count is preserved.</p></div>
 
-        <div class="doc"><p>Strips the common leading-space indentation shared by every non-blank line — the de-denting the parser applies to raw-string contents. Blank lines (empty or all-whitespace) don't constrain the common indent and are emitted empty; the original line count is preserved.</p></div>
+
+        </section>
 
 
       </section>

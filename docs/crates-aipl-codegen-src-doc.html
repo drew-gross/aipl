@@ -14,292 +14,262 @@
 
       <h1><code>crates/aipl-codegen/src/doc.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>any</code> <span class="from">from builtins</span></li>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
-          <li><code>concat</code> <span class="as">as</span> <code>+++</code> <span class="from">from builtins</span></li>
 
-          <li><code>contains</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-Doc">
+          <h3>
+            <a class="anchor" href="#item-Doc">Doc</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Doc</code></pre>
 
-          <li><code>drop_last</code> <span class="from">from builtins</span></li>
+          <p class="undocumented">Undocumented.</p>
 
-          <li><code>ends_with</code> <span class="from">from builtins</span></li>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+          <ul class="cases">
 
-          <li><code>greater_than</code> <span class="as">as</span> <code>&#62;</code> <span class="from">from builtins</span></li>
+            <li id="item-Text"><code>Text(str)</code></li>
 
-          <li><code>is_space</code> <span class="from">from builtins</span></li>
+            <li id="item-Concat"><code>Concat(Doc[])</code></li>
 
-          <li><code>join</code> <span class="from">from builtins</span></li>
+            <li id="item-Line"><code>Line</code></li>
 
-          <li><code>len</code> <span class="from">from builtins</span></li>
+            <li id="item-SoftLine"><code>SoftLine</code></li>
 
-          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+            <li id="item-HardLine"><code>HardLine</code></li>
 
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
+            <li id="item-BlankLine"><code>BlankLine</code></li>
 
-          <li><code>map</code> <span class="from">from builtins</span></li>
+            <li id="item-Indent"><code>Indent(Doc)</code></li>
 
-          <li><code>push</code> <span class="from">from builtins</span></li>
+            <li id="item-Group"><code>Group(bool, Doc)</code></li>
 
-          <li><code>repeat</code> <span class="from">from builtins</span></li>
+            <li id="item-IfBroken"><code>IfBroken(str)</code></li>
 
-          <li><code>right_fold</code> <span class="from">from builtins</span></li>
+            <li id="item-BreakParent"><code>BreakParent</code></li>
 
-          <li><code>saturating_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
+            <li id="item-RawBlock"><code>RawBlock(str)</code></li>
 
-          <li><code>split</code> <span class="from">from builtins</span></li>
+          </ul>
 
-          <li><code>value_or</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_add_assign</code> <span class="as">as</span> <code>+=</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
-
-          <li><code>reindent_block</code> <span class="from">from ./reindent_block.aipl</span></li>
-
-          <li><code>trim_end_while</code> <span class="from">from ./trim_end_while.aipl</span></li>
-
-        </ul>
-      </section>
+        </section>
 
 
 
-      <section class="item" id="item-Doc">
-        <h2>
-          <a class="anchor" href="#item-Doc">Doc</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Doc</code></pre>
+        <section class="item" id="item-Work">
+          <h3>
+            <a class="anchor" href="#item-Work">Work</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Work</code></pre>
 
-        <p class="undocumented">Undocumented.</p>
-
-
-        <ul class="cases">
-
-          <li id="item-Text"><code>Text(str)</code></li>
-
-          <li id="item-Concat"><code>Concat(Doc[])</code></li>
-
-          <li id="item-Line"><code>Line</code></li>
-
-          <li id="item-SoftLine"><code>SoftLine</code></li>
-
-          <li id="item-HardLine"><code>HardLine</code></li>
-
-          <li id="item-BlankLine"><code>BlankLine</code></li>
-
-          <li id="item-Indent"><code>Indent(Doc)</code></li>
-
-          <li id="item-Group"><code>Group(bool, Doc)</code></li>
-
-          <li id="item-IfBroken"><code>IfBroken(str)</code></li>
-
-          <li id="item-BreakParent"><code>BreakParent</code></li>
-
-          <li id="item-RawBlock"><code>RawBlock(str)</code></li>
-
-        </ul>
-
-      </section>
-
-      <section class="item" id="item-Work">
-        <h2>
-          <a class="anchor" href="#item-Work">Work</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Work</code></pre>
-
-        <div class="doc"><p>The printer's work-stack, as a cons-list of <code>(indent-columns, flat?, doc)</code> frames — the tail-recursive analog of the Rust printer's <code>Vec</code> work stack.</p></div>
+          <div class="doc"><p>The printer's work-stack, as a cons-list of <code>(indent-columns, flat?, doc)</code> frames — the tail-recursive analog of the Rust printer's <code>Vec</code> work stack.</p></div>
 
 
-        <ul class="cases">
+          <ul class="cases">
 
-          <li id="item-WNil"><code>WNil</code></li>
+            <li id="item-WNil"><code>WNil</code></li>
 
-          <li id="item-WCons"><code>WCons(u64, bool, Doc, Work)</code></li>
+            <li id="item-WCons"><code>WCons(u64, bool, Doc, Work)</code></li>
 
-        </ul>
+          </ul>
 
-      </section>
+        </section>
 
-      <section class="item" id="item-group">
-        <h2>
-          <a class="anchor" href="#item-group">group</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn group(self: Doc) -&#62; Doc</code></pre>
 
-        <div class="doc"><p>Wrap <code>self</code> in a group, pre-computing whether it is forced to break. Forcing is what makes a multi-statement block, or any construct holding a line comment, lay out vertically no matter the width.</p></div>
+
+        <section class="item" id="item-group">
+          <h3>
+            <a class="anchor" href="#item-group">group</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn group(self: Doc) -&#62; Doc</code></pre>
+
+          <div class="doc"><p>Wrap <code>self</code> in a group, pre-computing whether it is forced to break. Forcing is what makes a multi-statement block, or any construct holding a line comment, lay out vertically no matter the width.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-print_doc">
+          <h3>
+            <a class="anchor" href="#item-print_doc">print_doc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn print_doc(doc: Doc, width: u64) -&#62; str</code></pre>
+
+          <div class="doc"><p>Render <code>doc</code> at the given width limit. Lines are indented with spaces; trailing whitespace is stripped from every line and a final newline is preserved when present (the Rust <code>print</code>'s belt-and-braces cleanup).</p></div>
+
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-has_hard">
-        <h2>
-          <a class="anchor" href="#item-has_hard">has_hard</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn has_hard(self: Doc) -&#62; bool</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <div class="doc"><p>Whether <code>self</code> contains content that can never render flat: a hard/blank line, a break-parent, or multi-line verbatim text. Recurses through nested groups — a forced inner group means the outer can't be flat either.</p></div>
+
+        <section class="item" id="item-has_hard">
+          <h3>
+            <a class="anchor" href="#item-has_hard">has_hard</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn has_hard(self: Doc) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether <code>self</code> contains content that can never render flat: a hard/blank line, a break-parent, or multi-line verbatim text. Recurses through nested groups — a forced inner group means the outer can't be flat either.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-go">
+          <h3>
+            <a class="anchor" href="#item-go">go</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The main layout loop: pop a frame, emit for its <code>Doc</code>, push any children, and go round again. <code>col</code> is the current column; <code>sp</code> (inside each frame) is the indentation, in spaces, that a line break under that frame lands at.</p><p>Each arm updates the loop's own <code>mut</code> bindings directly. That needs <code>match</code> arms to be statement blocks; before they were, an arm could only be a single *expression*, so this was three functions threading a <code>Step { col, work, emit, emits, done }</code> carrier back to the loop — one to dispatch on the work-list, one on the <code>Doc</code>, and one for the <code>RawBlock</code> atom.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-group_flat">
+          <h3>
+            <a class="anchor" href="#item-group_flat">group_flat</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn group_flat(forced: bool, width: u64, col: u64, sp: u64, inner: Doc, rest: Work) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Decide a group's mode: forced groups always break; otherwise the group is flat exactly when its content — laid out flat, followed by the rest of the line — fits in the remaining width. The remaining width is an *unsigned* subtraction, so a line already past the limit floors at 0 rather than going negative — the same thing the Rust printer gets from <code>usize::saturating_sub</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-fits">
+          <h3>
+            <a class="anchor" href="#item-fits">fits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn fits(budget: u64, work: Work) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Would the pending work — the flat candidate followed by the outer frames, each in its own mode — stay within <code>budget</code> columns? Walks until the budget is exhausted (no) or the line provably ends at a break point (yes).</p><p>The budget is *unsigned*: it can't go negative, so an overrun is an explicit &quot;doesn't fit&quot; comparison in <code>fits_after</code> rather than a sign check on a wrapped-around remainder.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-fits_after">
+          <h3>
+            <a class="anchor" href="#item-fits_after">fits_after</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn fits_after(budget: u64, n: u64, rest: Work) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Spend <code>n</code> of the remaining columns and keep walking — or give up when <code>n</code> doesn't fit. The check has to come *before* the subtraction: on an unsigned budget <code>budget - n</code> floors at 0, which would hide the overrun.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-fits_atom">
+          <h3>
+            <a class="anchor" href="#item-fits_atom">fits_atom</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn fits_atom(budget: u64, s: str, flat: bool, rest: Work) -&#62; bool</code></pre>
+
+          <div class="doc"><p>A <code>Text</code>/<code>RawBlock</code> atom in <code>fits</code>: a multi-line atom can't sit on a flat line (so it only &quot;fits&quot; when the surrounding content is already broken); a single-line atom just consumes its width.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-prepend">
+          <h3>
+            <a class="anchor" href="#item-prepend">prepend</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -&#62; Work</code></pre>
+
+          <div class="doc"><p>Prepend an array of children onto the work-list so <code>ds[0]</code> is processed first: a right fold over <code>ds</code>, each frame carrying the parent's indent and mode.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-col_after">
+          <h3>
+            <a class="anchor" href="#item-col_after">col_after</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn col_after(col: u64, text: str) -&#62; u64</code></pre>
+
+          <div class="doc"><p>The column just past <code>text</code> when appended at column <code>col</code>: the length of its last line for multi-line text, else <code>col + width</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-newline_str">
+          <h3>
+            <a class="anchor" href="#item-newline_str">newline_str</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn newline_str(sp: u64) -&#62; str</code></pre>
+
+          <div class="doc"><p>A line break landing at indentation <code>sp</code>: a newline plus <code>sp</code> spaces.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-blank_str">
+          <h3>
+            <a class="anchor" href="#item-blank_str">blank_str</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn blank_str(sp: u64) -&#62; str</code></pre>
+
+          <div class="doc"><p>A blank-line break at indentation <code>sp</code>: two newlines plus <code>sp</code> spaces (the blank line's own trailing spaces are removed by <code>cleanup</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-cleanup">
+          <h3>
+            <a class="anchor" href="#item-cleanup">cleanup</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn cleanup(out: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>Strip trailing whitespace from every line and preserve a final newline when the rendered text had one (mirrors <code>str::lines().map(trim_end).join(sep=&quot;\n&quot;)</code>).</p></div>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-print_doc">
-        <h2>
-          <a class="anchor" href="#item-print_doc">print_doc</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn print_doc(doc: Doc, width: u64) -&#62; str</code></pre>
-
-        <div class="doc"><p>Render <code>doc</code> at the given width limit. Lines are indented with spaces; trailing whitespace is stripped from every line and a final newline is preserved when present (the Rust <code>print</code>'s belt-and-braces cleanup).</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-go">
-        <h2>
-          <a class="anchor" href="#item-go">go</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -&#62; str[]</code></pre>
-
-        <div class="doc"><p>The main layout loop: pop a frame, emit for its <code>Doc</code>, push any children, and go round again. <code>col</code> is the current column; <code>sp</code> (inside each frame) is the indentation, in spaces, that a line break under that frame lands at.</p><p>Each arm updates the loop's own <code>mut</code> bindings directly. That needs <code>match</code> arms to be statement blocks; before they were, an arm could only be a single *expression*, so this was three functions threading a <code>Step { col, work, emit, emits, done }</code> carrier back to the loop — one to dispatch on the work-list, one on the <code>Doc</code>, and one for the <code>RawBlock</code> atom.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-group_flat">
-        <h2>
-          <a class="anchor" href="#item-group_flat">group_flat</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn group_flat(forced: bool, width: u64, col: u64, sp: u64, inner: Doc, rest: Work) -&#62; bool</code></pre>
-
-        <div class="doc"><p>Decide a group's mode: forced groups always break; otherwise the group is flat exactly when its content — laid out flat, followed by the rest of the line — fits in the remaining width. The remaining width is an *unsigned* subtraction, so a line already past the limit floors at 0 rather than going negative — the same thing the Rust printer gets from <code>usize::saturating_sub</code>.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-fits">
-        <h2>
-          <a class="anchor" href="#item-fits">fits</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn fits(budget: u64, work: Work) -&#62; bool</code></pre>
-
-        <div class="doc"><p>Would the pending work — the flat candidate followed by the outer frames, each in its own mode — stay within <code>budget</code> columns? Walks until the budget is exhausted (no) or the line provably ends at a break point (yes).</p><p>The budget is *unsigned*: it can't go negative, so an overrun is an explicit &quot;doesn't fit&quot; comparison in <code>fits_after</code> rather than a sign check on a wrapped-around remainder.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-fits_after">
-        <h2>
-          <a class="anchor" href="#item-fits_after">fits_after</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn fits_after(budget: u64, n: u64, rest: Work) -&#62; bool</code></pre>
-
-        <div class="doc"><p>Spend <code>n</code> of the remaining columns and keep walking — or give up when <code>n</code> doesn't fit. The check has to come *before* the subtraction: on an unsigned budget <code>budget - n</code> floors at 0, which would hide the overrun.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-fits_atom">
-        <h2>
-          <a class="anchor" href="#item-fits_atom">fits_atom</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn fits_atom(budget: u64, s: str, flat: bool, rest: Work) -&#62; bool</code></pre>
-
-        <div class="doc"><p>A <code>Text</code>/<code>RawBlock</code> atom in <code>fits</code>: a multi-line atom can't sit on a flat line (so it only &quot;fits&quot; when the surrounding content is already broken); a single-line atom just consumes its width.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-prepend">
-        <h2>
-          <a class="anchor" href="#item-prepend">prepend</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -&#62; Work</code></pre>
-
-        <div class="doc"><p>Prepend an array of children onto the work-list so <code>ds[0]</code> is processed first: a right fold over <code>ds</code>, each frame carrying the parent's indent and mode.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-col_after">
-        <h2>
-          <a class="anchor" href="#item-col_after">col_after</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn col_after(col: u64, text: str) -&#62; u64</code></pre>
-
-        <div class="doc"><p>The column just past <code>text</code> when appended at column <code>col</code>: the length of its last line for multi-line text, else <code>col + width</code>.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-newline_str">
-        <h2>
-          <a class="anchor" href="#item-newline_str">newline_str</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn newline_str(sp: u64) -&#62; str</code></pre>
-
-        <div class="doc"><p>A line break landing at indentation <code>sp</code>: a newline plus <code>sp</code> spaces.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-blank_str">
-        <h2>
-          <a class="anchor" href="#item-blank_str">blank_str</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn blank_str(sp: u64) -&#62; str</code></pre>
-
-        <div class="doc"><p>A blank-line break at indentation <code>sp</code>: two newlines plus <code>sp</code> spaces (the blank line's own trailing spaces are removed by <code>cleanup</code>).</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-cleanup">
-        <h2>
-          <a class="anchor" href="#item-cleanup">cleanup</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn cleanup(out: str) -&#62; str</code></pre>
-
-        <div class="doc"><p>Strip trailing whitespace from every line and preserve a final newline when the rendered text had one (mirrors <code>str::lines().map(trim_end).join(sep=&quot;\n&quot;)</code>).</p></div>
-
-
-      </section>
-
 
 
     </main>

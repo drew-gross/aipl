@@ -14,32 +14,22 @@
 
       <h1><code>crates/aipl-mono/src/builtin_drop_n.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>first</code> <span class="from">from builtins</span></li>
-
-          <li><code>is_empty</code> <span class="from">from builtins</span></li>
-
-          <li><code>len</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-drop_n">
+          <h3>
+            <a class="anchor" href="#item-drop_n">drop_n</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn drop_n&#60;T: any&#62;(self: T[], n: u64) -&#62; T[]</code></pre>
 
-      <section class="item" id="item-drop_n">
-        <h2>
-          <a class="anchor" href="#item-drop_n">drop_n</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn drop_n&#60;T: any&#62;(self: T[], n: u64) -&#62; T[]</code></pre>
+          <div class="doc"><p>Every element except the first <code>n</code>. Dropping <code>n &gt;= len</code> gives an empty array — the same clamping an out-of-range slice does.</p></div>
 
-        <div class="doc"><p>Every element except the first <code>n</code>. Dropping <code>n &gt;= len</code> gives an empty array — the same clamping an out-of-range slice does.</p></div>
+
+        </section>
 
 
       </section>

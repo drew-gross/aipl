@@ -14,49 +14,46 @@
 
       <h1><code>crates/aipl-mono/src/builtin_all.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>filter</code> <span class="from">from builtins</span></li>
-
-          <li><code>less_than_or_equal</code> <span class="as">as</span> <code>&#60;=</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-all">
+          <h3>
+            <a class="anchor" href="#item-all">all</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn all&#60;T: any&#62;(self: T[], pred: (T) -&#62; bool) -&#62; bool</code></pre>
 
-      <section class="item" id="item-all">
-        <h2>
-          <a class="anchor" href="#item-all">all</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn all&#60;T: any&#62;(self: T[], pred: (T) -&#62; bool) -&#62; bool</code></pre>
+          <div class="doc"><p>True when every element satisfies <code>pred</code>, short-circuiting at the first element that fails it; an empty array is vacuously true. Generic over the element type and callable as a method: <code>xs.all(pred)</code>.</p></div>
 
-        <div class="doc"><p>True when every element satisfies <code>pred</code>, short-circuiting at the first element that fails it; an empty array is vacuously true. Generic over the element type and callable as a method: <code>xs.all(pred)</code>.</p></div>
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-is_nine">
-        <h2>
-          <a class="anchor" href="#item-is_nine">is_nine</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn is_nine(self: i64) -&#62; bool</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <p class="undocumented">Undocumented.</p>
+
+        <section class="item" id="item-is_nine">
+          <h3>
+            <a class="anchor" href="#item-is_nine">is_nine</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_nine(self: i64) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
-
 
 
     </main>

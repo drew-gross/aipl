@@ -14,30 +14,22 @@
 
       <h1><code>crates/aipl-mono/src/builtin_is_all_whitespace.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>all</code> <span class="from">from builtins</span></li>
-
-          <li><code>is_whitespace</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-is_all_whitespace">
+          <h3>
+            <a class="anchor" href="#item-is_all_whitespace">is_all_whitespace</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_all_whitespace(self: str) -&#62; bool</code></pre>
 
-      <section class="item" id="item-is_all_whitespace">
-        <h2>
-          <a class="anchor" href="#item-is_all_whitespace">is_all_whitespace</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn is_all_whitespace(self: str) -&#62; bool</code></pre>
+          <div class="doc"><p>True when every char of <code>self</code> is ASCII whitespace — space, tab, newline, carriage return, vertical tab or form feed — and true for the empty string. Callable as a method: <code>s.is_all_whitespace()</code>.</p><p>See <code>is_whitespace</code> for the per-char predicate, and <code>is_space</code> for the narrower four-character one.</p></div>
 
-        <div class="doc"><p>True when every char of <code>self</code> is ASCII whitespace — space, tab, newline, carriage return, vertical tab or form feed — and true for the empty string. Callable as a method: <code>s.is_all_whitespace()</code>.</p><p>See <code>is_whitespace</code> for the per-char predicate, and <code>is_space</code> for the narrower four-character one.</p></div>
+
+        </section>
 
 
       </section>

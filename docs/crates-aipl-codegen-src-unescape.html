@@ -14,53 +14,36 @@
 
       <h1><code>crates/aipl-codegen/src/unescape.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>concat</code> <span class="as">as</span> <code>+++</code> <span class="from">from builtins</span></li>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
 
-          <li><code>len</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-escape_text">
+          <h3>
+            <a class="anchor" href="#item-escape_text">escape_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn escape_text(self: str) -&#62; str</code></pre>
 
-          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>Map a <code>\X</code> escape's X to its meaning: <code>n</code>/<code>t</code>/<code>r</code> to the control chars, and any other escaped char (<code>&quot;</code>, <code>\</code>, <code></code> <code> </code><code>, </code>{<code>) to itself. Validity was already enforced by the matcher's scan (its </code>escapes<code> set), so an unknown </code>\X<code> never reaches here. </code>self<code> is the single char following the backslash.</code></p></div>
 
-          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
 
-          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_add_assign</code> <span class="as">as</span> <code>+=</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+        </section>
 
 
 
-      <section class="item" id="item-escape_text">
-        <h2>
-          <a class="anchor" href="#item-escape_text">escape_text</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn escape_text(self: str) -&#62; str</code></pre>
+        <section class="item" id="item-unescape">
+          <h3>
+            <a class="anchor" href="#item-unescape">unescape</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn unescape(self: str) -&#62; str</code></pre>
 
-        <div class="doc"><p>Map a <code>\X</code> escape's X to its meaning: <code>n</code>/<code>t</code>/<code>r</code> to the control chars, and any other escaped char (<code>&quot;</code>, <code>\</code>, <code></code> <code> </code><code>, </code>{<code>) to itself. Validity was already enforced by the matcher's scan (its </code>escapes<code> set), so an unknown </code>\X<code> never reaches here. </code>self<code> is the single char following the backslash.</code></p></div>
+          <div class="doc"><p>Decode every <code>\X</code> escape in <code>self</code>, copying everything else verbatim. Walks byte-by-byte: at each backslash (with a char after it) splice the run since the last escape plus the decoded <code>\X</code>, then resume past it; the trailing run is appended at the end. Copying whole runs by slicing (rather than char-by-char) keeps the common no-escape case a single copy. A trailing lone backslash can't occur — the matcher already rejected such a token as unterminated.</p></div>
 
 
-      </section>
-
-      <section class="item" id="item-unescape">
-        <h2>
-          <a class="anchor" href="#item-unescape">unescape</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn unescape(self: str) -&#62; str</code></pre>
-
-        <div class="doc"><p>Decode every <code>\X</code> escape in <code>self</code>, copying everything else verbatim. Walks byte-by-byte: at each backslash (with a char after it) splice the run since the last escape plus the decoded <code>\X</code>, then resume past it; the trailing run is appended at the end. Copying whole runs by slicing (rather than char-by-char) keeps the common no-escape case a single copy. A trailing lone backslash can't occur — the matcher already rejected such a token as unterminated.</p></div>
+        </section>
 
 
       </section>

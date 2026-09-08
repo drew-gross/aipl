@@ -14,36 +14,22 @@
 
       <h1><code>crates/aipl-codegen/src/clean_trailing_whitespace.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>join</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
-
-          <li><code>map</code> <span class="from">from builtins</span></li>
-
-          <li><code>lines</code> <span class="from">from ./lines.aipl</span></li>
-
-          <li><code>trim_end_while</code> <span class="from">from ./trim_end_while.aipl</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-clean_trailing_whitespace">
+          <h3>
+            <a class="anchor" href="#item-clean_trailing_whitespace">clean_trailing_whitespace</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn clean_trailing_whitespace(src: str) -&#62; str</code></pre>
 
-      <section class="item" id="item-clean_trailing_whitespace">
-        <h2>
-          <a class="anchor" href="#item-clean_trailing_whitespace">clean_trailing_whitespace</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn clean_trailing_whitespace(src: str) -&#62; str</code></pre>
+          <div class="doc"><p><code>src</code> with the trailing space/tab run removed from every line. Line endings are preserved exactly — splitting and rejoining on <code>\\n</code> puts back what was there, including a trailing newline or its absence.</p><p>Only spaces and tabs count as trailing whitespace, so a <code>\\r</code> before the <code>\\n</code> of a CRLF ending is content: it stops the trim, and whitespace before it survives. The formatter's input has already been through the parser's trailing-whitespace check, which treats CRLF the same way.</p></div>
 
-        <div class="doc"><p><code>src</code> with the trailing space/tab run removed from every line. Line endings are preserved exactly — splitting and rejoining on <code>\\n</code> puts back what was there, including a trailing newline or its absence.</p><p>Only spaces and tabs count as trailing whitespace, so a <code>\\r</code> before the <code>\\n</code> of a CRLF ending is content: it stops the trim, and whitespace before it survives. The formatter's input has already been through the parser's trailing-whitespace check, which treats CRLF the same way.</p></div>
+
+        </section>
 
 
       </section>

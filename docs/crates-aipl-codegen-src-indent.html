@@ -14,38 +14,22 @@
 
       <h1><code>crates/aipl-codegen/src/indent.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>concat</code> <span class="as">as</span> <code>+++</code> <span class="from">from builtins</span></li>
-
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>is_all_whitespace</code> <span class="from">from builtins</span></li>
-
-          <li><code>join</code> <span class="from">from builtins</span></li>
-
-          <li><code>map</code> <span class="from">from builtins</span></li>
-
-          <li><code>repeat</code> <span class="from">from builtins</span></li>
-
-          <li><code>lines</code> <span class="from">from ./lines.aipl</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-indent">
+          <h3>
+            <a class="anchor" href="#item-indent">indent</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn indent(self: str, target: u64) -&#62; str</code></pre>
 
-      <section class="item" id="item-indent">
-        <h2>
-          <a class="anchor" href="#item-indent">indent</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn indent(self: str, target: u64) -&#62; str</code></pre>
+          <div class="doc"><p>Indents every non-blank line of <code>self</code> by <code>target</code> spaces, keeping each line's own relative indentation; blank (empty or all-whitespace) lines are emitted empty. Assumes <code>self</code> is already fully dedented — it *adds* indentation, it does not rebase an existing common indent to <code>target</code>. The inverse of <code>dedent</code>; <code>reindent_block</code> dedents the raw-block content before calling this.</p></div>
 
-        <div class="doc"><p>Indents every non-blank line of <code>self</code> by <code>target</code> spaces, keeping each line's own relative indentation; blank (empty or all-whitespace) lines are emitted empty. Assumes <code>self</code> is already fully dedented — it *adds* indentation, it does not rebase an existing common indent to <code>target</code>. The inverse of <code>dedent</code>; <code>reindent_block</code> dedents the raw-block content before calling this.</p></div>
+
+        </section>
 
 
       </section>

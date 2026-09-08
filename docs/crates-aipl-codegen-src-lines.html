@@ -14,28 +14,22 @@
 
       <h1><code>crates/aipl-codegen/src/lines.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>split</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-lines">
+          <h3>
+            <a class="anchor" href="#item-lines">lines</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lines(self: str) -&#62; str[]</code></pre>
 
-      <section class="item" id="item-lines">
-        <h2>
-          <a class="anchor" href="#item-lines">lines</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn lines(self: str) -&#62; str[]</code></pre>
+          <div class="doc"><p>Splits <code>self</code> into lines on <code>\n</code>. Equivalent to <code>self.split(&quot;\n&quot;)</code>: a trailing <code>\n</code> yields a final empty element (not Rust's <code>str::lines()</code> semantics, which would drop it), and an empty <code>self</code> yields a single empty element.</p></div>
 
-        <div class="doc"><p>Splits <code>self</code> into lines on <code>\n</code>. Equivalent to <code>self.split(&quot;\n&quot;)</code>: a trailing <code>\n</code> yields a final empty element (not Rust's <code>str::lines()</code> semantics, which would drop it), and an empty <code>self</code> yields a single empty element.</p></div>
+
+        </section>
 
 
       </section>

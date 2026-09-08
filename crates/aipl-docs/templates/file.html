@@ -1,40 +1,45 @@
 {% extends "base.html" %}
-{% block content %}
-      <h1><code>{{ display }}</code></h1>
-{% if !imports.is_empty() %}
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
-{% for import in imports %}
-          <li><code>{{ import.name }}</code>{% if import.aliased %} <span class="as">as</span> <code>{{ import.local }}</code>{% endif %} <span class="from">from {{ import.from }}</span></li>
-{% endfor %}
-        </ul>
-      </section>
-{% endif %}
-{% if symbols.is_empty() %}
-      <p class="empty">This file declares nothing.</p>
-{% else %}
-{% for symbol in symbols %}
-      <section class="item" id="{{ symbol.anchor }}">
-        <h2>
-          <a class="anchor" href="#{{ symbol.anchor }}">{{ symbol.name }}</a>
-          <span class="kind {{ symbol.kind_class }}">{{ symbol.kind }}</span>
-{% if symbol.is_pub %}          <span class="badge">pub</span>{% endif %}
-        </h2>
-        <pre class="signature"><code>{{ symbol.detail }}</code></pre>
+{% macro item(symbol) %}
+        <section class="item" id="{{ symbol.anchor }}">
+          <h3>
+            <a class="anchor" href="#{{ symbol.anchor }}">{{ symbol.name }}</a>
+            <span class="kind {{ symbol.kind_class }}">{{ symbol.kind }}</span>
+          </h3>
+          <pre class="signature"><code>{{ symbol.detail }}</code></pre>
 {% if symbol.has_doc %}
-        <div class="doc">{{ symbol.doc|safe }}</div>
+          <div class="doc">{{ symbol.doc|safe }}</div>
 {% else %}
-        <p class="undocumented">Undocumented.</p>
+          <p class="undocumented">Undocumented.</p>
 {% endif %}
 {% if !symbol.cases.is_empty() %}
-        <ul class="cases">
+          <ul class="cases">
 {% for case in symbol.cases %}
-          <li id="{{ case.anchor }}"><code>{{ case.detail }}</code></li>
+            <li id="{{ case.anchor }}"><code>{{ case.detail }}</code></li>
 {% endfor %}
-        </ul>
+          </ul>
 {% endif %}
-      </section>
+        </section>
+{% endmacro %}
+{% block content %}
+      <h1><code>{{ display }}</code></h1>
+{% if public.is_empty() && private.is_empty() %}
+      <p class="empty">This file declares nothing.</p>
+{% endif %}
+{% if !public.is_empty() %}
+      <section class="group">
+        <h2 id="public">Public</h2>
+{% for symbol in public %}
+{% call item(symbol) %}{% endcall %}
 {% endfor %}
+      </section>
+{% endif %}
+{% if !private.is_empty() %}
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+{% for symbol in private %}
+{% call item(symbol) %}{% endcall %}
+{% endfor %}
+      </section>
 {% endif %}
 {% endblock %}

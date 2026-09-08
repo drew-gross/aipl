@@ -9,8 +9,6 @@
   --rule: #e2e4e8;
   --code-bg: #f5f6f8;
   --link: #0a58ca;
-  --badge-bg: #e7f1ff;
-  --badge-fg: #0a58ca;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,8 +19,6 @@
     --rule: #2c2e35;
     --code-bg: #21232a;
     --link: #7ab2ff;
-    --badge-bg: #1d2a3f;
-    --badge-fg: #7ab2ff;
   }
 }
 
@@ -100,7 +96,23 @@ section.item {
   scroll-margin-top: 1rem;
 }
 
-section.item h2 { align-items: baseline; display: flex; gap: 0.5rem; }
+section.group { margin-top: 2rem; }
+section.group > h2 {
+  border-bottom: 2px solid var(--rule);
+  margin: 0;
+  padding-bottom: 0.3rem;
+}
+/* The private half is still on the page, just visibly the back half of it. */
+section.group.private > h2 { color: var(--muted); }
+p.note { color: var(--muted); font-size: 0.85rem; margin: 0.4rem 0 0; }
+
+section.item h3 {
+  align-items: baseline;
+  display: flex;
+  font-size: 1.05rem;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+}
 a.anchor { color: var(--fg); text-decoration: none; }
 a.anchor:hover { text-decoration: underline; }
 
@@ -132,7 +144,7 @@ pre code { background: none; padding: 0; }
 ul.cases { list-style: none; margin: 0.5rem 0 0; padding: 0; }
 ul.cases li { padding: 0.15rem 0; }
 
-.kind, .badge {
+.kind {
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 600;
@@ -142,7 +154,7 @@ ul.cases li { padding: 0.15rem 0; }
 }
 
 .kind { background: var(--code-bg); color: var(--muted); }
-.badge { background: var(--badge-bg); color: var(--badge-fg); }
 
-section.imports ul { margin: 0; padding-left: 1.2rem; }
-.as { color: var(--muted); font-style: italic; }
+.private-count { font-size: 0.8rem; }
+.private-count a { color: var(--muted); text-decoration: none; }
+.private-count a:hover { text-decoration: underline; }

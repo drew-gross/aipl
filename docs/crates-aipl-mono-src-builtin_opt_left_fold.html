@@ -14,72 +14,60 @@
 
       <h1><code>crates/aipl-mono/src/builtin_opt_left_fold.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>concat</code> <span class="as">as</span> <code>+++</code> <span class="from">from builtins</span></li>
-
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>filter</code> <span class="from">from builtins</span></li>
-
-          <li><code>is_some</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
-
-          <li><code>to_digit</code> <span class="from">from builtins</span></li>
-
-          <li><code>value_or</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
-
-          <li><code>wrapping_mul</code> <span class="as">as</span> <code>*</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-opt_left_fold">
+          <h3>
+            <a class="anchor" href="#item-opt_left_fold">opt_left_fold</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn opt_left_fold&#60;T: any, A: any&#62;(self: T[], init: A, f: (A, T) -&#62; A?) -&#62; A?</code></pre>
 
-      <section class="item" id="item-opt_left_fold">
-        <h2>
-          <a class="anchor" href="#item-opt_left_fold">opt_left_fold</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn opt_left_fold&#60;T: any, A: any&#62;(self: T[], init: A, f: (A, T) -&#62; A?) -&#62; A?</code></pre>
+          <div class="doc"><p>Combine the elements left to right with a *fallible* combiner, starting from <code>init</code>: <code>f</code> returns <code>A?</code>, and the first <code>none</code> ends the fold with <code>none</code> — the remaining elements are never visited. All-<code>some</code> folds to <code>some(result)</code>, exactly as <code>left_fold</code> would; an empty array folds to <code>some(init)</code>.</p><p>Since the combiner's body may use <code>?</code>, a fold that can fail reads as one expression: <code>s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?))</code>.</p><p>Import it as plain <code>opt_fold</code> — <code>import { opt_left_fold as opt_fold } from builtins;</code> — in the usual case where a file folds in only one direction; spell it <code>opt_left_fold</code> only in a file that also imports <code>opt_right_fold</code>.</p></div>
 
-        <div class="doc"><p>Combine the elements left to right with a *fallible* combiner, starting from <code>init</code>: <code>f</code> returns <code>A?</code>, and the first <code>none</code> ends the fold with <code>none</code> — the remaining elements are never visited. All-<code>some</code> folds to <code>some(result)</code>, exactly as <code>left_fold</code> would; an empty array folds to <code>some(init)</code>.</p><p>Since the combiner's body may use <code>?</code>, a fold that can fail reads as one expression: <code>s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?))</code>.</p><p>Import it as plain <code>opt_fold</code> — <code>import { opt_left_fold as opt_fold } from builtins;</code> — in the usual case where a file folds in only one direction; spell it <code>opt_left_fold</code> only in a file that also imports <code>opt_right_fold</code>.</p></div>
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-add">
-        <h2>
-          <a class="anchor" href="#item-add">add</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn add(acc: i64, x: i64) -&#62; i64?</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <p class="undocumented">Undocumented.</p>
+
+        <section class="item" id="item-add">
+          <h3>
+            <a class="anchor" href="#item-add">add</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn add(acc: i64, x: i64) -&#62; i64?</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_big">
+          <h3>
+            <a class="anchor" href="#item-is_big">is_big</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_big(self: i64) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-is_big">
-        <h2>
-          <a class="anchor" href="#item-is_big">is_big</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn is_big(self: i64) -&#62; bool</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
 
 
     </main>

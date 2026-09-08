@@ -14,131 +14,102 @@
 
       <h1><code>crates/aipl-codegen/src/highlight_aipl.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>contains</code> <span class="from">from builtins</span></li>
-
-          <li><code>value_or</code> <span class="from">from builtins</span></li>
-
-          <li><code>Caps</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>Entry</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>Expansion</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>Include</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>Match</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>Pat</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>Region</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>Tm</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>decl_pat</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>matcher_regex</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>rule_pats</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>tm_json</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>word_pat</code> <span class="from">from ./highlight.aipl</span></li>
-
-          <li><code>aipl_rules</code> <span class="from">from ./lex_aipl.aipl</span></li>
-
-          <li><code>ident_cont</code> <span class="from">from ./lex_aipl.aipl</span></li>
-
-          <li><code>ident_start</code> <span class="from">from ./lex_aipl.aipl</span></li>
-
-          <li><code>CharRun</code> <span class="from">from ./lexer.aipl</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-aipl_tmlanguage">
+          <h3>
+            <a class="anchor" href="#item-aipl_tmlanguage">aipl_tmlanguage</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn aipl_tmlanguage() -&#62; str</code></pre>
 
-      <section class="item" id="item-aipl_tmlanguage">
-        <h2>
-          <a class="anchor" href="#item-aipl_tmlanguage">aipl_tmlanguage</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn aipl_tmlanguage() -&#62; str</code></pre>
+          <div class="doc"><p>AIPL's TextMate grammar as <code>.tmLanguage.json</code> text — what <code>editors/vscode/syntaxes/aipl.tmLanguage.json</code> holds. Derived from <code>aipl_rules()</code> plus the four patterns a lexer cannot describe; see the file header.</p></div>
 
-        <div class="doc"><p>AIPL's TextMate grammar as <code>.tmLanguage.json</code> text — what <code>editors/vscode/syntaxes/aipl.tmLanguage.json</code> holds. Derived from <code>aipl_rules()</code> plus the four patterns a lexer cannot describe; see the file header.</p></div>
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-escape_scope">
-        <h2>
-          <a class="anchor" href="#item-escape_scope">escape_scope</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn escape_scope() -&#62; str</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <div class="doc"><p>What an escape sequence inside a string, char or template literal is painted. One scope for all of them, since a <code>\n</code> means the same thing wherever it is.</p></div>
+
+        <section class="item" id="item-escape_scope">
+          <h3>
+            <a class="anchor" href="#item-escape_scope">escape_scope</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn escape_scope() -&#62; str</code></pre>
+
+          <div class="doc"><p>What an escape sequence inside a string, char or template literal is painted. One scope for all of them, since a <code>\n</code> means the same thing wherever it is.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ident_regex">
+          <h3>
+            <a class="anchor" href="#item-ident_regex">ident_regex</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn ident_regex() -&#62; str</code></pre>
+
+          <div class="doc"><p>The identifier regex, built from the very classes the identifier *rule* is built from (<code>lex_aipl.aipl</code>), so <code>fn NAME</code> accepts exactly the names AIPL accepts. <code>matcher_regex</code> answers <code>none</code> only for the delimiter-scanning matchers, which a <code>CharRun</code> is not.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-builtin_types">
+          <h3>
+            <a class="anchor" href="#item-builtin_types">builtin_types</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn builtin_types() -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The builtin type names. Lexically these are plain identifiers — the AIPL lexer emits <code>Name</code> for them and <code>classify_lexed</code> (<code>crates/aipl-parser/src/lib.rs</code>) is what separates them out — so there is no rule to derive this from, and this list has to stay in step with that one by hand.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-effect_pat">
+          <h3>
+            <a class="anchor" href="#item-effect_pat">effect_pat</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn effect_pat() -&#62; Pat</code></pre>
+
+          <div class="doc"><p>An effect declaration — <code>!prints</code> in a signature. The effect names are spelled out rather than matched as any <code>!ident</code>, which would mis-scope the unary <code>!</code> in <code>!true</code> / <code>!ready</code>; they must stay in step with <code>KNOWN_EFFECTS</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-section_tail">
+          <h3>
+            <a class="anchor" href="#item-section_tail">section_tail</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn section_tail() -&#62; Pat</code></pre>
+
+          <div class="doc"><p>A test-case file's <code>--- name ---</code> markers and everything after the first one. The tail is expected output, not AIPL, so it is scoped as plain content and only the markers themselves are painted — as comments, which is the closest thing a theme has to &quot;not code&quot;. <code>\z</code> never matches inside the text, so the region runs to end of file.</p></div>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-ident_regex">
-        <h2>
-          <a class="anchor" href="#item-ident_regex">ident_regex</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn ident_regex() -&#62; str</code></pre>
-
-        <div class="doc"><p>The identifier regex, built from the very classes the identifier *rule* is built from (<code>lex_aipl.aipl</code>), so <code>fn NAME</code> accepts exactly the names AIPL accepts. <code>matcher_regex</code> answers <code>none</code> only for the delimiter-scanning matchers, which a <code>CharRun</code> is not.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-builtin_types">
-        <h2>
-          <a class="anchor" href="#item-builtin_types">builtin_types</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn builtin_types() -&#62; str[]</code></pre>
-
-        <div class="doc"><p>The builtin type names. Lexically these are plain identifiers — the AIPL lexer emits <code>Name</code> for them and <code>classify_lexed</code> (<code>crates/aipl-parser/src/lib.rs</code>) is what separates them out — so there is no rule to derive this from, and this list has to stay in step with that one by hand.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-effect_pat">
-        <h2>
-          <a class="anchor" href="#item-effect_pat">effect_pat</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn effect_pat() -&#62; Pat</code></pre>
-
-        <div class="doc"><p>An effect declaration — <code>!prints</code> in a signature. The effect names are spelled out rather than matched as any <code>!ident</code>, which would mis-scope the unary <code>!</code> in <code>!true</code> / <code>!ready</code>; they must stay in step with <code>KNOWN_EFFECTS</code>.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-section_tail">
-        <h2>
-          <a class="anchor" href="#item-section_tail">section_tail</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn section_tail() -&#62; Pat</code></pre>
-
-        <div class="doc"><p>A test-case file's <code>--- name ---</code> markers and everything after the first one. The tail is expected output, not AIPL, so it is scoped as plain content and only the markers themselves are painted — as comments, which is the closest thing a theme has to &quot;not code&quot;. <code>\z</code> never matches inside the text, so the region runs to end of file.</p></div>
-
-
-      </section>
-
 
 
     </main>

@@ -14,64 +14,60 @@
 
       <h1><code>crates/aipl-mono/src/builtin_try_map.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>is_err_and</code> <span class="from">from builtins</span></li>
-
-          <li><code>len</code> <span class="from">from builtins</span></li>
-
-          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
-
-          <li><code>push</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-try_map">
+          <h3>
+            <a class="anchor" href="#item-try_map">try_map</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn try_map&#60;T: any, U: any, E: any&#62;(self: T[], f: (T) -&#62; U!E) -&#62; U[]!E</code></pre>
 
-      <section class="item" id="item-try_map">
-        <h2>
-          <a class="anchor" href="#item-try_map">try_map</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn try_map&#60;T: any, U: any, E: any&#62;(self: T[], f: (T) -&#62; U!E) -&#62; U[]!E</code></pre>
+          <div class="doc"><p><code>self</code> with <code>f</code> applied to each element, short-circuiting on failure: the result is <code>ok</code> of every mapped value, in order, or the *first* <code>err</code> that <code>f</code> returned — after which no further element is mapped. Generic over the element type, the mapped type and the error type, and callable as a method: <code>xs.try_map(f)</code>.</p><p>The fallible counterpart of <code>map</code>, and what a <code>for</code> loop over <code>set out.push(f(x)?)</code> is written as.</p></div>
 
-        <div class="doc"><p><code>self</code> with <code>f</code> applied to each element, short-circuiting on failure: the result is <code>ok</code> of every mapped value, in order, or the *first* <code>err</code> that <code>f</code> returned — after which no further element is mapped. Generic over the element type, the mapped type and the error type, and callable as a method: <code>xs.try_map(f)</code>.</p><p>The fallible counterpart of <code>map</code>, and what a <code>for</code> loop over <code>set out.push(f(x)?)</code> is written as.</p></div>
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-label">
-        <h2>
-          <a class="anchor" href="#item-label">label</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn label(n: i64) -&#62; str!str</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <div class="doc"><p>Fails on a negative input, so a test can place a failure at a chosen position and name which one came back.</p></div>
+
+        <section class="item" id="item-label">
+          <h3>
+            <a class="anchor" href="#item-label">label</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn label(n: i64) -&#62; str!str</code></pre>
+
+          <div class="doc"><p>Fails on a negative input, so a test can place a failure at a chosen position and name which one came back.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-width">
+          <h3>
+            <a class="anchor" href="#item-width">width</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn width(s: str) -&#62; u64!char</code></pre>
+
+          <div class="doc"><p>A second fallible mapping whose ok, err and element types all differ from <code>label</code>'s, so the tests cover <code>try_map</code> being generic in all three.</p></div>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-width">
-        <h2>
-          <a class="anchor" href="#item-width">width</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn width(s: str) -&#62; u64!char</code></pre>
-
-        <div class="doc"><p>A second fallible mapping whose ok, err and element types all differ from <code>label</code>'s, so the tests cover <code>try_map</code> being generic in all three.</p></div>
-
-
-      </section>
-
 
 
     </main>

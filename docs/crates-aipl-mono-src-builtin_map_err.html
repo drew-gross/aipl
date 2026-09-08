@@ -14,88 +14,88 @@
 
       <h1><code>crates/aipl-mono/src/builtin_map_err.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>is_err_and</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
-
-          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-map_err">
+          <h3>
+            <a class="anchor" href="#item-map_err">map_err</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn map_err&#60;T: any, E: any, F: any&#62;(self: T!E, f: (E) -&#62; F) -&#62; T!F</code></pre>
 
-      <section class="item" id="item-map_err">
-        <h2>
-          <a class="anchor" href="#item-map_err">map_err</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn map_err&#60;T: any, E: any, F: any&#62;(self: T!E, f: (E) -&#62; F) -&#62; T!F</code></pre>
-
-        <div class="doc"><p><code>self</code> with its error side rewritten by <code>f</code>: <code>err(e)</code> becomes <code>err(f(e))</code>, and <code>ok(v)</code> passes through untouched (<code>f</code> is not called). Generic over the ok type and both error types, and callable as a method: <code>r.map_err(f)</code>.</p><p>Bridges a call whose error type differs from the enclosing function's, so <code>?</code> can propagate it.</p></div>
+          <div class="doc"><p><code>self</code> with its error side rewritten by <code>f</code>: <code>err(e)</code> becomes <code>err(f(e))</code>, and <code>ok(v)</code> passes through untouched (<code>f</code> is not called). Generic over the ok type and both error types, and callable as a method: <code>r.map_err(f)</code>.</p><p>Bridges a call whose error type differs from the enclosing function's, so <code>?</code> can propagate it.</p></div>
 
 
-      </section>
-
-      <section class="item" id="item-LexError">
-        <h2>
-          <a class="anchor" href="#item-LexError">LexError</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct LexError</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
+        </section>
 
 
-      </section>
 
-      <section class="item" id="item-FmtError">
-        <h2>
-          <a class="anchor" href="#item-FmtError">FmtError</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct FmtError</code></pre>
+        <section class="item" id="item-LexError">
+          <h3>
+            <a class="anchor" href="#item-LexError">LexError</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct LexError</code></pre>
 
-        <p class="undocumented">Undocumented.</p>
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-FmtError">
+          <h3>
+            <a class="anchor" href="#item-FmtError">FmtError</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct FmtError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-to_fmt">
-        <h2>
-          <a class="anchor" href="#item-to_fmt">to_fmt</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn to_fmt(self: LexError) -&#62; FmtError</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <div class="doc"><p>A named conversion, so the tests cover passing a function rather than a lambda — the two sides carry the same shape, which is exactly the case <code>map_err</code> exists to bridge.</p></div>
+
+        <section class="item" id="item-to_fmt">
+          <h3>
+            <a class="anchor" href="#item-to_fmt">to_fmt</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn to_fmt(self: LexError) -&#62; FmtError</code></pre>
+
+          <div class="doc"><p>A named conversion, so the tests cover passing a function rather than a lambda — the two sides carry the same shape, which is exactly the case <code>map_err</code> exists to bridge.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lex">
+          <h3>
+            <a class="anchor" href="#item-lex">lex</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lex(s: str) -&#62; str!LexError</code></pre>
+
+          <div class="doc"><p>Fails with a struct error, so the tests above cover rewriting a multi-field payload as well as reading one field out of it.</p></div>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-lex">
-        <h2>
-          <a class="anchor" href="#item-lex">lex</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn lex(s: str) -&#62; str!LexError</code></pre>
-
-        <div class="doc"><p>Fails with a struct error, so the tests above cover rewriting a multi-field payload as well as reading one field out of it.</p></div>
-
-
-      </section>
-
 
 
     </main>

@@ -14,290 +14,294 @@
 
       <h1><code>crates/aipl-codegen/src/grammar.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>Span</code> <span class="from">from builtins</span></li>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
 
-          <li><code>find_index</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-ParseError">
+          <h3>
+            <a class="anchor" href="#item-ParseError">ParseError</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ParseError</code></pre>
 
-          <li><code>map</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>Why a parse failed: a message, and the span of the offending source (absolute into the parsed string — slice it to show the offender, or hand it to <code>caret_block.aipl</code> for the rustc-style underline). Mirrors <code>lexer.aipl</code>'s <code>LexError</code>, and for the same reason: the two halves of a front end should report failure in one shape.</p><p>A *grammar* error — an unresolved rule reference, a rule that can loop forever — has no source to point at and carries the empty <code>0..0</code>.</p></div>
 
-          <li><code>not_equal</code> <span class="as">as</span> <code>!=</code> <span class="from">from builtins</span></li>
 
-          <li><code>try_map</code> <span class="from">from builtins</span></li>
+        </section>
 
-          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
 
-          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
 
-        </ul>
-      </section>
+        <section class="item" id="item-failure_message">
+          <h3>
+            <a class="anchor" href="#item-failure_message">failure_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn failure_message(self: str!ParseError) -&#62; str</code></pre>
 
+          <div class="doc"><p>What a failed parse said — or, when it unexpectedly *succeeded*, a note carrying what it produced, so a broken assertion says which way it broke.</p><p>For <code>.test</code> blocks, which is where the distinction matters: an assertion on a message that silently parses instead reads as a mismatched string with no clue why. Pairs with <code>map_ok</code>, which is what turns a parse of any AST type into the <code>str!ParseError</code> this takes: <code>parse_x(src).map_ok(render_x).failure_message()</code>.</p></div>
 
 
-      <section class="item" id="item-ParseError">
-        <h2>
-          <a class="anchor" href="#item-ParseError">ParseError</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct ParseError</code></pre>
+        </section>
 
-        <div class="doc"><p>Why a parse failed: a message, and the span of the offending source (absolute into the parsed string — slice it to show the offender, or hand it to <code>caret_block.aipl</code> for the rustc-style underline). Mirrors <code>lexer.aipl</code>'s <code>LexError</code>, and for the same reason: the two halves of a front end should report failure in one shape.</p><p>A *grammar* error — an unresolved rule reference, a rule that can loop forever — has no source to point at and carries the empty <code>0..0</code>.</p></div>
 
 
-      </section>
+        <section class="item" id="item-Prec">
+          <h3>
+            <a class="anchor" href="#item-Prec">Prec</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Prec</code></pre>
 
-      <section class="item" id="item-failure_message">
-        <h2>
-          <a class="anchor" href="#item-failure_message">failure_message</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn failure_message(self: str!ParseError) -&#62; str</code></pre>
+          <div class="doc"><p>One precedence level of a <code>Climb</code>: the operators that share it, how tightly they bind (<code>power</code>, higher wins), and whether they associate to the right. Levels are matched in order, so a spelling belongs to exactly one.</p></div>
 
-        <div class="doc"><p>What a failed parse said — or, when it unexpectedly *succeeded*, a note carrying what it produced, so a broken assertion says which way it broke.</p><p>For <code>.test</code> blocks, which is where the distinction matters: an assertion on a message that silently parses instead reads as a mismatched string with no clue why. Pairs with <code>map_ok</code>, which is what turns a parse of any AST type into the <code>str!ParseError</code> this takes: <code>parse_x(src).map_ok(render_x).failure_message()</code>.</p></div>
 
+        </section>
 
-      </section>
 
-      <section class="item" id="item-Prec">
-        <h2>
-          <a class="anchor" href="#item-Prec">Prec</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct Prec</code></pre>
 
-        <div class="doc"><p>One precedence level of a <code>Climb</code>: the operators that share it, how tightly they bind (<code>power</code>, higher wins), and whether they associate to the right. Levels are matched in order, so a spelling belongs to exactly one.</p></div>
+        <section class="item" id="item-Rule">
+          <h3>
+            <a class="anchor" href="#item-Rule">Rule</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Rule&#60;K: variant&#62;</code></pre>
 
+          <div class="doc"><p>One rule shape, as plain data. Ordered choice makes this a PEG, not a CFG: <code>OneOf</code> commits to the first alternative that matches, so alternatives are tried in the order written and there is no ambiguity to resolve.</p></div>
 
-      </section>
 
-      <section class="item" id="item-Rule">
-        <h2>
-          <a class="anchor" href="#item-Rule">Rule</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Rule&#60;K: variant&#62;</code></pre>
+          <ul class="cases">
 
-        <div class="doc"><p>One rule shape, as plain data. Ordered choice makes this a PEG, not a CFG: <code>OneOf</code> commits to the first alternative that matches, so alternatives are tried in the order written and there is no ambiguity to resolve.</p></div>
+            <li id="item-Term"><code>Term(Case&#60;K&#62;)</code></li>
 
+            <li id="item-Literal"><code>Literal(str)</code></li>
 
-        <ul class="cases">
+            <li id="item-Then"><code>Then(Rule&#60;K&#62;[])</code></li>
 
-          <li id="item-Term"><code>Term(Case&#60;K&#62;)</code></li>
+            <li id="item-OneOf"><code>OneOf(Rule&#60;K&#62;[])</code></li>
 
-          <li id="item-Literal"><code>Literal(str)</code></li>
+            <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = .., sep: Rule&#60;K&#62;? = .., trailing_sep: bool = ..)</code></li>
 
-          <li id="item-Then"><code>Then(Rule&#60;K&#62;[])</code></li>
+            <li id="item-Maybe"><code>Maybe(Rule&#60;K&#62;)</code></li>
 
-          <li id="item-OneOf"><code>OneOf(Rule&#60;K&#62;[])</code></li>
+            <li id="item-Named"><code>Named(str)</code></li>
 
-          <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = .., sep: Rule&#60;K&#62;? = .., trailing_sep: bool = ..)</code></li>
+            <li id="item-NamedIdx"><code>NamedIdx(u64)</code></li>
 
-          <li id="item-Maybe"><code>Maybe(Rule&#60;K&#62;)</code></li>
+            <li id="item-Climb"><code>Climb(Rule&#60;K&#62;, Prec[])</code></li>
 
-          <li id="item-Named"><code>Named(str)</code></li>
+          </ul>
 
-          <li id="item-NamedIdx"><code>NamedIdx(u64)</code></li>
+        </section>
 
-          <li id="item-Climb"><code>Climb(Rule&#60;K&#62;, Prec[])</code></li>
 
-        </ul>
 
-      </section>
+        <section class="item" id="item-Build">
+          <h3>
+            <a class="anchor" href="#item-Build">Build</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Build&#60;A: any&#62;</code></pre>
 
-      <section class="item" id="item-Build">
-        <h2>
-          <a class="anchor" href="#item-Build">Build</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Build&#60;A: any&#62;</code></pre>
+          <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>: a function from the source text, the node itself, and the already-lowered values of its interior children (<code>nodes</code>, in match order). It may fail — a literal that overflows, a duplicate key — with a <code>ParseError</code> the driver passes straight through.</p><p>A one-arm variant rather than a bare function type, so a later arm can be added without every grammar changing shape. It stays one arm deliberately: a payload-free <code>NoLower</code> would pin no <code>A</code> of its own, leaving nothing to infer the type parameter from, so a production with nothing to lower passes a trivial named function instead.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so each is a named top-level <code>fn lower_x(src: str, node: Cst, kids: A[]) -&gt; A!ParseError</code>. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar *parses*, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
 
-        <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>: a function from the source text, the node itself, and the already-lowered values of its interior children (<code>nodes</code>, in match order). It may fail — a literal that overflows, a duplicate key — with a <code>ParseError</code> the driver passes straight through.</p><p>A one-arm variant rather than a bare function type, so a later arm can be added without every grammar changing shape. It stays one arm deliberately: a payload-free <code>NoLower</code> would pin no <code>A</code> of its own, leaving nothing to infer the type parameter from, so a production with nothing to lower passes a trivial named function instead.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so each is a named top-level <code>fn lower_x(src: str, node: Cst, kids: A[]) -&gt; A!ParseError</code>. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar *parses*, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
 
+          <ul class="cases">
 
-        <ul class="cases">
+            <li id="item-Mk"><code>Mk((str, Cst, A[]) -&#62; A!ParseError)</code></li>
 
-          <li id="item-Mk"><code>Mk((str, Cst, A[]) -&#62; A!ParseError)</code></li>
+          </ul>
 
-        </ul>
+        </section>
 
-      </section>
 
-      <section class="item" id="item-ListStyle">
-        <h2>
-          <a class="anchor" href="#item-ListStyle">ListStyle</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct ListStyle</code></pre>
 
-        <div class="doc"><p>How a bracketed list lays out: what separates its items, whether the brackets take inner spaces while the list stays on one line (<code>{ a, b }</code> against <code>(a, b)</code>), and whether a separator is written after the last item once it breaks.</p><p>The brackets themselves are not here. They are in the source, and the formatter reads them off the tokens the production matched — a style is only the handful of decisions the tokens cannot answer. An empty <code>sep</code> is the juxtaposed list, where items are separated by nothing but the space between them: <code>(a b c)</code>, and every S-expression ever written.</p></div>
+        <section class="item" id="item-ListStyle">
+          <h3>
+            <a class="anchor" href="#item-ListStyle">ListStyle</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ListStyle</code></pre>
 
+          <div class="doc"><p>How a bracketed list lays out: what separates its items, whether the brackets take inner spaces while the list stays on one line (<code>{ a, b }</code> against <code>(a, b)</code>), and whether a separator is written after the last item once it breaks.</p><p>The brackets themselves are not here. They are in the source, and the formatter reads them off the tokens the production matched — a style is only the handful of decisions the tokens cannot answer. An empty <code>sep</code> is the juxtaposed list, where items are separated by nothing but the space between them: <code>(a b c)</code>, and every S-expression ever written.</p></div>
 
-      </section>
 
-      <section class="item" id="item-Layout">
-        <h2>
-          <a class="anchor" href="#item-Layout">Layout</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Layout</code></pre>
+        </section>
 
-        <div class="doc"><p>How a production's matched children are joined into a <code>Doc</code> — the formatting half of a language description, read by <code>format.aipl</code> exactly as <code>Rule</code> is read by <code>parse.aipl</code>.</p><p>The vocabulary is deliberately small, and it is not the whole of a formatter: comment attachment, call hugging and chain breaking are judgement about *this* language and do not fall out of any grammar. What these three do cover is the mechanical majority — the productions whose layout is fully determined by the tokens they matched.</p></div>
 
 
-        <ul class="cases">
+        <section class="item" id="item-Layout">
+          <h3>
+            <a class="anchor" href="#item-Layout">Layout</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Layout</code></pre>
 
-          <li id="item-Tight"><code>Tight</code></li>
+          <div class="doc"><p>How a production's matched children are joined into a <code>Doc</code> — the formatting half of a language description, read by <code>format.aipl</code> exactly as <code>Rule</code> is read by <code>parse.aipl</code>.</p><p>The vocabulary is deliberately small, and it is not the whole of a formatter: comment attachment, call hugging and chain breaking are judgement about *this* language and do not fall out of any grammar. What these three do cover is the mechanical majority — the productions whose layout is fully determined by the tokens they matched.</p></div>
 
-          <li id="item-Inline"><code>Inline</code></li>
 
-          <li id="item-Wrap"><code>Wrap(ListStyle)</code></li>
+          <ul class="cases">
 
-        </ul>
+            <li id="item-Tight"><code>Tight</code></li>
 
-      </section>
+            <li id="item-Inline"><code>Inline</code></li>
 
-      <section class="item" id="item-Production">
-        <h2>
-          <a class="anchor" href="#item-Production">Production</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct Production&#60;K: variant, A: any&#62;</code></pre>
+            <li id="item-Wrap"><code>Wrap(ListStyle)</code></li>
 
-        <div class="doc"><p>One named production: its rule, and what each downstream pass needs from it.</p><p><code>name</code> is both the reference target (<code>Named(&quot;expr&quot;)</code>) and the CST node's name. <code>expect_as</code> is the label an error blames when this production fails having matched nothing — the reified form of the LR parser's <code>SYMBOL_DISPLAY_NAMES</code>, which collapses <code>expr</code>/<code>term</code>/<code>unary</code>/<code>atom</code> to one word. Empty means *transparent*: a plumbing production never surfaces in a message, and the finer expectations from inside it are what the reader sees. <code>scope</code> is the highlighter hint; it is carried, not yet consumed. <code>layout</code> is how the formatter joins what this production matched.</p><p><code>layout</code> has no default, unlike the two hints above it, and that is the compiler's decision rather than the design's: a struct field's default must be a literal, and <code>Layout</code> has no literal form. A bare <code>= Inline</code> is refused (&quot;unknown identifier&quot;), <code>Layout?</code> is refused as a field type because <code>Layout</code> is not recursive and so is not boxed, and a <code>= inline()</code> call *is* accepted but is then resolved in every file that constructs a <code>Production</code> — so a grammar that never mentions layout would have to import a function it never names, and the error when it forgets points at an unrelated line. Spelling the layout out is the honest version of that, and a grammar saying how each production prints beside how it parses is the whole point of the field.</p></div>
+          </ul>
 
+        </section>
 
-      </section>
 
-      <section class="item" id="item-Grammar">
-        <h2>
-          <a class="anchor" href="#item-Grammar">Grammar</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct Grammar&#60;K: variant, A: any&#62;</code></pre>
 
-        <div class="doc"><p>A whole language: its productions, in order. Position is identity — a <code>NamedIdx</code> and a <code>CTree</code> both name a production by its index here — so the order of this array is part of a linked grammar's meaning.</p></div>
+        <section class="item" id="item-Production">
+          <h3>
+            <a class="anchor" href="#item-Production">Production</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Production&#60;K: variant, A: any&#62;</code></pre>
 
+          <div class="doc"><p>One named production: its rule, and what each downstream pass needs from it.</p><p><code>name</code> is both the reference target (<code>Named(&quot;expr&quot;)</code>) and the CST node's name. <code>expect_as</code> is the label an error blames when this production fails having matched nothing — the reified form of the LR parser's <code>SYMBOL_DISPLAY_NAMES</code>, which collapses <code>expr</code>/<code>term</code>/<code>unary</code>/<code>atom</code> to one word. Empty means *transparent*: a plumbing production never surfaces in a message, and the finer expectations from inside it are what the reader sees. <code>scope</code> is the highlighter hint; it is carried, not yet consumed. <code>layout</code> is how the formatter joins what this production matched.</p><p><code>layout</code> has no default, unlike the two hints above it, and that is the compiler's decision rather than the design's: a struct field's default must be a literal, and <code>Layout</code> has no literal form. A bare <code>= Inline</code> is refused (&quot;unknown identifier&quot;), <code>Layout?</code> is refused as a field type because <code>Layout</code> is not recursive and so is not boxed, and a <code>= inline()</code> call *is* accepted but is then resolved in every file that constructs a <code>Production</code> — so a grammar that never mentions layout would have to import a function it never names, and the error when it forgets points at an unrelated line. Spelling the layout out is the honest version of that, and a grammar saying how each production prints beside how it parses is the whole point of the field.</p></div>
 
-      </section>
 
-      <section class="item" id="item-prod_names">
-        <h2>
-          <a class="anchor" href="#item-prod_names">prod_names</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn prod_names&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; str[]</code></pre>
+        </section>
 
-        <div class="doc"><p>The production names of <code>g</code>, in index order — the table <code>show</code> renders a tree against, and what <code>link</code> resolves references through.</p></div>
 
 
-      </section>
+        <section class="item" id="item-Grammar">
+          <h3>
+            <a class="anchor" href="#item-Grammar">Grammar</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Grammar&#60;K: variant, A: any&#62;</code></pre>
 
-      <section class="item" id="item-link_rule">
-        <h2>
-          <a class="anchor" href="#item-link_rule">link_rule</a>
-          <span class="kind kind-fn">fn</span>
+          <div class="doc"><p>A whole language: its productions, in order. Position is identity — a <code>NamedIdx</code> and a <code>CTree</code> both name a production by its index here — so the order of this array is part of a linked grammar's meaning.</p></div>
 
-        </h2>
-        <pre class="signature"><code>fn link_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[]) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
 
-        <div class="doc"><p>One rule with every <code>Named(n)</code> in it rewritten to <code>NamedIdx(i)</code>. Fails when a reference names no production — the error a grammar author most wants caught before a parse rather than during one.</p></div>
+        </section>
+
+
+
+        <section class="item" id="item-prod_names">
+          <h3>
+            <a class="anchor" href="#item-prod_names">prod_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn prod_names&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The production names of <code>g</code>, in index order — the table <code>show</code> renders a tree against, and what <code>link</code> resolves references through.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-link">
+          <h3>
+            <a class="anchor" href="#item-link">link</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn link&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; Grammar&#60;K, A&#62;!ParseError</code></pre>
+
+          <div class="doc"><p><code>g</code> with every rule reference resolved: each <code>Named(name)</code> rewritten to the <code>NamedIdx(index)</code> of the production it names, so the driver resolves a reference by indexing rather than by comparing strings. Fails when a reference names no production, or when two productions share a name.</p><p>Idempotent — a <code>NamedIdx</code> passes through — so a grammar may be linked once and reused, or handed to <code>parse</code> unlinked and linked per call.</p></div>
+
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-link_opt">
-        <h2>
-          <a class="anchor" href="#item-link_opt">link_opt</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn link_opt&#60;K: variant&#62;(r: Rule&#60;K&#62;?, names: str[]) -&#62; Rule&#60;K&#62;?!ParseError</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <div class="doc"><p>A <code>Many</code>'s separator, linked — <code>none</code> stays <code>none</code>. Its own function because <code>?</code> cannot reach inside an optional.</p></div>
+
+        <section class="item" id="item-link_rule">
+          <h3>
+            <a class="anchor" href="#item-link_rule">link_rule</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn link_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[]) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
+
+          <div class="doc"><p>One rule with every <code>Named(n)</code> in it rewritten to <code>NamedIdx(i)</code>. Fails when a reference names no production — the error a grammar author most wants caught before a parse rather than during one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-link_opt">
+          <h3>
+            <a class="anchor" href="#item-link_opt">link_opt</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn link_opt&#60;K: variant&#62;(r: Rule&#60;K&#62;?, names: str[]) -&#62; Rule&#60;K&#62;?!ParseError</code></pre>
+
+          <div class="doc"><p>A <code>Many</code>'s separator, linked — <code>none</code> stays <code>none</code>. Its own function because <code>?</code> cannot reach inside an optional.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-link_rules">
+          <h3>
+            <a class="anchor" href="#item-link_rules">link_rules</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[]) -&#62; Rule&#60;K&#62;[]!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-keep">
+          <h3>
+            <a class="anchor" href="#item-keep">keep</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn keep(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
+
+          <div class="doc"><p>The trivial lowering a production with nothing to lower passes, and all these fixtures need: <code>Build</code> has no payload-free arm to mean &quot;don't&quot;.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-rule_of">
+          <h3>
+            <a class="anchor" href="#item-rule_of">rule_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn rule_of&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, i: u64) -&#62; Rule&#60;K&#62;</code></pre>
+
+          <div class="doc"><p>The rule of production <code>i</code> of <code>g</code>, for the assertions above — a grammar value can't be compared with <code>==</code> (it holds function values), but the rule inside one can.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-expect_of">
+          <h3>
+            <a class="anchor" href="#item-expect_of">expect_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn expect_of&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, i: u64) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-link_rules">
-        <h2>
-          <a class="anchor" href="#item-link_rules">link_rules</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[]) -&#62; Rule&#60;K&#62;[]!ParseError</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-link">
-        <h2>
-          <a class="anchor" href="#item-link">link</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn link&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; Grammar&#60;K, A&#62;!ParseError</code></pre>
-
-        <div class="doc"><p><code>g</code> with every rule reference resolved: each <code>Named(name)</code> rewritten to the <code>NamedIdx(index)</code> of the production it names, so the driver resolves a reference by indexing rather than by comparing strings. Fails when a reference names no production, or when two productions share a name.</p><p>Idempotent — a <code>NamedIdx</code> passes through — so a grammar may be linked once and reused, or handed to <code>parse</code> unlinked and linked per call.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-keep">
-        <h2>
-          <a class="anchor" href="#item-keep">keep</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn keep(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
-
-        <div class="doc"><p>The trivial lowering a production with nothing to lower passes, and all these fixtures need: <code>Build</code> has no payload-free arm to mean &quot;don't&quot;.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-rule_of">
-        <h2>
-          <a class="anchor" href="#item-rule_of">rule_of</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn rule_of&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, i: u64) -&#62; Rule&#60;K&#62;</code></pre>
-
-        <div class="doc"><p>The rule of production <code>i</code> of <code>g</code>, for the assertions above — a grammar value can't be compared with <code>==</code> (it holds function values), but the rule inside one can.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-expect_of">
-        <h2>
-          <a class="anchor" href="#item-expect_of">expect_of</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn expect_of&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, i: u64) -&#62; str</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
 
 
     </main>

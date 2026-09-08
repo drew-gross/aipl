@@ -14,410 +14,330 @@
 
       <h1><code>crates/aipl-codegen/src/grammar_calc.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
-          <li><code>first</code> <span class="from">from builtins</span></li>
 
-          <li><code>int_parse</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-CalcTok">
+          <h3>
+            <a class="anchor" href="#item-CalcTok">CalcTok</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant CalcTok</code></pre>
 
-          <li><code>is_nonempty</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>Two token kinds: digit runs, and every one-character operator or bracket. The grammar tells the operators apart by <code>Literal</code>, so their kind never has to. (Imported unaliased, against the usual <code>Literal as Lit</code>: this grammar's own AST already calls a case <code>Lit</code>, and an import colliding with a local is a hard error. The alias is a convention, not a requirement.)</p></div>
 
-          <li><code>last</code> <span class="from">from builtins</span></li>
 
-          <li><code>len</code> <span class="from">from builtins</span></li>
+          <ul class="cases">
 
-          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+            <li id="item-Num"><code>Num</code></li>
 
-          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
+            <li id="item-Punct"><code>Punct</code></li>
 
-          <li><code>map_err</code> <span class="from">from builtins</span></li>
+          </ul>
 
-          <li><code>map_ok</code> <span class="from">from builtins</span></li>
+        </section>
 
-          <li><code>saturating_divide</code> <span class="as">as</span> <code>/</code> <span class="from">from builtins</span></li>
 
-          <li><code>saturating_remainder</code> <span class="as">as</span> <code>%</code> <span class="from">from builtins</span></li>
 
-          <li><code>to_str</code> <span class="from">from builtins</span></li>
+        <section class="item" id="item-Calc">
+          <h3>
+            <a class="anchor" href="#item-Calc">Calc</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Calc</code></pre>
 
-          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
+          <div class="doc"><p>The AST. <code>Bin</code> carries the operator's spelling rather than a case per operator — the grammar already lists them in its <code>Prec</code> table, and one arm in <code>eval_calc</code> per spelling keeps the two in step without a third enumeration.</p></div>
 
-          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
 
-          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
+          <ul class="cases">
 
-          <li><code>wrapping_mul</code> <span class="as">as</span> <code>*</code> <span class="from">from builtins</span></li>
+            <li id="item-Lit"><code>Lit(i64)</code></li>
 
-          <li><code>wrapping_mul_assign</code> <span class="as">as</span> <code>*=</code> <span class="from">from builtins</span></li>
+            <li id="item-Neg"><code>Neg(Calc)</code></li>
 
-          <li><code>wrapping_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
+            <li id="item-Bin"><code>Bin(str, Calc, Calc)</code></li>
 
-          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
+          </ul>
 
-          <li><code>own_token_text</code> <span class="from">from ./cst.aipl</span></li>
+        </section>
 
-          <li><code>show</code> <span class="from">from ./cst.aipl</span></li>
 
-          <li><code>span</code> <span class="from">from ./cst.aipl</span></li>
 
-          <li><code>text</code> <span class="from">from ./cst.aipl</span></li>
+        <section class="item" id="item-calc_grammar">
+          <h3>
+            <a class="anchor" href="#item-calc_grammar">calc_grammar</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn calc_grammar() -&#62; Grammar&#60;CalcTok, Calc&#62;</code></pre>
 
-          <li><code>ebnf</code> <span class="from">from ./ebnf.aipl</span></li>
+          <div class="doc"><p>The calculator grammar: <code>+ - * / % ^</code> over integer literals, with <code>^</code> right-associative and unary <code>-</code> binding tighter than any of them.</p><p>Only <code>atom</code> is labelled, so a failure deep in an expression reports as &quot;an expression&quot; rather than as the three productions it is made of.</p></div>
 
-          <li><code>show_first_sets</code> <span class="from">from ./ebnf.aipl</span></li>
 
-          <li><code>render_cst</code> <span class="from">from ./format.aipl</span></li>
+        </section>
 
-          <li><code>Climb</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>Inline</code> <span class="from">from ./grammar.aipl</span></li>
+        <section class="item" id="item-calc_cst">
+          <h3>
+            <a class="anchor" href="#item-calc_cst">calc_cst</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn calc_cst(src: str) -&#62; Cst!ParseError</code></pre>
 
-          <li><code>Literal</code> <span class="from">from ./grammar.aipl</span></li>
+          <div class="doc"><p>The lossless concrete tree for <code>src</code>. Use this when the tree is the point; <code>parse_calc</code> when only the <code>Calc</code> is.</p></div>
 
-          <li><code>Mk</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>Named</code> <span class="from">from ./grammar.aipl</span></li>
+        </section>
 
-          <li><code>OneOf</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>ParseError</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>Prec</code> <span class="from">from ./grammar.aipl</span></li>
+        <section class="item" id="item-parse_calc">
+          <h3>
+            <a class="anchor" href="#item-parse_calc">parse_calc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn parse_calc(src: str) -&#62; Calc!ParseError</code></pre>
 
-          <li><code>Production</code> <span class="from">from ./grammar.aipl</span></li>
+          <div class="doc"><p>The <code>Calc</code> <code>src</code> denotes: lex, parse to a concrete tree, lower it through the grammar's <code>build</code> functions.</p><p>Fails with a <code>ParseError</code> from either half of the front end, or from a lowering that refused — an integer literal too big for an <code>i64</code>.</p></div>
 
-          <li><code>Rule</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
+        </section>
 
-          <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>Tight</code> <span class="from">from ./grammar.aipl</span></li>
 
-          <li><code>failure_message</code> <span class="from">from ./grammar.aipl</span></li>
+        <section class="item" id="item-render_calc">
+          <h3>
+            <a class="anchor" href="#item-render_calc">render_calc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn render_calc(self: Calc) -&#62; str</code></pre>
 
-          <li><code>prod_names</code> <span class="from">from ./grammar.aipl</span></li>
+          <div class="doc"><p><code>self</code> printed back as source, fully parenthesized — every application gets brackets, so the text shows the tree and needs no precedence rules to read.</p><p>Round-trips with <code>parse_calc</code>: <code>parse_calc(render_calc(v)) == v</code>.</p></div>
 
-          <li><code>Bare</code> <span class="from">from ./lexer.aipl</span></li>
 
-          <li><code>CharRun</code> <span class="from">from ./lexer.aipl</span></li>
+        </section>
 
-          <li><code>Int</code> <span class="from">from ./lexer.aipl</span></li>
 
-          <li><code>LexResult</code> <span class="from">from ./lexer.aipl</span></li>
 
-          <li><code>OneChar</code> <span class="from">from ./lexer.aipl</span></li>
+        <section class="item" id="item-eval_calc">
+          <h3>
+            <a class="anchor" href="#item-eval_calc">eval_calc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn eval_calc(self: Calc) -&#62; i64</code></pre>
 
-          <li><code>TokenRule</code> <span class="from">from ./lexer.aipl</span></li>
+          <div class="doc"><p><code>self</code> evaluated as integer arithmetic. Division is saturating and <code>^</code> is integer exponentiation with a negative exponent yielding 0, so evaluation is total — a calculator's arithmetic policy is its own, not the parser's.</p></div>
 
-          <li><code>lex</code> <span class="from">from ./lexer.aipl</span></li>
 
-          <li><code>parse</code> <span class="from">from ./parse.aipl</span></li>
+        </section>
 
-          <li><code>parse_cst</code> <span class="from">from ./parse.aipl</span></li>
 
-        </ul>
-      </section>
 
+        <section class="item" id="item-format_calc">
+          <h3>
+            <a class="anchor" href="#item-format_calc">format_calc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn format_calc(src: str, width: u64) -&#62; str!ParseError</code></pre>
 
+          <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>The counterpart of <code>render_calc</code>, and the interesting half of the pair. <code>render_calc</code> prints the *value*, fully parenthesized, so it can only ever produce the tree's own shape; this prints the *source*, so the parentheses the author wrote survive and the ones they left out are not invented. Both round trip, and they are round trips of different things.</p><p>This grammar's lexer records no comments — it has none — so what a comment does to a layout is <code>grammar_sexp.aipl</code>'s to show.</p></div>
 
-      <section class="item" id="item-CalcTok">
-        <h2>
-          <a class="anchor" href="#item-CalcTok">CalcTok</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant CalcTok</code></pre>
 
-        <div class="doc"><p>Two token kinds: digit runs, and every one-character operator or bracket. The grammar tells the operators apart by <code>Literal</code>, so their kind never has to. (Imported unaliased, against the usual <code>Literal as Lit</code>: this grammar's own AST already calls a case <code>Lit</code>, and an import colliding with a local is a hard error. The alias is a convention, not a requirement.)</p></div>
-
-
-        <ul class="cases">
-
-          <li id="item-Num"><code>Num</code></li>
-
-          <li id="item-Punct"><code>Punct</code></li>
-
-        </ul>
-
-      </section>
-
-      <section class="item" id="item-Calc">
-        <h2>
-          <a class="anchor" href="#item-Calc">Calc</a>
-          <span class="kind kind-variant">variant</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>variant Calc</code></pre>
-
-        <div class="doc"><p>The AST. <code>Bin</code> carries the operator's spelling rather than a case per operator — the grammar already lists them in its <code>Prec</code> table, and one arm in <code>eval_calc</code> per spelling keeps the two in step without a third enumeration.</p></div>
-
-
-        <ul class="cases">
-
-          <li id="item-Lit"><code>Lit(i64)</code></li>
-
-          <li id="item-Neg"><code>Neg(Calc)</code></li>
-
-          <li id="item-Bin"><code>Bin(str, Calc, Calc)</code></li>
-
-        </ul>
-
-      </section>
-
-      <section class="item" id="item-calc_rules">
-        <h2>
-          <a class="anchor" href="#item-calc_rules">calc_rules</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn calc_rules() -&#62; TokenRule&#60;CalcTok&#62;[]</code></pre>
-
-        <div class="doc"><p>Whitespace is trivia rather than skipped, so the concrete tree covers every byte and reconstructs the source exactly.</p><p>The punctuation rule sits *ahead* of <code>Int</code>, which makes every <code>-</code> its own token and <code>Int</code> unsigned. That is the ordering this grammar needs: negation is a rule (<code>unary</code>), so a <code>-</code> the lexer had swallowed into the literal would be invisible to it — <code>1 -2</code> would lex as two numbers and parse as nothing.</p></div>
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-lower_expr">
-        <h2>
-          <a class="anchor" href="#item-lower_expr">lower_expr</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn lower_expr(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <div class="doc"><p>A <code>Climb</code> node is either a bare atom that climbed to itself — one interior child, no operator — or an application: two interior children with the operator as a direct leaf between them.</p></div>
+
+        <section class="item" id="item-calc_rules">
+          <h3>
+            <a class="anchor" href="#item-calc_rules">calc_rules</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn calc_rules() -&#62; TokenRule&#60;CalcTok&#62;[]</code></pre>
+
+          <div class="doc"><p>Whitespace is trivia rather than skipped, so the concrete tree covers every byte and reconstructs the source exactly.</p><p>The punctuation rule sits *ahead* of <code>Int</code>, which makes every <code>-</code> its own token and <code>Int</code> unsigned. That is the ordering this grammar needs: negation is a rule (<code>unary</code>), so a <code>-</code> the lexer had swallowed into the literal would be invisible to it — <code>1 -2</code> would lex as two numbers and parse as nothing.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_expr">
+          <h3>
+            <a class="anchor" href="#item-lower_expr">lower_expr</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_expr(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
+
+          <div class="doc"><p>A <code>Climb</code> node is either a bare atom that climbed to itself — one interior child, no operator — or an application: two interior children with the operator as a direct leaf between them.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_unary">
+          <h3>
+            <a class="anchor" href="#item-lower_unary">lower_unary</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_unary(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
+
+          <div class="doc"><p><code>-</code> then a unary, or a bare atom. The two are told apart by whether this node matched a <code>-</code> of its own: the atom branch matches no token directly at all.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_atom">
+          <h3>
+            <a class="anchor" href="#item-lower_atom">lower_atom</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_atom(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
+
+          <div class="doc"><p>A parenthesized expression lowered one interior child, and a literal lowered none — so the absence of a child is what says &quot;this is a number&quot;, and its text is the node's own.</p><p>The one <code>build</code> here that can fail: a literal too big for an <code>i64</code>. It is a lowering error, not a parse error, and <code>parse</code> hands it back unchanged.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lex_calc">
+          <h3>
+            <a class="anchor" href="#item-lex_calc">lex_calc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lex_calc(src: str) -&#62; LexResult&#60;CalcTok&#62;!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-pow">
+          <h3>
+            <a class="anchor" href="#item-pow">pow</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn pow(base: i64, exp: i64) -&#62; i64</code></pre>
+
+          <div class="doc"><p>Integer exponentiation by repeated multiplication. A negative exponent has no integer value, so it yields 0 rather than failing — see <code>eval_calc</code>'s doc.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-eval">
+          <h3>
+            <a class="anchor" href="#item-eval">eval</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn eval(src: str) -&#62; i64!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-msg_of">
+          <h3>
+            <a class="anchor" href="#item-msg_of">msg_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn msg_of(src: str) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-shown">
+          <h3>
+            <a class="anchor" href="#item-shown">shown</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn shown(src: str) -&#62; str!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-depth_of">
+          <h3>
+            <a class="anchor" href="#item-depth_of">depth_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn depth_of(src: str) -&#62; u64!ParseError</code></pre>
+
+          <div class="doc"><p>How deeply a parsed expression nests — the cheap shape check for a <code>Climb</code> that grouped its operands wrongly: a flat run would come back shallower.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-depth">
+          <h3>
+            <a class="anchor" href="#item-depth">depth</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn depth(self: Calc) -&#62; u64</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-calc_space">
+          <h3>
+            <a class="anchor" href="#item-calc_space">calc_space</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn calc_space(l: str, r: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>A space beside every binary operator and nowhere else. Unary minus is spelled with the same character, which the rule cannot tell apart — and does not have to: <code>unary</code> is <code>Tight</code>, so the rule is never asked about it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_calc_op">
+          <h3>
+            <a class="anchor" href="#item-is_calc_op">is_calc_op</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_calc_op(self: str) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-lower_unary">
-        <h2>
-          <a class="anchor" href="#item-lower_unary">lower_unary</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn lower_unary(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
-
-        <div class="doc"><p><code>-</code> then a unary, or a bare atom. The two are told apart by whether this node matched a <code>-</code> of its own: the atom branch matches no token directly at all.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-lower_atom">
-        <h2>
-          <a class="anchor" href="#item-lower_atom">lower_atom</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn lower_atom(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
-
-        <div class="doc"><p>A parenthesized expression lowered one interior child, and a literal lowered none — so the absence of a child is what says &quot;this is a number&quot;, and its text is the node's own.</p><p>The one <code>build</code> here that can fail: a literal too big for an <code>i64</code>. It is a lowering error, not a parse error, and <code>parse</code> hands it back unchanged.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-calc_grammar">
-        <h2>
-          <a class="anchor" href="#item-calc_grammar">calc_grammar</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn calc_grammar() -&#62; Grammar&#60;CalcTok, Calc&#62;</code></pre>
-
-        <div class="doc"><p>The calculator grammar: <code>+ - * / % ^</code> over integer literals, with <code>^</code> right-associative and unary <code>-</code> binding tighter than any of them.</p><p>Only <code>atom</code> is labelled, so a failure deep in an expression reports as &quot;an expression&quot; rather than as the three productions it is made of.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-lex_calc">
-        <h2>
-          <a class="anchor" href="#item-lex_calc">lex_calc</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn lex_calc(src: str) -&#62; LexResult&#60;CalcTok&#62;!ParseError</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-calc_cst">
-        <h2>
-          <a class="anchor" href="#item-calc_cst">calc_cst</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn calc_cst(src: str) -&#62; Cst!ParseError</code></pre>
-
-        <div class="doc"><p>The lossless concrete tree for <code>src</code>. Use this when the tree is the point; <code>parse_calc</code> when only the <code>Calc</code> is.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-parse_calc">
-        <h2>
-          <a class="anchor" href="#item-parse_calc">parse_calc</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn parse_calc(src: str) -&#62; Calc!ParseError</code></pre>
-
-        <div class="doc"><p>The <code>Calc</code> <code>src</code> denotes: lex, parse to a concrete tree, lower it through the grammar's <code>build</code> functions.</p><p>Fails with a <code>ParseError</code> from either half of the front end, or from a lowering that refused — an integer literal too big for an <code>i64</code>.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-render_calc">
-        <h2>
-          <a class="anchor" href="#item-render_calc">render_calc</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn render_calc(self: Calc) -&#62; str</code></pre>
-
-        <div class="doc"><p><code>self</code> printed back as source, fully parenthesized — every application gets brackets, so the text shows the tree and needs no precedence rules to read.</p><p>Round-trips with <code>parse_calc</code>: <code>parse_calc(render_calc(v)) == v</code>.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-eval_calc">
-        <h2>
-          <a class="anchor" href="#item-eval_calc">eval_calc</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn eval_calc(self: Calc) -&#62; i64</code></pre>
-
-        <div class="doc"><p><code>self</code> evaluated as integer arithmetic. Division is saturating and <code>^</code> is integer exponentiation with a negative exponent yielding 0, so evaluation is total — a calculator's arithmetic policy is its own, not the parser's.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-pow">
-        <h2>
-          <a class="anchor" href="#item-pow">pow</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn pow(base: i64, exp: i64) -&#62; i64</code></pre>
-
-        <div class="doc"><p>Integer exponentiation by repeated multiplication. A negative exponent has no integer value, so it yields 0 rather than failing — see <code>eval_calc</code>'s doc.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-eval">
-        <h2>
-          <a class="anchor" href="#item-eval">eval</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn eval(src: str) -&#62; i64!ParseError</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-msg_of">
-        <h2>
-          <a class="anchor" href="#item-msg_of">msg_of</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn msg_of(src: str) -&#62; str</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-shown">
-        <h2>
-          <a class="anchor" href="#item-shown">shown</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn shown(src: str) -&#62; str!ParseError</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-depth_of">
-        <h2>
-          <a class="anchor" href="#item-depth_of">depth_of</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn depth_of(src: str) -&#62; u64!ParseError</code></pre>
-
-        <div class="doc"><p>How deeply a parsed expression nests — the cheap shape check for a <code>Climb</code> that grouped its operands wrongly: a flat run would come back shallower.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-depth">
-        <h2>
-          <a class="anchor" href="#item-depth">depth</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn depth(self: Calc) -&#62; u64</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
-      <section class="item" id="item-format_calc">
-        <h2>
-          <a class="anchor" href="#item-format_calc">format_calc</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn format_calc(src: str, width: u64) -&#62; str!ParseError</code></pre>
-
-        <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>The counterpart of <code>render_calc</code>, and the interesting half of the pair. <code>render_calc</code> prints the *value*, fully parenthesized, so it can only ever produce the tree's own shape; this prints the *source*, so the parentheses the author wrote survive and the ones they left out are not invented. Both round trip, and they are round trips of different things.</p><p>This grammar's lexer records no comments — it has none — so what a comment does to a layout is <code>grammar_sexp.aipl</code>'s to show.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-calc_space">
-        <h2>
-          <a class="anchor" href="#item-calc_space">calc_space</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn calc_space(l: str, r: str) -&#62; bool</code></pre>
-
-        <div class="doc"><p>A space beside every binary operator and nowhere else. Unary minus is spelled with the same character, which the rule cannot tell apart — and does not have to: <code>unary</code> is <code>Tight</code>, so the rule is never asked about it.</p></div>
-
-
-      </section>
-
-      <section class="item" id="item-is_calc_op">
-        <h2>
-          <a class="anchor" href="#item-is_calc_op">is_calc_op</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn is_calc_op(self: str) -&#62; bool</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
-
-
-      </section>
-
 
 
     </main>

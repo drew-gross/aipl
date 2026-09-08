@@ -14,90 +14,88 @@
 
       <h1><code>crates/aipl-mono/src/builtin_map_ok.aipl</code></h1>
 
-      <section class="imports">
-        <h2>Imports</h2>
-        <ul>
 
-          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
-
-          <li><code>is_err_and</code> <span class="from">from builtins</span></li>
-
-          <li><code>len</code> <span class="from">from builtins</span></li>
-
-          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
-
-          <li><code>map_err</code> <span class="from">from builtins</span></li>
-
-        </ul>
-      </section>
+      <section class="group">
+        <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-map_ok">
+          <h3>
+            <a class="anchor" href="#item-map_ok">map_ok</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn map_ok&#60;T: any, U: any, E: any&#62;(self: T!E, f: (T) -&#62; U) -&#62; U!E</code></pre>
 
-      <section class="item" id="item-map_ok">
-        <h2>
-          <a class="anchor" href="#item-map_ok">map_ok</a>
-          <span class="kind kind-fn">fn</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>pub fn map_ok&#60;T: any, U: any, E: any&#62;(self: T!E, f: (T) -&#62; U) -&#62; U!E</code></pre>
-
-        <div class="doc"><p><code>self</code> with its value side rewritten by <code>f</code>: <code>ok(v)</code> becomes <code>ok(f(v))</code>, and <code>err(e)</code> passes through untouched (<code>f</code> is not called). Generic over both value types and the error type, and callable as a method: <code>r.map_ok(f)</code>.</p><p>The mirror of <code>map_err</code>. Where the error is the enclosing function's anyway, <code>f(r?)</code> says the same thing more directly; this is for the result that is returned or stored rather than unwrapped.</p></div>
+          <div class="doc"><p><code>self</code> with its value side rewritten by <code>f</code>: <code>ok(v)</code> becomes <code>ok(f(v))</code>, and <code>err(e)</code> passes through untouched (<code>f</code> is not called). Generic over both value types and the error type, and callable as a method: <code>r.map_ok(f)</code>.</p><p>The mirror of <code>map_err</code>. Where the error is the enclosing function's anyway, <code>f(r?)</code> says the same thing more directly; this is for the result that is returned or stored rather than unwrapped.</p></div>
 
 
-      </section>
-
-      <section class="item" id="item-LexError">
-        <h2>
-          <a class="anchor" href="#item-LexError">LexError</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct LexError</code></pre>
-
-        <p class="undocumented">Undocumented.</p>
+        </section>
 
 
-      </section>
 
-      <section class="item" id="item-Tagged">
-        <h2>
-          <a class="anchor" href="#item-Tagged">Tagged</a>
-          <span class="kind kind-struct">struct</span>
-          <span class="badge">pub</span>
-        </h2>
-        <pre class="signature"><code>struct Tagged</code></pre>
+        <section class="item" id="item-LexError">
+          <h3>
+            <a class="anchor" href="#item-LexError">LexError</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct LexError</code></pre>
 
-        <p class="undocumented">Undocumented.</p>
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Tagged">
+          <h3>
+            <a class="anchor" href="#item-Tagged">Tagged</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Tagged</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
 
 
       </section>
 
-      <section class="item" id="item-shout">
-        <h2>
-          <a class="anchor" href="#item-shout">shout</a>
-          <span class="kind kind-fn">fn</span>
 
-        </h2>
-        <pre class="signature"><code>fn shout(self: str) -&#62; str</code></pre>
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
 
-        <div class="doc"><p>A named conversion, so the tests cover passing a function rather than a lambda.</p></div>
+
+        <section class="item" id="item-shout">
+          <h3>
+            <a class="anchor" href="#item-shout">shout</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn shout(self: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>A named conversion, so the tests cover passing a function rather than a lambda.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lex">
+          <h3>
+            <a class="anchor" href="#item-lex">lex</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lex(s: str) -&#62; str!LexError</code></pre>
+
+          <div class="doc"><p>Fails with a struct error, so the tests above cover an error payload that is carried through untouched rather than a bare message.</p></div>
+
+
+        </section>
 
 
       </section>
-
-      <section class="item" id="item-lex">
-        <h2>
-          <a class="anchor" href="#item-lex">lex</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn lex(s: str) -&#62; str!LexError</code></pre>
-
-        <div class="doc"><p>Fails with a struct error, so the tests above cover an error payload that is carried through untouched rather than a bare message.</p></div>
-
-
-      </section>
-
 
 
     </main>
