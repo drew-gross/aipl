@@ -626,13 +626,13 @@ struct WKeys { w: W, names: ImportName[] }
 # rendered, and the hoist key.
 fn import_item(self: W) -> WImport!FmtError {
     let names = self.expect("import")?.w.expect("{")?.w.import_names([])?;
-    let src = names.w.expect("}")?.w.expect("from")?.w.bump();
-    let done = src.w.expect(";")?.w;
+    let WStr { w, text } = names.w.expect("}")?.w.expect("from")?.w.bump();
+    let done = w.expect(";")?.w;
     let list = comma_list_docs(sorted_import_names(names.names), SpacedBraces);
     ok(WImport {
         w: done,
-        source: src.text,
-        doc: Concat([Text("import "), list, Text(" from "), Text(src.text), Text(";")]),
+        source: text,
+        doc: Concat([Text("import "), list, Text(" from "), Text(text), Text(";")]),
     })
 }
 
@@ -739,20 +739,20 @@ fn ty_list(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
 # `?` / `[]` suffixes.
 fn base_ty(self: W) -> WDoc!FmtError {
     let head = if (self.peek_text() == "#") { self.set_or_dict_ty()? } else { self.named_ty()? };
-    let suf = head.w.type_suffixes([]);
-    ok(WDoc { w: suf.w, doc: Concat([head.doc, ..suf.docs]) })
+    let WDocs { w, docs } = head.w.type_suffixes([]);
+    ok(WDoc { w, doc: Concat([head.doc, ..docs]) })
 }
 
 # `#{T}` (set) or `#{K: V}` (dict) — the `:` decides which.
 fn set_or_dict_ty(self: W) -> WDoc!FmtError {
     let k = self.bump().w.expect("{")?.w.ty()?;
-    let rest = if (k.w.peek_text() == ":") {
+    let WDocs { w, docs } = if (k.w.peek_text() == ":") {
         k.w.dict_value_ty()?
     } else {
         WDocs { w: k.w, docs: [] }
     };
-    let closed = rest.w.expect("}")?.w;
-    ok(WDoc { w: closed, doc: Concat([Text("#{"), k.doc, ..rest.docs, Text("}")]) })
+    let closed = w.expect("}")?.w;
+    ok(WDoc { w: closed, doc: Concat([Text("#{"), k.doc, ..docs, Text("}")]) })
 }
 
 # The `: V` half of a dict type.
@@ -967,16 +967,16 @@ fn program(self: W) -> WDoc!FmtError {
     // does — drain every comment before the first token — so it runs up front,
     // before any import can claim them.
     let h = self.lead();
-    let p = h.w.program_items([], [])?;
-    mut out = [h.doc, ..sorted_imports(p.imports).intersperse(HardLine)];
-    let had_imports = p.imports.is_nonempty();
-    for (let i, d : p.items) {
+    let WProgram { w, imports, items } = h.w.program_items([], [])?;
+    mut out = [h.doc, ..sorted_imports(imports).intersperse(HardLine)];
+    let had_imports = imports.is_nonempty();
+    for (let i, d : items) {
         if (0 < i || had_imports) {
             set out.push(BlankLine);
         };
         set out.push(d);
     }
-    ok(WDoc { w: p.w, doc: Concat(out) })
+    ok(WDoc { w, doc: Concat(out) })
 }
 
 fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!FmtError {
@@ -1417,11 +1417,11 @@ fn mut_stmt(self: W) -> WDoc!FmtError {
 # walk twice.
 fn struct_pattern(self: W, kw: str, name: str) -> WDoc!FmtError {
     let ids = self.bump().w.ident_list("}", []);
-    let v = ids.w.expect("}")?.w.expect("=")?.w.expr()?;
-    let done = v.w.expect(";")?.w;
+    let WDoc { w, doc } = ids.w.expect("}")?.w.expect("=")?.w.expr()?;
+    let done = w.expect(";")?.w;
     ok(WDoc {
         w: done,
-        doc: Concat([Text(`{kw} {name} \{ {ids.names.join(sep=", ")} } = `), v.doc, Text(";")]),
+        doc: Concat([Text(`{kw} {name} \{ {ids.names.join(sep=", ")} } = `), doc, Text(";")]),
     })
 }.test({
     assert(
@@ -1664,27 +1664,27 @@ fn is_binop(t: str) -> bool {
 fn unary(self: W) -> WDoc!FmtError {
     if (self.peek_text() == "-" || self.peek_text() == "!") {
         let op = self.bump();
-        let rest = op.w.unary()?;
-        return ok(WDoc { w: rest.w, doc: Concat([Text(op.text), rest.doc]) });
+        let WDoc { w, doc } = op.w.unary()?;
+        return ok(WDoc { w, doc: Concat([Text(op.text), doc]) });
     };
     self.postfix()
 }
 
 fn postfix(self: W) -> WDoc!FmtError {
     let head = self.atom()?;
-    let segs = head.w.postfix_segs([])?;
-    if (segs.segs.is_empty()) {
-        return ok(WDoc { w: segs.w, doc: head.doc });
+    let WSegs { w, segs } = head.w.postfix_segs([])?;
+    if (segs.is_empty()) {
+        return ok(WDoc { w, doc: head.doc });
     };
 
     // A "member chain" (2+ method calls) becomes one group that, when it can't
     // fit, breaks before every call segment — the receiver ends up alone on the
     // first line and each `.method(..)` starts its own indented line. Fewer than
     // two calls: no chain break (a lone call's own argument list may still break).
-    if (segs.segs.count_if(|s| s.is_call) < 2) {
-        return ok(WDoc { w: segs.w, doc: Concat([head.doc, ..segs.segs.map(|s| s.doc)]) });
+    if (segs.count_if(|s| s.is_call) < 2) {
+        return ok(WDoc { w, doc: Concat([head.doc, ..segs.map(|s| s.doc)]) });
     };
-    ok(WDoc { w: segs.w, doc: group(Concat([head.doc, Indent(Concat(chain_docs(segs.segs)))])) })
+    ok(WDoc { w, doc: group(Concat([head.doc, Indent(Concat(chain_docs(segs)))])) })
 }
 
 fn postfix_segs(self: W, acc0: Seg[]) -> WSegs!FmtError {
@@ -2891,11 +2891,11 @@ allocations: 110684
 deallocations: 110684
 reallocations: 1833
 bytes allocated: 6009432
-instructions executed: 20980640
-binary size: 8266360
-  code: 5216412
+instructions executed: 20982134
+binary size: 8266368
+  code: 5216376
   data: 26580
-  metadata: 3023368
+  metadata: 3023412
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3168,7 +3168,7 @@ functions:
     calls: 4023
     bytes: (external)
   aipl_arr_inc:
-    calls: 246260
+    calls: 246455
     bytes: (external)
   aipl_arr_reserve:
     calls: 4092
@@ -3177,7 +3177,7 @@ functions:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 349252
+    calls: 349447
     bytes: (external)
   aipl_array_new:
     calls: 100404
@@ -3229,7 +3229,7 @@ functions:
     bytes: 2836
   base_ty:
     calls: 71
-    bytes: 4364
+    bytes: 4340
   binding_ann:
     calls: 7
     bytes: 2276
@@ -3334,7 +3334,7 @@ functions:
     bytes: 4180
   import_item:
     calls: 14
-    bytes: 17012
+    bytes: 17032
   index_or_from:
     calls: 3
     bytes: 4404
@@ -3403,13 +3403,13 @@ functions:
     bytes: 288
   postfix:
     calls: 123
-    bytes: 5548
+    bytes: 5640
   postfix_segs:
     calls: 123
     bytes: 3576
   program:
     calls: 13
-    bytes: 2636
+    bytes: 2564
   program_items:
     calls: 13
     bytes: 4696
@@ -3433,7 +3433,7 @@ functions:
     bytes: 5728
   set_or_dict_ty:
     calls: 4
-    bytes: 6460
+    bytes: 6408
   set_stmt:
     calls: 9
     bytes: 13084

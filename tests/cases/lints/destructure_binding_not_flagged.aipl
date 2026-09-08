@@ -22,8 +22,10 @@ fn main() !prints {
     let built = Pos { line: 1, col: 2 };
     print(`{built.line} {built.col}`);
 
-    // A field read off two values: `a` and `b` would each name two things, and
-    // the binding names are what tell them apart.
+    // A field read off two values that are both still around: `a` and `b` would
+    // each name two things, and the binding names are what tell them apart.
+    // Contrast the exempt case in `err_destructure_binding.aipl`, where the
+    // other read is inside the binding's own value and so already spent.
     let one = pair();
     let two = pair();
     print(`{one.a} {two.a} {one.b} {two.b}`);

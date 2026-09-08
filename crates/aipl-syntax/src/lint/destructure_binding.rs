@@ -29,6 +29,12 @@ use std::collections::{HashMap, HashSet};
 ///   silently changes meaning. This is the shape the lint met most often — a
 ///   cursor threaded through a `w` field, read alongside its own name.
 ///
+///   The binding's *own* name does not count, even when a field shares it
+///   (`let segs = ..` reading `segs.segs`). That binding is the one going away,
+///   and the `field_reads == mentions` test above has already established that
+///   every mention of it is the base of a field read the pattern replaces —
+///   so there is provably nothing left for the new name to shadow.
+///
 /// - **The field is read off more than one value.** Three `let`s binding the
 ///   same struct in one block are told apart by their *names*
 ///   (`plain.cleaned`, `empty.cleaned`); destructuring them all binds `cleaned`
@@ -38,37 +44,67 @@ use std::collections::{HashMap, HashSet};
 ///   whole-function pass rather than a per-expression one. Checking only the
 ///   binding's own body would see the *last* of such a group as unambiguous and
 ///   flag it alone.
+///
+///   Reads inside the binding's **own value** are the exception, and they are
+///   not a rarity: threading a cursor writes `let segs = head.w.next()?` and
+///   then reads `segs.w`, so `w` has two bases and neither is ambiguous. The
+///   value is evaluated before the pattern binds anything, so no name the
+///   pattern introduces can be confused with a read in it — by the time `w`
+///   means the field, `head.w` has already been consumed.
 pub(super) fn destructure_binding(program: &Program, hits: &mut Vec<Error>) {
     for item in &program.items {
         let Item::Fn(f) = item else {
             continue;
         };
         for body in [Some(&f.body), f.test_body.as_ref()].into_iter().flatten() {
-            let shared = fields_read_off_many(body);
-            each_subexpr(body, &mut |e| one_binding(e, &shared, hits));
+            let all = field_reads(body);
+            each_subexpr(body, &mut |e| one_binding(e, &all, hits));
         }
     }
 }
 
-/// Field names read off more than one base anywhere in `body` — see
-/// [`destructure_binding`]'s second condition.
-fn fields_read_off_many(body: &Expr) -> HashSet<String> {
-    let mut bases: HashMap<String, HashSet<String>> = HashMap::new();
-    each_subexpr(body, &mut |x| {
+/// Every `base.field` read in `e`, counted per `(field, base)` pair.
+///
+/// Counted rather than collected because the second condition needs to subtract
+/// one subtree's reads from another's: the pair is "shared" only if it occurs
+/// somewhere other than inside the binding's own value.
+fn field_reads(e: &Expr) -> HashMap<(String, String), usize> {
+    let mut out: HashMap<(String, String), usize> = HashMap::new();
+    each_subexpr(e, &mut |x| {
         if let ExprKind::Field(base, f) = &x.kind {
             if let ExprKind::Ident(b) = &base.kind {
-                bases.entry(f.clone()).or_default().insert(b.clone());
+                *out.entry((f.clone(), b.clone())).or_default() += 1;
             }
         }
     });
+    out
+}
+
+/// Field names read off more than one base, once the reads inside `value` are
+/// discounted — see [`destructure_binding`]'s second condition. `all` is the
+/// whole function's reads and `value` is the binding's own right-hand side, a
+/// subtree of it.
+fn shared_fields(all: &HashMap<(String, String), usize>, value: &Expr) -> HashSet<String> {
+    let in_value = field_reads(value);
+    let mut bases: HashMap<&str, HashSet<&str>> = HashMap::new();
+    for ((field, base), n) in all {
+        if *n
+            > in_value
+                .get(&(field.clone(), base.clone()))
+                .copied()
+                .unwrap_or(0)
+        {
+            bases.entry(field).or_default().insert(base);
+        }
+    }
     bases
         .into_iter()
         .filter(|(_, b)| b.len() > 1)
-        .map(|(f, _)| f)
+        .map(|(f, _)| f.to_string())
         .collect()
 }
 
-fn one_binding(e: &Expr, shared: &HashSet<String>, hits: &mut Vec<Error>) {
+fn one_binding(e: &Expr, all: &HashMap<(String, String), usize>, hits: &mut Vec<Error>) {
     let ExprKind::Let(name, ann, value, body) = &e.kind else {
         return;
     };
@@ -114,10 +150,10 @@ fn one_binding(e: &Expr, shared: &HashSet<String>, hits: &mut Vec<Error>) {
     if shadowed || field_reads == 0 || field_reads != mentions {
         return;
     }
-    // Would any of the names the pattern introduces collide with one already
-    // spoken for? A bare mention anywhere in the value or body is enough to say
-    // yes: this walk does not track scopes, and a name that is used is a name
-    // the pattern cannot quietly take over.
+    // Is one of these field names also read off some *other* value that is still
+    // around once the pattern binds it? Then the bare name would mean two things
+    // and the binding names are what tell them apart today.
+    let shared = shared_fields(all, value);
     if fields.iter().any(|f| shared.contains(f)) {
         return;
     }
@@ -132,15 +168,12 @@ fn one_binding(e: &Expr, shared: &HashSet<String>, hits: &mut Vec<Error>) {
     }) {
         return;
     }
-    let mut collides = false;
-    let mut mentioned = |x: &Expr| {
-        if let ExprKind::Ident(n) = &x.kind {
-            collides |= fields.iter().any(|f| f == n);
-        }
-    };
-    each_subexpr(value, &mut mentioned);
-    each_subexpr(body, &mut mentioned);
-    if collides {
+    // The binding's own name is exempt in the body — it is the name going away,
+    // and every mention of it there is the base of a read the pattern replaces
+    // (`field_reads == mentions`, above). In the *value* nothing is exempt: that
+    // is evaluated before the pattern binds, so a name it mentions is an outer
+    // one the pattern would shadow for the rest of the block.
+    if mentions_any(body, &fields, Some(name)) || mentions_any(value, &fields, None) {
         return;
     }
     // Taking apart a value built on the same line is not an improvement: the
@@ -166,6 +199,17 @@ fn one_binding(e: &Expr, shared: &HashSet<String>, hits: &mut Vec<Error>) {
         ),
         value.span.clone(),
     ));
+}
+
+/// Whether `e` mentions any of `names` as a bare identifier, ignoring `skip`.
+fn mentions_any(e: &Expr, names: &[String], skip: Option<&str>) -> bool {
+    let mut found = false;
+    each_subexpr(e, &mut |x| {
+        if let ExprKind::Ident(n) = &x.kind {
+            found |= Some(n.as_str()) != skip && names.iter().any(|f| f == n);
+        }
+    });
+    found
 }
 
 fn is_name(e: &Expr, name: &str) -> bool {

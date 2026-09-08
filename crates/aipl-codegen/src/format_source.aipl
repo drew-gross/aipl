@@ -72,11 +72,11 @@ allocations: 2109
 deallocations: 2109
 reallocations: 30
 bytes allocated: 126202
-instructions executed: 410446
-binary size: 1009544
-  code: 653968
+instructions executed: 410422
+binary size: 1009560
+  code: 653932
   data: 2219
-  metadata: 353357
+  metadata: 353409
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -293,7 +293,7 @@ functions:
     bytes: 2836
   __m6__base_ty:
     calls: 0
-    bytes: 4364
+    bytes: 4340
   __m6__binding_ann:
     calls: 0
     bytes: 2276
@@ -395,7 +395,7 @@ functions:
     bytes: 4180
   __m6__import_item:
     calls: 0
-    bytes: 17012
+    bytes: 17032
   __m6__index_or_from:
     calls: 0
     bytes: 4404
@@ -461,13 +461,13 @@ functions:
     bytes: 288
   __m6__postfix:
     calls: 0
-    bytes: 5548
+    bytes: 5640
   __m6__postfix_segs:
     calls: 0
     bytes: 3576
   __m6__program:
     calls: 4
-    bytes: 2636
+    bytes: 2564
   __m6__program_items:
     calls: 4
     bytes: 4696
@@ -488,7 +488,7 @@ functions:
     bytes: 5728
   __m6__set_or_dict_ty:
     calls: 0
-    bytes: 6460
+    bytes: 6408
   __m6__set_stmt:
     calls: 0
     bytes: 13084
@@ -628,13 +628,13 @@ functions:
     calls: 58
     bytes: (external)
   aipl_arr_inc:
-    calls: 4780
+    calls: 4772
     bytes: (external)
   aipl_arr_reserve:
     calls: 64
     bytes: (external)
   aipl_array_dec:
-    calls: 6769
+    calls: 6761
     bytes: (external)
   aipl_array_new:
     calls: 1930

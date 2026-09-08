@@ -1,3 +1,5 @@
+import { wrapping_add as + } from builtins;
+
 struct Pos { line: i64, col: i64 }
 
 fn make() -> Pos { line: 3, col: 7 }
@@ -9,9 +11,40 @@ fn f() -> i64 {
     let p = make();
     p.line
 }
+
+// `line` is read off two values here, so `head` stays quiet — but `step` does
+// not, because the competing read is inside `step`'s *own value*, evaluated
+// before the pattern binds anything. By the time a bare `line` means the field,
+// `head.line` is spent. Threading a cursor writes this shape constantly.
+fn threaded() -> i64 {
+    let head = make();
+    let step = shift(head.line);
+    step.line + step.col
+}
+
+// The binding sharing a name with one of its own fields is the same story: the
+// name the pattern takes over belongs to the binding that is going away.
+fn self_named() -> i64 {
+    let col = make();
+    col.col + col.line
+}
+
+fn shift(n: i64) -> Pos { line: n, col: n }
 --- errors ---
 error: only the fields of "p" are read — destructure the binding instead: "let <Type> { line } = ..." (or append #[allow] to this line to keep it)
- --> ./tests/cases/lints/err_destructure_binding.aipl:9:13
-  |
-9 |     let p = make();
-  |             ^^^^
+  --> ./tests/cases/lints/err_destructure_binding.aipl:11:13
+   |
+11 |     let p = make();
+   |             ^^^^
+
+error: only the fields of "step" are read — destructure the binding instead: "let <Type> { line, col } = ..." (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_destructure_binding.aipl:21:16
+   |
+21 |     let step = shift(head.line);
+   |                ^^^^^^^^^^^^^^^
+
+error: only the fields of "col" are read — destructure the binding instead: "let <Type> { col, line } = ..." (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_destructure_binding.aipl:28:15
+   |
+28 |     let col = make();
+   |               ^^^^

@@ -152,10 +152,6 @@ bugs:
       `xs.filter(keep).map(f)`; restructured around it rather than fixing.
 
 errors:
-  bad error for calling map on non-array:
-    error: field access on non-struct value of type _
-      --> crates/aipl-codegen/src/grammar.aipl:325:24
-    325 |     g.prods[i].map(|p| p.expect_as).value_or("")
 
 HOF:
   lower_item returns a T!E but the body doesn't seem to have any error paths. I think this is because it's passed to a function that accepts lambdas that return errors. There should be a better way to do this (Liskov substitution principle?)
