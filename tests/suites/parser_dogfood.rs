@@ -1,7 +1,7 @@
 //! The AIPL grammar written in AIPL (`crates/aipl-codegen/src/grammar_aipl.aipl`)
 //! parses the same language as the gazelle LR(1) grammar in `aipl-parser`.
 //!
-//! This is the differential test Stage 3 of `PARSER_LIBRARY.md` exists for, and
+//! This is the differential test `PARSER_LIBRARY.md` exists for, and
 //! it is the same shape as [`lexer_dogfood::dogfood_lex_hook_matches_fresh_compile_on_corpus`]:
 //! run both implementations over every `.aipl` in the repository and require
 //! them to agree, file by file. Agreement here is *acceptance* — the AIPL

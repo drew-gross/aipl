@@ -5,42 +5,57 @@
 Long-running, interleaved with other work. Update the checkboxes as items land;
 each is sized to be finishable in one session.
 
-- [x] 1 `ebnf.aipl` + FIRST sets
-- [x] 2 Highlighter generator (oracle: `tests/highlighting.rs`)
-- [x] 3 AIPL's grammar, differential-tested against gazelle
-- [x] 4 Formatter generator (the mechanical part)
-- [x] 4a `NestedIn` — bracket pairs as a rule, not a production annotation
-- [ ] 5 Retire gazelle
+**The library is built and stages 1-4 are done.** `grammar.aipl`, `cst.aipl`,
+`parse.aipl` and `format.aipl`, with three end-to-end toy grammars —
+`grammar_sexp.aipl` (recursion and depth), `grammar_json.aipl` (several terminal
+classes, a separated `Many`, a heterogeneous AST) and `grammar_calc.aipl`
+(`Climb`, lowered and then *evaluated*, which is the assertion a wrong tree
+cannot survive). Every `Rule` arm is covered. On top of them: an EBNF dump and
+FIRST sets (`ebnf.aipl`), a highlighter generator whose oracle is
+`tests/highlighting.rs`, AIPL's own grammar (`grammar_aipl.aipl`) checked against
+gazelle over the corpus, and a formatter generator. Those files and their `.test`
+blocks are the record of how the library works; what is left is below.
 
-The stages are strictly sequential.
+Everything remaining is one goal — **run the compiler on the AIPL parser and
+delete gazelle** — split into the pieces that can each be finished and judged on
+their own:
 
-**The library itself is built and proven**, and its plan is no longer here:
-`grammar.aipl`, `cst.aipl`, `parse.aipl` and `format.aipl`, with three end-to-end toy
-grammars — `grammar_sexp.aipl` (recursion and depth), `grammar_json.aipl`
-(several terminal classes, a separated `Many`, a heterogeneous AST) and
-`grammar_calc.aipl` (`Climb`, lowered and then
-*evaluated*, which is the assertion a wrong tree cannot survive). Every
-`Rule` arm is covered. Those files and their `.test` blocks are the record of how
-the library works; this document is now only what is left to build on top of it.
+- [ ] 5a Decide the bridge: how an AIPL parse becomes a Rust `Program`
+- [ ] 5b Wire FIRST-set pruning into the driver, and re-measure
+- [ ] 5c Extend the differential test from acceptance to tree/AST equality
+- [ ] 5d Lower AIPL's grammar to the AST
+- [ ] 5e Error-message parity against the corpus fixtures
+- [ ] 5f Side-channels: `#[allow]` spans, trailing whitespace, doc attachment
+- [ ] 5g The bootstrap procedure, and the `DOGFOOD_SOURCE_FILES` switch
+
+5a gates the shape of 5d. 5b and 5c are worth doing whatever 5a decides, and
+between them they answer whether the switch is viable at all — so they come
+first.
 
 ## Context
 
-AIPL's syntax is currently described **three times, by hand, in three unrelated
-formalisms**:
+AIPL's syntax started out described **three times, by hand, in three unrelated
+formalisms**. Two of the three are still hand-written, and they are what this
+project exists to remove:
 
-| Description | Where | Size | Produces |
-|---|---|---|---|
-| gazelle LR(1) grammar | `crates/aipl-parser/src/lib.rs:18-504` | ~254 non-comment lines, 81 rules, 238 alternatives | the compiler's AST |
-| formatter token walker | `crates/aipl-codegen/src/walker.aipl` | 2672 code lines, 145 functions | a `Doc` layout tree |
-| TextMate grammar | `editors/vscode/syntaxes/aipl.tmLanguage.json` | 173 lines | editor scopes |
+| Description | Where | Size | Produces | Status |
+|---|---|---|---|---|
+| gazelle LR(1) grammar | `crates/aipl-parser/src/lib.rs:18-504` | ~254 non-comment lines, 81 rules, 238 alternatives | the compiler's AST | by hand |
+| formatter token walker | `crates/aipl-codegen/src/walker.aipl` | 2920 code lines, 144 functions | a `Doc` layout tree | by hand |
+| TextMate grammar | `editors/vscode/syntaxes/aipl.tmLanguage.json` | 176 lines | editor scopes | **generated** (stage 2) |
+| the grammar as data | `crates/aipl-codegen/src/grammar_aipl.aipl` | 1144 code lines, 54 productions | a `Cst`, and nothing else yet | the replacement |
 
-CLAUDE.md already names the cost of two of them: *"Adding a syntax form means
+CLAUDE.md still names the cost of the first two: *"Adding a syntax form means
 teaching two parsers: the gazelle grammar in `aipl-parser` **and** the
 formatter's own token walker"* — a pairing with a documented bootstrap deadlock,
 since handoff formats the corpus before it regenerates IR, so a formatter that
 doesn't yet know the new syntax is the one asked to format sources written in
-it. The TextMate grammar is a third copy that drifts silently until
-`tests/highlighting.rs` catches it.
+it.
+
+Note the fourth row makes it *four* descriptions today, not two. That is the
+expected shape mid-project and the reason stage 5 is worth finishing rather than
+leaving: `grammar_aipl.aipl` only pays for itself once the two hand-written rows
+go away.
 
 The goal is **one grammar, expressed as data**, from which the parser, the
 formatter, and the highlighter are all derived. Eventually that grammar parses
@@ -57,48 +72,31 @@ one level up, and composes with it directly.
 Pressure-testing the natural design against the compiler turned up a set of
 blockers — each with a workaround, and each workaround a distortion of the
 library. Building around them would have baked the compiler's limits into a file
-meant to outlive them, so the language was fixed first. **That work is done, and
+meant to outlive them, so the language was fixed first. **That work is done and
 is no longer part of this project**; the library is written against the fixed
-compiler and depends on all of it.
+compiler and depends on all of it: matching a case without its payload
+(`same_case`, plus a `variant` bound), inferring a generic variant's type
+parameter from the expected type, recursion through an array, `match` arms as
+statement blocks, tail-call elimination, and four shapes that had no test
+anywhere in the repo (a fn value returning a boxed recursive variant, an `A[]`
+parameter where `A` is boxed, an array of structs each holding a boxed field, a
+two-parameter generic variant) — each now locked in by a case.
 
-What it bought, in the shape the library actually needs: a case can be matched
-without matching its payload (`same_case`, plus a `variant` bound), a generic
-variant's type parameter is inferred from the expected type, recursive types may
-recurse through an array, `match` arms may be statement blocks, and recursion is
-tail-call eliminated. (That last one turns out **not** to reach the parse itself:
-a recursive-descent call is never in tail position, so parse depth stays bounded
-by the stack. Measured against the 8 MB an ordinary binary gets, `((( ... )))`
-parses, renders and re-parses fine at 1,000 levels and segfaults before 2,000.)
-Four shapes the design rests on that had no test anywhere in the repo were
-confirmed to work and are locked in by cases — a fn value returning a boxed
-recursive variant, an `A[]` parameter where `A` is boxed, an array of structs each
-holding a boxed field, and a two-parameter generic variant.
+Building the library found four more gaps, all in the same unexplored corner:
+nobody had ever written a *generic recursive* variant, which `Rule<K>` is.
+Declaring `Rule<K>` at all crashed the compiler. All four are fixed and locked in
+by `tests/cases/generics/recursive_variant.aipl`.
 
-**Building the library found four more gaps**, all in the same unexplored
-corner — nobody had ever written a *generic recursive* variant, which `Rule<K>`
-is — and all four are now fixed and locked in by
-`tests/cases/generics/recursive_variant.aipl`:
+Two things worth knowing that came out of it:
 
-- Recovering a generic instance's type arguments (`instance_args`, in
-  `aipl-mono`'s `check.rs` and `lib.rs` alike) unified the template against the
-  instance's own cases, so a case whose payload *is* that instance asked for the
-  arguments being recovered and recursed until the stack ran out. Declaring
-  `Rule<K>` at all crashed the compiler.
-- A generic variant *constructed* inside a generic body (`Many(r, 0)` where
-  `r: Rule<K>`) eagerly minted an instance named after the abstract type
-  variable, which nothing else agreed with. The generic-*struct* path had always
-  kept such an application unresolved; the variant path had never been asked,
-  since before this every generic variant in the repo was only ever matched.
-- A `match` on a generic instance read its payload types from the wrong map,
-  missing the synthesized instances entirely and typing every binding as `i64`.
-- An array literal of a concrete generic-variant instance (`Rule<Kind>[]`) was
-  rejected as an invalid element type, for the same wrong-map reason.
-
-Hash-backed dicts and sets are on TODO.txt rather than here. They are the largest
-asymptotic win in the repo and would make packrat memoization affordable, but the
-link pass (`link`, in `grammar.aipl`) already turns rule references into array
-indices and FIRST sets (Stage 1) remove most of the need to memoize — so nothing
-below waits on them.
+- **Parse depth is bounded by the stack, and TCE does not help** — a
+  recursive-descent call is never in tail position. Measured against the 8 MB an
+  ordinary binary gets, `((( ... )))` parses, renders and re-parses fine at 1,000
+  levels and segfaults before 2,000.
+- **Hash-backed dicts and sets** are on TODO.txt rather than here. They are the
+  largest asymptotic win in the repo and would make packrat memoization
+  affordable, but `link` already turns rule references into array indices and
+  FIRST sets remove most of the need to memoize — so nothing above waits on them.
 
 ## Errors
 
@@ -130,254 +128,123 @@ hanging, the innermost wins, that being the one to close first. Under ordered
 choice a group failing to close is still an ordinary backtracking non-match, so
 the hint only ever reaches a reader when no alternative worked at all.
 
-## The stages
+## Remaining work
 
-Each new file goes flat in `crates/aipl-codegen/src/` alongside `lexer.aipl` and
-the library's own files (where every AIPL library file lives; a subdirectory only
-makes imports uglier), and is picked up automatically as a library case by the
-harness and by `aipl check crates`. Nothing joins `DOGFOOD_SOURCE_FILES` or
-`FMT_SOURCE_FILES` (`crates/aipl-codegen/src/lib.rs:3352,3391`) until Stage 3, so
-until then **no `.clif` regeneration is involved**.
+All of it changes the compiler's own parse path and pulls these files into
+`DOGFOOD_SOURCE_FILES` / `FMT_SOURCE_FILES`
+(`crates/aipl-codegen/src/lib.rs:3352,3391`); that is where IR regeneration,
+relink cost, and the formatter bootstrap deadlock start to matter. Nothing done
+so far has touched any of it — the library files are ordinary cases, picked up by
+the harness and by `aipl check crates`, with no `.clif` involved.
 
-**1 — Introspection, proven. Done.** `ebnf.aipl` holds both halves, each a pure
-function of the grammar value.
+**Where it actually stands.** `tests/suites/parser_dogfood.rs` proves less than
+its name suggests, and says so in its own module doc: agreement with gazelle is
+*acceptance* plus losslessness, file by file, over the corpus — never a tree,
+never an AST, never a message. Rejection is half of it, and the ~100 deliberate
+syntax-error fixtures are what make that half mean something. So the language is
+recognized; everything the production parser does beyond recognizing is unbuilt.
 
-`ebnf` dumps a grammar as EBNF — one `name = rule ;` line per production,
-juxtaposition for sequence, `|` for choice, postfix `?`/`*`/`+` for the
-repetitions. A separated `Many` and a `Climb` are combinators with no EBNF operator, so both
-expand: a list into its `(item (sep item)* sep?)?` longhand, a climb into the
-flat `atom (op atom)*` plus a `(* precedence: "^" (right) > "*" > "+" *)` note,
-since EBNF states neither binding power nor associativity. Total, like `show` —
-a grammar dumps linked or unlinked. All three toys assert their own dump, so the
-description and the parser cannot drift.
+### 5a — Decide the bridge
 
-`first_sets` computes, per production, the terminals a match can begin with and
-whether it can match nothing; `rule_first` answers the same for an arbitrary
-rule, and `can_start` is the predicate over a token's kind *and* its spelling
-(the two are different tests, so a `Sym` is one or the other). A fixed point, so
-a reference reaching back through the production it started from is fine —
-including left recursion, which the sets survive and the parse does not.
+`grammar_aipl.aipl` ends with `variant Ast = Ignored` and all 54 productions pass
+`Mk(keep)`. Gazelle's `Build` has **86 action methods** producing
+`aipl_syntax::Program` — `Item`, `Signature`, `Function`, the `Type` enum, `Expr`
+with 32 `ExprKind` variants, `Pattern`. Nothing bridges the two, and which shape
+the bridge takes decides what 5d is:
 
-**Not done, deliberately: the driver still backtracks.** Pruning
-`match_one_of`'s alternatives with `can_start` is a change to `parse.aipl`, and
-the catch is `Far`: an alternative that is skipped must still contribute its
-expectations, or the error messages get *worse* than the ones the collapsing in
-`expect_as` was built to keep readable. That is its own change, with its own
-tests; the sets it needs exist and are proven.
+- **Lower in AIPL, marshal the result.** `FfiValue` carries
+  `Variant(String, Vec<FfiValue>)` and `Array` (`aipl-codegen/src/lib.rs:2480`),
+  so a recursive AST does cross. The cost is re-declaring the whole of
+  `aipl_syntax`'s AST in AIPL and keeping the two in step — a second place to
+  describe the same thing, which is the problem this project exists to remove.
+- **Return the `Cst` and build `Program` in Rust by walking it.** No AST
+  re-declaration, and the tree is already lossless and proven. The cost is that
+  `Build`/`Mk` — the library's whole lowering mechanism — goes unused by the one
+  grammar that matters most, which is worth admitting before building more of
+  it.
+- Move the loader to AIPL. Out of scope by a wide margin.
 
-**2 — The highlighter generator. Done.**
-`editors/vscode/syntaxes/aipl.tmLanguage.json` is now generated, not written:
-`highlight.aipl` is the machinery, `highlight_aipl.aipl` the table, and
-`highlighting::checked_in_tmlanguage_is_current` fails when the checked-in file
-and the description disagree (`--ignored highlighting::fill_tmlanguage`
-regenerates it). The rest of `tests/highlighting.rs` — the strict oracle, every
-token of every case file and example — validates the result unchanged.
+This is a design decision, not an implementation task. Make it first.
 
-**The source is the lexer's own rule table.** `TokenRule` gained a
-`scope: str = ""` field (`lexer.aipl`), the `Production.scope` idea one level
-down: carried, ignored by `lex`, and read by the generator. `highlight.aipl`
-maps each `Matcher` to the TextMate pattern recognizing the same text — a
-`Delimited`/`Between`/`Template` scan to a begin/end region with its escapes, a
-`Nested` one to the single self-referential entry that needs a name, everything
-else to a plain regex — and is total over `Matcher`, so a new matcher shape has
-to answer for the highlighter before it compiles.
+### 5b — FIRST-set pruning, then re-measure
 
-**Order carries across for free**, which is the result that made this cheap:
-`lex` is first-match-wins at a position and TextMate takes the earliest match,
-tie broken by listing order. A rule list already sorted for maximal munch (`==`
-before `=`, the block comment before `/`) comes out sorted, and consecutive
-rules sharing a scope collapse into one *ordered* alternation — twenty `kw`
-rules become one `\bfn\b|\blet\b|..`.
+**Measured: 72.8s** for the AIPL parser to accept the corpus
+(`cargo test --test dogfood -- aipl_grammar_matches_gazelle`), against a gazelle
+parse that is a small fraction of a 165s full-suite run which also does all the
+codegen. That gap has to close before any of the rest is worth building.
 
-Four patterns have no lexical rule to derive from and are supplied by
-`highlight_aipl.aipl`: the `fn NAME` / `struct NAME` declarations (whose name
-regex still comes from the identifier rule's own character classes), the builtin
-type names (which lex as ordinary identifiers and are separated by
-`classify_lexed`, the one genuinely duplicated list), the `!prints` effect
-marker, and the `--- section ---` tail, which is not AIPL source at all. Adding
-a `variant NAME` declaration is now one line of data.
+`parse.aipl`'s own header names both causes: trivia attachment is
+O(tokens x trivia), and with no memoization a heavily-backtracking grammar can go
+exponential. FIRST sets are built (`ebnf.aipl`, stage 1) and deliberately not
+wired into the driver. Wiring them is the fix, and the re-measurement is the
+deliverable — a number that does not move says the approach needs rethinking
+rather than more code.
 
-Nothing joined `DOGFOOD_SOURCE_FILES`: the Rust test JIT-compiles the generator
-through `Engine::compile_file` and calls it, so there is no `.clif` for it. The
-`TokenRule` field does move the lexer's IR, which handoff regenerates.
+### 5c — Differential test: from acceptance to equality
 
-**3 — AIPL's own grammar. Done.** `grammar_aipl.aipl` is AIPL's syntax as a
-`Grammar<AiplTok, ..>` value, and
-`parser_dogfood::aipl_grammar_matches_gazelle_on_corpus` runs it and gazelle over
-every `.aipl` in the repository: **698 agreed-accept, 25 agreed-reject, 0
-disagreements**, over 734 files including the compiler's own sources. Rejection
-is half the comparison — a grammar that accepted everything would agree on none
-of the corpus's syntax-error fixtures.
+Extend `parser_dogfood.rs` to compare trees, not just accept/reject. Doing this
+*before* 5d makes it the oracle for the lowering rather than an afterthought, and
+it is the only thing that will catch a `build` that produces a plausible but
+wrong AST. Worth doing whatever 5a decides, since either bridge needs the same
+comparison.
 
-**LR to PEG was three mechanical translations**, and one that isn't. Left-recursive
-list rules become one `Many` with a separator (what varies — may the list be
-empty, is a trailing separator allowed — is `min` and `trailing_sep`); left-recursive
-postfix rules (`postfix`, `base_ty`) become an atom plus `Many(suffix)`; and
-`expr binop expr` with a runtime precedence table becomes `Climb` over
-`op_precedence`'s levels, `..` included. What is *not* mechanical is
-**alternative order**: LR picks with a token of lookahead, a PEG commits to the
-first match, so every choice is written longest-first. Wherever the gazelle
-grammar's comments say "one token of lookahead picks the production", that token
-is what the ordering encodes.
+### 5d — Lower AIPL's grammar to the AST
 
-Two shapes were copied verbatim rather than simplified. `block_body`/`block_tail`
-keep gazelle's right recursion: written as `Many(stmt)` plus an optional trailing
-expression, a PEG parses that expression *twice* — once inside the statement
-alternative that then fails on its missing `;` — and the doubling compounds
-through nested blocks. Deciding after the expression parses it once.
+The bulk of the work, and its shape follows from 5a. 54 productions against 86
+gazelle actions.
 
-**Losslessness needed two things from the lexer**, and got both. `TokenRule`'s
-`skip` rules drop whitespace outright, so `lexer.aipl` gained `keep_skipped` —
-one rule set read two ways, a compiler's and a lossless consumer's, rather than a
-language keeping two. And one byte used to belong to no token at all: the `}`
-closing a template interpolation, which the segment scan did not reach and the
-interpolation scan consumed without emitting. A token stream does not care; a
-concrete tree cannot have a hole in it. `template_scan` now keeps a segment's
-*span* start apart from its *value* start — the span runs brace to brace, the
-value is what lies strictly between — which is the same split it already made for
-the opening delimiter, and the tokens tile the literal.
+### 5e — Error-message parity
 
-**The 11 files where the two disagree are all one thing**, and the test lists them
-with the message fragment that identifies each: gazelle's grammar accepts them
-and its *build action* refuses them — `..` outside an array literal, a `#{ .. }`
-mixing set and dict entries, a string-argument function attribute, an
-unknown type-parameter bound,
-alternation binders that disagree, the body shorthand without a struct return
-type. They are exactly the checks Stage 5 has to reproduce when this grammar
-grows `build` functions, so they are pinned rather than waved through.
+**170 corpus files carry `--- errors ---` blocks**, rendered byte-exact from
+gazelle's `friendly_syntax_error`. Every one must match or be refilled and
+individually reviewed — and a refill that silently degrades a hundred messages is
+exactly what the handoff review guard exists to catch, so this is the step to
+diff by hand.
 
-Nothing joined `DOGFOOD_SOURCE_FILES` yet: the test JIT-compiles the grammar
-through `Engine::compile_file`. That happens in Stage 5.
+See *Errors* above for why PEG makes this harder than LR rather than easier: the
+`expect_as` labels exist but have never been measured against these fixtures.
 
-**4 — The formatter generator, for the mechanical part. Done.** `format.aipl`
-turns a `Cst` into a `Doc`, reading one `Layout` off each production the way
-`parse.aipl` reads its `Rule` — the language stays data, the file is the loop
-over it. `Production` gained `layout`, so one value still describes a language.
+### 5f — Side-channels
 
-The whole vocabulary is three arms and one function per language:
+Small individually, each a silent behavior loss if missed:
 
-| | |
-|---|---|
-| `Tight` | children run together, the spacing rule not consulted — `-x`, `i64?[]` |
-| `Inline` | children in order, a space wherever the language's rule wants one |
-| `Wrap(ListStyle)` | a bracketed list: flat while it fits, else one item per indented line |
+- `parse_with_allows` collects `#[allow]` spans through a thread-local
+  `ALLOW_SINK` for the loader. The AIPL side has no equivalent — the lexer makes
+  the markers trivia and `grammar_aipl.aipl` drops them.
+- `reject_trailing_whitespace`.
+- Doc-comment attachment.
 
-`ListStyle` is three fields (`sep`, `spaced`, `trailing`) and deliberately does
-*not* name the brackets: `Wrap` reads the leading and trailing runs of matched
-tokens as the open and close, which is why one annotation covers `(a, b)`,
-`[a]`, `#{a}` and `Name<A, B>` — the last two having two-token brackets — and
-why an alternative with no brackets is recognizable and falls back to `Inline`.
+### 5g — The bootstrap, and the switch
 
-The per-language function is `space(l, r) -> bool`: whether a space belongs
-between the token spelled `l` and the token spelled `r`. That is the piece a
-grammar genuinely cannot answer, and it is small — JSON's is `l == ":"`, the
-calculator's is "either side is an operator", AIPL's type rule is one line.
+The circularity: the parser that parses `grammar_aipl.aipl` would be generated
+from `grammar_aipl.aipl`. This is the `walker.aipl` formatter deadlock already
+documented in CLAUDE.md, one level worse, and there is no procedure for it yet.
+Write the procedure before needing it.
 
-Comments are the one thing a formatter must never lose, and the `Cst` makes that
-free: whitespace trivia is dropped (the formatter replaces it) and everything
-else the lexer set aside is emitted verbatim, followed by a hard line when the
-author ended their line with it. That flag is read from the source rather than
-configured, which is what tells a `//` comment from a `/* */` one without asking
-the language.
+## Constraints still in force
 
-**Proven end to end on all three toys**, each with the same four assertions:
-canonical output from messy input, output that re-parses to the same AST,
-idempotence, and the broken-list layout at a narrow width. `grammar_sexp.aipl`
-adds a comment surviving inside a list; `grammar_calc.aipl` adds the strongest
-check available to it — formatting cannot change the expression's *value*.
-JSON's entire layout is eight annotations plus a one-line `space`.
-
-**The shrink, measured on AIPL itself.** `format_aipl_ty` in
-`grammar_aipl.aipl` lays out an AIPL type through the generated formatter, and
-its `.test` block is `walker.aipl`'s own type assertions copied verbatim — same
-inputs, same expected strings, the broken `Map<str, i64>` included. Against
-that, `walker.aipl:679-803` is nine hand-written functions and 96 non-comment
-lines (`ty`, `paren_ty`, `ty_list`, `base_ty`, `set_or_dict_ty`,
-`dict_value_ty`, `named_ty`, `type_suffixes`, `array_suffixes`) that mirror, by
-hand, productions this repo already describes. The replacement is four
-annotations and a one-line spacing rule.
-
-**Wanting to format the grammar improved the grammar.** A `Layout` is per
-production, so a production whose alternatives are shaped differently cannot
-name one — AIPL's `ty` had the same `"(" ty,* ")"` written out in four of its
-seven alternatives, and no single pair of brackets to describe. Extracting
-`ty_parens` removed the duplication and made the layout expressible at once.
-The corpus differential still agrees with gazelle on every file.
-
-That extraction was also the warning, and stage 4a is the fix — see below.
-
-**What this does not do**, and the estimate in this plan was right about it.
-There is no `Stack` arm yet, so a hard-broken statement block is not expressible
-and AIPL's statements and items are unannotated. Comment *attachment* (which
-construct a comment belongs to), call hugging, chain breaking, import sorting
-and blank-line preservation are judgement about a specific language and are not
-layout at all; they stay in `walker.aipl`, which is not going away. The claim is
-only the one the measurement supports: the grammar-shaped part of a formatter is
-derivable, and that part is where describing one syntax twice actually costs.
-
-Three compiler limits turned up and are worked around rather than fixed, since
-none is on the library's critical path:
+Compiler limits the library is written around rather than blocked by. None is on
+the critical path; all are worth knowing before extending these files.
 
 - **A struct field default must be a literal.** `layout: Layout = Inline` is
   "unknown identifier"; `layout: Layout? = none` is refused as a field type
   (`Layout` is not recursive, so not boxed); `layout: Layout = inline()` *is*
   accepted but the call is re-resolved in every file that constructs a
-  `Production`, so a parser-only grammar would have to import a function it
-  never names — and the error when it forgets points at an unrelated line.
-  Hence `layout` has no default and every production states one.
+  `Production`, so a parser-only grammar would have to import a function it never
+  names — and the error when it forgets points at an unrelated line. Hence
+  `layout` has no default and every production states one. A *variant case*
+  payload may default to a struct literal (`style: ListStyle = ListStyle {}`),
+  which is why `NestedIn` can.
 - **A lambda bound to a `let` is not a value.** It cannot be called by name and
-  cannot be passed to a function expecting a function parameter, so test helpers
-  that would naturally be local lambdas are named top-level functions. (A lambda
-  in *value* position also needs a block body; only an argument-position one may
+  cannot be passed where a function parameter is expected, so test helpers that
+  would naturally be local lambdas are named top-level functions. (A lambda in
+  *value* position also needs a block body; only an argument-position one may
   have an expression body.)
-- A `#` followed by a space is a doc comment, so `# { str }` is not a set type.
-  That spelling was in `walker.aipl`'s type assertions, which had a test
-  tokenizer splitting on spaces; copying them here is what found it. That
-  tokenizer is now gone — `walker_of` lexes with `lex_aipl`, the same three
-  lines `format_program` runs — so both sides of the comparison read an input
-  the same way, and the walker's kind-dispatched branches (doc comments, string
-  atoms, the three template positions) have unit tests for the first time.
-
-**4a — `NestedIn`. Done.** Stage 4 put wrapping on the *production*
-(`Layout::Wrap(ListStyle)`) and read the brackets back off the matched tokens —
-the leading run opens, the trailing run closes. That works for a production that
-*is* one bracketed list, and forces the grammar to be carved up one bracket pair
-per production to get there. `ty_parens` was the first bill. `atom` was the one
-that could not be paid: eleven of its twenty alternatives hold brackets in six
-styles, three of them (`match (e) { .. }`, `shim N { .. } block`, `|a, b| block`)
-with brackets that are not the leading and trailing runs at all. A token scan
-reads `match (e) { .. }` as an open bracket spelled `match(`.
-
-So a bracket pair is now a **rule**, not an annotation: `NestedIn(open, body,
-close, style)`, parsing exactly as `Then` of the three and keeping what that
-spelling throws away. `Layout` shrank to `Tight | Inline`, `ListStyle` moved onto
-the group, and `lead_toks`/`tail_toks`/`run_text` — the whole inference — are
-gone. `atom` now holds eight groups in four styles and needs no production of its
-own for any of them.
-
-Three things fell out that were not the motivation:
-
-- **Unclosed-bracket errors** (see *Errors* above), which no flat sequence can
-  produce.
-- **`ListStyle { wraps: false }`** — the pair that is only a pair. A block's
-  braces, an `if`'s parentheses, `a[i]`: recorded so the parser can blame them,
-  laid out inline because statements and conditions are not lists. Without it,
-  every bracket pair would have had to pretend to be a list to be reported on.
-- **The formatter links its own grammar.** A group's style lives in
-  `Grammar.groups`, which only `link` fills, so `format_cst` links exactly as
-  `parse_cst` does rather than silently laying out against an absent table.
-
-The CST gained one case, `CGroup(u64, Cst[], Cst[], Cst[])` — group index, then
-the open, body and close runs. It is **transparent**: `nodes` and `own_tokens`
-splice straight through it, so converting a `Then` into a `NestedIn` leaves every
-`build` function reading the children it read before. Only the formatter sees a
-group, which is the pass that needs to know where the brackets are.
-
-**5 — Retire gazelle.**
-
-Stages 3-5 change the compiler's own parse path and pull these files into
-`DOGFOOD_SOURCE_FILES`; that is where IR regeneration, relink cost, and the
-formatter bootstrap deadlock start to matter. Stages 1-2 touch none of it.
+- **A function value cannot be generic**, and the forwarding lambda that would
+  work around it is what `lambda_only_forwards` refuses — the two rule each other
+  out, so `group_styles` in `grammar.aipl` carries an `#[allow]` with no other
+  spelling available. A lint whose advice does not compile; worth fixing.
+- **`# ` opens a doc comment**, so `# { str }` is not a set type. Write `#{str}`.
 
 ## Naming
 
@@ -408,10 +275,10 @@ file that also declares a `Kind` constructor trips the silent drop.
    `.test`-block requirement (`tests/ffi.rs:1109`).
 4. **Scoped case run** — `cargo test --test cases -- crates_aipl_codegen_src_parse`.
 5. **Losslessness** — assert that the CST's concatenated spans reconstruct the
-   source byte-for-byte. Stage 4 depends on this; it is the cheapest place to
-   catch a regression.
+   source byte-for-byte. The formatter depends on this; it is the cheapest
+   place to catch a regression.
 6. **Round-trip on each toy** — parse → lower → render → parse, which each of
-   the three asserts, and since Stage 4 the formatter's own pair as well:
+   the three asserts, plus the formatter's own pair:
    parse → format → parse gives back the same AST, and formatting an already
    formatted source changes nothing. The calculator renders fully parenthesized, so its round
    trip is exact *and* its text shows the tree; a grammar added later should
@@ -419,9 +286,9 @@ file that also declares a `Kind` constructor trips the silent drop.
    with the S-expressions and runs as a **built binary**, not just under
    `aipl check` — otherwise it is measured against the CLI's 256 MB thread stack
    instead of the 8 MB a shipped binary gets.
-7. **Stage 2 oracle** — `cargo test --test highlighting` against the generated
+7. **Highlighter oracle** — `cargo test --test highlighting` against the generated
    `.tmLanguage.json`, unchanged.
 8. **Finish** — `cargo handoff`, which regenerates the `#[test]` list for
    new case files and fills their `--- performance ---` sections. Expect churn: a
    library case's perf section measures its `.test` driver, and for scale
-   `walker.aipl` records 3,075,003 instructions.
+   `walker.aipl` records 21.6M instructions.

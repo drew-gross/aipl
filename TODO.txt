@@ -79,6 +79,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  In group_styles, rs.map(group_styles) is refused
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
   DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
   what is `walker.aipl`'s space-splitting test tokenizer? Can it be removed?
@@ -119,6 +120,7 @@ self-hosting:
     -> plan and progress checkboxes live in PARSER_LIBRARY.md
 
 highlighter:
+  #[allow] should highlight severely
   generate from parser
   improve the highlighter test: correct code should never highlight as a mismatched bracket
   integrate syntect (somehow) (or just make something like syntect, or syncat)
