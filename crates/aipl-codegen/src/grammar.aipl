@@ -33,11 +33,13 @@ import {
     equal as ==,
     extend,
     find_index,
+    is_empty,
     join,
     len,
     map,
     not_equal as !=,
     push,
+    try_map,
     value_or_err,
     wrapping_add as +,
     wrapping_add_assign as +=,
@@ -117,7 +119,31 @@ variant Rule<K: variant> =
     // production around a left-recursive pair — `x_list | x_list COMMA | _` —
     // and which of the four you picked is the thing that is easy to get subtly
     // wrong; here it is two arguments with names.
-    | Many(Rule<K>, min: u64 = 0, sep: Rule<K>? = none, trailing_sep: bool = true)
+    //
+    // `nested_in` is the bracketed-list shorthand: given `[open, close]` it is a
+    // `NestedIn` around this `Many`, which `desugar` rewrites it into before
+    // anything else runs. Nearly every bracket pair in a real grammar holds a
+    // list, and writing the brackets as an argument of the list beats wrapping
+    // the list in a separate rule — `Many(param, sep=comma, nested_in=parens())`
+    // against `NestedIn(Lit("("), Many(param, sep=comma), Lit(")"))`.
+    //
+    // The list's *style* is read off the `Many` rather than restated: `sep` from
+    // this rule's own separator and `trailing` from `trailing_sep`, which is the
+    // same fact said once instead of twice (strict JSON's `[1, 2,]` is an error
+    // *and* is never printed). Only `spaced` — whether flat brackets take inner
+    // spaces, `{ a, b }` against `(a, b)` — cannot be derived, so it is here.
+    //
+    // An array of two rather than a pair, because AIPL has no optional of a
+    // tuple and a generic struct's type parameter cannot be inferred from its
+    // field values. `desugar` refuses any other length.
+    | Many(
+        Rule<K>,
+        min: u64 = 0,
+        sep: Rule<K>? = none,
+        trailing_sep: bool = true,
+        nested_in: Rule<K>[] = [],
+        spaced: bool = false
+    )
     // `r`, or nothing. Always matches.
     | Maybe(Rule<K>)
     // A reference to the production called `n`. `link` rewrites every one of
@@ -287,7 +313,7 @@ fn group_styles<K: variant>(r: Rule<K>) -> ListStyle[] {
         // and the forwarding lambda that remains is what the lint objects to, so
         // the two rule each other out and the squelch is the only spelling left.
         Then(rs) | OneOf(rs) => rs.map(|sub| group_styles(sub)).join(), #[allow]
-        Many(sub, _, sep, _) => [..group_styles(sub), ..opt_group_styles(sep)],
+        Many(sub, _, sep, _, _, _) => [..group_styles(sub), ..opt_group_styles(sep)],
         Maybe(sub) => group_styles(sub),
         Climb(atom, _) => group_styles(atom),
         Term(..) | Literal(..) | Named(..) | NamedIdx(..) => [],
@@ -313,6 +339,114 @@ fn opt_group_styles<K: variant>(r: Rule<K>?) -> ListStyle[] {
 # How many groups `r` holds — the amount `base` advances past it.
 fn group_count<K: variant>(r: Rule<K>) -> u64 { group_styles(r).len() }
 
+# `r` with every bracketed-list shorthand written out: a `Many` carrying
+# `nested_in=[open, close]` becomes the `NestedIn` it is shorthand for, wrapping
+# the same `Many` with the brackets removed.
+#
+# Run before anything else looks at a rule, so only one spelling ever reaches the
+# driver, the formatter, the EBNF dump or the FIRST sets. That is the whole point
+# of making it sugar rather than a second rule shape: the passes downstream stay
+# unaware it exists.
+#
+# The style is derived here — `sep` from the list's own separator, `trailing`
+# from `trailing_sep`, `spaced` as given — so a grammar states each of those
+# once. `wraps` is always true: a `Many` in brackets is a list by construction,
+# which is exactly the case that wraps.
+pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
+    match (r) {
+        Many(sub, min, sep, trailing_sep, nested_in, spaced) => {
+            let inner: Rule<K> = Many(
+                desugar_rule(sub)?,
+                min=min,
+                sep=desugar_opt(sep)?,
+                trailing_sep=trailing_sep,
+            );
+            if (nested_in.is_empty()) {
+                return ok(inner);
+            };
+            if (nested_in.len() != 2) {
+                return err(ParseError {
+                    message: `nested_in takes an opening and a closing rule, got {nested_in.len()}`,
+                    span: 0..0,
+                });
+            };
+            let style = ListStyle { sep: sep_spelling(sep)?, spaced, trailing: trailing_sep };
+            ok(NestedIn(
+                desugar_rule(nested_in[0].value_or_err(missing_bracket())?)?,
+                inner,
+                desugar_rule(nested_in[1].value_or_err(missing_bracket())?)?,
+                style=style,
+            ))
+        },
+        Then(rs) => ok(Then(desugar_rules(rs)?)),
+        OneOf(rs) => ok(OneOf(desugar_rules(rs)?)),
+        Maybe(sub) => ok(Maybe(desugar_rule(sub)?)),
+        Climb(atom, precs) => ok(Climb(desugar_rule(atom)?, precs)),
+        NestedIn(open, body, close, style) => ok(NestedIn(
+            desugar_rule(open)?,
+            desugar_rule(body)?,
+            desugar_rule(close)?,
+            style=style,
+        )),
+        NestedIdx(i, open, body, close, style) => ok(NestedIdx(
+            i,
+            desugar_rule(open)?,
+            desugar_rule(body)?,
+            desugar_rule(close)?,
+            style=style,
+        )),
+        Term(k) => ok(Term(k)),
+        Literal(s) => ok(Literal(s)),
+        Named(n) => ok(Named(n)),
+        NamedIdx(i) => ok(NamedIdx(i)),
+    }
+}
+
+# The array said it held two rules and then did not — unreachable past the length
+# check, and reported rather than assumed.
+fn missing_bracket() -> ParseError { message: "nested_in is missing a bracket", span: 0..0 }
+
+# How the printer should write this list's separator: the spelling of the `Many`'s
+# own separator, or the empty string for a juxtaposed list with none.
+#
+# A separator that is not a literal has no spelling to write back, so a grammar
+# that brackets such a list is refused rather than guessed at — the alternative
+# is a formatter that silently drops the separator when the list breaks.
+fn sep_spelling<K: variant>(sep: Rule<K>?) -> str!ParseError {
+    match (sep) {
+        none => ok(""),
+        some(r) => match (r) {
+            Literal(s) => ok(s),
+            Term(..)
+            | Then(..)
+            | OneOf(..)
+            | Many(..)
+            | Maybe(..)
+            | Named(..)
+            | NamedIdx(..)
+            | NestedIn(..)
+            | NestedIdx(..)
+            | Climb(..) => err(ParseError {
+                message: "a bracketed list's separator must be a literal, so the printer can write it back",
+                span: 0..0,
+            }),
+        },
+    }
+}
+
+fn desugar_opt<K: variant>(r: Rule<K>?) -> Rule<K>?!ParseError {
+    match (r) {
+        some(sub) => ok(some(desugar_rule(sub)?)),
+        none => ok(none),
+    }
+}
+
+fn desugar_rules<K: variant>(rs: Rule<K>[]) -> Rule<K>[]!ParseError {
+    // Generic, so it has no function value to pass; the lint's advice does not
+    // compile here — see `group_styles` for the same pair of rules colliding.
+    rs.try_map(|r| desugar_rule(r)) #[allow]
+}
+
 # One rule with every `Named(n)` in it rewritten to `NamedIdx(i)` and every
 # `NestedIn` to a `NestedIdx` naming its entry in the grammar's `groups` table.
 # Fails when a reference names no production — the error a grammar author most
@@ -330,7 +464,9 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
         )),
         Then(rs) => ok(Then(link_rules(rs, names, base)?)),
         OneOf(rs) => ok(OneOf(link_rules(rs, names, base)?)),
-        Many(sub, min, sep, trailing_sep) => ok(Many(
+        // `desugar` has already rewritten a `nested_in` away, so the two slots
+        // it fills are empty by the time anything is linked.
+        Many(sub, min, sep, trailing_sep, _, _) => ok(Many(
             link_rule(sub, names, base)?,
             min=min,
             sep=link_opt(sep, names, base + group_count(sub))?,
@@ -412,11 +548,15 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // Group indices are handed out across the whole grammar, production by
     // production, so `base` carries over rather than restarting — one flat table
     // for the same reason `prods` is one: an index is the whole address.
+    // Sugar first: a `Many` carrying `nested_in` becomes the `NestedIn` it stands
+    // for before a group index is handed out, so the two spellings cannot get
+    // different answers and nothing below this line knows the shorthand exists.
     mut prods: Production<K, A>[] = [];
     mut groups: ListStyle[] = [];
     for (let p : g.prods) {
-        set prods.push(Production { ..p, rule: link_rule(p.rule, names, groups.len())? });
-        set groups.extend(group_styles(p.rule));
+        let rule = desugar_rule(p.rule)?;
+        set prods.push(Production { ..p, rule: link_rule(rule, names, groups.len())? });
+        set groups.extend(group_styles(rule));
     }
     ok(Grammar { prods, groups })
 }.test({
@@ -555,6 +695,68 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     assert(link(ns)?.groups == ns.groups);
     assert(rule_of(link(ns)?, 0) == rule_of(ns, 0));
 
+    // ---------- the `nested_in` shorthand ----------
+    //
+    // A bracketed list written the short way links to exactly what the long way
+    // links to. The style is derived: `,` from the separator, `trailing` from
+    // `trailing_sep`, `spaced` as given.
+    let sugar: Rule<Kind> = Many(
+        Term(Atom),
+        sep=some(Literal(",")),
+        trailing_sep=false,
+        nested_in=[Literal("("), Literal(")")],
+    );
+    let longhand: Rule<Kind> = NestedIn(
+        Literal("("),
+        Many(Term(Atom), sep=some(Literal(",")), trailing_sep=false),
+        Literal(")"),
+        style=ListStyle { sep: ",", trailing: false },
+    );
+    let short_g: Grammar<Kind, Node> = Grammar {
+        prods: [Production { name: "a", rule: sugar, build: Mk(keep), layout: Inline }],
+    };
+    let long_g: Grammar<Kind, Node> = Grammar {
+        prods: [Production { name: "a", rule: longhand, build: Mk(keep), layout: Inline }],
+    };
+    assert(rule_of(link(short_g)?, 0) == rule_of(link(long_g)?, 0));
+    assert(link(short_g)?.groups == link(long_g)?.groups);
+    assert(link(short_g)?.groups == [ListStyle { sep: ",", trailing: false }]);
+
+    // A juxtaposed list — no separator — carries the empty spelling, and
+    // `spaced` is the one thing the `Many` cannot answer for itself.
+    let words: Rule<Kind> = Many(Term(Atom), nested_in=[Literal("{"), Literal("}")], spaced=true);
+    let words_g: Grammar<Kind, Node> = Grammar {
+        prods: [Production { name: "a", rule: words, build: Mk(keep), layout: Inline }],
+    };
+    assert(link(words_g)?.groups == [ListStyle { sep: "", spaced: true }]);
+
+    // Two brackets exactly, and a separator the printer can write back.
+    let one_bracket: Rule<Kind> = Many(Term(Atom), nested_in=[Literal("(")]);
+    let one_g: Grammar<Kind, Node> = Grammar {
+        prods: [Production { name: "a", rule: one_bracket, build: Mk(keep), layout: Inline }],
+    };
+    assert(
+        link(one_g) == err(ParseError {
+            message: "nested_in takes an opening and a closing rule, got 1",
+            span: 0..0,
+        }),
+    );
+
+    let odd_sep: Rule<Kind> = Many(
+        Term(Atom),
+        sep=some(Term(Atom)),
+        nested_in=[Literal("("), Literal(")")],
+    );
+    let odd_g: Grammar<Kind, Node> = Grammar {
+        prods: [Production { name: "a", rule: odd_sep, build: Mk(keep), layout: Inline }],
+    };
+    assert(
+        link(odd_g) == err(ParseError {
+            message: "a bracketed list's separator must be a literal, so the printer can write it back",
+            span: 0..0,
+        }),
+    );
+
     // A group's insides are linked like anything else, and an unresolved
     // reference inside one is still the grammar error it would be outside.
     let bad_nest: Grammar<Kind, Node> = Grammar {
@@ -602,39 +804,39 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     }
 }
 --- performance ---
-allocations: 377
-deallocations: 377
-reallocations: 30
-bytes allocated: 28720
-instructions executed: 33803
-binary size: 78400
-  code: 48304
-  data: 2508
-  metadata: 27588
+allocations: 731
+deallocations: 731
+reallocations: 38
+bytes allocated: 56337
+instructions executed: 62441
+binary size: 138232
+  code: 84888
+  data: 3492
+  metadata: 49852
 functions:
   __arr_drop_ListStyle:
-    calls: 32
+    calls: 64
     bytes: 120
   __arr_drop_Prec:
     calls: 2
     bytes: 120
   __arr_drop_Production$Kind$Node:
-    calls: 20
+    calls: 31
     bytes: 188
   __arr_drop_Rule$Kind:
-    calls: 15
+    calls: 29
     bytes: 116
   __arr_retain_ListStyle:
-    calls: 13
+    calls: 19
     bytes: 120
   __arr_retain_Prec:
     calls: 0
     bytes: 120
   __arr_retain_Production$Kind$Node:
-    calls: 22
+    calls: 28
     bytes: 188
   __arr_retain_Rule$Kind:
-    calls: 16
+    calls: 32
     bytes: 116
   __builtin_find_index$str$lam1:
     calls: 1
@@ -646,16 +848,19 @@ functions:
     calls: 1
     bytes: 412
   __builtin_find_index$str$lam8:
-    calls: 18
+    calls: 26
     bytes: 400
+  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam17:
+    calls: 4
+    bytes: 720
   __eq_ListStyle:
-    calls: 11
+    calls: 15
     bytes: 200
   __eq_ListStyle$arr:
-    calls: 2
+    calls: 5
     bytes: 284
   __eq_ParseError:
-    calls: 3
+    calls: 5
     bytes: 128
   __eq_Prec:
     calls: 1
@@ -664,16 +869,16 @@ functions:
     calls: 1
     bytes: 284
   __eq_Rule$Kind:
-    calls: 29
-    bytes: 796
+    calls: 35
+    bytes: 852
   __eq_Rule$Kind$arr:
-    calls: 3
+    calls: 7
     bytes: 300
   __eq_Rule$Kind$opt:
-    calls: 3
+    calls: 4
     bytes: 92
   __eq___builtin_Span:
-    calls: 3
+    calls: 5
     bytes: 104
   __eq_str$arr:
     calls: 3
@@ -685,70 +890,73 @@ functions:
     calls: 0
     bytes: 72
   __rec_drop_Rule$Kind:
-    calls: 116
-    bytes: 436
+    calls: 277
+    bytes: 452
   __test$failure_message:
     calls: 1
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 24224
+    bytes: 43748
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
   __to_str_ParseError:
     calls: 0
     bytes: 824
+  __to_str_u64:
+    calls: 1
+    bytes: 204
   aipl_arr_drop_arr:
     calls: 4
     bytes: (external)
   aipl_arr_extend:
-    calls: 65
+    calls: 107
     bytes: (external)
   aipl_arr_inc:
-    calls: 497
+    calls: 895
     bytes: (external)
   aipl_arr_join:
     calls: 4
     bytes: (external)
   aipl_arr_reserve:
-    calls: 35
+    calls: 65
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 751
+    calls: 1340
     bytes: (external)
   aipl_array_new:
-    calls: 203
+    calls: 364
     bytes: (external)
   aipl_array_push:
-    calls: 24
+    calls: 40
     bytes: (external)
   aipl_array_push_mut:
-    calls: 36
+    calls: 44
     bytes: (external)
   aipl_array_with_cap:
-    calls: 17
+    calls: 25
     bytes: (external)
   aipl_assert:
-    calls: 22
+    calls: 28
     bytes: (external)
   aipl_rec_alloc:
-    calls: 116
+    calls: 277
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 660
+    calls: 1512
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 56
+    calls: 165
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 544
+    calls: 1235
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 56
+    calls: 165
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -759,6 +967,18 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  desugar_opt$Kind:
+    calls: 12
+    bytes: 644
+  desugar_rule$Kind:
+    calls: 99
+    bytes: 14788
   failure_message:
     calls: 2
     bytes: 404
@@ -766,23 +986,23 @@ functions:
     calls: 0
     bytes: 32
   group_styles$Kind$tail:
-    calls: 157
-    bytes: 3116
+    calls: 265
+    bytes: 3156
   keep:
     calls: 0
     bytes: 268
   link$Kind$Node:
-    calls: 9
-    bytes: 2328
+    calls: 17
+    bytes: 2796
   link_nest$Kind:
-    calls: 10
+    calls: 16
     bytes: 1300
   link_opt$Kind:
-    calls: 4
+    calls: 10
     bytes: 660
   link_rule$Kind:
-    calls: 62
-    bytes: 5108
+    calls: 97
+    bytes: 5232
   link_rules$Kind:
     calls: 4
     bytes: 832
@@ -790,11 +1010,11 @@ functions:
     calls: 1
     bytes: 180
   nest_styles$Kind:
-    calls: 15
+    calls: 21
     bytes: 956
   prod_names$Kind$Node:
-    calls: 13
+    calls: 21
     bytes: 492
   rule_of$Kind$Node:
-    calls: 11
+    calls: 13
     bytes: 820

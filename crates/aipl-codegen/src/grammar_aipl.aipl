@@ -127,7 +127,7 @@ fn items() -> Production<AiplTok, Ast>[] {
     // `import { a, b as c, equal as == } from "./x.aipl";` — or `from builtins`.
     let import_decl: Rule<AiplTok> = Then([
         Lit("import"),
-        nest("{", Many(Named("import_name"), sep=some(Lit(","))), "}", braced()),
+        Many(Named("import_name"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
         Lit("from"),
         OneOf([Term(StrLit), Lit("builtins")]),
         Lit(";"),
@@ -174,7 +174,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         Lit("fn"),
         Term(Name),
         Named("type_params"),
-        nest("(", Many(Named("param"), sep=some(Lit(","))), ")", loose()),
+        Many(Named("param"), sep=some(Lit(",")), nested_in=parens()),
         Many(Named("effect")),
         Maybe(Then([Lit("->"), Named("ty")])),
         Named("fn_body"),
@@ -184,11 +184,12 @@ fn items() -> Production<AiplTok, Ast>[] {
 
     // `<T, U: ord>`. At least one parameter — `<>` is a syntax error, as it is
     // under gazelle, which is why this list has `min=1`.
-    let type_params: Rule<AiplTok> = Maybe(nest(
-        "<",
-        Many(Named("type_param"), min=1, sep=some(Lit(",")), trailing_sep=false),
-        ">",
-        strict(),
+    let type_params: Rule<AiplTok> = Maybe(Many(
+        Named("type_param"),
+        min=1,
+        sep=some(Lit(",")),
+        trailing_sep=false,
+        nested_in=angles(),
     ));
     let type_param: Rule<AiplTok> = OneOf([
         Then([Term(Name), Lit(":"), OneOf([Term(Name), Lit("variant")])]),
@@ -206,7 +207,10 @@ fn items() -> Production<AiplTok, Ast>[] {
         // `Point { x, y }` — the argument destructured in place of being named,
         // the same pattern `let Point { x, y } = v;` writes. It names no
         // parameter, so there is no `: T` to follow.
-        Then([Term(Name), nest("{", Many(Term(Name), min=1, sep=some(Lit(","))), "}", braced())]),
+        Then([
+            Term(Name),
+            Many(Term(Name), min=1, sep=some(Lit(",")), nested_in=braces(), spaced=true),
+        ]),
     ]);
 
     // A body is a block, or the struct-literal shorthand. The shorthand is tried
@@ -242,7 +246,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         Lit("struct"),
         Term(Name),
         Named("type_params"),
-        nest("{", Many(Named("field_decl"), sep=some(Lit(","))), "}", braced()),
+        Many(Named("field_decl"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
     ]);
     let field_decl: Rule<AiplTok> = OneOf([
         Then([Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr")]),
@@ -262,11 +266,12 @@ fn items() -> Production<AiplTok, Ast>[] {
     let variant_case: Rule<AiplTok> = OneOf([
         Then([
             Term(Name),
-            nest(
-                "(",
-                Many(Named("case_param"), min=1, sep=some(Lit(",")), trailing_sep=false),
-                ")",
-                strict(),
+            Many(
+                Named("case_param"),
+                min=1,
+                sep=some(Lit(",")),
+                trailing_sep=false,
+                nested_in=parens(),
             ),
         ]),
         Term(Name),
@@ -312,11 +317,11 @@ fn types() -> Production<AiplTok, Ast>[] {
     // It no longer has to be its own production to be formattable: a group
     // carries its own style, so four bracketed alternatives in one production
     // are four groups rather than a shape with no single pair to describe.
-    let ty_parens: Rule<AiplTok> = nest(
-        "(",
-        Many(Named("ty"), sep=some(Lit(",")), trailing_sep=false),
-        ")",
-        strict(),
+    let ty_parens: Rule<AiplTok> = Many(
+        Named("ty"),
+        sep=some(Lit(",")),
+        trailing_sep=false,
+        nested_in=parens(),
     );
 
     // The `(`-led forms are ordered longest-first, which is exactly the shift
@@ -341,12 +346,7 @@ fn types() -> Production<AiplTok, Ast>[] {
         nest2("#", "{", Named("ty"), "}", strict()),
         Then([
             Term(Name),
-            nest(
-                "<",
-                Many(Named("ty"), min=1, sep=some(Lit(",")), trailing_sep=false),
-                ">",
-                strict(),
-            ),
+            Many(Named("ty"), min=1, sep=some(Lit(",")), trailing_sep=false, nested_in=angles()),
         ]),
         Term(Name),
     ]);
@@ -401,12 +401,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
     let let_stmt: Rule<AiplTok> = OneOf([
         Then([
             Lit("let"),
-            nest(
-                "(",
-                Many(Term(Name), min=1, sep=some(Lit(",")), trailing_sep=false),
-                ")",
-                strict(),
-            ),
+            Many(Term(Name), min=1, sep=some(Lit(",")), trailing_sep=false, nested_in=parens()),
             Lit("="),
             Named("expr"),
             Lit(";"),
@@ -414,7 +409,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
         Then([
             Lit("let"),
             Term(Name),
-            nest("{", Many(Term(Name), min=1, sep=some(Lit(","))), "}", braced()),
+            Many(Term(Name), min=1, sep=some(Lit(",")), nested_in=braces(), spaced=true),
             Lit("="),
             Named("expr"),
             Lit(";"),
@@ -426,7 +421,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
         Then([
             Lit("mut"),
             Term(Name),
-            nest("{", Many(Term(Name), min=1, sep=some(Lit(","))), "}", braced()),
+            Many(Term(Name), min=1, sep=some(Lit(",")), nested_in=braces(), spaced=true),
             Lit("="),
             Named("expr"),
             Lit(";"),
@@ -475,11 +470,12 @@ fn statements() -> Production<AiplTok, Ast>[] {
                 "(",
                 Then([
                     Lit("let"),
-                    nest(
-                        "(",
-                        Many(Term(Name), min=1, sep=some(Lit(",")), trailing_sep=false),
-                        ")",
-                        strict(),
+                    Many(
+                        Term(Name),
+                        min=1,
+                        sep=some(Lit(",")),
+                        trailing_sep=false,
+                        nested_in=parens(),
                     ),
                     Lit(":"),
                     Named("expr"),
@@ -587,7 +583,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([
             Lit("match"),
             nest("(", Named("expr"), ")", pair()),
-            nest("{", Many(Named("match_arm"), sep=some(Lit(","))), "}", braced()),
+            Many(Named("match_arm"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
         ]),
         // A bracketed list that is neither the start nor the end of its
         // alternative — the shape a leading/trailing token scan cannot see at
@@ -595,7 +591,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([
             Lit("shim"),
             Term(Name),
-            nest("{", Many(Named("shim_binding"), sep=some(Lit(","))), "}", braced()),
+            Many(Named("shim_binding"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
             Named("block"),
         ]),
         Term(IntLit),
@@ -605,7 +601,10 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Lit("false"),
         Lit("none"),
         Then([Term(Name), nest("(", Named("args"), ")", loose())]),
-        Then([Term(Name), nest("{", Many(Named("field_init"), sep=some(Lit(","))), "}", braced())]),
+        Then([
+            Term(Name),
+            Many(Named("field_init"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
+        ]),
         Term(Name),
         nest(
             "(",
@@ -625,12 +624,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         // The same token opens and closes this one, which is the case a scan for
         // a leading and a trailing run of tokens could never tell from a list.
         Then([
-            nest(
-                "|",
-                Many(Named("lambda_param"), sep=some(Lit(",")), trailing_sep=false),
-                "|",
-                strict(),
-            ),
+            Many(Named("lambda_param"), sep=some(Lit(",")), trailing_sep=false, nested_in=pipes()),
             Named("block"),
         ]),
     ]);
@@ -693,12 +687,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     ]);
     let lambda: Rule<AiplTok> = OneOf([
         Then([
-            nest(
-                "|",
-                Many(Named("lambda_param"), sep=some(Lit(",")), trailing_sep=false),
-                "|",
-                strict(),
-            ),
+            Many(Named("lambda_param"), sep=some(Lit(",")), trailing_sep=false, nested_in=pipes()),
             Named("expr"),
         ]),
         Then([Lit("||"), Named("block")]),
@@ -1105,6 +1094,20 @@ fn pl(name: str, rule: Rule<AiplTok>, expect_as: str) -> Production<AiplTok, Ast
     layout: Inline,
 }
 
+# The bracket pairs, for `Many`'s `nested_in`. A pair rather than two arguments
+# because that is what a bracket is, and naming them here keeps the lists below
+# reading as lists: `Many(param, sep=comma, nested_in=parens())`.
+fn parens() -> Rule<AiplTok>[] { [Lit("("), Lit(")")] }
+
+fn braces() -> Rule<AiplTok>[] { [Lit("{"), Lit("}")] }
+
+fn brackets() -> Rule<AiplTok>[] { [Lit("["), Lit("]")] }
+
+fn angles() -> Rule<AiplTok>[] { [Lit("<"), Lit(">")] }
+
+# The same token both ends, which a lambda's parameter list is.
+fn pipes() -> Rule<AiplTok>[] { [Lit("|"), Lit("|")] }
+
 # A bracketed group: `open`, whatever it holds, `close`, and how that lays out.
 # Shorter than the `NestedIn` it builds, because a grammar this size writes a lot
 # of them and the four arguments matter more than the constructor's name.
@@ -1182,15 +1185,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1130784
-deallocations: 1130784
+allocations: 1336972
+deallocations: 1336972
 reallocations: 7375
-bytes allocated: 99213692
-instructions executed: 159725338
-binary size: 718256
-  code: 477952
-  data: 13212
-  metadata: 227092
+bytes allocated: 116591668
+instructions executed: 173434931
+binary size: 738072
+  code: 490920
+  data: 13428
+  metadata: 233724
 functions:
   __arr_drop___m11__StepResult$__m10__AiplTok:
     calls: 5
@@ -1226,7 +1229,7 @@ functions:
     calls: 7875
     bytes: 188
   __arr_drop___m9__Rule$__m10__AiplTok:
-    calls: 99672
+    calls: 173063
     bytes: 116
   __arr_retain___m11__StepResult$__m10__AiplTok:
     calls: 7
@@ -1262,27 +1265,27 @@ functions:
     calls: 14207
     bytes: 188
   __arr_retain___m9__Rule$__m10__AiplTok:
-    calls: 121389
+    calls: 242778
     bytes: 116
-  __builtin_all$__m9__Rule$__m10__AiplTok$lam137:
+  __builtin_all$__m9__Rule$__m10__AiplTok$lam139:
     calls: 0
     bytes: 36
-  __builtin_all$__m9__Rule$__m10__AiplTok$lam137$tail:
+  __builtin_all$__m9__Rule$__m10__AiplTok$lam139$tail:
     calls: 270
     bytes: 384
-  __builtin_all$char$s0$lam121:
+  __builtin_all$char$s0$lam123:
     calls: 74
     bytes: 212
-  __builtin_any$__m3__Doc$lam148:
+  __builtin_any$__m3__Doc$lam150:
     calls: 0
     bytes: 32
-  __builtin_any$__m3__Doc$lam148$tail:
+  __builtin_any$__m3__Doc$lam150$tail:
     calls: 132
     bytes: 324
-  __builtin_any$__m9__Rule$__m10__AiplTok$lam140:
+  __builtin_any$__m9__Rule$__m10__AiplTok$lam142:
     calls: 0
     bytes: 36
-  __builtin_any$__m9__Rule$__m10__AiplTok$lam140$tail:
+  __builtin_any$__m9__Rule$__m10__AiplTok$lam142$tail:
     calls: 108
     bytes: 380
   __builtin_count_while$char$lam54:
@@ -1294,10 +1297,10 @@ functions:
   __builtin_count_while$char$s0$lam107$tail:
     calls: 23
     bytes: 256
-  __builtin_count_while$char$s0$lam118:
+  __builtin_count_while$char$s0$lam120:
     calls: 65
     bytes: 172
-  __builtin_count_while$char$s0$lam120:
+  __builtin_count_while$char$s0$lam122:
     calls: 1
     bytes: 172
   __builtin_count_while$char$s0$lam62:
@@ -1309,7 +1312,7 @@ functions:
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m9__Prec$lam152:
+  __builtin_find_if$__m9__Prec$lam154:
     calls: 144
     bytes: 688
   __builtin_find_index$str$lam15:
@@ -1330,6 +1333,9 @@ functions:
   __builtin_try_map$__m9__Production$__m10__AiplTok$Ast$__m19__First<__m10__AiplTok>$__m9__ParseError$lam83:
     calls: 72
     bytes: 920
+  __builtin_try_map$__m9__Rule$__m10__AiplTok$__m9__Rule<__m10__AiplTok>$__m9__ParseError$lam113:
+    calls: 19737
+    bytes: 720
   __eq___m19__First$__m10__AiplTok:
     calls: 1494
     bytes: 128
@@ -1494,7 +1500,7 @@ functions:
     bytes: 8804
   __m18__match_rule$__m10__AiplTok$Ast:
     calls: 36701
-    bytes: 14416
+    bytes: 14464
   __m18__match_then$__m10__AiplTok$Ast:
     calls: 9723
     bytes: 2128
@@ -1521,13 +1527,13 @@ functions:
     bytes: 44
   __m18__rule_labels$__m10__AiplTok$Ast$tail:
     calls: 18630
-    bytes: 7584
+    bytes: 7592
   __m18__rule_nullable$__m10__AiplTok:
     calls: 0
     bytes: 36
   __m18__rule_nullable$__m10__AiplTok$tail:
     calls: 7938
-    bytes: 1732
+    bytes: 1796
   __m18__seq_labels$__m10__AiplTok$Ast:
     calls: 0
     bytes: 44
@@ -1554,7 +1560,7 @@ functions:
     bytes: 1084
   __m19__rule_first$__m10__AiplTok:
     calls: 26064
-    bytes: 5948
+    bytes: 6012
   __m19__union_syms$__m10__AiplTok:
     calls: 20016
     bytes: 736
@@ -1579,7 +1585,7 @@ functions:
   __m2__format_cst$__m10__AiplTok$Ast$s1$lam12:
     calls: 19
     bytes: 384
-  __m2__gap_wanted$lam112:
+  __m2__gap_wanted$lam114:
     calls: 149
     bytes: 304
   __m2__group_doc$__m10__AiplTok$Ast$s1$lam73:
@@ -1594,7 +1600,7 @@ functions:
   __m2__render_cst$__m10__AiplTok$Ast$s1$lam3:
     calls: 19
     bytes: 5268
-  __m2__wrapped$lam113:
+  __m2__wrapped$lam115:
     calls: 12
     bytes: 4272
   __m3__col_after:
@@ -1624,15 +1630,21 @@ functions:
   __m5__dedent:
     calls: 1
     bytes: 1276
+  __m9__desugar_opt$__m10__AiplTok:
+    calls: 4386
+    bytes: 644
+  __m9__desugar_rule$__m10__AiplTok:
+    calls: 102450
+    bytes: 14788
   __m9__group_styles$__m10__AiplTok:
     calls: 0
     bytes: 32
   __m9__group_styles$__m10__AiplTok$tail:
     calls: 386097
-    bytes: 3116
+    bytes: 3156
   __m9__link$__m10__AiplTok$Ast:
     calls: 129
-    bytes: 2328
+    bytes: 2796
   __m9__link_nest$__m10__AiplTok:
     calls: 5805
     bytes: 1300
@@ -1641,7 +1653,7 @@ functions:
     bytes: 660
   __m9__link_rule$__m10__AiplTok:
     calls: 104490
-    bytes: 5108
+    bytes: 5232
   __m9__link_rules$__m10__AiplTok:
     calls: 19737
     bytes: 832
@@ -1661,8 +1673,8 @@ functions:
     calls: 608
     bytes: 84
   __rec_drop___m9__Rule$__m10__AiplTok:
-    calls: 246811
-    bytes: 436
+    calls: 348473
+    bytes: 452
   __test$aipl_parse_cst:
     calls: 1
     bytes: 1216
@@ -1691,7 +1703,7 @@ functions:
     calls: 82848
     bytes: (external)
   aipl_arr_inc:
-    calls: 3015512
+    calls: 3176525
     bytes: (external)
   aipl_arr_join:
     calls: 42716
@@ -1703,13 +1715,13 @@ functions:
     calls: 144477
     bytes: (external)
   aipl_array_dec:
-    calls: 3860352
+    calls: 4125891
     bytes: (external)
   aipl_array_new:
-    calls: 621838
+    calls: 655801
     bytes: (external)
   aipl_array_push:
-    calls: 81970
+    calls: 152533
     bytes: (external)
   aipl_array_push_mut:
     calls: 215548
@@ -1730,19 +1742,19 @@ functions:
     calls: 8
     bytes: 664
   aipl_rec_alloc:
-    calls: 255040
+    calls: 356702
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1882748
+    calls: 2534217
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 64540
+    calls: 83017
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1627708
+    calls: 2177515
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 64540
+    calls: 83017
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -1761,13 +1773,13 @@ functions:
     bytes: (external)
   expressions:
     calls: 202
-    bytes: 38252
+    bytes: 37040
   format_aipl_ty:
     calls: 19
     bytes: 808
   items:
     calls: 101
-    bytes: 31124
+    bytes: 29788
   keep:
     calls: 0
     bytes: 196
@@ -1785,13 +1797,13 @@ functions:
     bytes: 448
   patterns:
     calls: 202
-    bytes: 6980
+    bytes: 7076
   statements:
     calls: 202
-    bytes: 28596
+    bytes: 27532
   types:
     calls: 202
-    bytes: 8148
+    bytes: 7648
   why_prepared:
     calls: 9
     bytes: 1480

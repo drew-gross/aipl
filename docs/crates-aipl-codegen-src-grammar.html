@@ -81,7 +81,7 @@
 
             <li id="item-OneOf"><code>OneOf(Rule&#60;K&#62;[])</code></li>
 
-            <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = .., sep: Rule&#60;K&#62;? = .., trailing_sep: bool = ..)</code></li>
+            <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = .., sep: Rule&#60;K&#62;? = .., trailing_sep: bool = .., nested_in: Rule&#60;K&#62;[] = .., spaced: bool = ..)</code></li>
 
             <li id="item-Maybe"><code>Maybe(Rule&#60;K&#62;)</code></li>
 
@@ -199,6 +199,20 @@
 
 
 
+        <section class="item" id="item-desugar_rule">
+          <h3>
+            <a class="anchor" href="#item-desugar_rule">desugar_rule</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn desugar_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
+
+          <div class="doc"><p><code>r</code> with every bracketed-list shorthand written out: a <code>Many</code> carrying <code>nested_in=[open, close]</code> becomes the <code>NestedIn</code> it is shorthand for, wrapping the same <code>Many</code> with the brackets removed.</p><p>Run before anything else looks at a rule, so only one spelling ever reaches the driver, the formatter, the EBNF dump or the FIRST sets. That is the whole point of making it sugar rather than a second rule shape: the passes downstream stay unaware it exists.</p><p>The style is derived here — <code>sep</code> from the list's own separator, <code>trailing</code> from <code>trailing_sep</code>, <code>spaced</code> as given — so a grammar states each of those once. <code>wraps</code> is always true: a <code>Many</code> in brackets is a list by construction, which is exactly the case that wraps.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-link">
           <h3>
             <a class="anchor" href="#item-link">link</a>
@@ -270,6 +284,62 @@
           <pre class="signature"><code>fn group_count&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; u64</code></pre>
 
           <div class="doc"><p>How many groups <code>r</code> holds — the amount <code>base</code> advances past it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-missing_bracket">
+          <h3>
+            <a class="anchor" href="#item-missing_bracket">missing_bracket</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn missing_bracket() -&#62; ParseError</code></pre>
+
+          <div class="doc"><p>The array said it held two rules and then did not — unreachable past the length check, and reported rather than assumed.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-sep_spelling">
+          <h3>
+            <a class="anchor" href="#item-sep_spelling">sep_spelling</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn sep_spelling&#60;K: variant&#62;(sep: Rule&#60;K&#62;?) -&#62; str!ParseError</code></pre>
+
+          <div class="doc"><p>How the printer should write this list's separator: the spelling of the <code>Many</code>'s own separator, or the empty string for a juxtaposed list with none.</p><p>A separator that is not a literal has no spelling to write back, so a grammar that brackets such a list is refused rather than guessed at — the alternative is a formatter that silently drops the separator when the list breaks.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-desugar_opt">
+          <h3>
+            <a class="anchor" href="#item-desugar_opt">desugar_opt</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn desugar_opt&#60;K: variant&#62;(r: Rule&#60;K&#62;?) -&#62; Rule&#60;K&#62;?!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-desugar_rules">
+          <h3>
+            <a class="anchor" href="#item-desugar_rules">desugar_rules</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn desugar_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[]) -&#62; Rule&#60;K&#62;[]!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>

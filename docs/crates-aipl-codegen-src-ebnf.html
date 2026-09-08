@@ -114,7 +114,7 @@
           </h3>
           <pre class="signature"><code>pub fn rule_first&#60;K: variant&#62;(r: Rule&#60;K&#62;, sets: First&#60;K&#62;[]) -&#62; First&#60;K&#62;!ParseError</code></pre>
 
-          <div class="doc"><p>What an arbitrary rule can begin with, given <code>sets</code> — the FIRST sets of the grammar's productions, as <code>first_sets</code> returns them.</p><p>This is the piece a driver would prune a <code>OneOf</code> with: <code>first_sets</code> once per grammar, then this per alternative. Fails on a <code>Named</code> reference, which means the rule came from an unlinked grammar, and on a <code>NamedIdx</code> pointing past the end of <code>sets</code>.</p></div>
+          <div class="doc"><p>What an arbitrary rule can begin with, given <code>sets</code> — the FIRST sets of the grammar's productions, as <code>first_sets</code> returns them.</p><p>This is the piece a driver would prune a <code>OneOf</code> with: <code>first_sets</code> once per grammar, then this per alternative. Fails on a <code>Named</code> reference, which means the rule came from an unlinked grammar, and on a <code>NamedIdx</code> pointing past the end of <code>sets</code>.</p><p>Takes a *linked* rule, which is also a desugared one: a <code>Many</code> still carrying <code>nested_in</code> would report what its items begin with rather than its opening bracket. <code>link</code> writes the shorthand out, so anything that has been through it is safe here.</p></div>
 
 
         </section>
@@ -192,6 +192,20 @@
           <pre class="signature"><code>fn prod_line&#60;K: variant, A: any&#62;(p: Production&#60;K, A&#62;, names: str[]) -&#62; str</code></pre>
 
           <div class="doc"><p>One production's line, plus the precedence note if its rule climbs. The note hangs off the *line* rather than off the climb it describes, so a <code>Climb</code> nested inside a sequence still reads as one uninterrupted rule.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-desugared">
+          <h3>
+            <a class="anchor" href="#item-desugared">desugared</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn desugared&#60;K: variant, A: any&#62;(p: Production&#60;K, A&#62;) -&#62; Production&#60;K, A&#62;</code></pre>
+
+          <div class="doc"><p><code>p</code> with its rule's shorthand written out; the rule unchanged if desugaring refuses it, since a dump is a debug rendering and should not fail.</p></div>
 
 
         </section>

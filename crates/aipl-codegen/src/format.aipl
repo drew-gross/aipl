@@ -677,15 +677,15 @@ fn node_of(t: str) -> Piece { PNode(Text(t), t, t) }
 
 fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
 --- performance ---
-allocations: 2532
-deallocations: 2532
+allocations: 2576
+deallocations: 2576
 reallocations: 195
-bytes allocated: 181179
-instructions executed: 218619
-binary size: 213840
-  code: 134456
-  data: 4852
-  metadata: 74532
+bytes allocated: 186459
+instructions executed: 222065
+binary size: 239440
+  code: 151192
+  data: 5068
+  metadata: 83180
 functions:
   __arr_drop_Piece:
     calls: 118
@@ -723,7 +723,7 @@ functions:
   __arr_retain___m8__Rule$FKind:
     calls: 0
     bytes: 116
-  __builtin_all$char$s0$lam83:
+  __builtin_all$char$s0$lam85:
     calls: 17
     bytes: 212
   __builtin_any$__m2__Doc$lam33:
@@ -735,7 +735,7 @@ functions:
   __builtin_count_while$char$s0$lam66:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam92:
+  __builtin_count_while$char$s0$lam94:
     calls: 0
     bytes: 172
   __builtin_drop_last$str:
@@ -750,6 +750,9 @@ functions:
   __builtin_intersperse$__m2__Doc:
     calls: 28
     bytes: 408
+  __builtin_try_map$__m8__Rule$FKind$__m8__Rule<FKind>$__m8__ParseError$lam78:
+    calls: 0
+    bytes: 720
   __eq_str$arr:
     calls: 4
     bytes: 364
@@ -789,6 +792,12 @@ functions:
   __m3__reindent_block:
     calls: 0
     bytes: 4016
+  __m8__desugar_opt$FKind:
+    calls: 0
+    bytes: 644
+  __m8__desugar_rule$FKind:
+    calls: 44
+    bytes: 14788
   __m8__failure_message:
     calls: 2
     bytes: 404
@@ -797,10 +806,10 @@ functions:
     bytes: 32
   __m8__group_styles$FKind$tail:
     calls: 74
-    bytes: 3116
+    bytes: 3156
   __m8__link$FKind$str:
     calls: 8
-    bytes: 2788
+    bytes: 3192
   __m8__link_nest$FKind:
     calls: 6
     bytes: 1300
@@ -809,7 +818,7 @@ functions:
     bytes: 660
   __m8__link_rule$FKind:
     calls: 44
-    bytes: 5108
+    bytes: 5232
   __m8__link_rules$FKind:
     calls: 0
     bytes: 832
@@ -826,8 +835,8 @@ functions:
     calls: 662
     bytes: 84
   __rec_drop___m8__Rule$FKind:
-    calls: 50
-    bytes: 436
+    calls: 94
+    bytes: 452
   __test$breaks_after:
     calls: 1
     bytes: 484
@@ -898,19 +907,19 @@ functions:
     calls: 45
     bytes: (external)
   aipl_rec_alloc:
-    calls: 1076
+    calls: 1120
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 8151
+    calls: 8301
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 672
+    calls: 690
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 7075
+    calls: 7181
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 672
+    calls: 690
     bytes: (external)
   aipl_test_begin:
     calls: 8

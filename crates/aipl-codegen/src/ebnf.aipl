@@ -81,6 +81,7 @@ import {
     Rule,
     Term,
     Then,
+    desugar_rule,
     link,
     prod_names,
 } from "./grammar.aipl";
@@ -116,7 +117,12 @@ fn dq(s: str) -> str {
 # and a reference that resolves to nothing renders as `?` rather than failing.
 pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     let names = prod_names(g);
-    g.prods.map(|p| prod_line(p, names)).join(sep="\n")
+
+    // The bracketed-list shorthand is written out first, so a grammar dumps the
+    // same EBNF whichever spelling it used — `"(" item* ")"` either way. Without
+    // it the brackets are simply absent, living in an argument of the `Many`
+    // rather than around it. Once per production, not once per node.
+    g.prods.map(|p| prod_line(desugared(p), names)).join(sep="\n")
 }.test({
     // Parentheses are decided by where a rule sits rather than by how it was
     // written: a choice needs them inside a sequence, a sequence only under a
@@ -188,6 +194,15 @@ fn prod_line<K: variant, A: any>(p: Production<K, A>, names: str[]) -> str {
     if (note.is_empty()) { `{p.name} = {body} ;` } else { `{p.name} = {body} ; {note}` }
 }
 
+# `p` with its rule's shorthand written out; the rule unchanged if desugaring
+# refuses it, since a dump is a debug rendering and should not fail.
+fn desugared<K: variant, A: any>(p: Production<K, A>) -> Production<K, A> {
+    match (desugar_rule(p.rule)) {
+        ok(rule) => Production { ..p, rule },
+        err(..) => p,
+    }
+}
+
 fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
     match (r) {
         Term(k) => k.case_name(),
@@ -214,7 +229,7 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
                 Seq | Item => `({body})`,
             }
         },
-        Many(sub, min, sep, trailing_sep) => match (sep) {
+        Many(sub, min, sep, trailing_sep, _, _) => match (sep) {
             some(s) => render_list(sub, s, min, trailing_sep, names),
             none => {
                 let body = render_rule(sub, names, Item);
@@ -326,7 +341,7 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
         // Not grouped into one alternation: `_` counts as a bound name, so
         // arms whose payloads differ only in how many slots they ignore are
         // refused as binding different names.
-        Many(sub, _, _, _) => climb_precs(sub),
+        Many(sub, _, _, _, _, _) => climb_precs(sub),
         Maybe(sub) => climb_precs(sub),
         // A group's parts in order, like any sequence.
         NestedIn(open, body, close, _) => first_precs([open, body, close]),
@@ -470,6 +485,11 @@ fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseEr
 # grammar, then this per alternative. Fails on a `Named` reference, which means
 # the rule came from an unlinked grammar, and on a `NamedIdx` pointing past the
 # end of `sets`.
+#
+# Takes a *linked* rule, which is also a desugared one: a `Many` still carrying
+# `nested_in` would report what its items begin with rather than its opening
+# bracket. `link` writes the shorthand out, so anything that has been through it
+# is safe here.
 pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseError {
     match (r) {
         Term(k) => ok(First { syms: [SKind(k)], nullable: false }),
@@ -513,7 +533,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         },
         // A separated list begins with its item and never with its separator,
         // so the separator contributes nothing here.
-        Many(sub, min, sep, trailing_sep) => {
+        Many(sub, min, sep, trailing_sep, _, _) => {
             let First { syms, nullable } = rule_first(sub, sets)?;
             ok(First { syms, nullable: nullable || min == 0 })
         },
@@ -792,15 +812,15 @@ fn fixture() -> Grammar<Kind, Node> {
     }
 }
 --- performance ---
-allocations: 1726
-deallocations: 1726
+allocations: 2161
+deallocations: 2161
 reallocations: 144
-bytes allocated: 127319
-instructions executed: 162804
-binary size: 122576
-  code: 77240
-  data: 3684
-  metadata: 41652
+bytes allocated: 163295
+instructions executed: 193205
+binary size: 149832
+  code: 94984
+  data: 3900
+  metadata: 50948
 functions:
   __arr_drop_First$Kind:
     calls: 77
@@ -818,7 +838,7 @@ functions:
     calls: 42
     bytes: 188
   __arr_drop___m2__Rule$Kind:
-    calls: 91
+    calls: 207
     bytes: 116
   __arr_retain_First$Kind:
     calls: 149
@@ -836,7 +856,7 @@ functions:
     calls: 60
     bytes: 188
   __arr_retain___m2__Rule$Kind:
-    calls: 119
+    calls: 307
     bytes: 116
   __builtin_find_index$str$lam18:
     calls: 24
@@ -847,6 +867,9 @@ functions:
   __builtin_try_map$__m2__Production$Kind$Node$First<Kind>$__m2__ParseError$lam15:
     calls: 17
     bytes: 920
+  __builtin_try_map$__m2__Rule$Kind$__m2__Rule<Kind>$__m2__ParseError$lam36:
+    calls: 46
+    bytes: 720
   __eq_First$Kind:
     calls: 36
     bytes: 128
@@ -865,15 +888,21 @@ functions:
   __eq___m2__ParseError:
     calls: 1
     bytes: 128
+  __m2__desugar_opt$Kind:
+    calls: 22
+    bytes: 644
+  __m2__desugar_rule$Kind:
+    calls: 231
+    bytes: 14788
   __m2__group_styles$Kind:
     calls: 0
     bytes: 32
   __m2__group_styles$Kind$tail:
     calls: 262
-    bytes: 3116
+    bytes: 3156
   __m2__link$Kind$Node:
     calls: 9
-    bytes: 2328
+    bytes: 2796
   __m2__link_nest$Kind:
     calls: 0
     bytes: 1300
@@ -882,7 +911,7 @@ functions:
     bytes: 660
   __m2__link_rule$Kind:
     calls: 139
-    bytes: 5108
+    bytes: 5232
   __m2__link_rules$Kind:
     calls: 27
     bytes: 832
@@ -899,14 +928,14 @@ functions:
     calls: 0
     bytes: 72
   __rec_drop___m2__Rule$Kind:
-    calls: 233
-    bytes: 436
+    calls: 464
+    bytes: 452
   __test$can_start:
     calls: 1
     bytes: 900
   __test$ebnf:
     calls: 1
-    bytes: 9520
+    bytes: 9624
   __test$first_sets:
     calls: 1
     bytes: 5200
@@ -935,7 +964,7 @@ functions:
     calls: 66
     bytes: (external)
   aipl_arr_inc:
-    calls: 3796
+    calls: 4166
     bytes: (external)
   aipl_arr_join:
     calls: 34
@@ -950,13 +979,13 @@ functions:
     calls: 21
     bytes: (external)
   aipl_array_dec:
-    calls: 4897
+    calls: 5471
     bytes: (external)
   aipl_array_new:
-    calls: 594
+    calls: 682
     bytes: (external)
   aipl_array_push:
-    calls: 185
+    calls: 301
     bytes: (external)
   aipl_array_push_mut:
     calls: 464
@@ -968,19 +997,19 @@ functions:
     calls: 23
     bytes: (external)
   aipl_rec_alloc:
-    calls: 233
+    calls: 464
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2120
+    calls: 3324
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 52
+    calls: 105
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1887
+    calls: 2860
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 52
+    calls: 105
     bytes: (external)
   aipl_test_begin:
     calls: 6
@@ -1005,13 +1034,13 @@ functions:
     bytes: 32
   climb_precs$Kind$tail:
     calls: 84
-    bytes: 1744
+    bytes: 1748
   dq:
     calls: 47
     bytes: 456
   ebnf$Kind$Node:
     calls: 6
-    bytes: 1560
+    bytes: 2208
   first_msg:
     calls: 2
     bytes: 480
@@ -1026,7 +1055,7 @@ functions:
     bytes: 356
   fixture:
     calls: 2
-    bytes: 4900
+    bytes: 4992
   keep:
     calls: 0
     bytes: 268
@@ -1041,13 +1070,13 @@ functions:
     bytes: 3468
   render_rule$Kind:
     calls: 92
-    bytes: 8160
+    bytes: 8192
   rep_suffix:
     calls: 10
     bytes: 724
   rule_first$Kind:
     calls: 228
-    bytes: 5948
+    bytes: 6012
   show_first$Kind:
     calls: 25
     bytes: 1264
