@@ -78,6 +78,7 @@ highlighter:
   range collapsing in charachter classes
 
 misc cleanup:
+  lead_toks can be count_while I think?
   use an enum for the builtins
   made logical not more like the rest of the operators (lower it to a call immediately)
   rename saturating_remainter to total_remainder (maybe also do total_divide?)
@@ -161,6 +162,8 @@ HOF:
 math:
 
 syntax:
+  limitation: a struct default must be a literal
+  a lambda bound to a let is not a value (this would let test helpers move into the test, big cleanup)
   only allow doc comments at the start of lines
   #{} should flex to empty set or empty dict
   allow default args to be implicitly optional so that you pass T explicitly, but if you pass nothing the callee gets none.

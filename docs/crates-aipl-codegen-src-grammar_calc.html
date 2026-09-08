@@ -32,6 +32,8 @@
 
           <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
 
+          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
+
           <li><code>map_err</code> <span class="from">from builtins</span></li>
 
           <li><code>map_ok</code> <span class="from">from builtins</span></li>
@@ -68,9 +70,13 @@
 
           <li><code>show_first_sets</code> <span class="from">from ./ebnf.aipl</span></li>
 
+          <li><code>render_cst</code> <span class="from">from ./format.aipl</span></li>
+
           <li><code>Climb</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Inline</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>Literal</code> <span class="from">from ./grammar.aipl</span></li>
 
@@ -91,6 +97,8 @@
           <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Tight</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>failure_message</code> <span class="from">from ./grammar.aipl</span></li>
 
@@ -365,6 +373,45 @@
 
         </h2>
         <pre class="signature"><code>fn depth(self: Calc) -&#62; u64</code></pre>
+
+        <p class="undocumented">Undocumented.</p>
+
+
+      </section>
+
+      <section class="item" id="item-format_calc">
+        <h2>
+          <a class="anchor" href="#item-format_calc">format_calc</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn format_calc(src: str, width: u64) -&#62; str!ParseError</code></pre>
+
+        <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>The counterpart of <code>render_calc</code>, and the interesting half of the pair. <code>render_calc</code> prints the *value*, fully parenthesized, so it can only ever produce the tree's own shape; this prints the *source*, so the parentheses the author wrote survive and the ones they left out are not invented. Both round trip, and they are round trips of different things.</p><p>This grammar's lexer records no comments — it has none — so what a comment does to a layout is <code>grammar_sexp.aipl</code>'s to show.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-calc_space">
+        <h2>
+          <a class="anchor" href="#item-calc_space">calc_space</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn calc_space(l: str, r: str) -&#62; bool</code></pre>
+
+        <div class="doc"><p>A space beside every binary operator and nowhere else. Unary minus is spelled with the same character, which the rule cannot tell apart — and does not have to: <code>unary</code> is <code>Tight</code>, so the rule is never asked about it.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-is_calc_op">
+        <h2>
+          <a class="anchor" href="#item-is_calc_op">is_calc_op</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_calc_op(self: str) -&#62; bool</code></pre>
 
         <p class="undocumented">Undocumented.</p>
 

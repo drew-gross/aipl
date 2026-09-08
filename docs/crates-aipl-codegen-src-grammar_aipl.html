@@ -22,15 +22,23 @@
 
           <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
 
+          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
+
           <li><code>map_err</code> <span class="from">from builtins</span></li>
 
           <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
 
           <li><code>text</code> <span class="from">from ./cst.aipl</span></li>
 
+          <li><code>render_cst</code> <span class="from">from ./format.aipl</span></li>
+
           <li><code>Climb</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Inline</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ListStyle</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>Literal</code> <span class="as">as</span> <code>Lit</code> <span class="from">from ./grammar.aipl</span></li>
 
@@ -55,6 +63,10 @@
           <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Tight</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Wrap</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>AiplTok</code> <span class="from">from ./lex_aipl.aipl</span></li>
 
@@ -214,6 +226,32 @@
 
       </section>
 
+      <section class="item" id="item-format_aipl_ty">
+        <h2>
+          <a class="anchor" href="#item-format_aipl_ty">format_aipl_ty</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn format_aipl_ty(src: str, width: u64) -&#62; str!ParseError</code></pre>
+
+        <div class="doc"><p>One AIPL **type**, laid out by the generated formatter.</p><p>This is the stage-4 claim, stated where it can be checked. <code>walker.aipl</code> lays out a type with six hand-written functions — <code>ty</code>, <code>paren_ty</code>, <code>ty_list</code>, <code>base_ty</code>, <code>set_or_dict_ty</code>, <code>dict_value_ty</code>, <code>named_ty</code>, <code>type_suffixes</code>, <code>array_suffixes</code> — about ninety lines of cursor-walking that mirror, by hand, productions this file already describes. Here the same layouts are four annotations on those productions plus <code>ty_space</code> below, and the assertions under this function are <code>walker.aipl</code>'s own type assertions copied verbatim: same inputs, same expected strings, including the broken-list case.</p><p>What that does *not* say: the rest of AIPL is not this tractable. Statements want a hard-broken block layout that <code>format.aipl</code> does not have an arm for yet, and expressions want call hugging and chain breaking, which are not layout at all. The types are the honest measure of the mechanical part — and the mechanical part is most of the grammar-shaped half of the walker.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-ty_space">
+        <h2>
+          <a class="anchor" href="#item-ty_space">ty_space</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn ty_space(l: str, r: str) -&#62; bool</code></pre>
+
+        <div class="doc"><p>The spacing rule for the productions annotated so far: spaces around <code>-&gt;</code>, a space after the <code>:</code> of a dict type, and nothing anywhere else.</p><p>Everything else a reader would call spacing in a type is a list separating its items, which the <code>Wrap</code> layouts do, or a suffix written against its core, which <code>Tight</code> does. That is the shape the rule takes in a real language: a handful of tokens that want air, and silence for the rest.</p></div>
+
+
+      </section>
+
       <section class="item" id="item-lex_lossless">
         <h2>
           <a class="anchor" href="#item-lex_lossless">lex_lossless</a>
@@ -261,7 +299,7 @@
         </h2>
         <pre class="signature"><code>fn p(name: str, rule: Rule&#60;AiplTok&#62;) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
 
-        <div class="doc"><p>One production with the trivial lowering. Nothing here builds an AST — the tree is the product — so every production shares one <code>build</code>.</p></div>
+        <div class="doc"><p>One production with the trivial lowering, laid out <code>Inline</code>. Nothing here builds an AST — the tree is the product — so every production shares one <code>build</code>.</p><p><code>Inline</code> is the default in the same sense <code>expect_as: &quot;&quot;</code> is: it is what a production says when it has nothing particular to say. A production whose layout matters names it through <code>pw</code> or <code>pt</code> below.</p></div>
 
 
       </section>
@@ -275,6 +313,32 @@
         <pre class="signature"><code>fn pl(name: str, rule: Rule&#60;AiplTok&#62;, expect_as: str) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
 
         <div class="doc"><p>The same, labelled: what an error blames when this production fails having matched nothing. The reified form of the LR parser's <code>SYMBOL_DISPLAY_NAMES</code>, which is why only the handful of rules a reader would name are labelled and every plumbing rule stays transparent.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-pw">
+        <h2>
+          <a class="anchor" href="#item-pw">pw</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn pw(name: str, rule: Rule&#60;AiplTok&#62;, style: ListStyle) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
+
+        <div class="doc"><p>A production that is a bracketed list: <code>(a, b)</code>, <code>&lt;T: any&gt;</code>, <code>#{k: v}</code>.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-pt">
+        <h2>
+          <a class="anchor" href="#item-pt">pt</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn pt(name: str, rule: Rule&#60;AiplTok&#62;) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
+
+        <div class="doc"><p>A production whose parts are written against each other with no space between them, whatever the spacing rule would otherwise say: <code>i64?[]</code>, <code>#{</code>.</p></div>
 
 
       </section>

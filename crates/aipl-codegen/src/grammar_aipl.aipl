@@ -47,11 +47,14 @@
 // the reason `grammar.aipl` documents: `Literal` and `Named` mention no `K`, so
 // a rule made only of them has nothing to pin the type parameter, and the
 // annotation is what every constructor inside resolves from.
-import { equal as ==, logical_not as !, map_err } from builtins;
+import { equal as ==, logical_not as !, logical_or as ||, map_err } from builtins;
 import { Cst, text } from "./cst.aipl";
+import { render_cst } from "./format.aipl";
 import {
     Climb,
     Grammar,
+    Inline,
+    ListStyle,
     Literal as Lit,
     Many,
     Maybe,
@@ -64,6 +67,8 @@ import {
     Rule,
     Term,
     Then,
+    Tight,
+    Wrap,
 } from "./grammar.aipl";
 import {
     AiplTok,
@@ -300,32 +305,25 @@ fn items() -> Production<AiplTok, Ast>[] {
 // ---------- types ----------
 
 fn types() -> Production<AiplTok, Ast>[] {
+    // The parenthesized list the four `(`-led forms share, given a production of
+    // its own. It removes the duplication, and it is what makes the list
+    // *layable out*: a `Wrap` describes what sits between one pair of brackets,
+    // and a production with four bracketed alternatives has no single pair to
+    // describe. Wanting to format the grammar is what found the repetition.
+    let ty_parens: Rule<AiplTok> = Then([
+        Lit("("),
+        Many(Named("ty"), sep=some(Lit(",")), trailing_sep=false),
+        Lit(")"),
+    ]);
+
     // The `(`-led forms are ordered longest-first, which is exactly the shift
     // decision gazelle's comments describe: `(A, B) -> R` over `(A, B)[]` over
     // `(A, B)!E` over `(A, B)`.
     let ty: Rule<AiplTok> = OneOf([
-        Then([
-            Lit("("),
-            Many(Named("ty"), sep=some(Lit(",")), trailing_sep=false),
-            Lit(")"),
-            Lit("->"),
-            Named("ty"),
-        ]),
-        Then([
-            Lit("("),
-            Many(Named("ty"), sep=some(Lit(",")), trailing_sep=false),
-            Lit(")"),
-            Lit("["),
-            Lit("]"),
-        ]),
-        Then([
-            Lit("("),
-            Many(Named("ty"), sep=some(Lit(",")), trailing_sep=false),
-            Lit(")"),
-            Lit("!"),
-            Named("base_ty"),
-        ]),
-        Then([Lit("("), Many(Named("ty"), sep=some(Lit(",")), trailing_sep=false), Lit(")")]),
+        Then([Named("ty_parens"), Lit("->"), Named("ty")]),
+        Then([Named("ty_parens"), Lit("["), Lit("]")]),
+        Then([Named("ty_parens"), Lit("!"), Named("base_ty")]),
+        Named("ty_parens"),
         Then([Lit("!"), Named("base_ty")]),
         Then([Named("base_ty"), Lit("!"), Named("base_ty")]),
         Named("base_ty"),
@@ -347,7 +345,20 @@ fn types() -> Production<AiplTok, Ast>[] {
         Term(Name),
     ]);
 
-    [pl("ty", ty, "a type"), p("base_ty", base_ty), p("ty_core", ty_core)]
+    [
+        pl("ty", ty, "a type"),
+        // Type position takes no trailing comma even when the list breaks — the
+        // grammar above says so with `trailing_sep: false`, and the layout says
+        // the same thing to the printer.
+        pw("ty_parens", ty_parens, ListStyle { trailing: false }),
+        // A core and its `?`/`[]` suffixes are written against each other.
+        pt("base_ty", base_ty),
+        // `Name<A, B>` and `#{k: v}` are bracketed lists whose opening bracket
+        // happens to be two tokens; `Wrap` reads the brackets off the tokens, so
+        // that is not a special case. The bare-`Name` alternative has no
+        // brackets at all and falls through to `Inline`.
+        pw("ty_core", ty_core, ListStyle { trailing: false }),
+    ]
 }
 
 // ---------- statements ----------
@@ -816,6 +827,71 @@ pub fn aipl_parse_cst(src: str) -> Cst!ParseError {
     assert(aipl_source(cased) == "fn main() { }\n\n");
 })
 
+# One AIPL **type**, laid out by the generated formatter.
+#
+# This is the stage-4 claim, stated where it can be checked. `walker.aipl` lays
+# out a type with six hand-written functions — `ty`, `paren_ty`, `ty_list`,
+# `base_ty`, `set_or_dict_ty`, `dict_value_ty`, `named_ty`, `type_suffixes`,
+# `array_suffixes` — about ninety lines of cursor-walking that mirror, by hand,
+# productions this file already describes. Here the same layouts are four
+# annotations on those productions plus `ty_space` below, and the assertions
+# under this function are `walker.aipl`'s own type assertions copied verbatim:
+# same inputs, same expected strings, including the broken-list case.
+#
+# What that does *not* say: the rest of AIPL is not this tractable. Statements
+# want a hard-broken block layout that `format.aipl` does not have an arm for
+# yet, and expressions want call hugging and chain breaking, which are not
+# layout at all. The types are the honest measure of the mechanical part — and
+# the mechanical part is most of the grammar-shaped half of the walker.
+pub fn format_aipl_ty(src: str, width: u64) -> str!ParseError {
+    let g = aipl_grammar();
+    render_cst(g, src, parse_cst(src, lex_lossless(src)?, g, "ty")?, ty_space, width)
+}.test({
+    // A bare name, and the `?` / `[]` suffix runs, in source order.
+    assert(format_aipl_ty("i64", 100)? == "i64");
+    assert(format_aipl_ty("i64 ?", 100)? == "i64?");
+    assert(format_aipl_ty("i64 [ ]", 100)? == "i64[]");
+    assert(format_aipl_ty("i64 [ ] [ ]", 100)? == "i64[][]");
+    assert(format_aipl_ty("i64 ? [ ]", 100)? == "i64?[]");
+    assert(format_aipl_ty("i64 [ ] ?", 100)? == "i64[]?");
+
+    // Set and dict types. Written `#{` rather than `# {`, unlike the walker's
+    // copy of these: a real lexer reads `# ` as the start of a doc comment,
+    // where the walker's test tokenizer splits on spaces and never sees one.
+    assert(format_aipl_ty("#{ str }", 100)? == "#{str}");
+    assert(format_aipl_ty("#{ str : i64 }", 100)? == "#{str: i64}");
+    assert(format_aipl_ty("#{ str : i64 } [ ]", 100)? == "#{str: i64}[]");
+
+    // Generic application — `<`/`>` are unambiguously argument brackets here.
+    assert(format_aipl_ty("Box < i64 >", 100)? == "Box<i64>");
+    assert(format_aipl_ty("Map < str , i64 >", 100)? == "Map<str, i64>");
+    // No trailing comma in type position, even broken.
+    assert(format_aipl_ty("Map < str , i64 >", 1)? == "Map<\n    str,\n    i64\n>");
+
+    // Results: `T!E`, and the void-ok `!E`.
+    assert(format_aipl_ty("i64 ! str", 100)? == "i64!str");
+    assert(format_aipl_ty("! Error", 100)? == "!Error");
+
+    // Parenthesized: function type, tuple, tuple array.
+    assert(format_aipl_ty("( i64 , str ) -> bool", 100)? == "(i64, str) -> bool");
+    assert(format_aipl_ty("( i64 , str )", 100)? == "(i64, str)");
+    assert(format_aipl_ty("( i64 , str ) [ ]", 100)? == "(i64, str)[]");
+    // A function type nests on the right.
+    assert(format_aipl_ty("( i64 ) -> ( str ) -> bool", 100)? == "(i64) -> (str) -> bool");
+
+    // A comment inside a type is not layout, so it survives.
+    assert(format_aipl_ty("Map < str , /* k */ i64 >", 100)? == "Map<str, /* k */ i64>");
+})
+
+# The spacing rule for the productions annotated so far: spaces around `->`, a
+# space after the `:` of a dict type, and nothing anywhere else.
+#
+# Everything else a reader would call spacing in a type is a list separating its
+# items, which the `Wrap` layouts do, or a suffix written against its core,
+# which `Tight` does. That is the shape the rule takes in a real language: a
+# handful of tokens that want air, and silence for the rest.
+fn ty_space(l: str, r: str) -> bool { l == "->" || r == "->" || l == ":" }
+
 # The whole rule set, read losslessly — every byte accounted for by a token or a
 # trivia record. Lexing and parsing report failure in the same shape but not the
 # same type, so the conversion happens once, here.
@@ -942,9 +1018,19 @@ pub fn aipl_parses(src: str) -> bool {
 
 // ---------- production helpers ----------
 
-# One production with the trivial lowering. Nothing here builds an AST — the
-# tree is the product — so every production shares one `build`.
-fn p(name: str, rule: Rule<AiplTok>) -> Production<AiplTok, Ast> { name, rule, build: Mk(keep) }
+# One production with the trivial lowering, laid out `Inline`. Nothing here
+# builds an AST — the tree is the product — so every production shares one
+# `build`.
+#
+# `Inline` is the default in the same sense `expect_as: ""` is: it is what a
+# production says when it has nothing particular to say. A production whose
+# layout matters names it through `pw` or `pt` below.
+fn p(name: str, rule: Rule<AiplTok>) -> Production<AiplTok, Ast> {
+    name,
+    rule,
+    build: Mk(keep),
+    layout: Inline,
+}
 
 # The same, labelled: what an error blames when this production fails having
 # matched nothing. The reified form of the LR parser's `SYMBOL_DISPLAY_NAMES`,
@@ -955,6 +1041,24 @@ fn pl(name: str, rule: Rule<AiplTok>, expect_as: str) -> Production<AiplTok, Ast
     rule,
     build: Mk(keep),
     expect_as,
+    layout: Inline,
+}
+
+# A production that is a bracketed list: `(a, b)`, `<T: any>`, `#{k: v}`.
+fn pw(name: str, rule: Rule<AiplTok>, style: ListStyle) -> Production<AiplTok, Ast> {
+    name,
+    rule,
+    build: Mk(keep),
+    layout: Wrap(style),
+}
+
+# A production whose parts are written against each other with no space between
+# them, whatever the spacing rule would otherwise say: `i64?[]`, `#{`.
+fn pt(name: str, rule: Rule<AiplTok>) -> Production<AiplTok, Ast> {
+    name,
+    rule,
+    build: Mk(keep),
+    layout: Tight,
 }
 
 # The placeholder an AST would be. `Build` has no payload-free arm to mean
@@ -966,198 +1070,288 @@ fn keep(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError { ok(Ignored) }
 # Test shorthand, so an assertion reads as the source it is about.
 fn parses(src: str) -> bool { aipl_parses(src) }
 --- performance ---
-allocations: 330190
-deallocations: 330190
-reallocations: 3257
-bytes allocated: 28589806
-instructions executed: 59459573
-binary size: 556480
-  code: 381248
-  data: 9156
-  metadata: 166076
+allocations: 410979
+deallocations: 410979
+reallocations: 3823
+bytes allocated: 42856909
+instructions executed: 74918486
+binary size: 597088
+  code: 403588
+  data: 10900
+  metadata: 182600
 functions:
-  __arr_drop___m1__Cst:
-    calls: 7312
-    bytes: 116
-  __arr_drop___m2__Prec:
-    calls: 112
-    bytes: 120
-  __arr_drop___m2__Production$__m3__AiplTok$Ast:
-    calls: 3472
-    bytes: 188
-  __arr_drop___m2__Rule$__m3__AiplTok:
-    calls: 50344
-    bytes: 116
-  __arr_drop___m4__StepResult$__m3__AiplTok:
+  __arr_drop___m11__StepResult$__m10__AiplTok:
     calls: 5
     bytes: 140
-  __arr_drop___m4__Token$__m3__AiplTok:
-    calls: 1630
+  __arr_drop___m11__Token$__m10__AiplTok:
+    calls: 1832
     bytes: 388
-  __arr_drop___m4__TokenRule$__m3__AiplTok:
-    calls: 112
+  __arr_drop___m11__TokenRule$__m10__AiplTok:
+    calls: 150
     bytes: 832
-  __arr_retain___m1__Cst:
-    calls: 7697
+  __arr_drop___m1__Cst:
+    calls: 8664
     bytes: 116
-  __arr_retain___m2__Prec:
-    calls: 0
+  __arr_drop___m2__Piece:
+    calls: 255
+    bytes: 228
+  __arr_drop___m3__Doc:
+    calls: 250
+    bytes: 116
+  __arr_drop___m9__Prec:
+    calls: 150
     bytes: 120
-  __arr_retain___m2__Production$__m3__AiplTok$Ast:
-    calls: 6104
-    bytes: 188
-  __arr_retain___m2__Rule$__m3__AiplTok:
-    calls: 62888
+  __arr_drop___m9__Production$__m10__AiplTok$Ast:
+    calls: 4725
+    bytes: 240
+  __arr_drop___m9__Rule$__m10__AiplTok:
+    calls: 66975
     bytes: 116
-  __arr_retain___m4__StepResult$__m3__AiplTok:
+  __arr_retain___m11__StepResult$__m10__AiplTok:
     calls: 7
     bytes: 140
-  __arr_retain___m4__Token$__m3__AiplTok:
-    calls: 1518
+  __arr_retain___m11__Token$__m10__AiplTok:
+    calls: 1682
     bytes: 388
-  __arr_retain___m4__TokenRule$__m3__AiplTok:
-    calls: 3976
+  __arr_retain___m11__TokenRule$__m10__AiplTok:
+    calls: 5325
     bytes: 832
-  __builtin_all$char$s0$lam77:
-    calls: 2
+  __arr_retain___m1__Cst:
+    calls: 9113
+    bytes: 116
+  __arr_retain___m2__Piece:
+    calls: 333
+    bytes: 228
+  __arr_retain___m3__Doc:
+    calls: 320
+    bytes: 116
+  __arr_retain___m9__Prec:
+    calls: 0
+    bytes: 120
+  __arr_retain___m9__Production$__m10__AiplTok$Ast:
+    calls: 8325
+    bytes: 240
+  __arr_retain___m9__Rule$__m10__AiplTok:
+    calls: 83325
+    bytes: 116
+  __builtin_all$char$s0$lam96:
+    calls: 74
     bytes: 212
-  __builtin_count_while$char$lam26:
-    calls: 770
+  __builtin_any$__m3__Doc$lam100:
+    calls: 0
+    bytes: 32
+  __builtin_any$__m3__Doc$lam100$tail:
+    calls: 108
+    bytes: 324
+  __builtin_count_while$char$lam47:
+    calls: 876
     bytes: 220
-  __builtin_count_while$char$s0$lam34:
-    calls: 605
-    bytes: 184
-  __builtin_count_while$char$s0$lam49:
-    calls: 0
-    bytes: 172
-  __builtin_count_while$char$s0$lam62:
-    calls: 0
-    bytes: 40
-  __builtin_count_while$char$s0$lam62$tail:
-    calls: 20
-    bytes: 256
-  __builtin_count_while$char$s0$lam74:
+  __builtin_count_while$char$s0$lam104:
     calls: 48
     bytes: 172
-  __builtin_count_while$char$s0$lam76:
+  __builtin_count_while$char$s0$lam106:
     calls: 1
     bytes: 172
-  __builtin_find_if$__m2__Prec$lam98:
+  __builtin_count_while$char$s0$lam55:
+    calls: 662
+    bytes: 184
+  __builtin_count_while$char$s0$lam75:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam88:
+    calls: 0
+    bytes: 40
+  __builtin_count_while$char$s0$lam88$tail:
+    calls: 23
+    bytes: 256
+  __builtin_drop_last$str:
+    calls: 0
+    bytes: 208
+  __builtin_find_if$__m9__Prec$lam121:
     calls: 120
     bytes: 688
-  __builtin_find_index$str$lam17:
-    calls: 56
+  __builtin_find_index$str$lam23:
+    calls: 4050
     bytes: 400
-  __builtin_find_index$str$lam37:
-    calls: 2968
+  __builtin_find_index$str$lam58:
+    calls: 12675
     bytes: 400
-  __builtin_find_index$str$lam69:
-    calls: 9408
+  __builtin_find_index$str$lam8:
+    calls: 75
     bytes: 400
   __builtin_int_parse:
     calls: 48
     bytes: 1028
-  __builtin_try_map$__m2__Production$__m3__AiplTok$Ast$__m2__Production$__m3__AiplTok$Ast$__m2__ParseError$lam40:
-    calls: 56
-    bytes: 972
-  __builtin_try_map$__m2__Rule$__m3__AiplTok$__m2__Rule<__m3__AiplTok>$__m2__ParseError$lam86:
-    calls: 8456
+  __builtin_intersperse$__m3__Doc:
+    calls: 24
+    bytes: 408
+  __builtin_try_map$__m9__Production$__m10__AiplTok$Ast$__m9__Production$__m10__AiplTok$Ast$__m9__ParseError$lam26:
+    calls: 75
+    bytes: 1168
+  __builtin_try_map$__m9__Rule$__m10__AiplTok$__m9__Rule<__m10__AiplTok>$__m9__ParseError$lam95:
+    calls: 11325
     bytes: 732
   __eq_char$opt:
-    calls: 651
+    calls: 708
     bytes: 100
   __eq_str$opt:
     calls: 114
     bytes: 100
-  __lambda_10:
-    calls: 3
-    bytes: 164
   __lambda_11:
     calls: 0
-    bytes: 48
-  __lambda_12:
-    calls: 2
-    bytes: 64
-  __lambda_38:
-    calls: 2968
-    bytes: 964
-  __lambda_45:
-    calls: 43
-    bytes: 140
-  __lambda_5:
-    calls: 0
     bytes: 136
-  __lambda_6:
-    calls: 239
+  __lambda_12:
+    calls: 274
     bytes: 104
-  __lambda_7:
+  __lambda_13:
     calls: 0
     bytes: 144
-  __lambda_8:
+  __lambda_14:
     calls: 0
     bytes: 164
-  __lambda_9:
+  __lambda_15:
     calls: 0
     bytes: 144
-  __m10__trim_prefix:
+  __lambda_16:
+    calls: 3
+    bytes: 164
+  __lambda_17:
+    calls: 0
+    bytes: 48
+  __lambda_18:
+    calls: 2
+    bytes: 64
+  __lambda_24:
+    calls: 4050
+    bytes: 1328
+  __lambda_71:
+    calls: 43
+    bytes: 140
+  __m10__char_lit_emit:
+    calls: 0
+    bytes: 1648
+  __m10__dedent_segments:
+    calls: 1
+    bytes: 272
+  __m10__doc_text:
+    calls: 8
+    bytes: 196
+  __m10__int_lit:
+    calls: 48
+    bytes: 1296
+  __m10__raw_tpl_kind:
+    calls: 2
+    bytes: 2392
+  __m10__tpl_kind:
+    calls: 6
+    bytes: 2424
+  __m11__between_len:
+    calls: 614
+    bytes: 752
+  __m11__delimited_len:
+    calls: 1225
+    bytes: 1592
+  __m11__finalize_template$__m10__AiplTok:
+    calls: 3
+    bytes: 8464
+  __m11__float_len:
+    calls: 0
+    bytes: 824
+  __m11__interp_scan$__m10__AiplTok:
+    calls: 5
+    bytes: 2248
+  __m11__lex$__m10__AiplTok:
+    calls: 75
+    bytes: 1520
+  __m11__lex_step$__m10__AiplTok:
+    calls: 1656
+    bytes: 28908
+  __m11__nested_len:
+    calls: 1050
+    bytes: 940
+  __m11__step_result$__m10__AiplTok:
+    calls: 47666
+    bytes: 14224
+  __m11__template_scan$__m10__AiplTok:
+    calls: 3
+    bytes: 2728
+  __m11__template_step$__m10__AiplTok:
+    calls: 1221
+    bytes: 476
+  __m11__to_eol_len:
+    calls: 0
+    bytes: 52
+  __m11__to_eol_len$tail:
+    calls: 2103
+    bytes: 252
+  __m11__to_eol_unless_len:
+    calls: 1049
+    bytes: 368
+  __m12__unescape:
+    calls: 9
+    bytes: 1108
+  __m13__process_raw_string:
+    calls: 1
+    bytes: 556
+  __m14__trim_prefix:
     calls: 18
     bytes: 260
-  __m11__trim_suffix:
+  __m15__trim_suffix:
     calls: 0
     bytes: 332
-  __m12__strip_test_sections:
+  __m16__strip_test_sections:
     calls: 66
     bytes: 692
-  __m13__parse_test_section_header:
+  __m17__parse_test_section_header:
     calls: 114
     bytes: 744
-  __m14__climb$__m3__AiplTok$Ast:
+  __m18__climb$__m10__AiplTok$Ast:
     calls: 157
     bytes: 2736
-  __m14__error_at$__m3__AiplTok$Ast:
+  __m18__error_at$__m10__AiplTok$Ast:
     calls: 9
     bytes: 2956
-  __m14__far_miss:
-    calls: 8571
+  __m18__far_miss:
+    calls: 9516
     bytes: 940
-  __m14__find_prec:
+  __m18__find_prec:
     calls: 120
     bytes: 228
-  __m14__leaf_at$__m3__AiplTok$Ast:
-    calls: 2096
+  __m18__leaf_at$__m10__AiplTok$Ast:
+    calls: 2420
     bytes: 3100
-  __m14__match_many$__m3__AiplTok$Ast:
-    calls: 813
+  __m18__match_many$__m10__AiplTok$Ast:
+    calls: 947
     bytes: 3668
-  __m14__match_maybe$__m3__AiplTok$Ast:
+  __m18__match_maybe$__m10__AiplTok$Ast:
     calls: 325
     bytes: 868
-  __m14__match_one_of$__m3__AiplTok$Ast:
-    calls: 2186
+  __m18__match_one_of$__m10__AiplTok$Ast:
+    calls: 2502
     bytes: 1312
-  __m14__match_prod$__m3__AiplTok$Ast:
-    calls: 3164
-    bytes: 4012
-  __m14__match_rule$__m3__AiplTok$Ast:
-    calls: 24921
+  __m18__match_prod$__m10__AiplTok$Ast:
+    calls: 4371
+    bytes: 4820
+  __m18__match_rule$__m10__AiplTok$Ast:
+    calls: 29461
     bytes: 12788
-  __m14__match_then$__m3__AiplTok$Ast:
-    calls: 7870
+  __m18__match_then$__m10__AiplTok$Ast:
+    calls: 9503
     bytes: 1720
-  __m14__parse_cst$__m3__AiplTok$Ast:
-    calls: 56
+  __m18__parse_cst$__m10__AiplTok$Ast:
+    calls: 75
     bytes: 4388
-  __m14__prev_end$__m3__AiplTok$Ast:
-    calls: 2190
+  __m18__prev_end$__m10__AiplTok$Ast:
+    calls: 2552
     bytes: 1580
-  __m14__quoted:
-    calls: 7443
+  __m18__quoted:
+    calls: 8388
     bytes: 456
-  __m14__tok_text$__m3__AiplTok$Ast:
-    calls: 8551
+  __m18__tok_text$__m10__AiplTok$Ast:
+    calls: 9606
     bytes: 1640
-  __m14__trailing_trivia$__m3__AiplTok$Ast:
-    calls: 94
+  __m18__trailing_trivia$__m10__AiplTok$Ast:
+    calls: 132
     bytes: 1160
   __m1__leaves:
     calls: 246
@@ -1165,89 +1359,89 @@ functions:
   __m1__text:
     calls: 10
     bytes: 476
-  __m2__link$__m3__AiplTok$Ast:
-    calls: 56
-    bytes: 1188
-  __m2__link_opt$__m3__AiplTok:
-    calls: 2016
-    bytes: 652
-  __m2__link_rule$__m3__AiplTok:
-    calls: 43008
-    bytes: 4364
-  __m2__prod_names$__m3__AiplTok$Ast:
-    calls: 112
-    bytes: 492
-  __m3__char_lit_emit:
-    calls: 0
-    bytes: 1648
-  __m3__dedent_segments:
+  __m1__token_leaves:
+    calls: 663
+    bytes: 784
+  __m2__breaks_after:
     calls: 1
-    bytes: 272
-  __m3__doc_text:
-    calls: 8
-    bytes: 196
-  __m3__int_lit:
-    calls: 48
-    bytes: 1296
-  __m3__raw_tpl_kind:
-    calls: 2
-    bytes: 2392
-  __m3__tpl_kind:
-    calls: 6
-    bytes: 2424
-  __m4__between_len:
-    calls: 557
-    bytes: 752
-  __m4__delimited_len:
-    calls: 1111
-    bytes: 1592
-  __m4__finalize_template$__m3__AiplTok:
-    calls: 3
-    bytes: 8464
-  __m4__float_len:
+    bytes: 444
+  __m2__format_cst$__m10__AiplTok$Ast$s1$lam10:
+    calls: 123
+    bytes: 5420
+  __m2__gap_wanted$lam63:
+    calls: 106
+    bytes: 304
+  __m2__inline_doc$lam31:
+    calls: 91
+    bytes: 2668
+  __m2__lead_toks:
+    calls: 43
+    bytes: 740
+  __m2__pieces$__m10__AiplTok$Ast$s1$lam29:
+    calls: 123
+    bytes: 2140
+  __m2__render_cst$__m10__AiplTok$Ast$s1$lam3:
+    calls: 19
+    bytes: 5268
+  __m2__run_text:
+    calls: 24
+    bytes: 892
+  __m2__tail_toks:
+    calls: 43
+    bytes: 1176
+  __m2__wrapped$lam32:
+    calls: 43
+    bytes: 4544
+  __m3__col_after:
+    calls: 95
+    bytes: 544
+  __m3__fits:
     calls: 0
-    bytes: 824
-  __m4__interp_scan$__m3__AiplTok:
-    calls: 5
-    bytes: 2248
-  __m4__lex$__m3__AiplTok:
-    calls: 56
-    bytes: 1520
-  __m4__lex_step$__m3__AiplTok:
-    calls: 1492
-    bytes: 28908
-  __m4__nested_len:
-    calls: 957
-    bytes: 940
-  __m4__step_result$__m3__AiplTok:
-    calls: 43192
-    bytes: 14224
-  __m4__template_scan$__m3__AiplTok:
-    calls: 3
-    bytes: 2728
-  __m4__template_step$__m3__AiplTok:
-    calls: 1107
-    bytes: 476
-  __m4__to_eol_len:
+    bytes: 36
+  __m3__fits$tail:
+    calls: 226
+    bytes: 2684
+  __m3__fits_atom:
     calls: 0
     bytes: 52
-  __m4__to_eol_len$tail:
-    calls: 1918
-    bytes: 252
-  __m4__to_eol_unless_len:
-    calls: 957
-    bytes: 368
-  __m5__unescape:
-    calls: 9
-    bytes: 1108
-  __m6__process_raw_string:
+  __m3__fits_atom$tail:
+    calls: 68
+    bytes: 312
+  __m3__has_hard:
+    calls: 0
+    bytes: 32
+  __m3__has_hard$tail:
+    calls: 206
+    bytes: 688
+  __m4__reindent_block:
+    calls: 0
+    bytes: 2832
+  __m5__dedent:
     calls: 1
-    bytes: 1712
+    bytes: 1276
+  __m9__link$__m10__AiplTok$Ast:
+    calls: 75
+    bytes: 1188
+  __m9__link_opt$__m10__AiplTok:
+    calls: 2475
+    bytes: 652
+  __m9__link_rule$__m10__AiplTok:
+    calls: 56775
+    bytes: 4364
+  __m9__prod_names$__m10__AiplTok$Ast:
+    calls: 150
+    bytes: 564
   __rec_drop___m1__Cst:
-    calls: 5194
+    calls: 6145
     bytes: 48
-  __rec_drop___m2__Rule$__m3__AiplTok:
-    calls: 117264
+  __rec_drop___m3__Doc:
+    calls: 314
+    bytes: 184
+  __rec_drop___m3__Work:
+    calls: 537
+    bytes: 84
+  __rec_drop___m9__Rule$__m10__AiplTok:
+    calls: 154575
     bytes: 304
   __test$aipl_parse_cst:
     calls: 1
@@ -1258,99 +1452,117 @@ functions:
   __test$aipl_parses:
     calls: 1
     bytes: 11680
-  __test_try_fail___m2__ParseError:
+  __test$format_aipl_ty:
+    calls: 1
+    bytes: 8240
+  __test_try_fail___m9__ParseError:
     calls: 0
     bytes: 84
-  __to_str___m2__ParseError:
+  __to_str___m9__ParseError:
     calls: 0
     bytes: 824
   __to_str_u64:
     calls: 0
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 86
+    calls: 375
     bytes: (external)
   aipl_arr_extend:
-    calls: 7360
+    calls: 8443
     bytes: (external)
   aipl_arr_inc:
-    calls: 562380
+    calls: 660575
     bytes: (external)
   aipl_arr_join:
-    calls: 104
+    calls: 393
     bytes: (external)
   aipl_arr_reserve:
-    calls: 12446
+    calls: 13994
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 236
+    calls: 795
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 755177
+    calls: 893091
     bytes: (external)
   aipl_array_new:
-    calls: 143985
+    calls: 168397
     bytes: (external)
   aipl_array_push:
-    calls: 38669
+    calls: 51866
     bytes: (external)
   aipl_array_push_mut:
-    calls: 16731
+    calls: 21778
     bytes: (external)
   aipl_array_with_cap:
-    calls: 2474
+    calls: 3263
     bytes: (external)
   aipl_assert:
-    calls: 57
+    calls: 76
     bytes: (external)
+  aipl_grammar:
+    calls: 75
+    bytes: 884
   aipl_parse_cst:
     calls: 56
-    bytes: 151948
+    bytes: 496
   aipl_parse_report:
     calls: 8
     bytes: 664
   aipl_rec_alloc:
-    calls: 122458
+    calls: 161571
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 531861
+    calls: 711423
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 11648
+    calls: 14792
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 409403
+    calls: 549852
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 11648
+    calls: 14792
     bytes: (external)
   aipl_test_begin:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   expressions:
-    calls: 112
-    bytes: 32260
+    calls: 150
+    bytes: 33504
+  format_aipl_ty:
+    calls: 19
+    bytes: 744
+  items:
+    calls: 75
+    bytes: 29156
   keep:
     calls: 0
     bytes: 196
+  lex_lossless:
+    calls: 75
+    bytes: 96708
   main:
     calls: 1
-    bytes: 272
+    bytes: 348
   p:
-    calls: 4312
-    bytes: 424
+    calls: 5475
+    bytes: 532
   patterns:
-    calls: 112
-    bytes: 6020
+    calls: 150
+    bytes: 6364
   statements:
-    calls: 112
-    bytes: 24816
+    calls: 150
+    bytes: 25784
   types:
-    calls: 112
-    bytes: 8912
+    calls: 150
+    bytes: 9080

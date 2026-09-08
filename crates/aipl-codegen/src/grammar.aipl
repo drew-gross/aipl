@@ -138,6 +138,45 @@ variant Rule<K: variant> =
 # `lexer.aipl` lives with.
 variant Build<A: any> = Mk((str, Cst, A[]) -> A!ParseError)
 
+# How a bracketed list lays out: what separates its items, whether the brackets
+# take inner spaces while the list stays on one line (`{ a, b }` against
+# `(a, b)`), and whether a separator is written after the last item once it
+# breaks.
+#
+# The brackets themselves are not here. They are in the source, and the
+# formatter reads them off the tokens the production matched — a style is only
+# the handful of decisions the tokens cannot answer. An empty `sep` is the
+# juxtaposed list, where items are separated by nothing but the space between
+# them: `(a b c)`, and every S-expression ever written.
+struct ListStyle { sep: str = ",", spaced: bool = false, trailing: bool = true }
+
+# How a production's matched children are joined into a `Doc` — the formatting
+# half of a language description, read by `format.aipl` exactly as `Rule` is
+# read by `parse.aipl`.
+#
+# The vocabulary is deliberately small, and it is not the whole of a formatter:
+# comment attachment, call hugging and chain breaking are judgement about
+# *this* language and do not fall out of any grammar. What these three do cover
+# is the mechanical majority — the productions whose layout is fully determined
+# by the tokens they matched.
+variant Layout =
+    // The children in order with nothing inserted between them: `-x`, `a.b`,
+    // `i64?[]`. The layout for a production whose parts are written together.
+    | Tight
+    // The children in order, with a space between two of them exactly where the
+    // spacing rule passed to `format_cst` says one belongs. The default, and
+    // what a production that only passes a child through wants — a lone child
+    // has no gaps to decide.
+    | Inline
+    // A bracketed list: one line while it fits, otherwise one item per indented
+    // line. The leading and trailing runs of matched tokens are the brackets,
+    // and between them a token spelled like the style's separator ends an item.
+    //
+    // A production whose alternatives are not *all* bracketed falls back to
+    // `Inline` for the ones that aren't, so a single annotation still covers the
+    // whole production.
+    | Wrap(ListStyle)
+
 # One named production: its rule, and what each downstream pass needs from it.
 #
 # `name` is both the reference target (`Named("expr")`) and the CST node's name.
@@ -146,13 +185,26 @@ variant Build<A: any> = Mk((str, Cst, A[]) -> A!ParseError)
 # which collapses `expr`/`term`/`unary`/`atom` to one word. Empty means
 # *transparent*: a plumbing production never surfaces in a message, and the
 # finer expectations from inside it are what the reader sees. `scope` is the
-# highlighter hint; it is carried, not yet consumed.
+# highlighter hint; it is carried, not yet consumed. `layout` is how the
+# formatter joins what this production matched.
+#
+# `layout` has no default, unlike the two hints above it, and that is the
+# compiler's decision rather than the design's: a struct field's default must be
+# a literal, and `Layout` has no literal form. A bare `= Inline` is refused
+# ("unknown identifier"), `Layout?` is refused as a field type because `Layout`
+# is not recursive and so is not boxed, and a `= inline()` call *is* accepted but
+# is then resolved in every file that constructs a `Production` — so a grammar
+# that never mentions layout would have to import a function it never names, and
+# the error when it forgets points at an unrelated line. Spelling the layout out
+# is the honest version of that, and a grammar saying how each production prints
+# beside how it parses is the whole point of the field.
 struct Production<K: variant, A: any> {
     name: str,
     rule: Rule<K>,
     build: Build<A>,
     expect_as: str = "",
     scope: str = "",
+    layout: Layout,
 }
 
 # A whole language: its productions, in order. Position is identity — a
@@ -232,8 +284,14 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     let r_item: Rule<Kind> = OneOf([Term(Atom), Named("list")]);
     let g: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "list", rule: r_list, build: Mk(keep) },
-            Production { name: "item", rule: r_item, build: Mk(keep), expect_as: "an item" },
+            Production { name: "list", rule: r_list, build: Mk(keep), layout: Inline },
+            Production {
+                name: "item",
+                rule: r_item,
+                build: Mk(keep),
+                expect_as: "an item",
+                layout: Inline,
+            },
         ],
     };
 
@@ -258,18 +316,25 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // Every rule shape carries its reference, and every one is rewritten.
     let shapes: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "a", rule: Maybe(Named("a")), build: Mk(keep) },
+            Production { name: "a", rule: Maybe(Named("a")), build: Mk(keep), layout: Inline },
             Production {
                 name: "b",
                 rule: Many(Named("a"), sep=some(Literal(","))),
                 build: Mk(keep),
+                layout: Inline,
             },
             Production {
                 name: "c",
                 rule: Climb(Named("a"), [Prec { power: 1, right: false, ops: ["+"] }]),
                 build: Mk(keep),
+                layout: Inline,
             },
-            Production { name: "d", rule: Many(Named("b"), min=1), build: Mk(keep) },
+            Production {
+                name: "d",
+                rule: Many(Named("b"), min=1),
+                build: Mk(keep),
+                layout: Inline,
+            },
         ],
     };
     let ls = link(shapes)?;
@@ -280,15 +345,15 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 
     // An unresolved reference is a grammar error, named in the message.
     let bad: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: Named("missing"), build: Mk(keep) }],
+        prods: [Production { name: "a", rule: Named("missing"), build: Mk(keep), layout: Inline }],
     };
     assert(link(bad) == err(ParseError { message: "no rule named \"missing\"", span: 0..0 }));
 
     // So is a duplicate name — the typo that otherwise reads as a working grammar.
     let dup: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "a", rule: Literal("x"), build: Mk(keep) },
-            Production { name: "a", rule: Literal("y"), build: Mk(keep) },
+            Production { name: "a", rule: Literal("x"), build: Mk(keep), layout: Inline },
+            Production { name: "a", rule: Literal("y"), build: Mk(keep), layout: Inline },
         ],
     };
     assert(link(dup) == err(ParseError { message: "duplicate rule name \"a\"", span: 0..0 }));
@@ -329,19 +394,19 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
 allocations: 113
 deallocations: 113
 reallocations: 17
-bytes allocated: 9664
-instructions executed: 14250
-binary size: 48024
-  code: 29892
+bytes allocated: 10864
+instructions executed: 15831
+binary size: 50848
+  code: 32352
   data: 1724
-  metadata: 16408
+  metadata: 16772
 functions:
   __arr_drop_Prec:
     calls: 2
     bytes: 120
   __arr_drop_Production$Kind$Node:
     calls: 12
-    bytes: 188
+    bytes: 240
   __arr_drop_Rule$Kind:
     calls: 15
     bytes: 116
@@ -350,7 +415,7 @@ functions:
     bytes: 120
   __arr_retain_Production$Kind$Node:
     calls: 13
-    bytes: 188
+    bytes: 240
   __arr_retain_Rule$Kind:
     calls: 16
     bytes: 116
@@ -368,7 +433,7 @@ functions:
     bytes: 400
   __builtin_try_map$Production$Kind$Node$Production$Kind$Node$ParseError$lam11:
     calls: 4
-    bytes: 972
+    bytes: 1168
   __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam17:
     calls: 4
     bytes: 732
@@ -401,7 +466,7 @@ functions:
     bytes: 100
   __lambda_9:
     calls: 9
-    bytes: 964
+    bytes: 1328
   __rec_drop_Node:
     calls: 0
     bytes: 72
@@ -413,7 +478,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 12376
+    bytes: 13880
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -485,7 +550,7 @@ functions:
     bytes: 180
   prod_names$Kind$Node:
     calls: 9
-    bytes: 492
+    bytes: 564
   rule_of$Kind$Node:
     calls: 7
-    bytes: 820
+    bytes: 1040

@@ -674,6 +674,7 @@ case_tests! {
     crates_aipl_codegen_src_fill_or_add_section_file = "crates/aipl-codegen/src/fill_or_add_section_file",
     crates_aipl_codegen_src_find_files = "crates/aipl-codegen/src/find_files",
     crates_aipl_codegen_src_find_trailing_whitespace = "crates/aipl-codegen/src/find_trailing_whitespace",
+    crates_aipl_codegen_src_format = "crates/aipl-codegen/src/format",
     crates_aipl_codegen_src_format_source = "crates/aipl-codegen/src/format_source",
     crates_aipl_codegen_src_grammar = "crates/aipl-codegen/src/grammar",
     crates_aipl_codegen_src_grammar_aipl = "crates/aipl-codegen/src/grammar_aipl",

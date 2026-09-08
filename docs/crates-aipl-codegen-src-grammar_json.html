@@ -52,7 +52,13 @@
 
           <li><code>show_first_sets</code> <span class="from">from ./ebnf.aipl</span></li>
 
+          <li><code>render_cst</code> <span class="from">from ./format.aipl</span></li>
+
           <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Inline</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ListStyle</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>Literal</code> <span class="as">as</span> <code>Lit</code> <span class="from">from ./grammar.aipl</span></li>
 
@@ -75,6 +81,10 @@
           <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Tight</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Wrap</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>failure_message</code> <span class="from">from ./grammar.aipl</span></li>
 
@@ -401,6 +411,32 @@
         <pre class="signature"><code>fn shown(src: str) -&#62; str!ParseError</code></pre>
 
         <div class="doc"><p>The concrete tree, rendered against the production names — the debug view a tree assertion reads better as than a nested <code>CTree</code> literal.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-format_json">
+        <h2>
+          <a class="anchor" href="#item-format_json">format_json</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn format_json(src: str, width: u64) -&#62; str!ParseError</code></pre>
+
+        <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>The whole of JSON's layout is the eight annotations on the grammar above plus <code>json_space</code> below. There is no second walker over JSON's syntax, and adding a ninth production would need no more than a ninth annotation — which is the claim this stage exists to make good on.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-json_space">
+        <h2>
+          <a class="anchor" href="#item-json_space">json_space</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn json_space(l: str, r: str) -&#62; bool</code></pre>
+
+        <div class="doc"><p>JSON's whole spacing rule: a space after the <code>:</code> of a member, and nowhere else. Everything else that looks like spacing — between members, inside braces — is a list breaking or not breaking, which the layouts decide.</p></div>
 
 
       </section>

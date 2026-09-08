@@ -8,13 +8,13 @@ each is sized to be finishable in one session.
 - [x] 1 `ebnf.aipl` + FIRST sets
 - [x] 2 Highlighter generator (oracle: `tests/highlighting.rs`)
 - [x] 3 AIPL's grammar, differential-tested against gazelle
-- [ ] 4 Formatter generator
+- [x] 4 Formatter generator (the mechanical part)
 - [ ] 5 Retire gazelle
 
 The stages are strictly sequential.
 
 **The library itself is built and proven**, and its plan is no longer here:
-`grammar.aipl`, `cst.aipl` and `parse.aipl`, with three end-to-end toy
+`grammar.aipl`, `cst.aipl`, `parse.aipl` and `format.aipl`, with three end-to-end toy
 grammars — `grammar_sexp.aipl` (recursion and depth), `grammar_json.aipl`
 (several terminal classes, a separated `Many`, a heterogeneous AST) and
 `grammar_calc.aipl` (`Climb`, lowered and then
@@ -30,7 +30,7 @@ formalisms**:
 | Description | Where | Size | Produces |
 |---|---|---|---|
 | gazelle LR(1) grammar | `crates/aipl-parser/src/lib.rs:18-504` | ~254 non-comment lines, 81 rules, 238 alternatives | the compiler's AST |
-| formatter token walker | `crates/aipl-codegen/src/walker.aipl` | 2644 code lines, ~160 functions | a `Doc` layout tree |
+| formatter token walker | `crates/aipl-codegen/src/walker.aipl` | 2672 code lines, 145 functions | a `Doc` layout tree |
 | TextMate grammar | `editors/vscode/syntaxes/aipl.tmLanguage.json` | 173 lines | editor scopes |
 
 CLAUDE.md already names the cost of two of them: *"Adding a syntax form means
@@ -232,13 +232,88 @@ grows `build` functions, so they are pinned rather than waved through.
 Nothing joined `DOGFOOD_SOURCE_FILES` yet: the test JIT-compiles the grammar
 through `Engine::compile_file`. That happens in Stage 5.
 
-**4 — The formatter generator**, targeting the existing `Doc`. `Layout` starts
-from `walker.aipl`'s vocabulary (`ListStyle`, `comma_list_docs`, `match_expr`'s
-hard-broken block) with a `Custom(str)` escape hatch naming a hand-written layout
-function. Honest risk: most of `walker.aipl`'s bulk is *heuristics* — comment
-attachment, call hugging, chain breaking, import sorting — and those will not
-fall out of a grammar. The realistic win is retiring the mechanical two thirds
-and shrinking the "teach two parsers" problem, not deleting the file.
+**4 — The formatter generator, for the mechanical part. Done.** `format.aipl`
+turns a `Cst` into a `Doc`, reading one `Layout` off each production the way
+`parse.aipl` reads its `Rule` — the language stays data, the file is the loop
+over it. `Production` gained `layout`, so one value still describes a language.
+
+The whole vocabulary is three arms and one function per language:
+
+| | |
+|---|---|
+| `Tight` | children run together, the spacing rule not consulted — `-x`, `i64?[]` |
+| `Inline` | children in order, a space wherever the language's rule wants one |
+| `Wrap(ListStyle)` | a bracketed list: flat while it fits, else one item per indented line |
+
+`ListStyle` is three fields (`sep`, `spaced`, `trailing`) and deliberately does
+*not* name the brackets: `Wrap` reads the leading and trailing runs of matched
+tokens as the open and close, which is why one annotation covers `(a, b)`,
+`[a]`, `#{a}` and `Name<A, B>` — the last two having two-token brackets — and
+why an alternative with no brackets is recognizable and falls back to `Inline`.
+
+The per-language function is `space(l, r) -> bool`: whether a space belongs
+between the token spelled `l` and the token spelled `r`. That is the piece a
+grammar genuinely cannot answer, and it is small — JSON's is `l == ":"`, the
+calculator's is "either side is an operator", AIPL's type rule is one line.
+
+Comments are the one thing a formatter must never lose, and the `Cst` makes that
+free: whitespace trivia is dropped (the formatter replaces it) and everything
+else the lexer set aside is emitted verbatim, followed by a hard line when the
+author ended their line with it. That flag is read from the source rather than
+configured, which is what tells a `//` comment from a `/* */` one without asking
+the language.
+
+**Proven end to end on all three toys**, each with the same four assertions:
+canonical output from messy input, output that re-parses to the same AST,
+idempotence, and the broken-list layout at a narrow width. `grammar_sexp.aipl`
+adds a comment surviving inside a list; `grammar_calc.aipl` adds the strongest
+check available to it — formatting cannot change the expression's *value*.
+JSON's entire layout is eight annotations plus a one-line `space`.
+
+**The shrink, measured on AIPL itself.** `format_aipl_ty` in
+`grammar_aipl.aipl` lays out an AIPL type through the generated formatter, and
+its `.test` block is `walker.aipl`'s own type assertions copied verbatim — same
+inputs, same expected strings, the broken `Map<str, i64>` included. Against
+that, `walker.aipl:679-803` is nine hand-written functions and 96 non-comment
+lines (`ty`, `paren_ty`, `ty_list`, `base_ty`, `set_or_dict_ty`,
+`dict_value_ty`, `named_ty`, `type_suffixes`, `array_suffixes`) that mirror, by
+hand, productions this repo already describes. The replacement is four
+annotations and a one-line spacing rule.
+
+**Wanting to format the grammar improved the grammar.** A `Layout` is per
+production, so a production whose alternatives are shaped differently cannot
+name one — AIPL's `ty` had the same `"(" ty,* ")"` written out in four of its
+seven alternatives, and no single pair of brackets to describe. Extracting
+`ty_parens` removed the duplication and made the layout expressible at once.
+The corpus differential still agrees with gazelle on every file.
+
+**What this does not do**, and the estimate in this plan was right about it.
+There is no `Stack` arm yet, so a hard-broken statement block is not expressible
+and AIPL's statements and items are unannotated. Comment *attachment* (which
+construct a comment belongs to), call hugging, chain breaking, import sorting
+and blank-line preservation are judgement about a specific language and are not
+layout at all; they stay in `walker.aipl`, which is not going away. The claim is
+only the one the measurement supports: the grammar-shaped part of a formatter is
+derivable, and that part is where describing one syntax twice actually costs.
+
+Three compiler limits turned up and are worked around rather than fixed, since
+none is on the library's critical path:
+
+- **A struct field default must be a literal.** `layout: Layout = Inline` is
+  "unknown identifier"; `layout: Layout? = none` is refused as a field type
+  (`Layout` is not recursive, so not boxed); `layout: Layout = inline()` *is*
+  accepted but the call is re-resolved in every file that constructs a
+  `Production`, so a parser-only grammar would have to import a function it
+  never names — and the error when it forgets points at an unrelated line.
+  Hence `layout` has no default and every production states one.
+- **A lambda bound to a `let` is not a value.** It cannot be called by name and
+  cannot be passed to a function expecting a function parameter, so test helpers
+  that would naturally be local lambdas are named top-level functions. (A lambda
+  in *value* position also needs a block body; only an argument-position one may
+  have an expression body.)
+- A `#` followed by a space is a doc comment, so `# { str }` — the spelling
+  `walker.aipl`'s space-splitting test tokenizer uses — is not a set type to a
+  real lexer. The copied assertions write `#{ str }`.
 
 **5 — Retire gazelle.**
 
@@ -278,7 +353,9 @@ file that also declares a `Kind` constructor trips the silent drop.
    source byte-for-byte. Stage 4 depends on this; it is the cheapest place to
    catch a regression.
 6. **Round-trip on each toy** — parse → lower → render → parse, which each of
-   the three asserts. The calculator renders fully parenthesized, so its round
+   the three asserts, and since Stage 4 the formatter's own pair as well:
+   parse → format → parse gives back the same AST, and formatting an already
+   formatted source changes nothing. The calculator renders fully parenthesized, so its round
    trip is exact *and* its text shows the tree; a grammar added later should
    carry the same pair. The deep-nesting case (200 levels of `((((...))))`) lives
    with the S-expressions and runs as a **built binary**, not just under

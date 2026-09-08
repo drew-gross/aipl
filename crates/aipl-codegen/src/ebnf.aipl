@@ -65,6 +65,7 @@ import { Cst } from "./cst.aipl";
 import {
     Climb,
     Grammar,
+    Inline,
     Literal,
     Many,
     Maybe,
@@ -699,7 +700,12 @@ variant Node = NLeaf(str) | NList(Node[])
 # payload-free arm to mean "nothing to lower".
 fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(NList(kids)) }
 
-fn one(name: str, rule: Rule<Kind>) -> Production<Kind, Node> { name, rule, build: Mk(keep) }
+fn one(name: str, rule: Rule<Kind>) -> Production<Kind, Node> {
+    name,
+    rule,
+    build: Mk(keep),
+    layout: Inline,
+}
 
 fn g_of(ps: Production<Kind, Node>[]) -> Grammar<Kind, Node> { prods: ps }
 
@@ -743,12 +749,12 @@ fn fixture() -> Grammar<Kind, Node> {
 allocations: 1384
 deallocations: 1384
 reallocations: 144
-bytes allocated: 103295
-instructions executed: 145476
-binary size: 105784
-  code: 66920
+bytes allocated: 109247
+instructions executed: 152091
+binary size: 109928
+  code: 70744
   data: 3684
-  metadata: 35180
+  metadata: 35500
 functions:
   __arr_drop_First$Kind:
     calls: 77
@@ -761,7 +767,7 @@ functions:
     bytes: 120
   __arr_drop___m2__Production$Kind$Node:
     calls: 42
-    bytes: 188
+    bytes: 240
   __arr_drop___m2__Rule$Kind:
     calls: 91
     bytes: 116
@@ -776,7 +782,7 @@ functions:
     bytes: 120
   __arr_retain___m2__Production$Kind$Node:
     calls: 60
-    bytes: 188
+    bytes: 240
   __arr_retain___m2__Rule$Kind:
     calls: 119
     bytes: 116
@@ -788,10 +794,10 @@ functions:
     bytes: 400
   __builtin_try_map$__m2__Production$Kind$Node$First<Kind>$__m2__ParseError$lam18:
     calls: 17
-    bytes: 920
+    bytes: 1032
   __builtin_try_map$__m2__Production$Kind$Node$__m2__Production$Kind$Node$__m2__ParseError$lam10:
     calls: 9
-    bytes: 972
+    bytes: 1168
   __builtin_try_map$__m2__Rule$Kind$__m2__Rule<Kind>$__m2__ParseError$lam36:
     calls: 27
     bytes: 732
@@ -815,7 +821,7 @@ functions:
     bytes: 128
   __lambda_8:
     calls: 35
-    bytes: 964
+    bytes: 1328
   __m2__link$Kind$Node:
     calls: 9
     bytes: 1188
@@ -827,7 +833,7 @@ functions:
     bytes: 4364
   __m2__prod_names$Kind$Node:
     calls: 20
-    bytes: 492
+    bytes: 564
   __map30:
     calls: 0
     bytes: 380
@@ -842,10 +848,10 @@ functions:
     bytes: 900
   __test$ebnf:
     calls: 1
-    bytes: 8524
+    bytes: 10068
   __test$first_sets:
     calls: 1
-    bytes: 4592
+    bytes: 5228
   __test$rule_first:
     calls: 1
     bytes: 2232
@@ -938,7 +944,7 @@ functions:
     bytes: 456
   ebnf$Kind$Node:
     calls: 6
-    bytes: 1560
+    bytes: 1636
   first_msg:
     calls: 2
     bytes: 480
@@ -953,13 +959,13 @@ functions:
     bytes: 324
   fixture:
     calls: 2
-    bytes: 4720
+    bytes: 5356
   keep:
     calls: 0
     bytes: 268
   linked_first_sets$Kind$Node:
     calls: 6
-    bytes: 1084
+    bytes: 1168
   main:
     calls: 1
     bytes: 452

@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/format.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/format.aipl</code></h1>
+
+      <section class="imports">
+        <h2>Imports</h2>
+        <ul>
+
+          <li><code>Span</code> <span class="from">from builtins</span></li>
+
+          <li><code>equal</code> <span class="as">as</span> <code>==</code> <span class="from">from builtins</span></li>
+
+          <li><code>first</code> <span class="from">from builtins</span></li>
+
+          <li><code>intersperse</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_all_whitespace</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_empty</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_nonempty</code> <span class="from">from builtins</span></li>
+
+          <li><code>is_some_and</code> <span class="from">from builtins</span></li>
+
+          <li><code>join</code> <span class="from">from builtins</span></li>
+
+          <li><code>last</code> <span class="from">from builtins</span></li>
+
+          <li><code>len</code> <span class="from">from builtins</span></li>
+
+          <li><code>less_than</code> <span class="as">as</span> <code>&#60;</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_and</code> <span class="as">as</span> <code>&#38;&#38;</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_not</code> <span class="as">as</span> <code>!</code> <span class="from">from builtins</span></li>
+
+          <li><code>logical_or</code> <span class="as">as</span> <code>||</code> <span class="from">from builtins</span></li>
+
+          <li><code>map</code> <span class="from">from builtins</span></li>
+
+          <li><code>not_equal</code> <span class="as">as</span> <code>!=</code> <span class="from">from builtins</span></li>
+
+          <li><code>push</code> <span class="from">from builtins</span></li>
+
+          <li><code>saturating_decrement</code> <span class="as">as</span> <code>--</code> <span class="from">from builtins</span></li>
+
+          <li><code>saturating_sub</code> <span class="as">as</span> <code>-</code> <span class="from">from builtins</span></li>
+
+          <li><code>value_or_err</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_add</code> <span class="as">as</span> <code>+</code> <span class="from">from builtins</span></li>
+
+          <li><code>wrapping_increment</code> <span class="as">as</span> <code>++</code> <span class="from">from builtins</span></li>
+
+          <li><code>CLeaf</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>CTree</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>CTrivia</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>Cst</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>span</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>token_leaves</code> <span class="from">from ./cst.aipl</span></li>
+
+          <li><code>Concat</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Doc</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>HardLine</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>IfBroken</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Indent</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Line</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>SoftLine</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Text</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>group</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>print_doc</code> <span class="from">from ./doc.aipl</span></li>
+
+          <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Inline</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Layout</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ListStyle</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Mk</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ParseError</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Production</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Rule</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Tight</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Wrap</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>failure_message</code> <span class="from">from ./grammar.aipl</span></li>
+
+        </ul>
+      </section>
+
+
+
+      <section class="item" id="item-Piece">
+        <h2>
+          <a class="anchor" href="#item-Piece">Piece</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant Piece</code></pre>
+
+        <div class="doc"><p>One child of a node, reduced to what layout needs from it.</p><p>Whitespace never becomes a piece: the formatter decides the spacing, so the author's is read only where it changes meaning — which is the flag on a comment, and nowhere else.</p></div>
+
+
+        <ul class="cases">
+
+          <li id="item-PTok"><code>PTok(str)</code></li>
+
+          <li id="item-PNode"><code>PNode(Doc, str, str)</code></li>
+
+          <li id="item-PNote"><code>PNote(str, bool)</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-format_cst">
+        <h2>
+          <a class="anchor" href="#item-format_cst">format_cst</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn format_cst&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, node: Cst, space: (str, str) -&#62; bool) -&#62; Doc!ParseError</code></pre>
+
+        <div class="doc"><p>The <code>Doc</code> that lays <code>node</code> out, given the grammar it was parsed with.</p><p><code>space</code> answers the one question a grammar cannot: whether a space belongs between two adjacent tokens. It is asked with the spellings on either side of the gap — <code>space(&quot;+&quot;, &quot;1&quot;)</code> while laying out <code>1 + 1</code>, <code>space(&quot;(&quot;, &quot;a&quot;)</code> while laying out <code>(a)</code> — so a language brings one small function instead of a layout function per production. Where a production wants no spaces at all, that is <code>Tight</code> and the rule is never consulted.</p><p>Fails only on a tree that does not belong to <code>g</code> — a node naming a production index the grammar has no entry for, which a tree from <code>parse_cst</code> cannot be.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-render_cst">
+        <h2>
+          <a class="anchor" href="#item-render_cst">render_cst</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn render_cst&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, node: Cst, space: (str, str) -&#62; bool, width: u64) -&#62; str!ParseError</code></pre>
+
+        <div class="doc"><p><code>src</code> laid out at <code>width</code> — <code>format_cst</code> and <code>print_doc</code>, which is what every caller wants and neither half should assume.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-pieces">
+        <h2>
+          <a class="anchor" href="#item-pieces">pieces</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn pieces&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, kids: Cst[], space: (str, str) -&#62; bool) -&#62; Piece[]!ParseError</code></pre>
+
+        <div class="doc"><p>A node's children, each reduced to a <code>Piece</code>. Interior children are laid out first, so every layout below works on finished <code>Doc</code>s and never recurses.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-breaks_after">
+        <h2>
+          <a class="anchor" href="#item-breaks_after">breaks_after</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn breaks_after(src: str, at: u64) -&#62; bool</code></pre>
+
+        <div class="doc"><p>Whether the source puts a line break right after position <code>at</code>, with only blanks in between — the end of a source line, in other words.</p><p>This tells a line comment from a block one without asking the language: a comment the author ended their line with must still end a line, or it swallows whatever the formatter puts after it. End of input counts, there being nothing left to swallow.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-edge">
+        <h2>
+          <a class="anchor" href="#item-edge">edge</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn edge(src: str, sp: Span?) -&#62; str</code></pre>
+
+        <div class="doc"><p>The text of a token span, or <code>&quot;&quot;</code> for a child that matched no tokens.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-tok_text">
+        <h2>
+          <a class="anchor" href="#item-tok_text">tok_text</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn tok_text(self: Piece) -&#62; str</code></pre>
+
+        <div class="doc"><p>The spelling of a token piece; <code>&quot;&quot;</code> for anything else.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-run_text">
+        <h2>
+          <a class="anchor" href="#item-run_text">run_text</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn run_text(ps: Piece[]) -&#62; str</code></pre>
+
+        <div class="doc"><p>A run of token pieces folded into one string — how a bracket written as several tokens (<code>#{</code>) comes back out as one.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-is_tok">
+        <h2>
+          <a class="anchor" href="#item-is_tok">is_tok</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_tok(self: Piece) -&#62; bool</code></pre>
+
+        <p class="undocumented">Undocumented.</p>
+
+
+      </section>
+
+      <section class="item" id="item-is_sep">
+        <h2>
+          <a class="anchor" href="#item-is_sep">is_sep</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn is_sep(self: Piece, sep: str) -&#62; bool</code></pre>
+
+        <div class="doc"><p>Whether <code>self</code> is the separator token <code>sep</code>. Only a token can be one, so a child that happens to render as <code>,</code> is not mistaken for it.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-starts_item">
+        <h2>
+          <a class="anchor" href="#item-starts_item">starts_item</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn starts_item(self: Piece) -&#62; bool</code></pre>
+
+        <div class="doc"><p>Whether <code>self</code> begins a new item in a list with no separator token. Everything but a comment does: a comment belongs to the item it was written against.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-tight">
+        <h2>
+          <a class="anchor" href="#item-tight">tight</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn tight(ps: Piece[]) -&#62; Doc</code></pre>
+
+        <div class="doc"><p><code>Tight</code>: the children run together, the spacing rule not consulted.</p><p>A comment still ends its line where the author ended theirs — that is not spacing, it is what the comment means.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-piece_doc">
+        <h2>
+          <a class="anchor" href="#item-piece_doc">piece_doc</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn piece_doc(self: Piece) -&#62; Doc</code></pre>
+
+        <div class="doc"><p>One piece as a <code>Doc</code>, with nothing added around it.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-inline_doc">
+        <h2>
+          <a class="anchor" href="#item-inline_doc">inline_doc</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn inline_doc(ps: Piece[], space: (str, str) -&#62; bool) -&#62; Doc</code></pre>
+
+        <div class="doc"><p><code>Inline</code>: the children in order, with a space wherever the language's rule says one belongs between the spellings on either side of the gap.</p><p>Nothing goes in front of the first piece, and nothing goes beside a child that matched no tokens — an empty <code>Maybe</code> must not leave a space behind it.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-gap_wanted">
+        <h2>
+          <a class="anchor" href="#item-gap_wanted">gap_wanted</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn gap_wanted(prev: str, next: str, space: (str, str) -&#62; bool) -&#62; bool</code></pre>
+
+        <div class="doc"><p>Whether a space belongs between two adjacent pieces: not in front of the first, not beside a child that matched no tokens, and otherwise the language's rule.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-wrapped">
+        <h2>
+          <a class="anchor" href="#item-wrapped">wrapped</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn wrapped(ps: Piece[], st: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc</code></pre>
+
+        <div class="doc"><p><code>Wrap</code>: a bracketed list, on one line while it fits and otherwise one item per indented line.</p><p>The brackets are read off the tokens rather than named in the style: the leading run of matched tokens opens the list and the trailing run closes it. That is what lets one annotation cover <code>(a, b)</code>, <code>[a]</code>, <code>#{a}</code> and <code>&lt;T&gt;</code> alike, and it is also what makes an alternative with no brackets recognizable — a production whose alternatives are not all lists (AIPL's <code>ty</code> is one) falls back to <code>Inline</code> for the ones that aren't, rather than inventing break points.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-lead_toks">
+        <h2>
+          <a class="anchor" href="#item-lead_toks">lead_toks</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn lead_toks(ps: Piece[]) -&#62; u64</code></pre>
+
+        <div class="doc"><p>How many of <code>ps</code> at the front are tokens — the run that opens a list.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-tail_toks">
+        <h2>
+          <a class="anchor" href="#item-tail_toks">tail_toks</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn tail_toks(ps: Piece[], lead: u64) -&#62; u64</code></pre>
+
+        <div class="doc"><p>How many of <code>ps</code> at the end are tokens — the run that closes a list — without reaching back into the <code>lead</code> that already opened it.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-list_items">
+        <h2>
+          <a class="anchor" href="#item-list_items">list_items</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn list_items(mid: Piece[], st: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
+
+        <div class="doc"><p>The items between a pair of brackets, each laid out inline.</p><p>A token spelled like the style's separator ends the item it follows and is dropped; the style writes the separators back, which is what lets a list that breaks gain a trailing one it never had in the source. With an empty separator every token or child starts a new item instead, which is the juxtaposed list. A comment never starts one — it belongs to the item it was written against.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-FKind">
+        <h2>
+          <a class="anchor" href="#item-FKind">FKind</a>
+          <span class="kind kind-variant">variant</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>variant FKind</code></pre>
+
+        <p class="undocumented">Undocumented.</p>
+
+
+        <ul class="cases">
+
+          <li id="item-FWord"><code>FWord</code></li>
+
+        </ul>
+
+      </section>
+
+      <section class="item" id="item-grammar_of">
+        <h2>
+          <a class="anchor" href="#item-grammar_of">grammar_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn grammar_of(layouts: Layout[]) -&#62; Grammar&#60;FKind, str&#62;</code></pre>
+
+        <div class="doc"><p>A grammar of one production per layout, in order, so a hand-built <code>CTree(i, ..)</code> picks a layout by its index.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-prod_of">
+        <h2>
+          <a class="anchor" href="#item-prod_of">prod_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn prod_of(l: Layout) -&#62; Production&#60;FKind, str&#62;</code></pre>
+
+        <p class="undocumented">Undocumented.</p>
+
+
+      </section>
+
+      <section class="item" id="item-nothing">
+        <h2>
+          <a class="anchor" href="#item-nothing">nothing</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn nothing(src: str, node: Cst, kids: str[]) -&#62; str!ParseError</code></pre>
+
+        <div class="doc"><p>A <code>build</code> that lowers nothing: the formatter never lowers, and a <code>Production</code> needs one anyway.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-always_space">
+        <h2>
+          <a class="anchor" href="#item-always_space">always_space</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn always_space(l: str, r: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">Undocumented.</p>
+
+
+      </section>
+
+      <section class="item" id="item-never_space">
+        <h2>
+          <a class="anchor" href="#item-never_space">never_space</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn never_space(l: str, r: str) -&#62; bool</code></pre>
+
+        <p class="undocumented">Undocumented.</p>
+
+
+      </section>
+
+      <section class="item" id="item-colon_space">
+        <h2>
+          <a class="anchor" href="#item-colon_space">colon_space</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn colon_space(l: str, r: str) -&#62; bool</code></pre>
+
+        <div class="doc"><p>A space after a colon and nowhere else — the smallest rule that is not a constant, which is what <code>inline_doc</code>'s tests need.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-spaced_unless_punct">
+        <h2>
+          <a class="anchor" href="#item-spaced_unless_punct">spaced_unless_punct</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn spaced_unless_punct(l: str, r: str) -&#62; bool</code></pre>
+
+        <div class="doc"><p>A spacing rule small enough to read in the driver's own tests: nothing after an opening bracket, nothing before a closing one or before hugging punctuation, a space everywhere else.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-rendered">
+        <h2>
+          <a class="anchor" href="#item-rendered">rendered</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn rendered(g: Grammar&#60;FKind, str&#62;, src: str, node: Cst, width: u64) -&#62; str!ParseError</code></pre>
+
+        <p class="undocumented">Undocumented.</p>
+
+
+      </section>
+
+      <section class="item" id="item-at">
+        <h2>
+          <a class="anchor" href="#item-at">at</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn at(self: Doc, width: u64) -&#62; str</code></pre>
+
+        <div class="doc"><p>A <code>Doc</code> at a width, for the assertions above.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-kv">
+        <h2>
+          <a class="anchor" href="#item-kv">kv</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn kv(at: u64) -&#62; Cst</code></pre>
+
+        <div class="doc"><p>A two-leaf node at <code>at</code>, standing in for a production that matched a key and its colon — enough shape for the driver's tests without a parse.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-node_of">
+        <h2>
+          <a class="anchor" href="#item-node_of">node_of</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn node_of(t: str) -&#62; Piece</code></pre>
+
+        <div class="doc"><p>A child piece that renders as <code>t</code> and has <code>t</code> at both edges.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-texts">
+        <h2>
+          <a class="anchor" href="#item-texts">texts</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn texts(ds: Doc[]) -&#62; str[]</code></pre>
+
+        <p class="undocumented">Undocumented.</p>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

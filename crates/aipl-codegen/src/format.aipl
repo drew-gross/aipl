@@ -1,0 +1,949 @@
+// The formatter driver: one pass from a lossless `Cst` to a `Doc`, decided by
+// the `Layout` each production carries. It is the third interpreter of a
+// `Grammar` — after `parse.aipl`'s parser and `ebnf.aipl`'s dump — and is
+// written the same way: the language is data, this file is the loop over it.
+//
+// It works off the **concrete** tree, not the AST, and has to. An AST has
+// already thrown away the parentheses the author wrote and the comments they
+// wrote beside them, and putting those back is the whole job. `cst.aipl`
+// guarantees the tree covers every byte of the source, so nothing here can lose
+// a comment; the worst it can do is place one badly.
+//
+// **What this is not.** `walker.aipl`, AIPL's own formatter, is 3,500 lines,
+// and most of that is judgement about AIPL in particular — which call hugs its
+// last argument, when a method chain breaks, how imports sort, where a blank
+// line survives. None of that follows from a grammar and none of it is here.
+// What is here is the mechanical majority: the productions whose layout is
+// settled by the tokens they matched, which is where the cost of describing one
+// syntax twice actually falls.
+//
+// The whole vocabulary is three `Layout` arms plus one function per language.
+// That function — `space`, below — is the piece a grammar genuinely cannot
+// supply: whether two adjacent tokens want a space between them is a convention
+// of the language, not a fact about its structure.
+import {
+    Span,
+    equal as ==,
+    first,
+    intersperse,
+    is_all_whitespace,
+    is_empty,
+    is_nonempty,
+    is_some_and,
+    join,
+    last,
+    len,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    push,
+    saturating_decrement as --,
+    saturating_sub as -,
+    value_or_err,
+    wrapping_add as +,
+    wrapping_increment as ++,
+} from builtins;
+import { CLeaf, CTree, CTrivia, Cst, span, token_leaves } from "./cst.aipl";
+import {
+    Concat,
+    Doc,
+    HardLine,
+    IfBroken,
+    Indent,
+    Line,
+    SoftLine,
+    Text,
+    group,
+    print_doc,
+} from "./doc.aipl";
+import {
+    Grammar,
+    Inline,
+    Layout,
+    ListStyle,
+    Mk,
+    ParseError,
+    Production,
+    Rule,
+    Term,
+    Tight,
+    Wrap,
+    failure_message,
+} from "./grammar.aipl";
+
+# One child of a node, reduced to what layout needs from it.
+#
+# Whitespace never becomes a piece: the formatter decides the spacing, so the
+# author's is read only where it changes meaning — which is the flag on a
+# comment, and nowhere else.
+variant Piece =
+    // A token the grammar matched, and its spelling.
+    | PTok(str)
+    // An interior child: its finished `Doc`, and the spellings of its first and
+    // last tokens. Those two are what the spacing rule is asked about, since a
+    // child's edges are what its neighbours touch. Both are `""` for a child
+    // that matched no tokens at all, which an empty `Many` produces.
+    | PNode(Doc, str, str)
+    // A comment, verbatim, and whether the source put a newline after it. That
+    // flag is not style: a line comment swallows the rest of its line, so
+    // getting it wrong changes what the output means.
+    | PNote(str, bool)
+
+# The `Doc` that lays `node` out, given the grammar it was parsed with.
+#
+# `space` answers the one question a grammar cannot: whether a space belongs
+# between two adjacent tokens. It is asked with the spellings on either side of
+# the gap — `space("+", "1")` while laying out `1 + 1`, `space("(", "a")` while
+# laying out `(a)` — so a language brings one small function instead of a layout
+# function per production. Where a production wants no spaces at all, that is
+# `Tight` and the rule is never consulted.
+#
+# Fails only on a tree that does not belong to `g` — a node naming a production
+# index the grammar has no entry for, which a tree from `parse_cst` cannot be.
+pub fn format_cst<K: variant, A: any>(
+    g: Grammar<K, A>,
+    src: str,
+    node: Cst,
+    space: (str, str) -> bool,
+) -> Doc!ParseError {
+    match (node) {
+        // Reached only when a caller hands a leaf straight in; the driver turns
+        // a node's own leaves into pieces rather than recursing into them.
+        CLeaf(sp) | CTrivia(sp) => ok(Text(src[sp])),
+        CTree(i, kids) => {
+            let layout = g.prods[i].value_or_err(ParseError {
+                message: `no production at index {i}`,
+                span: node.span(),
+            })?.layout;
+            let ps = pieces(g, src, kids, space)?;
+            ok(
+                match (layout) {
+                    Tight => tight(ps),
+                    Inline => inline_doc(ps, space),
+                    Wrap(st) => wrapped(ps, st, space),
+                },
+            )
+        },
+    }
+}.test({
+    // Three productions, one per layout, and a tree written out by hand: the
+    // driver reads a production's `layout` and never its `rule`, so a grammar
+    // carrying the simplest rule there is exercises it exactly.
+    let g = grammar_of([Wrap(ListStyle { spaced: true }), Inline, Tight]);
+
+    //                  1
+    //        012345678901234
+    let src = "{ a: 1, b: -2 }";
+    let tree = CTree(
+        0,
+        [
+            CLeaf(0..1),
+            CTrivia(1..2),
+            kv(2),
+            CTrivia(4..5),
+            CLeaf(5..6),
+            CLeaf(6..7),
+            CTrivia(7..8),
+            kv(8),
+            CTrivia(10..11),
+            CTree(2, [CLeaf(11..12), CLeaf(12..13)]),
+            CTrivia(13..14),
+            CLeaf(14..15),
+        ],
+    );
+
+    // `Wrap` outside, `Inline` for `a:` (a space after the colon, none before
+    // it), `Tight` for `-2` (no space, whatever the rule says).
+    assert(rendered(g, src, tree, 80)? == "{ a: 1, b: -2 }");
+
+    // The same tree at a width it cannot fit: one item per indented line, plus
+    // the trailing separator the style asks for.
+    assert(rendered(g, src, tree, 12)? == "{\n    a: 1,\n    b: -2,\n}");
+
+    // A leaf handed straight in is its own text.
+    assert(rendered(g, src, CLeaf(2..3), 80)? == "a");
+
+    // A tree that does not belong to the grammar is the one way this fails.
+    let stray: Cst[] = [];
+    assert(rendered(g, src, CTree(9, stray), 80).failure_message() == "no production at index 9");
+})
+
+# `src` laid out at `width` — `format_cst` and `print_doc`, which is what every
+# caller wants and neither half should assume.
+pub fn render_cst<K: variant, A: any>(
+    g: Grammar<K, A>,
+    src: str,
+    node: Cst,
+    space: (str, str) -> bool,
+    width: u64,
+) -> str!ParseError { ok(print_doc(format_cst(g, src, node, space)?, width)) }.test({
+    let g = grammar_of([Inline]);
+    let src = "a b";
+    let tree = CTree(0, [CLeaf(0..1), CTrivia(1..2), CLeaf(2..3)]);
+    assert(render_cst(g, src, tree, always_space, 80)? == "a b");
+    assert(render_cst(g, src, tree, never_space, 80)? == "ab");
+})
+
+// ---------- pieces ----------
+
+# A node's children, each reduced to a `Piece`. Interior children are laid out
+# first, so every layout below works on finished `Doc`s and never recurses.
+fn pieces<K: variant, A: any>(
+    g: Grammar<K, A>,
+    src: str,
+    kids: Cst[],
+    space: (str, str) -> bool,
+) -> Piece[]!ParseError {
+    mut out: Piece[] = [];
+    for (let k : kids) {
+        match (k) {
+            CLeaf(sp) => {
+                set out.push(PTok(src[sp]));
+            },
+            // Whitespace is the author's spacing and this pass replaces it;
+            // anything else the lexer set aside is a comment, and survives.
+            CTrivia(sp) => {
+                if (!src[sp].is_all_whitespace()) {
+                    set out.push(PNote(src[sp], breaks_after(src, sp.end)));
+                };
+            },
+            CTree(..) => {
+                let d = format_cst(g, src, k, space)?;
+                let ts = k.token_leaves();
+                set out.push(PNode(d, edge(src, ts.first()), edge(src, ts.last())));
+            },
+        };
+    }
+    ok(out)
+}
+
+# Whether the source puts a line break right after position `at`, with only
+# blanks in between — the end of a source line, in other words.
+#
+# This tells a line comment from a block one without asking the language: a
+# comment the author ended their line with must still end a line, or it swallows
+# whatever the formatter puts after it. End of input counts, there being nothing
+# left to swallow.
+fn breaks_after(src: str, at: u64) -> bool {
+    mut i = at;
+    while (i < src.len()) {
+        let c = src[i..i + 1];
+        if (c == "\n") {
+            return true;
+        };
+        if (c != " " && c != "\t" && c != "\r") {
+            return false;
+        };
+        set i++;
+    }
+    true
+}.test({
+    assert(breaks_after("// x\ny", 4));
+    assert(breaks_after("// x  \ny", 4));
+    assert(breaks_after("// x", 4)); // end of input
+    assert(!breaks_after("/* x */ y", 7));
+    assert(!breaks_after("/* x */y", 7));
+})
+
+# The text of a token span, or `""` for a child that matched no tokens.
+fn edge(src: str, sp: Span?) -> str {
+    match (sp) {
+        some(s) => src[s],
+        none => "",
+    }
+}.test({
+    assert(edge("abc", some(1..2)) == "b");
+    assert(edge("abc", none) == "");
+})
+
+# The spelling of a token piece; `""` for anything else.
+fn tok_text(self: Piece) -> str {
+    match (self) {
+        PTok(t) => t,
+        PNode(..) | PNote(..) => "",
+    }
+}
+
+# A run of token pieces folded into one string — how a bracket written as
+# several tokens (`#{`) comes back out as one.
+fn run_text(ps: Piece[]) -> str { ps.map(tok_text).join(sep="") }
+
+fn is_tok(self: Piece) -> bool {
+    match (self) {
+        PTok(..) => true,
+        PNode(..) | PNote(..) => false,
+    }
+}
+
+# Whether `self` is the separator token `sep`. Only a token can be one, so a
+# child that happens to render as `,` is not mistaken for it.
+fn is_sep(self: Piece, sep: str) -> bool {
+    match (self) {
+        PTok(t) => t == sep,
+        PNode(..) | PNote(..) => false,
+    }
+}
+
+# Whether `self` begins a new item in a list with no separator token. Everything
+# but a comment does: a comment belongs to the item it was written against.
+fn starts_item(self: Piece) -> bool {
+    match (self) {
+        PTok(..) | PNode(..) => true,
+        PNote(..) => false,
+    }
+}
+
+// ---------- the three layouts ----------
+
+# `Tight`: the children run together, the spacing rule not consulted.
+#
+# A comment still ends its line where the author ended theirs — that is not
+# spacing, it is what the comment means.
+fn tight(ps: Piece[]) -> Doc { Concat(ps.map(piece_doc)) }.test({
+    let nothing: Piece[] = [];
+    assert(tight([PTok("-"), PTok("2")]).at(80) == "-2");
+    assert(tight(nothing).at(80) == "");
+    assert(tight([PTok("a"), PNote("/* c */", false), PTok("b")]).at(80) == "a/* c */b");
+    assert(tight([PTok("a"), PNote("// c", true), PTok("b")]).at(80) == "a// c\nb");
+})
+
+# One piece as a `Doc`, with nothing added around it.
+fn piece_doc(self: Piece) -> Doc {
+    match (self) {
+        PTok(t) => Text(t),
+        PNode(d, _, _) => d,
+        PNote(t, brk) => if (brk) { Concat([Text(t), HardLine]) } else { Text(t) },
+    }
+}
+
+# `Inline`: the children in order, with a space wherever the language's rule says
+# one belongs between the spellings on either side of the gap.
+#
+# Nothing goes in front of the first piece, and nothing goes beside a child that
+# matched no tokens — an empty `Maybe` must not leave a space behind it.
+fn inline_doc(ps: Piece[], space: (str, str) -> bool) -> Doc {
+    mut out: Doc[] = [];
+    mut prev = "";
+    for (let p : ps) {
+        match (p) {
+            PTok(t) => {
+                if (gap_wanted(prev, t, space)) {
+                    set out.push(Text(" "));
+                };
+                set out.push(Text(t));
+                set prev = t;
+            },
+            PNode(d, f, l) => {
+                if (gap_wanted(prev, f, space)) {
+                    set out.push(Text(" "));
+                };
+                set out.push(d);
+                if (l != "") {
+                    set prev = l;
+                };
+            },
+            // A comment takes a space in front of it whatever the rule says — it
+            // is prose, not punctuation — and then either ends the line or is
+            // followed by one space. Either way what comes next starts fresh, so
+            // the rule is never asked across a comment.
+            PNote(t, brk) => {
+                if (prev != "") {
+                    set out.push(Text(" "));
+                };
+                set out.push(Text(t));
+                set out.push(if (brk) { HardLine } else { Text(" ") });
+                set prev = "";
+            },
+        };
+    }
+    Concat(out)
+}.test({
+    let nothing: Piece[] = [];
+    assert(inline_doc([PTok("a"), PTok(":"), PTok("1")], colon_space).at(80) == "a: 1");
+    assert(inline_doc(nothing, colon_space).at(80) == "");
+
+    // A child contributes its edges, not its whole text: the rule is asked about
+    // `:` and `x`, never about the child's interior.
+    let kid = PNode(Text("x + y"), "x", "y");
+    assert(inline_doc([PTok(":"), kid, PTok(":")], colon_space).at(80) == ": x + y:");
+
+    // A child that matched nothing leaves no gap behind it.
+    let empty_kid = PNode(Concat([]), "", "");
+    assert(inline_doc([PTok(":"), empty_kid, PTok("z")], colon_space).at(80) == ": z");
+
+    // A comment ending a source line ends the formatted line too.
+    assert(
+        inline_doc([PTok("a"), PNote("// c", true), PTok("b")], colon_space).at(80) == "a // c\nb",
+    );
+    assert(
+        inline_doc([PTok("a"), PNote("/*c*/", false), PTok("b")], colon_space).at(
+            80,
+        ) == "a /*c*/ b",
+    );
+})
+
+# Whether a space belongs between two adjacent pieces: not in front of the first,
+# not beside a child that matched no tokens, and otherwise the language's rule.
+fn gap_wanted(prev: str, next: str, space: (str, str) -> bool) -> bool {
+    prev != "" && next != "" && space(prev, next)
+}
+
+# `Wrap`: a bracketed list, on one line while it fits and otherwise one item per
+# indented line.
+#
+# The brackets are read off the tokens rather than named in the style: the
+# leading run of matched tokens opens the list and the trailing run closes it.
+# That is what lets one annotation cover `(a, b)`, `[a]`, `#{a}` and `<T>` alike,
+# and it is also what makes an alternative with no brackets recognizable — a
+# production whose alternatives are not all lists (AIPL's `ty` is one) falls back
+# to `Inline` for the ones that aren't, rather than inventing break points.
+fn wrapped(ps: Piece[], st: ListStyle, space: (str, str) -> bool) -> Doc {
+    let lead = lead_toks(ps);
+    let tail = tail_toks(ps, lead);
+    if (lead == 0 || tail == 0) {
+        return inline_doc(ps, space);
+    };
+    let open = run_text(ps[..lead]);
+    let close = run_text(ps[ps.len() - tail..]);
+    let items = list_items(ps[lead..ps.len() - tail], st, space);
+    if (items.is_empty()) {
+        return Text(`{open}{close}`);
+    };
+
+    // A style that reads as words takes a space inside its brackets while flat
+    // (`{ a, b }`); the rest hug their contents (`(a, b)`).
+    let edge = if (st.spaced) { Line } else { SoftLine };
+    let step = if (st.sep == "") { Line } else { Concat([Text(st.sep), Line]) };
+    mut parts = [Text(open), Indent(Concat([edge, ..items.intersperse(step)]))];
+
+    // A separator after the last item, written only once the list breaks. A
+    // juxtaposed list has no separator to write.
+    if (st.trailing && st.sep != "") {
+        set parts.push(IfBroken(st.sep));
+    };
+    set parts.push(edge);
+    set parts.push(Text(close));
+    group(Concat(parts))
+}.test({
+    let parens = ListStyle { spaced: false };
+    let three = [
+        PTok("("),
+        node_of("a"),
+        PTok(","),
+        node_of("b"),
+        PTok(","),
+        node_of("c"),
+        PTok(")"),
+    ];
+
+    assert(wrapped(three, parens, never_space).at(80) == "(a, b, c)");
+    assert(wrapped(three, parens, never_space).at(5) == "(\n    a,\n    b,\n    c,\n)");
+
+    // An empty list is its brackets and nothing else — no space to break at.
+    assert(wrapped([PTok("("), PTok(")")], parens, never_space).at(80) == "()");
+    let braces = ListStyle { spaced: true };
+    assert(wrapped([PTok("{"), PTok("}")], braces, never_space).at(80) == "{}");
+
+    // Brackets are read off the tokens, so a two-token one is no different.
+    assert(
+        wrapped([PTok("#"), PTok("{"), node_of("a"), PTok("}")], parens, never_space).at(
+            80,
+        ) == "#{a}",
+    );
+
+    // Words-style braces gain inner spaces flat, and lose them broken.
+    let pair = [PTok("{"), node_of("a"), PTok(","), node_of("b"), PTok("}")];
+    assert(wrapped(pair, braces, never_space).at(80) == "{ a, b }");
+    assert(wrapped(pair, braces, never_space).at(5) == "{\n    a,\n    b,\n}");
+
+    // `trailing: false` is the dialect where `[1, 2,]` is an error.
+    assert(
+        wrapped(pair, ListStyle { trailing: false }, never_space).at(5) == "{\n    a,\n    b\n}",
+    );
+
+    // An empty separator is the juxtaposed list — a break between items and
+    // never a trailing anything.
+    let words = ListStyle { sep: "", trailing: false };
+    let sexp = [PTok("("), node_of("a"), node_of("b"), PTok(")")];
+    assert(wrapped(sexp, words, never_space).at(80) == "(a b)");
+    assert(wrapped(sexp, words, never_space).at(3) == "(\n    a\n    b\n)");
+
+    // No brackets on this alternative, so there is no list to wrap.
+    let bare = [node_of("a"), PTok("!"), node_of("b")];
+    assert(wrapped(bare, parens, never_space).at(80) == "a!b");
+    assert(wrapped(bare, parens, always_space).at(80) == "a ! b");
+})
+
+# How many of `ps` at the front are tokens — the run that opens a list.
+fn lead_toks(ps: Piece[]) -> u64 {
+    mut n: u64 = 0;
+    for (let p : ps) {
+        if (!p.is_tok()) {
+            return n;
+        };
+        set n++;
+    }
+    n
+}.test({
+    let nothing: Piece[] = [];
+    let a = PNode(Text("a"), "a", "a");
+    assert(lead_toks(nothing) == 0);
+    assert(lead_toks([PTok("#"), PTok("{"), a]) == 2);
+    assert(lead_toks([a, PTok(")")]) == 0);
+    // All tokens: the whole run leads, and `tail_toks` then finds none.
+    assert(lead_toks([PTok("("), PTok(")")]) == 2);
+})
+
+# How many of `ps` at the end are tokens — the run that closes a list — without
+# reaching back into the `lead` that already opened it.
+fn tail_toks(ps: Piece[], lead: u64) -> u64 {
+    mut n: u64 = 0;
+    mut i = ps.len();
+    while (lead < i) {
+        set i--;
+        if (!ps[i].is_some_and(is_tok)) {
+            return n;
+        };
+        set n++;
+    }
+    n
+}.test({
+    let nothing: Piece[] = [];
+    let a = PNode(Text("a"), "a", "a");
+    assert(tail_toks([PTok("("), a, PTok(")")], 1) == 1);
+    assert(tail_toks([PTok("("), a], 1) == 0);
+
+    // `(` and `)` with nothing between them: the lead took both, so no tail is
+    // left, and `wrapped` reads that as "not a list".
+    assert(tail_toks([PTok("("), PTok(")")], 2) == 0);
+    assert(tail_toks(nothing, 0) == 0);
+})
+
+# The items between a pair of brackets, each laid out inline.
+#
+# A token spelled like the style's separator ends the item it follows and is
+# dropped; the style writes the separators back, which is what lets a list that
+# breaks gain a trailing one it never had in the source. With an empty separator
+# every token or child starts a new item instead, which is the juxtaposed list. A
+# comment never starts one — it belongs to the item it was written against.
+fn list_items(mid: Piece[], st: ListStyle, space: (str, str) -> bool) -> Doc[] {
+    mut items: Doc[] = [];
+    mut cur: Piece[] = [];
+    for (let p : mid) {
+        if (st.sep != "" && p.is_sep(st.sep)) {
+            if (cur.is_nonempty()) {
+                set items.push(inline_doc(cur, space));
+                set cur = [];
+            };
+        } else {
+            if (st.sep == "" && p.starts_item() && cur.is_nonempty()) {
+                set items.push(inline_doc(cur, space));
+                set cur = [];
+            };
+            set cur.push(p);
+        };
+    }
+    if (cur.is_nonempty()) {
+        set items.push(inline_doc(cur, space));
+    };
+    items
+}.test({
+    let nothing: Piece[] = [];
+    let a = PNode(Text("a"), "a", "a");
+    let b = PNode(Text("b"), "b", "b");
+
+    assert(texts(list_items([a, PTok(","), b], ListStyle {}, never_space)) == ["a", "b"]);
+    assert(list_items(nothing, ListStyle {}, never_space).is_empty());
+    // A trailing separator in the source leaves no empty item behind it.
+    assert(
+        texts(list_items([a, PTok(","), b, PTok(",")], ListStyle {}, never_space)) == ["a", "b"],
+    );
+    // Juxtaposed: every child is its own item.
+    assert(texts(list_items([a, b], ListStyle { sep: "" }, never_space)) == ["a", "b"]);
+    // A comment rides with the item it was written against, not on its own.
+    assert(
+        texts(list_items([PNote("/*x*/", false), a, PTok(","), b], ListStyle {}, never_space)) == [
+            "/*x*/ a",
+            "b",
+        ],
+    );
+})
+
+// ---------- test support ----------
+
+// A token kind for this file's own tests. The driver reads a production's
+// `layout` and never its `rule`, so one bare kind is enough to build a grammar
+// whose trees can be written out by hand. `FKind` rather than `Kind`: a
+// test-only variant named `Kind` collides with a constructor `lexer.aipl`
+// declares, and the bare view drops one of the two silently.
+variant FKind = FWord
+
+# A grammar of one production per layout, in order, so a hand-built `CTree(i, ..)`
+# picks a layout by its index.
+fn grammar_of(layouts: Layout[]) -> Grammar<FKind, str> { prods: layouts.map(prod_of) }
+
+fn prod_of(l: Layout) -> Production<FKind, str> {
+    let word: Rule<FKind> = Term(FWord);
+    Production { name: "p", rule: word, build: Mk(nothing), layout: l }
+}
+
+# A `build` that lowers nothing: the formatter never lowers, and a `Production`
+# needs one anyway.
+fn nothing(src: str, node: Cst, kids: str[]) -> str!ParseError { ok("") }
+
+fn always_space(l: str, r: str) -> bool { true }
+
+fn never_space(l: str, r: str) -> bool { false }
+
+# A space after a colon and nowhere else — the smallest rule that is not a
+# constant, which is what `inline_doc`'s tests need.
+fn colon_space(l: str, r: str) -> bool { l == ":" }
+
+# A spacing rule small enough to read in the driver's own tests: nothing after an
+# opening bracket, nothing before a closing one or before hugging punctuation, a
+# space everywhere else.
+fn spaced_unless_punct(l: str, r: str) -> bool {
+    l != "{" && l != "(" && r != "," && r != ":" && r != "}" && r != ")"
+}
+
+fn rendered(g: Grammar<FKind, str>, src: str, node: Cst, width: u64) -> str!ParseError {
+    render_cst(g, src, node, spaced_unless_punct, width)
+}
+
+# A `Doc` at a width, for the assertions above.
+fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
+
+# A two-leaf node at `at`, standing in for a production that matched a key and
+# its colon — enough shape for the driver's tests without a parse.
+fn kv(at: u64) -> Cst { CTree(1, [CLeaf(at..at + 1), CLeaf(at + 1..at + 2)]) }
+
+# A child piece that renders as `t` and has `t` at both edges.
+fn node_of(t: str) -> Piece { PNode(Text(t), t, t) }
+
+fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
+--- performance ---
+allocations: 1688
+deallocations: 1688
+reallocations: 174
+bytes allocated: 122921
+instructions executed: 147712
+binary size: 173512
+  code: 109240
+  data: 4588
+  metadata: 59684
+functions:
+  __arr_drop_Piece:
+    calls: 119
+    bytes: 228
+  __arr_drop___m1__Cst:
+    calls: 5
+    bytes: 116
+  __arr_drop___m2__Doc:
+    calls: 181
+    bytes: 116
+  __arr_drop___m8__Layout:
+    calls: 2
+    bytes: 144
+  __arr_drop___m8__Production$FKind$str:
+    calls: 2
+    bytes: 240
+  __arr_retain_Piece:
+    calls: 119
+    bytes: 228
+  __arr_retain___m1__Cst:
+    calls: 0
+    bytes: 116
+  __arr_retain___m2__Doc:
+    calls: 297
+    bytes: 116
+  __arr_retain___m8__Layout:
+    calls: 0
+    bytes: 144
+  __arr_retain___m8__Production$FKind$str:
+    calls: 4
+    bytes: 240
+  __builtin_all$char$s0$lam57:
+    calls: 12
+    bytes: 212
+  __builtin_any$__m2__Doc$lam44:
+    calls: 0
+    bytes: 32
+  __builtin_any$__m2__Doc$lam44$tail:
+    calls: 56
+    bytes: 324
+  __builtin_count_while$char$s0$lam61:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam71:
+    calls: 0
+    bytes: 172
+  __builtin_drop_last$str:
+    calls: 0
+    bytes: 208
+  __builtin_intersperse$__m2__Doc:
+    calls: 20
+    bytes: 408
+  __eq_str$arr:
+    calls: 4
+    bytes: 364
+  __m1__leaves:
+    calls: 1
+    bytes: 808
+  __m1__span:
+    calls: 1
+    bytes: 460
+  __m1__token_leaves:
+    calls: 18
+    bytes: 784
+  __m2__col_after:
+    calls: 120
+    bytes: 544
+  __m2__fits:
+    calls: 0
+    bytes: 36
+  __m2__fits$tail:
+    calls: 159
+    bytes: 2684
+  __m2__fits_atom:
+    calls: 0
+    bytes: 52
+  __m2__fits_atom$tail:
+    calls: 59
+    bytes: 312
+  __m2__has_hard:
+    calls: 0
+    bytes: 32
+  __m2__has_hard$tail:
+    calls: 168
+    bytes: 688
+  __m2__print_doc:
+    calls: 35
+    bytes: 4968
+  __m3__reindent_block:
+    calls: 0
+    bytes: 4016
+  __map0:
+    calls: 0
+    bytes: 856
+  __map2:
+    calls: 0
+    bytes: 856
+  __rec_drop___m1__Cst:
+    calls: 25
+    bytes: 48
+  __rec_drop___m2__Doc:
+    calls: 234
+    bytes: 184
+  __rec_drop___m2__Work:
+    calls: 464
+    bytes: 84
+  __rec_drop___m8__Rule$FKind:
+    calls: 4
+    bytes: 304
+  __test$breaks_after:
+    calls: 1
+    bytes: 484
+  __test$edge:
+    calls: 1
+    bytes: 444
+  __test$format_cst:
+    calls: 1
+    bytes: 4288
+  __test$inline_doc:
+    calls: 1
+    bytes: 4236
+  __test$lead_toks:
+    calls: 1
+    bytes: 2136
+  __test$list_items:
+    calls: 1
+    bytes: 6800
+  __test$render_cst:
+    calls: 1
+    bytes: 2004
+  __test$tail_toks:
+    calls: 1
+    bytes: 2156
+  __test$tight:
+    calls: 1
+    bytes: 4364
+  __test$wrapped:
+    calls: 1
+    bytes: 8712
+  __test_try_fail___m8__ParseError:
+    calls: 0
+    bytes: 84
+  __to_str___m8__ParseError:
+    calls: 0
+    bytes: 824
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_arr_drop_arr:
+    calls: 6
+    bytes: (external)
+  aipl_arr_extend:
+    calls: 10
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 1007
+    bytes: (external)
+  aipl_arr_join:
+    calls: 7
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 10
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 12
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 30
+    bytes: (external)
+  aipl_array_dec:
+    calls: 1847
+    bytes: (external)
+  aipl_array_new:
+    calls: 402
+    bytes: (external)
+  aipl_array_push:
+    calls: 327
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 203
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 74
+    bytes: (external)
+  aipl_assert:
+    calls: 48
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 727
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 5362
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 449
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 4635
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 449
+    bytes: (external)
+  aipl_test_begin:
+    calls: 10
+    bytes: (external)
+  aipl_test_end:
+    calls: 10
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  at:
+    calls: 30
+    bytes: 76
+  breaks_after:
+    calls: 5
+    bytes: 444
+  edge:
+    calls: 14
+    bytes: 188
+  format_cst$FKind$str$s1$lam23:
+    calls: 1
+    bytes: 4292
+  format_cst$FKind$str$s1$lam24:
+    calls: 1
+    bytes: 4292
+  format_cst$FKind$str$s1$lam30:
+    calls: 10
+    bytes: 4292
+  gap_wanted$lam25:
+    calls: 13
+    bytes: 200
+  gap_wanted$lam42:
+    calls: 34
+    bytes: 144
+  gap_wanted$lam45:
+    calls: 5
+    bytes: 140
+  gap_wanted$lam54:
+    calls: 16
+    bytes: 468
+  inline_doc$lam10:
+    calls: 6
+    bytes: 2668
+  inline_doc$lam26:
+    calls: 29
+    bytes: 2668
+  inline_doc$lam27:
+    calls: 2
+    bytes: 2668
+  inline_doc$lam48:
+    calls: 8
+    bytes: 2668
+  kv:
+    calls: 2
+    bytes: 288
+  lead_toks:
+    calls: 18
+    bytes: 740
+  list_items$lam13:
+    calls: 13
+    bytes: 1728
+  main:
+    calls: 1
+    bytes: 712
+  nothing:
+    calls: 0
+    bytes: 228
+  piece_doc:
+    calls: 12
+    bytes: 820
+  pieces$FKind$str$s1$lam31:
+    calls: 1
+    bytes: 2032
+  pieces$FKind$str$s1$lam40:
+    calls: 1
+    bytes: 2032
+  pieces$FKind$str$s1$lam46:
+    calls: 8
+    bytes: 2032
+  render_cst$FKind$str$s1$lam22:
+    calls: 4
+    bytes: 404
+  render_cst$FKind$str$s1$lam4:
+    calls: 1
+    bytes: 404
+  render_cst$FKind$str$s1$lam5:
+    calls: 1
+    bytes: 404
+  rendered:
+    calls: 4
+    bytes: 120
+  run_text:
+    calls: 20
+    bytes: 892
+  tail_toks:
+    calls: 18
+    bytes: 1176
+  wrapped$lam11:
+    calls: 11
+    bytes: 2900
+  wrapped$lam12:
+    calls: 1
+    bytes: 4544
+  wrapped$lam49:
+    calls: 2
+    bytes: 4544

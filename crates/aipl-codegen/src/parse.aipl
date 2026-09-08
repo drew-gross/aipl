@@ -61,6 +61,7 @@ import { CLeaf, CTree, CTrivia, Cst, is_tree, show, span, text } from "./cst.aip
 import {
     Climb,
     Grammar,
+    Inline,
     Literal,
     Many,
     Maybe,
@@ -786,7 +787,7 @@ pub fn parse<K: variant, A: any>(
         ]),
     );
     // A `build` that refuses fails the parse with its own error, unchanged.
-    let refuser = g_of([Production { name: "w", rule: r_word, build: Mk(refuse) }]);
+    let refuser = g_of([Production { name: "w", rule: r_word, build: Mk(refuse), layout: Inline }]);
     assert(parsed("abc", refuser, "w") == err(ParseError { message: "refused", span: 0..3 }));
 
     // ---- link is not optional, and `parse_cst` does it ----
@@ -854,13 +855,19 @@ fn refuse(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
     err(ParseError { message: "refused", span: node.span() })
 }
 
-fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> { name, rule, build: Mk(build_node) }
+fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> {
+    name,
+    rule,
+    build: Mk(build_node),
+    layout: Inline,
+}
 
 fn labelled_prod(name: str, rule: Rule<Tok>, expect_as: str) -> Production<Tok, Node> {
     name,
     rule,
     build: Mk(build_node),
     expect_as,
+    layout: Inline,
 }
 
 fn g_of(ps: Production<Tok, Node>[]) -> Grammar<Tok, Node> { prods: ps }
@@ -887,12 +894,12 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
 allocations: 2979
 deallocations: 2979
 reallocations: 324
-bytes allocated: 188789
-instructions executed: 449347
-binary size: 317280
-  code: 195196
+bytes allocated: 193013
+instructions executed: 464056
+binary size: 322720
+  code: 200012
   data: 5924
-  metadata: 116160
+  metadata: 116784
 functions:
   __arr_drop_Node:
     calls: 11
@@ -905,7 +912,7 @@ functions:
     bytes: 120
   __arr_drop___m2__Production$Tok$Node:
     calls: 73
-    bytes: 188
+    bytes: 240
   __arr_drop___m2__Rule$Tok:
     calls: 99
     bytes: 116
@@ -929,7 +936,7 @@ functions:
     bytes: 120
   __arr_retain___m2__Production$Tok$Node:
     calls: 67
-    bytes: 188
+    bytes: 240
   __arr_retain___m2__Rule$Tok:
     calls: 142
     bytes: 116
@@ -971,7 +978,7 @@ functions:
     bytes: 748
   __builtin_try_map$__m2__Production$Tok$Node$__m2__Production$Tok$Node$__m2__ParseError$lam23:
     calls: 43
-    bytes: 972
+    bytes: 1168
   __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam52:
     calls: 36
     bytes: 732
@@ -1001,7 +1008,7 @@ functions:
     bytes: 128
   __lambda_21:
     calls: 55
-    bytes: 964
+    bytes: 1328
   __lambda_24:
     calls: 0
     bytes: 128
@@ -1043,7 +1050,7 @@ functions:
     bytes: 4364
   __m2__prod_names$Tok$Node:
     calls: 107
-    bytes: 492
+    bytes: 564
   __m3__between_len:
     calls: 0
     bytes: 752
@@ -1097,7 +1104,7 @@ functions:
     bytes: 304
   __test$parse:
     calls: 1
-    bytes: 78684
+    bytes: 81428
   __test_try_fail___m2__ParseError:
     calls: 0
     bytes: 84
@@ -1190,7 +1197,7 @@ functions:
     bytes: 696
   lower_node$Tok$Node:
     calls: 10
-    bytes: 3316
+    bytes: 3844
   main:
     calls: 1
     bytes: 104
@@ -1205,7 +1212,7 @@ functions:
     bytes: 1312
   match_prod$Tok$Node:
     calls: 84
-    bytes: 4012
+    bytes: 4820
   match_rule$Tok$Node:
     calls: 276
     bytes: 4684

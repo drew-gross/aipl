@@ -48,7 +48,13 @@
 
           <li><code>show_first_sets</code> <span class="from">from ./ebnf.aipl</span></li>
 
+          <li><code>render_cst</code> <span class="from">from ./format.aipl</span></li>
+
           <li><code>Grammar</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Inline</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>ListStyle</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>Literal</code> <span class="as">as</span> <code>Lit</code> <span class="from">from ./grammar.aipl</span></li>
 
@@ -69,6 +75,8 @@
           <li><code>Term</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>Then</code> <span class="from">from ./grammar.aipl</span></li>
+
+          <li><code>Wrap</code> <span class="from">from ./grammar.aipl</span></li>
 
           <li><code>failure_message</code> <span class="from">from ./grammar.aipl</span></li>
 
@@ -280,6 +288,32 @@
         <pre class="signature"><code>fn shown(src: str) -&#62; str!ParseError</code></pre>
 
         <div class="doc"><p>The concrete tree, rendered against the production names — the debug view a tree assertion reads better as than a nested <code>CTree</code> literal.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-format_sexp">
+        <h2>
+          <a class="anchor" href="#item-format_sexp">format_sexp</a>
+          <span class="kind kind-fn">fn</span>
+          <span class="badge">pub</span>
+        </h2>
+        <pre class="signature"><code>pub fn format_sexp(src: str, width: u64) -&#62; str!ParseError</code></pre>
+
+        <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>Nothing here knows what an S-expression looks like. The layout is the two annotations on the grammar above, and everything else — where a list breaks, what happens to the author's blank lines, where a comment lands — is <code>format.aipl</code> reading them. That is the whole point of the exercise: a second hand-written walker over the same syntax is what this replaces.</p></div>
+
+
+      </section>
+
+      <section class="item" id="item-sexp_space">
+        <h2>
+          <a class="anchor" href="#item-sexp_space">sexp_space</a>
+          <span class="kind kind-fn">fn</span>
+
+        </h2>
+        <pre class="signature"><code>fn sexp_space(l: str, r: str) -&#62; bool</code></pre>
+
+        <div class="doc"><p>S-expressions have no spacing rule to speak of: every separation in the language is a list separating its elements, which the <code>Wrap</code> layout does. The rule still has to exist — <code>format.aipl</code> asks every language the same question — and answering &quot;never&quot; is the honest answer here.</p></div>
 
 
       </section>
