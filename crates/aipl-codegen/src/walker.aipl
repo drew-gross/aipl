@@ -61,6 +61,7 @@ import {
 } from "./doc.aipl";
 import { is_operator_name } from "./is_operator_name.aipl";
 import { AiplTok, lex_aipl } from "./lex_aipl.aipl";
+import { LexResult } from "./lexer.aipl";
 
 # What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
 # `TokenKind` for an ordinary token, plus the three interpolated-template pieces,
@@ -457,13 +458,15 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
 # trailing `--- section ---` blocks, stripping trailing whitespace, validating
 # with the real parser, and the token-preservation check.
 pub fn format_program(src: str, width: u64) -> str!FmtError {
-    let lexed = lex_aipl(src).map_err(|e| FmtError { message: e.message, span: e.span })?; #[allow]
+    let LexResult { tokens, trivia } = lex_aipl(src).map_err(
+        |e| FmtError { message: e.message, span: e.span },
+    )?;
 
     // The lexer's tokens as the walker's own `(kind, span)` pairs. Trivia is
     // comments and `#[allow]` markers only — whitespace is a `skip` rule, so it
     // never reaches the trivia stream, and only its spans are kept.
-    let toks = lexed.tokens.map(|t| FmtTok { kind: fmt_kind(t.kind), span: t.text.span });
-    let w = new_walker(src, toks, lexed.trivia.map(|t| t.text.span));
+    let toks = tokens.map(|t| FmtTok { kind: fmt_kind(t.kind), span: t.text.span });
+    let w = new_walker(src, toks, trivia.map(|t| t.text.span));
     let d = w.program()?;
 
     // Every comment must have been carried into the output; one left behind
@@ -1421,12 +1424,12 @@ fn struct_pattern(self: W, kw: str, name: str) -> WDoc!FmtError {
     })
 }.test({
     assert(
-        walker_of("{ a , b } = p ;")
+        walker_of("{ a , b } = p ;")?
             .struct_pattern("let", "S")
             .rendered(100)? == "let S { a, b } = p;",
     );
     assert(
-        walker_of("{ x } = q ;")
+        walker_of("{ x } = q ;")?
             .struct_pattern("mut", "Point")
             .rendered(100)? == "mut Point { x } = q;",
     );
@@ -1442,13 +1445,13 @@ fn binding_ann(self: W) -> WDoc!FmtError {
     let WDoc { w, doc } = self.bump().w.ty()?;
     ok(WDoc { w, doc: Concat([Text(": "), doc]) })
 }.test({
-    // `toks_of` splits on spaces, so these inputs are spelled token-by-token.
-    assert(walker_of(": u8 =").binding_ann().rendered(100)? == ": u8");
-    assert(walker_of(": i8 [ ] =").binding_ann().rendered(100)? == ": i8[]");
-    assert(walker_of(": # { str : u8 } =").binding_ann().rendered(100)? == ": #{str: u8}");
-    assert(walker_of(": Point ? =").binding_ann().rendered(100)? == ": Point?");
+    // The trailing `=` is what stops the annotation, so each input carries one.
+    assert(walker_of(": u8 =")?.binding_ann().rendered(100)? == ": u8");
+    assert(walker_of(": i8 [ ] =")?.binding_ann().rendered(100)? == ": i8[]");
+    assert(walker_of(": #{ str : u8 } =")?.binding_ann().rendered(100)? == ": #{str: u8}");
+    assert(walker_of(": Point ? =")?.binding_ann().rendered(100)? == ": Point?");
     // Absent: renders nothing and consumes nothing.
-    assert(walker_of("= 1 ;").binding_ann().rendered(100)? == "");
+    assert(walker_of("= 1 ;")?.binding_ann().rendered(100)? == "");
 })
 
 # The compound-assignment operators. Each stands where a `=` would and is
@@ -2358,68 +2361,68 @@ fn call_arg_list(args: Doc[], hug: bool) -> Doc {
 
 // ---------- test support ----------
 
-# Tokenize `src` by splitting on single spaces — one token per run of non-space
-# characters, each span pointing at the real text. Lets a test write the source
-# it means (`"# { str : i64 }"`, one space between real tokens) instead of
-# hand-computing byte offsets. Every token gets kind `Ident`: the walkers in this
-# file dispatch on token *text*, not kind.
-fn toks_of(src: str) -> FmtTok[] {
-    mut out = [];
-    mut start: u64 = 0;
-    for (let i, c : src) {
-        if (c == ' ') {
-            if (start < i) {
-                set out.push(FmtTok { kind: Ident, span: start..i });
-            };
-            set start = i + 1;
-        };
-    }
-    if (start < src.len()) {
-        set out.push(FmtTok { kind: Ident, span: start..src.len() });
-    };
-    out
-}
-
-# A walker over `src` tokenized by `toks_of`, with no comments.
-fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
-    // `toks_of` splits on single spaces, spans pointing at the real text.
-    let w = walker_of("a bc d");
+# A walker over `src`, tokenized by the real lexer — the same three lines
+# `format_program` runs, so a unit assertion and the formatter proper see one
+# token stream and cannot drift apart.
+#
+# There was a stand-in here once: a tokenizer that split on single spaces and
+# called every token an `Ident`, so a test could write `"i64 [ ] ?"` and mean
+# five tokens without computing byte offsets. It diverged in both of the ways a
+# stand-in can. It produced no kinds, so every walker branch on `FmtKind` — doc
+# comments, string atoms, the three template positions — was unreachable from a
+# unit test; and it accepted inputs the real lexer reads differently, which is
+# how `# { str : i64 }` sat here as a set type when `# ` in fact opens a doc
+# comment. Avoiding that is worth the `?` on every call below.
+fn walker_of(src: str) -> W!FmtError {
+    let LexResult { tokens, trivia } = lex_aipl(src).map_err(
+        |e| FmtError { message: e.message, span: e.span },
+    )?;
+    let toks = tokens.map(|t| FmtTok { kind: fmt_kind(t.kind), span: t.text.span });
+    ok(new_walker(src, toks, trivia.map(|t| t.text.span)))
+}.test({
+    // The real lexer, so a test writes source and gets the tokens the formatter
+    // gets. Spacing in an input is therefore *input*, not a token separator: an
+    // assertion that starts from `"i64 [ ] ?"` is checking that the spacing is
+    // normalized away, which is the formatter's whole job.
+    let w = walker_of("a bc d")?;
     assert(w.peek_text() == "a");
     assert(w.peek_text_n(1) == "bc");
     assert(w.peek_text_n(2) == "d");
     assert(w.peek_text_n(3) == "");
-    assert(walker_of("").at_end());
+    assert(walker_of("")?.at_end());
 
     // --- types ------------------------------------------------------------
     // A bare name, and the `?` / `[]` suffix runs, in source order.
-    assert(walker_of("i64").ty().rendered(100)? == "i64");
-    assert(walker_of("i64 ?").ty().rendered(100)? == "i64?");
-    assert(walker_of("i64 [ ]").ty().rendered(100)? == "i64[]");
-    assert(walker_of("i64 [ ] [ ]").ty().rendered(100)? == "i64[][]");
-    assert(walker_of("i64 ? [ ]").ty().rendered(100)? == "i64?[]");
-    assert(walker_of("i64 [ ] ?").ty().rendered(100)? == "i64[]?");
+    assert(walker_of("i64")?.ty().rendered(100)? == "i64");
+    assert(walker_of("i64 ?")?.ty().rendered(100)? == "i64?");
+    assert(walker_of("i64 [ ]")?.ty().rendered(100)? == "i64[]");
+    assert(walker_of("i64 [ ] [ ]")?.ty().rendered(100)? == "i64[][]");
+    assert(walker_of("i64 ? [ ]")?.ty().rendered(100)? == "i64?[]");
+    assert(walker_of("i64 [ ] ?")?.ty().rendered(100)? == "i64[]?");
 
     // Set and dict types.
-    assert(walker_of("# { str }").ty().rendered(100)? == "#{str}");
-    assert(walker_of("# { str : i64 }").ty().rendered(100)? == "#{str: i64}");
-    assert(walker_of("# { str : i64 } [ ]").ty().rendered(100)? == "#{str: i64}[]");
+    assert(walker_of("#{ str }")?.ty().rendered(100)? == "#{str}");
+    assert(walker_of("#{ str : i64 }")?.ty().rendered(100)? == "#{str: i64}");
+    assert(walker_of("#{ str : i64 } [ ]")?.ty().rendered(100)? == "#{str: i64}[]");
 
     // Generic application — `<`/`>` are unambiguously argument brackets here.
-    assert(walker_of("Box < i64 >").ty().rendered(100)? == "Box<i64>");
-    assert(walker_of("Map < str , i64 >").ty().rendered(100)? == "Map<str, i64>");
+    assert(walker_of("Box < i64 >")?.ty().rendered(100)? == "Box<i64>");
+    assert(walker_of("Map < str , i64 >")?.ty().rendered(100)? == "Map<str, i64>");
     // An `Angles` list takes no trailing comma even when broken.
-    assert(walker_of("Map < str , i64 >").ty().rendered(1)? == "Map<\n    str,\n    i64\n>");
+    assert(walker_of("Map < str , i64 >")?.ty().rendered(1)? == "Map<\n    str,\n    i64\n>");
 
     // Results: `T!E`, and the void-ok `!E`.
-    assert(walker_of("i64 ! str").ty().rendered(100)? == "i64!str");
-    assert(walker_of("! Error").ty().rendered(100)? == "!Error");
+    assert(walker_of("i64 ! str")?.ty().rendered(100)? == "i64!str");
+    assert(walker_of("! Error")?.ty().rendered(100)? == "!Error");
 
     // Parenthesized: function type, tuple, tuple array.
-    assert(walker_of("( i64 , str ) -> bool").ty().rendered(100)? == "(i64, str) -> bool");
-    assert(walker_of("( i64 , str )").ty().rendered(100)? == "(i64, str)");
-    assert(walker_of("( i64 , str ) [ ]").ty().rendered(100)? == "(i64, str)[]");
+    assert(walker_of("( i64 , str ) -> bool")?.ty().rendered(100)? == "(i64, str) -> bool");
+    assert(walker_of("( i64 , str )")?.ty().rendered(100)? == "(i64, str)");
+    assert(walker_of("( i64 , str ) [ ]")?.ty().rendered(100)? == "(i64, str)[]");
     // A function type nests on the right.
-    assert(walker_of("( i64 ) -> ( str ) -> bool").ty().rendered(100)? == "(i64) -> (str) -> bool");
+    assert(
+        walker_of("( i64 ) -> ( str ) -> bool")?.ty().rendered(100)? == "(i64) -> (str) -> bool",
+    );
 
     // --- comma lists --------------------------------------------------------
     // Empty renders as just the brackets; no indent machinery.
@@ -2438,10 +2441,10 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
 
     // --- type parameters ----------------------------------------------------
     // Absent is an empty doc, so a caller can concatenate it unconditionally.
-    assert(walker_of("(").type_params().rendered(100)? == "");
-    assert(walker_of("< T >").type_params().rendered(100)? == "<T>");
-    assert(walker_of("< T : any >").type_params().rendered(100)? == "<T: any>");
-    assert(walker_of("< T , U : ord >").type_params().rendered(100)? == "<T, U: ord>");
+    assert(walker_of("(")?.type_params().rendered(100)? == "");
+    assert(walker_of("< T >")?.type_params().rendered(100)? == "<T>");
+    assert(walker_of("< T : any >")?.type_params().rendered(100)? == "<T: any>");
+    assert(walker_of("< T , U : ord >")?.type_params().rendered(100)? == "<T, U: ord>");
 
     // --- end to end, on real source ---------------------------------------------
     // `format_program` lexes for itself, so these are genuine AIPL programs, not
@@ -2478,167 +2481,205 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
         ),
     );
 
+    // --- kind-dispatched atoms ---------------------------------------------
+    //
+    // `atom` asks the token's *kind* for these four, so none of them was
+    // reachable while this file tokenized its own inputs and called every token
+    // an `Ident`. They are the paths a stand-in tokenizer cannot reach.
+    assert(walker_of(`"s"`)?.expr().rendered(100)? == `"s"`);
+    assert(walker_of("'c'")?.expr().rendered(100)? == "'c'");
+    assert(walker_of("12")?.expr().rendered(100)? == "12");
+    assert(walker_of("true")?.expr().rendered(100)? == "true");
+
+    // A `"""` block is a `RawBlock`, so its closing delimiter re-aligns under
+    // the opening one rather than staying where the author left it.
+    assert(walker_of("\"\"\"\n    a\n\"\"\"")?.expr().rendered(100)? == "\"\"\"\n    a\n\"\"\"");
+
+    // A template literal is copied verbatim, interpolations and all — three
+    // token positions (head, middle, tail) that only a kind tells apart.
+    assert(walker_of(`\`a\{b}c\``)?.expr().rendered(100)? == `\`a\{b}c\``);
+
     // --- expressions ------------------------------------------------------------
-    assert(walker_of("a").expr().rendered(100)? == "a");
-    assert(walker_of("a + b").expr().rendered(100)? == "a + b");
-    assert(walker_of("a + b * c").expr().rendered(100)? == "a + b * c");
-    assert(walker_of("! a").expr().rendered(100)? == "!a");
-    assert(walker_of("- a").expr().rendered(100)? == "-a");
-    assert(walker_of("a .. b").expr().rendered(100)? == "a..b");
+    assert(walker_of("a")?.expr().rendered(100)? == "a");
+    assert(walker_of("a + b")?.expr().rendered(100)? == "a + b");
+    assert(walker_of("a + b * c")?.expr().rendered(100)? == "a + b * c");
+    assert(walker_of("! a")?.expr().rendered(100)? == "!a");
+    assert(walker_of("- a")?.expr().rendered(100)? == "-a");
+    assert(walker_of("a .. b")?.expr().rendered(100)? == "a..b");
 
     // Postfix: field access and `?` glue; a lone call keeps its own list.
-    assert(walker_of("a . b").expr().rendered(100)? == "a.b");
-    assert(walker_of("a ?").expr().rendered(100)? == "a?");
-    assert(walker_of("f ( x )").expr().rendered(100)? == "f(x)");
-    assert(walker_of("f ( )").expr().rendered(100)? == "f()");
-    assert(walker_of("a . f ( x )").expr().rendered(100)? == "a.f(x)");
-    assert(walker_of("xs [ i ]").expr().rendered(100)? == "xs[i]");
-    assert(walker_of("xs [ a .. b ]").expr().rendered(100)? == "xs[a..b]");
-    assert(walker_of("xs [ a .. ]").expr().rendered(100)? == "xs[a..]");
-    assert(walker_of("xs [ .. b ]").expr().rendered(100)? == "xs[..b]");
+    assert(walker_of("a . b")?.expr().rendered(100)? == "a.b");
+    assert(walker_of("a ?")?.expr().rendered(100)? == "a?");
+    assert(walker_of("f ( x )")?.expr().rendered(100)? == "f(x)");
+    assert(walker_of("f ( )")?.expr().rendered(100)? == "f()");
+    assert(walker_of("a . f ( x )")?.expr().rendered(100)? == "a.f(x)");
+    assert(walker_of("xs [ i ]")?.expr().rendered(100)? == "xs[i]");
+    assert(walker_of("xs [ a .. b ]")?.expr().rendered(100)? == "xs[a..b]");
+    assert(walker_of("xs [ a .. ]")?.expr().rendered(100)? == "xs[a..]");
+    assert(walker_of("xs [ .. b ]")?.expr().rendered(100)? == "xs[..b]");
 
     // Two or more calls form a chain that breaks before each call when too wide.
-    assert(walker_of("a . f ( ) . g ( )").expr().rendered(100)? == "a.f().g()");
-    assert(walker_of("a . f ( ) . g ( )").expr().rendered(5)? == "a\n    .f()\n    .g()");
+    assert(walker_of("a . f ( ) . g ( )")?.expr().rendered(100)? == "a.f().g()");
+    assert(walker_of("a . f ( ) . g ( )")?.expr().rendered(5)? == "a\n    .f()\n    .g()");
 
     // Literals and containers.
-    assert(walker_of("( a )").expr().rendered(100)? == "(a)");
-    assert(walker_of("( a , b )").expr().rendered(100)? == "(a, b)");
-    assert(walker_of("[ a , b ]").expr().rendered(100)? == "[a, b]");
-    assert(walker_of("[ ]").expr().rendered(100)? == "[]");
-    assert(walker_of("# { a , b }").expr().rendered(100)? == "#{a, b}");
-    assert(walker_of("# { k : v }").expr().rendered(100)? == "#{k: v}");
-    assert(walker_of("# { : }").expr().rendered(100)? == "#{:}");
+    assert(walker_of("( a )")?.expr().rendered(100)? == "(a)");
+    assert(walker_of("( a , b )")?.expr().rendered(100)? == "(a, b)");
+    assert(walker_of("[ a , b ]")?.expr().rendered(100)? == "[a, b]");
+    assert(walker_of("[ ]")?.expr().rendered(100)? == "[]");
+    assert(walker_of("#{ a , b }")?.expr().rendered(100)? == "#{a, b}");
+    assert(walker_of("#{ k : v }")?.expr().rendered(100)? == "#{k: v}");
+    assert(walker_of("#{ : }")?.expr().rendered(100)? == "#{:}");
 
     // Struct construction, including the field shorthand.
-    assert(walker_of("S { a : 1 , b }").expr().rendered(100)? == "S { a: 1, b }");
-    assert(walker_of("S { }").expr().rendered(100)? == "S {}");
+    assert(walker_of("S { a : 1 , b }")?.expr().rendered(100)? == "S { a: 1, b }");
+    assert(walker_of("S { }")?.expr().rendered(100)? == "S {}");
 
     // Keyword arguments spell tight; a bare operator passes as a value.
-    assert(walker_of("f ( 1 , k = 2 )").expr().rendered(100)? == "f(1, k=2)");
-    assert(walker_of("apply ( 2 , 3 , + )").expr().rendered(100)? == "apply(2, 3, +)");
+    assert(walker_of("f ( 1 , k = 2 )")?.expr().rendered(100)? == "f(1, k=2)");
+    assert(walker_of("apply ( 2 , 3 , + )")?.expr().rendered(100)? == "apply(2, 3, +)");
 
     // Lambdas.
-    assert(walker_of("| x | x").expr().rendered(100)? == "|x| x");
-    assert(walker_of("| x : i64 | x").expr().rendered(100)? == "|x: i64| x");
-    assert(walker_of("f ( | | x )").expr().rendered(100)? == "f(|| x)");
+    assert(walker_of("| x | x")?.expr().rendered(100)? == "|x| x");
+    assert(walker_of("| x : i64 | x")?.expr().rendered(100)? == "|x: i64| x");
+    assert(walker_of("f ( | | x )")?.expr().rendered(100)? == "f(|| x)");
 
     // --- if / match ---------------------------------------------------------
-    assert(walker_of("if ( c ) { a }").expr().rendered(100)? == "if (c) { a }");
+    assert(walker_of("if ( c ) { a }")?.expr().rendered(100)? == "if (c) { a }");
     assert(
-        walker_of("if ( c ) { a } else { b }").expr().rendered(100)? == "if (c) { a } else { b }",
+        walker_of("if ( c ) { a } else { b }")?.expr().rendered(100)? == "if (c) { a } else { b }",
     );
     // Both branches break together, never one inline and the other split.
     assert(
-        walker_of("if ( c ) { a } else { b }")
+        walker_of("if ( c ) { a } else { b }")?
             .expr()
             .rendered(5)? == "if (c) {\n    a\n} else {\n    b\n}",
     );
     // A match is always one arm per line, even when it would fit.
     assert(
-        walker_of("match ( v ) { A => 1 , }")
+        walker_of("match ( v ) { A => 1 , }")?
             .expr()
             .rendered(100)? == "match (v) {\n    A => 1,\n}",
     );
     assert(
-        walker_of("match ( v ) { A ( x ) => x , B => 2 , }")
+        walker_of("match ( v ) { A ( x ) => x , B => 2 , }")?
             .expr()
             .rendered(100)? == "match (v) {\n    A(x) => x,\n    B => 2,\n}",
     );
 
     // --- statements & blocks --------------------------------------------------
-    assert(walker_of("{ }").block().rendered(100)? == "{}");
-    assert(walker_of("{ a }").block().rendered(100)? == "{ a }");
+    assert(walker_of("{ }")?.block().rendered(100)? == "{}");
+    assert(walker_of("{ a }")?.block().rendered(100)? == "{ a }");
     // Any `;` forces one statement per line.
-    assert(walker_of("{ f ( ) ; }").block().rendered(100)? == "{\n    f();\n}");
-    assert(walker_of("{ let x = 1 ; x }").block().rendered(100)? == "{\n    let x = 1;\n    x\n}");
-    assert(walker_of("{ mut x = 1 ; x }").block().rendered(100)? == "{\n    mut x = 1;\n    x\n}");
-    assert(walker_of("{ set x = 1 ; }").block().rendered(100)? == "{\n    set x = 1;\n}");
-    assert(walker_of("{ set x ++ ; }").block().rendered(100)? == "{\n    set x++;\n}");
-    assert(walker_of("{ set x -- ; }").block().rendered(100)? == "{\n    set x--;\n}");
+    assert(walker_of("{ f ( ) ; }")?.block().rendered(100)? == "{\n    f();\n}");
+    assert(walker_of("{ let x = 1 ; x }")?.block().rendered(100)? == "{\n    let x = 1;\n    x\n}");
+    assert(walker_of("{ mut x = 1 ; x }")?.block().rendered(100)? == "{\n    mut x = 1;\n    x\n}");
+    assert(walker_of("{ set x = 1 ; }")?.block().rendered(100)? == "{\n    set x = 1;\n}");
+    assert(walker_of("{ set x ++ ; }")?.block().rendered(100)? == "{\n    set x++;\n}");
+    assert(walker_of("{ set x -- ; }")?.block().rendered(100)? == "{\n    set x--;\n}");
     // The compound assignments are spaced like the `=` they stand in for.
-    assert(walker_of("{ set x += 1 ; }").block().rendered(100)? == "{\n    set x += 1;\n}");
-    assert(walker_of("{ set x -= n ; }").block().rendered(100)? == "{\n    set x -= n;\n}");
-    assert(walker_of("{ set x *= 2 ; }").block().rendered(100)? == "{\n    set x *= 2;\n}");
+    assert(walker_of("{ set x += 1 ; }")?.block().rendered(100)? == "{\n    set x += 1;\n}");
+    assert(walker_of("{ set x -= n ; }")?.block().rendered(100)? == "{\n    set x -= n;\n}");
+    assert(walker_of("{ set x *= 2 ; }")?.block().rendered(100)? == "{\n    set x *= 2;\n}");
     assert(
-        walker_of("{ set x /= f ( 2 ) ; }").block().rendered(100)? == "{\n    set x /= f(2);\n}",
+        walker_of("{ set x /= f ( 2 ) ; }")?.block().rendered(100)? == "{\n    set x /= f(2);\n}",
     );
-    assert(walker_of("{ set a . b = 1 ; }").block().rendered(100)? == "{\n    set a.b = 1;\n}");
+    assert(walker_of("{ set a . b = 1 ; }")?.block().rendered(100)? == "{\n    set a.b = 1;\n}");
     assert(
-        walker_of("{ set xs . push ( 1 ) ; }")
+        walker_of("{ set xs . push ( 1 ) ; }")?
             .block()
             .rendered(100)? == "{\n    set xs.push(1);\n}",
     );
-    assert(walker_of("{ return 1 ; }").block().rendered(100)? == "{\n    return 1;\n}");
+    assert(walker_of("{ return 1 ; }")?.block().rendered(100)? == "{\n    return 1;\n}");
     // Destructuring binders.
     assert(
-        walker_of("{ let ( a , b ) = p ; }").block().rendered(100)? == "{\n    let (a, b) = p;\n}",
+        walker_of("{ let ( a , b ) = p ; }")?.block().rendered(100)? == "{\n    let (a, b) = p;\n}",
     );
     assert(
-        walker_of("{ let S { a , b } = p ; }")
+        walker_of("{ let S { a , b } = p ; }")?
             .block()
             .rendered(100)? == "{\n    let S { a, b } = p;\n}",
     );
     assert(
-        walker_of("{ mut S { a , b } = p ; }")
+        walker_of("{ mut S { a , b } = p ; }")?
             .block()
             .rendered(100)? == "{\n    mut S { a, b } = p;\n}",
     );
     // Loops.
     assert(
-        walker_of("{ while ( c ) { f ( ) ; } }")
+        walker_of("{ while ( c ) { f ( ) ; } }")?
             .block()
             .rendered(100)? == "{\n    while (c) {\n        f();\n    }\n}",
     );
     assert(
-        walker_of("{ for ( let x : xs ) { f ( ) ; } }")
+        walker_of("{ for ( let x : xs ) { f ( ) ; } }")?
             .block()
             .rendered(100)? == "{\n    for (let x : xs) {\n        f();\n    }\n}",
     );
     assert(
-        walker_of("{ for ( let ( i , x ) : xs ) { f ( ) ; } }")
+        walker_of("{ for ( let ( i , x ) : xs ) { f ( ) ; } }")?
             .block()
             .rendered(100)? == "{\n    for (let (i, x) : xs) {\n        f();\n    }\n}",
     );
 
     // --- items ------------------------------------------------------------------
-    assert(walker_of("struct S { a : i64 }").struct_item().rendered(100)? == "struct S { a: i64 }");
-    assert(walker_of("struct S { }").struct_item().rendered(100)? == "struct S {}");
     assert(
-        walker_of("struct S < T > { a : T , b : str }")
+        walker_of("struct S { a : i64 }")?.struct_item().rendered(100)? == "struct S { a: i64 }",
+    );
+    assert(walker_of("struct S { }")?.struct_item().rendered(100)? == "struct S {}");
+    assert(
+        walker_of("struct S < T > { a : T , b : str }")?
             .struct_item()
             .rendered(100)? == "struct S<T> { a: T, b: str }",
     );
     // A field default keeps spaces around `=`.
     assert(
-        walker_of("struct S { a : i64 = 1 }")
+        walker_of("struct S { a : i64 = 1 }")?
             .struct_item()
             .rendered(100)? == "struct S { a: i64 = 1 }",
     );
 
-    assert(walker_of("fn f ( ) { }").fn_item().rendered(100)? == "fn f() {}");
-    assert(walker_of("pub fn f ( ) { }").fn_item().rendered(100)? == "pub fn f() {}");
-    assert(walker_of("fn f ( ) -> i64 { 1 }").fn_item().rendered(100)? == "fn f() -> i64 { 1 }");
+    // `# ..` doc comments are tokens, not trivia, so `item` emits them itself —
+    // one per line, verbatim, above whatever they document. Another branch that
+    // only a real kind reaches.
+    assert(walker_of("# Doc.\nfn f ( ) { }")?.item().rendered(100)? == "# Doc.\nfn f() {}");
     assert(
-        walker_of("fn f ( a : i64 , b : str ) -> bool { c }")
+        walker_of("# One.\n#\n# Two.\nstruct S { }")?
+            .item()
+            .rendered(100)? == "# One.\n#\n# Two.\nstruct S {}",
+    );
+
+    // A `//` note above the docs is an ordinary comment, drained by `lead`, so
+    // it stays above them and stays a `//`.
+    assert(
+        walker_of("// note\n# Doc.\nfn f ( ) { }")?
+            .program()
+            .rendered(100)? == "// note\n# Doc.\nfn f() {}",
+    );
+
+    assert(walker_of("fn f ( ) { }")?.fn_item().rendered(100)? == "fn f() {}");
+    assert(walker_of("pub fn f ( ) { }")?.fn_item().rendered(100)? == "pub fn f() {}");
+    assert(walker_of("fn f ( ) -> i64 { 1 }")?.fn_item().rendered(100)? == "fn f() -> i64 { 1 }");
+    assert(
+        walker_of("fn f ( a : i64 , b : str ) -> bool { c }")?
             .fn_item()
             .rendered(100)? == "fn f(a: i64, b: str) -> bool { c }",
     );
     // `mut` receiver, variadic marker, and a declaration default.
     assert(
-        walker_of("fn f ( mut self : i64 [ ] , x : i64 = 1 ) { }")
+        walker_of("fn f ( mut self : i64 [ ] , x : i64 = 1 ) { }")?
             .fn_item()
             .rendered(100)? == "fn f(mut self: i64[], x: i64 = 1) {}",
     );
-    assert(walker_of("fn f ( xs : i64 * ) { }").fn_item().rendered(100)? == "fn f(xs: i64*) {}");
+    assert(walker_of("fn f ( xs : i64 * ) { }")?.fn_item().rendered(100)? == "fn f(xs: i64*) {}");
     // Effects, type params, and a statement body.
     assert(
-        walker_of("fn f ( ) ! prints { g ( ) ; }")
+        walker_of("fn f ( ) ! prints { g ( ) ; }")?
             .fn_item()
             .rendered(100)? == "fn f() !prints {\n    g();\n}",
     );
     assert(
-        walker_of("fn f < T : any > ( x : T ) -> T { x }")
+        walker_of("fn f < T : any > ( x : T ) -> T { x }")?
             .fn_item()
             .rendered(100)? == "fn f<T: any>(x: T) -> T { x }",
     );
@@ -2647,10 +2688,10 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     // syntax the parser refuses by name (see `fn_attrs`); the formatter still
     // lays it out so that refusal is what the author sees.
     assert(
-        walker_of(`fn f ( ) \{ } . doc ( "d" )`).fn_item().rendered(100)? == `fn f() \{}.doc("d")`,
+        walker_of(`fn f ( ) \{ } . doc ( "d" )`)?.fn_item().rendered(100)? == `fn f() \{}.doc("d")`,
     );
     assert(
-        walker_of("fn f ( ) { } . test ( { g ( ) ; } )")
+        walker_of("fn f ( ) { } . test ( { g ( ) ; } )")?
             .fn_item()
             .rendered(100)? == "fn f() {}.test({\n    g();\n})",
     );
@@ -2658,13 +2699,17 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     // --- program ------------------------------------------------------------
     // Items are separated by exactly one blank line.
     assert(
-        walker_of("fn a ( ) { } fn b ( ) { }").program().rendered(100)? == "fn a() {}\n\nfn b() {}",
+        walker_of("fn a ( ) { } fn b ( ) { }")?
+            .program()
+            .rendered(100)? == "fn a() {}\n\nfn b() {}",
     );
 
     // Imports hoist above the items, builtins before paths, each on its own line
     // and separated from the first item by a blank line.
     assert(
-        walker_of(`import \{ x } from "./m.aipl" ; import \{ b , a } from builtins ; fn f ( ) \{ }`)
+        walker_of(
+            `import \{ x } from "./m.aipl" ; import \{ b , a } from builtins ; fn f ( ) \{ }`,
+        )?
             .program()
             .rendered(
                 100,
@@ -2672,11 +2717,11 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     );
     // A struct and a variant are items too.
     assert(
-        walker_of("struct S { a : i64 } variant V = A | B")
+        walker_of("struct S { a : i64 } variant V = A | B")?
             .program()
             .rendered(100)? == "struct S { a: i64 }\n\nvariant V = A | B",
     );
-    assert(walker_of("").program().rendered(100)? == "");
+    assert(walker_of("")?.program().rendered(100)? == "");
 
     // Comments: a file-header comment stays at the very top (above the hoisted
     // imports), and a comment attached to an item rides with it. `walker_of`
@@ -2719,23 +2764,23 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     // and `bump()` does not advance there — so the loop cannot progress and
     // cannot exit. Each of these hung `aipl check` with no output before the
     // wrapper existed.
-    assert(more_before(walker_of("import { len"), "}")); // more to read
-    assert(!walker_of("").more_before("}")); // nothing left: stop, don't spin
+    assert(more_before(walker_of("import { len")?, "}")); // more to read
+    assert(!walker_of("")?.more_before("}")); // nothing left: stop, don't spin
     // An import whose `}` never arrives is an error, not a hang.
     assert(
-        walker_of("import { len from builtins ;")
+        walker_of("import { len from builtins ;")?
             .import_item()
             .is_err_and(|e| e.message == `formatter: expected "}", found "" (at end of input)`),
     );
     // Truncated right after the brace: an error naming end-of-input, not a hang.
     assert(
-        walker_of("import { len}")
+        walker_of("import { len}")?
             .import_item()
             .is_err_and(|e| e.message.contains("at end of input")),
     );
     // A well-formed import in the same shapes still parses.
     assert(
-        walker_of("import { len } from builtins ;")
+        walker_of("import { len } from builtins ;")?
             .import_item()?.doc
             .at(100) == "import { len } from builtins;",
     );
@@ -2743,13 +2788,13 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     // --- imports --------------------------------------------------------------
     // Names are sorted, and the braces get inner spaces when flat.
     assert(
-        walker_of("import { b , a } from builtins ;")
+        walker_of("import { b , a } from builtins ;")?
             .import_item()?.doc
             .at(100) == "import { a, b } from builtins;",
     );
     // Operators sort after plain names, and among themselves by `str` order.
     assert(
-        walker_of("import { == , len , ! } from builtins ;")
+        walker_of("import { == , len , ! } from builtins ;")?
             .import_item()?.doc
             .at(100) == "import { len, !, == } from builtins;",
     );
@@ -2758,43 +2803,43 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     // spelling — so it stays with the plain names rather than joining the
     // operators at the end.
     assert(
-        walker_of("import { wrapping_add as + , len , == } from builtins ;")
+        walker_of("import { wrapping_add as + , len , == } from builtins ;")?
             .import_item()?.doc
             .at(100) == "import { len, wrapping_add as +, == } from builtins;",
     );
 
     // A prefix sorts before the longer name extending it.
     assert(
-        walker_of("import { ab , a } from builtins ;")
+        walker_of("import { ab , a } from builtins ;")?
             .import_item()?.doc
             .at(100) == "import { a, ab } from builtins;",
     );
     // A path import keeps its quoted source verbatim.
     assert(
-        walker_of(`import \{ x } from "./m.aipl" ;`)
+        walker_of(`import \{ x } from "./m.aipl" ;`)?
             .import_item()?.doc
             .at(100) == `import \{ x } from "./m.aipl";`,
     );
     // Too wide: one name per line with a trailing comma.
     assert(
-        walker_of("import { b , a } from builtins ;")
+        walker_of("import { b , a } from builtins ;")?
             .import_item()?.doc
             .at(5) == "import {\n    a,\n    b,\n} from builtins;",
     );
     // The hoist key puts builtins ahead of every path.
-    assert(walker_of("import { x } from builtins ;").import_item()?.source == "builtins");
-    assert(walker_of(`import \{ x } from "./m.aipl" ;`).import_item()?.source == `"./m.aipl"`);
+    assert(walker_of("import { x } from builtins ;")?.import_item()?.source == "builtins");
+    assert(walker_of(`import \{ x } from "./m.aipl" ;`)?.import_item()?.source == `"./m.aipl"`);
 
     // --- variant ------------------------------------------------------------
-    assert(walker_of("variant V = A").variant_item().rendered(100)? == "variant V = A");
-    assert(walker_of("variant V = A | B").variant_item().rendered(100)? == "variant V = A | B");
+    assert(walker_of("variant V = A")?.variant_item().rendered(100)? == "variant V = A");
+    assert(walker_of("variant V = A | B")?.variant_item().rendered(100)? == "variant V = A | B");
     assert(
-        walker_of("variant V = A | B ( i64 )")
+        walker_of("variant V = A | B ( i64 )")?
             .variant_item()
             .rendered(100)? == "variant V = A | B(i64)",
     );
     assert(
-        walker_of("variant V = A ( i64 , str )")
+        walker_of("variant V = A ( i64 , str )")?
             .variant_item()
             .rendered(100)? == "variant V = A(i64, str)",
     );
@@ -2802,42 +2847,42 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     // Named payload slots, with and without defaults; a case may mix them with
     // bare positional ones.
     assert(
-        walker_of("variant V = A ( r : i64 )")
+        walker_of("variant V = A ( r : i64 )")?
             .variant_item()
             .rendered(100)? == "variant V = A(r: i64)",
     );
     assert(
-        walker_of("""variant V = A ( r : i64 , c : str = "red" )""")
+        walker_of("""variant V = A ( r : i64 , c : str = "red" )""")?
             .variant_item()
             .rendered(100)? == """variant V = A(r: i64, c: str = "red")""",
     );
     assert(
-        walker_of("variant V = A ( i64 , n : i64 [ ] = [ ] )")
+        walker_of("variant V = A ( i64 , n : i64 [ ] = [ ] )")?
             .variant_item()
             .rendered(100)? == "variant V = A(i64, n: i64[] = [])",
     );
     // Generic variant.
     assert(
-        walker_of("variant Opt < T > = Some ( T ) | Nil")
+        walker_of("variant Opt < T > = Some ( T ) | Nil")?
             .variant_item()
             .rendered(100)? == "variant Opt<T> = Some(T) | Nil",
     );
 
     // A leading `|` in the source is accepted and dropped when the layout fits
     // on one line — the same normalization a list's trailing comma gets.
-    assert(walker_of("variant V = | A | B").variant_item().rendered(100)? == "variant V = A | B");
-    assert(walker_of("variant V = | A").variant_item().rendered(100)? == "variant V = A");
+    assert(walker_of("variant V = | A | B")?.variant_item().rendered(100)? == "variant V = A | B");
+    assert(walker_of("variant V = | A")?.variant_item().rendered(100)? == "variant V = A");
 
     // Too wide to fit: one case per line, every case (the first included) led by
     // `|`, indented one level under the `=`.
     assert(
-        walker_of("variant V = A | B")
+        walker_of("variant V = A | B")?
             .variant_item()
             .rendered(5)? == "variant V =\n    | A\n    | B",
     );
     // Same layout whether or not the source already had the leading `|`.
     assert(
-        walker_of("variant V = | A | B")
+        walker_of("variant V = | A | B")?
             .variant_item()
             .rendered(5)? == "variant V =\n    | A\n    | B",
     );
@@ -2851,15 +2896,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 20551
-deallocations: 20551
-reallocations: 1242
-bytes allocated: 1257422
-instructions executed: 3446459
-binary size: 4129792
-  code: 2557560
-  data: 25300
-  metadata: 1546932
+allocations: 110684
+deallocations: 110684
+reallocations: 1833
+bytes allocated: 6009432
+instructions executed: 20980640
+binary size: 8266360
+  code: 5216412
+  data: 26580
+  metadata: 3023368
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2874,16 +2919,16 @@ functions:
     calls: 20
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1421
+    calls: 1442
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
-    calls: 0
+    calls: 1
     bytes: 140
   __arr_drop___m9__Token$__m8__AiplTok:
-    calls: 100
+    calls: 1335
     bytes: 388
   __arr_drop___m9__TokenRule$__m8__AiplTok:
-    calls: 8
+    calls: 148
     bytes: 832
   __arr_retain_ImportEntry:
     calls: 30
@@ -2898,61 +2943,61 @@ functions:
     calls: 27
     bytes: 140
   __arr_retain___m1__Doc:
-    calls: 1479
+    calls: 1499
     bytes: 116
   __arr_retain___m9__StepResult$__m8__AiplTok:
-    calls: 0
+    calls: 1
     bytes: 140
   __arr_retain___m9__Token$__m8__AiplTok:
-    calls: 84
+    calls: 1045
     bytes: 388
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
     bytes: 832
-  __builtin_all$char$s0$lam79:
-    calls: 0
+  __builtin_all$char$s0$lam104:
+    calls: 5
     bytes: 212
-  __builtin_any$__m1__Doc$lam32:
+  __builtin_any$__m1__Doc$lam46:
     calls: 0
     bytes: 32
-  __builtin_any$__m1__Doc$lam32$tail:
-    calls: 556
+  __builtin_any$__m1__Doc$lam46$tail:
+    calls: 554
     bytes: 324
   __builtin_count_is_at_least$char$s0:
-    calls: 47
+    calls: 48
     bytes: 252
-  __builtin_count_while$char$lam68:
-    calls: 69
+  __builtin_count_while$char$lam66:
+    calls: 1163
     bytes: 220
   __builtin_count_while$char$s0$lam103:
-    calls: 1
+    calls: 2
     bytes: 172
-  __builtin_count_while$char$s0$lam52:
-    calls: 0
+  __builtin_count_while$char$s0$lam109:
+    calls: 22
     bytes: 172
-  __builtin_count_while$char$s0$lam76:
-    calls: 50
+  __builtin_count_while$char$s0$lam74:
+    calls: 614
     bytes: 184
-  __builtin_count_while$char$s0$lam78:
+  __builtin_count_while$char$s0$lam77:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam91:
+  __builtin_count_while$char$s0$lam97:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam91$tail:
-    calls: 1
+  __builtin_count_while$char$s0$lam97$tail:
+    calls: 14
     bytes: 256
   __builtin_drop_last$str:
-    calls: 0
+    calls: 1
     bytes: 208
   __builtin_int_parse:
-    calls: 1
+    calls: 22
     bytes: 1028
   __builtin_intersperse$__m1__Doc:
-    calls: 150
+    calls: 152
     bytes: 408
   __eq_FmtKind:
-    calls: 951
+    calls: 908
     bytes: 64
   __eq_FmtTok:
     calls: 0
@@ -2970,61 +3015,61 @@ functions:
     calls: 6
     bytes: 300
   __eq_char$opt:
-    calls: 54
+    calls: 666
     bytes: 100
-  __lambda_37:
+  __lambda_38:
     calls: 0
     bytes: 136
-  __lambda_38:
-    calls: 23
-    bytes: 104
   __lambda_39:
-    calls: 0
-    bytes: 144
+    calls: 308
+    bytes: 104
   __lambda_40:
     calls: 0
-    bytes: 164
+    bytes: 144
   __lambda_41:
+    calls: 1
+    bytes: 164
+  __lambda_42:
     calls: 0
     bytes: 144
-  __lambda_42:
-    calls: 1
-    bytes: 164
   __lambda_43:
-    calls: 0
-    bytes: 48
+    calls: 7
+    bytes: 164
   __lambda_44:
     calls: 0
-    bytes: 64
-  __lambda_82:
+    bytes: 48
+  __lambda_45:
     calls: 1
+    bytes: 64
+  __lambda_88:
+    calls: 23
     bytes: 140
   __m10__unescape:
-    calls: 1
+    calls: 10
     bytes: 1108
   __m11__process_raw_string:
-    calls: 0
+    calls: 1
     bytes: 556
   __m12__trim_prefix:
-    calls: 0
+    calls: 12
     bytes: 260
   __m13__trim_suffix:
-    calls: 0
+    calls: 2
     bytes: 332
   __m1__col_after:
-    calls: 913
+    calls: 941
     bytes: 544
   __m1__fits:
     calls: 0
     bytes: 36
   __m1__fits$tail:
-    calls: 1571
+    calls: 1574
     bytes: 2684
   __m1__fits_atom:
     calls: 0
     bytes: 52
   __m1__fits_atom$tail:
-    calls: 547
+    calls: 549
     bytes: 312
   __m1__has_hard:
     calls: 0
@@ -3033,92 +3078,95 @@ functions:
     calls: 1448
     bytes: 688
   __m1__print_doc:
-    calls: 139
+    calls: 148
     bytes: 4968
   __m2__reindent_block:
-    calls: 0
+    calls: 2
     bytes: 2832
   __m3__dedent:
-    calls: 0
+    calls: 2
     bytes: 1276
+  __m8__aipl_rules:
+    calls: 148
+    bytes: 90364
   __m8__char_lit_emit:
-    calls: 0
+    calls: 1
     bytes: 1648
   __m8__dedent_segments:
     calls: 0
     bytes: 272
   __m8__doc_text:
-    calls: 0
+    calls: 5
     bytes: 196
   __m8__int_lit:
-    calls: 1
+    calls: 22
     bytes: 1296
   __m8__raw_tpl_kind:
     calls: 0
     bytes: 2392
   __m8__tpl_kind:
-    calls: 0
+    calls: 2
     bytes: 2424
   __m9__between_len:
-    calls: 49
+    calls: 592
     bytes: 752
   __m9__delimited_len:
-    calls: 96
+    calls: 1174
     bytes: 1592
   __m9__finalize_template$__m8__AiplTok:
-    calls: 0
+    calls: 1
     bytes: 8464
   __m9__float_len:
     calls: 0
     bytes: 824
   __m9__interp_scan$__m8__AiplTok:
-    calls: 0
+    calls: 1
     bytes: 2248
   __m9__lex$__m8__AiplTok:
-    calls: 8
+    calls: 148
     bytes: 1520
   __m9__lex_step$__m8__AiplTok:
-    calls: 131
+    calls: 1895
     bytes: 28908
   __m9__nested_len:
-    calls: 84
+    calls: 1038
     bytes: 940
   __m9__step_result$__m8__AiplTok:
-    calls: 3753
+    calls: 47218
     bytes: 14224
   __m9__template_scan$__m8__AiplTok:
-    calls: 0
+    calls: 1
     bytes: 2728
   __m9__template_step$__m8__AiplTok:
-    calls: 94
+    calls: 1164
     bytes: 476
   __m9__to_eol_len:
     calls: 0
     bytes: 52
   __m9__to_eol_len$tail:
-    calls: 169
+    calls: 2078
     bytes: 252
   __m9__to_eol_unless_len:
-    calls: 84
+    calls: 1038
     bytes: 368
   __rec_drop___m1__Doc:
-    calls: 2800
+    calls: 2863
     bytes: 184
   __rec_drop___m1__Work:
-    calls: 4047
+    calls: 4115
     bytes: 84
   __test$binding_ann:
     calls: 1
-    bytes: 5152
+    bytes: 7868
   __test$new_walker:
     calls: 1
     bytes: 12132
   __test$struct_pattern:
     calls: 1
-    bytes: 1708
+    bytes: 2188
   __test$walker_of:
     calls: 1
-    bytes: 1887684
+    bytes: 4574844
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
@@ -3126,49 +3174,49 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 490
+    calls: 4023
     bytes: (external)
   aipl_arr_inc:
-    calls: 54400
+    calls: 246260
     bytes: (external)
   aipl_arr_reserve:
-    calls: 555
+    calls: 4092
     bytes: (external)
   aipl_arr_slice:
-    calls: 81
+    calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 67434
+    calls: 349252
     bytes: (external)
   aipl_array_new:
-    calls: 11072
+    calls: 100404
     bytes: (external)
   aipl_array_push:
-    calls: 1597
+    calls: 1642
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1832
+    calls: 1897
     bytes: (external)
   aipl_array_with_cap:
-    calls: 203
+    calls: 499
     bytes: (external)
   aipl_assert:
-    calls: 183
+    calls: 192
     bytes: (external)
   aipl_rec_alloc:
-    calls: 6847
+    calls: 6978
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 47065
+    calls: 47797
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 4150
+    calls: 4211
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 40218
+    calls: 40819
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 4150
+    calls: 4211
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -3186,7 +3234,7 @@ functions:
     calls: 7
     bytes: 76
   atom:
-    calls: 118
+    calls: 123
     bytes: 2836
   base_ty:
     calls: 71
@@ -3195,22 +3243,22 @@ functions:
     calls: 7
     bytes: 2276
   binop_expr:
-    calls: 114
+    calls: 119
     bytes: 3204
   binop_tail:
-    calls: 114
+    calls: 119
     bytes: 4352
   block:
-    calls: 47
+    calls: 49
     bytes: 1144
   block_entries:
-    calls: 52
+    calls: 54
     bytes: 3952
   block_layout:
-    calls: 52
+    calls: 54
     bytes: 5192
   bump:
-    calls: 1032
+    calls: 1059
     bytes: 1100
   call_arg:
     calls: 12
@@ -3225,10 +3273,10 @@ functions:
     calls: 6
     bytes: 6580
   comma_list_docs:
-    calls: 93
+    calls: 96
     bytes: 4168
   comment_starts_before:
-    calls: 302
+    calls: 313
     bytes: 280
   construct_body:
     calls: 0
@@ -3252,19 +3300,22 @@ functions:
     calls: 5
     bytes: 760
   expect:
-    calls: 438
+    calls: 452
     bytes: 1228
   expr:
-    calls: 112
+    calls: 117
     bytes: 760
+  fmt_kind:
+    calls: 1031
+    bytes: 2524
   fn_attrs:
-    calls: 22
+    calls: 24
     bytes: 5908
   fn_body:
-    calls: 22
+    calls: 24
     bytes: 1304
   fn_item:
-    calls: 22
+    calls: 24
     bytes: 19052
   fn_return:
     calls: 6
@@ -3274,7 +3325,7 @@ functions:
     bytes: 12952
   format_program:
     calls: 8
-    bytes: 132548
+    bytes: 5212
   hug_close:
     calls: 0
     bytes: 732
@@ -3300,7 +3351,7 @@ functions:
     calls: 4
     bytes: 4104
   item:
-    calls: 14
+    calls: 22
     bytes: 2632
   lambda:
     calls: 3
@@ -3312,7 +3363,7 @@ functions:
     calls: 3
     bytes: 3412
   lead:
-    calls: 296
+    calls: 305
     bytes: 1884
   let_stmt:
     calls: 3
@@ -3327,22 +3378,22 @@ functions:
     calls: 2
     bytes: 12032
   more_before:
-    calls: 185
+    calls: 188
     bytes: 200
   mut_stmt:
     calls: 2
     bytes: 7100
   name_atom:
-    calls: 101
+    calls: 80
     bytes: 5728
   named_ty:
     calls: 67
     bytes: 4112
   next_start:
-    calls: 47
+    calls: 48
     bytes: 532
   params_until:
-    calls: 22
+    calls: 24
     bytes: 10212
   paren_atom:
     calls: 2
@@ -3357,28 +3408,28 @@ functions:
     calls: 3
     bytes: 3252
   peek_is:
-    calls: 951
+    calls: 908
     bytes: 288
   postfix:
-    calls: 118
+    calls: 123
     bytes: 5548
   postfix_segs:
-    calls: 118
+    calls: 123
     bytes: 3576
   program:
-    calls: 12
+    calls: 13
     bytes: 2636
   program_items:
-    calls: 12
+    calls: 13
     bytes: 4696
   range_has_semi:
     calls: 37
     bytes: 228
   range_tail:
-    calls: 112
+    calls: 117
     bytes: 2352
   rendered:
-    calls: 117
+    calls: 126
     bytes: 572
   sep_entry:
     calls: 39
@@ -3405,7 +3456,7 @@ functions:
     calls: 1
     bytes: 1496
   sorted_imports:
-    calls: 24
+    calls: 26
     bytes: 1884
   spaced_default:
     calls: 4
@@ -3414,7 +3465,7 @@ functions:
     calls: 39
     bytes: 5876
   str_atom:
-    calls: 2
+    calls: 5
     bytes: 568
   struct_atom:
     calls: 2
@@ -3423,31 +3474,31 @@ functions:
     calls: 1
     bytes: 1648
   struct_fields:
-    calls: 5
+    calls: 6
     bytes: 6436
   struct_inits:
     calls: 2
     bytes: 5972
   struct_item:
-    calls: 5
+    calls: 6
     bytes: 6632
   struct_pattern:
     calls: 4
     bytes: 6296
   take_comment:
-    calls: 8
+    calls: 9
     bytes: 256
   template_scan:
-    calls: 0
+    calls: 1
     bytes: 2496
   template_verbatim:
-    calls: 0
+    calls: 1
     bytes: 900
   tok_text:
-    calls: 3304
+    calls: 3311
     bytes: 456
   trailing_comment:
-    calls: 82
+    calls: 83
     bytes: 2188
   trim_last_break:
     calls: 0
@@ -3465,10 +3516,10 @@ functions:
     calls: 8
     bytes: 2364
   type_params:
-    calls: 44
+    calls: 47
     bytes: 5788
   unary:
-    calls: 120
+    calls: 125
     bytes: 1884
   variant_cases:
     calls: 13
@@ -3480,8 +3531,8 @@ functions:
     calls: 6
     bytes: 2432
   walker_of:
-    calls: 131
-    bytes: 748
+    calls: 140
+    bytes: 3692
   while_stmt:
     calls: 1
     bytes: 4892

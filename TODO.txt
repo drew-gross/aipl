@@ -78,6 +78,7 @@ highlighter:
   range collapsing in charachter classes
 
 misc cleanup:
+  what is `walker.aipl`'s space-splitting test tokenizer? Can it be removed?
   lead_toks can be count_while I think?
   use an enum for the builtins
   made logical not more like the rest of the operators (lower it to a call immediately)

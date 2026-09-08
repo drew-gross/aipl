@@ -311,9 +311,13 @@ none is on the library's critical path:
   that would naturally be local lambdas are named top-level functions. (A lambda
   in *value* position also needs a block body; only an argument-position one may
   have an expression body.)
-- A `#` followed by a space is a doc comment, so `# { str }` — the spelling
-  `walker.aipl`'s space-splitting test tokenizer uses — is not a set type to a
-  real lexer. The copied assertions write `#{ str }`.
+- A `#` followed by a space is a doc comment, so `# { str }` is not a set type.
+  That spelling was in `walker.aipl`'s type assertions, which had a test
+  tokenizer splitting on spaces; copying them here is what found it. That
+  tokenizer is now gone — `walker_of` lexes with `lex_aipl`, the same three
+  lines `format_program` runs — so both sides of the comparison read an input
+  the same way, and the walker's kind-dispatched branches (doc comments, string
+  atoms, the three template positions) have unit tests for the first time.
 
 **5 — Retire gazelle.**
 

@@ -836,7 +836,8 @@ pub fn aipl_parse_cst(src: str) -> Cst!ParseError {
 # productions this file already describes. Here the same layouts are four
 # annotations on those productions plus `ty_space` below, and the assertions
 # under this function are `walker.aipl`'s own type assertions copied verbatim:
-# same inputs, same expected strings, including the broken-list case.
+# same inputs, same expected strings, including the broken-list case. Both sides
+# lex with `lex_aipl`, so the inputs mean the same thing to both.
 #
 # What that does *not* say: the rest of AIPL is not this tractable. Statements
 # want a hard-broken block layout that `format.aipl` does not have an arm for
@@ -855,9 +856,7 @@ pub fn format_aipl_ty(src: str, width: u64) -> str!ParseError {
     assert(format_aipl_ty("i64 ? [ ]", 100)? == "i64?[]");
     assert(format_aipl_ty("i64 [ ] ?", 100)? == "i64[]?");
 
-    // Set and dict types. Written `#{` rather than `# {`, unlike the walker's
-    // copy of these: a real lexer reads `# ` as the start of a doc comment,
-    // where the walker's test tokenizer splits on spaces and never sees one.
+    // Set and dict types.
     assert(format_aipl_ty("#{ str }", 100)? == "#{str}");
     assert(format_aipl_ty("#{ str : i64 }", 100)? == "#{str: i64}");
     assert(format_aipl_ty("#{ str : i64 } [ ]", 100)? == "#{str: i64}[]");

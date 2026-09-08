@@ -114,6 +114,8 @@
 
           <li><code>lex_aipl</code> <span class="from">from ./lex_aipl.aipl</span></li>
 
+          <li><code>LexResult</code> <span class="from">from ./lexer.aipl</span></li>
+
         </ul>
       </section>
 
@@ -2274,28 +2276,15 @@
 
       </section>
 
-      <section class="item" id="item-toks_of">
-        <h2>
-          <a class="anchor" href="#item-toks_of">toks_of</a>
-          <span class="kind kind-fn">fn</span>
-
-        </h2>
-        <pre class="signature"><code>fn toks_of(src: str) -&#62; FmtTok[]</code></pre>
-
-        <div class="doc"><p>Tokenize <code>src</code> by splitting on single spaces — one token per run of non-space characters, each span pointing at the real text. Lets a test write the source it means (<code>&quot;# { str : i64 }&quot;</code>, one space between real tokens) instead of hand-computing byte offsets. Every token gets kind <code>Ident</code>: the walkers in this file dispatch on token *text*, not kind.</p></div>
-
-
-      </section>
-
       <section class="item" id="item-walker_of">
         <h2>
           <a class="anchor" href="#item-walker_of">walker_of</a>
           <span class="kind kind-fn">fn</span>
 
         </h2>
-        <pre class="signature"><code>fn walker_of(src: str) -&#62; W</code></pre>
+        <pre class="signature"><code>fn walker_of(src: str) -&#62; W!FmtError</code></pre>
 
-        <div class="doc"><p>A walker over <code>src</code> tokenized by <code>toks_of</code>, with no comments.</p></div>
+        <div class="doc"><p>A walker over <code>src</code>, tokenized by the real lexer — the same three lines <code>format_program</code> runs, so a unit assertion and the formatter proper see one token stream and cannot drift apart.</p><p>There was a stand-in here once: a tokenizer that split on single spaces and called every token an <code>Ident</code>, so a test could write <code>&quot;i64 [ ] ?&quot;</code> and mean five tokens without computing byte offsets. It diverged in both of the ways a stand-in can. It produced no kinds, so every walker branch on <code>FmtKind</code> — doc comments, string atoms, the three template positions — was unreachable from a unit test; and it accepted inputs the real lexer reads differently, which is how <code># { str : i64 }</code> sat here as a set type when <code># </code> in fact opens a doc comment. Avoiding that is worth the <code>?</code> on every call below.</p></div>
 
 
       </section>
