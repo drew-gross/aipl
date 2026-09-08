@@ -17,6 +17,13 @@ import {
 // `count_while` counts a *leading run* matching a predicate, and this counts
 // *every* element matching a predicate, anywhere. Unsigned, like `len`: a count
 // is never negative.
+# Counts how many elements of `self` satisfy `pred`, examining every element.
+# Generic over the element type and callable as a method: `xs.count_if(pred)`.
+# A `str` receiver iterates its chars, since `str` and `char[]` share a
+# representation.
+#
+# See `count` for the equal-to-a-value form, and `count_while` for the
+# leading-run form that stops at the first element failing `pred`.
 pub fn count_if<T: any>(self: T[], pred: (T) -> bool) -> u64 {
     mut n: u64 = 0;
     for (let x : self) {
@@ -25,15 +32,7 @@ pub fn count_if<T: any>(self: T[], pred: (T) -> bool) -> u64 {
         };
     }
     n
-}.doc("""
-    Counts how many elements of `self` satisfy `pred`, examining every element.
-    Generic over the element type and callable as a method: `xs.count_if(pred)`.
-    A `str` receiver iterates its chars, since `str` and `char[]` share a
-    representation.
-
-    See `count` for the equal-to-a-value form, and `count_while` for the
-    leading-run form that stops at the first element failing `pred`.
-""").test({
+}.test({
     assert([1, 2, 3, 4].count_if(|x| x > 2) == 2);
     assert([1, 2, 3].count_if(|x| x > 9) == 0); // nothing matches
     assert([1, 2, 3].count_if(|x| x > 0) == 3); // everything matches

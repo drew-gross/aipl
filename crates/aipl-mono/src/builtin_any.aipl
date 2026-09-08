@@ -6,6 +6,9 @@ import { equal as ==, filter, greater_than as >, logical_not as ! } from builtin
 // user's `xs.any(pred)` specializes through the ordinary generic / higher-order
 // machinery — the in-file name `any` is only for this file's own tests, which
 // read exactly like user code.
+# True when at least one element satisfies `pred`, short-circuiting at the first
+# element that does; an empty array is false. Generic over the element type and
+# callable as a method: `xs.any(pred)`.
 pub fn any<T: any>(self: T[], pred: (T) -> bool) -> bool {
     for (let x : self) {
         if (pred(x)) {
@@ -13,11 +16,7 @@ pub fn any<T: any>(self: T[], pred: (T) -> bool) -> bool {
         };
     }
     false
-}.doc("""
-    True when at least one element satisfies `pred`, short-circuiting at the first
-    element that does; an empty array is false. Generic over the element type and
-    callable as a method: `xs.any(pred)`.
-""").test({
+}.test({
     assert([1, 2, 9].any(|x| x > 5)); // 9 satisfies it
     assert(![2, 4, 6].any(|x| x > 6)); // none does -> false
     assert(any([5, 4], |x| x == 4)); // free-call form

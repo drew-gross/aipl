@@ -13,20 +13,19 @@ import { equal as ==, len } from builtins;
 // `walker.aipl` ended up spelling this out by hand. A generic AIPL body has no
 // such restriction: the `match` it expands to is the one those callers were
 // writing themselves.
+# The optional's payload when it has one, otherwise `default`. Generic over the
+# payload type — including inline structs and variants — and callable as a
+# method: `o.value_or(d)`.
+#
+# `default` is an ordinary argument, so it is evaluated whether or not the
+# optional is empty. Keep it cheap; reach for a `match` when it isn't.
 pub fn value_or<T: any>(self: T?, default: T) -> T {
     match (self) {
         some(v) => v, #[allow]
         // `value_or` cannot be written in terms of itself
         none => default,
     }
-}.doc("""
-    The optional's payload when it has one, otherwise `default`. Generic over the
-    payload type — including inline structs and variants — and callable as a
-    method: `o.value_or(d)`.
-
-    `default` is an ordinary argument, so it is evaluated whether or not the
-    optional is empty. Keep it cheap; reach for a `match` when it isn't.
-""").test({
+}.test({
     // Scalars.
     assert(some(5).value_or(9) == 5);
     assert(none.value_or(9) == 9);

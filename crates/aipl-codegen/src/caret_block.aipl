@@ -1,12 +1,3 @@
-// The error renderer's caret-block formatter: the compiler calls this through the
-// FFI (see `install_parser_hooks`) when rendering an error with a span. Given
-// `source` and `span` (a half-open byte range `[start, end)`), it returns the
-// rustc-style location + underline block (no leading `error:`/`note:` label):
-//
-//   {pad}--> input:line:col
-//   {pad} |
-//   {line_no} | <source line>
-//   {pad} | <indent>^^^
 import {
     Span,
     equal as ==,
@@ -21,6 +12,15 @@ import {
 } from builtins;
 import { line_at } from "./line_at.aipl";
 
+# The error renderer's caret-block formatter: the compiler calls this through the
+# FFI (see `install_parser_hooks`) when rendering an error with a span. Given
+# `source` and `span` (a half-open byte range `[start, end)`), it returns the
+# rustc-style location + underline block (no leading `error:`/`note:` label):
+#
+#     {pad}--> input:line:col
+#     {pad} |
+#     {line_no} | <source line>
+#     {pad} | <indent>^^^
 pub fn caret_block(source: str, span: Span, filename: str) -> str {
     // `at.span` is the line's byte range, so the source line is one slice.
     let at = line_at(source, span.start);

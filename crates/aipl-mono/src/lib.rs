@@ -1788,7 +1788,7 @@ struct Generic {
 /// are none left) and ownership/representation specialization decisions are
 /// final, so it's ready for codegen. Distinct from [`Function`] (the AST type),
 /// which additionally carries source-only concerns — visibility, declared type
-/// parameters, an attached `.test`/`.doc` — that have no meaning once
+/// parameters, an attached `.test`, documentation — that have no meaning once
 /// monomorphization is done; conversely each param's `owned` has no meaning
 /// *before* monomorphization, since specialization is the only thing that ever
 /// sets it. Reusing one struct for both ends of the pass meant every source

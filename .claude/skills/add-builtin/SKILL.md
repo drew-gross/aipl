@@ -1,6 +1,6 @@
 ---
 name: add-builtin
-description: Add a new builtin utility to AIPL (find_if, count_if, trim_while, …) — the AIPL-implemented builtin file, the two Rust registration points, the .doc/.test block, dogfooding it in the compiler's own sources, and the lint that flags ad-hoc reimplementations of it. Use when asked to add a builtin, a standard-library function, or a utility to `import { .. } from builtins`.
+description: Add a new builtin utility to AIPL (find_if, count_if, trim_while, …) — the AIPL-implemented builtin file, the two Rust registration points, the `# ..` documentation and `.test` block, dogfooding it in the compiler's own sources, and the lint that flags ad-hoc reimplementations of it. Use when asked to add a builtin, a standard-library function, or a utility to `import { .. } from builtins`.
 ---
 
 # Adding a builtin utility
@@ -29,6 +29,10 @@ import { equal as ==, filter, greater_than as > } from builtins;
 // `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_if(pred)` resolves
 // through the ordinary generic / higher-order machinery — the in-file name
 // `find_if` is only for this file's own tests, which read exactly like user code.
+# What it returns, when it stops, and what an empty receiver gives. Say it is
+# callable as a method, and cross-reference the siblings a reader might have
+# wanted instead (`any` reports only *that* a match existed; `first` is the
+# unconditional first element).
 pub fn find_if<T: any>(self: T[], pred: (T) -> bool) -> T? {
     for (let x : self) {
         if (pred(x)) {
@@ -36,12 +40,7 @@ pub fn find_if<T: any>(self: T[], pred: (T) -> bool) -> T? {
         };
     }
     none
-}.doc("""
-    What it returns, when it stops, and what an empty receiver gives. Say it is
-    callable as a method, and cross-reference the siblings a reader might have
-    wanted instead (`any` reports only *that* a match existed; `first` is the
-    unconditional first element).
-""").test({ .. })
+}.test({ .. })
 ```
 
 Rules that bite:

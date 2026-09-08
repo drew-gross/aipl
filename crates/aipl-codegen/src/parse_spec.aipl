@@ -22,8 +22,8 @@ import { lines as split_lines } from "./lines.aipl";
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 
-// One `--- file: p ---` / `--- expect file: p ---` companion: a path and the
-// body that follows it.
+# One `--- file: p ---` / `--- expect file: p ---` companion: a path and the
+# body that follows it.
 struct Entry { path: str, contents: str }
 
 struct Spec {
@@ -39,6 +39,12 @@ struct Spec {
     check: str?,
 }
 
+# Parses a case file into its `Spec`: the entry-point source (everything before
+# the first `--- name ---` marker) plus one field per section. Section bodies
+# have their trailing newlines stripped. Unknown section names, a malformed
+# `exit code`, and an invalid companion path are errors rather than silent
+# omissions — a mistyped marker would otherwise drop an expectation and the
+# case would pass for the wrong reason.
 pub fn parse_spec(src: str) -> Spec!str {
     mut spec = Spec {
         source: "",
@@ -69,14 +75,7 @@ pub fn parse_spec(src: str) -> Spec!str {
         };
     }
     finalize(spec, current, buf)
-}.doc("""
-    Parses a case file into its `Spec`: the entry-point source (everything before
-    the first `--- name ---` marker) plus one field per section. Section bodies
-    have their trailing newlines stripped. Unknown section names, a malformed
-    `exit code`, and an invalid companion path are errors rather than silent
-    omissions — a mistyped marker would otherwise drop an expectation and the
-    case would pass for the wrong reason.
-""").test({
+}.test({
     // The preamble is the source; sections fill their fields.
     let s = parse_spec("fn main() {}\n--- stdout ---\nhi\n")?;
     assert(s.source == "fn main() {}");
@@ -126,7 +125,7 @@ pub fn parse_spec(src: str) -> Spec!str {
     assert(parse_spec("x\n--- file: a\\b ---\n").is_err_and(|m| m.contains("use \"/\"")));
 })
 
-// Fold one finished section into the spec. `name` is `""` for the preamble.
+# Fold one finished section into the spec. `name` is `""` for the preamble.
 fn finalize(spec: Spec, name: str, buf: str) -> Spec!str {
     let body = buf.trim_end_while(|c| c == '\n' || c == '\r');
     if (name == "") {
@@ -167,9 +166,9 @@ fn finalize(spec: Spec, name: str, buf: str) -> Spec!str {
     }
 }
 
-// The path a `file:`-style marker carries, validated. `\` is a path-separator
-// nuisance in this markup, so the source side is held to `/` and the harness
-// canonicalizes on disk.
+# The path a `file:`-style marker carries, validated. `\` is a path-separator
+# nuisance in this markup, so the source side is held to `/` and the harness
+# canonicalizes on disk.
 fn companion_path(name: str, prefix: str) -> str!str {
     let path = name.drop_n(prefix.len()).trim();
     if (path == "") {

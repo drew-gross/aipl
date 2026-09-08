@@ -18,6 +18,15 @@ import { equal as ==, filter, greater_than as >, logical_not as ! } from builtin
 // `find_index`. Here it *is* `find_index`. Without the marker the lint fires on
 // a builtin's own source, which panics the compiler for every program that
 // reaches it.
+# The position of the first element of `self` satisfying `pred`, or `none` when
+# none does, stopping at the first match. Generic over the element type and
+# callable as a method: `xs.find_index(pred)`. A `str` receiver iterates its
+# chars, since `str` and `char[]` share a representation.
+#
+# The counterpart of `find_if`, which hands back the element rather than its
+# position. Reach for this one when the position is the answer — to index a
+# parallel array with it, or to record a reference as an offset instead of a
+# name. See `any` for the same scan reporting only whether a match existed.
 pub fn find_index<T: any>(self: T[], pred: (T) -> bool) -> u64? {
     for (let i, x : self) {
         if (pred(x)) {
@@ -25,17 +34,7 @@ pub fn find_index<T: any>(self: T[], pred: (T) -> bool) -> u64? {
         };
     }
     none
-}.doc("""
-    The position of the first element of `self` satisfying `pred`, or `none` when
-    none does, stopping at the first match. Generic over the element type and
-    callable as a method: `xs.find_index(pred)`. A `str` receiver iterates its
-    chars, since `str` and `char[]` share a representation.
-
-    The counterpart of `find_if`, which hands back the element rather than its
-    position. Reach for this one when the position is the answer — to index a
-    parallel array with it, or to record a reference as an offset instead of a
-    name. See `any` for the same scan reporting only whether a match existed.
-""").test({
+}.test({
     assert([1, 2, 3, 4].find_index(|x| x > 2) == some(2));
     assert([1, 2, 3].find_index(|x| x > 9) == none); // nothing matches
 

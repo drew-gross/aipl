@@ -2,9 +2,10 @@
 // closing line.
 import { drop_last, equal as ==, last } from builtins;
 
+# Drops a single trailing `c` if present, else returns `self` unchanged.
 pub fn trim_suffix(self: str, c: char) -> str {
     if (self.last() == some(c)) { self.drop_last() } else { self }
-}.doc("Drops a single trailing `c` if present, else returns `self` unchanged.").test({
+}.test({
     assert("rest\n".trim_suffix('\n') == "rest"); // trailing char dropped
     assert("rest".trim_suffix('\n') == "rest"); // absent -> unchanged
     assert("".trim_suffix('\n') == ""); // empty source (index -1 is none)

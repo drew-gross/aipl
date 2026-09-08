@@ -2,12 +2,11 @@
 // `.aipl` file whose formatting is enforced.
 import { ends_with, equal as ==, filter, list_files, sort } from builtins;
 
+# Every file at or below `dir` whose path ends with `ext`, sorted. `err(..)` if
+# the tree can't be walked at all — see the `list_files` builtin.
 pub fn find_files(dir: str, ext: str) !list_files -> str[]!Error {
     ok(with_extension(list_files(dir)?, ext))
-}.doc("""
-    Every file at or below `dir` whose path ends with `ext`, sorted. `err(..)` if
-    the tree can't be walked at all — see the `list_files` builtin.
-""").test({
+}.test({
     // `list_files` is the disk-touching half, and this file is loaded in place by
     // `aipl check` (whose cwd is the repo root, not a staged throwaway dir), so
     // only the failure path — which reads nothing — is safe to exercise here. The
@@ -16,12 +15,11 @@ pub fn find_files(dir: str, ext: str) !list_files -> str[]!Error {
     assert(find_files("no_such_dir_xyz_12345", ".aipl") == err("could not list files"));
 })
 
+# The paths ending with `ext`, sorted — the pure half of `find_files`, applied
+# to a directory listing (which arrives in filesystem order).
 pub fn with_extension(self: str[], ext: str) -> str[] {
     self.filter(|p| p.ends_with(ext)).sort()
-}.doc("""
-    The paths ending with `ext`, sorted — the pure half of `find_files`, applied
-    to a directory listing (which arrives in filesystem order).
-""").test({
+}.test({
     let paths = ["b/x.aipl", "a.txt", "a.aipl"];
     assert(paths.with_extension(".aipl") == ["a.aipl", "b/x.aipl"]); // filtered + sorted
     assert(paths.with_extension(".txt") == ["a.txt"]);

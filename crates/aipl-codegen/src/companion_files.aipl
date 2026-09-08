@@ -20,6 +20,14 @@ import { trim_end_while } from "./trim_end_while.aipl";
 
 struct Companion { path: str, contents: str }
 
+# The `--- file: <path> ---` sections of `src`, in order, as `path`/`contents`
+# pairs. Everything outside such a section — the program text and the other
+# section kinds — is ignored, and a section body keeps its inner blank lines
+# but drops trailing newlines.
+#
+# A `file:` section whose path is empty, or contains a backslash, is an
+# `err`: both would resolve unpredictably when staged, and staging a case
+# somewhere unintended is worse than refusing to stage it at all.
 pub fn companion_files(src: str) -> Companion[]!str {
     mut out: Companion[] = [];
 
@@ -52,16 +60,7 @@ pub fn companion_files(src: str) -> Companion[]!str {
         set out.push(Companion { path, contents: buf.trim_end_while(|c| c == '\n') });
     };
     ok(out)
-}.doc("""
-    The `--- file: <path> ---` sections of `src`, in order, as `path`/`contents`
-    pairs. Everything outside such a section — the program text and the other
-    section kinds — is ignored, and a section body keeps its inner blank lines
-    but drops trailing newlines.
-
-    A `file:` section whose path is empty, or contains a backslash, is an
-    `err`: both would resolve unpredictably when staged, and staging a case
-    somewhere unintended is worse than refusing to stage it at all.
-""").test({
+}.test({
     let one = """
         fn main() {}
         --- file: data.txt ---
@@ -128,10 +127,10 @@ pub fn companion_files(src: str) -> Companion[]!str {
     assert(companion_files("--- files: x.txt ---\nx\n")? == []);
 })
 
-// The path a `file:` section names, rejected when it can't be staged. Mirrors
-// the corpus harness's own checks on these markers, so a fixture that would be
-// staged one way by `aipl check` and another way by the harness is refused by
-// both instead of being silently skipped by one.
+# The path a `file:` section names, rejected when it can't be staged. Mirrors
+# the corpus harness's own checks on these markers, so a fixture that would be
+# staged one way by `aipl check` and another way by the harness is refused by
+# both instead of being silently skipped by one.
 fn companion_path(header: str) -> str!str {
     let path = header["file:".len()..].trim();
     if (path == "") {

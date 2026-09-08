@@ -18,6 +18,15 @@ import {
 // Walks the indices backwards rather than folding over a reversed copy, so
 // nothing is allocated. `self[i]` yields an optional and `i` is always in range,
 // so the `none` arm is dead — it just hands the accumulator back unchanged.
+# Combine the elements right to left, starting from `init`: for `[a, b, c]`,
+# `f(a, f(b, f(c, init)))` — note the combiner takes the element first, the
+# accumulator second, the mirror of `left_fold`. Generic over both the element
+# and accumulator types and callable as a method:
+# `xs.right_fold(Nil, |x, acc| Cons(x, acc))`.
+#
+# Prefer `left_fold` (imported as plain `fold`) unless the right-to-left order
+# matters — building a cons list front-to-back from an array is the standard
+# case where it does.
 pub fn right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A) -> A {
     mut acc = init;
     mut i = self.len();
@@ -29,17 +38,7 @@ pub fn right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A) -> A {
         };
     }
     acc
-}.doc("""
-    Combine the elements right to left, starting from `init`: for `[a, b, c]`,
-    `f(a, f(b, f(c, init)))` — note the combiner takes the element first, the
-    accumulator second, the mirror of `left_fold`. Generic over both the element
-    and accumulator types and callable as a method:
-    `xs.right_fold(Nil, |x, acc| Cons(x, acc))`.
-
-    Prefer `left_fold` (imported as plain `fold`) unless the right-to-left order
-    matters — building a cons list front-to-back from an array is the standard
-    case where it does.
-""").test({
+}.test({
     assert([1, 2, 3].right_fold(0, |x, acc| x + acc) == 6); // sum: order-agnostic
     assert(right_fold([2, 3], 1, |x, acc| x + acc) == 6); // free-call form
     // Empty (a typed empty from `filter`) folds to its init untouched.

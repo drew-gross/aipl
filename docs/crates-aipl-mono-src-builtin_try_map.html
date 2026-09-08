@@ -54,7 +54,7 @@
         </h2>
         <pre class="signature"><code>fn label(n: i64) -&#62; str!str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Fails on a negative input, so a test can place a failure at a chosen position and name which one came back.</p></div>
 
 
       </section>
@@ -67,7 +67,7 @@
         </h2>
         <pre class="signature"><code>fn width(s: str) -&#62; u64!char</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A second fallible mapping whose ok, err and element types all differ from <code>label</code>'s, so the tests cover <code>try_map</code> being generic in all three.</p></div>
 
 
       </section>

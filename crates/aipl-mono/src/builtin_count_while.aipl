@@ -13,6 +13,9 @@ import {
 // user code. Because a builtin's body may call other builtins (loaded through
 // the real loader), this is also the shared helper the `trim_while` builtin and
 // the dogfooded compiler helpers (`dedent`, and `lexer.aipl`) call.
+# Counts elements from the front while `pred` holds, stopping at the first element
+# that fails it (or at the end). Generic over the element type and callable as a
+# method: `xs.count_while(pred)`.
 pub fn count_while<T: any>(self: T[], pred: (T) -> bool) -> u64 {
     mut n: u64 = 0;
     for (let x : self) {
@@ -22,11 +25,7 @@ pub fn count_while<T: any>(self: T[], pred: (T) -> bool) -> u64 {
         set n++;
     }
     n
-}.doc("""
-    Counts elements from the front while `pred` holds, stopping at the first element
-    that fails it (or at the end). Generic over the element type and callable as a
-    method: `xs.count_while(pred)`.
-""").test({
+}.test({
     assert([1, 2, 3].count_while(|x| x <= 2) == 2); // stops at 3
     assert([1, 2, 3].count_while(|x| x <= 9) == 3); // whole array passes
     assert([1, 2, 3].count_while(|x| x <= 0) == 0); // first element fails

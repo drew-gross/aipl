@@ -205,17 +205,19 @@ gazelle! {
                          // which is also the existing rule that a bare
                          // `T { ..x }` is just `x`.
                          | DOTDOT expr COMMA field_inits => spread_first;
-        // Zero or more attributes attached to a function, in any order:
-        // `.test({ .. })` (a test block the `check` command runs) and
-        // `.doc("...")` (documentation surfaced by the `doc` command). The two
-        // forms are distinguished by their argument — a `block` (`{ .. }`) vs a
-        // `STR` — and the IDENT (`test`/`doc`) is validated in the build action.
+        // Zero or more attributes attached to a function. There is exactly one:
+        // `.test({ .. })`, the test block the `check` command runs.
         // `FOLLOW(function)` is item-leading keywords or EOF, none of which is
         // `.`, so the (repeatable) suffix is unambiguous.
+        //
+        // The string-argument form parses too, and the build action refuses
+        // every spelling of it. It is there for the diagnostics: `.doc("..")`
+        // was the documentation form before `# ..` lines, and a parse error
+        // pointing at the string says nothing about what to write instead.
         fn_attrs = fn_attr_list => present | _ => empty;
         fn_attr_list = fn_attr => first | fn_attr_list fn_attr => rest;
         fn_attr = DOT IDENT LPAREN block RPAREN => test
-                | DOT IDENT LPAREN STR RPAREN => doc;
+                | DOT IDENT LPAREN STR RPAREN => str_arg;
         // Optional `<T, U: ord>` generic parameter list. A bound is optional —
         // a bare `T` defaults to the `any` bound; `T: ord` narrows it. After an
         // `IDENT`, one token of lookahead (`:` → bounded, else → bare) picks the
@@ -768,9 +770,9 @@ impl aipl::Types for Build {
     type Params = Vec<Param>;
     type BaseTy = Type;
     type ReturnTy = Option<Type>;
-    type FnAttr = ParsedAttr;
-    type FnAttrList = Vec<ParsedAttr>;
-    type FnAttrs = Vec<ParsedAttr>;
+    type FnAttr = (Expr, Span);
+    type FnAttrList = Vec<(Expr, Span)>;
+    type FnAttrs = Vec<(Expr, Span)>;
     type TypeParams = Vec<TypeParam>;
     type TypeParamList = Vec<TypeParam>;
     type TypeParam = TypeParam;
@@ -972,38 +974,13 @@ impl gazelle::Action<aipl::Docs<Self>> for Build {
     }
 }
 
-/// The documentation a declaration ends up with, given its `# text` lines and
-/// any `.doc("..")` it also carries.
-///
-/// Both is an error rather than a precedence rule. The two spellings say the
-/// same thing, so a declaration with both is a half-finished edit, and picking
-/// a winner would leave the other silently dropped — during a migration from
-/// one form to the other, that is precisely the mistake worth catching.
-fn one_doc(
-    lines: Option<(String, Span)>,
-    attr: Option<String>,
-    what: &str,
-) -> Result<Option<String>, Error> {
-    match (lines, attr) {
-        (Some((_, span)), Some(_)) => Err(Error::at(
-            format!(
-                "{what} is documented twice — with `# ..` lines and with \
-                 `.doc(\"..\")`. Keep one; `# ..` is the current form."
-            ),
-            span,
-        )),
-        (Some((text, _)), None) => Ok(Some(text)),
-        (None, attr) => Ok(attr),
-    }
-}
-
 impl gazelle::Action<aipl::Item<Self>> for Build {
     fn build(&mut self, node: aipl::Item<Self>) -> Result<Item, Self::Error> {
         Ok(match node {
-            aipl::Item::Function(docs, f) => {
-                let doc = one_doc(docs, f.doc, &format!("fn {:?}", f.name))?;
-                Item::Fn(Function { doc, ..f })
-            }
+            aipl::Item::Function(docs, f) => Item::Fn(Function {
+                doc: docs.map(|(text, _)| text),
+                ..f
+            }),
             aipl::Item::StructDecl(docs, s) => Item::Struct(StructDecl {
                 doc: docs.map(|(text, _)| text),
                 ..s
@@ -1455,16 +1432,6 @@ impl gazelle::Action<aipl::ConstructFields<Self>> for Build {
     }
 }
 
-/// A parsed function attribute (`.test({ .. })` or `.doc("...")`), carrying the
-/// attribute name's span for duplicate-attribute diagnostics. Folded into the
-/// `Function`'s `test_body` / `doc` by the `Function` build action. `pub` only
-/// because it surfaces as a gazelle `Action` associated type; not part of the
-/// crate's intended API.
-pub enum ParsedAttr {
-    Test(Expr, Span),
-    Doc(String, Span),
-}
-
 impl gazelle::Action<aipl::Function<Self>> for Build {
     fn build(&mut self, node: aipl::Function<Self>) -> Result<Function, Self::Error> {
         let aipl::Function::Function(
@@ -1477,25 +1444,14 @@ impl gazelle::Action<aipl::Function<Self>> for Build {
             body,
             attrs,
         ) = node;
-        // Fold the attribute list into the single `test_body` / `doc` slots,
-        // rejecting a repeated attribute (which slot would silently win?).
+        // Fold the attribute list into the single `test_body` slot, rejecting a
+        // repeated attribute (which one would silently win?).
         let mut test_body = None;
-        let mut doc = None;
-        for attr in attrs {
-            match attr {
-                ParsedAttr::Test(block, span) => {
-                    if test_body.is_some() {
-                        return Err(Error::at("duplicate `.test` attribute", span));
-                    }
-                    test_body = Some(block);
-                }
-                ParsedAttr::Doc(text, span) => {
-                    if doc.is_some() {
-                        return Err(Error::at("duplicate `.doc` attribute", span));
-                    }
-                    doc = Some(text);
-                }
+        for (block, span) in attrs {
+            if test_body.is_some() {
+                return Err(Error::at("duplicate `.test` attribute", span));
             }
+            test_body = Some(block);
         }
         // Resolve the struct-literal shorthand now that the return type and the
         // field list are both in hand. The result is exactly the `Construct` the
@@ -1542,7 +1498,10 @@ impl gazelle::Action<aipl::Function<Self>> for Build {
             },
             body,
             test_body,
-            doc,
+            // Documentation comes from the `# ..` lines in front of the
+            // declaration, which the `item` production holds; this action never
+            // sees them.
+            doc: None,
         })
     }
 }
@@ -1554,45 +1513,41 @@ impl gazelle::Action<aipl::Vis<Self>> for Build {
 }
 
 impl gazelle::Action<aipl::FnAttr<Self>> for Build {
-    fn build(&mut self, node: aipl::FnAttr<Self>) -> Result<ParsedAttr, Self::Error> {
+    fn build(&mut self, node: aipl::FnAttr<Self>) -> Result<(Expr, Span), Self::Error> {
         // The argument shape (`{ .. }` block vs string) is fixed by the grammar
         // production; here we only validate the attribute name matches it.
         let unknown = |name: &str, name_span| {
             Error::at(
-                format!(
-                    "unknown function attribute {name:?}; only `.test({{ .. }})` and \
-                     `.doc(\"..\")` are supported"
-                ),
+                format!("unknown function attribute {name:?}; only `.test({{ .. }})` is supported"),
                 name_span,
             )
         };
-        Ok(match node {
+        match node {
             aipl::FnAttr::Test((name, name_span), block) => match name.as_str() {
-                "test" => ParsedAttr::Test(block, name_span),
-                "doc" => {
-                    return Err(Error::at(
-                        "`.doc` takes a string argument, not a `{ .. }` block",
-                        name_span,
-                    ))
-                }
-                _ => return Err(unknown(&name, name_span)),
+                "test" => Ok((block, name_span)),
+                _ => Err(unknown(&name, name_span)),
             },
-            aipl::FnAttr::Doc((name, name_span), (text, _)) => match name.as_str() {
-                "doc" => ParsedAttr::Doc(text, name_span),
-                "test" => {
-                    return Err(Error::at(
-                        "`.test` takes a `{ .. }` block, not a string argument",
-                        name_span,
-                    ))
-                }
-                _ => return Err(unknown(&name, name_span)),
+            // Every string-argument attribute is refused; the production exists
+            // only so each one can be refused *by name*.
+            aipl::FnAttr::StrArg((name, name_span), _) => match name.as_str() {
+                "doc" => Err(Error::at(
+                    "`.doc(\"..\")` is no longer a function attribute — write the \
+                     documentation as `# ..` lines above the declaration, which \
+                     also documents structs and variants",
+                    name_span,
+                )),
+                "test" => Err(Error::at(
+                    "`.test` takes a `{ .. }` block, not a string argument",
+                    name_span,
+                )),
+                _ => Err(unknown(&name, name_span)),
             },
-        })
+        }
     }
 }
 
 impl gazelle::Action<aipl::FnAttrList<Self>> for Build {
-    fn build(&mut self, node: aipl::FnAttrList<Self>) -> Result<Vec<ParsedAttr>, Self::Error> {
+    fn build(&mut self, node: aipl::FnAttrList<Self>) -> Result<Vec<(Expr, Span)>, Self::Error> {
         Ok(match node {
             aipl::FnAttrList::First(a) => vec![a],
             aipl::FnAttrList::Rest(mut prev, a) => {
@@ -1604,7 +1559,7 @@ impl gazelle::Action<aipl::FnAttrList<Self>> for Build {
 }
 
 impl gazelle::Action<aipl::FnAttrs<Self>> for Build {
-    fn build(&mut self, node: aipl::FnAttrs<Self>) -> Result<Vec<ParsedAttr>, Self::Error> {
+    fn build(&mut self, node: aipl::FnAttrs<Self>) -> Result<Vec<(Expr, Span)>, Self::Error> {
         Ok(match node {
             aipl::FnAttrs::Present(list) => list,
             aipl::FnAttrs::Empty => Vec::new(),

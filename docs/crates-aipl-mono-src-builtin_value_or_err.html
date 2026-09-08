@@ -48,7 +48,7 @@
         </h2>
         <pre class="signature"><code>fn digit_of(s: str) -&#62; i64!str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>?</code> on the result <code>value_or_err</code> builds: the <code>none</code> cases leave <code>digit_of</code> early carrying a message, so the body reads as the happy path alone.</p></div>
 
 
       </section>
@@ -61,7 +61,7 @@
         </h2>
         <pre class="signature"><code>fn maybe_int(present: bool) -&#62; i64?</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Test helpers. The optionals come from functions rather than a bare <code>none</code> literal so each one's element type is pinned by a declared return type.</p></div>
 
 
       </section>
@@ -74,7 +74,7 @@
         </h2>
         <pre class="signature"><code>fn maybe_str(present: bool) -&#62; str?</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -87,7 +87,7 @@
         </h2>
         <pre class="signature"><code>fn unwrap(r: i64!str, default: i64) -&#62; i64</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Reading one side of a result at a time, since <code>==</code> doesn't span the two.</p></div>
 
 
       </section>
@@ -100,7 +100,7 @@
         </h2>
         <pre class="signature"><code>fn unwrap_str(r: str!str, default: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -113,7 +113,7 @@
         </h2>
         <pre class="signature"><code>fn message(r: i64!str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -126,7 +126,7 @@
         </h2>
         <pre class="signature"><code>fn code(r: char!i64) -&#62; i64</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>

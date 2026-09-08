@@ -47,7 +47,7 @@
         </h2>
         <pre class="signature"><code>struct ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Why a parse failed: a message, and the span of the offending source (absolute into the parsed string — slice it to show the offender, or hand it to <code>caret_block.aipl</code> for the rustc-style underline). Mirrors <code>lexer.aipl</code>'s <code>LexError</code>, and for the same reason: the two halves of a front end should report failure in one shape.</p><p>A *grammar* error — an unresolved rule reference, a rule that can loop forever — has no source to point at and carries the empty <code>0..0</code>.</p></div>
 
 
       </section>
@@ -60,7 +60,7 @@
         </h2>
         <pre class="signature"><code>pub fn failure_message(self: str!ParseError) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>What a failed parse said — or, when it unexpectedly *succeeded*, a note carrying what it produced, so a broken assertion says which way it broke.</p><p>For <code>.test</code> blocks, which is where the distinction matters: an assertion on a message that silently parses instead reads as a mismatched string with no clue why. Pairs with <code>map_ok</code>, which is what turns a parse of any AST type into the <code>str!ParseError</code> this takes: <code>parse_x(src).map_ok(render_x).failure_message()</code>.</p></div>
 
 
       </section>
@@ -73,7 +73,7 @@
         </h2>
         <pre class="signature"><code>struct Prec</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One precedence level of a <code>Climb</code>: the operators that share it, how tightly they bind (<code>power</code>, higher wins), and whether they associate to the right. Levels are matched in order, so a spelling belongs to exactly one.</p></div>
 
 
       </section>
@@ -86,7 +86,7 @@
         </h2>
         <pre class="signature"><code>variant Rule&#60;K: variant&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One rule shape, as plain data. Ordered choice makes this a PEG, not a CFG: <code>OneOf</code> commits to the first alternative that matches, so alternatives are tried in the order written and there is no ambiguity to resolve.</p></div>
 
 
         <ul class="cases">
@@ -121,7 +121,7 @@
         </h2>
         <pre class="signature"><code>variant Build&#60;A: any&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>: a function from the source text, the node itself, and the already-lowered values of its interior children (<code>nodes</code>, in match order). It may fail — a literal that overflows, a duplicate key — with a <code>ParseError</code> the driver passes straight through.</p><p>A one-arm variant rather than a bare function type, so a later arm can be added without every grammar changing shape. It stays one arm deliberately: a payload-free <code>NoLower</code> would pin no <code>A</code> of its own, leaving nothing to infer the type parameter from, so a production with nothing to lower passes a trivial named function instead.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so each is a named top-level <code>fn lower_x(src: str, node: Cst, kids: A[]) -&gt; A!ParseError</code>. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar *parses*, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
 
 
         <ul class="cases">
@@ -140,7 +140,7 @@
         </h2>
         <pre class="signature"><code>struct Production&#60;K: variant, A: any&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One named production: its rule, and what each downstream pass needs from it.</p><p><code>name</code> is both the reference target (<code>Named(&quot;expr&quot;)</code>) and the CST node's name. <code>expect_as</code> is the label an error blames when this production fails having matched nothing — the reified form of the LR parser's <code>SYMBOL_DISPLAY_NAMES</code>, which collapses <code>expr</code>/<code>term</code>/<code>unary</code>/<code>atom</code> to one word. Empty means *transparent*: a plumbing production never surfaces in a message, and the finer expectations from inside it are what the reader sees. <code>scope</code> is the highlighter hint; it is carried, not yet consumed.</p></div>
 
 
       </section>
@@ -153,7 +153,7 @@
         </h2>
         <pre class="signature"><code>struct Grammar&#60;K: variant, A: any&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A whole language: its productions, in order. Position is identity — a <code>NamedIdx</code> and a <code>CTree</code> both name a production by its index here — so the order of this array is part of a linked grammar's meaning.</p></div>
 
 
       </section>
@@ -166,7 +166,7 @@
         </h2>
         <pre class="signature"><code>pub fn prod_names&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; str[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The production names of <code>g</code>, in index order — the table <code>show</code> renders a tree against, and what <code>link</code> resolves references through.</p></div>
 
 
       </section>
@@ -179,7 +179,7 @@
         </h2>
         <pre class="signature"><code>fn link_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[]) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One rule with every <code>Named(n)</code> in it rewritten to <code>NamedIdx(i)</code>. Fails when a reference names no production — the error a grammar author most wants caught before a parse rather than during one.</p></div>
 
 
       </section>
@@ -192,7 +192,7 @@
         </h2>
         <pre class="signature"><code>fn link_opt&#60;K: variant&#62;(r: Rule&#60;K&#62;?, names: str[]) -&#62; Rule&#60;K&#62;?!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A <code>Many</code>'s separator, linked — <code>none</code> stays <code>none</code>. Its own function because <code>?</code> cannot reach inside an optional.</p></div>
 
 
       </section>
@@ -205,7 +205,7 @@
         </h2>
         <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[]) -&#62; Rule&#60;K&#62;[]!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -231,7 +231,7 @@
         </h2>
         <pre class="signature"><code>fn keep(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The trivial lowering a production with nothing to lower passes, and all these fixtures need: <code>Build</code> has no payload-free arm to mean &quot;don't&quot;.</p></div>
 
 
       </section>
@@ -244,7 +244,7 @@
         </h2>
         <pre class="signature"><code>fn rule_of&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, i: u64) -&#62; Rule&#60;K&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The rule of production <code>i</code> of <code>g</code>, for the assertions above — a grammar value can't be compared with <code>==</code> (it holds function values), but the rule inside one can.</p></div>
 
 
       </section>
@@ -257,7 +257,7 @@
         </h2>
         <pre class="signature"><code>fn expect_of&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, i: u64) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>

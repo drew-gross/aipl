@@ -6,18 +6,17 @@ import { equal as ==, join, logical_or as ||, map } from builtins;
 import { lines } from "./lines.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 
+# `src` with the trailing space/tab run removed from every line. Line endings
+# are preserved exactly — splitting and rejoining on `\\n` puts back what was
+# there, including a trailing newline or its absence.
+#
+# Only spaces and tabs count as trailing whitespace, so a `\\r` before the
+# `\\n` of a CRLF ending is content: it stops the trim, and whitespace before
+# it survives. The formatter's input has already been through the parser's
+# trailing-whitespace check, which treats CRLF the same way.
 pub fn clean_trailing_whitespace(src: str) -> str {
     src.lines().map(|l| l.trim_end_while(|c| c == ' ' || c == '\t')).join(sep="\n")
-}.doc("""
-    `src` with the trailing space/tab run removed from every line. Line endings
-    are preserved exactly — splitting and rejoining on `\\n` puts back what was
-    there, including a trailing newline or its absence.
-
-    Only spaces and tabs count as trailing whitespace, so a `\\r` before the
-    `\\n` of a CRLF ending is content: it stops the trim, and whitespace before
-    it survives. The formatter's input has already been through the parser's
-    trailing-whitespace check, which treats CRLF the same way.
-""").test({
+}.test({
     // The point of the function: a trailing run comes off, per line.
     assert(clean_trailing_whitespace("a  \nb\t\n") == "a\nb\n");
     assert(clean_trailing_whitespace("trailing   ") == "trailing"); // no newline at EOF

@@ -5,6 +5,11 @@ import {
     logical_not as !,
 } from builtins;
 
+# Whether the integer value `v` (an `i64` literal) is representable in the
+# integer type named `name` (`"i8"`..`"u64"`). `u64` accepts any non-negative
+# value — a literal can't exceed `i64::MAX`, which fits `u64`. Any non-integer
+# name is `false`. This is the compiler's flexible-literal range check (a bare
+# literal flowing into a narrow-int context), dogfooded through the FFI.
 pub fn int_fits(v: i64, name: str) -> bool {
     match (name) {
         "i8" => v >= -128 && v <= 127,
@@ -17,13 +22,7 @@ pub fn int_fits(v: i64, name: str) -> bool {
         "u64" => v >= 0,
         _ => false,
     }
-}.doc("""
-    Whether the integer value `v` (an `i64` literal) is representable in the
-    integer type named `name` (`"i8"`..`"u64"`). `u64` accepts any non-negative
-    value — a literal can't exceed `i64::MAX`, which fits `u64`. Any non-integer
-    name is `false`. This is the compiler's flexible-literal range check (a bare
-    literal flowing into a narrow-int context), dogfooded through the FFI.
-""").test({
+}.test({
     // i8: [-128, 127]
     assert(int_fits(127, "i8"));
     assert(int_fits(-128, "i8"));

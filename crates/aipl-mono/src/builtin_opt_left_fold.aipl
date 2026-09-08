@@ -28,6 +28,17 @@ import {
 // points at them, so a `str`/array/boxed accumulator would corrupt. A plain `A`
 // binding goes through the slot-owned-reference model instead, which is correct
 // across scopes.
+# Combine the elements left to right with a *fallible* combiner, starting from
+# `init`: `f` returns `A?`, and the first `none` ends the fold with `none` —
+# the remaining elements are never visited. All-`some` folds to `some(result)`,
+# exactly as `left_fold` would; an empty array folds to `some(init)`.
+#
+# Since the combiner's body may use `?`, a fold that can fail reads as one
+# expression: `s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?))`.
+#
+# Import it as plain `opt_fold` — `import { opt_left_fold as opt_fold } from
+# builtins;` — in the usual case where a file folds in only one direction;
+# spell it `opt_left_fold` only in a file that also imports `opt_right_fold`.
 pub fn opt_left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A?) -> A? {
     mut acc = init;
     mut ok = true;
@@ -40,19 +51,7 @@ pub fn opt_left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A?) -> A? 
         set acc = step.value_or(acc);
     }
     if (ok) { some(acc) } else { none }
-}.doc("""
-    Combine the elements left to right with a *fallible* combiner, starting from
-    `init`: `f` returns `A?`, and the first `none` ends the fold with `none` —
-    the remaining elements are never visited. All-`some` folds to `some(result)`,
-    exactly as `left_fold` would; an empty array folds to `some(init)`.
-
-    Since the combiner's body may use `?`, a fold that can fail reads as one
-    expression: `s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?))`.
-
-    Import it as plain `opt_fold` — `import { opt_left_fold as opt_fold } from
-    builtins;` — in the usual case where a file folds in only one direction;
-    spell it `opt_left_fold` only in a file that also imports `opt_right_fold`.
-""").test({
+}.test({
     // All-`some`: the same result `left_fold` would give.
     assert([1, 2, 3].opt_left_fold(0, |acc, x| some(acc + x)) == some(6));
     assert(opt_left_fold([2, 3], 1, |acc, x| some(acc + x)) == some(6)); // free-call

@@ -384,7 +384,8 @@ pub mod ast {
     }
 
     /// A function's shape apart from its body and source-only concerns (name,
-    /// visibility, `.test`/`.doc`): its declared type variables, value
+    /// visibility, its `.test` block, its documentation): its declared type
+    /// variables, value
     /// parameters, declared effects, and return type. Shared with aipl-mono,
     /// which normalizes its own copy of this (synthesizing a type variable per
     /// anonymous `any[]`/`any?` parameter, and rewriting those parameters to
@@ -482,7 +483,8 @@ pub mod ast {
         /// a test for this function; ignored by `run`/`build`. The `assert(c)`
         /// calls inside it are rewritten at parse time to `__assert(c, "loc")`.
         pub test_body: Option<Expr>,
-        /// The text of an attached `.doc("...")` block, if any — structured
+        /// The text of the `# ..` doc comment above the declaration, if any —
+        /// structured
         /// documentation for the function, surfaced by the `doc` command and
         /// ignored by `run`/`build`/`check`. A `"""..."""` raw string is
         /// de-dented like any other (the parser's raw-string hook runs first).

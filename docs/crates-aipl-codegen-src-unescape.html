@@ -47,7 +47,7 @@
         </h2>
         <pre class="signature"><code>pub fn escape_text(self: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Map a <code>\X</code> escape's X to its meaning: <code>n</code>/<code>t</code>/<code>r</code> to the control chars, and any other escaped char (<code>&quot;</code>, <code>\</code>, <code></code> <code> </code><code>, </code>{<code>) to itself. Validity was already enforced by the matcher's scan (its </code>escapes<code> set), so an unknown </code>\X<code> never reaches here. </code>self<code> is the single char following the backslash.</code></p></div>
 
 
       </section>
@@ -60,7 +60,7 @@
         </h2>
         <pre class="signature"><code>pub fn unescape(self: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Decode every <code>\X</code> escape in <code>self</code>, copying everything else verbatim. Walks byte-by-byte: at each backslash (with a char after it) splice the run since the last escape plus the decoded <code>\X</code>, then resume past it; the trailing run is appended at the end. Copying whole runs by slicing (rather than char-by-char) keeps the common no-escape case a single copy. A trailing lone backslash can't occur — the matcher already rejected such a token as unterminated.</p></div>
 
 
       </section>

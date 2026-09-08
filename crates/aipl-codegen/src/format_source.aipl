@@ -18,19 +18,18 @@ import { split_test_sections } from "./split_test_sections.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 import { FmtError, format_program } from "./walker.aipl";
 
-// The formatter's input, split into the part it lays out and the part it copies.
+# The formatter's input, split into the part it lays out and the part it copies.
 struct FmtInput { cleaned: str, sections: str }
 
+# The first half of `format_source`: `src` split into the code to format
+# (trailing whitespace already stripped) and its trailing `--- section ---`
+# blocks, which are copied to the output verbatim rather than laid out.
+#
+# The caller parses `cleaned` before handing it to `fmt_layout`.
 pub fn fmt_prepare(src: str) -> FmtInput {
     let (code, sections) = split_test_sections(src);
     FmtInput { cleaned: clean_trailing_whitespace(code), sections }
-}.doc("""
-    The first half of `format_source`: `src` split into the code to format
-    (trailing whitespace already stripped) and its trailing `--- section ---`
-    blocks, which are copied to the output verbatim rather than laid out.
-
-    The caller parses `cleaned` before handing it to `fmt_layout`.
-""").test({
+}.test({
     // No sections: everything is code, and the cleanup has run.
     let plain = fmt_prepare("fn main() {}  \n");
     assert(plain.cleaned == "fn main() {}\n");
@@ -48,19 +47,18 @@ pub fn fmt_prepare(src: str) -> FmtInput {
     assert(empty.sections == "");
 })
 
+# The second half of `format_source`: lay `cleaned` out at `width`, then
+# normalize to exactly one trailing newline — including for an empty program,
+# which formats to just that. The printer only keeps a trailing newline when
+# the layout happens to end with one, so the guarantee is made here rather
+# than there.
+#
+# The caller verifies the result carries the same tokens as `cleaned`, then
+# appends the sections `fmt_prepare` set aside.
 pub fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
     let laid_out = format_program(cleaned, width)?;
     ok(laid_out.trim_end_while(|c| c == '\n') +++ "\n")
-}.doc("""
-    The second half of `format_source`: lay `cleaned` out at `width`, then
-    normalize to exactly one trailing newline — including for an empty program,
-    which formats to just that. The printer only keeps a trailing newline when
-    the layout happens to end with one, so the guarantee is made here rather
-    than there.
-
-    The caller verifies the result carries the same tokens as `cleaned`, then
-    appends the sections `fmt_prepare` set aside.
-""").test({
+}.test({
     assert(fmt_layout("fn main() {}", 100) == ok("fn main() {}\n")); // newline added
     assert(fmt_layout("fn main() {}\n\n\n", 100) == ok("fn main() {}\n")); // run collapsed
     assert(fmt_layout("", 100) == ok("\n")); // empty program is just the newline

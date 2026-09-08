@@ -1,5 +1,10 @@
 import { logical_not as ! } from builtins;
 
+# Whether `self` spells a built-in operator that must be imported to be used.
+# Every operator is imported by aliasing its named builtin — `equal as ==`,
+# `less_than as <`, `wrapping_add as +` — and none has a bare form.
+# Used by the loader to gate operator imports and usage; dogfooded through the
+# FFI.
 pub fn is_operator_name(self: str) -> bool {
     match (self) {
         // Grouped by what they do rather than packed to the line: all of them in
@@ -12,13 +17,7 @@ pub fn is_operator_name(self: str) -> bool {
         "+=" | "-=" | "*=" | "/=" => true,
         _ => false,
     }
-}.doc("""
-    Whether `self` spells a built-in operator that must be imported to be used.
-    Every operator is imported by aliasing its named builtin — `equal as ==`,
-    `less_than as <`, `wrapping_add as +` — and none has a bare form.
-    Used by the loader to gate operator imports and usage; dogfooded through the
-    FFI.
-""").test({
+}.test({
     // Every recognized operator spelling.
     assert("+".is_operator_name());
     assert("-".is_operator_name());

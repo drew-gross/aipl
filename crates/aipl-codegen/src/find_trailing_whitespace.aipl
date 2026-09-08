@@ -17,12 +17,12 @@ import {
     wrapping_sub as -,
 } from builtins;
 
-// The span of a line's trailing space/tab run, given the bytes around its ending,
-// or `none` if the line has none. `boundary` is the index of the line-ending '\n'
-// (or the input length, at EOF); `prev`/`prev2` are the two bytes before it;
-// `ws_start` is where the current run of spaces/tabs began; `line_start` is the
-// line's first byte. A single '\r' right before the boundary is part of a CRLF
-// (or lone-CR) ending, so the last content byte is the one before it.
+# The span of a line's trailing space/tab run, given the bytes around its ending,
+# or `none` if the line has none. `boundary` is the index of the line-ending '\n'
+# (or the input length, at EOF); `prev`/`prev2` are the two bytes before it;
+# `ws_start` is where the current run of spaces/tabs began; `line_start` is the
+# line's first byte. A single '\r' right before the boundary is part of a CRLF
+# (or lone-CR) ending, so the last content byte is the one before it.
 fn line_end_span(prev: char, prev2: char, boundary: u64, ws_start: u64, line_start: u64) -> Span? {
     let cr = prev == '\r';
     let end = if (cr) { boundary - 1 } else { boundary };
@@ -34,6 +34,7 @@ fn line_end_span(prev: char, prev2: char, boundary: u64, ws_start: u64, line_sta
     }
 }
 
+# The byte `Span` of the first line's trailing space/tab run in `src` as `some(span)`, or `none` if no line has trailing whitespace. A single CR before a LF is part of a CRLF line ending, not content. The locator for the parser's trailing-whitespace check.
 pub fn find_trailing_whitespace(src: str) -> Span? {
     mut prev = '\n'; // byte at i-1 (sentinel '\n': line start, not ws/CR)
     mut prev2 = '\n'; // byte at i-2
@@ -61,7 +62,7 @@ pub fn find_trailing_whitespace(src: str) -> Span? {
     }
     // The final line may have no trailing '\n'; its boundary is the input length.
     line_end_span(prev, prev2, src.len(), ws_start, line_start)
-}.doc("The byte `Span` of the first line's trailing space/tab run in `src` as `some(span)`, or `none` if no line has trailing whitespace. A single CR before a LF is part of a CRLF line ending, not content. The locator for the parser's trailing-whitespace check.").test({
+}.test({
     // A clean line yields `none`.
     assert(find_trailing_whitespace("") == none);
     assert(find_trailing_whitespace("clean") == none);

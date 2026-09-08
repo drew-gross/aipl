@@ -6,22 +6,21 @@ import { concat as +++, equal as ==, filter, logical_not as !, wrapping_add as +
 // specializes through the ordinary generic / higher-order machinery — the
 // in-file name `left_fold` is only for this file's own tests, which read exactly
 // like user code.
+# Combine the elements left to right, starting from `init`: for `[a, b, c]`,
+# `f(f(f(init, a), b), c)`. Generic over both the element and accumulator types
+# and callable as a method: `xs.left_fold(0, |acc, x| acc + x)`.
+#
+# Import it as plain `fold` — `import { left_fold as fold } from builtins;` — in
+# the usual case where a file folds in only one direction; spell it `left_fold`
+# only in a file that also imports `right_fold`, where the two need telling
+# apart.
 pub fn left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A) -> A {
     mut acc = init;
     for (let x : self) {
         set acc = f(acc, x);
     }
     acc
-}.doc("""
-    Combine the elements left to right, starting from `init`: for `[a, b, c]`,
-    `f(f(f(init, a), b), c)`. Generic over both the element and accumulator types
-    and callable as a method: `xs.left_fold(0, |acc, x| acc + x)`.
-
-    Import it as plain `fold` — `import { left_fold as fold } from builtins;` — in
-    the usual case where a file folds in only one direction; spell it `left_fold`
-    only in a file that also imports `right_fold`, where the two need telling
-    apart.
-""").test({
+}.test({
     assert([1, 2, 3].left_fold(0, |acc, x| acc + x) == 6); // sum
     assert([1, 2, 3].left_fold(10, |acc, x| acc + x) == 16); // from a nonzero init
     assert(left_fold([2, 3], 1, |acc, x| acc + x) == 6); // free-call form

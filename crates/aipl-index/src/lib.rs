@@ -7,7 +7,7 @@
 //! parse AIPL to get them. So they are gathered once here:
 //!
 //! - [`Symbol`] — every top-level declaration: its kind, its rendered
-//!   signature, its `.doc("..")` text, whether it is `pub`, and the span of
+//!   signature, its `# ..` documentation, whether it is `pub`, and the span of
 //!   the *name* (what an editor jumps to).
 //! - [`Import`] — every imported name, its local spelling when aliased, and
 //!   where it came from. This is what makes go-to-definition cross files.
@@ -84,7 +84,7 @@ pub struct Symbol {
     /// what a docs page uses as a heading.
     pub detail: String,
     /// The declaration's documentation: its `# ..` lines, joined with newlines,
-    /// or the `.doc("..")` a function may still carry instead. `None` when it is
+    /// the `# ..` lines above the declaration. `None` when it is
     /// undocumented.
     pub doc: Option<String>,
     /// Declared `pub`, and so importable by another file. Always false for a
@@ -482,7 +482,8 @@ struct Point { x: i64, y: i64 }
 
 variant Shape<T: any> = Circle(i64) | Rect(i64, i64) | Empty
 
-pub fn add(a: i64, b: i64) -> i64 { a + b }.doc("Adds two integers.")
+# Adds two integers.
+pub fn add(a: i64, b: i64) -> i64 { a + b }
 
 fn helper(n: i64) !prints -> i64 {
     print("hi");
@@ -661,7 +662,7 @@ fn helper(n: i64) !prints -> i64 {
 
     #[test]
     fn go_to_definition_follows_an_import_across_files() {
-        let cst = "pub fn show(n: i64) -> str { \"x\" }.doc(\"Renders.\")\n";
+        let cst = "# Renders.\npub fn show(n: i64) -> str { \"x\" }\n";
         let mut index = hosted_index();
         index.add("src/demo.aipl", SRC).expect("demo");
         index.add("src/cst.aipl", cst).expect("cst");

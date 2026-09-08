@@ -1,0 +1,15 @@
+import { wrapping_add as + } from builtins;
+
+// A `#` line is documentation only in front of a declaration. Anywhere else it
+// is an error — which is what keeps `////////` section banners working, since
+// they stay ordinary `//` comments.
+fn f(n: i64) -> i64 {
+    # not documentation
+    n + 1
+}
+--- errors ---
+error: unexpected '# not documentation'; expected '}', expression, field, or statement
+ --> ./tests/cases/docs/err_doc_in_body.aipl:7:5
+  |
+7 |     # not documentation
+  |     ^^^^^^^^^^^^^^^^^^^

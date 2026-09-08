@@ -82,7 +82,7 @@ fn usage(prog: &str) -> String {
         "usage:
   {prog} run   <file.aipl> [fn] [args...]   compile and JIT-execute a function (default: main)
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
-  {prog} doc   <file.aipl>                  print each fn's `.doc(\"..\")` documentation
+  {prog} doc   <file.aipl>                  print each declaration's `# ..` documentation
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
   {prog} fmt   <file.aipl> [--check]        rewrite the file in canonical format
@@ -463,8 +463,8 @@ fn ir_cmd(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-/// `doc <file>` — print each function's attached `.doc("..")` documentation.
-/// Functions without a `.doc` are skipped. Parses just this file (it doesn't
+/// `doc <file>` — print the `# ..` documentation above each declaration.
+/// Undocumented declarations are skipped. Parses just this file (it doesn't
 /// resolve imports, compile, or run it), so docs come out under the names
 /// written here — not the loader's cross-file-mangled forms — and are available
 /// even for code that wouldn't otherwise build.
@@ -477,11 +477,16 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
     let stripped = aipl::strip_test_sections(&src);
     let program = aipl::parse(stripped).map_err(|e| e.render(stripped, file))?;
     for item in &program.items {
-        let aipl::ast::Item::Fn(f) = item else {
-            continue;
+        // Every kind of declaration a `# ..` block can sit above; an `import`
+        // declares nothing, so it is the one item with no documentation slot.
+        let (name, doc) = match item {
+            aipl::ast::Item::Fn(f) => (&f.name, &f.doc),
+            aipl::ast::Item::Struct(s) => (&s.name, &s.doc),
+            aipl::ast::Item::Variant(v) => (&v.name, &v.doc),
+            aipl::ast::Item::Import(_) => continue,
         };
-        let Some(doc) = &f.doc else { continue };
-        println!("{}", f.name);
+        let Some(doc) = doc else { continue };
+        println!("{name}");
         for line in doc.lines() {
             println!("    {line}");
         }
@@ -494,7 +499,7 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
 /// site for a project's AIPL source.
 ///
 /// The whole-project counterpart of [`doc_cmd`]: that one prints one file's
-/// `.doc("..")` text to stdout, this one indexes every `.aipl` under each
+/// documentation to stdout, this one indexes every `.aipl` under each
 /// `path` and writes a browsable static site. Several paths document one site,
 /// which is how a project keeps its library and its examples together
 /// (`aipl docs crates examples`).

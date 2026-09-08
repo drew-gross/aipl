@@ -6,7 +6,7 @@
 //! result without running anything, and a change that alters it shows up in the
 //! diff where it can be judged. The cost is that it goes stale, which is what
 //! [`checked_in_docs_are_current`] exists to catch — and what
-//! `cargo handoff` regenerates rather than stopping on, since a `.doc("..")`
+//! `cargo handoff` regenerates rather than stopping on, since a doc-comment
 //! edit makes it stale every time.
 
 use std::path::{Path, PathBuf};

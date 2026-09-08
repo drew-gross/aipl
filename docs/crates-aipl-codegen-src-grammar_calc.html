@@ -127,7 +127,7 @@
         </h2>
         <pre class="signature"><code>variant CalcTok</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Two token kinds: digit runs, and every one-character operator or bracket. The grammar tells the operators apart by <code>Literal</code>, so their kind never has to. (Imported unaliased, against the usual <code>Literal as Lit</code>: this grammar's own AST already calls a case <code>Lit</code>, and an import colliding with a local is a hard error. The alias is a convention, not a requirement.)</p></div>
 
 
         <ul class="cases">
@@ -148,7 +148,7 @@
         </h2>
         <pre class="signature"><code>variant Calc</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The AST. <code>Bin</code> carries the operator's spelling rather than a case per operator — the grammar already lists them in its <code>Prec</code> table, and one arm in <code>eval_calc</code> per spelling keeps the two in step without a third enumeration.</p></div>
 
 
         <ul class="cases">
@@ -171,7 +171,7 @@
         </h2>
         <pre class="signature"><code>fn calc_rules() -&#62; TokenRule&#60;CalcTok&#62;[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Whitespace is trivia rather than skipped, so the concrete tree covers every byte and reconstructs the source exactly.</p><p>The punctuation rule sits *ahead* of <code>Int</code>, which makes every <code>-</code> its own token and <code>Int</code> unsigned. That is the ordering this grammar needs: negation is a rule (<code>unary</code>), so a <code>-</code> the lexer had swallowed into the literal would be invisible to it — <code>1 -2</code> would lex as two numbers and parse as nothing.</p></div>
 
 
       </section>
@@ -184,7 +184,7 @@
         </h2>
         <pre class="signature"><code>fn lower_expr(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A <code>Climb</code> node is either a bare atom that climbed to itself — one interior child, no operator — or an application: two interior children with the operator as a direct leaf between them.</p></div>
 
 
       </section>
@@ -197,7 +197,7 @@
         </h2>
         <pre class="signature"><code>fn lower_unary(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>-</code> then a unary, or a bare atom. The two are told apart by whether this node matched a <code>-</code> of its own: the atom branch matches no token directly at all.</p></div>
 
 
       </section>
@@ -210,7 +210,7 @@
         </h2>
         <pre class="signature"><code>fn lower_atom(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A parenthesized expression lowered one interior child, and a literal lowered none — so the absence of a child is what says &quot;this is a number&quot;, and its text is the node's own.</p><p>The one <code>build</code> here that can fail: a literal too big for an <code>i64</code>. It is a lowering error, not a parse error, and <code>parse</code> hands it back unchanged.</p></div>
 
 
       </section>
@@ -236,7 +236,7 @@
         </h2>
         <pre class="signature"><code>fn lex_calc(src: str) -&#62; LexResult&#60;CalcTok&#62;!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -301,7 +301,7 @@
         </h2>
         <pre class="signature"><code>fn pow(base: i64, exp: i64) -&#62; i64</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Integer exponentiation by repeated multiplication. A negative exponent has no integer value, so it yields 0 rather than failing — see <code>eval_calc</code>'s doc.</p></div>
 
 
       </section>
@@ -314,7 +314,7 @@
         </h2>
         <pre class="signature"><code>fn eval(src: str) -&#62; i64!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -327,7 +327,7 @@
         </h2>
         <pre class="signature"><code>fn msg_of(src: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -340,7 +340,7 @@
         </h2>
         <pre class="signature"><code>fn shown(src: str) -&#62; str!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -353,7 +353,7 @@
         </h2>
         <pre class="signature"><code>fn depth_of(src: str) -&#62; u64!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>How deeply a parsed expression nests — the cheap shape check for a <code>Climb</code> that grouped its operands wrongly: a flat run would come back shallower.</p></div>
 
 
       </section>
@@ -366,7 +366,7 @@
         </h2>
         <pre class="signature"><code>fn depth(self: Calc) -&#62; u64</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>

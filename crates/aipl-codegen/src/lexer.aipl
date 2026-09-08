@@ -51,39 +51,39 @@ import {
 // than keeping a second copy in sync.
 import { unescape } from "./unescape.aipl";
 
-// What a token carries beyond its span: the processed *value* of the matched
-// text, computed at lex time by the matcher that claimed it (see each
-// matcher's doc). `StrVal` holds delimiter-stripped, *un-decoded* text (strings,
-// raw strings, template segments) — the library strips the delimiters but leaves
-// escapes verbatim for the rule's `emit` to decode with its own decoder (escape
-// meaning is a language's policy, not the library's). Everything a rule can
-// recover by slicing its span — identifiers, punctuation, keywords, comments,
-// and the `Int`/`Float` numeric runs (whose *parsing* is the rule's `emit`'s
-// job, via the `int_parse` builtin or its own) — carries `NoValue`. (A char
-// literal is not a library concern: a consumer that wants one lexes it as a
-// single-quoted `Delimited` string and validates the one-char shape in its
-// `emit` — see `lex_aipl.aipl`.)
+# What a token carries beyond its span: the processed *value* of the matched
+# text, computed at lex time by the matcher that claimed it (see each
+# matcher's doc). `StrVal` holds delimiter-stripped, *un-decoded* text (strings,
+# raw strings, template segments) — the library strips the delimiters but leaves
+# escapes verbatim for the rule's `emit` to decode with its own decoder (escape
+# meaning is a language's policy, not the library's). Everything a rule can
+# recover by slicing its span — identifiers, punctuation, keywords, comments,
+# and the `Int`/`Float` numeric runs (whose *parsing* is the rule's `emit`'s
+# job, via the `int_parse` builtin or its own) — carries `NoValue`. (A char
+# literal is not a library concern: a consumer that wants one lexes it as a
+# single-quoted `Delimited` string and validates the one-char shape in its
+# `emit` — see `lex_aipl.aipl`.)
 variant TokenValue = NoValue | StrVal(str)
 
-// Matched text together with where it was matched: the two halves every
-// consumer of a token needs, carried in one value so they cannot be separated.
-//
-// A `SpanStr` is built by `span_str` and nothing else, which is what makes its
-// one invariant hold: **`text` is exactly `src[span]`** for the source it was
-// sliced from. Consumers rely on that in both directions — a diagnostic renders
-// `span` against the source it already has, and a parser reads `text` without
-// needing the source at all.
-//
-// It is a plain struct, not a language feature: `str` alone cannot carry the
-// offset (a `str` is text, and two equal strings from different places are
-// equal), so the span rides alongside. That costs 16 bytes over a bare `str`,
-// and buys every function downstream one parameter instead of two.
+# Matched text together with where it was matched: the two halves every
+# consumer of a token needs, carried in one value so they cannot be separated.
+#
+# A `SpanStr` is built by `span_str` and nothing else, which is what makes its
+# one invariant hold: **`text` is exactly `src[span]`** for the source it was
+# sliced from. Consumers rely on that in both directions — a diagnostic renders
+# `span` against the source it already has, and a parser reads `text` without
+# needing the source at all.
+#
+# It is a plain struct, not a language feature: `str` alone cannot carry the
+# offset (a `str` is text, and two equal strings from different places are
+# equal), so the span rides alongside. That costs 16 bytes over a bare `str`,
+# and buys every function downstream one parameter instead of two.
 struct SpanStr { text: str, span: Span }
 
-// `src[at]` paired with `at` — the only way a `SpanStr` is made, so its
-// text-matches-span invariant holds by construction. Slicing clamps, so an
-// out-of-range or inverted `at` yields the empty text rather than failing;
-// `span` is kept verbatim either way, since it is what a caret block underlines.
+# `src[at]` paired with `at` — the only way a `SpanStr` is made, so its
+# text-matches-span invariant holds by construction. Slicing clamps, so an
+# out-of-range or inverted `at` yields the empty text rather than failing;
+# `span` is kept verbatim either way, since it is what a caret block underlines.
 pub fn span_str(src: str, at: Span) -> SpanStr { text: src[at], span: at }.test({
     let src = "let x = 42;";
     assert(span_str(src, 0..3).text == "let");
@@ -109,33 +109,33 @@ pub fn span_str(src: str, at: Span) -> SpanStr { text: src[at], span: at }.test(
     }
 })
 
-// What a token is: its `kind` — a caller-defined value carrying whatever the
-// matched token means, produced by the rule's `emit` (see `Emit`) — and its
-// `text`, the raw source it covers plus the span it covers (see `SpanStr`).
-// `Token` is generic over the kind type `K`, so a language pins `K` to its own
-// `variant` whose arms *are* the token kinds, each carrying that kind's content
-// (`Int(i64)`, `Str(str)`, a bare `Plus`, …) — rather than a stringly-typed
-// label plus a separate value.
-//
-// The text is carried rather than recovered by slicing (`src[t.span]`, as it
-// used to be) so that holding a token is enough: a parser does not thread the
-// source alongside its token list just to read a token back.
+# What a token is: its `kind` — a caller-defined value carrying whatever the
+# matched token means, produced by the rule's `emit` (see `Emit`) — and its
+# `text`, the raw source it covers plus the span it covers (see `SpanStr`).
+# `Token` is generic over the kind type `K`, so a language pins `K` to its own
+# `variant` whose arms *are* the token kinds, each carrying that kind's content
+# (`Int(i64)`, `Str(str)`, a bare `Plus`, …) — rather than a stringly-typed
+# label plus a separate value.
+#
+# The text is carried rather than recovered by slicing (`src[t.span]`, as it
+# used to be) so that holding a token is enough: a parser does not thread the
+# source alongside its token list just to read a token back.
 struct Token<K> { kind: K, text: SpanStr }
 
-// Where in a template literal a text segment sits, handed to a `Template`
-// rule's `OfSeg` emit so one rule can produce a *different* kind per position:
-// `Plain` (a literal with no interpolations), `Head` (open delim through the
-// first `{`), `Middle` (between two interpolations), `Tail` (through the close).
+# Where in a template literal a text segment sits, handed to a `Template`
+# rule's `OfSeg` emit so one rule can produce a *different* kind per position:
+# `Plain` (a literal with no interpolations), `Head` (open delim through the
+# first `{`), `Middle` (between two interpolations), `Tail` (through the close).
 variant Seg = Plain | Head | Middle | Tail
 
-// How a rule turns its matched token into a kind `K`: a fixed set of options.
-//
-// Four of the five are handed the token's *content string* — the
-// delimiter-stripped text for a string matcher (`Delimited`/`Between`/`Nested`),
-// or the raw matched text for everything else (identifiers, whose text is their
-// content, and numeric `Int`/`Float` runs, whose emit parses the digits itself).
-// The two never overlap — a matcher either strips delimiters or has none — so
-// one notion serves both, always handing over the meaningful content.
+# How a rule turns its matched token into a kind `K`: a fixed set of options.
+#
+# Four of the five are handed the token's *content string* — the
+# delimiter-stripped text for a string matcher (`Delimited`/`Between`/`Nested`),
+# or the raw matched text for everything else (identifiers, whose text is their
+# content, and numeric `Int`/`Float` runs, whose emit parses the digits itself).
+# The two never overlap — a matcher either strips delimiters or has none — so
+# one notion serves both, always handing over the meaningful content.
 variant Emit<K> =
     // A finished kind for a valueless token: punctuation, an operator.
     | Bare(K)
@@ -156,27 +156,27 @@ variant Emit<K> =
     // `OfSeg`'s fallible sibling, on the same terms.
     | TrySeg((str, Seg) -> K!str)
 
-// Why a lex failed: what went wrong, and the span of the offending source
-// (absolute into the lexed string — slice it to show the offender).
+# Why a lex failed: what went wrong, and the span of the offending source
+# (absolute into the lexed string — slice it to show the offender).
 struct LexError { message: str, span: Span }
 
-// One token shape, as plain data. Char classes and fixed spellings are both
-// spelled as strings (class membership via `contains`, a spelling matched
-// whole); none of them ever match empty input, so `lex` always makes progress.
-//
-// Tokens carry values (see `TokenValue`), computed by the claiming matcher:
-// `Delimited` a `StrVal` of the delimiter-stripped contents, *un-decoded* (the
-// rule's `emit` decodes — escape handling is the caller's, not the library's);
-// `Between`/`Nested` a verbatim `StrVal` of the contents (a raw string's
-// de-denting is the caller's post-pass). `Template` (its segments), `Int`/`Float`
-// (their digit text), and everything else — plus every trivia record — carry
-// `NoValue`, so an `Of` emit recovers the raw matched text and interprets it. The
-// library provides no string-escape decoder: what a `\X` means is a language's
-// own policy, so a consumer's `emit` decodes with its own (e.g. `lex_aipl.aipl`'s
-// `unescape`, mapping `\n`/`\t`/`\r` to control chars and any other `\X` to X
-// itself). A char literal is likewise not a matcher: a consumer lexes it as a
-// single-quoted `Delimited` string and enforces the one-char shape in a `Try`
-// emit (see `lex_aipl.aipl`'s `char_lit_emit`).
+# One token shape, as plain data. Char classes and fixed spellings are both
+# spelled as strings (class membership via `contains`, a spelling matched
+# whole); none of them ever match empty input, so `lex` always makes progress.
+#
+# Tokens carry values (see `TokenValue`), computed by the claiming matcher:
+# `Delimited` a `StrVal` of the delimiter-stripped contents, *un-decoded* (the
+# rule's `emit` decodes — escape handling is the caller's, not the library's);
+# `Between`/`Nested` a verbatim `StrVal` of the contents (a raw string's
+# de-denting is the caller's post-pass). `Template` (its segments), `Int`/`Float`
+# (their digit text), and everything else — plus every trivia record — carry
+# `NoValue`, so an `Of` emit recovers the raw matched text and interprets it. The
+# library provides no string-escape decoder: what a `\X` means is a language's
+# own policy, so a consumer's `emit` decodes with its own (e.g. `lex_aipl.aipl`'s
+# `unescape`, mapping `\n`/`\t`/`\r` to control chars and any other `\X` to X
+# itself). A char literal is likewise not a matcher: a consumer lexes it as a
+# single-quoted `Delimited` string and enforces the one-char shape in a `Try`
+# emit (see `lex_aipl.aipl`'s `char_lit_emit`).
 variant Matcher =
     // A maximal run of chars in `cont`. `first` restricts what may *open* the
     // run and defaults to `cont`, so the usual shape — one class for the whole
@@ -287,29 +287,29 @@ variant Matcher =
     // only expressible with the `-` and digits together.
     | Int
 
-// One prioritized entry of a rule set: the shape to match, how to turn a match
-// into a kind (`emit`), and what becomes of its matches. A plain rule emits a
-// token; `skip: true` consumes matches silently (whitespace); `trivia: true`
-// consumes them but records each in the result's trivia side-channel — for
-// matches a later pass wants located but not parsed, like comments (a formatter
-// re-attaches them) or lint markers (`#[allow]`). Set at most one of the two
-// flags (`skip` wins when both are set). Generic over the kind type `K` — every
-// rule of one set builds the same `K`.
-// `unterminated` overrides the message used when this rule's token runs off the
-// end of the source (a `Delimited`/`Between`/`Nested`/`Template` scan that never
-// closes). Empty means "use the matcher's built-in default" (a generic
-// "unterminated delimited token" / "unterminated template literal") — so a rule
-// can name its token in the diagnostic (`"unterminated string literal"`) without
-// every rule having to.
-//
-// `scope` is the TextMate scope a syntax highlighter should paint this rule's
-// matches — `"keyword.control.aipl"`, `"string.quoted.double.aipl"`. `lex`
-// ignores it entirely: it is carried here so that one rule set describes a
-// language's lexical structure *once*, for the lexer and the highlighter both
-// (`highlight.aipl` generates the second from it), rather than the two drifting
-// apart as separate descriptions. Empty means "not highlighted", which is what a
-// `skip` rule wants. The same hint on the syntactic half is
-// `Production.scope` in `grammar.aipl`.
+# One prioritized entry of a rule set: the shape to match, how to turn a match
+# into a kind (`emit`), and what becomes of its matches. A plain rule emits a
+# token; `skip: true` consumes matches silently (whitespace); `trivia: true`
+# consumes them but records each in the result's trivia side-channel — for
+# matches a later pass wants located but not parsed, like comments (a formatter
+# re-attaches them) or lint markers (`#[allow]`). Set at most one of the two
+# flags (`skip` wins when both are set). Generic over the kind type `K` — every
+# rule of one set builds the same `K`.
+# `unterminated` overrides the message used when this rule's token runs off the
+# end of the source (a `Delimited`/`Between`/`Nested`/`Template` scan that never
+# closes). Empty means "use the matcher's built-in default" (a generic
+# "unterminated delimited token" / "unterminated template literal") — so a rule
+# can name its token in the diagnostic (`"unterminated string literal"`) without
+# every rule having to.
+#
+# `scope` is the TextMate scope a syntax highlighter should paint this rule's
+# matches — `"keyword.control.aipl"`, `"string.quoted.double.aipl"`. `lex`
+# ignores it entirely: it is carried here so that one rule set describes a
+# language's lexical structure *once*, for the lexer and the highlighter both
+# (`highlight.aipl` generates the second from it), rather than the two drifting
+# apart as separate descriptions. Empty means "not highlighted", which is what a
+# `skip` rule wants. The same hint on the syntactic half is
+# `Production.scope` in `grammar.aipl`.
 struct TokenRule<K> {
     matcher: Matcher,
     emit: Emit<K>,
@@ -319,25 +319,24 @@ struct TokenRule<K> {
     scope: str = "",
 }
 
-// What `lex` returns: the emitted tokens, and the trivia side-channel — the
-// recorded matches of every `trivia: true` rule, in source order. Silent
-// `skip` matches appear in neither.
+# What `lex` returns: the emitted tokens, and the trivia side-channel — the
+# recorded matches of every `trivia: true` rule, in source order. Silent
+# `skip` matches appear in neither.
 struct LexResult<K> { tokens: Token<K>[], trivia: Token<K>[] }
 
+# `self` with every `skip` rule turned into a `trivia` rule: nothing is
+# dropped, so every byte of a lexed source is accounted for by some token or
+# trivia record.
+#
+# A compiler's rule set skips whitespace outright — it has no use for it, and
+# recording it would cost every consumer something only one of them wants. A
+# *lossless* consumer has the opposite need: a parser building a concrete
+# syntax tree, or a formatter reproducing its input, must be able to put every
+# byte back. Both read the one rule set through this, rather than the language
+# keeping two of them.
 pub fn keep_skipped<K>(self: TokenRule<K>[]) -> TokenRule<K>[] {
     self.map(|r| if (r.skip) { TokenRule { ..r, skip: false, trivia: true } } else { r })
-}.doc("""
-    `self` with every `skip` rule turned into a `trivia` rule: nothing is
-    dropped, so every byte of a lexed source is accounted for by some token or
-    trivia record.
-
-    A compiler's rule set skips whitespace outright — it has no use for it, and
-    recording it would cost every consumer something only one of them wants. A
-    *lossless* consumer has the opposite need: a parser building a concrete
-    syntax tree, or a formatter reproducing its input, must be able to put every
-    byte back. Both read the one rule set through this, rather than the language
-    keeping two of them.
-""").test({
+}.test({
     let ws: TokenRule<Kind> = TokenRule { matcher: CharRun(" "), emit: Bare(Ws), skip: true };
     let word: TokenRule<Kind> = TokenRule { matcher: CharRun("ab"), emit: Of(Ident) };
 
@@ -356,9 +355,9 @@ pub fn keep_skipped<K>(self: TokenRule<K>[]) -> TokenRule<K>[] {
 
 fn lex_err(message: str, span: Span) -> LexError { message, span }
 
-// `CharRun`: length of the maximal run at the start of `self` — a `head`
-// char, then `cont` chars. 0 when the first char isn't in `head`.
-// (`head` rather than `first`, which is now a builtin this file calls.)
+# `CharRun`: length of the maximal run at the start of `self` — a `head`
+# char, then `cont` chars. 0 when the first char isn't in `head`.
+# (`head` rather than `first`, which is now a builtin this file calls.)
 fn char_run_len(self: str, head: str, cont: str) -> u64 {
     if (self.first().is_some_and(|c| head.contains(c))) {
         1 + self.drop_first().count_while(|c| cont.contains(c))
@@ -367,24 +366,24 @@ fn char_run_len(self: str, head: str, cont: str) -> u64 {
     }
 }
 
-// `OneChar`: 1 when `self` opens with a char in `chars`, else 0 —
-// `char_run_len`'s single-character counterpart, and the reason a rule never has
-// to spell that shape as a run with nothing to continue it. An empty set never
-// matches.
+# `OneChar`: 1 when `self` opens with a char in `chars`, else 0 —
+# `char_run_len`'s single-character counterpart, and the reason a rule never has
+# to spell that shape as a run with nothing to continue it. An empty set never
+# matches.
 fn one_char_len(self: str, chars: str) -> u64 {
     if (self.first().is_some_and(|c| chars.contains(c))) { 1 } else { 0 }
 }
 
-// `Exact`: length of `spelling` when it prefixes `self`, else 0. An empty
-// spelling never matches.
+# `Exact`: length of `spelling` when it prefixes `self`, else 0. An empty
+# spelling never matches.
 fn exact_len(self: str, spelling: str) -> u64 {
     if (spelling.is_nonempty() && self.starts_with(spelling)) { spelling.len() } else { 0 }
 }
 
-// `Keyword`: the length of `spelling` when it prefixes `self`, but only when the
-// char after it is absent (end of source) or outside `boundary` — a keyword must
-// not end in the middle of an identifier. 0 when it doesn't match (or the char
-// after is a boundary char, as in `iffy` for `if`).
+# `Keyword`: the length of `spelling` when it prefixes `self`, but only when the
+# char after it is absent (end of source) or outside `boundary` — a keyword must
+# not end in the middle of an identifier. 0 when it doesn't match (or the char
+# after is a boundary char, as in `iffy` for `if`).
 fn keyword_len(self: str, spelling: str, boundary: str) -> u64 {
     let bounded = !self[spelling.len()].is_some_and(|c| boundary.contains(c));
     if (spelling.is_nonempty() && bounded && self.starts_with(spelling)) {
@@ -394,14 +393,14 @@ fn keyword_len(self: str, spelling: str, boundary: str) -> u64 {
     }
 }
 
-// `Delimited`: a `delims` char opens the token, which spans to just past the
-// next occurrence of the same char. ok(0) when the first char isn't a
-// delimiter. With a non-empty `escapes` set, a backslash escapes its next
-// char: an allowed char is content (an escaped delimiter doesn't close), a
-// disallowed one is a hard error, and a dangling backslash at the end of the
-// source leaves the token unterminated. A token still open at the end of the
-// source is a hard error (`at` is the token's absolute start, so error spans
-// land in the real source).
+# `Delimited`: a `delims` char opens the token, which spans to just past the
+# next occurrence of the same char. ok(0) when the first char isn't a
+# delimiter. With a non-empty `escapes` set, a backslash escapes its next
+# char: an allowed char is content (an escaped delimiter doesn't close), a
+# disallowed one is a hard error, and a dangling backslash at the end of the
+# source leaves the token unterminated. A token still open at the end of the
+# source is a hard error (`at` is the token's absolute start, so error spans
+# land in the real source).
 fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -> u64!LexError {
     if (!self.first().is_some_and(|c| delims.contains(c))) {
         return ok(0);
@@ -438,19 +437,19 @@ fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -> u64
     ok(i)
 }
 
-// The message for an unterminated scan: a rule's own `unterminated` override, or
-// the generic default when it left the field empty.
+# The message for an unterminated scan: a rule's own `unterminated` override, or
+# the generic default when it left the field empty.
 fn unterminated_msg(msg: str) -> str {
     if (msg.is_empty()) { "unterminated delimited token" } else { msg }
 }
 
-// `Between`: the `open` spelling opens the token, which runs to just past the
-// next full occurrence of `close`. ok(0) when `self` doesn't start with
-// `open`. The close scan starts past the open and matches the whole `close`
-// spelling, so a partial close inside (a lone `"`/`""` under a `"""` close) is
-// content, not a terminator, and open/close may be multi-char and differ. No
-// escapes — contents are verbatim. A token still open at the end of the source
-// is a hard error (`at` places the span in the real source).
+# `Between`: the `open` spelling opens the token, which runs to just past the
+# next full occurrence of `close`. ok(0) when `self` doesn't start with
+# `open`. The close scan starts past the open and matches the whole `close`
+# spelling, so a partial close inside (a lone `"`/`""` under a `"""` close) is
+# content, not a terminator, and open/close may be multi-char and differ. No
+# escapes — contents are verbatim. A token still open at the end of the source
+# is a hard error (`at` places the span in the real source).
 fn between_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
     if (!self.starts_with(open)) {
         return ok(0);
@@ -468,13 +467,13 @@ fn between_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexEr
     err(LexError { message: unterminated_msg(msg), span: at..at + self.len() })
 }
 
-// `Nested`: the depth-tracked `Between`. The `open` spelling opens the token at
-// depth 1; each further `open` raises the depth and each `close` lowers it, so
-// the token ends just past the `close` that returns the depth to 0. ok(0) when
-// `self` doesn't start with `open`. `open` is tested before `close` so an
-// overlap can't misclassify, but the two must be distinct for nesting to mean
-// anything. No escapes — contents are verbatim. Still open (depth > 0) at the
-// end of the source is a hard error (`at` places the span in the real source).
+# `Nested`: the depth-tracked `Between`. The `open` spelling opens the token at
+# depth 1; each further `open` raises the depth and each `close` lowers it, so
+# the token ends just past the `close` that returns the depth to 0. ok(0) when
+# `self` doesn't start with `open`. `open` is tested before `close` so an
+# overlap can't misclassify, but the two must be distinct for nesting to mean
+# anything. No escapes — contents are verbatim. Still open (depth > 0) at the
+# end of the source is a hard error (`at` places the span in the real source).
 fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexError {
     if (!self.starts_with(open)) {
         return ok(0);
@@ -500,8 +499,8 @@ fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexErr
     ok(i)
 }
 
-// `ToEol`: the marker, then everything up to (not including) the next
-// newline. 0 when `self` doesn't start with the (non-empty) marker.
+# `ToEol`: the marker, then everything up to (not including) the next
+# newline. 0 when `self` doesn't start with the (non-empty) marker.
 fn to_eol_len(self: str, marker: str) -> u64 {
     if (marker.is_nonempty() && self.starts_with(marker)) {
         self.count_while(|x| x != '\n')
@@ -510,9 +509,9 @@ fn to_eol_len(self: str, marker: str) -> u64 {
     }
 }
 
-// `ToEolUnless`: `to_eol_len`, refused when the character right after the marker
-// is one `blocked` claims. End of input or a newline right after the marker is
-// *not* blocked — an empty comment line is a comment.
+# `ToEolUnless`: `to_eol_len`, refused when the character right after the marker
+# is one `blocked` claims. End of input or a newline right after the marker is
+# *not* blocked — an empty comment line is a comment.
 fn to_eol_unless_len(self: str, marker: str, blocked: str) -> u64 {
     let len = self.to_eol_len(marker);
     if (len == 0) {
@@ -524,10 +523,10 @@ fn to_eol_unless_len(self: str, marker: str, blocked: str) -> u64 {
     }
 }
 
-// The end of the number whose integer part ends at `int_end`: extends past a
-// fraction (`.` then at least one digit), then past an exponent (`e` or `E`,
-// an optional sign, then at least one digit). Either part may be absent;
-// `int_end` comes back unchanged when neither matches.
+# The end of the number whose integer part ends at `int_end`: extends past a
+# fraction (`.` then at least one digit), then past an exponent (`e` or `E`,
+# an optional sign, then at least one digit). Either part may be absent;
+# `int_end` comes back unchanged when neither matches.
 fn number_end(self: str, int_end: u64) -> u64 {
     mut end = int_end;
     if (self[end] == some('.') && self[end + 1].is_some_and(is_digit)) {
@@ -543,8 +542,8 @@ fn number_end(self: str, int_end: u64) -> u64 {
     end
 }
 
-// `Float`: a digit run that extends past a fraction and/or exponent. A bare
-// digit run is 0 (no match) — it belongs to the int rule.
+# `Float`: a digit run that extends past a fraction and/or exponent. A bare
+# digit run is 0 (no match) — it belongs to the int rule.
 fn float_len(self: str) -> u64 {
     let int_end = self.count_while(is_digit);
     if (int_end == 0) {
@@ -554,13 +553,13 @@ fn float_len(self: str) -> u64 {
     if (int_end < end) { end } else { 0 }
 }
 
-// `Int`: the length of an optional leading `-` then a digit run. 0 (no match)
-// when there's no digit run — including a `-` *not* immediately followed by a
-// digit (a `-` before a space or a letter is left for a `-` operator rule, so
-// `- 5`/`-x` don't match). That decline is the entire sign-vs-operator
-// disambiguation: with an `Int` rule before the `-` operator rule, `-5` is a
-// signed literal while `- 5`/`-x` are the operator; put the operator first and
-// every `-` is the operator and `Int` is unsigned.
+# `Int`: the length of an optional leading `-` then a digit run. 0 (no match)
+# when there's no digit run — including a `-` *not* immediately followed by a
+# digit (a `-` before a space or a letter is left for a `-` operator rule, so
+# `- 5`/`-x` don't match). That decline is the entire sign-vs-operator
+# disambiguation: with an `Int` rule before the `-` operator rule, `-5` is a
+# signed literal while `- 5`/`-x` are the operator; put the operator first and
+# every `-` is the operator and `Int` is unsigned.
 fn int_len(self: str) -> u64 {
     let signed = self.first() == some('-') && self[1].is_some_and(is_digit);
     let start: u64 = if (signed) { 1 } else { 0 };
@@ -568,13 +567,13 @@ fn int_len(self: str) -> u64 {
     if (digits == 0) { 0 } else { start + digits }
 }
 
-// The value a token of matcher `m` carries, computed from its matched `text`
-// (`src[at..at+n]`, delimiters included) — see the value table on `Matcher`.
-// Only the string-valued matchers carry a computed value; everything a rule can
-// recover by slicing its span (`Int`/`Float` numeric runs, identifiers, …) is
-// `NoValue`, so the rule's `emit` interprets the text itself. `Template` returns
-// `NoValue` here only because its tokens are built inside `template_scan`, which
-// attaches each segment's value itself.
+# The value a token of matcher `m` carries, computed from its matched `text`
+# (`src[at..at+n]`, delimiters included) — see the value table on `Matcher`.
+# Only the string-valued matchers carry a computed value; everything a rule can
+# recover by slicing its span (`Int`/`Float` numeric runs, identifiers, …) is
+# `NoValue`, so the rule's `emit` interprets the text itself. `Template` returns
+# `NoValue` here only because its tokens are built inside `template_scan`, which
+# attaches each segment's value itself.
 fn token_value(m: Matcher, text: str) -> TokenValue {
     match (m) {
         Delimited(..) => StrVal(text[1..text.len() - 1]),
@@ -595,12 +594,12 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
     }
 }
 
-// Build a token's kind by applying the rule's `emit` to its content string —
-// the matcher-computed `value` (a delimited string, stripped) when there is one,
-// else the raw matched `text`. `Bare` ignores it; `Of` applies its constructor;
-// `Try` does too but may fail with a message (paired with the token `span` to
-// make a `LexError`). `OfSeg`/`TrySeg` belong to a `Template` rule and are a lex
-// error here.
+# Build a token's kind by applying the rule's `emit` to its content string —
+# the matcher-computed `value` (a delimited string, stripped) when there is one,
+# else the raw matched `text`. `Bare` ignores it; `Of` applies its constructor;
+# `Try` does too but may fail with a message (paired with the token `span` to
+# make a `LexError`). `OfSeg`/`TrySeg` belong to a `Template` rule and are a lex
+# error here.
 fn apply_emit<K>(e: Emit<K>, matched: SpanStr, value: TokenValue) -> K!LexError {
     // A matcher either hands over a computed value (a delimited string, already
     // stripped) or nothing; take the stripped string when present, else the raw
@@ -620,24 +619,24 @@ fn apply_emit<K>(e: Emit<K>, matched: SpanStr, value: TokenValue) -> K!LexError 
     }
 }
 
-// A `LexError` for a segment emit (`OfSeg`/`TrySeg`) used on a non-`Template`
-// rule — those only make sense per template segment (see `seg_emit`).
+# A `LexError` for a segment emit (`OfSeg`/`TrySeg`) used on a non-`Template`
+# rule — those only make sense per template segment (see `seg_emit`).
 fn seg_only(span: Span) -> LexError {
     message: "an OfSeg/TrySeg emit is only valid on a Template rule",
     span,
 }
 
-// One lexing step's outcome: the token(s) the winning rule produced — one
-// usually, none for a `skip` rule, a whole head/expr/middle/tail run for a
-// `Template` — any trivia recorded along the way, and the position just past
-// the consumed text. `end` staying at the step's start means no rule matched.
+# One lexing step's outcome: the token(s) the winning rule produced — one
+# usually, none for a `skip` rule, a whole head/expr/middle/tail run for a
+# `Template` — any trivia recorded along the way, and the position just past
+# the consumed text. `end` staying at the step's start means no rule matched.
 struct StepResult<K> { tokens: Token<K>[], trivia: Token<K>[], end: u64 }
 
-// A simple (single-token) matcher's outcome: a decline when the matched
-// length `n` is 0, otherwise `n` chars consumed producing the rule's one
-// token — recorded as trivia for a `trivia` rule, or nothing at all for a
-// `skip` rule. The token's kind comes from the rule's `emit` applied to the
-// matcher-computed value, which can fail on an emit/value-shape mismatch.
+# A simple (single-token) matcher's outcome: a decline when the matched
+# length `n` is 0, otherwise `n` chars consumed producing the rule's one
+# token — recorded as trivia for a `trivia` rule, or nothing at all for a
+# `skip` rule. The token's kind comes from the rule's `emit` applied to the
+# matcher-computed value, which can fail on an emit/value-shape mismatch.
 fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!LexError {
     if (n == 0 || r.skip) {
         return ok(StepResult { tokens: [], trivia: [], end: at + n });
@@ -652,14 +651,14 @@ fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!L
     ok(StepResult { tokens: [t], trivia: [], end: at + n })
 }
 
-// One lexing step at absolute position `at`: tries each rule in order (first
-// match wins) and returns the winning rule's outcome — see `StepResult`. Every
-// arm but `Template` computes how far its matcher reaches (0 for no match — no
-// matcher matches empty input, so a nonzero length always means progress) and
-// wraps it via `step_result`; a `Template`'s multi-token run doesn't fit a single
-// length, so its arm builds the outcome directly. Mutually recursive with
-// `template_scan`: an interpolation re-enters this full rule set, so template
-// literals nest.
+# One lexing step at absolute position `at`: tries each rule in order (first
+# match wins) and returns the winning rule's outcome — see `StepResult`. Every
+# arm but `Template` computes how far its matcher reaches (0 for no match — no
+# matcher matches empty input, so a nonzero length always means progress) and
+# wraps it via `step_result`; a `Template`'s multi-token run doesn't fit a single
+# length, so its arm builds the outcome directly. Mutually recursive with
+# `template_scan`: an interpolation re-enters this full rule set, so template
+# literals nest.
 fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[]) -> StepResult<K>!LexError {
     for (let r : rules) {
         let res = match (r.matcher) {
@@ -717,11 +716,11 @@ fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[]) -> StepResult<K>!LexErr
     ok(StepResult { tokens: [], trivia: [], end: at })
 }
 
-// Apply a `Template` rule's `emit` to one segment's raw text and its position.
-// The emit must be an `OfSeg` (or its fallible sibling `TrySeg`) — a template
-// produces several kinds per literal, one per segment position, which only a
-// segment emit can distinguish; any other option is a lex error. A `TrySeg` that
-// returns `err(msg)` carries the segment's `span`.
+# Apply a `Template` rule's `emit` to one segment's raw text and its position.
+# The emit must be an `OfSeg` (or its fallible sibling `TrySeg`) — a template
+# produces several kinds per literal, one per segment position, which only a
+# segment emit can distinguish; any other option is a lex error. A `TrySeg` that
+# returns `err(msg)` carries the segment's `span`.
 fn seg_emit<K>(e: Emit<K>, text: str, seg: Seg, span: Span) -> K!LexError {
     match (e) {
         OfSeg(f) => ok(f(text, seg)),
@@ -735,9 +734,9 @@ fn seg_needs_ofseg(span: Span) -> LexError {
     span,
 }
 
-// The `Template` arm of `lex_step`'s dispatch: a decline when `src[at..]`
-// doesn't open with `delim` (mirroring every other matcher's 0), else the
-// literal's whole token run.
+# The `Template` arm of `lex_step`'s dispatch: a decline when `src[at..]`
+# doesn't open with `delim` (mirroring every other matcher's 0), else the
+# literal's whole token run.
 fn template_step<K>(
     src: str,
     at: u64,
@@ -754,27 +753,27 @@ fn template_step<K>(
     template_scan(src, at, delim, escapes, finalize, emit, rules, unterminated)
 }
 
-// `Template`: scans a whole template literal at `at` (the caller verified the
-// opening `delim`); the result's tokens are the literal's whole run and its
-// `end` sits just past the closing `delim`. A text segment runs until the
-// closing `delim` (matched in full, like `Between`) or a `{`, which ends the
-// segment and opens an interpolation (see `interp_scan`).
-//
-// **A segment's span runs brace to brace, and its value does not.** The span
-// takes the delimiter or `}` that opens the segment and the delimiter or `{`
-// that closes it; the value is what lies strictly between. Keeping the two
-// starts apart is what makes the token stream *tile* the source — every byte of
-// a template under exactly one token — which a concrete syntax tree needs and a
-// token stream alone does not care about. They were once the same variable, and
-// the `}` closing an interpolation was then the one byte of a template that
-// belonged to no token at all. The text segments are collected first (with their spans and the
-// interpolation token runs between them), then handed to `finalize_template` —
-// which post-processes them as a group and emits each. A nested template inside
-// an interpolation is fully lexed (and its own segments finalized) by the
-// recursive `interp_scan`, so each `template_scan` only ever handles its own
-// direct segments. `escapes` still governs *scanning* as in `delimited_len`,
-// including the hard error on an unknown escape and the dangling backslash
-// falling through to run the literal out unterminated.
+# `Template`: scans a whole template literal at `at` (the caller verified the
+# opening `delim`); the result's tokens are the literal's whole run and its
+# `end` sits just past the closing `delim`. A text segment runs until the
+# closing `delim` (matched in full, like `Between`) or a `{`, which ends the
+# segment and opens an interpolation (see `interp_scan`).
+#
+# **A segment's span runs brace to brace, and its value does not.** The span
+# takes the delimiter or `}` that opens the segment and the delimiter or `{`
+# that closes it; the value is what lies strictly between. Keeping the two
+# starts apart is what makes the token stream *tile* the source — every byte of
+# a template under exactly one token — which a concrete syntax tree needs and a
+# token stream alone does not care about. They were once the same variable, and
+# the `}` closing an interpolation was then the one byte of a template that
+# belonged to no token at all. The text segments are collected first (with their spans and the
+# interpolation token runs between them), then handed to `finalize_template` —
+# which post-processes them as a group and emits each. A nested template inside
+# an interpolation is fully lexed (and its own segments finalized) by the
+# recursive `interp_scan`, so each `template_scan` only ever handles its own
+# direct segments. `escapes` still governs *scanning* as in `delimited_len`,
+# including the hard error on an unknown escape and the dangling backslash
+# falling through to run the literal out unterminated.
 fn template_scan<K>(
     src: str,
     at: u64,
@@ -835,12 +834,12 @@ fn template_scan<K>(
     err(LexError { message: m, span: at..src.len() })
 }
 
-// Emit a template literal's tokens: apply the caller's `finalize` to all of its
-// text segments as a group (it returns one finalized text per segment), then
-// emit each finalized segment — its position `Plain` for a lone segment, else
-// `Head`/`Middle`/`Tail` — via the rule's `OfSeg`/`TrySeg` emit, interleaved
-// with the interpolation token runs (`interp_runs[k]` following segment `k`).
-// `end` sits just past the closing delim.
+# Emit a template literal's tokens: apply the caller's `finalize` to all of its
+# text segments as a group (it returns one finalized text per segment), then
+# emit each finalized segment — its position `Plain` for a lone segment, else
+# `Head`/`Middle`/`Tail` — via the rule's `OfSeg`/`TrySeg` emit, interleaved
+# with the interpolation token runs (`interp_runs[k]` following segment `k`).
+# `end` sits just past the closing delim.
 fn finalize_template<K>(
     src: str,
     finalize: (str[]) -> str[],
@@ -882,16 +881,16 @@ fn finalize_template<K>(
     ok(StepResult { tokens: toks, trivia, end })
 }
 
-// A template interpolation's `{ ... }` body: lexes expression tokens with the
-// full rule set from `at` (just past the opening `{`, which sits at `open`)
-// until the `}` balancing it; that closing `}` is consumed without a token of
-// its own — it's the template's delimiter, not an expression token, and it is
-// the *next* text segment's span that covers it (see `template_scan`). Depth
-// moves by what
-// each step consumed: a step consuming exactly `{` or `}` (a brace lexed as
-// its own token — set/dict literals, blocks) raises/lowers it, while a brace
-// buried inside a bigger token (a delimited string's content, a nested
-// template) doesn't. The result's `end` sits just past the closing `}`.
+# A template interpolation's `{ ... }` body: lexes expression tokens with the
+# full rule set from `at` (just past the opening `{`, which sits at `open`)
+# until the `}` balancing it; that closing `}` is consumed without a token of
+# its own — it's the template's delimiter, not an expression token, and it is
+# the *next* text segment's span that covers it (see `template_scan`). Depth
+# moves by what
+# each step consumed: a step consuming exactly `{` or `}` (a brace lexed as
+# its own token — set/dict literals, blocks) raises/lowers it, while a brace
+# buried inside a bigger token (a delimited string's content, a nested
+# template) doesn't. The result's `end` sits just past the closing `}`.
 fn interp_scan<K>(src: str, at: u64, open: u64, rules: TokenRule<K>[]) -> StepResult<K>!LexError {
     mut toks = [];
     mut trivia = [];
@@ -929,11 +928,11 @@ fn interp_scan<K>(src: str, at: u64, open: u64, rules: TokenRule<K>[]) -> StepRe
     ok(StepResult { tokens: toks, trivia, end: i })
 }
 
-// A concrete token-kind variant for the `.test` block below — one example of
-// the per-language `K` a caller pins `Token<K>`/`TokenRule<K>` to. Each arm is a
-// kind; value-bearing kinds carry their content (`Int(i64)`, `Str(str)`, the
-// template segments), text-recovered kinds are bare (their text is sliced from
-// the span). A real consumer writes its own such variant.
+# A concrete token-kind variant for the `.test` block below — one example of
+# the per-language `K` a caller pins `Token<K>`/`TokenRule<K>` to. Each arm is a
+# kind; value-bearing kinds carry their content (`Int(i64)`, `Str(str)`, the
+# template segments), text-recovered kinds are bare (their text is sliced from
+# the span). A real consumer writes its own such variant.
 variant Kind =
     | Ws
     | Ident(str)
@@ -958,9 +957,9 @@ variant Kind =
     | RawTplMid(str)
     | RawTplTail(str)
 
-// The `.test` block's template `OfSeg` emit: the library hands each segment's
-// *raw* text, so this emit decodes it (with the imported `unescape`) before
-// mapping to a `Kind` arm — escape handling is the caller's job.
+# The `.test` block's template `OfSeg` emit: the library hands each segment's
+# *raw* text, so this emit decodes it (with the imported `unescape`) before
+# mapping to a `Kind` arm — escape handling is the caller's job.
 fn tpl_kind(text: str, seg: Seg) -> Kind {
     let t = text.unescape();
     match (seg) {
@@ -971,29 +970,29 @@ fn tpl_kind(text: str, seg: Seg) -> Kind {
     }
 }
 
-// The `Of` emit for the escaped-string test below: the library hands the raw
-// (un-decoded) delimiter-stripped contents, so the emit decodes them itself.
+# The `Of` emit for the escaped-string test below: the library hands the raw
+# (un-decoded) delimiter-stripped contents, so the emit decodes them itself.
 fn esc_str(text: str) -> Kind { Str(text.unescape()) }
 
-// The `Try` emit for the `Int` test below: the library hands the raw digit
-// run, so this emit parses it — here with the `int_parse` builtin, reporting an
-// i64 overflow as an error *message* (the library attaches the token's span).
-// Parsing policy, and what overflow means, is the caller's — a bignum lexer would
-// parse into a wide type and never fail here.
+# The `Try` emit for the `Int` test below: the library hands the raw digit
+# run, so this emit parses it — here with the `int_parse` builtin, reporting an
+# i64 overflow as an error *message* (the library attaches the token's span).
+# Parsing policy, and what overflow means, is the caller's — a bignum lexer would
+# parse into a wide type and never fail here.
 fn int_tok(text: str) -> Kind!str {
     ok(IntTok(text.int_parse().value_or_err("integer literal overflows i64")?))
 }
 
-// A `Try` emit: the escaped-string decoder above, plus a content rule the
-// caller enforces — a string literal may not be empty. A whole-token verdict, so
-// the token's span is the right place for the error.
+# A `Try` emit: the escaped-string decoder above, plus a content rule the
+# caller enforces — a string literal may not be empty. A whole-token verdict, so
+# the token's span is the right place for the error.
 fn nonempty_str(text: str) -> Kind!str {
     let s = text.unescape();
     if (s.is_empty()) { err("empty string literal") } else { ok(Str(s)) }
 }
 
-// A `TrySeg` emit: like `tpl_kind`, but the caller rejects a `TODO` segment. The
-// error carries the whole template's span.
+# A `TrySeg` emit: like `tpl_kind`, but the caller rejects a `TODO` segment. The
+# error carries the whole template's span.
 fn checked_seg(text: str, seg: Seg) -> Kind!str {
     if (text == "TODO") { err("TODO segment not allowed") } else { ok(tpl_kind(text, seg)) }
 }
@@ -1007,17 +1006,30 @@ fn rawtpl_kind(text: str, seg: Seg) -> Kind {
     }
 }
 
-// Test-block shorthands over the concrete `Kind` (each kind arm carries its own
-// content): an expected token, and a token-only result (no trivia).
-//
-// `tok` slices its text out of `src` — the same source the `lex` call under
-// test was given — rather than taking it as a literal. An expectation therefore
-// cannot claim text the source does not hold at that span, which is the one
-// thing a hand-written `SpanStr` could get wrong while still looking right.
+# Test-block shorthands over the concrete `Kind` (each kind arm carries its own
+# content): an expected token, and a token-only result (no trivia).
+#
+# `tok` slices its text out of `src` — the same source the `lex` call under
+# test was given — rather than taking it as a literal. An expectation therefore
+# cannot claim text the source does not hold at that span, which is the one
+# thing a hand-written `SpanStr` could get wrong while still looking right.
 fn tok(src: str, kind: Kind, span: Span) -> Token<Kind> { kind, text: span_str(src, span) }
 
 fn toks(tokens: Token<Kind>[]) -> LexResult<Kind> { tokens, trivia: [] }
 
+# Lexes `self` into a `LexResult`: the flat token list, plus the trivia
+# side-channel, as described by the ordered `rules`. At each position the
+# first rule whose matcher matches claims the token (so order is priority —
+# keywords before identifiers, floats before ints); a `skip: true` rule
+# consumes its match without producing anything (whitespace), and a
+# `trivia: true` rule records its matches in the side-channel instead of
+# the token stream (comments, lint markers). A `Template` rule emits
+# several tokens per literal — head/middle/tail segments around the tokens
+# of each `{...}` interpolation, which are lexed by this same rule set.
+# Lexing fails with
+# an `err` — a `LexError` carrying a message and the offending span — when
+# a byte matches no rule or a matcher sees invalid input outright (an
+# unterminated `Delimited` token).
 pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     mut tokens = [];
     mut trivia = [];
@@ -1034,21 +1046,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         set pos = step.end;
     }
     ok(LexResult { tokens, trivia })
-}.doc("""
-    Lexes `self` into a `LexResult`: the flat token list, plus the trivia
-    side-channel, as described by the ordered `rules`. At each position the
-    first rule whose matcher matches claims the token (so order is priority —
-    keywords before identifiers, floats before ints); a `skip: true` rule
-    consumes its match without producing anything (whitespace), and a
-    `trivia: true` rule records its matches in the side-channel instead of
-    the token stream (comments, lint markers). A `Template` rule emits
-    several tokens per literal — head/middle/tail segments around the tokens
-    of each `{...}` interpolation, which are lexed by this same rule set.
-    Lexing fails with
-    an `err` — a `LexError` carrying a message and the offending span — when
-    a byte matches no rule or a matcher sees invalid input outright (an
-    unterminated `Delimited` token).
-""").test({
+}.test({
     // Character classes shared across the rule sets below.
     let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";

@@ -1,0 +1,71 @@
+import { equal as ==, print, wrapping_add as + } from builtins;
+
+// A `# ..` block in front of a declaration is its documentation. It is ignored
+// by run/check/build (only `aipl doc` and `aipl docs` surface it) and attaches
+// to any declaration, not just a function — which is what `.doc("..")`, the
+// form it replaced, could not do.
+# Adds two integers and returns the sum.
+#
+# A bare `#` is a blank line, so a doc block can have paragraphs.
+pub fn add(a: i64, b: i64) -> i64 { a + b }.test({
+    assert(add(2, 3) == 5);
+    assert(add(-1, 1) == 0);
+})
+
+# A point in the plane.
+struct Point { x: i64, y: i64 }
+
+# Something or nothing.
+variant Maybe = Yes | No
+
+// `//` comments are untouched: only `#` documents, so the banner style below
+// still means nothing to the parser.
+fn undocumented(n: i64) -> i64 {
+    ////////////
+    // part 1 //
+    ////////////
+    n + n
+}
+
+fn main() !prints {
+    let p = Point { x: 1, y: 2 };
+    print(`sum {add(p.x, p.y)}`);
+    print(`doubled {undocumented(2)}`);
+    print(`yes {Yes == Maybe.Yes}`);
+}
+--- stdout ---
+sum 3
+doubled 4
+yes true
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 318
+instructions executed: 181
+binary size: 2672
+  code: 1212
+  data: 47
+  metadata: 1413
+functions:
+  __eq_Maybe:
+    calls: 1
+    bytes: 64
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_i64:
+    calls: 2
+    bytes: 204
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 712

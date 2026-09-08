@@ -62,10 +62,10 @@ import {
 import { is_operator_name } from "./is_operator_name.aipl";
 import { AiplTok, lex_aipl } from "./lex_aipl.aipl";
 
-// What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
-// `TokenKind` for an ordinary token, plus the three interpolated-template pieces,
-// which token *text* alone cannot distinguish — an empty segment's `TplMid` is
-// the single character `{`, identical to a brace.
+# What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
+# `TokenKind` for an ordinary token, plus the three interpolated-template pieces,
+# which token *text* alone cannot distinguish — an empty segment's `TplMid` is
+# the single character `{`, identical to a brace.
 variant FmtKind =
     | Keyword
     | Constant
@@ -84,13 +84,13 @@ variant FmtKind =
     // where a declaration is expected and nowhere else.
     | DocTok
 
-// One token: what it is, and where it sits in the source. The text is recovered
-// from the span (`src[span]`) rather than stored, exactly as the Rust walker
-// slices `&self.src[sp]` — so every literal, comment and paren stays verbatim.
+# One token: what it is, and where it sits in the source. The text is recovered
+# from the span (`src[span]`) rather than stored, exactly as the Rust walker
+# slices `&self.src[sp]` — so every literal, comment and paren stays verbatim.
 struct FmtTok { kind: FmtKind, span: Span }
 
-// The walker's whole state. `src`/`toks`/`comments` are the immutable inputs;
-// `pos`/`cpos`/`last_end` are the cursor the Rust version mutates in place.
+# The walker's whole state. `src`/`toks`/`comments` are the immutable inputs;
+# `pos`/`cpos`/`last_end` are the cursor the Rust version mutates in place.
 struct W {
     src: str,
     toks: FmtTok[],
@@ -104,18 +104,18 @@ struct W {
     last_end: u64,
 }
 
-// Cursor-advancing steps return the moved-on `W` beside their result.
+# Cursor-advancing steps return the moved-on `W` beside their result.
 struct WDoc { w: W, doc: Doc }
 
 struct WStr { w: W, text: str }
 
-// A step that produces *several* docs (a comma list's items, a run of type
-// suffixes) rather than one.
+# A step that produces *several* docs (a comma list's items, a run of type
+# suffixes) rather than one.
 struct WDocs { w: W, docs: Doc[] }
 
-// A formatter failure. Mirrors `lexer.aipl`'s `LexError`; the Rust walker's
-// span-less `Error::msg` case (past the last token) becomes a message carrying
-// "(at end of input)" with an empty span at EOF — see `err_here`.
+# A formatter failure. Mirrors `lexer.aipl`'s `LexError`; the Rust walker's
+# span-less `Error::msg` case (past the last token) becomes a message carrying
+# "(at end of input)" with an empty span at EOF — see `err_here`.
 struct FmtError { message: str, span: Span }
 
 fn new_walker(src: str, toks: FmtTok[], comments: Span[]) -> W {
@@ -237,36 +237,36 @@ fn new_walker(src: str, toks: FmtTok[], comments: Span[]) -> W {
 
 // ---------- token primitives ----------
 
-// The token at the cursor, or `none` past the end.
+# The token at the cursor, or `none` past the end.
 fn peek(self: W) -> FmtTok? { self.toks[self.pos] }
 
-// Source text of the token `n` past the cursor; `""` past the end. A `Span`
-// index is slice sugar, so `src[span]` is the token's verbatim text.
+# Source text of the token `n` past the cursor; `""` past the end. A `Span`
+# index is slice sugar, so `src[span]` is the token's verbatim text.
 fn peek_text_n(self: W, n: u64) -> str { self.tok_text(self.pos + n) }
 
 fn peek_text(self: W) -> str { self.peek_text_n(0) }
 
 fn at_end(self: W) -> bool { self.toks.len() <= self.pos }
 
-// Is there another item to read before the closing `end` token?
-//
-// **Use this for every "scan until a closing token" loop.** The bare form
-//
-//     while (w.peek_text() != "}") { .. }        // WRONG
-//
-// spins forever on truncated input: past the last token `peek_text()` is `""`,
-// which never equals `"}"`, and `bump()` deliberately does not advance at the
-// end (see its comment) — so the loop makes no progress and never exits. That
-// is not hypothetical; it hung `aipl check` on a truncated import with no
-// output and no diagnostic, which is indistinguishable from a compiler hang.
-//
-// Folding the `at_end` check in here means a caller cannot forget it. The
-// `expect(end)` that follows the loop then reports the missing token properly.
+# Is there another item to read before the closing `end` token?
+#
+# **Use this for every "scan until a closing token" loop.** The bare form
+#
+#     while (w.peek_text() != "}") { .. }        // WRONG
+#
+# spins forever on truncated input: past the last token `peek_text()` is `""`,
+# which never equals `"}"`, and `bump()` deliberately does not advance at the
+# end (see its comment) — so the loop makes no progress and never exits. That
+# is not hypothetical; it hung `aipl check` on a truncated import with no
+# output and no diagnostic, which is indistinguishable from a compiler hang.
+#
+# Folding the `at_end` check in here means a caller cannot forget it. The
+# `expect(end)` that follows the loop then reports the missing token properly.
 fn more_before(self: W, end: str) -> bool { !self.at_end() && self.peek_text() != end }
 
-// Consume the token at the cursor, returning its text. The caller has already
-// dispatched on it; comments before it must have been drained (else the final
-// not-carried check in the driver fails).
+# Consume the token at the cursor, returning its text. The caller has already
+# dispatched on it; comments before it must have been drained (else the final
+# not-carried check in the driver fails).
 fn bump(self: W) -> WStr {
     match (self.peek()) {
         some(t) => WStr {
@@ -280,7 +280,7 @@ fn bump(self: W) -> WStr {
     }
 }
 
-// Consume the next token, which must read exactly `want`.
+# Consume the next token, which must read exactly `want`.
 fn expect(self: W, want: str) -> WStr!FmtError {
     if (self.peek_text() == want) {
         ok(self.bump())
@@ -289,9 +289,9 @@ fn expect(self: W, want: str) -> WStr!FmtError {
     }
 }
 
-// An error at the cursor. Past the last token there is no span to point at, so
-// the message says so and the span collapses to EOF — the AIPL stand-in for the
-// Rust `Error::msg` (span-less) case.
+# An error at the cursor. Past the last token there is no span to point at, so
+# the message says so and the span collapses to EOF — the AIPL stand-in for the
+# Rust `Error::msg` (span-less) case.
 fn err_here(self: W, msg: str) -> FmtError {
     match (self.peek()) {
         some(t) => FmtError { message: msg, span: t.span },
@@ -304,8 +304,8 @@ fn err_here(self: W, msg: str) -> FmtError {
 
 // ---------- source gaps ----------
 
-// Where the next syntactic entity begins: the next comment or token, whichever
-// comes first. Past both, the end of the source.
+# Where the next syntactic entity begins: the next comment or token, whichever
+# comes first. Past both, the end of the source.
 fn next_start(self: W) -> u64 {
     let tok = match (self.peek()) {
         some(t) => t.span.start,
@@ -317,18 +317,18 @@ fn next_start(self: W) -> u64 {
     }
 }
 
-// Whether the source across a span holds a blank line (two newlines).
+# Whether the source across a span holds a blank line (two newlines).
 fn gap_has_blank(self: W, span: Span) -> bool { 2 <= self.src[span].count('\n') }
 
-// Whether a span's endpoints sit on the same source line.
+# Whether a span's endpoints sit on the same source line.
 fn same_line(self: W, span: Span) -> bool { !self.src[span].contains("\n") }
 
 // ---------- comments ----------
 
-// Drain the comments before the next token, each on its own line — so a
-// mid-list line comment forces the enclosing group to break (a comment can never
-// be flattened onto one line). A blank line *after* a comment is preserved: it
-// marks the comment as standalone rather than attached to what follows.
+# Drain the comments before the next token, each on its own line — so a
+# mid-list line comment forces the enclosing group to break (a comment can never
+# be flattened onto one line). A blank line *after* a comment is preserved: it
+# marks the comment as standalone rather than attached to what follows.
 fn lead(self: W) -> WDoc {
     // Past the last token every remaining comment is "before" it, which is what
     // flushes a file's trailing comments; `next_start` still bounds each gap.
@@ -359,12 +359,12 @@ fn lead_loop(w0: W, limit: u64, acc0: Doc[]) -> WDoc {
     WDoc { w, doc: Concat(acc) }
 }
 
-// A trailing comment on the same line as whatever just ended, rendered as
-// ` // ...` glued to the current line plus a `BreakParent`, so no group flattens
-// anything after it onto the comment's line. It must also come *before* the next
-// unconsumed token: a comment ending a source line whose earlier tokens are still
-// pending (e.g. after the `}` closing an inline block) belongs to a later flush
-// point, not this one.
+# A trailing comment on the same line as whatever just ended, rendered as
+# ` // ...` glued to the current line plus a `BreakParent`, so no group flattens
+# anything after it onto the comment's line. It must also come *before* the next
+# unconsumed token: a comment ending a source line whose earlier tokens are still
+# pending (e.g. after the `}` closing an inline block) belongs to a later flush
+# point, not this one.
 fn trailing_comment(self: W) -> WDoc {
     let next_tok = match (self.peek()) {
         some(t) => t.span.start,
@@ -383,17 +383,17 @@ fn trailing_comment(self: W) -> WDoc {
     }
 }
 
-// Consume comment `c`: step past it and mark it as the last thing emitted. The
-// Rust `pop_front` + `last_end` update, as one move.
+# Consume comment `c`: step past it and mark it as the last thing emitted. The
+# Rust `pop_front` + `last_end` update, as one move.
 fn take_comment(self: W, c: Span) -> W { ..self, cpos: self.cpos + 1, last_end: c.end }
 
 // ---------- comma lists ----------
 
-// The bracket pair (and flat-mode edge spacing) of a comma list. Braces that read
-// as words get inner spaces when flat (`{ a, b }`); the rest hug their contents
-// (`(a, b)`, `[a]`, `#{a}`, `<T: any>`). Type-position lists (`TyParens`,
-// `Angles`) take no trailing comma when broken — the grammar doesn't allow one
-// there.
+# The bracket pair (and flat-mode edge spacing) of a comma list. Braces that read
+# as words get inner spaces when flat (`{ a, b }`); the rest hug their contents
+# (`(a, b)`, `[a]`, `#{a}`, `<T: any>`). Type-position lists (`TyParens`,
+# `Angles`) take no trailing comma when broken — the grammar doesn't allow one
+# there.
 variant ListStyle =
     | Parens
     | Brackets
@@ -403,8 +403,8 @@ variant ListStyle =
     | TyParens
     | SpacedBracesNoTrailing
 
-// A style's brackets and the two layout bits, unpacked. The Rust version returns
-// a 4-tuple from a `match`; a struct names the bits at the use site.
+# A style's brackets and the two layout bits, unpacked. The Rust version returns
+# a 4-tuple from a `match`; a struct names the bits at the use site.
 struct ListShape { open: str, close: str, spaced: bool, trailing: bool }
 
 fn shape(self: ListStyle) -> ListShape {
@@ -427,9 +427,9 @@ fn shape(self: ListStyle) -> ListShape {
     }
 }
 
-// A bracketed comma list that either fits on one line or breaks to one item per
-// indented line with a trailing comma. Width decisions happen at print time, so
-// this only describes both layouts.
+# A bracketed comma list that either fits on one line or breaks to one item per
+# indented line with a trailing comma. Width decisions happen at print time, so
+# this only describes both layouts.
 fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
     let ListShape { open, close, spaced, trailing } = style.shape();
     if (items.is_empty()) {
@@ -448,14 +448,14 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
 
 // ---------- entry point ----------
 
-// Format `src` at `width`, from source text to laid-out source text: lex it,
-// walk the tokens into a `Doc`, then print. This is the whole formatter as far
-// as the Rust side is concerned — arrays cannot cross the FFI as arguments, so
-// the token stream is produced here rather than marshalled in.
-//
-// The caller still owns the surrounding steps that are not layout: splitting off
-// trailing `--- section ---` blocks, stripping trailing whitespace, validating
-// with the real parser, and the token-preservation check.
+# Format `src` at `width`, from source text to laid-out source text: lex it,
+# walk the tokens into a `Doc`, then print. This is the whole formatter as far
+# as the Rust side is concerned — arrays cannot cross the FFI as arguments, so
+# the token stream is produced here rather than marshalled in.
+#
+# The caller still owns the surrounding steps that are not layout: splitting off
+# trailing `--- section ---` blocks, stripping trailing whitespace, validating
+# with the real parser, and the token-preservation check.
 pub fn format_program(src: str, width: u64) -> str!FmtError {
     let lexed = lex_aipl(src).map_err(|e| FmtError { message: e.message, span: e.span })?; #[allow]
 
@@ -477,9 +477,9 @@ pub fn format_program(src: str, width: u64) -> str!FmtError {
     }
 }
 
-// A lexer token kind as the kind the walker dispatches on. The interpolated
-// template pieces (regular *or* raw) keep their head/middle/tail position, which
-// token text alone cannot recover; everything else folds to its syntactic class.
+# A lexer token kind as the kind the walker dispatches on. The interpolated
+# template pieces (regular *or* raw) keep their head/middle/tail position, which
+# token text alone cannot recover; everything else folds to its syntactic class.
 fn fmt_kind(k: AiplTok) -> FmtKind {
     match (k) {
         DocComment(..) => DocTok,
@@ -505,7 +505,7 @@ fn fmt_kind(k: AiplTok) -> FmtKind {
     }
 }
 
-// The lexically-identifier names the highlighter scopes as types.
+# The lexically-identifier names the highlighter scopes as types.
 fn is_builtin_type_name(n: str) -> bool {
     n == "bool" || n == "char" || n == "str" || n == "any" || n.is_int_type_name()
 }
@@ -516,7 +516,7 @@ fn is_int_type_name(self: str) -> bool {
 
 // ---------- small shared helpers ----------
 
-// Source text of token `i`; `""` past the end.
+# Source text of token `i`; `""` past the end.
 fn tok_text(self: W, i: u64) -> str {
     match (self.toks[i]) {
         some(t) => self.src[t.span],
@@ -524,26 +524,26 @@ fn tok_text(self: W, i: u64) -> str {
     }
 }
 
-// Whether the token at the cursor has kind `k`.
+# Whether the token at the cursor has kind `k`.
 fn peek_is(self: W, k: FmtKind) -> bool { self.peek_is_n(0, k) }
 
-// Whether the token `n` past the cursor has kind `k`.
+# Whether the token `n` past the cursor has kind `k`.
 fn peek_is_n(self: W, n: u64, k: FmtKind) -> bool {
     self.toks[self.pos + n].is_some_and(|t| t.kind == k)
 }
 
-// Whether an undrained comment sits before the token at the cursor.
+# Whether an undrained comment sits before the token at the cursor.
 fn comment_before_cursor(self: W) -> bool {
     self.comments[self.cpos].is_some_and(|c| self.peek().is_some_and(|t| c.start < t.span.start))
 }
 
-// Step past one token, recording where it ended. `bump` without the text.
+# Step past one token, recording where it ended. `bump` without the text.
 fn advance(self: W, end: u64) -> W { ..self, pos: self.pos + 1, last_end: end }
 
 fn skip_comment(self: W) -> W { ..self, cpos: self.cpos + 1 }
 
-// Whether `d` is the empty `Concat` that `lead`/`trailing_comment` hand back when
-// there was no comment — the "nothing here" doc.
+# Whether `d` is the empty `Concat` that `lead`/`trailing_comment` hand back when
+# there was no comment — the "nothing here" doc.
 fn is_empty_doc(self: Doc) -> bool {
     match (self) {
         Concat(ds) => ds.is_empty(),
@@ -556,14 +556,14 @@ fn is_empty_doc(self: Doc) -> bool {
     }
 }
 
-// Separator between block entries: nothing before the first, otherwise a hard
-// line — doubled when the source had a blank line there.
+# Separator between block entries: nothing before the first, otherwise a hard
+# line — doubled when the source had a blank line there.
 fn sep_entry(blank: bool, not_first: bool) -> Doc {
     if (!not_first) { Concat([]) } else { if (blank) { BlankLine } else { HardLine } }
 }
 
-// Drop a trailing `HardLine`/`BlankLine` from a `Concat` — the line break `lead`
-// leaves dangling when the closing `}` follows and supplies its own.
+# Drop a trailing `HardLine`/`BlankLine` from a `Concat` — the line break `lead`
+# leaves dangling when the closing `}` follows and supplies its own.
 fn without_trailing_break(self: Doc) -> Doc {
     match (self) {
         Concat(ds) => Concat(ds.drop_trailing_break()),
@@ -584,7 +584,7 @@ fn drop_trailing_break(self: Doc[]) -> Doc[] {
     if (self[n - 1].value_or(Concat([])).is_line_break()) { self[..n - 1] } else { self }
 }
 
-// A break `lead` may have left at the end of its docs.
+# A break `lead` may have left at the end of its docs.
 fn is_line_break(self: Doc) -> bool {
     match (self) {
         HardLine | BlankLine => true,
@@ -598,8 +598,8 @@ fn is_line_break(self: Doc) -> bool {
     }
 }
 
-// Replace the last element of `self` — how the block builder rewrites the entry
-// it just pushed (AIPL has no `last_mut`).
+# Replace the last element of `self` — how the block builder rewrites the entry
+# it just pushed (AIPL has no `last_mut`).
 fn with_last(self: Doc[], d: Doc) -> Doc[] {
     let n = self.len();
     if (n == 0) {
@@ -610,16 +610,16 @@ fn with_last(self: Doc[], d: Doc) -> Doc[] {
 
 // ---------- imports ----------
 
-// One import, plus the key `program` will order it by.
+# One import, plus the key `program` will order it by.
 struct WImport { w: W, source: str, doc: Doc }
 
-// One imported name: what it sorts by, and how it is spelled in the output.
+# One imported name: what it sorts by, and how it is spelled in the output.
 struct ImportName { name: str, rendered: str }
 
 struct WKeys { w: W, names: ImportName[] }
 
-// `import { a, b as c } from "path";` — the imported names sorted, the statement
-// rendered, and the hoist key.
+# `import { a, b as c } from "path";` — the imported names sorted, the statement
+# rendered, and the hoist key.
 fn import_item(self: W) -> WImport!FmtError {
     let names = self.expect("import")?.w.expect("{")?.w.import_names([])?;
     let src = names.w.expect("}")?.w.expect("from")?.w.bump();
@@ -648,17 +648,17 @@ fn import_names(self: W, acc0: ImportName[]) -> WKeys!FmtError {
     ok(WKeys { w, names: acc })
 }
 
-// `name as alias` — the spelling written when an import is renamed.
+# `name as alias` — the spelling written when an import is renamed.
 fn import_alias(self: W, first: str) -> WStr {
     let WStr { w, text } = self.bump().w.bump();
     WStr { w, text: `{first} as {text}` }
 }
 
-// Plain names first, operators last; within each group, ordinary `str` order on
-// the *imported* name — the one to the left of an `as` — so `wrapping_add as +`
-// sorts under `w`, next to the function it actually imports, rather than among
-// the operator spellings. A comparator states that directly, so nothing has to
-// be packed into a sort key.
+# Plain names first, operators last; within each group, ordinary `str` order on
+# the *imported* name — the one to the left of an `as` — so `wrapping_add as +`
+# sorts under `w`, next to the function it actually imports, rather than among
+# the operator spellings. A comparator states that directly, so nothing has to
+# be packed into a sort key.
 fn import_name_precedes(a: str, b: str) -> bool {
     let a_op = a.is_operator_name();
     if (a_op != b.is_operator_name()) { !a_op } else { a < b }
@@ -668,9 +668,9 @@ fn sorted_import_names(names: ImportName[]) -> Doc[] {
     names.sort_by(|a, b| import_name_precedes(a.name, b.name)).map(|n| Text(n.rendered))
 }
 
-// What `program` orders imports by: `builtins` ahead of every path import, then
-// paths in ordinary `str` order. Like the name ordering above, a comparator
-// states this directly rather than packing a bucket digit into a sort key.
+# What `program` orders imports by: `builtins` ahead of every path import, then
+# paths in ordinary `str` order. Like the name ordering above, a comparator
+# states this directly rather than packing a bucket digit into a sort key.
 fn import_source_precedes(a: str, b: str) -> bool {
     let a_builtins = a == "builtins";
     if (a_builtins != (b == "builtins")) { a_builtins } else { a < b }
@@ -678,9 +678,9 @@ fn import_source_precedes(a: str, b: str) -> bool {
 
 // ---------- types ----------
 
-// A type. Handles the three shapes the grammar allows at this level: a bare `!E`
-// void-ok result, a parenthesized function/tuple type, and a base type optionally
-// followed by `!E`.
+# A type. Handles the three shapes the grammar allows at this level: a bare `!E`
+# void-ok result, a parenthesized function/tuple type, and a base type optionally
+# followed by `!E`.
 fn ty(self: W) -> WDoc!FmtError {
     if (self.peek_text() == "!") {
         let inner = self.bump().w.base_ty()?;
@@ -697,9 +697,9 @@ fn ty(self: W) -> WDoc!FmtError {
     ok(base)
 }
 
-// `(A, B) -> R` (function type), `(A, B)` (tuple), `(A, B)[]` (tuple array), or
-// `(A, B)!E` (a result with a tuple Ok payload). Which one is only known after
-// the closing paren.
+# `(A, B) -> R` (function type), `(A, B)` (tuple), `(A, B)[]` (tuple array), or
+# `(A, B)!E` (a result with a tuple Ok payload). Which one is only known after
+# the closing paren.
 fn paren_ty(self: W) -> WDoc!FmtError {
     let args = self.bump().w.ty_list(")", [])?;
     let closed = args.w.expect(")")?.w;
@@ -719,7 +719,7 @@ fn paren_ty(self: W) -> WDoc!FmtError {
     ok(WDoc { w: arrs.w, doc: Concat([list, ..arrs.docs]) })
 }
 
-// Comma-separated types up to (not consuming) `end`.
+# Comma-separated types up to (not consuming) `end`.
 fn ty_list(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
@@ -731,15 +731,15 @@ fn ty_list(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     ok(WDocs { w, docs: acc })
 }
 
-// A base type — a set/dict `#{..}` or a (possibly generic) name — plus any run of
-// `?` / `[]` suffixes.
+# A base type — a set/dict `#{..}` or a (possibly generic) name — plus any run of
+# `?` / `[]` suffixes.
 fn base_ty(self: W) -> WDoc!FmtError {
     let head = if (self.peek_text() == "#") { self.set_or_dict_ty()? } else { self.named_ty()? };
     let suf = head.w.type_suffixes([]);
     ok(WDoc { w: suf.w, doc: Concat([head.doc, ..suf.docs]) })
 }
 
-// `#{T}` (set) or `#{K: V}` (dict) — the `:` decides which.
+# `#{T}` (set) or `#{K: V}` (dict) — the `:` decides which.
 fn set_or_dict_ty(self: W) -> WDoc!FmtError {
     let k = self.bump().w.expect("{")?.w.ty()?;
     let rest = if (k.w.peek_text() == ":") {
@@ -751,14 +751,14 @@ fn set_or_dict_ty(self: W) -> WDoc!FmtError {
     ok(WDoc { w: closed, doc: Concat([Text("#{"), k.doc, ..rest.docs, Text("}")]) })
 }
 
-// The `: V` half of a dict type.
+# The `: V` half of a dict type.
 fn dict_value_ty(self: W) -> WDocs!FmtError {
     let WDoc { w, doc } = self.bump().w.ty()?;
     ok(WDocs { w, docs: [Text(": "), doc] })
 }
 
-// A type name, plus `<A, B>` type arguments when applied. In type position `<`/`>`
-// are unambiguously the argument brackets.
+# A type name, plus `<A, B>` type arguments when applied. In type position `<`/`>`
+# are unambiguously the argument brackets.
 fn named_ty(self: W) -> WDoc!FmtError {
     let n = self.bump();
     if (n.w.peek_text() != "<") {
@@ -769,7 +769,7 @@ fn named_ty(self: W) -> WDoc!FmtError {
     ok(WDoc { w: closed, doc: Concat([Text(n.text), comma_list_docs(args.docs, Angles)]) })
 }
 
-// A run of `?` (optional) and `[]` (array) suffixes, in source order.
+# A run of `?` (optional) and `[]` (array) suffixes, in source order.
 fn type_suffixes(self: W, acc0: Doc[]) -> WDocs {
     mut w = self;
     mut acc = acc0;
@@ -790,7 +790,7 @@ fn type_suffixes(self: W, acc0: Doc[]) -> WDocs {
     WDocs { w, docs: acc }
 }
 
-// A run of `[]` alone — what may follow a parenthesized tuple type.
+# A run of `[]` alone — what may follow a parenthesized tuple type.
 fn array_suffixes(self: W, acc0: Doc[]) -> WDocs {
     mut w = self;
     mut acc = acc0;
@@ -803,10 +803,10 @@ fn array_suffixes(self: W, acc0: Doc[]) -> WDocs {
 
 // ---------- type parameters ----------
 
-// A `<T, U: ord>` type-parameter list, or an empty `Text` when the declaration has
-// none. (The Rust version returns `Option<Doc>` and every caller unwraps it to an
-// empty text, so this collapses the two.) A bound is optional — bare `T` prints
-// as-is, `T: ord` keeps its bound. Shared by `fn`, `struct` and `variant`.
+# A `<T, U: ord>` type-parameter list, or an empty `Text` when the declaration has
+# none. (The Rust version returns `Option<Doc>` and every caller unwraps it to an
+# empty text, so this collapses the two.) A bound is optional — bare `T` prints
+# as-is, `T: ord` keeps its bound. Shared by `fn`, `struct` and `variant`.
 fn type_params(self: W) -> WDoc!FmtError {
     if (self.peek_text() != "<") {
         return ok(WDoc { w: self, doc: Text("") });
@@ -832,7 +832,7 @@ fn type_param_list(self: W, acc0: Doc[]) -> WDocs {
     WDocs { w, docs: acc }
 }
 
-// `T: ord` — the `: bound` half of a type parameter.
+# `T: ord` — the `: bound` half of a type parameter.
 fn param_bound(self: W, name: str) -> WDoc {
     let WStr { w, text } = self.bump().w.bump();
     WDoc { w, doc: Text(`{name}: {text}`) }
@@ -840,15 +840,15 @@ fn param_bound(self: W, name: str) -> WDoc {
 
 // ---------- variant ----------
 
-// One variant case: its leading comments (rendered above it) and the case itself.
+# One variant case: its leading comments (rendered above it) and the case itself.
 struct VCase { lead: Doc, body: Doc }
 
 struct WCases { w: W, cases: VCase[] }
 
-// `variant V = A | B(i64)`. Flat when it fits; broken to one case per line with a
-// leading `| ` — including the first case, so every case aligns under one `|`.
-// A case's leading comment sits above it and, being a hard line, forces the
-// broken layout.
+# `variant V = A | B(i64)`. Flat when it fits; broken to one case per line with a
+# leading `| ` — including the first case, so every case aligns under one `|`.
+# A case's leading comment sits above it and, being a hard line, forces the
+# broken layout.
 fn variant_item(self: W) -> WDoc!FmtError {
     let n = self.expect("variant")?.w.bump();
     let tps = n.w.type_params()?;
@@ -872,8 +872,8 @@ fn variant_item(self: W) -> WDoc!FmtError {
     })
 }
 
-// Each case carries its own leading comments and any same-line trailing comment,
-// so a comment written between two arms stays between them.
+# Each case carries its own leading comments and any same-line trailing comment,
+# so a comment written between two arms stays between them.
 fn variant_cases(self: W, acc0: VCase[]) -> WCases!FmtError {
     mut w = self;
     mut acc = acc0;
@@ -898,17 +898,17 @@ fn variant_cases(self: W, acc0: VCase[]) -> WCases!FmtError {
     ok(WCases { w, cases: acc })
 }
 
-// A case's payload: `(A, B)`, `(r: i64)`, or `(r: i64 = 1)`.
+# A case's payload: `(A, B)`, `(r: i64)`, or `(r: i64 = 1)`.
 fn variant_payload(self: W) -> WDoc!FmtError {
     let WDocs { w, docs } = self.bump().w.case_params([])?;
     let closed = w.expect(")")?.w;
     ok(WDoc { w: closed, doc: comma_list_docs(docs, TyParens) })
 }
 
-// The payload slots, up to (not consuming) the closing `)`. A slot is named when
-// an identifier is followed by `:` — the same two-token look the grammar takes,
-// and the only place a `:` can sit second in a type is a dict's `#{K: V}`, which
-// starts with `#`. A named slot may carry a default, spaced like a parameter's.
+# The payload slots, up to (not consuming) the closing `)`. A slot is named when
+# an identifier is followed by `:` — the same two-token look the grammar takes,
+# and the only place a `:` can sit second in a type is a dict's `#{K: V}`, which
+# starts with `#`. A named slot may carry a default, spaced like a parameter's.
 fn case_params(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
@@ -928,10 +928,10 @@ fn case_params(self: W, acc0: Doc[]) -> WDocs!FmtError {
     ok(WDocs { w, docs: acc })
 }
 
-// The cases laid out: the first sits inline after `=`; each later one is preceded
-// by a `Line` and its `| ` separator, with its leading comments above it. The
-// first case's `| ` is an `IfBroken`, so it appears only in the broken layout —
-// the same normalization a list's trailing comma gets, just at the other end.
+# The cases laid out: the first sits inline after `=`; each later one is preceded
+# by a `Line` and its `| ` separator, with its leading comments above it. The
+# first case's `| ` is an `IfBroken`, so it appears only in the broken layout —
+# the same normalization a list's trailing comma gets, just at the other end.
 fn variant_body(cases: VCase[]) -> Doc[] {
     mut out = [];
     for (let i, c : cases) {
@@ -951,12 +951,12 @@ fn variant_body(cases: VCase[]) -> Doc[] {
 
 // ---------- program & items ----------
 
-// One hoisted import: the statement, and the key `program` orders it by.
+# One hoisted import: the statement, and the key `program` orders it by.
 struct ImportEntry { source: str, doc: Doc }
 
 struct WProgram { w: W, imports: ImportEntry[], items: Doc[] }
 
-// A whole file: header comments, then the hoisted imports, then the items.
+# A whole file: header comments, then the hoisted imports, then the items.
 fn program(self: W) -> WDoc!FmtError {
     // File-header comments (before the first item) stay at the very top, even
     // though the imports below may be reordered. That is exactly what `lead`
@@ -1005,8 +1005,8 @@ fn program_items(self: W, imports0: ImportEntry[], items0: Doc[]) -> WProgram!Fm
     ok(WProgram { w, imports, items })
 }
 
-// The imports in hoist order. Two imports from the same source share a key;
-// `sort_by` is stable, so they stay in source order.
+# The imports in hoist order. Two imports from the same source share a key;
+# `sort_by` is stable, so they stay in source order.
 fn sorted_imports(entries: ImportEntry[]) -> Doc[] {
     entries.sort_by(|a, b| import_source_precedes(a.source, b.source)).map(|e| e.doc)
 }
@@ -1062,19 +1062,19 @@ fn fn_item(self: W) -> WDoc!FmtError {
     ok(WDoc { w: attrs.w, doc: Concat(attrs.docs) })
 }
 
-// A function body: an ordinary statement block, or the *struct-literal
-// shorthand* `{ field: value, .. }`, which names no type because the declared
-// return type supplies it. The shorthand is laid out like the struct literal it
-// stands for — flat while it fits — not like a block, which always breaks.
-//
-// `{ x }` stays a block returning `x`, so the shorthand is recognized by the
-// token *after* the first one: neither `IDENT :` nor `IDENT ,` can begin a
-// statement, and no other body shape puts `:` or `,` in that position (a tuple
-// or array literal leads with `(`/`[`, a call's comma sits past its `(`). That
-// is the grammar's own rule, so testing the following token alone keeps the two
-// parsers in step — testing the field name's *kind* would not, since a field
-// may be named `str`, which the formatter classifies as a builtin type rather
-// than an identifier.
+# A function body: an ordinary statement block, or the *struct-literal
+# shorthand* `{ field: value, .. }`, which names no type because the declared
+# return type supplies it. The shorthand is laid out like the struct literal it
+# stands for — flat while it fits — not like a block, which always breaks.
+#
+# `{ x }` stays a block returning `x`, so the shorthand is recognized by the
+# token *after* the first one: neither `IDENT :` nor `IDENT ,` can begin a
+# statement, and no other body shape puts `:` or `,` in that position (a tuple
+# or array literal leads with `(`/`[`, a call's comma sits past its `(`). That
+# is the grammar's own rule, so testing the following token alone keeps the two
+# parsers in step — testing the field name's *kind* would not, since a field
+# may be named `str`, which the formatter classifies as a builtin type rather
+# than an identifier.
 fn fn_body(self: W) -> WDoc!FmtError {
     if (self.peek_text() != "{") {
         return self.block();
@@ -1093,16 +1093,16 @@ fn fn_body(self: W) -> WDoc!FmtError {
     self.block()
 }
 
-// The shorthand body's field list, entered with the `{` already consumed.
-// Mirrors `struct_atom` without the leading type name.
-//
-// One wrinkle the ordinary struct literal doesn't have: in `{ id, }` — a single
-// *shorthand* field — the comma is **syntax, not style**. Drop it and `{ id }`
-// reads back as a block whose value is `id`, so formatting would change what the
-// source means. `comma_list_docs` writes a trailing comma only when the list
-// breaks (`IfBroken`), which is not enough here, so that comma is written into
-// the item itself and the style's own one switched off. Every other shape
-// already carries a comma or a colon between the braces and formats as usual.
+# The shorthand body's field list, entered with the `{` already consumed.
+# Mirrors `struct_atom` without the leading type name.
+#
+# One wrinkle the ordinary struct literal doesn't have: in `{ id, }` — a single
+# *shorthand* field — the comma is **syntax, not style**. Drop it and `{ id }`
+# reads back as a block whose value is `id`, so formatting would change what the
+# source means. `comma_list_docs` writes a trailing comma only when the list
+# breaks (`IfBroken`), which is not enough here, so that comma is written into
+# the item itself and the style's own one switched off. Every other shape
+# already carries a comma or a colon between the braces and formats as usual.
 fn construct_body(self: W) -> WDoc!FmtError {
     let lone_shorthand = self.peek_text_n(1) == "," && self.peek_text_n(2) == "}";
     let WDocs { w, docs } = self.struct_inits([])?;
@@ -1117,7 +1117,7 @@ fn construct_body(self: W) -> WDoc!FmtError {
     ok(WDoc { w: closed, doc: comma_list_docs(docs, SpacedBraces) })
 }
 
-// `!prints`, `!reads`, … — a run of effect annotations after the parameters.
+# `!prints`, `!reads`, … — a run of effect annotations after the parameters.
 fn fn_effects(self: W, acc0: Doc[]) -> WDocs {
     mut w = self;
     mut acc = acc0;
@@ -1134,8 +1134,8 @@ fn fn_return(self: W, acc: Doc[]) -> WDocs!FmtError {
     ok(WDocs { w, docs: [..acc, Text(" -> "), doc] })
 }
 
-// `.test({ .. })` / `.doc("..")` attributes, glued to the closing brace the way
-// the corpus writes them.
+# `.test({ .. })` attributes, glued to the closing brace the way the corpus
+# writes them.
 fn fn_attrs(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
@@ -1143,8 +1143,12 @@ fn fn_attrs(self: W, acc0: Doc[]) -> WDocs!FmtError {
         let a = w.bump().w.bump();
         let opened = a.w.expect("(")?.w;
 
-        // A `.test` body is a block; a `.doc` argument is its string verbatim —
-        // a `"""` raw block aligns its closing delimiter under the opening one.
+        // A `.test` body is a block. The string-argument form is not valid
+        // AIPL — `.doc("..")` was retired in favour of `# ..` doc comments —
+        // but the parser still accepts it in order to *refuse* it by name, so
+        // the formatter lays it out rather than erroring first and burying the
+        // better diagnostic. A `"""` raw block aligns its closing delimiter
+        // under the opening one.
         let arg = if (opened.peek_text() == "{") {
             opened.block()?
         } else {
@@ -1158,7 +1162,7 @@ fn fn_attrs(self: W, acc0: Doc[]) -> WDocs!FmtError {
     ok(WDocs { w, docs: acc })
 }
 
-// Parameters of a fn declaration, up to (not consuming) `end`.
+# Parameters of a fn declaration, up to (not consuming) `end`.
 fn params_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
@@ -1234,20 +1238,20 @@ fn struct_fields(self: W, acc0: Doc[]) -> WDocs!FmtError {
 
 // ---------- blocks & statements ----------
 
-// A block's entries, plus the offset the next blank-line decision measures from.
+# A block's entries, plus the offset the next blank-line decision measures from.
 struct WEntries { w: W, entries: Doc[], prev_end: u64 }
 
-// A `{ .. }` block as its own independently-breaking group.
+# A `{ .. }` block as its own independently-breaking group.
 fn block(self: W) -> WDoc!FmtError {
     let WDoc { w, doc } = self.block_layout()?;
     ok(WDoc { w, doc: group(doc) })
 }
 
-// A `{ .. }` block: statements (`;`-terminated) plus an optional trailing
-// expression. `{}` when empty, `{ expr }` when a lone trailing expression fits,
-// one statement per line otherwise. *Not* wrapped in a group, so a caller can
-// place several blocks under one shared group (an `if`/`else` breaks both
-// branches together) — `block` is the grouped form.
+# A `{ .. }` block: statements (`;`-terminated) plus an optional trailing
+# expression. `{}` when empty, `{ expr }` when a lone trailing expression fits,
+# one statement per line otherwise. *Not* wrapped in a group, so a caller can
+# place several blocks under one shared group (an `if`/`else` breaks both
+# branches together) — `block` is the grouped form.
 fn block_layout(self: W) -> WDoc!FmtError {
     let opened = self.expect("{")?.w;
     let body_start = opened.pos;
@@ -1269,10 +1273,10 @@ fn block_layout(self: W) -> WDoc!FmtError {
     })
 }
 
-// A loop rather than recursion: the depth would otherwise be one frame per
-// statement, and AIPL frames are large enough (structs by value, plus a stack
-// slot per composite temporary) that a big function body exhausts the native
-// stack. The same reasoning applies to `program_items`.
+# A loop rather than recursion: the depth would otherwise be one frame per
+# statement, and AIPL frames are large enough (structs by value, plus a stack
+# slot per composite temporary) that a big function body exhausts the native
+# stack. The same reasoning applies to `program_items`.
 fn block_entries(self: W, entries0: Doc[], prev_end0: u64) -> WEntries!FmtError {
     mut w = self;
     mut entries = entries0;
@@ -1324,9 +1328,9 @@ fn trim_last_break(self: Doc[]) -> Doc[] {
     self.with_last(self[n - 1].value_or(Concat([])).without_trailing_break())
 }
 
-// Whether any token in `[lo, hi)` is a `;`. A loop, not recursion: this scans
-// every token of a block, so on a large one the recursive form ran the native
-// stack out (AIPL does not guarantee tail-call elimination).
+# Whether any token in `[lo, hi)` is a `;`. A loop, not recursion: this scans
+# every token of a block, so on a large one the recursive form ran the native
+# stack out (AIPL does not guarantee tail-call elimination).
 fn range_has_semi(self: W, span: Span) -> bool {
     mut i = span.start;
     while (i < span.end) {
@@ -1338,7 +1342,7 @@ fn range_has_semi(self: W, span: Span) -> bool {
     false
 }
 
-// One statement (consuming its `;`) or the block's trailing expression.
+# One statement (consuming its `;`) or the block's trailing expression.
 fn statement(self: W) -> WDoc!FmtError {
     let t = self.peek_text();
     if (t == "let") {
@@ -1369,7 +1373,7 @@ fn statement(self: W) -> WDoc!FmtError {
     ok(WDoc { w: e.w.bump().w, doc: Concat([e.doc, Text(";")]) })
 }
 
-// `let x = e;`, `let x: T = e;`, `let (a, b) = e;`, or `let Name { a, b } = e;`.
+# `let x = e;`, `let x: T = e;`, `let (a, b) = e;`, or `let Name { a, b } = e;`.
 fn let_stmt(self: W) -> WDoc!FmtError {
     let kw = self.bump().w;
     if (kw.peek_text() == "(") {
@@ -1391,7 +1395,7 @@ fn let_stmt(self: W) -> WDoc!FmtError {
     ok(WDoc { w: done, doc: Concat([Text(`let {n.text}`), a.doc, Text(" = "), v.doc, Text(";")]) })
 }
 
-// `mut x = e;`, `mut x: T = e;`, or `mut Name { a, b } = e;`.
+# `mut x = e;`, `mut x: T = e;`, or `mut Name { a, b } = e;`.
 fn mut_stmt(self: W) -> WDoc!FmtError {
     let n = self.bump().w.bump();
     if (n.w.peek_text() == "{") {
@@ -1403,10 +1407,10 @@ fn mut_stmt(self: W) -> WDoc!FmtError {
     ok(WDoc { w: done, doc: Concat([Text(`mut {n.text}`), a.doc, Text(" = "), v.doc, Text(";")]) })
 }
 
-// The tail of a struct-destructuring statement, entered on the `{`: `kw` is the
-// leading keyword and `name` the struct the pattern names. `let` and `mut`
-// differ only in that keyword, so they share this rather than spelling the same
-// walk twice.
+# The tail of a struct-destructuring statement, entered on the `{`: `kw` is the
+# leading keyword and `name` the struct the pattern names. `let` and `mut`
+# differ only in that keyword, so they share this rather than spelling the same
+# walk twice.
 fn struct_pattern(self: W, kw: str, name: str) -> WDoc!FmtError {
     let ids = self.bump().w.ident_list("}", []);
     let v = ids.w.expect("}")?.w.expect("=")?.w.expr()?;
@@ -1428,9 +1432,9 @@ fn struct_pattern(self: W, kw: str, name: str) -> WDoc!FmtError {
     );
 })
 
-// The optional `: T` on a `let`/`mut` binding, rendered as `": T"` (empty when
-// absent). Positioned after the name and before the `=`, so both callers can
-// splice it in unconditionally.
+# The optional `: T` on a `let`/`mut` binding, rendered as `": T"` (empty when
+# absent). Positioned after the name and before the `=`, so both callers can
+# splice it in unconditionally.
 fn binding_ann(self: W) -> WDoc!FmtError {
     if (self.peek_text() != ":") {
         return ok(WDoc { w: self, doc: Text("") });
@@ -1447,8 +1451,8 @@ fn binding_ann(self: W) -> WDoc!FmtError {
     assert(walker_of("= 1 ;").binding_ann().rendered(100)? == "");
 })
 
-// The compound-assignment operators. Each stands where a `=` would and is
-// spaced like one, so `set_stmt` renders them all the same way.
+# The compound-assignment operators. Each stands where a `=` would and is
+# spaced like one, so `set_stmt` renders them all the same way.
 fn is_compound_assign(self: str) -> bool {
     match (self) {
         "+=" | "-=" | "*=" | "/=" => true,
@@ -1456,8 +1460,8 @@ fn is_compound_assign(self: str) -> bool {
     }
 }
 
-// The step-by-one operators. Each stands where a whole `= e` would, so
-// `set_stmt` renders them the same way: glued to the binding, then the `;`.
+# The step-by-one operators. Each stands where a whole `= e` would, so
+# `set_stmt` renders them the same way: glued to the binding, then the `;`.
 fn is_step_by_one(self: str) -> bool {
     match (self) {
         "++" | "--" => true,
@@ -1465,9 +1469,9 @@ fn is_step_by_one(self: str) -> bool {
     }
 }
 
-// `set n = e;`, `set n++;`, `set n--;`, `set n += e;` (and the other three
-// compound assignments), `set recv.f.g = e;`, or the writeback form
-// `set recv.method(args);`.
+# `set n = e;`, `set n++;`, `set n--;`, `set n += e;` (and the other three
+# compound assignments), `set recv.f.g = e;`, or the writeback form
+# `set recv.method(args);`.
 fn set_stmt(self: W) -> WDoc!FmtError {
     let n = self.bump().w.bump();
     let step = n.w.peek_text();
@@ -1492,8 +1496,8 @@ fn set_stmt(self: W) -> WDoc!FmtError {
     ok(WDoc { w: done, doc: Concat([Text(`set {n.text} = `), v.doc, Text(";")]) })
 }
 
-// After `set recv`, a `.`-led path: the token after the last member (`(` vs `=`)
-// picks between a mutating-method writeback and a field assignment.
+# After `set recv`, a `.`-led path: the token after the last member (`(` vs `=`)
+# picks between a mutating-method writeback and a field assignment.
 fn set_member(self: W, name: str) -> WDoc!FmtError {
     let p = self.member_path(name);
     if (p.w.peek_text() == "=") {
@@ -1563,8 +1567,8 @@ fn while_stmt(self: W) -> WDoc!FmtError {
     ok(WDoc { w: body.w, doc: Concat([Text("while ("), cond.doc, Text(") "), body.doc]) })
 }
 
-// A bare comma-separated identifier list up to (not consuming) `end` — binder
-// names and constructor-pattern bindings, which are names rather than types.
+# A bare comma-separated identifier list up to (not consuming) `end` — binder
+# names and constructor-pattern bindings, which are names rather than types.
 struct WNames { w: W, names: str[] }
 
 fn ident_list(self: W, end: str, acc0: str[]) -> WNames {
@@ -1580,18 +1584,18 @@ fn ident_list(self: W, end: str, acc0: str[]) -> WNames {
 
 // ---------- expressions ----------
 
-// One postfix segment, tagged so a long chain can break before each *call*
-// rather than exploding an inner argument list.
+# One postfix segment, tagged so a long chain can break before each *call*
+# rather than exploding an inner argument list.
 struct Seg { is_call: bool, doc: Doc }
 
 struct WSegs { w: W, segs: Seg[] }
 
 struct WSeg { w: W, seg: Seg }
 
-// `a..b` — range construction, spelled tight like the slice forms. A `..`
-// directly followed by `]` is the open-ended slice postfix instead, left for the
-// bracket code in `postfix`. Left-assoc, mirroring the grammar (`a..b..c` parses,
-// even though it can only fail the type check later).
+# `a..b` — range construction, spelled tight like the slice forms. A `..`
+# directly followed by `]` is the open-ended slice postfix instead, left for the
+# bracket code in `postfix`. Left-assoc, mirroring the grammar (`a..b..c` parses,
+# even though it can only fail the type check later).
 fn expr(self: W) -> WDoc!FmtError {
     let WDoc { w, doc } = self.binop_expr()?;
     w.range_tail(doc)
@@ -1707,8 +1711,8 @@ fn postfix_segs(self: W, acc0: Seg[]) -> WSegs!FmtError {
     ok(WSegs { w, segs: acc })
 }
 
-// `.member` or `.method(args)` — field access glues to its left; a call is
-// tagged so the chain layout can break before it.
+# `.member` or `.method(args)` — field access glues to its left; a call is
+# tagged so the chain layout can break before it.
 fn dot_seg(self: W) -> WSeg!FmtError {
     let m = self.bump().w.bump();
     if (m.w.peek_text() != "(") {
@@ -1723,7 +1727,7 @@ fn dot_seg(self: W) -> WSeg!FmtError {
     })
 }
 
-// `[i]`, `[a..b]`, `[a..]`, `[..b]` — indexing and the slice forms.
+# `[i]`, `[a..b]`, `[a..]`, `[..b]` — indexing and the slice forms.
 fn index_seg(self: W) -> WSeg!FmtError {
     let opened = self.bump().w;
     let WDocs { w, docs } = if (opened.peek_text() == "..") {
@@ -1735,13 +1739,13 @@ fn index_seg(self: W) -> WSeg!FmtError {
     ok(WSeg { w: closed, seg: Seg { is_call: false, doc: Concat([Text("["), ..docs, Text("]")]) } })
 }
 
-// `[..b]` — open-ended on the left.
+# `[..b]` — open-ended on the left.
 fn slice_to(self: W) -> WDocs!FmtError {
     let WDoc { w, doc } = self.bump().w.expr()?;
     ok(WDocs { w, docs: [Text(".."), doc] })
 }
 
-// `[i]`, `[a..b]`, or `[a..]`.
+# `[i]`, `[a..b]`, or `[a..]`.
 fn index_or_from(self: W) -> WDocs!FmtError {
     let a = self.expr()?;
     if (a.w.peek_text() != "..") {
@@ -1765,8 +1769,8 @@ fn call_count(segs: Seg[]) -> u64 {
     n
 }
 
-// The chain layout: a `SoftLine` before every call segment, so a break puts each
-// `.method(..)` on its own line while field access stays glued.
+# The chain layout: a `SoftLine` before every call segment, so a break puts each
+# `.method(..)` on its own line while field access stays glued.
 fn chain_docs(segs: Seg[]) -> Doc[] {
     mut out = [];
     for (let s : segs) {
@@ -1821,14 +1825,14 @@ fn atom(self: W) -> WDoc!FmtError {
     self.name_atom()
 }
 
-// A `"""..."""` raw string is a `RawBlock` so its closing delimiter aligns under
-// the opening one; a plain `"..."` string is ordinary verbatim text.
+# A `"""..."""` raw string is a `RawBlock` so its closing delimiter aligns under
+# the opening one; a plain `"..."` string is ordinary verbatim text.
 fn str_atom(self: WStr) -> WDoc {
     let d = if (self.text.starts_with(`"""`)) { RawBlock(self.text) } else { Text(self.text) };
     WDoc { w: self.w, doc: d }
 }
 
-// `(e)` — a parenthesized expression, or a tuple literal when a comma follows.
+# `(e)` — a parenthesized expression, or a tuple literal when a comma follows.
 fn paren_atom(self: W) -> WDoc!FmtError {
     let first = self.bump().w.expr()?;
     if (first.w.peek_text() != ",") {
@@ -1864,7 +1868,7 @@ fn array_atom(self: W) -> WDoc!FmtError {
     ok(WDoc { w: closed, doc: comma_list_docs(docs, Brackets) })
 }
 
-// `#{a, b}` (set) / `#{k: v}` (dict), and the empty-dict spelling `#{:}`.
+# `#{a, b}` (set) / `#{k: v}` (dict), and the empty-dict spelling `#{:}`.
 fn set_or_dict_atom(self: W) -> WDoc!FmtError {
     let opened = self.bump().w.expect("{")?.w;
     if (opened.peek_text() == ":") {
@@ -1898,8 +1902,8 @@ fn dict_value(self: W, lead: Doc, k: Doc) -> WDoc!FmtError {
     ok(WDoc { w, doc: Concat([lead, k, Text(": "), doc]) })
 }
 
-// An identifier-led atom: a bare name, a call `f(..)`, or a struct construction
-// `Name { field: value, .. }`.
+# An identifier-led atom: a bare name, a call `f(..)`, or a struct construction
+# `Name { field: value, .. }`.
 fn name_atom(self: W) -> WDoc!FmtError {
     if (!(self.peek_is(Ident) || self.peek_is(BuiltinType) || self.peek_is(Keyword))) {
         return err(self.err_here(`formatter: expected an expression, found "{self.peek_text()}"`));
@@ -1998,10 +2002,10 @@ fn if_expr(self: W) -> WDoc!FmtError {
     ok(WDoc { w: tail.w, doc: group(Concat([..head, Text(" else "), tail.doc])) })
 }
 
-// `PATTERN = EXPR)` — entered just past `if (let`; consumes the closing `)`
-// too; a plain `pattern()` covers `if let`'s pattern exactly (it never accepts
-// an array pattern — the grammar reaches it only through `pattern`, not the
-// `match_arm` alternative that adds array patterns on top).
+# `PATTERN = EXPR)` — entered just past `if (let`; consumes the closing `)`
+# too; a plain `pattern()` covers `if let`'s pattern exactly (it never accepts
+# an array pattern — the grammar reaches it only through `pattern`, not the
+# `match_arm` alternative that adds array patterns on top).
 fn if_let_clause(self: W) -> WDoc!FmtError {
     let pat = self.pattern()?;
     let value = pat.w.expect("=")?.w.expr()?;
@@ -2033,9 +2037,9 @@ fn match_expr(self: W) -> WDoc!FmtError {
     })
 }
 
-// `shim <effect> { op = f, .. } { body }`. The bindings group like a call's
-// arguments — flat when they fit, one per line when they don't — and the body is
-// laid out as an ordinary block.
+# `shim <effect> { op = f, .. } { body }`. The bindings group like a call's
+# arguments — flat when they fit, one per line when they don't — and the body is
+# laid out as an ordinary block.
 fn shim_expr(self: W) -> WDoc!FmtError {
     let effect = self.expect("shim")?.w.bump();
     let opened = effect.w.expect("{")?.w;
@@ -2049,7 +2053,7 @@ fn shim_expr(self: W) -> WDoc!FmtError {
     })
 }
 
-// `op = f` pairs up to (not consuming) the closing brace, trailing comma allowed.
+# `op = f` pairs up to (not consuming) the closing brace, trailing comma allowed.
 fn shim_bindings(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
@@ -2084,10 +2088,10 @@ fn match_arms(self: W, acc0: Doc[]) -> WDocs!FmtError {
     ok(WDocs { w, docs: acc })
 }
 
-// `A | B | C => body` — the `| P` tail of an alternation, folded onto the doc
-// for the pattern already parsed. A group with `Line` before each `|`, so a
-// short alternation stays on one line (`Line` renders flat as a space, giving
-// `A | B`) and a long one breaks with the `|` leading each continuation.
+# `A | B | C => body` — the `| P` tail of an alternation, folded onto the doc
+# for the pattern already parsed. A group with `Line` before each `|`, so a
+# short alternation stays on one line (`Line` renders flat as a space, giving
+# `A | B`) and a long one breaks with the `|` leading each continuation.
 fn pattern_alts(self: W, first: Doc) -> WDoc!FmtError {
     mut w = self;
     mut parts = [first];
@@ -2136,7 +2140,7 @@ fn qualified_case(self: W, name: str) -> WStr {
     WStr { w, text: `{name}.{text}` }
 }
 
-// Call-argument (or array-element) list up to `end`.
+# Call-argument (or array-element) list up to `end`.
 fn call_args_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
@@ -2149,8 +2153,8 @@ fn call_args_until(self: W, end: str, acc0: Doc[]) -> WDocs!FmtError {
     ok(WDocs { w, docs: acc })
 }
 
-// One argument, plus the arg-only forms — keyword arguments (`k=1`, spelled
-// tight), lambdas, and bare operator values (`apply(2, 3, +)`).
+# One argument, plus the arg-only forms — keyword arguments (`k=1`, spelled
+# tight), lambdas, and bare operator values (`apply(2, 3, +)`).
 fn call_arg(self: W) -> WDoc!FmtError {
     // `..xs` — an array-literal spread, spelled tight against its operand. The
     // grammar hangs it off the shared argument rule, so it is accepted here and
@@ -2219,9 +2223,9 @@ fn lambda_param_ty(self: W, name: str) -> WDoc!FmtError {
     ok(WDoc { w, doc: Concat([Text(`{name}: `), doc]) })
 }
 
-// Copy a template literal verbatim, from its head through the matching tail
-// (interpolation contents included — the formatter does not reach inside
-// templates).
+# Copy a template literal verbatim, from its head through the matching tail
+# (interpolation contents included — the formatter does not reach inside
+# templates).
 fn template_verbatim(self: W) -> WDoc!FmtError {
     let FmtTok { span } = self
         .peek()
@@ -2260,8 +2264,8 @@ fn template_scan(self: W, start: u64, depth0: u64) -> WDoc!FmtError {
     })
 }
 
-// Comments inside interpolations came through the comment stream; they are
-// inside the verbatim copy already, so drop them rather than double-emitting.
+# Comments inside interpolations came through the comment stream; they are
+# inside the verbatim copy already, so drop them rather than double-emitting.
 fn drop_comments_before(self: W, end: u64) -> W {
     mut w = self;
     while (w.comment_starts_before(end)) {
@@ -2270,26 +2274,26 @@ fn drop_comments_before(self: W, end: u64) -> W {
     w
 }
 
-// The next undrained comment. Callers test `comment_starts_before` first, so the
-// empty fallback is unreachable.
+# The next undrained comment. Callers test `comment_starts_before` first, so the
+# empty fallback is unreachable.
 fn cur_comment(self: W) -> Span { self.comments[self.cpos].value_or(0..0) }
 
-// The token at the cursor. Callers test `at_end` first, so the fallback is
-// unreachable.
+# The token at the cursor. Callers test `at_end` first, so the fallback is
+# unreachable.
 fn cur_tok(self: W) -> FmtTok { self.peek().value_or(FmtTok { kind: Punct, span: 0..0 }) }
 
-// Whether the next undrained comment begins before `end`.
+# Whether the next undrained comment begins before `end`.
 fn comment_starts_before(self: W, end: u64) -> bool {
     self.comments[self.cpos].is_some_and(|c| c.start < end)
 }
 
 // ---------- call-argument layout ----------
 
-// Whether the call whose `(` was just consumed takes exactly one argument that
-// *is* a bracketed construct — a nested call, an array, a struct literal, or a
-// set/dict literal — filling the parens end to end. Such a call is *hugged*: the
-// argument's own brackets carry the break, so the nesting costs one indent level
-// instead of one per layer. Pure lookahead over the token stream, no parse state.
+# Whether the call whose `(` was just consumed takes exactly one argument that
+# *is* a bracketed construct — a nested call, an array, a struct literal, or a
+# set/dict literal — filling the parens end to end. Such a call is *hugged*: the
+# argument's own brackets carry the break, so the nesting costs one indent level
+# instead of one per layer. Pure lookahead over the token stream, no parse state.
 fn hugs_sole_arg(self: W) -> bool {
     // Declines when a comment sits before the argument: it needs its own line,
     // above the whole call.
@@ -2311,9 +2315,9 @@ fn hugs_sole_arg(self: W) -> bool {
     self.hug_close(open_at).is_some_and(|close| self.hug_fills_call(open_at, close))
 }
 
-// Index of the bracket closing the one at `start`, or `none` if unbalanced. A
-// loop for the same reason as `range_has_semi`: it walks token by token to the
-// match, which on a large construct is far too deep to recurse.
+# Index of the bracket closing the one at `start`, or `none` if unbalanced. A
+# loop for the same reason as `range_has_semi`: it walks token by token to the
+# match, which on a large construct is far too deep to recurse.
 fn hug_close(self: W, start: u64) -> u64? {
     mut i = start;
     mut depth: u64 = 0;
@@ -2334,17 +2338,17 @@ fn hug_close(self: W, start: u64) -> u64? {
     none
 }
 
-// Hug only a non-empty construct (`f()`/`[]` have nothing to hug) that runs all
-// the way to the call's own `)` — otherwise the argument is a larger expression
-// that merely *starts* with a bracketed one. Source that is already broken has a
-// trailing comma after the argument, so step over one.
+# Hug only a non-empty construct (`f()`/`[]` have nothing to hug) that runs all
+# the way to the call's own `)` — otherwise the argument is a larger expression
+# that merely *starts* with a bracketed one. Source that is already broken has a
+# trailing comma after the argument, so step over one.
 fn hug_fills_call(self: W, open_at: u64, close: u64) -> bool {
     let after = if (self.tok_text(close + 1) == ",") { close + 2 } else { close + 1 };
     open_at + 1 < close && self.tok_text(after) == ")"
 }
 
-// The `(..)` of a call: hugged when `hugs_sole_arg` approved, else the ordinary
-// comma list.
+# The `(..)` of a call: hugged when `hugs_sole_arg` approved, else the ordinary
+# comma list.
 fn call_arg_list(args: Doc[], hug: bool) -> Doc {
     if (hug && args.len() == 1) {
         return Concat([Text("("), args.first().value_or(Concat([])), Text(")")]);
@@ -2354,11 +2358,11 @@ fn call_arg_list(args: Doc[], hug: bool) -> Doc {
 
 // ---------- test support ----------
 
-// Tokenize `src` by splitting on single spaces — one token per run of non-space
-// characters, each span pointing at the real text. Lets a test write the source
-// it means (`"# { str : i64 }"`, one space between real tokens) instead of
-// hand-computing byte offsets. Every token gets kind `Ident`: the walkers in this
-// file dispatch on token *text*, not kind.
+# Tokenize `src` by splitting on single spaces — one token per run of non-space
+# characters, each span pointing at the real text. Lets a test write the source
+# it means (`"# { str : i64 }"`, one space between real tokens) instead of
+# hand-computing byte offsets. Every token gets kind `Ident`: the walkers in this
+# file dispatch on token *text*, not kind.
 fn toks_of(src: str) -> FmtTok[] {
     mut out = [];
     mut start: u64 = 0;
@@ -2376,7 +2380,7 @@ fn toks_of(src: str) -> FmtTok[] {
     out
 }
 
-// A walker over `src` tokenized by `toks_of`, with no comments.
+# A walker over `src` tokenized by `toks_of`, with no comments.
 fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     // `toks_of` splits on single spaces, spans pointing at the real text.
     let w = walker_of("a bc d");
@@ -2638,7 +2642,10 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
             .fn_item()
             .rendered(100)? == "fn f<T: any>(x: T) -> T { x }",
     );
-    // Attributes glue to the closing brace.
+
+    // Attributes glue to the closing brace. The string-argument form is dead
+    // syntax the parser refuses by name (see `fn_attrs`); the formatter still
+    // lays it out so that refusal is what the author sees.
     assert(
         walker_of(`fn f ( ) \{ } . doc ( "d" )`).fn_item().rendered(100)? == `fn f() \{}.doc("d")`,
     );
@@ -2836,12 +2843,12 @@ fn walker_of(src: str) -> W { new_walker(src, toks_of(src), []) }.test({
     );
 })
 
-// Render what a walker step produced at the given width — the round trip a
-// formatter test actually cares about.
+# Render what a walker step produced at the given width — the round trip a
+# formatter test actually cares about.
 fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self?.doc, width)) }
 
-// Render a `Doc` directly — the `WDoc`-free form, for steps that hand back
-// something other than a plain `WDoc`.
+# Render a `Doc` directly — the `WDoc`-free form, for steps that hand back
+# something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
 allocations: 20551

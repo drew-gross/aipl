@@ -72,8 +72,8 @@ import {
 
 // ---------- the TextMate model ----------
 
-// One TextMate pattern, as data. Four shapes, which is every shape the grammars
-// generated here use and every shape the oracle interprets.
+# One TextMate pattern, as data. Four shapes, which is every shape the grammars
+# generated here use and every shape the oracle interprets.
 variant Pat =
     // Paint what `regex` matches. An empty scope matches and paints nothing,
     // which is only useful inside a region.
@@ -98,17 +98,17 @@ variant Pat =
     // needs a name.
     | Include(str)
 
-// One named repository entry: a list of patterns tried in order.
+# One named repository entry: a list of patterns tried in order.
 struct Entry { name: str, pats: Pat[] }
 
-// A whole TextMate grammar. `top` is the pattern list applied to a file, and
-// `repo` the named entries it and they reach through `Include` — including the
-// conventional `main`, which is where a language's own patterns live so that a
-// string interpolation can include the whole language back into itself.
-//
-// `note` becomes the top-level `comment` key, which the format reserves for
-// exactly this and every consumer ignores. A generated file that does not say it
-// is generated gets hand-edited, so it is not optional in practice.
+# A whole TextMate grammar. `top` is the pattern list applied to a file, and
+# `repo` the named entries it and they reach through `Include` — including the
+# conventional `main`, which is where a language's own patterns live so that a
+# string interpolation can include the whole language back into itself.
+#
+# `note` becomes the top-level `comment` key, which the format reserves for
+# exactly this and every consumer ignores. A generated file that does not say it
+# is generated gets hand-edited, so it is not optional in practice.
 struct Tm {
     name: str,
     scope_name: str,
@@ -120,16 +120,16 @@ struct Tm {
 
 // ---------- regex construction ----------
 
-// The chars a regex reads specially outside a character class, and so that a
-// literal spelling must escape. `-` is not among them: it is only special
-// *inside* a class (see `class_char`).
+# The chars a regex reads specially outside a character class, and so that a
+# literal spelling must escape. `-` is not among them: it is only special
+# *inside* a class (see `class_char`).
 fn re_meta() -> str {
     let backslash = "\\";
     `{backslash}.^$|?*+()[]{ob()}{cb()}`
 }
 
-// The chars that must be escaped *inside* `[...]`, where the rules are different
-// and much shorter.
+# The chars that must be escaped *inside* `[...]`, where the rules are different
+# and much shorter.
 fn class_meta() -> str {
     let backslash = "\\";
     `{backslash}[]^-`
@@ -139,17 +139,16 @@ fn ob() -> str { "{" }
 
 fn cb() -> str { "}" }
 
+# `s` as a regex matching exactly `s`: every character the engine reads
+# specially is backslash-escaped. Used for a rule's fixed spelling — an
+# operator, a keyword, a delimiter.
 pub fn re_escape(s: str) -> str {
     mut out = "";
     for (let ch : s) {
         set out = if (re_meta().contains(ch)) { `{out}\\{ch}` } else { `{out}{ch}` };
     }
     out
-}.doc("""
-    `s` as a regex matching exactly `s`: every character the engine reads
-    specially is backslash-escaped. Used for a rule's fixed spelling — an
-    operator, a keyword, a delimiter.
-""").test({
+}.test({
     assert(re_escape("fn") == "fn");
     assert(re_escape("+++") == "\\+\\+\\+");
     assert(re_escape("#[allow]") == "#\\[allow\\]");
@@ -165,18 +164,17 @@ pub fn char_class(chars: str) -> str { `[{char_class_body(chars)}]` }
 // The inside of a character class — what `char_class` brackets, and what a
 // *negated* class needs instead (`[^..]`, which is not something bracketing an
 // existing class can produce).
+# A regex character class accepting exactly the characters of `chars`, in the
+# order given. Written out literally rather than collapsed into ranges: the
+# class is data, the character set comes from a lexer rule that spells it out
+# too, and a range is only a shorter way to say the same thing.
 fn char_class_body(chars: str) -> str {
     mut body = "";
     for (let ch : chars) {
         set body = `{body}{class_char(ch)}`;
     }
     body
-}.doc("""
-    A regex character class accepting exactly the characters of `chars`, in the
-    order given. Written out literally rather than collapsed into ranges: the
-    class is data, the character set comes from a lexer rule that spells it out
-    too, and a range is only a shorter way to say the same thing.
-""").test({
+}.test({
     assert(char_class("abc") == "[abc]");
     assert(char_class("0123456789") == "[0123456789]");
     // The four class metacharacters are escaped; nothing else is.
@@ -187,9 +185,9 @@ fn char_class_body(chars: str) -> str {
     assert(char_class(" \t\n\r") == "[ \\t\\n\\r]");
 })
 
-// One character inside a class: the control characters as their regex escapes
-// (so the generated JSON carries no literal newline), the four class
-// metacharacters backslashed, everything else verbatim.
+# One character inside a class: the control characters as their regex escapes
+# (so the generated JSON carries no literal newline), the four class
+# metacharacters backslashed, everything else verbatim.
 fn class_char(ch: char) -> str {
     if (ch == '\n') {
         return "\\n";
@@ -208,6 +206,13 @@ fn class_char(ch: char) -> str {
 
 // ---------- matchers become patterns ----------
 
+# The TextMate pattern recognizing what `m` matches, painted `scope`. A
+# matcher that scans between delimiters becomes a `Region`, and `esc_scope` is
+# what its escape sequences are painted (`constant.character.escape.*`);
+# every other matcher becomes a plain `Match`.
+#
+# Total over `Matcher`, so a new matcher shape in `lexer.aipl` fails to compile
+# here until it has a highlighting answer.
 pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
     match (m) {
         // A run of `cont` chars opened by a `first` char. When the two classes
@@ -264,15 +269,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
             scope=scope,
         ),
     }
-}.doc("""
-    The TextMate pattern recognizing what `m` matches, painted `scope`. A
-    matcher that scans between delimiters becomes a `Region`, and `esc_scope` is
-    what its escape sequences are painted (`constant.character.escape.*`);
-    every other matcher becomes a plain `Match`.
-
-    Total over `Matcher`, so a new matcher shape in `lexer.aipl` fails to compile
-    here until it has a highlighting answer.
-""").test({
+}.test({
     let none_scope = "";
     assert(matcher_pat(Exact("=="), "op", none_scope) == Match("==", "op"));
     assert(matcher_pat(Keyword("fn", "abc"), "kw", none_scope) == Match("\\bfn\\b", "kw"));
@@ -328,17 +325,16 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
     );
 })
 
+# The plain regex `m` matches, or `none` when `m` scans between delimiters and
+# needs a whole region rather than one expression. The way to reuse a rule's
+# own character classes in a pattern written by hand — a `fn NAME` declaration
+# accepting exactly the names the identifier rule accepts.
 pub fn matcher_regex(m: Matcher) -> str? {
     match (matcher_pat(m, "", "")) {
         Match(re, _) => some(re),
         Caps(..) | Region(..) | Include(..) => none,
     }
-}.doc("""
-    The plain regex `m` matches, or `none` when `m` scans between delimiters and
-    needs a whole region rather than one expression. The way to reuse a rule's
-    own character classes in a pattern written by hand — a `fn NAME` declaration
-    accepting exactly the names the identifier rule accepts.
-""").test({
+}.test({
     assert(matcher_regex(Exact("->")) == some("->"));
     assert(matcher_regex(CharRun("ab1", first="ab")) == some("[ab][ab1]*"));
     // The four delimiter-scanning matchers have no single-expression form.
@@ -348,36 +344,49 @@ pub fn matcher_regex(m: Matcher) -> str? {
     assert(matcher_regex(Template("`", "", |segs: str[]| segs)) == none);
 })
 
-// A backslash followed by one of `escapes` — what a delimited scan treats as an
-// escape rather than as content.
+# A backslash followed by one of `escapes` — what a delimited scan treats as an
+# escape rather than as content.
 fn escape_pat(escapes: str, scope: str) -> Pat { Match(`\\\\{char_class(escapes)}`, scope) }
 
-// What lies inside a template literal: its escapes, when it has any, and the
-// `{ .. }` interpolation, which includes the whole language back into itself so
-// an interpolated expression keeps its ordinary scopes.
+# What lies inside a template literal: its escapes, when it has any, and the
+# `{ .. }` interpolation, which includes the whole language back into itself so
+# an interpolated expression keeps its ordinary scopes.
 fn template_inner(escapes: str, esc_scope: str) -> Pat[] {
     let interp: Pat = Region("\\{", "\\}", [Include("main")]);
     if (escapes.is_empty()) { [interp] } else { [escape_pat(escapes, esc_scope), interp] }
 }
 
-// The repository entry name a scope makes: its parts joined with `-`, without
-// the trailing language suffix — `comment.block.aipl` becomes `comment-block`.
-// Only a self-referential region needs one, so this is the whole naming scheme.
+# The repository entry name a scope makes: its parts joined with `-`, without
+# the trailing language suffix — `comment.block.aipl` becomes `comment-block`.
+# Only a self-referential region needs one, so this is the whole naming scheme.
 fn entry_name(scope: str) -> str { scope.split(".").drop_last().join(sep="-") }
 
 // ---------- rule sets become patterns ----------
 
-// What a rule set expands to: the patterns, in rule order, and the repository
-// entries some of them need names for. A self-referential region can only be
-// written as a named entry that includes itself, so the expansion cannot be a
-// bare pattern list.
+# What a rule set expands to: the patterns, in rule order, and the repository
+# entries some of them need names for. A self-referential region can only be
+# written as a named entry that includes itself, so the expansion cannot be a
+# bare pattern list.
 struct Expansion { pats: Pat[], entries: Entry[] }
 
-// One scoped rule reduced to what the merge below needs: its pattern, its
-// scope, the regex when the pattern is a plain `Match`, and whether it has to
-// become a named entry.
+# One scoped rule reduced to what the merge below needs: its pattern, its
+# scope, the regex when the pattern is a plain `Match`, and whether it has to
+# become a named entry.
 struct Item { scope: str, re: str, pat: Pat, plain: bool, named: bool }
 
+# The patterns `rules` describes, in rule order — one per rule, except that a
+# run of consecutive rules sharing a scope collapses into a single ordered
+# alternation, which is what turns twenty `Keyword` rules into one
+# `\\bfn\\b|\\blet\\b|..`. Rules with no scope (whitespace, anything a
+# highlighter should not paint) are dropped.
+#
+# Order is preserved exactly, and regex alternation is ordered too, so a rule
+# list written longest-spelling-first stays maximal munch. `esc_scope` paints
+# the escape sequences inside delimited literals.
+#
+# A self-referential region — a nestable block comment — comes back as an
+# `Include` plus the named entry it refers to, since that shape cannot be
+# written inline.
 pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
     mut pats: Pat[] = [];
     mut entries: Entry[] = [];
@@ -391,21 +400,7 @@ pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
         };
     }
     Expansion { pats, entries }
-}.doc("""
-    The patterns `rules` describes, in rule order — one per rule, except that a
-    run of consecutive rules sharing a scope collapses into a single ordered
-    alternation, which is what turns twenty `Keyword` rules into one
-    `\\bfn\\b|\\blet\\b|..`. Rules with no scope (whitespace, anything a
-    highlighter should not paint) are dropped.
-
-    Order is preserved exactly, and regex alternation is ordered too, so a rule
-    list written longest-spelling-first stays maximal munch. `esc_scope` paints
-    the escape sequences inside delimited literals.
-
-    A self-referential region — a nestable block comment — comes back as an
-    `Include` plus the named entry it refers to, since that shape cannot be
-    written inline.
-""").test({
+}.test({
     // Consecutive same-scope rules merge, in order, and a differently-scoped
     // rule between them breaks the run.
     let rules: TokenRule<Kind>[] = [
@@ -476,9 +471,9 @@ fn items_of<K>(rules: TokenRule<K>[], esc_scope: str) -> Item[] {
     out
 }
 
-// `items` with each maximal run of consecutive plain items sharing a scope
-// collapsed into one alternation. Alternation is ordered, so the collapse
-// preserves the priority the rule order encoded.
+# `items` with each maximal run of consecutive plain items sharing a scope
+# collapsed into one alternation. Alternation is ordered, so the collapse
+# preserves the priority the rule order encoded.
 fn merge_runs(items: Item[]) -> Item[] {
     mut out: Item[] = [];
     mut i: u64 = 0;
@@ -500,8 +495,8 @@ fn merge_runs(items: Item[]) -> Item[] {
     out
 }
 
-// How many items starting at `i` merge into one: 1 unless the item is a plain
-// `Match` and the items after it are too and share its scope.
+# How many items starting at `i` merge into one: 1 unless the item is a plain
+# `Match` and the items after it are too and share its scope.
 fn run_len(items: Item[], i: u64) -> u64 {
     match (items[i]) {
         some(it) => {
@@ -530,9 +525,9 @@ fn run_len(items: Item[], i: u64) -> u64 {
     }
 }
 
-// Whether a matcher's pattern has to refer to itself — a depth-tracked region,
-// which is the only shape that cannot be written inline. Exhaustive on purpose:
-// a new matcher shape has to answer this before it compiles.
+# Whether a matcher's pattern has to refer to itself — a depth-tracked region,
+# which is the only shape that cannot be written inline. Exhaustive on purpose:
+# a new matcher shape has to answer this before it compiles.
 fn self_referential(m: Matcher) -> bool {
     match (m) {
         Nested(..) => true,
@@ -552,33 +547,34 @@ fn self_referential(m: Matcher) -> bool {
 
 // ---------- patterns the lexer cannot describe ----------
 
+# A declaration: `keyword` then a name matching `name_re`, with the two halves
+# painted `kw_scope` and `name_scope`. This is the one genuinely *syntactic*
+# thing a highlighter does — a name means something different for standing
+# after `fn` — and the only one a regex- and line-based target can express.
+#
+# Pass `name_re` from the identifier rule's own matcher (`matcher_regex`) so
+# the names a declaration accepts stay the names the lexer accepts. It must
+# contain no capture groups of its own, which a character-class run never does.
 pub fn decl_pat(keyword: str, name_re: str, kw_scope: str, name_scope: str) -> Pat {
     Caps(`\\b({re_escape(keyword)})\\s+({name_re})`, [kw_scope, name_scope])
-}.doc("""
-    A declaration: `keyword` then a name matching `name_re`, with the two halves
-    painted `kw_scope` and `name_scope`. This is the one genuinely *syntactic*
-    thing a highlighter does — a name means something different for standing
-    after `fn` — and the only one a regex- and line-based target can express.
-
-    Pass `name_re` from the identifier rule's own matcher (`matcher_regex`) so
-    the names a declaration accepts stay the names the lexer accepts. It must
-    contain no capture groups of its own, which a character-class run never does.
-""").test({
+}.test({
     assert(decl_pat("fn", "[a-z]+", "kw", "name") == Caps("\\b(fn)\\s+([a-z]+)", ["kw", "name"]));
 })
 
+# An alternation of whole words, all painted `scope` — for a class the lexer
+# does not distinguish because it is decided after lexing, like the builtin
+# type names that are lexically just identifiers.
 pub fn word_pat(words: str[], scope: str) -> Pat {
     Match(words.map(|w| `\\b{re_escape(w)}\\b`).join(sep="|"), scope)
-}.doc("""
-    An alternation of whole words, all painted `scope` — for a class the lexer
-    does not distinguish because it is decided after lexing, like the builtin
-    type names that are lexically just identifiers.
-""").test({
+}.test({
     assert(word_pat(["i64", "str"], "type") == Match("\\bi64\\b|\\bstr\\b", "type"));
 })
 
 // ---------- JSON ----------
 
+# `g` as the `.tmLanguage.json` text an editor extension ships: two-space
+# indented, one trailing newline. Generated files are read in diffs, so the
+# layout is fixed and deterministic rather than minified.
 pub fn tm_json(g: Tm) -> str {
     mut fields = [fld("$schema", json_str(SCHEMA()))];
     if (!g.note.is_empty()) {
@@ -593,11 +589,7 @@ pub fn tm_json(g: Tm) -> str {
         obj_fld("repository", g.repo.map(entry_json)),
     ];
     `{obj_of(fields)}\n`
-}.doc("""
-    `g` as the `.tmLanguage.json` text an editor extension ships: two-space
-    indented, one trailing newline. Generated files are read in diffs, so the
-    layout is fixed and deterministic rather than minified.
-""").test({
+}.test({
     let g = Tm {
         name: "Toy",
         scope_name: "source.toy",
@@ -669,11 +661,11 @@ fn entry_json(e: Entry) -> str {
     `{json_str(e.name)}: {ob()}\n{body.indent(2)}\n{cb()}`
 }
 
-// One `"key": value` line, where `value` is already JSON.
+# One `"key": value` line, where `value` is already JSON.
 fn fld(key: str, value: str) -> str { `{json_str(key)}: {value}` }
 
-// `"key": [ .. ]`, one item per line. Items arrive rendered at column 0 and are
-// indented here, which is what keeps every renderer below indentation-free.
+# `"key": [ .. ]`, one item per line. Items arrive rendered at column 0 and are
+# indented here, which is what keeps every renderer below indentation-free.
 fn arr_fld(key: str, items: str[]) -> str {
     if (items.is_empty()) {
         return `{json_str(key)}: []`;
@@ -690,9 +682,9 @@ fn obj_fld(key: str, entries: str[]) -> str {
     `{json_str(key)}: {ob()}\n{body}\n{cb()}`
 }
 
-// `"key": { "<base>": { "name": ".." }, .. }` — the capture-scope map, whose
-// keys are group numbers counting from `base` (1 for `captures`, 0 for
-// `beginCaptures`, which scopes the whole opening match).
+# `"key": { "<base>": { "name": ".." }, .. }` — the capture-scope map, whose
+# keys are group numbers counting from `base` (1 for `captures`, 0 for
+# `beginCaptures`, which scopes the whole opening match).
 fn caps_fld(key: str, scopes: str[], base: u64) -> str {
     mut entries: str[] = [];
     for (let i, scope : scopes) {
@@ -709,18 +701,17 @@ fn obj_of(fields: str[]) -> str {
     `{ob()}\n{body}\n{cb()}`
 }
 
+# `s` as a JSON string literal, quotes included: backslashes and double quotes
+# escaped, and the three whitespace control characters spelled as `\\n`, `\\t`
+# and `\\r`. Nothing else in a generated grammar needs escaping — the regexes
+# carry backslashes by the handful, which is the case that matters.
 pub fn json_str(s: str) -> str {
     mut body = "";
     for (let ch : s) {
         set body = `{body}{json_char(ch)}`;
     }
     `"{body}"`
-}.doc("""
-    `s` as a JSON string literal, quotes included: backslashes and double quotes
-    escaped, and the three whitespace control characters spelled as `\\n`, `\\t`
-    and `\\r`. Nothing else in a generated grammar needs escaping — the regexes
-    carry backslashes by the handful, which is the case that matters.
-""").test({
+}.test({
     assert(json_str("abc") == "\"abc\"");
     assert(json_str("") == "\"\"");
     // A regex's backslashes double, and its quotes escape.

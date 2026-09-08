@@ -1,0 +1,47 @@
+// A `#` line in front of a declaration is documentation: a real token, so the
+// formatter emits it itself rather than draining it with the comments.
+# Adds `a` and `b`.
+#
+# A bare `#` is a blank line, which is what gives a doc block paragraphs.
+#     an indented line keeps its indent
+pub    fn add(a: i64, b: i64) -> i64 { a + b }
+// An ordinary `//` note sits above the docs, where `lead` drains it.
+# The origin.
+struct   Point { x: i64, y: i64 }
+# Either something or nothing.
+variant Maybe   = Yes | No
+# Documented and tested.
+fn tested( x : i64 ) -> i64 { x }.test({ assert(tested(1) == 1); })
+fn banners() -> i64 {
+    ////////////
+    // part 1 //
+    ////////////
+    1
+}
+--- formatted ---
+// A `#` line in front of a declaration is documentation: a real token, so the
+// formatter emits it itself rather than draining it with the comments.
+# Adds `a` and `b`.
+#
+# A bare `#` is a blank line, which is what gives a doc block paragraphs.
+#     an indented line keeps its indent
+pub fn add(a: i64, b: i64) -> i64 { a + b }
+
+// An ordinary `//` note sits above the docs, where `lead` drains it.
+# The origin.
+struct Point { x: i64, y: i64 }
+
+# Either something or nothing.
+variant Maybe = Yes | No
+
+# Documented and tested.
+fn tested(x: i64) -> i64 { x }.test({
+    assert(tested(1) == 1);
+})
+
+fn banners() -> i64 {
+    ////////////
+    // part 1 //
+    ////////////
+    1
+}

@@ -46,6 +46,10 @@ import {
 import { aipl_rules, ident_cont, ident_start } from "./lex_aipl.aipl";
 import { CharRun } from "./lexer.aipl";
 
+# AIPL's TextMate grammar as `.tmLanguage.json` text — what
+# `editors/vscode/syntaxes/aipl.tmLanguage.json` holds. Derived from
+# `aipl_rules()` plus the four patterns a lexer cannot describe; see the file
+# header.
 pub fn aipl_tmlanguage() -> str {
     let Expansion { pats, entries } = rule_pats(aipl_rules(), escape_scope());
     let ident = ident_regex();
@@ -84,12 +88,7 @@ pub fn aipl_tmlanguage() -> str {
             ..entries,
         ],
     })
-}.doc("""
-    AIPL's TextMate grammar as `.tmLanguage.json` text — what
-    `editors/vscode/syntaxes/aipl.tmLanguage.json` holds. Derived from
-    `aipl_rules()` plus the four patterns a lexer cannot describe; see the file
-    header.
-""").test({
+}.test({
     let json = aipl_tmlanguage();
 
     // The frame.
@@ -130,36 +129,36 @@ pub fn aipl_tmlanguage() -> str {
     assert(json.contains("\"contentName\": \"meta.section-content.aipl\""));
 })
 
-// What an escape sequence inside a string, char or template literal is painted.
-// One scope for all of them, since a `\n` means the same thing wherever it is.
+# What an escape sequence inside a string, char or template literal is painted.
+# One scope for all of them, since a `\n` means the same thing wherever it is.
 fn escape_scope() -> str { "constant.character.escape.aipl" }
 
-// The identifier regex, built from the very classes the identifier *rule* is
-// built from (`lex_aipl.aipl`), so `fn NAME` accepts exactly the names AIPL
-// accepts. `matcher_regex` answers `none` only for the delimiter-scanning
-// matchers, which a `CharRun` is not.
+# The identifier regex, built from the very classes the identifier *rule* is
+# built from (`lex_aipl.aipl`), so `fn NAME` accepts exactly the names AIPL
+# accepts. `matcher_regex` answers `none` only for the delimiter-scanning
+# matchers, which a `CharRun` is not.
 fn ident_regex() -> str { matcher_regex(CharRun(ident_cont(), first=ident_start())).value_or("") }
 
-// The builtin type names. Lexically these are plain identifiers — the AIPL lexer
-// emits `Name` for them and `classify_lexed` (`crates/aipl-parser/src/lib.rs`)
-// is what separates them out — so there is no rule to derive this from, and this
-// list has to stay in step with that one by hand.
+# The builtin type names. Lexically these are plain identifiers — the AIPL lexer
+# emits `Name` for them and `classify_lexed` (`crates/aipl-parser/src/lib.rs`)
+# is what separates them out — so there is no rule to derive this from, and this
+# list has to stay in step with that one by hand.
 fn builtin_types() -> str[] {
     ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "bool", "char", "str", "any"]
 }
 
-// An effect declaration — `!prints` in a signature. The effect names are spelled
-// out rather than matched as any `!ident`, which would mis-scope the unary `!`
-// in `!true` / `!ready`; they must stay in step with `KNOWN_EFFECTS`.
+# An effect declaration — `!prints` in a signature. The effect names are spelled
+# out rather than matched as any `!ident`, which would mis-scope the unary `!`
+# in `!true` / `!ready`; they must stay in step with `KNOWN_EFFECTS`.
 fn effect_pat() -> Pat {
     Caps("(!)(prints)\\b", ["keyword.operator.effect.aipl", "entity.name.tag.effect.aipl"])
 }
 
-// A test-case file's `--- name ---` markers and everything after the first one.
-// The tail is expected output, not AIPL, so it is scoped as plain content and
-// only the markers themselves are painted — as comments, which is the closest
-// thing a theme has to "not code". `\z` never matches inside the text, so the
-// region runs to end of file.
+# A test-case file's `--- name ---` markers and everything after the first one.
+# The tail is expected output, not AIPL, so it is scoped as plain content and
+# only the markers themselves are painted — as comments, which is the closest
+# thing a theme has to "not code". `\z` never matches inside the text, so the
+# region runs to end of file.
 fn section_tail() -> Pat {
     let marker = "^[ \\t]*---[ \\t]+\\S.*?\\S[ \\t]+---[ \\t]*\\r?$";
     Region(

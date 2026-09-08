@@ -323,7 +323,7 @@ fn anchor(name: &str) -> String {
     format!("item-{cleaned}")
 }
 
-/// A `.doc("..")` string as HTML.
+/// A declaration's documentation as HTML.
 ///
 /// Deliberately not a Markdown renderer — AIPL doc text is prose, and the two
 /// things it actually uses are blank-line paragraphs and `` `inline code` ``.
@@ -451,15 +451,14 @@ struct Point { x: i64, y: i64 }
 
 variant Shape = Circle(r: i64) | Empty
 
-pub fn area(s: Shape) -> i64 { 0 }.doc("""
-    The area of `s`.
-
-    Worked example:
-
-        let a = area(Circle(2));
-
-    Rounded down, always.
-""")
+# The area of `s`.
+#
+# Worked example:
+#
+#     let a = area(Circle(2));
+#
+# Rounded down, always.
+pub fn area(s: Shape) -> i64 { 0 }
 
 fn private_helper() -> i64 { 1 }
 "#;
@@ -555,10 +554,10 @@ fn private_helper() -> i64 { 1 }
         );
         assert!(page.contains("<p>Rounded down, always.</p>"));
         // The undocumented ones say so rather than showing an empty block.
-        assert!(page.contains("No <code>.doc(&quot;..&quot;)</code> attached."));
+        assert!(page.contains("Undocumented."));
     }
 
-    /// Doc text is data, not markup: a `<script>` in a `.doc("..")` must come
+    /// Doc text is data, not markup: a `<script>` in a doc comment must come
     /// out as text.
     #[test]
     fn escapes_doc_text() {

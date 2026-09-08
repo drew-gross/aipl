@@ -68,25 +68,25 @@ import {
 import { Bare, CharRun, Int, LexResult, OneChar, TokenRule, lex } from "./lexer.aipl";
 import { parse, parse_cst } from "./parse.aipl";
 
-// Two token kinds: digit runs, and every one-character operator or bracket. The
-// grammar tells the operators apart by `Literal`, so their kind never has to.
-// (Imported unaliased, against the usual `Literal as Lit`: this grammar's own
-// AST already calls a case `Lit`, and an import colliding with a local is a hard
-// error. The alias is a convention, not a requirement.)
+# Two token kinds: digit runs, and every one-character operator or bracket. The
+# grammar tells the operators apart by `Literal`, so their kind never has to.
+# (Imported unaliased, against the usual `Literal as Lit`: this grammar's own
+# AST already calls a case `Lit`, and an import colliding with a local is a hard
+# error. The alias is a convention, not a requirement.)
 variant CalcTok = Num | Punct
 
-// The AST. `Bin` carries the operator's spelling rather than a case per
-// operator — the grammar already lists them in its `Prec` table, and one arm in
-// `eval_calc` per spelling keeps the two in step without a third enumeration.
+# The AST. `Bin` carries the operator's spelling rather than a case per
+# operator — the grammar already lists them in its `Prec` table, and one arm in
+# `eval_calc` per spelling keeps the two in step without a third enumeration.
 variant Calc = Lit(i64) | Neg(Calc) | Bin(str, Calc, Calc)
 
-// Whitespace is trivia rather than skipped, so the concrete tree covers every
-// byte and reconstructs the source exactly.
-//
-// The punctuation rule sits *ahead* of `Int`, which makes every `-` its own
-// token and `Int` unsigned. That is the ordering this grammar needs: negation is
-// a rule (`unary`), so a `-` the lexer had swallowed into the literal would be
-// invisible to it — `1 -2` would lex as two numbers and parse as nothing.
+# Whitespace is trivia rather than skipped, so the concrete tree covers every
+# byte and reconstructs the source exactly.
+#
+# The punctuation rule sits *ahead* of `Int`, which makes every `-` its own
+# token and `Int` unsigned. That is the ordering this grammar needs: negation is
+# a rule (`unary`), so a `-` the lexer had swallowed into the literal would be
+# invisible to it — `1 -2` would lex as two numbers and parse as nothing.
 fn calc_rules() -> TokenRule<CalcTok>[] {
     [
         TokenRule { matcher: CharRun(" \t\r\n"), emit: Bare(Punct), trivia: true },
@@ -97,9 +97,9 @@ fn calc_rules() -> TokenRule<CalcTok>[] {
 
 // ---------- lowering ----------
 
-// A `Climb` node is either a bare atom that climbed to itself — one interior
-// child, no operator — or an application: two interior children with the
-// operator as a direct leaf between them.
+# A `Climb` node is either a bare atom that climbed to itself — one interior
+# child, no operator — or an application: two interior children with the
+# operator as a direct leaf between them.
 fn lower_expr(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
     let lhs = kids
         .first()
@@ -114,8 +114,8 @@ fn lower_expr(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
     }
 }
 
-// `-` then a unary, or a bare atom. The two are told apart by whether this node
-// matched a `-` of its own: the atom branch matches no token directly at all.
+# `-` then a unary, or a bare atom. The two are told apart by whether this node
+# matched a `-` of its own: the atom branch matches no token directly at all.
 fn lower_unary(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
     let inner = kids
         .first()
@@ -129,12 +129,12 @@ fn lower_unary(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
     ok(inner)
 }
 
-// A parenthesized expression lowered one interior child, and a literal lowered
-// none — so the absence of a child is what says "this is a number", and its text
-// is the node's own.
-//
-// The one `build` here that can fail: a literal too big for an `i64`. It is a
-// lowering error, not a parse error, and `parse` hands it back unchanged.
+# A parenthesized expression lowered one interior child, and a literal lowered
+# none — so the absence of a child is what says "this is a number", and its text
+# is the node's own.
+#
+# The one `build` here that can fail: a literal too big for an `i64`. It is a
+# lowering error, not a parse error, and `parse` hands it back unchanged.
 fn lower_atom(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
     match (kids.first()) {
         some(inner) => ok(inner),
@@ -151,6 +151,11 @@ fn lower_atom(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
     }
 }
 
+# The calculator grammar: `+ - * / % ^` over integer literals, with `^`
+# right-associative and unary `-` binding tighter than any of them.
+#
+# Only `atom` is labelled, so a failure deep in an expression reports as "an
+# expression" rather than as the three productions it is made of.
 pub fn calc_grammar() -> Grammar<CalcTok, Calc> {
     // Higher `power` binds tighter. `^` is the one right-associative level, which
     // is what makes `2 ^ 3 ^ 2` nest to the right where `-` nests to the left.
@@ -192,13 +197,7 @@ pub fn calc_grammar() -> Grammar<CalcTok, Calc> {
             },
         ],
     }
-}.doc("""
-    The calculator grammar: `+ - * / % ^` over integer literals, with `^`
-    right-associative and unary `-` binding tighter than any of them.
-
-    Only `atom` is labelled, so a failure deep in an expression reports as "an
-    expression" rather than as the three productions it is made of.
-""").test({
+}.test({
     // The grammar as a reader would write it, derived from the same value the
     // driver parses with — so the description and the parser cannot drift.
     // `Climb` has no EBNF operator, so it renders flat with its binding powers
@@ -227,12 +226,11 @@ fn lex_calc(src: str) -> LexResult<CalcTok>!ParseError {
     src.lex(calc_rules()).map_err(|e| ParseError { message: e.message, span: e.span })
 }
 
+# The lossless concrete tree for `src`. Use this when the tree is the point;
+# `parse_calc` when only the `Calc` is.
 pub fn calc_cst(src: str) -> Cst!ParseError {
     parse_cst(src, lex_calc(src)?, calc_grammar(), "expr")
-}.doc("""
-    The lossless concrete tree for `src`. Use this when the tree is the point;
-    `parse_calc` when only the `Calc` is.
-""").test({
+}.test({
     // What `Climb` actually builds: one node per operand, nested by binding
     // power, with the operator a direct leaf of the node that applies it. The
     // outermost application is flat because `match_prod`'s own wrap completes it.
@@ -252,15 +250,14 @@ pub fn calc_cst(src: str) -> Cst!ParseError {
     assert(calc_cst(src)?.text(src) == src);
 })
 
+# The `Calc` `src` denotes: lex, parse to a concrete tree, lower it through
+# the grammar's `build` functions.
+#
+# Fails with a `ParseError` from either half of the front end, or from a
+# lowering that refused — an integer literal too big for an `i64`.
 pub fn parse_calc(src: str) -> Calc!ParseError {
     parse(src, lex_calc(src)?, calc_grammar(), "expr")
-}.doc("""
-    The `Calc` `src` denotes: lex, parse to a concrete tree, lower it through
-    the grammar's `build` functions.
-
-    Fails with a `ParseError` from either half of the front end, or from a
-    lowering that refused — an integer literal too big for an `i64`.
-""").test({
+}.test({
     // ---- atoms ----
     assert(parse_calc("7")? == Lit(7));
     assert(parse_calc("(7)")? == Lit(7));
@@ -293,18 +290,17 @@ pub fn parse_calc(src: str) -> Calc!ParseError {
 // Fully parenthesized, so the rendering *is* the tree shape — which is what
 // makes the precedence assertions below readable, and what makes the round trip
 // exact rather than approximate.
+# `self` printed back as source, fully parenthesized — every application gets
+# brackets, so the text shows the tree and needs no precedence rules to read.
+#
+# Round-trips with `parse_calc`: `parse_calc(render_calc(v)) == v`.
 pub fn render_calc(self: Calc) -> str {
     match (self) {
         Lit(v) => v.to_str(),
         Neg(x) => `-{x.render_calc()}`,
         Bin(op, l, r) => `({l.render_calc()} {op} {r.render_calc()})`,
     }
-}.doc("""
-    `self` printed back as source, fully parenthesized — every application gets
-    brackets, so the text shows the tree and needs no precedence rules to read.
-
-    Round-trips with `parse_calc`: `parse_calc(render_calc(v)) == v`.
-""").test({
+}.test({
     // ---- precedence and associativity, made visible ----
     assert(render_calc(parse_calc("1 + 2 * 3")?) == "(1 + (2 * 3))");
     assert(render_calc(parse_calc("1 * 2 + 3")?) == "((1 * 2) + 3)");
@@ -329,6 +325,9 @@ pub fn render_calc(self: Calc) -> str {
 // division the language provides (so a zero divisor yields a value rather than a
 // trap) — a calculator's semantics are its own, and this one's are deliberately
 // total.
+# `self` evaluated as integer arithmetic. Division is saturating and `^` is
+# integer exponentiation with a negative exponent yielding 0, so evaluation is
+# total — a calculator's arithmetic policy is its own, not the parser's.
 pub fn eval_calc(self: Calc) -> i64 {
     match (self) {
         Lit(v) => v,
@@ -347,11 +346,7 @@ pub fn eval_calc(self: Calc) -> i64 {
             }
         },
     }
-}.doc("""
-    `self` evaluated as integer arithmetic. Division is saturating and `^` is
-    integer exponentiation with a negative exponent yielding 0, so evaluation is
-    total — a calculator's arithmetic policy is its own, not the parser's.
-""").test({
+}.test({
     // The assertion a wrong tree cannot survive: precedence as arithmetic.
     assert(eval("2 + 3 * 4")? == 14);
     assert(eval("2 * 3 + 4")? == 10);
@@ -371,8 +366,8 @@ pub fn eval_calc(self: Calc) -> i64 {
     assert(eval("2 ^ -1")? == 0);
 })
 
-// Integer exponentiation by repeated multiplication. A negative exponent has no
-// integer value, so it yields 0 rather than failing — see `eval_calc`'s doc.
+# Integer exponentiation by repeated multiplication. A negative exponent has no
+# integer value, so it yields 0 rather than failing — see `eval_calc`'s doc.
 fn pow(base: i64, exp: i64) -> i64 {
     if (exp < 0) {
         return 0;
@@ -394,8 +389,8 @@ fn msg_of(src: str) -> str { parse_calc(src).map_ok(render_calc).failure_message
 
 fn shown(src: str) -> str!ParseError { ok(calc_cst(src)?.show(src, prod_names(calc_grammar()))) }
 
-// How deeply a parsed expression nests — the cheap shape check for a `Climb`
-// that grouped its operands wrongly: a flat run would come back shallower.
+# How deeply a parsed expression nests — the cheap shape check for a `Climb`
+# that grouped its operands wrongly: a flat run would come back shallower.
 fn depth_of(src: str) -> u64!ParseError { ok(depth(parse_calc(src)?)) }
 
 fn depth(self: Calc) -> u64 {

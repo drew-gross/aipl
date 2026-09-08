@@ -2,9 +2,10 @@
 // opening line.
 import { drop_first, equal as ==, first } from builtins;
 
+# Drops a single leading `c` if present, else returns `self` unchanged.
 pub fn trim_prefix(self: str, c: char) -> str {
     if (self.first() == some(c)) { self.drop_first() } else { self }
-}.doc("Drops a single leading `c` if present, else returns `self` unchanged.").test({
+}.test({
     assert("\nrest".trim_prefix('\n') == "rest"); // leading char dropped
     assert("rest".trim_prefix('\n') == "rest"); // absent -> unchanged
     assert("".trim_prefix('\n') == ""); // empty source

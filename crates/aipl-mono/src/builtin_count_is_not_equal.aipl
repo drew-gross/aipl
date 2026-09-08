@@ -12,6 +12,11 @@ import {
 // A fused comparison: `count(x) != limit` without counting past the point the answer is
 // settled. Once the running count exceeds `limit` it can never come back, so the
 // rest of the collection cannot change the answer.
+# Fused form of `count(x) != limit` — see `count`. Stops as soon as the count passes
+# `limit`, since no later element can bring it back.
+#
+# Written by the compiler's operation-fusion pass, which rewrites
+# `xs.count(x) != n` (and the mirrored form) into this. Also callable directly.
 pub fn count_is_not_equal<T: any>(self: T[], x: T, limit: u64) -> bool {
     mut n: u64 = 0;
     for (let e : self) {
@@ -23,13 +28,7 @@ pub fn count_is_not_equal<T: any>(self: T[], x: T, limit: u64) -> bool {
         };
     }
     n != limit
-}.doc("""
-    Fused form of `count(x) != limit` — see `count`. Stops as soon as the count passes
-    `limit`, since no later element can bring it back.
-
-    Written by the compiler's operation-fusion pass, which rewrites
-    `xs.count(x) != n` (and the mirrored form) into this. Also callable directly.
-""").test({
+}.test({
     assert([1, 2, 2, 3].count_is_not_equal(2, 2) == ([1, 2, 2, 3].count(2) != 2));
     assert([1, 2, 2, 3].count_is_not_equal(2, 3) == ([1, 2, 2, 3].count(2) != 3));
     assert([1, 2, 2, 3].count_is_not_equal(2, 1) == ([1, 2, 2, 3].count(2) != 1));

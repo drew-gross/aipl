@@ -3,6 +3,10 @@
 // than a slice deliberately — AIPL has no substring operator.
 import { equal as ==, logical_and as &&, wrapping_increment as ++ } from builtins;
 
+# Returns the length of the longest common prefix of `a` and `b` made up entirely
+# of space characters — their shared space-only indentation. Stops at the first
+# index where the strings differ or the (matching) byte isn't a space (a tab or
+# letter ends the count).
 pub fn common_space_prefix(a: str, b: str) -> i64 {
     // Walk forward while both strings still have a space at index `i`. `s[i]`
     // yields `some(c)` for the byte there and `none` past the end, so comparing
@@ -14,12 +18,7 @@ pub fn common_space_prefix(a: str, b: str) -> i64 {
         set i++;
     }
     i
-}.doc("""
-    Returns the length of the longest common prefix of `a` and `b` made up entirely
-    of space characters — their shared space-only indentation. Stops at the first
-    index where the strings differ or the (matching) byte isn't a space (a tab or
-    letter ends the count).
-""").test({
+}.test({
     // Identical space runs: the whole (shorter-or-equal) run is the prefix.
     assert(common_space_prefix("", "") == 0);
     assert(common_space_prefix("    ", "    ") == 4);

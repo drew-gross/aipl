@@ -497,7 +497,6 @@ expression matcher:
   use it for operation fusion
 
 handoff:
-  handoff could regenerate the IR before the discovery run whenever a dogfooded .aipl is newer than the checked-in .clif
   retire AIPL_CASE, add a non-env alternative
   switch the nextest --no-build to the corresponding cargo build so that we get better progress output
   aipl probably needs streaming for proper tee replacement
@@ -583,7 +582,9 @@ docs:
   make /// docs a thing for things that should be documented (and only for those things)
   make docs renderer part of check
   doc comments for structs/variants
-  hide private functions
+  hide private functions (or separate section)
+  make the types and etc. into links
+  reove imports
 
 cache the compiled module on disk instead of using clif ir (expensive to parse)
 

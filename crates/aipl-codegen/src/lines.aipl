@@ -1,10 +1,9 @@
 import { equal as ==, split } from builtins;
 
-pub fn lines(self: str) -> str[] { self.split("\n") }.doc("""
-    Splits `self` into lines on `\n`. Equivalent to `self.split("\n")`: a trailing
-    `\n` yields a final empty element (not Rust's `str::lines()` semantics, which
-    would drop it), and an empty `self` yields a single empty element.
-""").test({
+# Splits `self` into lines on `\n`. Equivalent to `self.split("\n")`: a trailing
+# `\n` yields a final empty element (not Rust's `str::lines()` semantics, which
+# would drop it), and an empty `self` yields a single empty element.
+pub fn lines(self: str) -> str[] { self.split("\n") }.test({
     assert(
         lines(
             """

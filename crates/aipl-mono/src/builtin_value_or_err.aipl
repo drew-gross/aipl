@@ -12,18 +12,17 @@ import { equal as ==, to_digit } from builtins;
 // The error is a plain value, so it's evaluated whether or not it's used (like
 // `value_or`'s default). Its main use is in front of `?`:
 // `let v = maybe(x).value_or_err("no value")?;`
+# Turns an optional into a result: `some(v)` becomes `ok(v)`, `none` becomes
+# `err(e)`. Generic over both the value and the error type, and callable as a
+# method: `x.value_or_err(e)`. `e` is evaluated either way. Pairs with `?` to
+# give a `none` a message and propagate it out of a result-returning function.
 pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
     match (self) {
         some(v) => ok(v),
         // `value_or_err` cannot be written in terms of itself
         none => err(e), #[allow]
     }
-}.doc("""
-    Turns an optional into a result: `some(v)` becomes `ok(v)`, `none` becomes
-    `err(e)`. Generic over both the value and the error type, and callable as a
-    method: `x.value_or_err(e)`. `e` is evaluated either way. Pairs with `?` to
-    give a `none` a message and propagate it out of a result-returning function.
-""").test({
+}.test({
     // some -> ok, none -> err(e).
     assert(unwrap(maybe_int(true).value_or_err("absent"), 0) == 7);
     assert(unwrap(maybe_int(false).value_or_err("absent"), -1) == -1);
@@ -46,8 +45,8 @@ pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
     assert(message(digit_of("x")) == "not a digit");
 })
 
-// `?` on the result `value_or_err` builds: the `none` cases leave `digit_of`
-// early carrying a message, so the body reads as the happy path alone.
+# `?` on the result `value_or_err` builds: the `none` cases leave `digit_of`
+# early carrying a message, so the body reads as the happy path alone.
 fn digit_of(s: str) -> i64!str {
     ok(s[0].value_or_err("empty")?.to_digit().value_or_err("not a digit")?)
 }.test({
@@ -56,13 +55,13 @@ fn digit_of(s: str) -> i64!str {
     assert(message(digit_of("x")) == "not a digit"); // the second one does
 })
 
-// Test helpers. The optionals come from functions rather than a bare `none`
-// literal so each one's element type is pinned by a declared return type.
+# Test helpers. The optionals come from functions rather than a bare `none`
+# literal so each one's element type is pinned by a declared return type.
 fn maybe_int(present: bool) -> i64? { if (present) { some(7) } else { none } }
 
 fn maybe_str(present: bool) -> str? { if (present) { some("hi") } else { none } }
 
-// Reading one side of a result at a time, since `==` doesn't span the two.
+# Reading one side of a result at a time, since `==` doesn't span the two.
 fn unwrap(r: i64!str, default: i64) -> i64 {
     match (r) {
         ok(v) => v,

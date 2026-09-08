@@ -5,10 +5,9 @@ import { equal as ==, first, is_empty, len } from builtins;
 //
 // A start past the end already slices to empty, so dropping more than there is
 // needs no guard.
-pub fn drop_n<T: any>(self: T[], n: u64) -> T[] { self[n..] }.doc("""
-    Every element except the first `n`. Dropping `n >= len` gives an empty
-    array — the same clamping an out-of-range slice does.
-""").test({
+# Every element except the first `n`. Dropping `n >= len` gives an empty
+# array — the same clamping an out-of-range slice does.
+pub fn drop_n<T: any>(self: T[], n: u64) -> T[] { self[n..] }.test({
     assert([1, 2, 3].drop_n(1).len() == 2);
     assert([1, 2, 3].drop_n(1).first() == some(2));
     assert([1, 2, 3].drop_n(0).len() == 3);

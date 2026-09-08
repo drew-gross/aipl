@@ -101,7 +101,7 @@
         </h2>
         <pre class="signature"><code>variant Ctx</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Where a rule sits in its parent, which is all that decides whether it needs parentheses. <code>Alt</code> is a production's whole right-hand side, where nothing binds looser and even a choice renders bare; <code>Seq</code> is one element of a sequence, where a choice needs parentheses but a nested sequence does not (concatenation is associative, so it flattens); <code>Item</code> is the operand of a postfix <code>?</code>/<code>*</code>/<code>+</code>, where both need them.</p></div>
 
 
         <ul class="cases">
@@ -124,7 +124,7 @@
         </h2>
         <pre class="signature"><code>fn dq(s: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>s</code> in double quotes — how EBNF spells a literal terminal.</p></div>
 
 
       </section>
@@ -150,7 +150,7 @@
         </h2>
         <pre class="signature"><code>fn prod_line&#60;K: variant, A: any&#62;(p: Production&#60;K, A&#62;, names: str[]) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One production's line, plus the precedence note if its rule climbs. The note hangs off the *line* rather than off the climb it describes, so a <code>Climb</code> nested inside a sequence still reads as one uninterrupted rule.</p></div>
 
 
       </section>
@@ -163,7 +163,7 @@
         </h2>
         <pre class="signature"><code>fn render_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;, names: str[], ctx: Ctx) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -176,7 +176,7 @@
         </h2>
         <pre class="signature"><code>fn rep_suffix(min: u64) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>*</code>, <code>+</code>, or the <code>{n,}</code> longhand for a minimum EBNF has no operator for. The braces come from bindings rather than from the template, which has no escape for a literal one.</p></div>
 
 
       </section>
@@ -189,7 +189,7 @@
         </h2>
         <pre class="signature"><code>fn render_list&#60;K: variant&#62;(item: Rule&#60;K&#62;, sep: Rule&#60;K&#62;, min: u64, trailing_sep: bool, names: str[]) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A separated list, longhand: the first item, then as many <code>sep item</code> pairs as the minimum demands and more. The outer <code>?</code> on a zero-minimum list is not decoration — an empty list is a list, so the whole thing is optional.</p></div>
 
 
       </section>
@@ -202,7 +202,7 @@
         </h2>
         <pre class="signature"><code>fn render_climb&#60;K: variant&#62;(atom: Rule&#60;K&#62;, precs: Prec[], names: str[], ctx: Ctx) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A climb, flattened: every operator of every level in one alternation. The nesting that binding power produces is stated in <code>prec_note</code> instead — writing it structurally would need one EBNF production per level, and inlining those doubles the atom's text per level.</p></div>
 
 
       </section>
@@ -215,7 +215,7 @@
         </h2>
         <pre class="signature"><code>fn all_ops(precs: Prec[]) -&#62; str[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Every operator spelling in <code>precs</code>, deduped, in the order the levels list them.</p></div>
 
 
       </section>
@@ -228,7 +228,7 @@
         </h2>
         <pre class="signature"><code>fn climb_precs&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; Prec[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The precedence levels of the first <code>Climb</code> in <code>r</code>, or <code>[]</code> when it has none. A rule holding two climbs is not a shape any grammar here writes; the first is what the note describes.</p></div>
 
 
       </section>
@@ -241,7 +241,7 @@
         </h2>
         <pre class="signature"><code>fn first_precs&#60;K: variant&#62;(rs: Rule&#60;K&#62;[]) -&#62; Prec[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -254,7 +254,7 @@
         </h2>
         <pre class="signature"><code>fn prec_note(precs: Prec[]) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>(* precedence: &quot;*&quot; &gt; &quot;+&quot; &quot;-&quot; *)</code> — the levels loosest-last, each one its operators, with a right-associative level marked. Empty when there is nothing to say.</p></div>
 
 
       </section>
@@ -267,7 +267,7 @@
         </h2>
         <pre class="signature"><code>fn powers_desc(precs: Prec[]) -&#62; u64[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The distinct binding powers in <code>precs</code>, tightest first.</p></div>
 
 
       </section>
@@ -280,7 +280,7 @@
         </h2>
         <pre class="signature"><code>fn level_text(precs: Prec[], power: u64) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One level: its operators, gathered across every <code>Prec</code> sharing that power, since a power written twice is one level as far as binding goes.</p></div>
 
 
       </section>
@@ -293,7 +293,7 @@
         </h2>
         <pre class="signature"><code>variant Sym&#60;K: variant&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A terminal a match can begin with: a token *kind*, as <code>Term</code> matches it, or an exact *spelling*, as <code>Literal</code> does. Kept apart because the two tests are different — a kind ignores the token's text, a spelling ignores its kind — so a set holding <code>SKind(Num)</code> and one holding <code>SText(&quot;1&quot;)</code> are not the same set even where they accept the same token.</p></div>
 
 
         <ul class="cases">
@@ -314,7 +314,7 @@
         </h2>
         <pre class="signature"><code>struct First&#60;K: variant&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>What one production (or one rule) can begin with: the terminal set, and whether it can match nothing at all. <code>nullable</code> is not a property of the set — an empty set with <code>nullable: true</code> is a rule that matches only emptiness, and a non-empty set with it is one that may or may not consume — so both travel together.</p></div>
 
 
       </section>
@@ -340,7 +340,7 @@
         </h2>
         <pre class="signature"><code>fn linked_first_sets&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; First&#60;K&#62;[]!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The fixed point itself, over an already-linked grammar. Split out because the loop reads whole productions and <code>link</code> returns a whole grammar, and a <code>let</code> binding that only ever has its fields read is a lint.</p></div>
 
 
       </section>
@@ -366,7 +366,7 @@
         </h2>
         <pre class="signature"><code>fn union_syms&#60;K: variant&#62;(a: Sym&#60;K&#62;[], b: Sym&#60;K&#62;[]) -&#62; Sym&#60;K&#62;[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>a</code> with everything from <code>b</code> that is not already in it. Sets are a handful of entries and are built once per grammar, so a scan is the whole implementation — the same trade the <code>find_index</code> scan in <code>grammar.aipl</code>'s <code>link</code> makes.</p></div>
 
 
       </section>
@@ -405,7 +405,7 @@
         </h2>
         <pre class="signature"><code>fn show_sym&#60;K: variant&#62;(self: Sym&#60;K&#62;) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -431,7 +431,7 @@
         </h2>
         <pre class="signature"><code>fn keep(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The trivial lowering every fixture production passes: <code>Build</code> has no payload-free arm to mean &quot;nothing to lower&quot;.</p></div>
 
 
       </section>
@@ -444,7 +444,7 @@
         </h2>
         <pre class="signature"><code>fn one(name: str, rule: Rule&#60;Kind&#62;) -&#62; Production&#60;Kind, Node&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -457,7 +457,7 @@
         </h2>
         <pre class="signature"><code>fn g_of(ps: Production&#60;Kind, Node&#62;[]) -&#62; Grammar&#60;Kind, Node&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -470,7 +470,7 @@
         </h2>
         <pre class="signature"><code>fn first_msg(r: Rule&#60;Kind&#62;, sets: First&#60;Kind&#62;[]) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The message a <code>rule_first</code> failure reports — and a distinguishable string when it unexpectedly succeeded, so a broken assertion says which way it broke. <code>grammar.aipl</code>'s <code>failure_message</code> is the same idea over a <code>str!ParseError</code>.</p></div>
 
 
       </section>
@@ -483,7 +483,7 @@
         </h2>
         <pre class="signature"><code>fn fixture() -&#62; Grammar&#60;Kind, Node&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A grammar with one production per shape worth rendering: a separated list, a sequence, a precedence climb over two levels, an ordered choice with a nested sequence in it, and an optional prefix in front of a one-or-more.</p></div>
 
 
       </section>

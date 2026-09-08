@@ -49,7 +49,7 @@
         </h2>
         <pre class="signature"><code>fn line_end_span(prev: char, prev2: char, boundary: u64, ws_start: u64, line_start: u64) -&#62; Span?</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The span of a line's trailing space/tab run, given the bytes around its ending, or <code>none</code> if the line has none. <code>boundary</code> is the index of the line-ending '\n' (or the input length, at EOF); <code>prev</code>/<code>prev2</code> are the two bytes before it; <code>ws_start</code> is where the current run of spaces/tabs began; <code>line_start</code> is the line's first byte. A single '\r' right before the boundary is part of a CRLF (or lone-CR) ending, so the last content byte is the one before it.</p></div>
 
 
       </section>

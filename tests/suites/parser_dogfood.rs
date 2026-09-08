@@ -96,14 +96,11 @@ const BUILD_ACTION_REJECTS: &[(&str, &str)] = &[
         "can't mix set elements and",
     ),
     // `fn_attr` accepts `.NAME(block)` and `.NAME("str")`; which names take
-    // which argument, and that neither repeats, is the action's business.
+    // which argument, and that none repeats, is the action's business. The
+    // string form is dead syntax kept only so the action can refuse it by name.
     (
-        "tests/cases/docs/err_doc_wrong_arg.aipl",
-        "`.doc` takes a string",
-    ),
-    (
-        "tests/cases/docs/err_duplicate_doc.aipl",
-        "duplicate `.doc`",
+        "tests/cases/docs/err_doc_attr.aipl",
+        "no longer a function attribute",
     ),
     (
         "tests/cases/docs/err_test_wrong_arg.aipl",
@@ -112,6 +109,12 @@ const BUILD_ACTION_REJECTS: &[(&str, &str)] = &[
     (
         "tests/cases/docs/err_unknown_attr.aipl",
         "unknown function attribute",
+    ),
+    // Both grammars put the `# ..` lines on `item`, `import` included; that an
+    // import has nothing to document is the action's rule.
+    (
+        "tests/cases/docs/err_doc_on_import.aipl",
+        "import cannot be documented",
     ),
     // `T: bound` is `IDENT COLON IDENT` to the grammar; the bound names are the
     // action's.

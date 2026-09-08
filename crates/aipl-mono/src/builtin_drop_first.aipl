@@ -2,9 +2,8 @@ import { drop_n, equal as ==, first, is_empty, len } from builtins;
 
 // The AIPL implementation of the `drop_first` builtin (see
 // `AIPL_BUILTIN_SOURCES` in `lib.rs`) — `drop_n(1)`, named for the common case.
-pub fn drop_first<T: any>(self: T[]) -> T[] { self.drop_n(1) }.doc("""
-    Every element except the first. An empty array stays empty.
-""").test({
+# Every element except the first. An empty array stays empty.
+pub fn drop_first<T: any>(self: T[]) -> T[] { self.drop_n(1) }.test({
     assert([1, 2, 3].drop_first().len() == 2);
     assert([1, 2, 3].drop_first().first() == some(2));
     assert([7].drop_first().is_empty());

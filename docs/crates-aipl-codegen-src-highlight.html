@@ -91,7 +91,7 @@
         </h2>
         <pre class="signature"><code>variant Pat</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One TextMate pattern, as data. Four shapes, which is every shape the grammars generated here use and every shape the oracle interprets.</p></div>
 
 
         <ul class="cases">
@@ -116,7 +116,7 @@
         </h2>
         <pre class="signature"><code>struct Entry</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One named repository entry: a list of patterns tried in order.</p></div>
 
 
       </section>
@@ -129,7 +129,7 @@
         </h2>
         <pre class="signature"><code>struct Tm</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A whole TextMate grammar. <code>top</code> is the pattern list applied to a file, and <code>repo</code> the named entries it and they reach through <code>Include</code> — including the conventional <code>main</code>, which is where a language's own patterns live so that a string interpolation can include the whole language back into itself.</p><p><code>note</code> becomes the top-level <code>comment</code> key, which the format reserves for exactly this and every consumer ignores. A generated file that does not say it is generated gets hand-edited, so it is not optional in practice.</p></div>
 
 
       </section>
@@ -142,7 +142,7 @@
         </h2>
         <pre class="signature"><code>fn re_meta() -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The chars a regex reads specially outside a character class, and so that a literal spelling must escape. <code>-</code> is not among them: it is only special *inside* a class (see <code>class_char</code>).</p></div>
 
 
       </section>
@@ -155,7 +155,7 @@
         </h2>
         <pre class="signature"><code>fn class_meta() -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The chars that must be escaped *inside* <code>[...]</code>, where the rules are different and much shorter.</p></div>
 
 
       </section>
@@ -168,7 +168,7 @@
         </h2>
         <pre class="signature"><code>fn ob() -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -181,7 +181,7 @@
         </h2>
         <pre class="signature"><code>fn cb() -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -207,7 +207,7 @@
         </h2>
         <pre class="signature"><code>pub fn char_class(chars: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -233,7 +233,7 @@
         </h2>
         <pre class="signature"><code>fn class_char(ch: char) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One character inside a class: the control characters as their regex escapes (so the generated JSON carries no literal newline), the four class metacharacters backslashed, everything else verbatim.</p></div>
 
 
       </section>
@@ -272,7 +272,7 @@
         </h2>
         <pre class="signature"><code>fn escape_pat(escapes: str, scope: str) -&#62; Pat</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A backslash followed by one of <code>escapes</code> — what a delimited scan treats as an escape rather than as content.</p></div>
 
 
       </section>
@@ -285,7 +285,7 @@
         </h2>
         <pre class="signature"><code>fn template_inner(escapes: str, esc_scope: str) -&#62; Pat[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>What lies inside a template literal: its escapes, when it has any, and the <code>{ .. }</code> interpolation, which includes the whole language back into itself so an interpolated expression keeps its ordinary scopes.</p></div>
 
 
       </section>
@@ -298,7 +298,7 @@
         </h2>
         <pre class="signature"><code>fn entry_name(scope: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The repository entry name a scope makes: its parts joined with <code>-</code>, without the trailing language suffix — <code>comment.block.aipl</code> becomes <code>comment-block</code>. Only a self-referential region needs one, so this is the whole naming scheme.</p></div>
 
 
       </section>
@@ -311,7 +311,7 @@
         </h2>
         <pre class="signature"><code>struct Expansion</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>What a rule set expands to: the patterns, in rule order, and the repository entries some of them need names for. A self-referential region can only be written as a named entry that includes itself, so the expansion cannot be a bare pattern list.</p></div>
 
 
       </section>
@@ -324,7 +324,7 @@
         </h2>
         <pre class="signature"><code>struct Item</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One scoped rule reduced to what the merge below needs: its pattern, its scope, the regex when the pattern is a plain <code>Match</code>, and whether it has to become a named entry.</p></div>
 
 
       </section>
@@ -350,7 +350,7 @@
         </h2>
         <pre class="signature"><code>fn items_of&#60;K: any&#62;(rules: TokenRule&#60;K&#62;[], esc_scope: str) -&#62; Item[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -363,7 +363,7 @@
         </h2>
         <pre class="signature"><code>fn merge_runs(items: Item[]) -&#62; Item[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>items</code> with each maximal run of consecutive plain items sharing a scope collapsed into one alternation. Alternation is ordered, so the collapse preserves the priority the rule order encoded.</p></div>
 
 
       </section>
@@ -376,7 +376,7 @@
         </h2>
         <pre class="signature"><code>fn run_len(items: Item[], i: u64) -&#62; u64</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>How many items starting at <code>i</code> merge into one: 1 unless the item is a plain <code>Match</code> and the items after it are too and share its scope.</p></div>
 
 
       </section>
@@ -389,7 +389,7 @@
         </h2>
         <pre class="signature"><code>fn self_referential(m: Matcher) -&#62; bool</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Whether a matcher's pattern has to refer to itself — a depth-tracked region, which is the only shape that cannot be written inline. Exhaustive on purpose: a new matcher shape has to answer this before it compiles.</p></div>
 
 
       </section>
@@ -441,7 +441,7 @@
         </h2>
         <pre class="signature"><code>fn SCHEMA() -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -454,7 +454,7 @@
         </h2>
         <pre class="signature"><code>fn pat_json(p: Pat) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -467,7 +467,7 @@
         </h2>
         <pre class="signature"><code>fn entry_json(e: Entry) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -480,7 +480,7 @@
         </h2>
         <pre class="signature"><code>fn fld(key: str, value: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One <code>&quot;key&quot;: value</code> line, where <code>value</code> is already JSON.</p></div>
 
 
       </section>
@@ -493,7 +493,7 @@
         </h2>
         <pre class="signature"><code>fn arr_fld(key: str, items: str[]) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>&quot;key&quot;: [ .. ]</code>, one item per line. Items arrive rendered at column 0 and are indented here, which is what keeps every renderer below indentation-free.</p></div>
 
 
       </section>
@@ -506,7 +506,7 @@
         </h2>
         <pre class="signature"><code>fn obj_fld(key: str, entries: str[]) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -519,7 +519,7 @@
         </h2>
         <pre class="signature"><code>fn caps_fld(key: str, scopes: str[], base: u64) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>&quot;key&quot;: { &quot;&lt;base&gt;&quot;: { &quot;name&quot;: &quot;..&quot; }, .. }</code> — the capture-scope map, whose keys are group numbers counting from <code>base</code> (1 for <code>captures</code>, 0 for <code>beginCaptures</code>, which scopes the whole opening match).</p></div>
 
 
       </section>
@@ -532,7 +532,7 @@
         </h2>
         <pre class="signature"><code>fn inline_arr(items: str[]) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -545,7 +545,7 @@
         </h2>
         <pre class="signature"><code>fn obj_of(fields: str[]) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -571,7 +571,7 @@
         </h2>
         <pre class="signature"><code>fn json_char(ch: char) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -584,7 +584,7 @@
         </h2>
         <pre class="signature"><code>variant Kind</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
         <ul class="cases">

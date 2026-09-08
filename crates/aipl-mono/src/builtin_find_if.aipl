@@ -15,6 +15,13 @@ import { equal as ==, filter, greater_than as >, logical_not as ! } from builtin
 // The `#[allow]` squelches `return_loop_find_if`, which flags exactly this
 // shape — a loop returning the first match — and asks for `find_if`. Here it
 // *is* `find_if`.
+# The first element of `self` satisfying `pred`, or `none` when none does,
+# stopping at the first match. Generic over the element type and callable as a
+# method: `xs.find_if(pred)`. A `str` receiver iterates its chars, since `str`
+# and `char[]` share a representation.
+#
+# See `any` for the same scan reporting only whether a match existed, and
+# `first` for the unconditional first element.
 pub fn find_if<T: any>(self: T[], pred: (T) -> bool) -> T? {
     for (let x : self) {
         if (pred(x)) {
@@ -22,15 +29,7 @@ pub fn find_if<T: any>(self: T[], pred: (T) -> bool) -> T? {
         };
     }
     none
-}.doc("""
-    The first element of `self` satisfying `pred`, or `none` when none does,
-    stopping at the first match. Generic over the element type and callable as a
-    method: `xs.find_if(pred)`. A `str` receiver iterates its chars, since `str`
-    and `char[]` share a representation.
-
-    See `any` for the same scan reporting only whether a match existed, and
-    `first` for the unconditional first element.
-""").test({
+}.test({
     assert([1, 2, 3, 4].find_if(|x| x > 2) == some(3));
     assert([1, 2, 3].find_if(|x| x > 9) == none); // nothing matches
     // The *first* match, not the last: it stops there.

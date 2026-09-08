@@ -7,6 +7,11 @@
 import { concat as +++, equal as ==, is_all_whitespace, join, map, repeat } from builtins;
 import { lines } from "./lines.aipl";
 
+# Indents every non-blank line of `self` by `target` spaces, keeping each line's
+# own relative indentation; blank (empty or all-whitespace) lines are emitted
+# empty. Assumes `self` is already fully dedented — it *adds* indentation, it does
+# not rebase an existing common indent to `target`. The inverse of `dedent`;
+# `reindent_block` dedents the raw-block content before calling this.
 pub fn indent(self: str, target: u64) -> str {
     let pad = " ".repeat(target);
 
@@ -17,13 +22,7 @@ pub fn indent(self: str, target: u64) -> str {
         .lines()
         .map(|line| if (line.is_all_whitespace()) { "" } else { pad +++ line })
         .join(sep="\n")
-}.doc("""
-    Indents every non-blank line of `self` by `target` spaces, keeping each line's
-    own relative indentation; blank (empty or all-whitespace) lines are emitted
-    empty. Assumes `self` is already fully dedented — it *adds* indentation, it does
-    not rebase an existing common indent to `target`. The inverse of `dedent`;
-    `reindent_block` dedents the raw-block content before calling this.
-""").test({
+}.test({
     // A dedented block is indented by the target, line for line.
     assert("a\nb".indent(4) == "    a\n    b");
     // Relative indent is preserved: a deeper line keeps its extra 2 spaces.

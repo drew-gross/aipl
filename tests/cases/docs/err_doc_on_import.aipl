@@ -1,0 +1,10 @@
+# An import brings a name in; it declares nothing to document.
+import { print } from builtins;
+
+fn main() !prints { print("hi"); }
+--- errors ---
+error: an import cannot be documented — `# ..` lines attach to a declaration, and this one is above an `import`
+ --> ./tests/cases/docs/err_doc_on_import.aipl:1:1
+  |
+1 | # An import brings a name in; it declares nothing to document.
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

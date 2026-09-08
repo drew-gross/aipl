@@ -82,7 +82,7 @@
         </h2>
         <pre class="signature"><code>fn escape_scope() -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>What an escape sequence inside a string, char or template literal is painted. One scope for all of them, since a <code>\n</code> means the same thing wherever it is.</p></div>
 
 
       </section>
@@ -95,7 +95,7 @@
         </h2>
         <pre class="signature"><code>fn ident_regex() -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The identifier regex, built from the very classes the identifier *rule* is built from (<code>lex_aipl.aipl</code>), so <code>fn NAME</code> accepts exactly the names AIPL accepts. <code>matcher_regex</code> answers <code>none</code> only for the delimiter-scanning matchers, which a <code>CharRun</code> is not.</p></div>
 
 
       </section>
@@ -108,7 +108,7 @@
         </h2>
         <pre class="signature"><code>fn builtin_types() -&#62; str[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The builtin type names. Lexically these are plain identifiers — the AIPL lexer emits <code>Name</code> for them and <code>classify_lexed</code> (<code>crates/aipl-parser/src/lib.rs</code>) is what separates them out — so there is no rule to derive this from, and this list has to stay in step with that one by hand.</p></div>
 
 
       </section>
@@ -121,7 +121,7 @@
         </h2>
         <pre class="signature"><code>fn effect_pat() -&#62; Pat</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>An effect declaration — <code>!prints</code> in a signature. The effect names are spelled out rather than matched as any <code>!ident</code>, which would mis-scope the unary <code>!</code> in <code>!true</code> / <code>!ready</code>; they must stay in step with <code>KNOWN_EFFECTS</code>.</p></div>
 
 
       </section>
@@ -134,7 +134,7 @@
         </h2>
         <pre class="signature"><code>fn section_tail() -&#62; Pat</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A test-case file's <code>--- name ---</code> markers and everything after the first one. The tail is expected output, not AIPL, so it is scoped as plain content and only the markers themselves are painted — as comments, which is the closest thing a theme has to &quot;not code&quot;. <code>\z</code> never matches inside the text, so the region runs to end of file.</p></div>
 
 
       </section>

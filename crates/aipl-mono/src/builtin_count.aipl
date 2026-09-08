@@ -9,6 +9,12 @@ import { equal as ==, wrapping_increment as ++ } from builtins;
 // The counterpart of `count_while`, which counts a *leading run* matching a
 // predicate; this counts *every* element equal to a value, anywhere. Unsigned,
 // like `len`: a count is never negative.
+# Counts how many elements of `self` equal `x`, comparing with `==` (so strings
+# and chars compare by value). Generic over the element type and callable as a
+# method: `xs.count(x)`. A `str` receiver counts bytes, since `str` and `char[]`
+# share a representation: `s.count('\\n')` is the number of newlines in `s`.
+#
+# See `count_while` for the leading-run-matching-a-predicate form.
 pub fn count<T: any>(self: T[], x: T) -> u64 {
     mut n: u64 = 0;
     for (let e : self) {
@@ -17,14 +23,7 @@ pub fn count<T: any>(self: T[], x: T) -> u64 {
         };
     }
     n
-}.doc("""
-    Counts how many elements of `self` equal `x`, comparing with `==` (so strings
-    and chars compare by value). Generic over the element type and callable as a
-    method: `xs.count(x)`. A `str` receiver counts bytes, since `str` and `char[]`
-    share a representation: `s.count('\\n')` is the number of newlines in `s`.
-
-    See `count_while` for the leading-run-matching-a-predicate form.
-""").test({
+}.test({
     assert([1, 2, 3, 2].count(2) == 2);
     assert([1, 2, 3].count(9) == 0); // absent
     assert([].count(1) == 0); // empty

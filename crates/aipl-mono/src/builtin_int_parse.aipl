@@ -19,6 +19,11 @@ import {
 // only for this file's own tests, which read exactly like user code. The
 // body's own builtin calls (`starts_with`, `to_digit`, ...) resolve through
 // this file's imports, loaded like any user file.
+# Parse `self` as a decimal integer: an optional leading `-`, then one or
+# more ASCII digits, nothing else. `none` when the input is empty, a bare
+# `-`, contains any other character (including `+`, spaces, or `_`), or
+# doesn't fit an i64. The full range parses, including i64::MIN. Callable
+# as a method: `s.int_parse()`.
 pub fn int_parse(self: str) -> i64? {
     let neg = self.starts_with("-");
     let body = if (neg) { self.drop_first() } else { self };
@@ -58,13 +63,7 @@ pub fn int_parse(self: str) -> i64? {
     // negation (-i64::MIN) has no i64 representation (e.g. "9223372036854775808").
     let min = -9223372036854775808;
     if (neg) { some(v) } else { if (v == min) { none } else { some(0 - v) } }
-}.doc("""
-    Parse `self` as a decimal integer: an optional leading `-`, then one or
-    more ASCII digits, nothing else. `none` when the input is empty, a bare
-    `-`, contains any other character (including `+`, spaces, or `_`), or
-    doesn't fit an i64. The full range parses, including i64::MIN. Callable
-    as a method: `s.int_parse()`.
-""").test({
+}.test({
     assert(int_parse("123") == some(123));
     assert("123".int_parse() == some(123)); // method form
     assert("0".int_parse() == some(0));

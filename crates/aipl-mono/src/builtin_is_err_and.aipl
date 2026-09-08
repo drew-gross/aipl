@@ -10,17 +10,16 @@ import { equal as ==, logical_not as !, value_or_err } from builtins;
 // The result-world mirror of `is_some_and`. It exists mainly for tests that
 // assert on a failure: `==` doesn't span the two sides of a result, so without
 // it every such assertion needs a hand-written `match` helper per error type.
+# True when `self` is `err(e)` and `pred(e)` holds; `false` for `ok` (the
+# predicate is not called). The result-world mirror of `is_some_and`, generic
+# over both the ok and error types and callable as a method:
+# `r.is_err_and(pred)`.
 pub fn is_err_and<T: any, E: any>(self: T!E, pred: (E) -> bool) -> bool {
     match (self) {
         ok(_) => false,
         err(e) => pred(e),
     }
-}.doc("""
-    True when `self` is `err(e)` and `pred(e)` holds; `false` for `ok` (the
-    predicate is not called). The result-world mirror of `is_some_and`, generic
-    over both the ok and error types and callable as a method:
-    `r.is_err_and(pred)`.
-""").test({
+}.test({
     // err: the predicate runs on the error payload.
     assert(digit_of("x").is_err_and(|e| e == "not a digit"));
     assert(!digit_of("x").is_err_and(|e| e == "some other message"));
@@ -50,8 +49,8 @@ pub fn is_err_and<T: any, E: any>(self: T!E, pred: (E) -> bool) -> bool {
 
 struct LenError { reason: str, at: i64 }
 
-// A result whose error side is a struct, so the tests above cover reading a
-// single field out of a multi-field payload.
+# A result whose error side is a struct, so the tests above cover reading a
+# single field out of a multi-field payload.
 fn check_len(s: str) -> str!LenError {
     if (s == "hi") { err(LenError { reason: "too short", at: 2 }) } else { ok(s) }
 }.test({
@@ -64,7 +63,7 @@ fn is_not_a_digit(self: str) -> bool { self == "not a digit" }.test({
     assert(!is_not_a_digit("empty"));
 })
 
-// Two ways to fail, so the tests can tell one error message from another.
+# Two ways to fail, so the tests can tell one error message from another.
 fn digit_of(s: str) -> i64!str {
     let c = s[0].value_or_err("empty")?;
     if (c == '7') { ok(7) } else { err("not a digit") }

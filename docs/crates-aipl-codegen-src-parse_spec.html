@@ -65,7 +65,7 @@
         </h2>
         <pre class="signature"><code>struct Entry</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One <code>--- file: p ---</code> / <code>--- expect file: p ---</code> companion: a path and the body that follows it.</p></div>
 
 
       </section>
@@ -78,7 +78,7 @@
         </h2>
         <pre class="signature"><code>struct Spec</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -104,7 +104,7 @@
         </h2>
         <pre class="signature"><code>fn finalize(spec: Spec, name: str, buf: str) -&#62; Spec!str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Fold one finished section into the spec. <code>name</code> is <code>&quot;&quot;</code> for the preamble.</p></div>
 
 
       </section>
@@ -117,7 +117,7 @@
         </h2>
         <pre class="signature"><code>fn companion_path(name: str, prefix: str) -&#62; str!str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The path a <code>file:</code>-style marker carries, validated. <code>\</code> is a path-separator nuisance in this markup, so the source side is held to <code>/</code> and the harness canonicalizes on disk.</p></div>
 
 
       </section>

@@ -33,10 +33,10 @@ import {
 
 variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[])
 
-// Whether `self` is an interior node. The parser's lowering pass hands a
-// production's `build` only the values of its *interior* children — a leaf has
-// no lowered value, and its text is reachable from the node's own span — so
-// this is the filter that decides what counts as a child.
+# Whether `self` is an interior node. The parser's lowering pass hands a
+# production's `build` only the values of its *interior* children — a leaf has
+# no lowered value, and its text is reachable from the node's own span — so
+# this is the filter that decides what counts as a child.
 pub fn is_tree(self: Cst) -> bool {
     match (self) {
         CTree(..) => true,
@@ -44,10 +44,10 @@ pub fn is_tree(self: Cst) -> bool {
     }
 }
 
-// Every leaf span under `self`, in source order — token leaves and trivia
-// alike. The whole losslessness property is stated in terms of this list: the
-// spans are contiguous and cover the parsed source, so `text` is just
-// "slice each one and join".
+# Every leaf span under `self`, in source order — token leaves and trivia
+# alike. The whole losslessness property is stated in terms of this list: the
+# spans are contiguous and cover the parsed source, so `text` is just
+# "slice each one and join".
 pub fn leaves(self: Cst) -> Span[] {
     match (self) {
         CLeaf(sp) | CTrivia(sp) => [sp],
@@ -55,17 +55,17 @@ pub fn leaves(self: Cst) -> Span[] {
     }
 }
 
-// The source text `self` covers, reconstructed from its leaf spans. For a whole
-// parse this equals the input exactly; that identity is the cheapest regression
-// test there is for the driver's trivia handling, so the `.test` blocks assert
-// it directly.
+# The source text `self` covers, reconstructed from its leaf spans. For a whole
+# parse this equals the input exactly; that identity is the cheapest regression
+# test there is for the driver's trivia handling, so the `.test` blocks assert
+# it directly.
 pub fn text(self: Cst, src: str) -> str { self.leaves().map(|sp| src[sp]).join(sep="") }
 
-// Every *token* leaf span under `self`, in source order — `leaves` with the
-// trivia dropped. The two are the lossless/meaningful pair: `leaves` keeps the
-// comments and whitespace because reconstructing the source needs them, and this
-// one drops them because a lowering function reading a token's spelling does not
-// want the blank line in front of it.
+# Every *token* leaf span under `self`, in source order — `leaves` with the
+# trivia dropped. The two are the lossless/meaningful pair: `leaves` keeps the
+# comments and whitespace because reconstructing the source needs them, and this
+# one drops them because a lowering function reading a token's spelling does not
+# want the blank line in front of it.
 pub fn token_leaves(self: Cst) -> Span[] {
     match (self) {
         CLeaf(sp) => [sp],
@@ -74,17 +74,17 @@ pub fn token_leaves(self: Cst) -> Span[] {
     }
 }
 
-// The text of the tokens under `self`, trivia dropped and nothing inserted
-// between them — what a production's `build` reads a matched token's spelling
-// from. Written for the single-token node that is the usual case; over a wider
-// node the tokens run together (`( a b )` reads back as `(ab)`), which is why
-// `text` and not this one is what reconstructs source.
+# The text of the tokens under `self`, trivia dropped and nothing inserted
+# between them — what a production's `build` reads a matched token's spelling
+# from. Written for the single-token node that is the usual case; over a wider
+# node the tokens run together (`( a b )` reads back as `(ab)`), which is why
+# `text` and not this one is what reconstructs source.
 pub fn token_text(self: Cst, src: str) -> str { self.token_leaves().map(|sp| src[sp]).join(sep="") }
 
-// The span `self` covers: its first leaf's start through its last leaf's end.
-// A node with no leaves at all — an interior node for a production that matched
-// empty input, which `Maybe` and a zero-minimum `Many` can both produce — has no
-// extent, and reports the empty `0..0`.
+# The span `self` covers: its first leaf's start through its last leaf's end.
+# A node with no leaves at all — an interior node for a production that matched
+# empty input, which `Maybe` and a zero-minimum `Many` can both produce — has no
+# extent, and reports the empty `0..0`.
 pub fn span(self: Cst) -> Span {
     let ls = self.leaves();
     match (ls.first()) {
@@ -96,10 +96,10 @@ pub fn span(self: Cst) -> Span {
     }
 }
 
-// The interior children of `self` — its kids with the leaves dropped. This is
-// the child list a production's `build` is lowered against, so its order and
-// length are part of the contract between a grammar and its lowering functions:
-// one entry per `Named` reference the rule matched, in the order it matched them.
+# The interior children of `self` — its kids with the leaves dropped. This is
+# the child list a production's `build` is lowered against, so its order and
+# length are part of the contract between a grammar and its lowering functions:
+# one entry per `Named` reference the rule matched, in the order it matched them.
 pub fn nodes(self: Cst) -> Cst[] {
     match (self) {
         CLeaf(..) | CTrivia(..) => [],
@@ -107,15 +107,15 @@ pub fn nodes(self: Cst) -> Cst[] {
     }
 }
 
-// The token leaves `self` matched *directly* — one level down, not recursed
-// into. The mirror of `nodes`: that one is a node's direct branches, this its
-// direct leaves, and between them they are everything the node itself matched.
-//
-// This is what a lowering function reads an operator or a keyword from. A
-// `Climb` node's two operands arrive as interior children and the operator
-// between them is a direct leaf, so `own_token_text` is the operator and nothing
-// else — where `token_text` would hand back the whole expression's tokens run
-// together. Trivia is dropped here as it is there.
+# The token leaves `self` matched *directly* — one level down, not recursed
+# into. The mirror of `nodes`: that one is a node's direct branches, this its
+# direct leaves, and between them they are everything the node itself matched.
+#
+# This is what a lowering function reads an operator or a keyword from. A
+# `Climb` node's two operands arrive as interior children and the operator
+# between them is a direct leaf, so `own_token_text` is the operator and nothing
+# else — where `token_text` would hand back the whole expression's tokens run
+# together. Trivia is dropped here as it is there.
 pub fn own_tokens(self: Cst) -> Span[] {
     match (self) {
         CLeaf(..) | CTrivia(..) => [],
@@ -123,13 +123,13 @@ pub fn own_tokens(self: Cst) -> Span[] {
     }
 }
 
-// The source text of `self`'s direct token leaves, run together with nothing
-// between them — the operator of a binary node, the keyword that opened a form.
+# The source text of `self`'s direct token leaves, run together with nothing
+# between them — the operator of a binary node, the keyword that opened a form.
 pub fn own_token_text(self: Cst, src: str) -> str {
     self.own_tokens().map(|sp| src[sp]).join(sep="")
 }
 
-// Whether `self` is a token leaf: not an interior node, and not trivia.
+# Whether `self` is a token leaf: not an interior node, and not trivia.
 fn is_leaf(self: Cst) -> bool {
     match (self) {
         CLeaf(..) => true,
@@ -137,8 +137,8 @@ fn is_leaf(self: Cst) -> bool {
     }
 }
 
-// The span of a leaf, for `own_tokens`'s `filter_map`. A non-leaf never reaches
-// it (the filter runs first), and reports the empty span rather than failing.
+# The span of a leaf, for `own_tokens`'s `filter_map`. A non-leaf never reaches
+# it (the filter runs first), and reports the empty span rather than failing.
 fn leaf_span(self: Cst) -> Span {
     match (self) {
         CLeaf(sp) => sp,
@@ -146,11 +146,11 @@ fn leaf_span(self: Cst) -> Span {
     }
 }
 
-// `self` rendered as an S-expression against the grammar's production names
-// (`prod_names`), for tests and for reading a tree by eye: a leaf as its source
-// text, a trivia leaf prefixed with `~`, an interior node as
-// `(name kid kid ...)`. A production index with no name in `names` renders as
-// `?` rather than failing — this is a debug rendering, not a checked one.
+# `self` rendered as an S-expression against the grammar's production names
+# (`prod_names`), for tests and for reading a tree by eye: a leaf as its source
+# text, a trivia leaf prefixed with `~`, an interior node as
+# `(name kid kid ...)`. A production index with no name in `names` renders as
+# `?` rather than failing — this is a debug rendering, not a checked one.
 pub fn show(self: Cst, src: str, names: str[]) -> str {
     match (self) {
         CLeaf(sp) => src[sp],

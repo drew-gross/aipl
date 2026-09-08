@@ -8,7 +8,7 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// Test fixture: a record sorted by one of its fields.
+# Test fixture: a record sorted by one of its fields.
 struct E { key: str, tag: str }
 
 // The AIPL implementation of the `sort_by` builtin. Monomorphization registers
@@ -30,6 +30,10 @@ struct E { key: str, tag: str }
 // this small and obviously-stable: its callers sort import lists and other
 // short sequences. Sorting a large array by its natural order should still use
 // the native `sort` builtin.
+# Sorts by a caller-supplied `less` predicate: `less(a, b)` is true when `a`
+# must come before `b`. Stable — elements neither of which precedes the other
+# keep their input order. Generic over the element type and callable as a
+# method: `xs.sort_by(|a, b| a.key < b.key)`.
 pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
     // The annotation is what makes the empty literal usable: untyped, `[]` has
     // element type `__none__`, so `out[k]` below would hand the comparator a
@@ -58,12 +62,7 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
         set out = [..out[..k], x, ..out[k..]];
     }
     out
-}.doc("""
-    Sorts by a caller-supplied `less` predicate: `less(a, b)` is true when `a`
-    must come before `b`. Stable — elements neither of which precedes the other
-    keep their input order. Generic over the element type and callable as a
-    method: `xs.sort_by(|a, b| a.key < b.key)`.
-""").test({
+}.test({
     // Ascending and descending over the same input.
     assert([3, 1, 2].sort_by(|a, b| a < b) == [1, 2, 3]);
     assert([3, 1, 2].sort_by(|a, b| b < a) == [3, 2, 1]);

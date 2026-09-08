@@ -64,8 +64,8 @@ variant Doc =
 // `IfBroken` text only when the group breaks; `BreakParent` a zero-width
 // force-break; `RawBlock` a verbatim multi-line atom re-aligned via `reindent_block`.
 
-// The printer's work-stack, as a cons-list of `(indent-columns, flat?, doc)`
-// frames — the tail-recursive analog of the Rust printer's `Vec` work stack.
+# The printer's work-stack, as a cons-list of `(indent-columns, flat?, doc)`
+# frames — the tail-recursive analog of the Rust printer's `Vec` work stack.
 variant Work = WNil | WCons(u64, bool, Doc, Work)
 
 // ---------- constructors ----------
@@ -73,16 +73,16 @@ variant Work = WNil | WCons(u64, bool, Doc, Work)
 // `Text`/`Concat`/`Indent`/`RawBlock` are constructed directly at the call site;
 // only `group` needs a helper, since it derives its `forced` flag.
 
-// Wrap `self` in a group, pre-computing whether it is forced to break. Forcing
-// is what makes a multi-statement block, or any construct holding a line
-// comment, lay out vertically no matter the width.
+# Wrap `self` in a group, pre-computing whether it is forced to break. Forcing
+# is what makes a multi-statement block, or any construct holding a line
+# comment, lay out vertically no matter the width.
 pub fn group(self: Doc) -> Doc { Group(self.has_hard(), self) }
 
 // ---------- forcing ----------
 
-// Whether `self` contains content that can never render flat: a hard/blank line,
-// a break-parent, or multi-line verbatim text. Recurses through nested groups —
-// a forced inner group means the outer can't be flat either.
+# Whether `self` contains content that can never render flat: a hard/blank line,
+# a break-parent, or multi-line verbatim text. Recurses through nested groups —
+# a forced inner group means the outer can't be flat either.
 fn has_hard(self: Doc) -> bool {
     match (self) {
         Text(s) | RawBlock(s) => s.contains("\n"),
@@ -97,23 +97,23 @@ fn has_hard(self: Doc) -> bool {
 
 // ---------- printing ----------
 
-// Render `doc` at the given width limit. Lines are indented with spaces;
-// trailing whitespace is stripped from every line and a final newline is
-// preserved when present (the Rust `print`'s belt-and-braces cleanup).
+# Render `doc` at the given width limit. Lines are indented with spaces;
+# trailing whitespace is stripped from every line and a final newline is
+# preserved when present (the Rust `print`'s belt-and-braces cleanup).
 pub fn print_doc(doc: Doc, width: u64) -> str {
     let pieces = go(width, 0, WCons(0, false, doc, WNil), []);
     cleanup(pieces.join(sep=""))
 }
 
-// The main layout loop: pop a frame, emit for its `Doc`, push any children, and
-// go round again. `col` is the current column; `sp` (inside each frame) is the
-// indentation, in spaces, that a line break under that frame lands at.
-//
-// Each arm updates the loop's own `mut` bindings directly. That needs `match`
-// arms to be statement blocks; before they were, an arm could only be a single
-// *expression*, so this was three functions threading a `Step { col, work, emit,
-// emits, done }` carrier back to the loop — one to dispatch on the work-list,
-// one on the `Doc`, and one for the `RawBlock` atom.
+# The main layout loop: pop a frame, emit for its `Doc`, push any children, and
+# go round again. `col` is the current column; `sp` (inside each frame) is the
+# indentation, in spaces, that a line break under that frame lands at.
+#
+# Each arm updates the loop's own `mut` bindings directly. That needs `match`
+# arms to be statement blocks; before they were, an arm could only be a single
+# *expression*, so this was three functions threading a `Step { col, work, emit,
+# emits, done }` carrier back to the loop — one to dispatch on the work-list,
+# one on the `Doc`, and one for the `RawBlock` atom.
 fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -> str[] {
     mut col = col0;
     mut work = work0;
@@ -190,22 +190,22 @@ fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -> str[] {
     acc
 }
 
-// Decide a group's mode: forced groups always break; otherwise the group is flat
-// exactly when its content — laid out flat, followed by the rest of the line —
-// fits in the remaining width. The remaining width is an *unsigned* subtraction,
-// so a line already past the limit floors at 0 rather than going negative — the
-// same thing the Rust printer gets from `usize::saturating_sub`.
+# Decide a group's mode: forced groups always break; otherwise the group is flat
+# exactly when its content — laid out flat, followed by the rest of the line —
+# fits in the remaining width. The remaining width is an *unsigned* subtraction,
+# so a line already past the limit floors at 0 rather than going negative — the
+# same thing the Rust printer gets from `usize::saturating_sub`.
 fn group_flat(forced: bool, width: u64, col: u64, sp: u64, inner: Doc, rest: Work) -> bool {
     if (forced) { false } else { fits(width - col, WCons(sp, true, inner, rest)) }
 }
 
-// Would the pending work — the flat candidate followed by the outer frames, each
-// in its own mode — stay within `budget` columns? Walks until the budget is
-// exhausted (no) or the line provably ends at a break point (yes).
-//
-// The budget is *unsigned*: it can't go negative, so an overrun is an explicit
-// "doesn't fit" comparison in `fits_after` rather than a sign check on a
-// wrapped-around remainder.
+# Would the pending work — the flat candidate followed by the outer frames, each
+# in its own mode — stay within `budget` columns? Walks until the budget is
+# exhausted (no) or the line provably ends at a break point (yes).
+#
+# The budget is *unsigned*: it can't go negative, so an overrun is an explicit
+# "doesn't fit" comparison in `fits_after` rather than a sign check on a
+# wrapped-around remainder.
 fn fits(budget: u64, work: Work) -> bool {
     match (work) {
         WNil => true,
@@ -231,45 +231,45 @@ fn fits(budget: u64, work: Work) -> bool {
     }
 }
 
-// Spend `n` of the remaining columns and keep walking — or give up when `n`
-// doesn't fit. The check has to come *before* the subtraction: on an unsigned
-// budget `budget - n` floors at 0, which would hide the overrun.
+# Spend `n` of the remaining columns and keep walking — or give up when `n`
+# doesn't fit. The check has to come *before* the subtraction: on an unsigned
+# budget `budget - n` floors at 0, which would hide the overrun.
 fn fits_after(budget: u64, n: u64, rest: Work) -> bool {
     if (n > budget) { false } else { fits(budget - n, rest) }
 }
 
-// A `Text`/`RawBlock` atom in `fits`: a multi-line atom can't sit on a flat line
-// (so it only "fits" when the surrounding content is already broken); a
-// single-line atom just consumes its width.
+# A `Text`/`RawBlock` atom in `fits`: a multi-line atom can't sit on a flat line
+# (so it only "fits" when the surrounding content is already broken); a
+# single-line atom just consumes its width.
 fn fits_atom(budget: u64, s: str, flat: bool, rest: Work) -> bool {
     if (s.contains("\n")) { !flat } else { fits_after(budget, s.len(), rest) }
 }
 
 // ---------- helpers ----------
 
-// Prepend an array of children onto the work-list so `ds[0]` is processed first:
-// a right fold over `ds`, each frame carrying the parent's indent and mode.
+# Prepend an array of children onto the work-list so `ds[0]` is processed first:
+# a right fold over `ds`, each frame carrying the parent's indent and mode.
 fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -> Work {
     ds.right_fold(rest, |d, work| WCons(sp, flat, d, work))
 }
 
-// The column just past `text` when appended at column `col`: the length of its
-// last line for multi-line text, else `col + width`.
+# The column just past `text` when appended at column `col`: the length of its
+# last line for multi-line text, else `col + width`.
 fn col_after(col: u64, text: str) -> u64 {
     let parts = text.split("\n");
     let n = parts.len();
     if (n < 2) { col + text.len() } else { parts[n - 1].value_or("").len() }
 }
 
-// A line break landing at indentation `sp`: a newline plus `sp` spaces.
+# A line break landing at indentation `sp`: a newline plus `sp` spaces.
 fn newline_str(sp: u64) -> str { "\n" +++ " ".repeat(sp) }
 
-// A blank-line break at indentation `sp`: two newlines plus `sp` spaces (the
-// blank line's own trailing spaces are removed by `cleanup`).
+# A blank-line break at indentation `sp`: two newlines plus `sp` spaces (the
+# blank line's own trailing spaces are removed by `cleanup`).
 fn blank_str(sp: u64) -> str { "\n\n" +++ " ".repeat(sp) }
 
-// Strip trailing whitespace from every line and preserve a final newline when
-// the rendered text had one (mirrors `str::lines().map(trim_end).join(sep="\n")`).
+# Strip trailing whitespace from every line and preserve a final newline when
+# the rendered text had one (mirrors `str::lines().map(trim_end).join(sep="\n")`).
 fn cleanup(out: str) -> str {
     let ended = out.ends_with("\n");
     let raw = out.split("\n");

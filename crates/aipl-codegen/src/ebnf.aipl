@@ -84,38 +84,37 @@ import {
 
 // ---------- EBNF ----------
 
-// Where a rule sits in its parent, which is all that decides whether it needs
-// parentheses. `Alt` is a production's whole right-hand side, where nothing
-// binds looser and even a choice renders bare; `Seq` is one element of a
-// sequence, where a choice needs parentheses but a nested sequence does not
-// (concatenation is associative, so it flattens); `Item` is the operand of a
-// postfix `?`/`*`/`+`, where both need them.
+# Where a rule sits in its parent, which is all that decides whether it needs
+# parentheses. `Alt` is a production's whole right-hand side, where nothing
+# binds looser and even a choice renders bare; `Seq` is one element of a
+# sequence, where a choice needs parentheses but a nested sequence does not
+# (concatenation is associative, so it flattens); `Item` is the operand of a
+# postfix `?`/`*`/`+`, where both need them.
 variant Ctx = Alt | Seq | Item
 
-// `s` in double quotes — how EBNF spells a literal terminal.
+# `s` in double quotes — how EBNF spells a literal terminal.
 fn dq(s: str) -> str {
     let q = "\"";
     `{q}{s}{q}`
 }
 
+# `g` rendered as EBNF: one `name = rule ;` line per production, in grammar
+# order, with no trailing newline.
+#
+# Sequence is juxtaposition, choice is `|`, and repetition is the postfix
+# `?` (`Maybe`), `*` (`Many` with minimum 0) and `+` (`Many` with minimum 1);
+# a higher minimum renders as `{n,}`. A separated `Many` and a `Climb` have no
+# EBNF operator and are expanded — the list into its separator longhand, the
+# climb
+# into `atom (op atom)*` plus a `(* precedence: ... *)` note, since EBNF cannot
+# express binding power.
+#
+# Total, like `cst.aipl`'s `show`: a grammar may be dumped linked or unlinked,
+# and a reference that resolves to nothing renders as `?` rather than failing.
 pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     let names = prod_names(g);
     g.prods.map(|p| prod_line(p, names)).join(sep="\n")
-}.doc("""
-    `g` rendered as EBNF: one `name = rule ;` line per production, in grammar
-    order, with no trailing newline.
-
-    Sequence is juxtaposition, choice is `|`, and repetition is the postfix
-    `?` (`Maybe`), `*` (`Many` with minimum 0) and `+` (`Many` with minimum 1);
-    a higher minimum renders as `{n,}`. A separated `Many` and a `Climb` have no
-    EBNF operator and are expanded — the list into its separator longhand, the
-    climb
-    into `atom (op atom)*` plus a `(* precedence: ... *)` note, since EBNF cannot
-    express binding power.
-
-    Total, like `cst.aipl`'s `show`: a grammar may be dumped linked or unlinked,
-    and a reference that resolves to nothing renders as `?` rather than failing.
-""").test({
+}.test({
     // Parentheses are decided by where a rule sits rather than by how it was
     // written: a choice needs them inside a sequence, a sequence only under a
     // postfix, and neither needs them as a whole right-hand side.
@@ -177,9 +176,9 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     );
 })
 
-// One production's line, plus the precedence note if its rule climbs. The note
-// hangs off the *line* rather than off the climb it describes, so a `Climb`
-// nested inside a sequence still reads as one uninterrupted rule.
+# One production's line, plus the precedence note if its rule climbs. The note
+# hangs off the *line* rather than off the climb it describes, so a `Climb`
+# nested inside a sequence still reads as one uninterrupted rule.
 fn prod_line<K: variant, A: any>(p: Production<K, A>, names: str[]) -> str {
     let body = render_rule(p.rule, names, Alt);
     let note = prec_note(climb_precs(p.rule));
@@ -227,9 +226,9 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
     }
 }
 
-// `*`, `+`, or the `{n,}` longhand for a minimum EBNF has no operator for. The
-// braces come from bindings rather than from the template, which has no escape
-// for a literal one.
+# `*`, `+`, or the `{n,}` longhand for a minimum EBNF has no operator for. The
+# braces come from bindings rather than from the template, which has no escape
+# for a literal one.
 fn rep_suffix(min: u64) -> str {
     if (min == 0) {
         return "*";
@@ -242,9 +241,9 @@ fn rep_suffix(min: u64) -> str {
     `{open}{min},{close}`
 }
 
-// A separated list, longhand: the first item, then as many `sep item` pairs as
-// the minimum demands and more. The outer `?` on a zero-minimum list is not
-// decoration — an empty list is a list, so the whole thing is optional.
+# A separated list, longhand: the first item, then as many `sep item` pairs as
+# the minimum demands and more. The outer `?` on a zero-minimum list is not
+# decoration — an empty list is a list, so the whole thing is optional.
 fn render_list<K: variant>(
     item: Rule<K>,
     sep: Rule<K>,
@@ -263,10 +262,10 @@ fn render_list<K: variant>(
     if (min == 0) { `({body})?` } else { body }
 }
 
-// A climb, flattened: every operator of every level in one alternation. The
-// nesting that binding power produces is stated in `prec_note` instead — writing
-// it structurally would need one EBNF production per level, and inlining those
-// doubles the atom's text per level.
+# A climb, flattened: every operator of every level in one alternation. The
+# nesting that binding power produces is stated in `prec_note` instead — writing
+# it structurally would need one EBNF production per level, and inlining those
+# doubles the atom's text per level.
 fn render_climb<K: variant>(atom: Rule<K>, precs: Prec[], names: str[], ctx: Ctx) -> str {
     let a = render_rule(atom, names, Seq);
     let ops = all_ops(precs);
@@ -286,8 +285,8 @@ fn render_climb<K: variant>(atom: Rule<K>, precs: Prec[], names: str[], ctx: Ctx
     }
 }
 
-// Every operator spelling in `precs`, deduped, in the order the levels list
-// them.
+# Every operator spelling in `precs`, deduped, in the order the levels list
+# them.
 fn all_ops(precs: Prec[]) -> str[] {
     mut out: str[] = [];
     for (let pr : precs) {
@@ -300,9 +299,9 @@ fn all_ops(precs: Prec[]) -> str[] {
     out
 }
 
-// The precedence levels of the first `Climb` in `r`, or `[]` when it has none.
-// A rule holding two climbs is not a shape any grammar here writes; the first is
-// what the note describes.
+# The precedence levels of the first `Climb` in `r`, or `[]` when it has none.
+# A rule holding two climbs is not a shape any grammar here writes; the first is
+# what the note describes.
 fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
     match (r) {
         Climb(_, precs) => precs,
@@ -326,9 +325,9 @@ fn first_precs<K: variant>(rs: Rule<K>[]) -> Prec[] {
     []
 }
 
-// `(* precedence: "*" > "+" "-" *)` — the levels loosest-last, each one its
-// operators, with a right-associative level marked. Empty when there is nothing
-// to say.
+# `(* precedence: "*" > "+" "-" *)` — the levels loosest-last, each one its
+# operators, with a right-associative level marked. Empty when there is nothing
+# to say.
 fn prec_note(precs: Prec[]) -> str {
     if (precs.is_empty()) {
         return "";
@@ -337,7 +336,7 @@ fn prec_note(precs: Prec[]) -> str {
     `(* precedence: {levels} *)`
 }
 
-// The distinct binding powers in `precs`, tightest first.
+# The distinct binding powers in `precs`, tightest first.
 fn powers_desc(precs: Prec[]) -> u64[] {
     mut out: u64[] = [];
     for (let pr : precs) {
@@ -348,8 +347,8 @@ fn powers_desc(precs: Prec[]) -> u64[] {
     out.sort_by(|a, b| b < a)
 }
 
-// One level: its operators, gathered across every `Prec` sharing that power,
-// since a power written twice is one level as far as binding goes.
+# One level: its operators, gathered across every `Prec` sharing that power,
+# since a power written twice is one level as far as binding goes.
 fn level_text(precs: Prec[], power: u64) -> str {
     mut ops: str[] = [];
     mut right = false;
@@ -367,34 +366,33 @@ fn level_text(precs: Prec[], power: u64) -> str {
 
 // ---------- FIRST sets ----------
 
-// A terminal a match can begin with: a token *kind*, as `Term` matches it, or an
-// exact *spelling*, as `Literal` does. Kept apart because the two tests are
-// different — a kind ignores the token's text, a spelling ignores its kind — so
-// a set holding `SKind(Num)` and one holding `SText("1")` are not the same set
-// even where they accept the same token.
+# A terminal a match can begin with: a token *kind*, as `Term` matches it, or an
+# exact *spelling*, as `Literal` does. Kept apart because the two tests are
+# different — a kind ignores the token's text, a spelling ignores its kind — so
+# a set holding `SKind(Num)` and one holding `SText("1")` are not the same set
+# even where they accept the same token.
 variant Sym<K: variant> = SKind(Case<K>) | SText(str)
 
-// What one production (or one rule) can begin with: the terminal set, and
-// whether it can match nothing at all. `nullable` is not a property of the set —
-// an empty set with `nullable: true` is a rule that matches only emptiness, and
-// a non-empty set with it is one that may or may not consume — so both travel
-// together.
+# What one production (or one rule) can begin with: the terminal set, and
+# whether it can match nothing at all. `nullable` is not a property of the set —
+# an empty set with `nullable: true` is a rule that matches only emptiness, and
+# a non-empty set with it is one that may or may not consume — so both travel
+# together.
 struct First<K: variant> { syms: Sym<K>[], nullable: bool }
 
+# The FIRST set of every production of `g`, in grammar order: the terminals a
+# match of that production can begin with, and whether it can match nothing.
+#
+# `g` is linked here, so it may be handed over unlinked; linking is idempotent.
+# Fails only the way `link` fails — an unresolved reference, or a duplicate
+# rule name.
+#
+# Computed as a fixed point, so a reference reaching back through the
+# production it started from is fine, left recursion included: the sets only
+# grow, and the loop stops on the round that changes nothing.
 pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError {
     linked_first_sets(link(g)?)
-}.doc("""
-    The FIRST set of every production of `g`, in grammar order: the terminals a
-    match of that production can begin with, and whether it can match nothing.
-
-    `g` is linked here, so it may be handed over unlinked; linking is idempotent.
-    Fails only the way `link` fails — an unresolved reference, or a duplicate
-    rule name.
-
-    Computed as a fixed point, so a reference reaching back through the
-    production it started from is fine, left recursion included: the sets only
-    grow, and the loop stops on the round that changes nothing.
-""").test({
+}.test({
     // Nullability reaching through a reference is what makes this a fixed point
     // rather than one pass: `a` cannot know it continues past `b` until `b` is
     // known nullable, and `b` is computed after it.
@@ -421,9 +419,9 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
     assert(first_sets(bad) == err(ParseError { message: "no rule named \"nope\"", span: 0..0 }));
 })
 
-// The fixed point itself, over an already-linked grammar. Split out because the
-// loop reads whole productions and `link` returns a whole grammar, and a `let`
-// binding that only ever has its fields read is a lint.
+# The fixed point itself, over an already-linked grammar. Split out because the
+# loop reads whole productions and `link` returns a whole grammar, and a `let`
+# binding that only ever has its fields read is a lint.
 fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError {
     // One empty set per production, and the annotated `[]` is what pins `K`:
     // nothing in `First { syms: .., nullable: false }` mentions it otherwise.
@@ -445,6 +443,13 @@ fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseEr
     ok(sets)
 }
 
+# What an arbitrary rule can begin with, given `sets` — the FIRST sets of the
+# grammar's productions, as `first_sets` returns them.
+#
+# This is the piece a driver would prune a `OneOf` with: `first_sets` once per
+# grammar, then this per alternative. Fails on a `Named` reference, which means
+# the rule came from an unlinked grammar, and on a `NamedIdx` pointing past the
+# end of `sets`.
 pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseError {
     match (r) {
         Term(k) => ok(First { syms: [SKind(k)], nullable: false }),
@@ -507,15 +512,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         // unlinked grammar, whose references cannot be followed.
         Named(n) => err(ParseError { message: `unlinked rule reference "{n}"`, span: 0..0 }),
     }
-}.doc("""
-    What an arbitrary rule can begin with, given `sets` — the FIRST sets of the
-    grammar's productions, as `first_sets` returns them.
-
-    This is the piece a driver would prune a `OneOf` with: `first_sets` once per
-    grammar, then this per alternative. Fails on a `Named` reference, which means
-    the rule came from an unlinked grammar, and on a `NamedIdx` pointing past the
-    end of `sets`.
-""").test({
+}.test({
     let sets = first_sets(fixture())?;
 
     // An arbitrary rule against the grammar's sets — what a driver would prune
@@ -545,9 +542,9 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     assert(first_msg(r_far, sets) == "no production at index 9");
 })
 
-// `a` with everything from `b` that is not already in it. Sets are a handful of
-// entries and are built once per grammar, so a scan is the whole implementation
-// — the same trade the `find_index` scan in `grammar.aipl`'s `link` makes.
+# `a` with everything from `b` that is not already in it. Sets are a handful of
+# entries and are built once per grammar, so a scan is the whole implementation
+# — the same trade the `find_index` scan in `grammar.aipl`'s `link` makes.
 fn union_syms<K: variant>(a: Sym<K>[], b: Sym<K>[]) -> Sym<K>[] {
     mut out = a;
     for (let s : b) {
@@ -558,19 +555,18 @@ fn union_syms<K: variant>(a: Sym<K>[], b: Sym<K>[]) -> Sym<K>[] {
     out
 }
 
+# Whether a token of kind `kind` spelled `text` could begin a match of `self` —
+# the test a driver skips an alternative on.
+#
+# A nullable rule accepts anything, because it can match without consuming the
+# token at all; otherwise the token's kind is looked for among the set's kinds
+# and its spelling among the set's spellings. Conservative in the direction
+# that matters: it is never false for a token that could in fact start a match,
+# so pruning on it cannot lose a parse.
 pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
     let spelled: Sym<K> = SText(text);
     self.nullable || self.syms.contains(SKind(kind)) || self.syms.contains(spelled)
-}.doc("""
-    Whether a token of kind `kind` spelled `text` could begin a match of `self` —
-    the test a driver skips an alternative on.
-
-    A nullable rule accepts anything, because it can match without consuming the
-    token at all; otherwise the token's kind is looked for among the set's kinds
-    and its spelling among the set's spellings. Conservative in the direction
-    that matters: it is never false for a token that could in fact start a match,
-    so pruning on it cannot lose a parse.
-""").test({
+}.test({
     let syms: Sym<Kind>[] = [SKind(Num), SText("(")];
     let f: First<Kind> = First { syms, nullable: false };
 
@@ -597,6 +593,9 @@ pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
     assert(!dead.can_start(name, "x"));
 })
 
+# `self` as one readable line: each terminal in set order — a kind by its case
+# name, a spelling in double quotes — with `<empty>` appended when the rule is
+# nullable. A debug rendering, like `cst.aipl`'s `show`.
 pub fn show_first<K: variant>(self: First<K>) -> str {
     // The lambda is not forwarding for its own sake: `show_sym` is generic, and
     // a generic function has no value form to pass to `map`.
@@ -608,11 +607,7 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
         return "<empty>";
     };
     `{syms} <empty>`
-}.doc("""
-    `self` as one readable line: each terminal in set order — a kind by its case
-    name, a spelling in double quotes — with `<empty>` appended when the rule is
-    nullable. A debug rendering, like `cst.aipl`'s `show`.
-""").test({
+}.test({
     let syms: Sym<Kind>[] = [SKind(Num), SText("(")];
     let f: First<Kind> = First { syms, nullable: false };
     assert(
@@ -645,6 +640,9 @@ fn show_sym<K: variant>(self: Sym<K>) -> str {
     }
 }
 
+# `first_sets` rendered one `name = terminals` line per production, in grammar
+# order, with no trailing newline — the FIRST-set counterpart of `ebnf`, and
+# what makes a whole grammar's sets one readable assertion.
 pub fn show_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> str!ParseError {
     let sets = first_sets(g)?;
     let names = prod_names(g);
@@ -657,11 +655,7 @@ pub fn show_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> str!ParseError {
         set lines = [..lines, `{n} = {f.show_first()}`];
     }
     ok(lines.join(sep="\n"))
-}.doc("""
-    `first_sets` rendered one `name = terminals` line per production, in grammar
-    order, with no trailing newline — the FIRST-set counterpart of `ebnf`, and
-    what makes a whole grammar's sets one readable assertion.
-""").test({
+}.test({
     // The fixture grammar, dumped both ways. Between them the two dumps say
     // everything this file computes, over every `Rule` arm the grammar uses.
     let g = fixture();
@@ -701,17 +695,17 @@ variant Kind = Num(str) | Name(str) | Punct
 
 variant Node = NLeaf(str) | NList(Node[])
 
-// The trivial lowering every fixture production passes: `Build` has no
-// payload-free arm to mean "nothing to lower".
+# The trivial lowering every fixture production passes: `Build` has no
+# payload-free arm to mean "nothing to lower".
 fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(NList(kids)) }
 
 fn one(name: str, rule: Rule<Kind>) -> Production<Kind, Node> { name, rule, build: Mk(keep) }
 
 fn g_of(ps: Production<Kind, Node>[]) -> Grammar<Kind, Node> { prods: ps }
 
-// The message a `rule_first` failure reports — and a distinguishable string when
-// it unexpectedly succeeded, so a broken assertion says which way it broke.
-// `grammar.aipl`'s `failure_message` is the same idea over a `str!ParseError`.
+# The message a `rule_first` failure reports — and a distinguishable string when
+# it unexpectedly succeeded, so a broken assertion says which way it broke.
+# `grammar.aipl`'s `failure_message` is the same idea over a `str!ParseError`.
 fn first_msg(r: Rule<Kind>, sets: First<Kind>[]) -> str {
     match (rule_first(r, sets)) {
         ok(f) => `unexpectedly computed: {f.show_first()}`,
@@ -719,9 +713,9 @@ fn first_msg(r: Rule<Kind>, sets: First<Kind>[]) -> str {
     }
 }
 
-// A grammar with one production per shape worth rendering: a separated list, a
-// sequence, a precedence climb over two levels, an ordered choice with a nested
-// sequence in it, and an optional prefix in front of a one-or-more.
+# A grammar with one production per shape worth rendering: a separated list, a
+# sequence, a precedence climb over two levels, an ordered choice with a nested
+# sequence in it, and an optional prefix in front of a one-or-more.
 fn fixture() -> Grammar<Kind, Node> {
     let r_prog: Rule<Kind> = Many(Named("stmt"), sep=some(Literal(";")));
     let r_stmt: Rule<Kind> = Then([Term(Name), Literal("="), Named("expr")]);

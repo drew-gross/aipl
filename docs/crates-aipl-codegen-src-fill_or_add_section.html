@@ -53,7 +53,7 @@
         </h2>
         <pre class="signature"><code>fn fill_section(contents: str, section: str, body: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Replaces the body of the <code>--- section ---</code> block in <code>contents</code> with <code>body</code> (dropping the old body up to the next header line or EOF), preserving everything else. Only ever called once <code>fill_or_add_section</code> has confirmed <code>section</code> is present, so the &quot;not found&quot; fallthrough below is never actually hit by a real caller — it falls out of the line-walk for free, not worth special-casing away.</p></div>
 
 
       </section>
@@ -66,7 +66,7 @@
         </h2>
         <pre class="signature"><code>fn contains_section(contents: str, section: str) -&#62; bool</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Whether <code>contents</code> already carries a <code>--- section ---</code> header. <code>lines</code> mirrors plain <code>split(&quot;\n&quot;)</code> (a spurious trailing empty element for a final <code>\n</code>), unlike Rust's <code>str::lines()</code> — harmless here since an empty line never parses as a header.</p></div>
 
 
       </section>

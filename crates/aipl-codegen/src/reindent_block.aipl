@@ -27,6 +27,15 @@ import { dedent } from "./dedent.aipl";
 import { indent } from "./indent.aipl";
 import { lines } from "./lines.aipl";
 
+# Re-lays-out a multi-line raw-string / template atom around `base` columns. The
+# closing-delimiter line is re-indented to `base` — but only when it is whitespace
+# followed by a bare triple-quote / triple-backtick delimiter (the inert blank
+# closing line); otherwise the atom is returned unchanged. For a bare-opening block
+# (its opening line is exactly the delimiter), the content is `dedent`-ed and then
+# re-indented (via `indent`) so its common indent becomes `base + 4` —
+# one level deeper than the delimiters — while each line keeps its indentation
+# relative to that common base. A content-bearing opening keeps its content
+# byte-for-byte; only the closing delimiter moves.
 pub fn reindent_block(self: str, base: u64) -> str {
     let ls = self.lines();
     let n = ls.len();
@@ -63,17 +72,7 @@ pub fn reindent_block(self: str, base: u64) -> str {
         set out = out +++ "\n" +++ body;
     };
     out +++ "\n" +++ " ".repeat(base) +++ closing
-}.doc("""
-    Re-lays-out a multi-line raw-string / template atom around `base` columns. The
-    closing-delimiter line is re-indented to `base` — but only when it is whitespace
-    followed by a bare triple-quote / triple-backtick delimiter (the inert blank
-    closing line); otherwise the atom is returned unchanged. For a bare-opening block
-    (its opening line is exactly the delimiter), the content is `dedent`-ed and then
-    re-indented (via `indent`) so its common indent becomes `base + 4` —
-    one level deeper than the delimiters — while each line keeps its indentation
-    relative to that common base. A content-bearing opening keeps its content
-    byte-for-byte; only the closing delimiter moves.
-""").test({
+}.test({
     // Fewer than two lines: nothing to re-lay-out.
     assert("only".reindent_block(0) == "only");
     // Closing line is not a bare delimiter: unchanged.

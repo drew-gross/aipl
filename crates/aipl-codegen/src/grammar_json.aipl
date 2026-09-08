@@ -67,17 +67,17 @@ import {
 import { parse, parse_cst } from "./parse.aipl";
 import { unescape } from "./unescape.aipl";
 
-// The token kinds: three terminal classes that carry meaning, and one bare kind
-// for the punctuation the grammar matches by `Lit`.
-//
-// `Str` keeps its delimiter-stripped contents (the lexer's `Delimited` computes
-// them), but the concrete tree holds *spans*, not values — so lowering reads the
-// quoted source text back out and strips it itself. The payload is what makes a
-// string token tell itself apart from a number, which is all `Term` needs.
+# The token kinds: three terminal classes that carry meaning, and one bare kind
+# for the punctuation the grammar matches by `Lit`.
+#
+# `Str` keeps its delimiter-stripped contents (the lexer's `Delimited` computes
+# them), but the concrete tree holds *spans*, not values — so lowering reads the
+# quoted source text back out and strips it itself. The payload is what makes a
+# string token tell itself apart from a number, which is all `Term` needs.
 variant JsonTok = Str(str) | Num | Kw | Punct
 
-// The AST. `JNumber` keeps the source spelling (see the header); `JMember` is a
-// key/value pair and is meaningful only inside a `JObject`.
+# The AST. `JNumber` keeps the source spelling (see the header); `JMember` is a
+# key/value pair and is meaningful only inside a `JObject`.
 variant Json =
     | JNull
     | JBool(bool)
@@ -87,16 +87,16 @@ variant Json =
     | JObject(Json[])
     | JMember(str, Json)
 
-// Whitespace is recorded as **trivia** rather than skipped, so the concrete tree
-// covers every byte of the source and reconstructs it exactly. JSON has no
-// comments, so trivia is whitespace and nothing else.
-//
-// Rule order carries two decisions. `Float` sits ahead of `Int` because a bare
-// digit run doesn't match `Float` and `1.5` would otherwise lex as `1` then a
-// stray `.`. And `Exact("-")` sits ahead of both, which makes every `-` its own
-// token and `Int` unsigned — so the sign is the *grammar's* business
-// (`Maybe(Lit("-"))` in `number`), one place, rather than split between a
-// sign the lexer swallowed and one it didn't.
+# Whitespace is recorded as **trivia** rather than skipped, so the concrete tree
+# covers every byte of the source and reconstructs it exactly. JSON has no
+# comments, so trivia is whitespace and nothing else.
+#
+# Rule order carries two decisions. `Float` sits ahead of `Int` because a bare
+# digit run doesn't match `Float` and `1.5` would otherwise lex as `1` then a
+# stray `.`. And `Exact("-")` sits ahead of both, which makes every `-` its own
+# token and `Int` unsigned — so the sign is the *grammar's* business
+# (`Maybe(Lit("-"))` in `number`), one place, rather than split between a
+# sign the lexer swallowed and one it didn't.
 fn json_rules() -> TokenRule<JsonTok>[] {
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
     [
@@ -117,8 +117,8 @@ fn json_rules() -> TokenRule<JsonTok>[] {
 // One named function per production: `Build`'s function values must be
 // non-capturing and non-generic, so none of these can be a lambda.
 
-// The single alternative that matched, unwrapped. Every branch of `value` is a
-// rule *reference*, so exactly one interior child arrives.
+# The single alternative that matched, unwrapped. Every branch of `value` is a
+# rule *reference*, so exactly one interior child arrives.
 fn lower_value(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
     kids
         .first()
@@ -132,9 +132,9 @@ fn lower_object(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(JObje
 
 fn lower_array(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(JArray(kids)) }
 
-// A member's value is its one interior child; its key is the string token in
-// front of the `:`, which is a *leaf* and so has no lowered value — the node's
-// first token leaf is where it is read from.
+# A member's value is its one interior child; its key is the string token in
+# front of the `:`, which is a *leaf* and so has no lowered value — the node's
+# first token leaf is where it is read from.
 fn lower_member(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
     let key = node
         .token_leaves()
@@ -150,8 +150,8 @@ fn lower_string(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
     ok(JString(unquote(node.token_text(src)).unescape()))
 }
 
-// The spelling, sign included — `token_text` runs the matched tokens together
-// with nothing between them, which is exactly right for `-` followed by digits.
+# The spelling, sign included — `token_text` runs the matched tokens together
+# with nothing between them, which is exactly right for `-` followed by digits.
 fn lower_number(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
     ok(JNumber(node.token_text(src)))
 }
@@ -162,11 +162,16 @@ fn lower_bool(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
 
 fn lower_null(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(JNull) }
 
-// `s` without its first and last byte — a string token's surrounding quotes. The
-// lexer guarantees both are there (a `Delimited` match spans them), so this needs
-// no check of its own.
+# `s` without its first and last byte — a string token's surrounding quotes. The
+# lexer guarantees both are there (a `Delimited` match spans them), so this needs
+# no check of its own.
 fn unquote(s: str) -> str { s[1..s.len() - 1] }
 
+# The JSON grammar, with `value` as the start rule.
+#
+# Only `value` carries an `expect_as`, so a failure anywhere inside reports as
+# "a JSON value" rather than as the six alternatives it is made of — the
+# collapse that keeps a PEG's error messages readable.
 pub fn json_grammar() -> Grammar<JsonTok, Json> {
     let r_value: Rule<JsonTok> = OneOf([
         Named("object"),
@@ -212,13 +217,7 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
             Production { name: "null", rule: r_null, build: Mk(lower_null) },
         ],
     }
-}.doc("""
-    The JSON grammar, with `value` as the start rule.
-
-    Only `value` carries an `expect_as`, so a failure anywhere inside reports as
-    "a JSON value" rather than as the six alternatives it is made of — the
-    collapse that keeps a PEG's error messages readable.
-""").test({
+}.test({
     // The grammar as a reader would write it, derived from the same value the
     // driver parses with. A separated `Many` has no EBNF operator, so both lists render as
     // the separator longhand — and the strictness the flag encodes shows up as
@@ -257,13 +256,12 @@ fn lex_json(src: str) -> LexResult<JsonTok>!ParseError {
     src.lex(json_rules()).map_err(|e| ParseError { message: e.message, span: e.span })
 }
 
+# The lossless concrete tree for `src` — every byte of it under exactly one
+# leaf, whitespace included. Use this when the tree is the point; `parse_json`
+# when only the `Json` is.
 pub fn json_cst(src: str) -> Cst!ParseError {
     parse_cst(src, lex_json(src)?, json_grammar(), "value")
-}.doc("""
-    The lossless concrete tree for `src` — every byte of it under exactly one
-    leaf, whitespace included. Use this when the tree is the point; `parse_json`
-    when only the `Json` is.
-""").test({
+}.test({
     // The tree the eight productions build. Every alternative of `value` is a
     // rule *reference*, so a value is always a `value` node wrapping the node
     // that matched — which is what gives `lower_value` its single child. The
@@ -292,16 +290,15 @@ pub fn json_cst(src: str) -> Cst!ParseError {
     assert(json_cst(padded)?.text(padded) == padded);
 })
 
+# The `Json` `src` denotes: lex, parse to a concrete tree, lower it through
+# the grammar's `build` functions.
+#
+# Numbers arrive as their source spelling (`JNumber("1e9")`), since JSON's
+# number syntax is wider than any one AIPL type — parsing one is the
+# consumer's policy.
 pub fn parse_json(src: str) -> Json!ParseError {
     parse(src, lex_json(src)?, json_grammar(), "value")
-}.doc("""
-    The `Json` `src` denotes: lex, parse to a concrete tree, lower it through
-    the grammar's `build` functions.
-
-    Numbers arrive as their source spelling (`JNumber("1e9")`), since JSON's
-    number syntax is wider than any one AIPL type — parsing one is the
-    consumer's policy.
-""").test({
+}.test({
     // ---- the terminal classes, one at a time ----
     assert(parse_json("null")? == JNull);
     assert(parse_json("true")? == JBool(true));
@@ -356,6 +353,15 @@ pub fn parse_json(src: str) -> Json!ParseError {
     assert(msg_of("@") == "unexpected character");
 })
 
+# `self` printed back as JSON source, in one canonical compact spelling: no
+# spaces, no trailing separators, strings escaped.
+#
+# Round-trips with `parse_json` — `parse_json(render_json(v)) == v` for every
+# `v` a parse produced — which is what makes the pair a usable end-to-end check
+# of the library.
+#
+# A bare `JMember` renders as the `"key":value` it is; it is only meaningful
+# inside a `JObject`, which is where a parse ever puts one.
 pub fn render_json(self: Json) -> str {
     match (self) {
         JNull => "null",
@@ -366,17 +372,7 @@ pub fn render_json(self: Json) -> str {
         JObject(ms) => `\{{ms.map(render_json).join(sep=",")}}`,
         JMember(k, v) => `"{escape_json(k)}":{v.render_json()}`,
     }
-}.doc("""
-    `self` printed back as JSON source, in one canonical compact spelling: no
-    spaces, no trailing separators, strings escaped.
-
-    Round-trips with `parse_json` — `parse_json(render_json(v)) == v` for every
-    `v` a parse produced — which is what makes the pair a usable end-to-end check
-    of the library.
-
-    A bare `JMember` renders as the `"key":value` it is; it is only meaningful
-    inside a `JObject`, which is where a parse ever puts one.
-""").test({
+}.test({
     // ---- round trip: parse -> lower -> render -> parse ----
     let src = """{"name":"ada","tags":["x","y"],"n":-1.5,"ok":true,"nil":null}""";
     let v = parse_json(src)?;
@@ -401,9 +397,9 @@ pub fn render_json(self: Json) -> str {
     assert(render_json(JMember("k", JNull)) == "\"k\":null");
 })
 
-// The inverse of the `unescape` lowering applies: the two characters JSON
-// *requires* escaping, plus the control characters that have short forms. Enough
-// for the round trip, and for anything this library will parse back.
+# The inverse of the `unescape` lowering applies: the two characters JSON
+# *requires* escaping, plus the control characters that have short forms. Enough
+# for the round trip, and for anything this library will parse back.
 fn escape_json(s: str) -> str {
     mut out = "";
     for (let c : s) {
@@ -434,12 +430,12 @@ fn escape_json(s: str) -> str {
 
 // ---------- test-only helpers ----------
 
-// The message a failed parse reports — and a distinguishable string when it
-// unexpectedly succeeded, so a broken assertion says which way it broke.
+# The message a failed parse reports — and a distinguishable string when it
+# unexpectedly succeeded, so a broken assertion says which way it broke.
 fn msg_of(src: str) -> str { parse_json(src).map_ok(render_json).failure_message() }
 
-// The concrete tree, rendered against the production names — the debug view a
-// tree assertion reads better as than a nested `CTree` literal.
+# The concrete tree, rendered against the production names — the debug view a
+# tree assertion reads better as than a nested `CTree` literal.
 fn shown(src: str) -> str!ParseError { ok(json_cst(src)?.show(src, prod_names(json_grammar()))) }
 --- performance ---
 allocations: 11966

@@ -118,7 +118,7 @@
         </h2>
         <pre class="signature"><code>fn items() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -131,7 +131,7 @@
         </h2>
         <pre class="signature"><code>fn types() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -144,7 +144,7 @@
         </h2>
         <pre class="signature"><code>fn statements() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -157,7 +157,7 @@
         </h2>
         <pre class="signature"><code>fn expressions() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -170,7 +170,7 @@
         </h2>
         <pre class="signature"><code>fn expr_unary(x: Rule&#60;AiplTok&#62;) -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>unary</code> needs no transformation; the wrapper exists only so the <code>expressions</code> list above reads as one column of <code>p(name, rule)</code> calls.</p></div>
 
 
       </section>
@@ -183,7 +183,7 @@
         </h2>
         <pre class="signature"><code>fn patterns() -&#62; Production&#60;AiplTok, Ast&#62;[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -222,7 +222,7 @@
         </h2>
         <pre class="signature"><code>fn lex_lossless(text: str) -&#62; LexResult&#60;AiplTok&#62;!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The whole rule set, read losslessly — every byte accounted for by a token or a trivia record. Lexing and parsing report failure in the same shape but not the same type, so the conversion happens once, here.</p></div>
 
 
       </section>
@@ -261,7 +261,7 @@
         </h2>
         <pre class="signature"><code>fn p(name: str, rule: Rule&#60;AiplTok&#62;) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One production with the trivial lowering. Nothing here builds an AST — the tree is the product — so every production shares one <code>build</code>.</p></div>
 
 
       </section>
@@ -274,7 +274,7 @@
         </h2>
         <pre class="signature"><code>fn pl(name: str, rule: Rule&#60;AiplTok&#62;, expect_as: str) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The same, labelled: what an error blames when this production fails having matched nothing. The reified form of the LR parser's <code>SYMBOL_DISPLAY_NAMES</code>, which is why only the handful of rules a reader would name are labelled and every plumbing rule stays transparent.</p></div>
 
 
       </section>
@@ -287,7 +287,7 @@
         </h2>
         <pre class="signature"><code>variant Ast</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The placeholder an AST would be. <code>Build</code> has no payload-free arm to mean &quot;nothing to lower&quot;, so a production with nothing to lower passes this.</p></div>
 
 
         <ul class="cases">
@@ -306,7 +306,7 @@
         </h2>
         <pre class="signature"><code>fn keep(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -319,7 +319,7 @@
         </h2>
         <pre class="signature"><code>fn parses(src: str) -&#62; bool</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Test shorthand, so an assertion reads as the source it is about.</p></div>
 
 
       </section>

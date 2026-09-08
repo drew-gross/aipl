@@ -7,9 +7,8 @@ import { equal as == } from builtins;
 //
 // Indexing already yields an optional — `some(elem)` in bounds, `none` out of
 // bounds — so the empty case needs no special handling: `[][0]` is `none`.
-pub fn first<T: any>(self: T[]) -> T? { self[0] }.doc("""
-    The first element, or `none` if the array is empty.
-""").test({
+# The first element, or `none` if the array is empty.
+pub fn first<T: any>(self: T[]) -> T? { self[0] }.test({
     assert([1, 2, 3].first() == some(1));
     assert([7].first() == some(7));
     assert(first(["a", "b"]) == some("a")); // free-call form

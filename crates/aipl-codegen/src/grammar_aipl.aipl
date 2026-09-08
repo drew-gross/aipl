@@ -86,16 +86,15 @@ import { strip_test_sections } from "./strip_test_sections.aipl";
 
 // ---------- the grammar ----------
 
+# AIPL's grammar: the productions the driver in `parse.aipl` parses AIPL with,
+# starting at `program`.
+#
+# Split across five builder functions purely for reading — the array they
+# concatenate to is one flat production list, and position in it is identity
+# (a linked `NamedIdx` and a `CTree` both name a production by its index).
 pub fn aipl_grammar() -> Grammar<AiplTok, Ast> {
     prods: [..items(), ..types(), ..statements(), ..expressions(), ..patterns()],
-}.doc("""
-    AIPL's grammar: the productions the driver in `parse.aipl` parses AIPL with,
-    starting at `program`.
-
-    Split across five builder functions purely for reading — the array they
-    concatenate to is one flat production list, and position in it is identity
-    (a linked `NamedIdx` and a `CTree` both name a production by its index).
-""")
+}
 
 // ---------- items ----------
 
@@ -223,7 +222,10 @@ fn items() -> Production<AiplTok, Ast>[] {
         Then([Term(Name), Lit(":"), Named("expr")]),
         Then([Term(Name), Lit(","), Many(Named("field_init"), sep=some(Lit(",")))]),
     ]);
-    // `.test({ .. })` and `.doc("..")`, told apart by their argument.
+
+    // `.test({ .. })`, the only attribute. The string-argument form parses
+    // here and in gazelle so that the retired `.doc("..")` can be refused by
+    // name, with the migration to `# ..` lines in the message.
     let fn_attr: Rule<AiplTok> = Then([
         Lit("."),
         Term(Name),
@@ -730,8 +732,8 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     ]
 }
 
-// `unary` needs no transformation; the wrapper exists only so the `expressions`
-// list above reads as one column of `p(name, rule)` calls.
+# `unary` needs no transformation; the wrapper exists only so the `expressions`
+# list above reads as one column of `p(name, rule)` calls.
 fn expr_unary(x: Rule<AiplTok>) -> Rule<AiplTok> { x }
 
 // ---------- patterns ----------
@@ -777,28 +779,26 @@ fn patterns() -> Production<AiplTok, Ast>[] {
 
 // ---------- entry points ----------
 
-pub fn aipl_source(src: str) -> str { strip_test_sections(src) }.doc("""
-    The part of `src` that is AIPL: everything before the first
-    `--- section ---` marker, which is where a test-case file stops being source
-    and starts being expected output. `aipl_parser::parse` strips exactly this,
-    and `aipl_parse_cst` parses exactly this — so a losslessness assertion is
-    against this string, not the whole file.
-""")
+# The part of `src` that is AIPL: everything before the first
+# `--- section ---` marker, which is where a test-case file stops being source
+# and starts being expected output. `aipl_parser::parse` strips exactly this,
+# and `aipl_parse_cst` parses exactly this — so a losslessness assertion is
+# against this string, not the whole file.
+pub fn aipl_source(src: str) -> str { strip_test_sections(src) }
 
+# The lossless concrete syntax tree for AIPL source `src`, parsed by the
+# library against `aipl_grammar()`.
+#
+# Every byte of `aipl_source(src)` is under exactly one leaf. That needs the
+# lexer's rule set read *losslessly* (`keep_skipped`): the compiler's own
+# lexing skips whitespace outright, having no use for it, and a concrete tree
+# has to be able to put it back. Nothing else needs putting back — every other
+# byte, the braces around a template interpolation included, already sits
+# inside some token's span.
 pub fn aipl_parse_cst(src: str) -> Cst!ParseError {
     let text = aipl_source(src);
     parse_cst(text, lex_lossless(text)?, aipl_grammar(), "program")
-}.doc("""
-    The lossless concrete syntax tree for AIPL source `src`, parsed by the
-    library against `aipl_grammar()`.
-
-    Every byte of `aipl_source(src)` is under exactly one leaf. That needs the
-    lexer's rule set read *losslessly* (`keep_skipped`): the compiler's own
-    lexing skips whitespace outright, having no use for it, and a concrete tree
-    has to be able to put it back. Nothing else needs putting back — every other
-    byte, the braces around a template interpolation included, already sits
-    inside some token's span.
-""").test({
+}.test({
     // Losslessness, on something small enough to read: the leaves tile the
     // source, so concatenating them returns it whole.
     let src = "fn f() -> i64 { 1 }";
@@ -816,15 +816,23 @@ pub fn aipl_parse_cst(src: str) -> Cst!ParseError {
     assert(aipl_source(cased) == "fn main() { }\n\n");
 })
 
-// The whole rule set, read losslessly — every byte accounted for by a token or a
-// trivia record. Lexing and parsing report failure in the same shape but not the
-// same type, so the conversion happens once, here.
+# The whole rule set, read losslessly — every byte accounted for by a token or a
+# trivia record. Lexing and parsing report failure in the same shape but not the
+# same type, so the conversion happens once, here.
 fn lex_lossless(text: str) -> LexResult<AiplTok>!ParseError {
     text
         .lex(aipl_rules().keep_skipped())
         .map_err(|e| ParseError { message: e.message, span: e.span })
 }
 
+# What this grammar makes of `src`, in one string: empty when it parses *and*
+# its concrete tree reconstructs the source byte for byte, and otherwise a
+# line beginning `error:` (it did not parse, with the message) or `lossless:`
+# (it did, but the tree lost bytes).
+#
+# The FFI entry the corpus differential test calls — one crossing and one
+# parse per file, checking both properties at once. Rejection is half the
+# comparison: a grammar that accepts everything agrees with nothing.
 pub fn aipl_parse_report(src: str) -> str {
     let text = aipl_source(src);
     match (aipl_parse_cst(src)) {
@@ -835,16 +843,7 @@ pub fn aipl_parse_report(src: str) -> str {
         },
         err(e) => `error: {e.message}`,
     }
-}.doc("""
-    What this grammar makes of `src`, in one string: empty when it parses *and*
-    its concrete tree reconstructs the source byte for byte, and otherwise a
-    line beginning `error:` (it did not parse, with the message) or `lossless:`
-    (it did, but the tree lost bytes).
-
-    The FFI entry the corpus differential test calls — one crossing and one
-    parse per file, checking both properties at once. Rejection is half the
-    comparison: a grammar that accepts everything agrees with nothing.
-""").test({
+}.test({
     // Empty means both properties held.
     assert(aipl_parse_report("fn f() { }") == "");
 
@@ -864,16 +863,15 @@ pub fn aipl_parse_report(src: str) -> str {
     assert(aipl_parse_report("fn main() { }\n--- stdout ---\nx\n") == "");
 })
 
+# Whether `src` parses as AIPL. The FFI entry the corpus differential test
+# calls: it compares this against `aipl_parser::parse` succeeding, file by
+# file, over every `.aipl` in the repository.
 pub fn aipl_parses(src: str) -> bool {
     match (aipl_parse_cst(src)) {
         ok(..) => true,
         err(..) => false,
     }
-}.doc("""
-    Whether `src` parses as AIPL. The FFI entry the corpus differential test
-    calls: it compares this against `aipl_parser::parse` succeeding, file by
-    file, over every `.aipl` in the repository.
-""").test({
+}.test({
     // Doc comments in front of a declaration, and only there.
     assert(parses("# One line.\nfn f() { }"));
     assert(parses("# One.\n#\n# Two, after a blank line.\nstruct P { x: i64 }"));
@@ -923,6 +921,8 @@ pub fn aipl_parses(src: str) -> bool {
     assert(parses("fn f(v: V) { match (v) { none => { g(); }, some(x) => { h(x); } }; }"));
 
     // Attributes and the struct-literal body shorthand.
+    // The string-argument attribute parses; refusing `.doc` by name is the
+    // build action's job, not the grammar's.
     assert(parses("fn f() -> i64 { 1 }.doc(\"d\").test({ assert(f() == 1); })"));
     assert(parses("fn f(v: i64) -> P { v, next: none }"));
     assert(parses("fn f(v: P) -> P { ..v, x: 1 }"));
@@ -942,14 +942,14 @@ pub fn aipl_parses(src: str) -> bool {
 
 // ---------- production helpers ----------
 
-// One production with the trivial lowering. Nothing here builds an AST — the
-// tree is the product — so every production shares one `build`.
+# One production with the trivial lowering. Nothing here builds an AST — the
+# tree is the product — so every production shares one `build`.
 fn p(name: str, rule: Rule<AiplTok>) -> Production<AiplTok, Ast> { name, rule, build: Mk(keep) }
 
-// The same, labelled: what an error blames when this production fails having
-// matched nothing. The reified form of the LR parser's `SYMBOL_DISPLAY_NAMES`,
-// which is why only the handful of rules a reader would name are labelled and
-// every plumbing rule stays transparent.
+# The same, labelled: what an error blames when this production fails having
+# matched nothing. The reified form of the LR parser's `SYMBOL_DISPLAY_NAMES`,
+# which is why only the handful of rules a reader would name are labelled and
+# every plumbing rule stays transparent.
 fn pl(name: str, rule: Rule<AiplTok>, expect_as: str) -> Production<AiplTok, Ast> {
     name,
     rule,
@@ -957,13 +957,13 @@ fn pl(name: str, rule: Rule<AiplTok>, expect_as: str) -> Production<AiplTok, Ast
     expect_as,
 }
 
-// The placeholder an AST would be. `Build` has no payload-free arm to mean
-// "nothing to lower", so a production with nothing to lower passes this.
+# The placeholder an AST would be. `Build` has no payload-free arm to mean
+# "nothing to lower", so a production with nothing to lower passes this.
 variant Ast = Ignored
 
 fn keep(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError { ok(Ignored) }
 
-// Test shorthand, so an assertion reads as the source it is about.
+# Test shorthand, so an assertion reads as the source it is about.
 fn parses(src: str) -> bool { aipl_parses(src) }
 --- performance ---
 allocations: 330190

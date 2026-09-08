@@ -12,12 +12,12 @@ import { lines } from "./lines.aipl";
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
 
-// Replaces the body of the `--- section ---` block in `contents` with `body`
-// (dropping the old body up to the next header line or EOF), preserving
-// everything else. Only ever called once `fill_or_add_section` has confirmed
-// `section` is present, so the "not found" fallthrough below is never actually
-// hit by a real caller — it falls out of the line-walk for free, not worth
-// special-casing away.
+# Replaces the body of the `--- section ---` block in `contents` with `body`
+# (dropping the old body up to the next header line or EOF), preserving
+# everything else. Only ever called once `fill_or_add_section` has confirmed
+# `section` is present, so the "not found" fallthrough below is never actually
+# hit by a real caller — it falls out of the line-walk for free, not worth
+# special-casing away.
 fn fill_section(contents: str, section: str, body: str) -> str {
     // Walk `contents` line by line (matching Rust's `str::lines()`: no line
     // terminators kept, no trailing empty line for a final `\n`, but the final
@@ -55,10 +55,10 @@ fn fill_section(contents: str, section: str, body: str) -> str {
     out
 }
 
-// Whether `contents` already carries a `--- section ---` header. `lines`
-// mirrors plain `split("\n")` (a spurious trailing empty element for a final
-// `\n`), unlike Rust's `str::lines()` — harmless here since an empty line
-// never parses as a header.
+# Whether `contents` already carries a `--- section ---` header. `lines`
+# mirrors plain `split("\n")` (a spurious trailing empty element for a final
+# `\n`), unlike Rust's `str::lines()` — harmless here since an empty line
+# never parses as a header.
 fn contains_section(contents: str, section: str) -> bool {
     for (let line : contents.lines()) {
         if (parse_test_section_header(line) == some(section)) {
@@ -68,6 +68,11 @@ fn contains_section(contents: str, section: str) -> bool {
     false
 }
 
+# Replaces the body of the `--- section ---` block in `contents` with `body`
+# (dropping the old body up to the next header line or EOF), preserving
+# everything else; or, when `contents` doesn't already carry that section,
+# appends `--- section ---\\n<body>\\n` (after dropping trailing newlines)
+# instead of requiring it to exist.
 pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
     if (contains_section(contents, section)) {
         fill_section(contents, section, body)
@@ -80,13 +85,7 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
 
         ```
     }
-}.doc("""
-    Replaces the body of the `--- section ---` block in `contents` with `body`
-    (dropping the old body up to the next header line or EOF), preserving
-    everything else; or, when `contents` doesn't already carry that section,
-    appends `--- section ---\\n<body>\\n` (after dropping trailing newlines)
-    instead of requiring it to exist.
-""").test({
+}.test({
     // Fixtures below embed real `--- name ---` marker lines inside `"""` raw
     // strings. That's safe: this file is itself parsed through
     // `strip_test_sections`, which only cuts at a marker line that starts at
@@ -269,9 +268,9 @@ deallocations: 59
 reallocations: 0
 bytes allocated: 5328
 instructions executed: 10410
-binary size: 13200
+binary size: 13192
   code: 6212
-  data: 2792
+  data: 2784
   metadata: 4196
 functions:
   __eq_str$opt:

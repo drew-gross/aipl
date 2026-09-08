@@ -7,6 +7,7 @@ import { trim_end_while } from "./trim_end_while.aipl";
 import { trim_prefix } from "./trim_prefix.aipl";
 import { trim_suffix } from "./trim_suffix.aipl";
 
+# Processes a raw string's verbatim contents: trims a blank opening line and a blank closing line (with a CR before it on CRLF), then strips the common leading-space indentation via `dedent`.
 pub fn process_raw_string(s: str) -> str {
     // Drop a blank opening line. Trailing whitespace is a compile error (even
     // inside a string), so the opening `"""` line can carry no spaces/tabs before
@@ -31,7 +32,7 @@ pub fn process_raw_string(s: str) -> str {
         opened
     };
     trimmed.dedent()
-}.doc("Processes a raw string's verbatim contents: trims a blank opening line and a blank closing line (with a CR before it on CRLF), then strips the common leading-space indentation via `dedent`.").test({
+}.test({
     // Blank opening + closing lines are dropped, then the common indent is
     // stripped — the usual `"""` shape.
     assert(process_raw_string("\n    a\n    b\n    ") == "a\nb");

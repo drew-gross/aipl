@@ -22,14 +22,13 @@ import { all, is_whitespace, logical_not as ! } from builtins;
 //
 // Empty is all-whitespace, by `all`'s vacuous truth — the same answer the native
 // version gave, and consistent with `"".trim() == ""`.
-pub fn is_all_whitespace(self: str) -> bool { self.all(is_whitespace) }.doc("""
-    True when every char of `self` is ASCII whitespace — space, tab, newline,
-    carriage return, vertical tab or form feed — and true for the empty string.
-    Callable as a method: `s.is_all_whitespace()`.
-
-    See `is_whitespace` for the per-char predicate, and `is_space` for the
-    narrower four-character one.
-""").test({
+# True when every char of `self` is ASCII whitespace — space, tab, newline,
+# carriage return, vertical tab or form feed — and true for the empty string.
+# Callable as a method: `s.is_all_whitespace()`.
+#
+# See `is_whitespace` for the per-char predicate, and `is_space` for the
+# narrower four-character one.
+pub fn is_all_whitespace(self: str) -> bool { self.all(is_whitespace) }.test({
     assert(" ".is_all_whitespace());
     assert("   ".is_all_whitespace());
     assert("\t".is_all_whitespace());

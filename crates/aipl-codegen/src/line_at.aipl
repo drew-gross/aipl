@@ -1,9 +1,3 @@
-// The error renderer's line locator: the compiler calls this through the FFI
-// (see `install_parser_hooks`) when rendering an error with a span. Given
-// `source` and a byte `offset`, it returns the 0-based line index and the
-// line's byte range — from its first byte up to the '\n' terminator (or
-// source.len() for the last line). The range is a `Span`, so a caller can
-// slice the line straight out of the source with `source[at.span]`.
 import {
     Span,
     equal as ==,
@@ -15,6 +9,12 @@ import {
 
 struct LineAt { line: u64, span: Span }
 
+# The error renderer's line locator: the compiler calls this through the FFI
+# (see `install_parser_hooks`) when rendering an error with a span. Given
+# `source` and a byte `offset`, it returns the 0-based line index and the
+# line's byte range — from its first byte up to the '\n' terminator (or
+# source.len() for the last line). The range is a `Span`, so a caller can
+# slice the line straight out of the source with `source[at.span]`.
 pub fn line_at(source: str, offset: u64) -> LineAt {
     mut line: u64 = 0;
     mut line_start: u64 = 0;

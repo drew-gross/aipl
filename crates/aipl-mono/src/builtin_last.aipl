@@ -6,9 +6,8 @@ import { equal as ==, len, wrapping_sub as - } from builtins;
 // On an empty array `len() - 1` wraps, and an out-of-range index is `none` —
 // the same answer the empty case wants, by the ordinary index rule rather than
 // a special case.
-pub fn last<T: any>(self: T[]) -> T? { self[self.len() - 1] }.doc("""
-    The last element, or `none` if the array is empty.
-""").test({
+# The last element, or `none` if the array is empty.
+pub fn last<T: any>(self: T[]) -> T? { self[self.len() - 1] }.test({
     assert([1, 2, 3].last() == some(3));
     assert([7].last() == some(7));
     assert(last(["a", "b"]) == some("b")); // free-call form

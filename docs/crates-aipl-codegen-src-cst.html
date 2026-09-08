@@ -55,7 +55,7 @@
         </h2>
         <pre class="signature"><code>variant Cst</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
         <ul class="cases">
@@ -78,7 +78,7 @@
         </h2>
         <pre class="signature"><code>pub fn is_tree(self: Cst) -&#62; bool</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Whether <code>self</code> is an interior node. The parser's lowering pass hands a production's <code>build</code> only the values of its *interior* children — a leaf has no lowered value, and its text is reachable from the node's own span — so this is the filter that decides what counts as a child.</p></div>
 
 
       </section>
@@ -91,7 +91,7 @@
         </h2>
         <pre class="signature"><code>pub fn leaves(self: Cst) -&#62; Span[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Every leaf span under <code>self</code>, in source order — token leaves and trivia alike. The whole losslessness property is stated in terms of this list: the spans are contiguous and cover the parsed source, so <code>text</code> is just &quot;slice each one and join&quot;.</p></div>
 
 
       </section>
@@ -104,7 +104,7 @@
         </h2>
         <pre class="signature"><code>pub fn text(self: Cst, src: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The source text <code>self</code> covers, reconstructed from its leaf spans. For a whole parse this equals the input exactly; that identity is the cheapest regression test there is for the driver's trivia handling, so the <code>.test</code> blocks assert it directly.</p></div>
 
 
       </section>
@@ -117,7 +117,7 @@
         </h2>
         <pre class="signature"><code>pub fn token_leaves(self: Cst) -&#62; Span[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Every *token* leaf span under <code>self</code>, in source order — <code>leaves</code> with the trivia dropped. The two are the lossless/meaningful pair: <code>leaves</code> keeps the comments and whitespace because reconstructing the source needs them, and this one drops them because a lowering function reading a token's spelling does not want the blank line in front of it.</p></div>
 
 
       </section>
@@ -130,7 +130,7 @@
         </h2>
         <pre class="signature"><code>pub fn token_text(self: Cst, src: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The text of the tokens under <code>self</code>, trivia dropped and nothing inserted between them — what a production's <code>build</code> reads a matched token's spelling from. Written for the single-token node that is the usual case; over a wider node the tokens run together (<code>( a b )</code> reads back as <code>(ab)</code>), which is why <code>text</code> and not this one is what reconstructs source.</p></div>
 
 
       </section>
@@ -143,7 +143,7 @@
         </h2>
         <pre class="signature"><code>pub fn span(self: Cst) -&#62; Span</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The span <code>self</code> covers: its first leaf's start through its last leaf's end. A node with no leaves at all — an interior node for a production that matched empty input, which <code>Maybe</code> and a zero-minimum <code>Many</code> can both produce — has no extent, and reports the empty <code>0..0</code>.</p></div>
 
 
       </section>
@@ -156,7 +156,7 @@
         </h2>
         <pre class="signature"><code>pub fn nodes(self: Cst) -&#62; Cst[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The interior children of <code>self</code> — its kids with the leaves dropped. This is the child list a production's <code>build</code> is lowered against, so its order and length are part of the contract between a grammar and its lowering functions: one entry per <code>Named</code> reference the rule matched, in the order it matched them.</p></div>
 
 
       </section>
@@ -169,7 +169,7 @@
         </h2>
         <pre class="signature"><code>pub fn own_tokens(self: Cst) -&#62; Span[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The token leaves <code>self</code> matched *directly* — one level down, not recursed into. The mirror of <code>nodes</code>: that one is a node's direct branches, this its direct leaves, and between them they are everything the node itself matched.</p><p>This is what a lowering function reads an operator or a keyword from. A <code>Climb</code> node's two operands arrive as interior children and the operator between them is a direct leaf, so <code>own_token_text</code> is the operator and nothing else — where <code>token_text</code> would hand back the whole expression's tokens run together. Trivia is dropped here as it is there.</p></div>
 
 
       </section>
@@ -182,7 +182,7 @@
         </h2>
         <pre class="signature"><code>pub fn own_token_text(self: Cst, src: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The source text of <code>self</code>'s direct token leaves, run together with nothing between them — the operator of a binary node, the keyword that opened a form.</p></div>
 
 
       </section>
@@ -195,7 +195,7 @@
         </h2>
         <pre class="signature"><code>fn is_leaf(self: Cst) -&#62; bool</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Whether <code>self</code> is a token leaf: not an interior node, and not trivia.</p></div>
 
 
       </section>
@@ -208,7 +208,7 @@
         </h2>
         <pre class="signature"><code>fn leaf_span(self: Cst) -&#62; Span</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The span of a leaf, for <code>own_tokens</code>'s <code>filter_map</code>. A non-leaf never reaches it (the filter runs first), and reports the empty span rather than failing.</p></div>
 
 
       </section>
@@ -221,7 +221,7 @@
         </h2>
         <pre class="signature"><code>pub fn show(self: Cst, src: str, names: str[]) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>self</code> rendered as an S-expression against the grammar's production names (<code>prod_names</code>), for tests and for reading a tree by eye: a leaf as its source text, a trivia leaf prefixed with <code>~</code>, an interior node as <code>(name kid kid ...)</code>. A production index with no name in <code>names</code> renders as <code>?</code> rather than failing — this is a debug rendering, not a checked one.</p></div>
 
 
       </section>

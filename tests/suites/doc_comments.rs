@@ -1,12 +1,11 @@
 //! `# text` doc comments: the documentation form that attaches to any
 //! declaration, not just to a function.
 //!
-//! These are Rust tests over inline source rather than `tests/cases/` files,
-//! against this repo's usual preference, and for a reason worth recording: a
-//! case file carrying `# ..` would put the new syntax in the corpus, and
-//! `cargo handoff` formats the corpus with the *live* `fmt.clif` before it
-//! regenerates one — the bootstrap deadlock in CLAUDE.md. Corpus cases arrive
-//! with the migration off `.doc("..")`, which pays the staged-IR dance anyway.
+//! The user-visible rules live in `tests/cases/docs/`, where a reviewer sees
+//! them as source and diagnostic. What is left here is what a case cannot
+//! express: the doc *text* a declaration ends up carrying, which nothing a
+//! program can print exposes — it reaches the world through `aipl doc`, the
+//! docs site, and the source index, each of which reads the AST field.
 
 use aipl::ast::Item;
 
@@ -104,29 +103,6 @@ fn does_not_swallow_set_literals_or_lint_markers() {
     let allow = "import { len, print } from builtins;\n\
                  fn f(s: str) !prints { print(s[3..s.len()]); #[allow]\n}";
     assert_eq!(parse(allow).items.len(), 2);
-}
-
-/// Documented twice is an error, not a silent winner — the mistake a migration
-/// from `.doc("..")` to `# ..` would otherwise leave behind.
-#[test]
-fn refuses_two_documentation_sources_on_one_function() {
-    let message = err("# Lines.\nfn f() -> i64 { 1 }.doc(\"Attribute.\")");
-    assert!(message.contains("documented twice"), "{message}");
-    // Either alone is fine.
-    assert_eq!(
-        doc_of("# Lines.\nfn f() -> i64 { 1 }").as_deref(),
-        Some("Lines.")
-    );
-    assert_eq!(
-        doc_of("fn f() -> i64 { 1 }.doc(\"Attribute.\")").as_deref(),
-        Some("Attribute.")
-    );
-}
-
-#[test]
-fn refuses_documentation_on_an_import() {
-    let message = err("# Why?\nimport { print } from builtins;");
-    assert!(message.contains("import cannot be documented"), "{message}");
 }
 
 /// What the index — and so the docs site — now sees for a type.

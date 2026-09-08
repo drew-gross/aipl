@@ -1,6 +1,11 @@
 import { equal as ==, not_equal as !=, wrapping_add as + } from builtins;
 import { parse_test_section_header } from "./parse_test_section_header.aipl";
 
+# Splits `src` at the first `--- name ---` test-section marker line into
+# `(main, sections)`: the source before the marker, and the marker plus
+# everything after it. When there is no marker, `sections` is empty and `main`
+# is all of `src`. The counterpart of `strip_test_sections`, which returns only
+# the `main` half. (`parse_test_section_header` classifies each line.)
 pub fn split_test_sections(src: str) -> (str, str) {
     // Like `strip_test_sections`, but returns both halves. Walk byte-by-byte
     // (the index and every slice below are byte-indexed), tracking the start of
@@ -25,13 +30,7 @@ pub fn split_test_sections(src: str) -> (str, str) {
     } else {
         (src, "")
     }
-}.doc("""
-    Splits `src` at the first `--- name ---` test-section marker line into
-    `(main, sections)`: the source before the marker, and the marker plus
-    everything after it. When there is no marker, `sections` is empty and `main`
-    is all of `src`. The counterpart of `strip_test_sections`, which returns only
-    the `main` half. (`parse_test_section_header` classifies each line.)
-""").test({
+}.test({
     // No marker: everything is main, sections empty.
     assert(split_test_sections("fn main() {}\n") == ("fn main() {}\n", ""));
     assert(split_test_sections("") == ("", ""));

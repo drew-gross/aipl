@@ -114,6 +114,10 @@ fn categorize(case: &str) -> &'static str {
         "Period" | "Comma" | "Colon" | "Semi" | "Question" | "Hash" | "LParen" | "RParen"
         | "LBrace" | "RBrace" | "LBracket" | "RBracket" => "punct",
         "Space" | "LineComment" | "BlockComment" | "AllowMarker" => "trivia",
+        // A `# ..` doc comment is *not* trivia — it is a token the grammar
+        // consumes in front of a declaration — so it gets a category of its own
+        // rather than folding in with `//`, which would hide the two swapping.
+        "DocComment" => "doc",
         other => panic!("unknown AiplTok case {other:?}"),
     }
 }

@@ -1604,7 +1604,7 @@ block81:
 ;   v60 = header
 ;   v112 = $inl27_self
 ;   ss20 = k
-;   ss21 = __idx$309
+;   ss21 = __idx$410
 ;   v125 = c
 ;   v125 = $inl26_c
 ;   v135 = i
@@ -1612,7 +1612,7 @@ block81:
 ;   v195 = path
 ;   v390 = $inl29_self
 ;   ss46 = k
-;   ss47 = __idx$309
+;   ss47 = __idx$410
 ;   v403 = c
 ;   v403 = $inl28_c
 ;   v413 = i
@@ -2868,7 +2868,7 @@ block21(v131: i64):
 ;   ss1 = out
 ;   ss2 = skipping
 ;   ss3 = line_start
-;   ss4 = __idx$1319
+;   ss4 = __idx$1313
 ;   v23 = c
 ;   v31 = i
 ;   v34 = line
@@ -3638,7 +3638,7 @@ block3(v5: i64):
 ;   ss1 = out
 ;   ss2 = skipping
 ;   ss3 = line_start
-;   ss4 = __idx$1319
+;   ss4 = __idx$1313
 ;   v25 = c
 ;   v33 = i
 ;   v36 = line
@@ -4365,7 +4365,7 @@ block52:
 ;   ss4 = out
 ;   ss5 = skipping
 ;   ss6 = line_start
-;   ss7 = __idx$1319
+;   ss7 = __idx$1313
 ;   v63 = c
 ;   v71 = i
 ;   v74 = line
@@ -5075,7 +5075,7 @@ block3:
 ;   ss1 = prev2
 ;   ss2 = ws_start
 ;   ss3 = line_start
-;   ss4 = __idx$1881
+;   ss4 = __idx$2132
 ;   v17 = c
 ;   v21 = i
 ;   v34 = s
@@ -44317,7 +44317,7 @@ block3:
 ;   ss0 = line
 ;   ss1 = line_start
 ;   ss2 = found
-;   ss3 = __idx$785
+;   ss3 = __idx$779
 ;   v16 = c
 ;   v20 = i
 ; __m2__lines
@@ -44483,7 +44483,7 @@ block3:
 ;   v1 = self
 ;   v19 = $inl71_self
 ;   ss5 = k
-;   ss6 = __idx$309
+;   ss6 = __idx$410
 ;   v29 = c
 ;   v29 = $inl70_c
 ;   v43 = i
@@ -53006,7 +53006,7 @@ block185(v1181: i64):
 ;   v3 = buf
 ;   v3 = $inl73_self
 ;   ss0 = k
-;   ss1 = __idx$309
+;   ss1 = __idx$410
 ;   v13 = c
 ;   v13 = $inl72_c
 ;   v27 = i
@@ -53701,7 +53701,7 @@ block9(v53: i64):
 ;   v5 = opened
 ;   v5 = $inl75_self
 ;   ss2 = k
-;   ss3 = __idx$309
+;   ss3 = __idx$410
 ;   v15 = c
 ;   v15 = $inl74_c
 ;   v29 = i
@@ -54676,7 +54676,7 @@ block19:
 ; source variables:
 ;   v1 = src
 ;   ss0 = line_start
-;   ss1 = __idx$652
+;   ss1 = __idx$1027
 ;   v11 = c
 ;   v19 = i
 ; __m7__strip_test_sections
@@ -54892,7 +54892,7 @@ block19:
 ; source variables:
 ;   v1 = src
 ;   ss0 = line_start
-;   ss1 = __idx$647
+;   ss1 = __idx$1012
 ;   v11 = c
 ;   v19 = i
 ; __m3__trim_prefix
@@ -55540,7 +55540,7 @@ block3:
 ; source variables:
 ;   v1 = self
 ;   ss0 = k
-;   ss1 = __idx$309
+;   ss1 = __idx$410
 ;   v11 = c
 ;   v11 = $inl26_c
 ;   v21 = i
@@ -55647,7 +55647,7 @@ block3:
 ; source variables:
 ;   v1 = self
 ;   ss0 = k
-;   ss1 = __idx$309
+;   ss1 = __idx$410
 ;   v11 = c
 ;   v11 = $inl28_c
 ;   v21 = i
@@ -56333,7 +56333,7 @@ block3:
 ; source variables:
 ;   v1 = self
 ;   ss0 = k
-;   ss1 = __idx$309
+;   ss1 = __idx$410
 ;   v11 = c
 ;   v11 = $inl40_c
 ;   v25 = i
@@ -58756,7 +58756,7 @@ block3:
 ; source variables:
 ;   v1 = self
 ;   ss0 = k
-;   ss1 = __idx$309
+;   ss1 = __idx$410
 ;   v11 = c
 ;   v11 = $inl70_c
 ;   v25 = i
@@ -58871,7 +58871,7 @@ block3:
 ; source variables:
 ;   v1 = self
 ;   ss0 = k
-;   ss1 = __idx$309
+;   ss1 = __idx$410
 ;   v11 = c
 ;   v11 = $inl72_c
 ;   v25 = i
@@ -59010,7 +59010,7 @@ block3:
 ; source variables:
 ;   v1 = self
 ;   ss0 = k
-;   ss1 = __idx$309
+;   ss1 = __idx$410
 ;   v11 = c
 ;   v11 = $inl74_c
 ;   v25 = i
@@ -80021,7 +80021,7 @@ block342:
 ;   ss0 = toks
 ;   ss1 = trivia
 ;   v24 = n
-;   ss2 = __idx$42560
+;   ss2 = __idx$42311
 ;   v56 = txt
 ;   v58 = k
 ;   v66 = $inl96_self

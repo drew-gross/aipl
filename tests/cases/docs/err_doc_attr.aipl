@@ -1,0 +1,13 @@
+import { wrapping_add as + } from builtins;
+
+// `.doc("..")` was the old documentation form. It still parses, so that it can
+// be refused by name with the migration in the message.
+pub fn add(a: i64, b: i64) -> i64 {
+    a + b
+}.doc("Adds two integers.")
+--- errors ---
+error: `.doc("..")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants
+ --> ./tests/cases/docs/err_doc_attr.aipl:7:3
+  |
+7 | }.doc("Adds two integers.")
+  |   ^^^

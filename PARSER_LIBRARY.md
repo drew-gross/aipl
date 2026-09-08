@@ -223,7 +223,8 @@ the opening delimiter, and the tokens tile the literal.
 **The 11 files where the two disagree are all one thing**, and the test lists them
 with the message fragment that identifies each: gazelle's grammar accepts them
 and its *build action* refuses them — `..` outside an array literal, a `#{ .. }`
-mixing set and dict entries, `.doc({..})`, an unknown type-parameter bound,
+mixing set and dict entries, a string-argument function attribute, an
+unknown type-parameter bound,
 alternation binders that disagree, the body shorthand without a struct return
 type. They are exactly the checks Stage 5 has to reproduce when this grammar
 grows `build` functions, so they are pinned rather than waved through.

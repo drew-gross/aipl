@@ -8,12 +8,11 @@ import { equal as ==, first, is_empty, last, len, less_than as <, wrapping_sub a
 // happen to produce an empty array — but that is an accident of how a wrapped
 // `u64` is interpreted, not a stated rule. Spelling the empty case out keeps the
 // contract independent of that.
+# Every element except the last `n`. Dropping `n >= len` gives an empty array,
+# mirroring `drop_n`.
 pub fn drop_last_n<T: any>(self: T[], n: u64) -> T[] {
     if (self.len() < n) { self[..0] } else { self[..self.len() - n] }
-}.doc("""
-    Every element except the last `n`. Dropping `n >= len` gives an empty array,
-    mirroring `drop_n`.
-""").test({
+}.test({
     assert([1, 2, 3].drop_last_n(1).len() == 2);
     assert([1, 2, 3].drop_last_n(1).last() == some(2));
     assert([1, 2, 3].drop_last_n(0).len() == 3);

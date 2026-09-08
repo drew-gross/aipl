@@ -57,20 +57,20 @@ import {
 import { Bare, CharRun, LexResult, Of, OneChar, ToEol, TokenRule, lex } from "./lexer.aipl";
 import { parse, parse_cst } from "./parse.aipl";
 
-// The token kinds. One terminal class carrying its text, and one bare kind for
-// the parentheses — the grammar matches those by `Lit`, so their kind never
-// has to be distinguished.
+# The token kinds. One terminal class carrying its text, and one bare kind for
+# the parentheses — the grammar matches those by `Lit`, so their kind never
+# has to be distinguished.
 variant SexpKind = Atom(str) | Punct
 
-// The AST an S-expression lowers to: a bare atom, or a list of them. Recursive
-// through an array, so a `Sexp` is a refcounted heap block — the shape a
-// `build` function value had to be proven able to return.
+# The AST an S-expression lowers to: a bare atom, or a list of them. Recursive
+# through an array, so a `Sexp` is a refcounted heap block — the shape a
+# `build` function value had to be proven able to return.
 variant Sexp = SAtom(str) | SList(Sexp[])
 
-// Whitespace and `;` comments are recorded as **trivia** rather than skipped, so
-// the concrete tree covers every byte of the source and reconstructs it exactly
-// (asserted below). An atom is a run of the usual Lisp symbol characters, which
-// includes digits — this grammar has no number type, so `12` is just an atom.
+# Whitespace and `;` comments are recorded as **trivia** rather than skipped, so
+# the concrete tree covers every byte of the source and reconstructs it exactly
+# (asserted below). An atom is a run of the usual Lisp symbol characters, which
+# includes digits — this grammar has no number type, so `12` is just an atom.
 fn sexp_rules() -> TokenRule<SexpKind>[] {
     let space = " \t\r\n";
     let sym = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/<>=!?_.";
@@ -82,13 +82,13 @@ fn sexp_rules() -> TokenRule<SexpKind>[] {
     ]
 }
 
-// A `list` node's children are exactly its interior `item`s — the parentheses
-// are leaves, and leaves have no lowered value — so the list *is* its kids.
+# A `list` node's children are exactly its interior `item`s — the parentheses
+# are leaves, and leaves have no lowered value — so the list *is* its kids.
 fn lower_list(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError { ok(SList(kids)) }
 
-// An `item` is one of its two alternatives, told apart by whether it got an
-// interior child: the `list` branch lowered one, and the `Atom` branch matched a
-// bare token, whose spelling is the node's own text with trivia dropped.
+# An `item` is one of its two alternatives, told apart by whether it got an
+# interior child: the `list` branch lowered one, and the `Atom` branch matched a
+# bare token, whose spelling is the node's own text with trivia dropped.
 fn lower_item(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError {
     match (kids.first()) {
         some(inner) => ok(inner),
@@ -96,6 +96,13 @@ fn lower_item(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError {
     }
 }
 
+# The S-expression grammar: `list -> "(" item* ")"` and `item -> Atom | list`,
+# with `item` as the start rule so a bare atom is as much a program as a list
+# is.
+#
+# `item` is labelled and `list` is transparent, so a failure inside a list
+# reports as "an s-expression" rather than as the grammar's internals — the
+# collapse `expect_as` exists for.
 pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
     let r_list: Rule<SexpKind> = Then([Lit("("), Many(Named("item")), Lit(")")]);
     let r_item: Rule<SexpKind> = OneOf([Term(Atom), Named("list")]);
@@ -110,15 +117,7 @@ pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
             },
         ],
     }
-}.doc("""
-    The S-expression grammar: `list -> "(" item* ")"` and `item -> Atom | list`,
-    with `item` as the start rule so a bare atom is as much a program as a list
-    is.
-
-    `item` is labelled and `list` is transparent, so a failure inside a list
-    reports as "an s-expression" rather than as the grammar's internals — the
-    collapse `expect_as` exists for.
-""").test({
+}.test({
     // The two productions of the header comment, rendered back out of the value
     // the driver parses with rather than written by hand next to it.
     assert(
@@ -137,19 +136,18 @@ pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
     );
 })
 
-// Lexing and parsing report failure in the same shape but not the same type, so
-// the conversion happens once, here.
+# Lexing and parsing report failure in the same shape but not the same type, so
+# the conversion happens once, here.
 fn lex_sexp(src: str) -> LexResult<SexpKind>!ParseError {
     src.lex(sexp_rules()).map_err(|e| ParseError { message: e.message, span: e.span })
 }
 
+# The lossless concrete tree for `src` — every byte of it under exactly one
+# leaf, comments and whitespace included. Use this when the tree is the point;
+# `parse_sexp` when only the `Sexp` is.
 pub fn sexp_cst(src: str) -> Cst!ParseError {
     parse_cst(src, lex_sexp(src)?, sexp_grammar(), "item")
-}.doc("""
-    The lossless concrete tree for `src` — every byte of it under exactly one
-    leaf, comments and whitespace included. Use this when the tree is the point;
-    `parse_sexp` when only the `Sexp` is.
-""").test({
+}.test({
     // The tree the two productions build: one `item` node per element, and a
     // `list` node inside the `item` that took that alternative. The parentheses
     // are leaves of the `list`, since only a rule *reference* builds a node.
@@ -174,15 +172,14 @@ pub fn sexp_cst(src: str) -> Cst!ParseError {
     assert(shown(small)? == "(item (list ( (item a) )) ~  ~; tail)");
 })
 
+# The `Sexp` `src` denotes: lex, parse to a concrete tree, lower it through
+# the grammar's `build` functions.
+#
+# Fails with a `ParseError` carrying the span of the offending token, from
+# either half of the front end — a lex error is reported in the same shape.
 pub fn parse_sexp(src: str) -> Sexp!ParseError {
     parse(src, lex_sexp(src)?, sexp_grammar(), "item")
-}.doc("""
-    The `Sexp` `src` denotes: lex, parse to a concrete tree, lower it through
-    the grammar's `build` functions.
-
-    Fails with a `ParseError` carrying the span of the offending token, from
-    either half of the front end — a lex error is reported in the same shape.
-""").test({
+}.test({
     // ---- the two productions, and the recursion between them ----
     assert(parse_sexp("a")? == SAtom("a"));
     assert(parse_sexp("()")? == SList([]));
@@ -221,18 +218,17 @@ pub fn parse_sexp(src: str) -> Sexp!ParseError {
     assert(msg_of("(a #b)") == "unexpected character");
 })
 
+# `self` printed back as S-expression source, in the one canonical spelling:
+# atoms as themselves, a list as its elements joined by single spaces.
+#
+# Round-trips with `parse_sexp` — `parse_sexp(render_sexp(v)) == v` for every
+# `v` — which is what makes the pair a usable end-to-end check of the library.
 pub fn render_sexp(self: Sexp) -> str {
     match (self) {
         SAtom(a) => a,
         SList(xs) => `({xs.map(render_sexp).join(sep=" ")})`,
     }
-}.doc("""
-    `self` printed back as S-expression source, in the one canonical spelling:
-    atoms as themselves, a list as its elements joined by single spaces.
-
-    Round-trips with `parse_sexp` — `parse_sexp(render_sexp(v)) == v` for every
-    `v` — which is what makes the pair a usable end-to-end check of the library.
-""").test({
+}.test({
     // ---- round trip: parse -> lower -> render -> parse ----
     //
     // Rendering is canonical, so the second parse is what the assertion turns
@@ -270,9 +266,9 @@ pub fn render_sexp(self: Sexp) -> str {
 
 // ---------- test-only helpers ----------
 
-// How deeply `self` nests: an atom is 0, a list one more than its deepest
-// element. The deep-nesting assertion's whole content — a parse that silently
-// stopped early would show up here as a shallower tree.
+# How deeply `self` nests: an atom is 0, a list one more than its deepest
+# element. The deep-nesting assertion's whole content — a parse that silently
+# stopped early would show up here as a shallower tree.
 fn depth(self: Sexp) -> u64 {
     match (self) {
         SAtom(_) => 0,
@@ -289,12 +285,12 @@ fn depth(self: Sexp) -> u64 {
     }
 }
 
-// The message a failed parse reports — and a distinguishable string when it
-// unexpectedly succeeded, so a broken assertion says which way it broke.
+# The message a failed parse reports — and a distinguishable string when it
+# unexpectedly succeeded, so a broken assertion says which way it broke.
 fn msg_of(src: str) -> str { parse_sexp(src).map_ok(render_sexp).failure_message() }
 
-// The concrete tree, rendered against the production names — the debug view a
-// tree assertion reads better as than a nested `CTree` literal.
+# The concrete tree, rendered against the production names — the debug view a
+# tree assertion reads better as than a nested `CTree` literal.
 fn shown(src: str) -> str!ParseError { ok(sexp_cst(src)?.show(src, prod_names(sexp_grammar()))) }
 --- performance ---
 allocations: 26821

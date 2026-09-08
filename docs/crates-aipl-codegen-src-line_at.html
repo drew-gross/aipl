@@ -43,7 +43,7 @@
         </h2>
         <pre class="signature"><code>struct LineAt</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -56,7 +56,7 @@
         </h2>
         <pre class="signature"><code>pub fn line_at(source: str, offset: u64) -&#62; LineAt</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The error renderer's line locator: the compiler calls this through the FFI (see <code>install_parser_hooks</code>) when rendering an error with a span. Given <code>source</code> and a byte <code>offset</code>, it returns the 0-based line index and the line's byte range — from its first byte up to the '\n' terminator (or source.len() for the last line). The range is a <code>Span</code>, so a caller can slice the line straight out of the source with <code>source[at.span]</code>.</p></div>
 
 
       </section>

@@ -19,12 +19,16 @@ fn main() !prints {
     ```,
     );
 }
-// A mid-line opening (`... }.doc("""`): the block aligns to the opening line's
-// indentation (here 0) — closing at column 0, content one level deeper.
-fn documented() -> i64 { 0 }.doc("""
-Line one.
-Line two.
-""")
+// A mid-line opening (`let s = """`): the block aligns to the *opening line's*
+// indentation, not to its own column, so the closing triple lands under the
+// `let` and the content one level deeper.
+fn bound() -> str {
+    let s = """
+      Line one.
+    Line two.
+""";
+    s
+}
 --- formatted ---
 import { print } from builtins;
 
@@ -50,9 +54,13 @@ fn main() !prints {
     );
 }
 
-// A mid-line opening (`... }.doc("""`): the block aligns to the opening line's
-// indentation (here 0) — closing at column 0, content one level deeper.
-fn documented() -> i64 { 0 }.doc("""
-    Line one.
-    Line two.
-""")
+// A mid-line opening (`let s = """`): the block aligns to the *opening line's*
+// indentation, not to its own column, so the closing triple lands under the
+// `let` and the content one level deeper.
+fn bound() -> str {
+    let s = """
+          Line one.
+        Line two.
+    """;
+    s
+}

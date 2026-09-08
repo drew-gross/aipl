@@ -11,20 +11,19 @@ import { equal as ==, is_err_and, len, logical_not as !, map_err } from builtins
 // function's, so what is left for this is the result that is handed straight
 // back or stored rather than unwrapped — where a hand-written `match` would
 // otherwise rebuild both sides in order to change one.
+# `self` with its value side rewritten by `f`: `ok(v)` becomes `ok(f(v))`, and
+# `err(e)` passes through untouched (`f` is not called). Generic over both
+# value types and the error type, and callable as a method: `r.map_ok(f)`.
+#
+# The mirror of `map_err`. Where the error is the enclosing function's anyway,
+# `f(r?)` says the same thing more directly; this is for the result that is
+# returned or stored rather than unwrapped.
 pub fn map_ok<T: any, U: any, E: any>(self: T!E, f: (T) -> U) -> U!E {
     match (self) {
         ok(v) => ok(f(v)),
         err(e) => err(e), #[allow]
     }
-}.doc("""
-    `self` with its value side rewritten by `f`: `ok(v)` becomes `ok(f(v))`, and
-    `err(e)` passes through untouched (`f` is not called). Generic over both
-    value types and the error type, and callable as a method: `r.map_ok(f)`.
-
-    The mirror of `map_err`. Where the error is the enclosing function's anyway,
-    `f(r?)` says the same thing more directly; this is for the result that is
-    returned or stored rather than unwrapped.
-""").test({
+}.test({
     // ok: the value is rewritten, and the error type is carried along.
     assert(lex("fine").map_ok(shout)? == "fine!");
 
@@ -60,14 +59,14 @@ struct LexError { message: str, span: i64 }
 
 struct Tagged { text: str, n: i64 }
 
-// A named conversion, so the tests cover passing a function rather than a
-// lambda.
+# A named conversion, so the tests cover passing a function rather than a
+# lambda.
 fn shout(self: str) -> str { `{self}!` }.test({
     assert(shout("hi") == "hi!");
 })
 
-// Fails with a struct error, so the tests above cover an error payload that is
-// carried through untouched rather than a bare message.
+# Fails with a struct error, so the tests above cover an error payload that is
+# carried through untouched rather than a bare message.
 fn lex(s: str) -> str!LexError {
     if (s == "bad") { err(LexError { message: "unexpected", span: 3 }) } else { ok(s) }
 }.test({

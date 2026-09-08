@@ -123,7 +123,7 @@
         </h2>
         <pre class="signature"><code>variant JsonTok</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The token kinds: three terminal classes that carry meaning, and one bare kind for the punctuation the grammar matches by <code>Lit</code>.</p><p><code>Str</code> keeps its delimiter-stripped contents (the lexer's <code>Delimited</code> computes them), but the concrete tree holds *spans*, not values — so lowering reads the quoted source text back out and strips it itself. The payload is what makes a string token tell itself apart from a number, which is all <code>Term</code> needs.</p></div>
 
 
         <ul class="cases">
@@ -148,7 +148,7 @@
         </h2>
         <pre class="signature"><code>variant Json</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The AST. <code>JNumber</code> keeps the source spelling (see the header); <code>JMember</code> is a key/value pair and is meaningful only inside a <code>JObject</code>.</p></div>
 
 
         <ul class="cases">
@@ -179,7 +179,7 @@
         </h2>
         <pre class="signature"><code>fn json_rules() -&#62; TokenRule&#60;JsonTok&#62;[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Whitespace is recorded as **trivia** rather than skipped, so the concrete tree covers every byte of the source and reconstructs it exactly. JSON has no comments, so trivia is whitespace and nothing else.</p><p>Rule order carries two decisions. <code>Float</code> sits ahead of <code>Int</code> because a bare digit run doesn't match <code>Float</code> and <code>1.5</code> would otherwise lex as <code>1</code> then a stray <code>.</code>. And <code>Exact(&quot;-&quot;)</code> sits ahead of both, which makes every <code>-</code> its own token and <code>Int</code> unsigned — so the sign is the *grammar's* business (<code>Maybe(Lit(&quot;-&quot;))</code> in <code>number</code>), one place, rather than split between a sign the lexer swallowed and one it didn't.</p></div>
 
 
       </section>
@@ -192,7 +192,7 @@
         </h2>
         <pre class="signature"><code>fn lower_value(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The single alternative that matched, unwrapped. Every branch of <code>value</code> is a rule *reference*, so exactly one interior child arrives.</p></div>
 
 
       </section>
@@ -205,7 +205,7 @@
         </h2>
         <pre class="signature"><code>fn lower_object(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -218,7 +218,7 @@
         </h2>
         <pre class="signature"><code>fn lower_array(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -231,7 +231,7 @@
         </h2>
         <pre class="signature"><code>fn lower_member(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A member's value is its one interior child; its key is the string token in front of the <code>:</code>, which is a *leaf* and so has no lowered value — the node's first token leaf is where it is read from.</p></div>
 
 
       </section>
@@ -244,7 +244,7 @@
         </h2>
         <pre class="signature"><code>fn lower_string(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -257,7 +257,7 @@
         </h2>
         <pre class="signature"><code>fn lower_number(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The spelling, sign included — <code>token_text</code> runs the matched tokens together with nothing between them, which is exactly right for <code>-</code> followed by digits.</p></div>
 
 
       </section>
@@ -270,7 +270,7 @@
         </h2>
         <pre class="signature"><code>fn lower_bool(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -283,7 +283,7 @@
         </h2>
         <pre class="signature"><code>fn lower_null(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -296,7 +296,7 @@
         </h2>
         <pre class="signature"><code>fn unquote(s: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>s</code> without its first and last byte — a string token's surrounding quotes. The lexer guarantees both are there (a <code>Delimited</code> match spans them), so this needs no check of its own.</p></div>
 
 
       </section>
@@ -322,7 +322,7 @@
         </h2>
         <pre class="signature"><code>fn lex_json(src: str) -&#62; LexResult&#60;JsonTok&#62;!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -374,7 +374,7 @@
         </h2>
         <pre class="signature"><code>fn escape_json(s: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The inverse of the <code>unescape</code> lowering applies: the two characters JSON *requires* escaping, plus the control characters that have short forms. Enough for the round trip, and for anything this library will parse back.</p></div>
 
 
       </section>
@@ -387,7 +387,7 @@
         </h2>
         <pre class="signature"><code>fn msg_of(src: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The message a failed parse reports — and a distinguishable string when it unexpectedly succeeded, so a broken assertion says which way it broke.</p></div>
 
 
       </section>
@@ -400,7 +400,7 @@
         </h2>
         <pre class="signature"><code>fn shown(src: str) -&#62; str!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The concrete tree, rendered against the production names — the debug view a tree assertion reads better as than a nested <code>CTree</code> literal.</p></div>
 
 
       </section>

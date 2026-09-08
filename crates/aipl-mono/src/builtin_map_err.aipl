@@ -13,19 +13,18 @@ import { equal as ==, is_err_and, logical_not as !, value_or_err } from builtins
 // the other — one per pair of error types. `map_err` converts the error side and
 // leaves the ok side alone, so the bridge becomes part of the call:
 // `lex(src).map_err(|e| FmtError { message: e.message, span: e.span })?`.
+# `self` with its error side rewritten by `f`: `err(e)` becomes `err(f(e))`,
+# and `ok(v)` passes through untouched (`f` is not called). Generic over the
+# ok type and both error types, and callable as a method: `r.map_err(f)`.
+#
+# Bridges a call whose error type differs from the enclosing function's, so
+# `?` can propagate it.
 pub fn map_err<T: any, E: any, F: any>(self: T!E, f: (E) -> F) -> T!F {
     match (self) {
         ok(v) => ok(v), #[allow]
         err(e) => err(f(e)),
     }
-}.doc("""
-    `self` with its error side rewritten by `f`: `err(e)` becomes `err(f(e))`,
-    and `ok(v)` passes through untouched (`f` is not called). Generic over the
-    ok type and both error types, and callable as a method: `r.map_err(f)`.
-
-    Bridges a call whose error type differs from the enclosing function's, so
-    `?` can propagate it.
-""").test({
+}.test({
     // err: the payload is rewritten, ok type carried along unchanged.
     assert(lex("bad").map_err(to_fmt).is_err_and(|e| e.message == "unexpected"));
     assert(lex("bad").map_err(to_fmt).is_err_and(|e| e.span == 3));
@@ -68,16 +67,16 @@ struct LexError { message: str, span: i64 }
 
 struct FmtError { message: str, span: i64 }
 
-// A named conversion, so the tests cover passing a function rather than a
-// lambda — the two sides carry the same shape, which is exactly the case
-// `map_err` exists to bridge.
+# A named conversion, so the tests cover passing a function rather than a
+# lambda — the two sides carry the same shape, which is exactly the case
+# `map_err` exists to bridge.
 fn to_fmt(self: LexError) -> FmtError { message: self.message, span: self.span }.test({
     assert(to_fmt(LexError { message: "unexpected", span: 3 }).message == "unexpected");
     assert(to_fmt(LexError { message: "unexpected", span: 3 }).span == 3);
 })
 
-// Fails with a struct error, so the tests above cover rewriting a multi-field
-// payload as well as reading one field out of it.
+# Fails with a struct error, so the tests above cover rewriting a multi-field
+# payload as well as reading one field out of it.
 fn lex(s: str) -> str!LexError {
     if (s == "bad") { err(LexError { message: "unexpected", span: 3 }) } else { ok(s) }
 }.test({

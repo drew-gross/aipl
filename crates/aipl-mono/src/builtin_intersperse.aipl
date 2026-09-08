@@ -9,6 +9,13 @@ import { equal as ==, len, less_than as <, push } from builtins;
 // which only `str` can do — every element type can be interleaved, so that is
 // where the generic version stops. `Doc[]` is the motivating case, where the
 // result is handed to a `Concat`.
+# Insert `sep` between consecutive elements, returning a new array:
+# `[a, b, c].intersperse(s)` is `[a, s, b, s, c]`. An empty or single-element
+# array comes back unchanged — a separator only ever appears *between* two
+# elements, never leading or trailing.
+#
+# Generic over the element type and callable as a method. For `str[]` prefer
+# `join`, which does this and concatenates the result in one step.
 pub fn intersperse<T: any>(self: T[], sep: T) -> T[] {
     mut out = [];
     for (let i, x : self) {
@@ -18,15 +25,7 @@ pub fn intersperse<T: any>(self: T[], sep: T) -> T[] {
         set out.push(x);
     }
     out
-}.doc("""
-    Insert `sep` between consecutive elements, returning a new array:
-    `[a, b, c].intersperse(s)` is `[a, s, b, s, c]`. An empty or single-element
-    array comes back unchanged — a separator only ever appears *between* two
-    elements, never leading or trailing.
-
-    Generic over the element type and callable as a method. For `str[]` prefer
-    `join`, which does this and concatenates the result in one step.
-""").test({
+}.test({
     assert(["a", "b", "c"].intersperse("-").len() == 5);
     assert(["a", "b", "c"].intersperse("-")[1] == some("-"));
     assert(["a", "b"].intersperse("-")[0] == some("a"));

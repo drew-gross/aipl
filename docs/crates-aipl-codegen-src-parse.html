@@ -153,7 +153,7 @@
         </h2>
         <pre class="signature"><code>struct Far</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The furthest failure seen so far: the token position nothing could be matched at, and the deduped labels of everything that *was* expected there.</p><p>This is the reified form of what an LR table gives you for free — the state's expected-symbol set — and it is why <code>Production.expect_as</code> exists: under ordered choice a more specific alternative can fail deeper than the one that was really meant, so a label collapsing a family of rules to one word (&quot;an expression&quot;) is what keeps the message readable.</p></div>
 
 
       </section>
@@ -166,7 +166,7 @@
         </h2>
         <pre class="signature"><code>struct Step</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One rule's result at one position: whether it matched, where it left off, the CST children it contributed to its parent, and the furthest failure so far.</p><p><code>hit: false</code> is an ordinary non-match — the caller backtracks and tries something else — and is *not* an error. A <code>ParseError</code> is reserved for what no alternative could fix: a malformed grammar, or a <code>build</code> that refused.</p></div>
 
 
       </section>
@@ -179,7 +179,7 @@
         </h2>
         <pre class="signature"><code>struct Parser&#60;K: variant, A: any&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>What the driver parses against: the tokens, the trivia the lexer set aside, the linked productions, and <code>end</code> — one byte past the source's last byte.</p><p>The source itself is *not* here. Every token carries its own text (a <code>SpanStr</code>, see <code>lexer.aipl</code>), so matching a rule spelling reads the token and nothing else. <code>end</code> is all that remains of the source: the empty span at end of input, which <code>error_at</code> reports when a rule ran off the token list and there is no token to point at.</p></div>
 
 
       </section>
@@ -192,7 +192,7 @@
         </h2>
         <pre class="signature"><code>fn far_miss(far: Far, pos: u64, label: str) -&#62; Far</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>far</code> updated with &quot;<code>label</code> was expected at <code>pos</code>&quot;. Deeper wins outright; equally deep joins the expected set (deduped); shallower is discarded. An empty label is a *transparent* production and records nothing.</p></div>
 
 
       </section>
@@ -205,7 +205,7 @@
         </h2>
         <pre class="signature"><code>fn no(far: Far, pos: u64) -&#62; Step</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A non-match that leaves <code>pos</code> where the rule started (the caller backtracks).</p></div>
 
 
       </section>
@@ -218,7 +218,7 @@
         </h2>
         <pre class="signature"><code>fn miss(far: Far, pos: u64, label: str) -&#62; Step</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A non-match that also records what was expected.</p></div>
 
 
       </section>
@@ -231,7 +231,7 @@
         </h2>
         <pre class="signature"><code>fn tok_text&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The source text of token <code>i</code>, or <code>&quot;&quot;</code> past the end. Empty is a safe sentinel because no matcher in <code>lexer.aipl</code> ever produces an empty token.</p></div>
 
 
       </section>
@@ -244,7 +244,7 @@
         </h2>
         <pre class="signature"><code>fn prev_end&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; u64</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Where token <code>i - 1</code> ended — the start of the run of trivia that belongs in front of token <code>i</code>. Derived from the token positions rather than remembered, so backtracking can't leave it stale: re-consuming a token re-attaches exactly the same trivia.</p></div>
 
 
       </section>
@@ -257,7 +257,7 @@
         </h2>
         <pre class="signature"><code>fn leaf_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; Cst[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The CST children consuming token <code>i</code> contributes: every trivia record between the previous token and this one, then the token's own leaf. Attaching trivia *before* its following token is what makes the leaf spans tile the source with no gaps, which is the whole losslessness property.</p></div>
 
 
       </section>
@@ -270,7 +270,7 @@
         </h2>
         <pre class="signature"><code>fn trailing_trivia&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;) -&#62; Cst[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The trivia after the last token — a trailing comment or newline, which no token consumption can pick up. Appended to the root node so the tree still covers the source to its last byte.</p></div>
 
 
       </section>
@@ -283,7 +283,7 @@
         </h2>
         <pre class="signature"><code>fn with_trailing&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, root: Cst) -&#62; Cst</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -296,7 +296,7 @@
         </h2>
         <pre class="signature"><code>fn quoted(s: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -309,7 +309,7 @@
         </h2>
         <pre class="signature"><code>fn match_rule&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, r: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Match <code>r</code> at <code>pos</code>. <code>cur</code> is the index of the production being matched, which only <code>Climb</code> needs (each operator application nests under it).</p></div>
 
 
       </section>
@@ -322,7 +322,7 @@
         </h2>
         <pre class="signature"><code>fn match_term&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, k: Case&#60;K&#62;, pos: u64, far: Far) -&#62; Step</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Any one token whose kind is the case <code>k</code> — <code>Term(Name)</code> matches every identifier, whatever text it carries. <code>k</code> is a <code>Case&lt;K&gt;</code>: a case with no payload, so naming a kind needs no value of that kind.</p></div>
 
 
       </section>
@@ -335,7 +335,7 @@
         </h2>
         <pre class="signature"><code>fn match_spelling&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, s: str, pos: u64, far: Far) -&#62; Step</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>One token spelled exactly <code>s</code>.</p></div>
 
 
       </section>
@@ -348,7 +348,7 @@
         </h2>
         <pre class="signature"><code>fn match_then&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: Rule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Every rule in order; children concatenate. A failure anywhere rewinds the whole sequence to where it started — the caller decides what to try next.</p></div>
 
 
       </section>
@@ -361,7 +361,7 @@
         </h2>
         <pre class="signature"><code>fn match_one_of&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, rs: Rule&#60;K&#62;[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The first alternative that matches. Every alternative's expectations are kept in <code>far</code> whether it matched or not, which is what makes &quot;expected <code>(</code>, an identifier, or a number&quot; possible from a choice that failed on all three.</p></div>
 
 
       </section>
@@ -374,7 +374,7 @@
         </h2>
         <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>sub</code> until it stops matching, at least <code>min</code> times — and, with a <code>sep</code>, with that separator between consecutive items.</p><p>A rule that can match empty input would repeat forever here, and AIPL has no <code>break</code> to escape with — so a zero-width iteration is refused outright, the same invariant <code>lexer.aipl</code> keeps by having no matcher accept empty input. It is a grammar bug, reported as one rather than hung on.</p><p>The separated case is the same loop with one step in front of each item after the first. What the separator matched is held back until an item follows it, because a separator with nothing after it is only part of the list when <code>trailing_sep</code> says so; otherwise the position rewinds to before it and the enclosing rule is the one that complains — which is how <code>[1, 2,]</code> can be either the list or a list followed by a stray comma.</p></div>
 
 
       </section>
@@ -387,7 +387,7 @@
         </h2>
         <pre class="signature"><code>fn match_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: Rule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The separator step: what <code>sep</code> matched, or an empty match when there is none.</p></div>
 
 
       </section>
@@ -400,7 +400,7 @@
         </h2>
         <pre class="signature"><code>fn hit_nothing(pos: u64, far: Far) -&#62; Step</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A match that consumed nothing and succeeded — the identity step.</p></div>
 
 
       </section>
@@ -413,7 +413,7 @@
         </h2>
         <pre class="signature"><code>fn match_maybe&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p><code>sub</code>, or nothing. Always matches — but its expectations still reach <code>far</code>, so an optional part that was *started* and then went wrong still reports.</p></div>
 
 
       </section>
@@ -426,7 +426,7 @@
         </h2>
         <pre class="signature"><code>fn match_prod&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64, pos: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A reference to production <code>i</code> — and the only rule that builds a node. The production's own rule matches, and its children go into one <code>CTree(i, ..)</code>.</p><p>A labelled production that fails *without getting anywhere* reports as its label instead of as the expectations from inside it — the collapse <code>SYMBOL_DISPLAY_NAMES</code> performs for the LR parser, where <code>expr</code>/<code>term</code>/<code>atom</code> all render as &quot;expression&quot;. It matters more here than there: under ordered choice every alternative of a failed <code>OneOf</code> leaves its own expectation behind, so an uncollapsed message lists the grammar's internals.</p><p>&quot;Without getting anywhere&quot; is the operative test. When the production failed *deeper* than it started, that deeper expectation is the useful one and the label is not applied; when it failed at its own first token, the label replaces what it expected there — but only what *this* production contributed, since the incoming <code>far</code> (a sibling alternative's expectations at the same position) is what the label is merged into. A transparent production (empty <code>expect_as</code>) never collapses anything: its insides are the message.</p></div>
 
 
       </section>
@@ -439,7 +439,7 @@
         </h2>
         <pre class="signature"><code>fn find_prec(precs: Prec[], text: str, min_power: u64) -&#62; Prec?</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The precedence level <code>text</code> belongs to, if it binds at least as tightly as <code>min_power</code>. Levels are scanned in order, so a spelling listed twice takes the first. The empty string never matches — that is what <code>tok_text</code> returns past the end of the tokens, so running out of input simply ends the climb.</p></div>
 
 
       </section>
@@ -452,7 +452,7 @@
         </h2>
         <pre class="signature"><code>fn match_climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: Rule&#60;K&#62;, precs: Prec[], pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -465,7 +465,7 @@
         </h2>
         <pre class="signature"><code>fn climb&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, atom: Rule&#60;K&#62;, precs: Prec[], pos: u64, min_power: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Precedence climbing: an atom, then any operator binding at least as tightly as <code>min_power</code>, whose right-hand side is climbed at one power higher (or the same power, for a right-associative level).</p><p>Each application nests *both* operands under the enclosing production's index while leaving the outermost one flat, so <code>match_prod</code>'s own wrap completes the tree: <code>1 + 2 * 3</code> becomes <code>(expr (expr 1) + (expr (expr 2) * (expr 3)))</code> — one node per operand, shaped by precedence rather than a flat run the lowering would have to re-parse.</p></div>
 
 
       </section>
@@ -478,7 +478,7 @@
         </h2>
         <pre class="signature"><code>fn error_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, far: Far) -&#62; ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The error a furthest failure describes: what was expected there, and what was found instead. The span is the offending token's (or the empty span at the end of the source), which is what <code>caret_block.aipl</code> renders the underline from.</p></div>
 
 
       </section>
@@ -517,7 +517,7 @@
         </h2>
         <pre class="signature"><code>fn lower_node&#60;K: variant, A: any&#62;(src: str, node: Cst, prods: Production&#60;K, A&#62;[]) -&#62; A!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -543,7 +543,7 @@
         </h2>
         <pre class="signature"><code>fn tok_rules() -&#62; TokenRule&#60;Tok&#62;[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Lower-case words, digit runs, and one-character punctuation. Whitespace is skipped, so most assertions above are about grammar rather than layout; <code>trivia_rules</code> is the same set with whitespace and comments *recorded*, which is what the losslessness assertion needs.</p></div>
 
 
       </section>
@@ -556,7 +556,7 @@
         </h2>
         <pre class="signature"><code>fn trivia_rules() -&#62; TokenRule&#60;Tok&#62;[]</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -569,7 +569,7 @@
         </h2>
         <pre class="signature"><code>fn lex_toks(src: str, rules: TokenRule&#60;Tok&#62;[]) -&#62; LexResult&#60;Tok&#62;!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Lexing and parsing report failure in the same shape but not the same type, so the tests convert once here rather than at every call.</p></div>
 
 
       </section>
@@ -582,7 +582,7 @@
         </h2>
         <pre class="signature"><code>variant Node</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
         <ul class="cases">
@@ -603,7 +603,7 @@
         </h2>
         <pre class="signature"><code>fn build_node(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
 
 
       </section>
@@ -616,7 +616,7 @@
         </h2>
         <pre class="signature"><code>fn refuse(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>A <code>build</code> that always refuses, for the error-propagation assertion.</p></div>
 
 
       </section>
@@ -629,7 +629,7 @@
         </h2>
         <pre class="signature"><code>fn one(name: str, rule: Rule&#60;Tok&#62;) -&#62; Production&#60;Tok, Node&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -642,7 +642,7 @@
         </h2>
         <pre class="signature"><code>fn labelled_prod(name: str, rule: Rule&#60;Tok&#62;, expect_as: str) -&#62; Production&#60;Tok, Node&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -655,7 +655,7 @@
         </h2>
         <pre class="signature"><code>fn g_of(ps: Production&#60;Tok, Node&#62;[]) -&#62; Grammar&#60;Tok, Node&#62;</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
@@ -668,7 +668,7 @@
         </h2>
         <pre class="signature"><code>fn shown(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>Parse and render, so an assertion is one readable string rather than a nested <code>CTree</code> literal.</p></div>
 
 
       </section>
@@ -681,7 +681,7 @@
         </h2>
         <pre class="signature"><code>fn msg_of(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <div class="doc"><p>The message a failed parse reports — and a distinguishable string when it unexpectedly succeeded, so a broken assertion says which way it broke.</p></div>
 
 
       </section>
@@ -694,7 +694,7 @@
         </h2>
         <pre class="signature"><code>fn parsed(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; Node!ParseError</code></pre>
 
-        <p class="undocumented">No <code>.doc(&quot;..&quot;)</code> attached.</p>
+        <p class="undocumented">Undocumented.</p>
 
 
       </section>
