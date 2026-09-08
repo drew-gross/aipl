@@ -20,7 +20,7 @@ Everything remaining is one goal — **run the compiler on the AIPL parser and
 delete gazelle** — split into the pieces that can each be finished and judged on
 their own:
 
-- [ ] 5a Decide the bridge: how an AIPL parse becomes a Rust `Program`
+- [x] 5a Decide the bridge: how an AIPL parse becomes a Rust `Program`
 - [ ] 5b Wire FIRST-set pruning into the driver, and re-measure
 - [ ] 5c Extend the differential test from acceptance to tree/AST equality
 - [ ] 5d Lower AIPL's grammar to the AST
@@ -28,9 +28,9 @@ their own:
 - [ ] 5f Side-channels: `#[allow]` spans, trailing whitespace, doc attachment
 - [ ] 5g The bootstrap procedure, and the `DOGFOOD_SOURCE_FILES` switch
 
-5a gates the shape of 5d. 5b and 5c are worth doing whatever 5a decides, and
-between them they answer whether the switch is viable at all — so they come
-first.
+**5a is decided: lower in AIPL and marshal the result.** 5b and 5c are worth
+doing whatever, and between them they answer whether the switch is viable at all
+— so they come next.
 
 ## Context
 
@@ -144,27 +144,54 @@ never an AST, never a message. Rejection is half of it, and the ~100 deliberate
 syntax-error fixtures are what make that half mean something. So the language is
 recognized; everything the production parser does beyond recognizing is unbuilt.
 
-### 5a — Decide the bridge
+### 5a — The bridge. Done: lower in AIPL, marshal the result
 
 `grammar_aipl.aipl` ends with `variant Ast = Ignored` and all 54 productions pass
 `Mk(keep)`. Gazelle's `Build` has **86 action methods** producing
 `aipl_syntax::Program` — `Item`, `Signature`, `Function`, the `Type` enum, `Expr`
-with 32 `ExprKind` variants, `Pattern`. Nothing bridges the two, and which shape
-the bridge takes decides what 5d is:
+with 32 `ExprKind` variants, `Pattern`. The chosen bridge is to declare the AST
+in AIPL, lower to it in the `build` functions, and marshal the result across the
+FFI as an `FfiValue` the Rust side rebuilds into a `Program`.
 
-- **Lower in AIPL, marshal the result.** `FfiValue` carries
-  `Variant(String, Vec<FfiValue>)` and `Array` (`aipl-codegen/src/lib.rs:2480`),
-  so a recursive AST does cross. The cost is re-declaring the whole of
-  `aipl_syntax`'s AST in AIPL and keeping the two in step — a second place to
-  describe the same thing, which is the problem this project exists to remove.
-- **Return the `Cst` and build `Program` in Rust by walking it.** No AST
-  re-declaration, and the tree is already lossless and proven. The cost is that
-  `Build`/`Mk` — the library's whole lowering mechanism — goes unused by the one
-  grammar that matters most, which is worth admitting before building more of
-  it.
-- Move the loader to AIPL. Out of scope by a wide margin.
+The alternative — return the `Cst` and build `Program` in Rust by walking it —
+needs no AST re-declaration, but leaves `Build`/`Mk` unused by the grammar that
+matters most and puts the lowering back in Rust, which is the code this project
+is trying to delete. Re-declaring the AST is a real cost and is honestly the
+weaker half of this decision; it is accepted because the lowering, not the type
+declaration, is where the duplication actually hurts.
 
-This is a design decision, not an implementation task. Make it first.
+**The plan was not viable as written.** The FFI could not marshal a recursive
+type in either direction, which is what every syntax tree is. Three things were
+wrong and are now fixed, with tests in `tests/suites/ffi.rs`:
+
+- **`check_ffi_return` recursed forever.** It walks a variant's case payloads,
+  and a case mentioning its own type never bottoms out — so `call_values` on a
+  tree-returning function overflowed the stack rather than failing. It now
+  carries the set of named types already on the stack; marshalability is a
+  property of the type graph, not of a path through it.
+- **The reader read the pointer as the payload.** A boxed value is an 8-byte
+  pointer to a heap payload that has the type's ordinary inline layout, so the
+  fix is one deref and then the existing inline read — `read_ffi_boxed_payload`.
+  The payload is read *borrowing* whatever the caller's ownership: releasing per
+  constituent would double-release what the block still owns, so one
+  `dec_strong` after the read balances the callee's returned reference and the
+  drop cascade reclaims the children.
+- **A boxed return took the sret path.** It has a struct/variant layout like any
+  declared type, so the composite-return arms claimed it and read the returned
+  pointer word as a payload's first field. It is a register return, and is now
+  taken out of the running before those arms.
+
+Proven on the shape an AST actually is: a struct and a variant that reach each
+other (so *both* are boxed), carrying a non-boxed struct inline, an optional
+boxed field both ways, and an array of boxed values. Plus 10,000 iterations
+against a tree holding heap strings, since a refcount error is silent in one
+call.
+
+**Building a boxed value from the host is still refused**, and deliberately: the
+host cannot construct the refcounted block. That is fine for this bridge, which
+only ever reads one out. The refusal now says so on the top-level path too
+(previously reachable only for a boxed value nested inside a composite, so a
+boxed parameter got a generic shape-mismatch message instead).
 
 ### 5b — FIRST-set pruning, then re-measure
 
@@ -190,8 +217,15 @@ comparison.
 
 ### 5d — Lower AIPL's grammar to the AST
 
-The bulk of the work, and its shape follows from 5a. 54 productions against 86
-gazelle actions.
+The bulk of the work. Declare `aipl_syntax`'s AST as AIPL types, replace
+`variant Ast = Ignored` with it, and write the 54 `build` functions against the
+86 gazelle actions as the reference. The marshalling underneath is done and
+tested (5a); what is left is the AST declaration, the lowering, and the Rust-side
+`FfiValue` → `Program` reconstruction.
+
+Keeping the two AST declarations in step is the standing cost of this bridge. A
+test that walks both and compares shape — not just the differential in 5c — is
+worth having early.
 
 ### 5e — Error-message parity
 

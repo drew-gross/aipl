@@ -512,6 +512,134 @@ pub fn empty() -> Bag { Empty }";
     );
 }
 
+#[test]
+fn call_values_marshals_a_recursive_variant() {
+    // A variant whose payload is an array of itself — the shape every syntax
+    // tree is, and the one the AIPL-side AST in `PARSER_LIBRARY.md`'s stage 5
+    // rests on. `check_ffi_return` walks a variant's case payloads to decide
+    // marshalability, so a case that mentions its own type is where that walk
+    // would recurse forever if nothing stopped it; and the reader has to follow
+    // the same cycle at run time without a static depth to work from.
+    let src = "\
+variant Tree = Leaf(i64) | Node(Tree[])
+pub fn leaf() -> Tree { Leaf(7) }
+pub fn deep() -> Tree { Node([Leaf(1), Node([Leaf(2), Leaf(3)]), Node([])]) }";
+    let e = Engine::compile(src).unwrap();
+    use aipl::FfiValue::{Array, Int, Variant};
+    let leaf = |n| Variant("Leaf".into(), vec![Int(n)]);
+    assert_eq!(e.call_values("leaf", &[]).unwrap(), leaf(7));
+    assert_eq!(
+        e.call_values("deep", &[]).unwrap(),
+        Variant(
+            "Node".into(),
+            vec![Array(vec![
+                leaf(1),
+                Variant("Node".into(), vec![Array(vec![leaf(2), leaf(3)])]),
+                Variant("Node".into(), vec![Array(vec![])]),
+            ])]
+        )
+    );
+}
+
+#[test]
+fn call_values_marshals_a_mutually_recursive_ast() {
+    // The shape an AST actually is, and the one `PARSER_LIBRARY.md`'s
+    // "lower in AIPL, marshal the result" bridge stands or falls on: a struct
+    // and a variant that reach each other, so *both* are boxed, carrying a
+    // non-boxed struct (`Span`) inline, an optional boxed field, and an array of
+    // boxed values. Every edge here is one the reader has to follow differently.
+    let src = "\
+struct Span { start: i64, end: i64 }
+struct Expr { kind: Kind, span: Span }
+variant Kind = Num(i64) | Neg(Expr) | Call(str, Expr[]) | Tail(Expr?)
+
+fn at(k: Kind, s: i64, e: i64) -> Expr { kind: k, span: Span { start: s, end: e } }
+pub fn tree() -> Expr {
+    at(Call(\"f\", [at(Num(1), 2, 3), at(Neg(at(Num(4), 5, 6)), 7, 8)]), 0, 9)
+}
+pub fn empty_tail() -> Expr { at(Tail(none), 0, 1) }
+pub fn some_tail() -> Expr { at(Tail(some(at(Num(2), 3, 4))), 0, 5) }";
+    let e = Engine::compile(src).unwrap();
+    use aipl::FfiValue::{Array, Int, Opt, Str, Struct, Variant};
+
+    let span = |s, t| Struct(vec![("start".into(), Int(s)), ("end".into(), Int(t))]);
+    let expr = |k, s, t| Struct(vec![("kind".into(), k), ("span".into(), span(s, t))]);
+    let num = |n, s, t| expr(Variant("Num".into(), vec![Int(n)]), s, t);
+
+    assert_eq!(
+        e.call_values("tree", &[]).unwrap(),
+        expr(
+            Variant(
+                "Call".into(),
+                vec![
+                    Str("f".into()),
+                    Array(vec![
+                        num(1, 2, 3),
+                        expr(Variant("Neg".into(), vec![num(4, 5, 6)]), 7, 8),
+                    ]),
+                ]
+            ),
+            0,
+            9
+        )
+    );
+
+    // An optional boxed field, both ways — `none` must not be dereferenced.
+    assert_eq!(
+        e.call_values("empty_tail", &[]).unwrap(),
+        expr(Variant("Tail".into(), vec![Opt(None)]), 0, 1)
+    );
+    assert_eq!(
+        e.call_values("some_tail", &[]).unwrap(),
+        expr(
+            Variant("Tail".into(), vec![Opt(Some(Box::new(num(2, 3, 4))))]),
+            0,
+            5
+        )
+    );
+}
+
+#[test]
+fn reading_a_boxed_return_balances_its_refcount() {
+    // The reader takes the one strong reference the callee returned and releases
+    // it after reading, letting the drop cascade reclaim the children. Getting
+    // that wrong is silent in a single call — a leak grows nothing visible, and a
+    // double-release usually survives once — so call it enough times that neither
+    // does. A corrupt heap aborts here; a leak shows as RSS growth.
+    let src = "\
+variant Tree = Leaf(str) | Node(Tree[])
+pub fn tree() -> Tree { Node([Leaf(\"a heap string, not an inline one\"), Node([Leaf(\"b\")])]) }";
+    let e = Engine::compile(src).unwrap();
+    let first = e.call_values("tree", &[]).unwrap();
+    for _ in 0..10_000 {
+        assert_eq!(e.call_values("tree", &[]).unwrap(), first);
+    }
+}
+
+#[test]
+fn call_values_still_refuses_a_boxed_argument() {
+    // Reading a boxed value back is now supported; *building* one from the host
+    // is not, and the refusal must stay pointed rather than becoming a crash —
+    // the host has no way to construct the refcounted block the callee expects.
+    let src = "\
+variant Tree = Leaf(i64) | Node(Tree[])
+pub fn depth(t: Tree) -> i64 { 0 }";
+    let e = Engine::compile(src).unwrap();
+    let err = e
+        .call_values(
+            "depth",
+            &[aipl::FfiValue::Variant(
+                "Leaf".into(),
+                vec![aipl::FfiValue::Int(1)],
+            )],
+        )
+        .unwrap_err();
+    assert!(
+        format!("{err:?}").contains("recursive type"),
+        "expected a pointed refusal, got {err:?}"
+    );
+}
+
 /// Array returns over a spread of element types: scalars, `str`, `bool`
 /// (bit-packed), `char` (str-shaped), nested arrays, structs, and variants — the
 /// last being the shape the AIPL lexer needs (a `Token[]` token stream).

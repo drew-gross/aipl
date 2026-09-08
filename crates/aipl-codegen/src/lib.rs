@@ -5089,12 +5089,22 @@ impl Compilation {
         // A `Result<ok, err>` — each side a scalar/`str`/`Unit`/struct — is also
         // sret-returned, same shape as an optional but tagged/sized differently.
         let ret_is_result = matches!(info.return_ty, ConcreteType::Result(_, _));
+        // A *boxed* (recursive) return is one 8-byte pointer in a register, not an
+        // sret composite — its payload is on the heap, which is the whole point of
+        // boxing it. It has a struct/variant layout like any declared type, so it
+        // has to be taken out of the running before the two lines below claim it
+        // and read the returned pointer word as a payload's first field.
+        let ret_boxed = is_boxed(&info.return_ty, &self.structs);
         // A `struct` returned directly (not under an optional); read back field by
         // field from the sret buffer.
-        let ret_struct = ffi_struct_layout(&info.return_ty, &self.structs);
+        let ret_struct = (!ret_boxed)
+            .then(|| ffi_struct_layout(&info.return_ty, &self.structs))
+            .flatten();
         // A `variant` returned directly; read back tag + payload from the sret
         // buffer (same sret shape as a struct return).
-        let ret_variant = ffi_variant_layout(&info.return_ty, &self.structs);
+        let ret_variant = (!ret_boxed)
+            .then(|| ffi_variant_layout(&info.return_ty, &self.structs))
+            .flatten();
 
         // Marshal each argument to its `i64` ABI, validating the value against
         // the parameter type. Every buffer this allocates — heap `str`s, array
@@ -5206,6 +5216,23 @@ impl Compilation {
                     &self.structs,
                 )
             };
+            return Ok(result);
+        }
+
+        if ret_boxed {
+            // The callee returns the payload pointer in a register, owning one
+            // strong reference; read the payload behind it and hand that
+            // reference back.
+            // SAFETY: `args.len() <= 6` and every argument lowered to one `i64`.
+            let raw = unsafe { invoke(ptr, &abi) };
+            let payload = raw as *const u8;
+            if payload.is_null() {
+                return Ok(FfiValue::Int(0));
+            }
+            let result = unsafe {
+                read_ffi_boxed_payload(abi_kind, payload, &info.return_ty, &self.structs)
+            };
+            aipl_rec_dec_strong(payload);
             return Ok(result);
         }
 
@@ -5375,27 +5402,52 @@ fn check_ffi_return(
     ty: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
 ) -> Result<(), Error> {
+    check_ffi_return_seen(name, ty, structs, &mut HashSet::new())
+}
+
+/// `check_ffi_return`, carrying the set of named types already being checked.
+///
+/// A *recursive* type — a syntax tree, the shape every AST is — reaches itself
+/// through its own case payloads, so the plain recursion never terminates:
+/// `Tree` asks about `Node(Tree[])`, which asks about `Tree`. Marshalability is a
+/// property of the type graph rather than of a path through it, so a name already
+/// on the stack is already answered and returns `Ok` rather than descending
+/// again. Nothing is lost by that: if some *other* field of the cycle is
+/// unmarshalable, the walk still reaches it by a different edge and reports it.
+///
+/// The reader has no matching problem — `read_ffi_variant` follows the runtime
+/// tag, so it descends only into the case actually present and bottoms out at a
+/// leaf.
+fn check_ffi_return_seen(
+    name: &str,
+    ty: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+    seen: &mut HashSet<String>,
+) -> Result<(), Error> {
     if is_ffi_scalar(ty) || is_str_repr(ty) || is_unit(ty) {
         return Ok(());
     }
     match ty {
         // Peel optional layers down to the (shared, flattened) core.
-        ConcreteType::Optional(inner) => check_ffi_return(name, inner, structs),
+        ConcreteType::Optional(inner) => check_ffi_return_seen(name, inner, structs, seen),
         // Each side independently: same rules as a bare return.
         ConcreteType::Result(ok, err) => {
-            check_ffi_return(name, ok, structs)?;
-            check_ffi_return(name, err, structs)
+            check_ffi_return_seen(name, ok, structs, seen)?;
+            check_ffi_return_seen(name, err, structs, seen)
         }
         // An array marshals if its element type does (recursively). `char[]` —
         // whose element is a scalar — is read specially (str-shaped) but validates
         // the same way.
-        ConcreteType::Array(elem) => check_ffi_return(name, elem, structs),
-        ConcreteType::Named(_) => {
+        ConcreteType::Array(elem) => check_ffi_return_seen(name, elem, structs, seen),
+        ConcreteType::Named(n) => {
+            if !seen.insert(n.clone()) {
+                return Ok(());
+            }
             if let Some(layout) = ffi_struct_layout(ty, structs) {
                 // Each field must itself be marshalable — a field may be a nested
                 // struct/variant/array/optional (stored inline), so recurse.
                 for f in &layout.fields {
-                    if check_ffi_return(name, &f.ty, structs).is_err() {
+                    if check_ffi_return_seen(name, &f.ty, structs, seen).is_err() {
                         return Err(Error::msg(format!(
                             "fn {name:?} returns struct {} whose field {:?} is {}; the FFI can't \
                              marshal that field type",
@@ -5412,7 +5464,7 @@ fn check_ffi_return(
                 // is only known at runtime — recurse (a payload may be composite).
                 for case in &layout.cases {
                     for f in &case.fields {
-                        if check_ffi_return(name, &f.ty, structs).is_err() {
+                        if check_ffi_return_seen(name, &f.ty, structs, seen).is_err() {
                             return Err(Error::msg(format!(
                                 "fn {name:?} returns variant {} whose case {:?} has a payload of \
                                  type {}; the FFI can't marshal that payload type",
@@ -5646,6 +5698,18 @@ fn ffi_arg_word(
         !abi_is_composite(abi, ty, structs),
         "a composite goes through ffi_arg_abi"
     );
+    // A boxed value is a pointer word, so it lands here rather than in
+    // `write_ffi_arg` — which carries the same refusal for one nested inside a
+    // composite. Saying why beats the generic shape mismatch: the host passed a
+    // perfectly well-shaped `Variant`, and the reason it cannot be used has
+    // nothing to do with its shape. Returning one of these *is* supported.
+    if is_boxed(ty, structs) {
+        return Err(format!(
+            "is {}, a recursive type held behind a refcounted heap pointer; the FFI can't \
+             build one (it can return one)",
+            type_name(ty)
+        ));
+    }
     match v {
         FfiValue::Int(n) if is_ffi_scalar(ty) => Ok(*n),
         FfiValue::Str(s) if is_str_repr(ty) => Ok(bufs.str_value(s)),
@@ -5795,7 +5859,7 @@ unsafe fn write_ffi_arg(
     if is_boxed(ty, structs) {
         return Err(format!(
             "is {}, a recursive type held behind a refcounted heap pointer; the FFI can't \
-             build one",
+             build one (it can return one)",
             type_name(ty)
         ));
     }
@@ -5936,6 +6000,28 @@ unsafe fn read_ffi_borrowed(
     owned: bool,
     structs: &HashMap<String, TypeDef>,
 ) -> FfiValue {
+    // A boxed (recursive) value is a *pointer* to its payload, and the payload
+    // has the type's ordinary inline layout — so the whole of the read below is
+    // shared, one deref down. Without this the layout arms would read the
+    // pointer word itself as the payload's first field.
+    //
+    // The reference belongs to whoever handed it over, so the payload is read by
+    // *borrowing* (`owned: false`) whatever the caller's own ownership: releasing
+    // per constituent would double-release everything the block still owns. When
+    // this reference is owned, one `dec_strong` after the read balances the
+    // retain the callee did on return, and the cascade in `aipl_rec_dec_strong`
+    // reclaims the children.
+    if is_boxed(ty, structs) {
+        let payload = unsafe { *(at as *const *const u8) };
+        if payload.is_null() {
+            return FfiValue::Int(0);
+        }
+        let value = unsafe { read_ffi_boxed_payload(abi, payload, ty, structs) };
+        if owned {
+            aipl_rec_dec_strong(payload);
+        }
+        return value;
+    }
     if let Some(layout) = ffi_struct_layout(ty, structs) {
         return unsafe { read_ffi_struct(abi, at, layout, owned, structs) };
     }
@@ -5980,6 +6066,31 @@ unsafe fn read_ffi_borrowed(
         }
         _ => FfiValue::Int(unsafe { *(at as *const i64) }),
     }
+}
+
+/// Read the payload a boxed value's pointer points at. The payload has the
+/// type's ordinary inline struct/variant layout, so this is the inline read with
+/// the deref already done — and it borrows, the block owning its constituents.
+///
+/// SAFETY: `payload` must be the payload pointer of a live block of type `ty`.
+unsafe fn read_ffi_boxed_payload(
+    abi: Abi,
+    payload: *const u8,
+    ty: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+) -> FfiValue {
+    if let Some(layout) = ffi_struct_layout(ty, structs) {
+        return unsafe { read_ffi_struct(abi, payload, layout, false, structs) };
+    }
+    if let Some(layout) = ffi_variant_layout(ty, structs) {
+        return unsafe { read_ffi_variant(abi, payload, layout, false, structs) };
+    }
+    // `is_boxed` is true only for a declared struct or variant, so one of the two
+    // layouts above always answers.
+    unreachable!(
+        "boxed type {} is neither a struct nor a variant",
+        type_name(ty)
+    )
 }
 
 /// Read an array value `raw` (of element type `elem`) into an [`FfiValue::Array`]
