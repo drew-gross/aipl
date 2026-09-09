@@ -635,6 +635,7 @@ case_tests! {
     cases_tuples_destructure = "cases/tuples/destructure",
     cases_tuples_field_access = "cases/tuples/field_access",
     cases_tuples_for_loop_destructure = "cases/tuples/for_loop_destructure",
+    cases_tuples_optional_tuple = "cases/tuples/optional_tuple",
     cases_tuples_three_elements = "cases/tuples/three_elements",
     cases_tuples_vec_of_tuples = "cases/tuples/vec_of_tuples",
     cases_variants_basic = "cases/variants/basic",

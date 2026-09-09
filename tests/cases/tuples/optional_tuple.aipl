@@ -1,0 +1,66 @@
+import { equal as ==, print, to_str } from builtins;
+
+// `(A, B)?` — an optional tuple. A tuple type is not a `base_ty`, so it does not
+// inherit `base_ty`'s chained `?`/`[]` suffixes; each `(`-led form is its own
+// production, and this is the `?` one alongside `(A, B)[]` and `(A, B)!E`.
+fn lookup(want: bool) -> (i64, str)? { if (want) { some((7, "seven")) } else { none } }
+
+// It works as a parameter too. It does *not* chain into further suffixes:
+// `(A, B)?[]` is a parse error, because the `?` production yields a whole type
+// rather than a `base_ty` that more suffixes could attach to.
+fn describe(p: (i64, str)?) -> str {
+    match (p) {
+        some(pair) => `{pair.0.to_str()}={pair.1}`,
+        none => "nothing",
+    }
+}
+
+fn main() !prints {
+    print(describe(lookup(true)));
+    print(describe(lookup(false)));
+    print((lookup(true) == some((7, "seven"))).to_str());
+    print((lookup(false) == none).to_str());
+}
+--- stdout ---
+7=seven
+nothing
+true
+true
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 233
+instructions executed: 505
+binary size: 5096
+  code: 2928
+  data: 47
+  metadata: 2121
+functions:
+  __eq___tuple$i64$str:
+    calls: 1
+    bytes: 104
+  __eq___tuple$i64$str$opt:
+    calls: 2
+    bytes: 92
+  __to_str_bool:
+    calls: 2
+    bytes: 232
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  describe:
+    calls: 2
+    bytes: 604
+  main:
+    calls: 1
+    bytes: 1692

@@ -347,7 +347,12 @@ gazelle! {
            // so the `base_ty BANG base_ty` form above can't reach it; with
            // `BANG` as lookahead the parser shifts here instead of reducing
            // `tuple_ty`.
-           | LPAREN ty_args RPAREN BANG base_ty => tuple_result;
+           | LPAREN ty_args RPAREN BANG base_ty => tuple_result
+           // `(A, B)?` — an optional tuple, the twin of `tuple_array_ty`. Same
+           // reason it needs its own production rather than riding `base_ty
+           // QUESTION`: a tuple is not a `base_ty`. With `QUESTION` as lookahead
+           // the parser shifts here instead of reducing `tuple_ty`.
+           | LPAREN ty_args RPAREN QUESTION => tuple_optional;
         base_ty = IDENT => named
                 // `Foo<A, B>` — a use of a generic struct/variant with concrete
                 // type arguments. Only in type position (no expressions here),
@@ -1868,6 +1873,14 @@ impl gazelle::Action<aipl::Ty<Self>> for Build {
                     ));
                 }
                 Type::Result(Box::new(Type::Tuple(args)), Box::new(err))
+            }
+            aipl::Ty::TupleOptional(args) => {
+                if args.len() < 2 {
+                    return Err(Error::msg(
+                        "a tuple type needs at least 2 elements, e.g. (i64, str)?".to_string(),
+                    ));
+                }
+                Type::Optional(Box::new(Type::Tuple(args)))
             }
         })
     }
