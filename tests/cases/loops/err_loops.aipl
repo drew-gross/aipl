@@ -41,7 +41,7 @@ error: "==" between char and i64: both sides must be the same type
 11 |         let _ = c == 5;
    |                 ^^^^^^
 
-error: for-loop iterable must be a str or array, got i64
+error: for-loop iterable must be a str, array, or set, got i64
   --> ./tests/cases/loops/err_loops.aipl:18:18
    |
 18 |     for (let c : 42) {}

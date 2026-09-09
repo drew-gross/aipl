@@ -1,0 +1,129 @@
+import {
+    print,
+    push,
+    sort,
+    to_str,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+} from builtins;
+
+// `for (let x : s)` walks a set's elements. A set shares the array heap block
+// (see `is_heap` in `aipl-codegen`), so this is the array walk — same length
+// word, same element reads.
+//
+// **No order is promised.** A set is unordered, and the representation that
+// gives it an order today is not a guarantee to write code against, so every
+// assertion below either sorts the result or is order-independent.
+fn elems(s: #{str}) -> str[] {
+    mut out: str[] = []; #[allow]
+    for (let x : s) {
+        set out.push(x);
+    }
+    out
+}
+
+fn total(s: #{i64}) -> i64 {
+    mut n = 0;
+    for (let x : s) {
+        set n += x;
+    }
+    n
+}
+
+fn char_strs(s: #{char}) -> str[] {
+    mut out: str[] = []; #[allow]
+    for (let c : s) {
+        set out.push(c.to_str());
+    }
+    out
+}
+
+// `bool` elements are bit-packed in the block, so they read back through the
+// same unpacking the array walk already does.
+fn bool_score(s: #{bool}) -> i64 {
+    mut n = 0;
+    for (let b : s) {
+        if (b) {
+            set n++;
+        } else {
+            set n += 10;
+        };
+    }
+    n
+}
+
+fn main() !prints {
+    print(elems(#{"b", "a", "c", "a"}).sort().to_str());
+    print(total(#{1, 2, 3, 2}).to_str());
+    print(char_strs(#{'x', 'y', 'x'}).sort().to_str());
+    print(bool_score(#{true, false, true}).to_str());
+
+    // An empty set yields no iterations.
+    let empty: #{i64} = #{};
+    print(total(empty).to_str());
+}
+--- stdout ---
+["a", "b", "c"]
+6
+["'x'", "'y'"]
+11
+0
+--- performance ---
+allocations: 16
+deallocations: 16
+reallocations: 5
+bytes allocated: 712
+instructions executed: 1635
+binary size: 6512
+  code: 3592
+  data: 67
+  metadata: 2853
+functions:
+  __to_str_char:
+    calls: 2
+    bytes: 204
+  __to_str_i64:
+    calls: 3
+    bytes: 204
+  __to_str_str$arr:
+    calls: 2
+    bytes: 812
+  aipl_arr_inc:
+    calls: 2
+    bytes: (external)
+  aipl_arr_sort:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 11
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 15
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 5
+    bytes: (external)
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_set_contains:
+    calls: 14
+    bytes: (external)
+  aipl_set_insert:
+    calls: 14
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 12
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2188
+  total:
+    calls: 2
+    bytes: 184

@@ -229,6 +229,11 @@ formatter:
   Why the formatter isn't already a thin wrapper
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
+sets:
+  support iteration
+  support conversion to other containers
+  support other types
+
 parser:
   remove NestedIn after souping up Many enough
   a bracketed list's separator must be a literal, so the printer can write it back <--- lift this restriction

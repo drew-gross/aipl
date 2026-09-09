@@ -2586,12 +2586,17 @@ impl Cx<'_> {
             ExprKind::For(_var, iter, body) => {
                 let it = self.check_expr(iter, env, effects)?;
                 let elem = match &it {
-                    Type::Array(inner) => (**inner).clone(),
+                    // A set shares the array heap block (see `is_heap` in
+                    // `aipl-codegen`), so iterating one is iterating its
+                    // elements. No order is promised: a set is unordered, and the
+                    // representation that gives it an order today is not a
+                    // guarantee to write code against.
+                    Type::Array(inner) | Type::Set(inner) => (**inner).clone(),
                     t if *t == Type::Primitive(Primitive::Str) => Type::Primitive(Primitive::Char),
                     other => {
                         return Err(Error::at(
                             format!(
-                                "for-loop iterable must be a str or array, got {}",
+                                "for-loop iterable must be a str, array, or set, got {}",
                                 tyname(other)
                             ),
                             iter.span.clone(),

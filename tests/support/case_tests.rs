@@ -491,6 +491,7 @@ case_tests! {
     cases_sets_basic = "cases/sets/basic",
     cases_sets_elem_types = "cases/sets/elem_types",
     cases_sets_err_sets = "cases/sets/err_sets",
+    cases_sets_iteration = "cases/sets/iteration",
     cases_sets_set_param = "cases/sets/set_param",
     cases_sets_str_elements = "cases/sets/str_elements",
     cases_sets_union = "cases/sets/union",

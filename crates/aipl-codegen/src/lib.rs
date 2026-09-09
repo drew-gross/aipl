@@ -18431,7 +18431,11 @@ fn compile_expr_inner<M: Module>(
                     builder.ins().brif(more, body_block, &[], exit, &[]);
                     (byte_i64, ConcreteType::Primitive(Primitive::Char))
                 }
-                ConcreteType::Array(inner) => {
+                // A set shares the array heap block, so the array walk *is* the
+                // set walk — same length word, same element reads. The order is
+                // whatever the representation happens to give and is deliberately
+                // not promised; see the checker for the same note.
+                ConcreteType::Array(inner) | ConcreteType::Set(inner) => {
                     let elem_ty = (**inner).clone();
                     let len = load_arr_len(builder, it_ptr);
                     let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
@@ -18454,7 +18458,7 @@ fn compile_expr_inner<M: Module>(
                 _ => {
                     return Err(Error::at(
                         format!(
-                            "for-loop iterable must be a str or array, got {}",
+                            "for-loop iterable must be a str, array, or set, got {}",
                             type_name(&it_ty)
                         ),
                         iterable.span.clone(),
