@@ -55,6 +55,7 @@ import {
     map,
     map_err,
     not_equal as !=,
+    sort,
     try_map,
     value_or,
     value_or_err,
@@ -637,9 +638,12 @@ fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str,
 # driver's own tests catch, seven of them.
 #
 # A fixed point for the same reason `first_sets` is one: a transparent production
-# referencing another is not answerable until that one is. Order is preserved
-# through the unions, since the expected set reads back in the order the
-# alternatives would have been tried.
+# referencing another is not answerable until that one is.
+#
+# The result is a *set* in everything but representation: `error_at` sorts before
+# rendering, so the order these accumulate in is not observable. It stays a
+# deduped `str[]` only because a `#{str}` cannot be iterated, and the labels have
+# to be folded into `Far` one at a time.
 fn label_sets<K: variant, A: any>(prods: Production<K, A>[], firsts: First<K>[]) -> str[][] {
     let empty: str[] = [];
     mut labels = prods.map(|pr| empty);
@@ -740,8 +744,9 @@ fn rule_nullable<K: variant>(r: Rule<K>, firsts: First<K>[]) -> bool {
     }
 }
 
-# `a` then whatever in `b` is not already there — order preserved, since the
-# expected set reads back in the order alternatives were tried.
+# `a` then whatever in `b` is not already there. Only the deduplication matters —
+# `error_at` sorts — so this is a set union written the long way, for want of an
+# iterable set.
 fn union_labels(a: str[], b: str[]) -> str[] {
     mut out = a;
     for (let l : b) {
@@ -845,9 +850,20 @@ fn error_at<K: variant, A: any>(p: Parser<K, A>, src: str, far: Far) -> ParseErr
         return ParseError { message: `unexpected {found}{hint}`, span };
     };
 
+    // Sorted, not in the order the alternatives happened to be tried. The order
+    // a PEG reaches its alternatives in is an artefact of how the grammar was
+    // written, not something a reader can use, and it moves whenever a
+    // production is reordered. Sorting makes the message a function of *what*
+    // was expected and nothing else — the same reason gazelle collects its own
+    // expected set into a `BTreeSet` (`friendly_syntax_error`), which is the
+    // behaviour this has to match when it takes over.
+    //
+    // It also means nothing upstream has to preserve order: `far_miss` and
+    // `label_sets` dedupe, and are free to do it however they like.
+    //
     // `a`, `a or b`, `a, b, or c` — the Oxford list `join`'s two extra
     // separators write directly.
-    let expected = far.expected.join(sep=", ", final_sep=", or ", only_sep=" or ");
+    let expected = far.expected.sort().join(sep=", ", final_sep=", or ", only_sep=" or ");
     ParseError { message: `expected {expected}, found {found}{hint}`, span }
 }
 
@@ -1031,10 +1047,10 @@ pub fn parse<K: variant, A: any>(
     assert(shown("x", g_atom, "a")? == "(a x)");
     assert(shown("7", g_atom, "a")? == "(a 7)");
     // Three alternatives, three expectations, Oxford-joined.
-    assert(msg_of("]", g_atom, "a") == "expected Word, Num, or `(`, found `]`");
+    assert(msg_of("]", g_atom, "a") == "expected Num, Word, or `(`, found `]`");
     // Two joins with "or"; a repeated expectation is deduped, not doubled.
     let r_dup: Rule<Tok> = OneOf([Term(Word), Term(Num), Term(Word)]);
-    assert(msg_of("]", g_of([one("a", r_dup)]), "a") == "expected Word or Num, found `]`");
+    assert(msg_of("]", g_of([one("a", r_dup)]), "a") == "expected Num or Word, found `]`");
 
     // ---- Many: zero-or-more and one-or-more ----
     let r_many: Rule<Tok> = Many(Term(Word));
@@ -1129,7 +1145,7 @@ pub fn parse<K: variant, A: any>(
     let r_stmt: Rule<Tok> = Then([Named("expr"), Literal(";")]);
     let r_alt: Rule<Tok> = OneOf([Term(Word), Term(Num)]);
     let plain = g_of([one("stmt", r_stmt), one("expr", r_alt)]);
-    assert(msg_of("]", plain, "stmt") == "expected Word or Num, found `]`");
+    assert(msg_of("]", plain, "stmt") == "expected Num or Word, found `]`");
     let labelled = g_of([one("stmt", r_stmt), labelled_prod("expr", r_alt, "an expression")]);
     assert(msg_of("]", labelled, "stmt") == "expected an expression, found `]`");
     // Got somewhere, so the label steps aside for what actually went wrong.
@@ -1219,7 +1235,7 @@ pub fn parse<K: variant, A: any>(
             "(a, b",
             g_grp,
             "list",
-        ) == "expected `,` or `)`, found end of input (`(` at line 1 is never closed)",
+        ) == "expected `)` or `,`, found end of input (`(` at line 1 is never closed)",
     );
 
     // The line is the *opener's*, not the failure's — which is the whole point
@@ -1229,7 +1245,7 @@ pub fn parse<K: variant, A: any>(
             "(a,\nb,\nc",
             g_grp,
             "list",
-        ) == "expected `,` or `)`, found end of input (`(` at line 1 is never closed)",
+        ) == "expected `)` or `,`, found end of input (`(` at line 1 is never closed)",
     );
 
     // An inner bracket left open blames the inner one, being the deepest failure
@@ -1239,7 +1255,7 @@ pub fn parse<K: variant, A: any>(
             "(a,\n(b",
             g_grp,
             "list",
-        ) == "expected `,` or `)`, found end of input (`(` at line 2 is never closed)",
+        ) == "expected `)` or `,`, found end of input (`(` at line 2 is never closed)",
     );
 
     // A failure that has nothing to do with a bracket says nothing about one.
@@ -1270,7 +1286,7 @@ pub fn parse<K: variant, A: any>(
 
     // Spelled out once rather than only compared, so a regression that broke
     // *both* paths the same way could not pass unnoticed.
-    assert(msg_of_prepared("]", g_atom, "a") == "expected Word, Num, or `(`, found `]`");
+    assert(msg_of_prepared("]", g_atom, "a") == "expected Num, Word, or `(`, found `]`");
     assert(msg_of_prepared("]", labelled, "stmt") == "expected an expression, found `]`");
 })
 
@@ -1380,15 +1396,15 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 8732
-deallocations: 8732
+allocations: 8766
+deallocations: 8766
 reallocations: 617
-bytes allocated: 557507
-instructions executed: 1152194
-binary size: 560448
-  code: 342232
+bytes allocated: 559867
+instructions executed: 1152432
+binary size: 560640
+  code: 342308
   data: 8772
-  metadata: 209444
+  metadata: 209560
 functions:
   __arr_drop_Node:
     calls: 21
@@ -1718,7 +1734,7 @@ functions:
     calls: 1069
     bytes: (external)
   aipl_arr_inc:
-    calls: 28800
+    calls: 28834
     bytes: (external)
   aipl_arr_join:
     calls: 150
@@ -1729,8 +1745,11 @@ functions:
   aipl_arr_retain_ptr:
     calls: 382
     bytes: (external)
+  aipl_arr_sort:
+    calls: 34
+    bytes: (external)
   aipl_array_dec:
-    calls: 35417
+    calls: 35485
     bytes: (external)
   aipl_array_new:
     calls: 4357
@@ -1785,7 +1804,7 @@ functions:
     bytes: 3160
   error_at$Tok$Node:
     calls: 34
-    bytes: 3032
+    bytes: 3108
   far_miss:
     calls: 113
     bytes: 1084

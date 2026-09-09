@@ -492,15 +492,15 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
 # braces — is a list breaking or not breaking, which the layouts decide.
 fn json_space(l: str, r: str) -> bool { l == ":" }
 --- performance ---
-allocations: 36979
-deallocations: 36979
+allocations: 36986
+deallocations: 36986
 reallocations: 1230
-bytes allocated: 2645253
-instructions executed: 4579454
-binary size: 443832
-  code: 285252
+bytes allocated: 2645693
+instructions executed: 4579503
+binary size: 444024
+  code: 285336
   data: 7876
-  metadata: 150704
+  metadata: 150812
 functions:
   __arr_drop_Json:
     calls: 147
@@ -708,7 +708,7 @@ functions:
     bytes: 3160
   __m13__error_at$JsonTok$Json:
     calls: 7
-    bytes: 2884
+    bytes: 2968
   __m13__far_miss:
     calls: 524
     bytes: 1084
@@ -983,7 +983,7 @@ functions:
     calls: 2939
     bytes: (external)
   aipl_arr_inc:
-    calls: 97872
+    calls: 97879
     bytes: (external)
   aipl_arr_join:
     calls: 2057
@@ -994,8 +994,11 @@ functions:
   aipl_arr_retain_ptr:
     calls: 3764
     bytes: (external)
+  aipl_arr_sort:
+    calls: 7
+    bytes: (external)
   aipl_array_dec:
-    calls: 124739
+    calls: 124753
     bytes: (external)
   aipl_array_new:
     calls: 17789

@@ -517,7 +517,7 @@
           </h3>
           <pre class="signature"><code>fn label_sets&#60;K: variant, A: any&#62;(prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[]) -&#62; str[][]</code></pre>
 
-          <div class="doc"><p>The expectation labels each production would record on failing at its own first token, in grammar order — the FIRST set computed over *labels* rather than terminals, so a labelled sub-production contributes its label and a transparent one contributes its insides.</p><p>This exists so pruning is invisible. <code>match_prod</code>'s label branch already makes a pruned *labelled* production observationally identical to an attempted one; a transparent production has no label, and what it would have recorded is exactly this. Without it, skipping a production silently drops entries from the &quot;expected a, b, or c&quot; set of any error reported at that position — which the driver's own tests catch, seven of them.</p><p>A fixed point for the same reason <code>first_sets</code> is one: a transparent production referencing another is not answerable until that one is. Order is preserved through the unions, since the expected set reads back in the order the alternatives would have been tried.</p></div>
+          <div class="doc"><p>The expectation labels each production would record on failing at its own first token, in grammar order — the FIRST set computed over *labels* rather than terminals, so a labelled sub-production contributes its label and a transparent one contributes its insides.</p><p>This exists so pruning is invisible. <code>match_prod</code>'s label branch already makes a pruned *labelled* production observationally identical to an attempted one; a transparent production has no label, and what it would have recorded is exactly this. Without it, skipping a production silently drops entries from the &quot;expected a, b, or c&quot; set of any error reported at that position — which the driver's own tests catch, seven of them.</p><p>A fixed point for the same reason <code>first_sets</code> is one: a transparent production referencing another is not answerable until that one is.</p><p>The result is a *set* in everything but representation: <code>error_at</code> sorts before rendering, so the order these accumulate in is not observable. It stays a deduped <code>str[]</code> only because a <code>#{str}</code> cannot be iterated, and the labels have to be folded into <code>Far</code> one at a time.</p></div>
 
 
         </section>
@@ -573,7 +573,7 @@
           </h3>
           <pre class="signature"><code>fn union_labels(a: str[], b: str[]) -&#62; str[]</code></pre>
 
-          <div class="doc"><p><code>a</code> then whatever in <code>b</code> is not already there — order preserved, since the expected set reads back in the order alternatives were tried.</p></div>
+          <div class="doc"><p><code>a</code> then whatever in <code>b</code> is not already there. Only the deduplication matters — <code>error_at</code> sorts — so this is a set union written the long way, for want of an iterable set.</p></div>
 
 
         </section>

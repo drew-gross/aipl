@@ -959,7 +959,7 @@ pub fn aipl_parses(src: str) -> bool {
     assert(
         why(
             "fn f() {\n    g();\n",
-        ) == "expected a statement, an expression, or `}`, found end of input (`{` at line 1 is never closed)",
+        ) == "expected `}`, a statement, or an expression, found end of input (`{` at line 1 is never closed)",
     );
     assert(
         why(
@@ -973,7 +973,7 @@ pub fn aipl_parses(src: str) -> bool {
     assert(
         why(
             "fn f() {\n    g(1,\n    2",
-        ) == "expected `.`, `[`, `?`, `,`, or `)`, found end of input (`(` at line 2 is never closed)",
+        ) == "expected `)`, `,`, `.`, `?`, or `[`, found end of input (`(` at line 2 is never closed)",
     );
 
     // A bracket that *is* closed is never blamed. Both of these fail with a real
@@ -1198,15 +1198,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1411582
-deallocations: 1411582
+allocations: 1411614
+deallocations: 1411614
 reallocations: 7757
-bytes allocated: 122385921
-instructions executed: 186682580
-binary size: 750392
-  code: 501124
+bytes allocated: 122389033
+instructions executed: 186682804
+binary size: 750584
+  code: 501208
   data: 13996
-  metadata: 235272
+  metadata: 235380
 functions:
   __arr_drop___m11__StepResult$__m10__AiplTok:
     calls: 5
@@ -1483,7 +1483,7 @@ functions:
     bytes: 3160
   __m18__error_at$__m10__AiplTok$Ast:
     calls: 32
-    bytes: 4024
+    bytes: 4108
   __m18__far_miss:
     calls: 13253
     bytes: 1084
@@ -1716,7 +1716,7 @@ functions:
     calls: 87321
     bytes: (external)
   aipl_arr_inc:
-    calls: 3389833
+    calls: 3389865
     bytes: (external)
   aipl_arr_join:
     calls: 44977
@@ -1727,8 +1727,11 @@ functions:
   aipl_arr_retain_ptr:
     calls: 151721
     bytes: (external)
+  aipl_arr_sort:
+    calls: 32
+    bytes: (external)
   aipl_array_dec:
-    calls: 4390917
+    calls: 4390981
     bytes: (external)
   aipl_array_new:
     calls: 693412
