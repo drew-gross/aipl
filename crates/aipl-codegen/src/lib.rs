@@ -7978,6 +7978,10 @@ fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
     match (actual, expected) {
         (ConcreteType::Optional(a), ConcreteType::Optional(b)) => coercible(a, b),
         (ConcreteType::Array(a), ConcreteType::Array(b)) => coercible(a, b),
+        // The empty `#{}` is the empty literal for a set *and* a dict, and it
+        // reaches codegen as `#{__none__}` — the type only an empty brace pair
+        // produces. Mirrors the checker's rule in `coerce`.
+        (ConcreteType::Set(a), ConcreteType::Dict(_, _)) if is_none_inner(a) => true,
         (ConcreteType::Set(a), ConcreteType::Set(b)) => coercible(a, b),
         (ConcreteType::Dict(ak, av), ConcreteType::Dict(bk, bv)) => {
             coercible(ak, bk) && coercible(av, bv)
@@ -11214,7 +11218,12 @@ fn array_drop_fn_addr<M: Module>(
         // nested `char[]` element (e.g. in `char[][]`) is freed the same way
         // a `str` element is, not via the generic array-element drop-fn.
         ConcreteType::Array(_) if is_char_array(elem) => Some(b.id(module, drop_str)),
-        ConcreteType::Array(_) => Some(b.id(module, "aipl_arr_drop_arr")),
+        // A set or a dict *is* an array block (see `is_heap`), so the element
+        // drop for a nested array serves them unchanged: it decs each element's
+        // block pointer, and that is what one of these is.
+        ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _) => {
+            Some(b.id(module, "aipl_arr_drop_arr"))
+        }
         ConcreteType::Optional(inner)
             if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
         {
@@ -11245,7 +11254,11 @@ fn array_retain_fn_addr<M: Module>(
         _ if is_str_repr(elem) => Some(b.id(module, "aipl_arr_retain_str")),
         ConcreteType::Array(_) if is_char_array(elem) => Some(b.id(module, "aipl_arr_retain_str")),
         ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_retain_ptr")),
-        ConcreteType::Array(_) => Some(b.id(module, "aipl_arr_retain_ptr")),
+        // As in `array_drop_fn_addr`: a set or dict element is a block pointer
+        // like a nested array's, and `aipl_arr_retain_ptr` incs exactly that.
+        ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _) => {
+            Some(b.id(module, "aipl_arr_retain_ptr"))
+        }
         ConcreteType::Optional(inner)
             if matches!(inner.as_ref(), ConcreteType::Primitive(Primitive::Str)) =>
         {

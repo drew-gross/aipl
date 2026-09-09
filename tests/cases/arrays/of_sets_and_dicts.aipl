@@ -1,0 +1,174 @@
+import {
+    equal as ==,
+    get,
+    has,
+    is_empty,
+    len,
+    print,
+    push,
+    to_str,
+    wrapping_add_assign as +=,
+} from builtins;
+
+// A set and a dict are heap blocks addressed by an 8-byte pointer — the same
+// shape a nested array element already has — so they can be array elements, and
+// the element retain/drop helpers a `T[][]` already uses carry them unchanged.
+//
+// The `--- performance ---` section below is the real assertion: balanced
+// allocations are what says the element blocks are retained and released exactly
+// once each.
+fn tag_sets() -> #{str}[] { [#{"a", "b"}, #{}, #{"c"}] }
+
+fn counts() -> #{str: i64}[] { [#{"a": 1, "b": 2}, #{}] }
+
+fn has_a(s: #{str}) -> bool { s.has("a") }
+
+fn set_size(s: #{str}) -> u64 { s.len() }
+
+// Handing one to a callee and getting one back: the array is retained on the way
+// in and released on the way out, elements included.
+fn total_size(xs: #{str}[]) -> u64 {
+    mut n: u64 = 0;
+    for (let s : xs) {
+        set n += s.len();
+    }
+    n
+}
+
+fn grown() -> #{str}[] {
+    mut out: #{str}[] = []; #[allow]
+    for (let s : tag_sets()) {
+        set out.push(s);
+    }
+    out
+}
+
+fn main() !prints {
+    let sets = tag_sets();
+    print(sets.len().to_str());
+    print(total_size(sets).to_str());
+
+    // Elements come back out intact, not as freed blocks.
+    match (sets[0]) {
+        some(s) => print(`{has_a(s).to_str()} {set_size(s).to_str()}`),
+        none => print("missing"),
+    };
+
+    let ds = counts();
+    print(ds.len().to_str());
+    match (ds[0]) {
+        some(d) => print(d.get("b").to_str()),
+        none => print("missing"),
+    };
+    match (ds[1]) {
+        some(d) => print(d.is_empty().to_str()),
+        none => print("missing"),
+    };
+
+    // Copied element by element into a second array — both arrays co-own the
+    // same element blocks until each is released.
+    print(total_size(grown()).to_str());
+
+    // Equality compares element blocks, not pointers.
+    print((tag_sets() == tag_sets()).to_str());
+
+    // Nested one level further: an array of arrays of sets.
+    let nested: #{str}[][] = [tag_sets(), []];
+    print(nested.len().to_str());
+}
+--- stdout ---
+3
+3
+true 2
+2
+some(2)
+true
+3
+true
+2
+--- performance ---
+allocations: 38
+deallocations: 38
+reallocations: 3
+bytes allocated: 1769
+instructions executed: 1870
+binary size: 11464
+  code: 6852
+  data: 115
+  metadata: 4497
+functions:
+  __dict_drop_str$i64:
+    calls: 1
+    bytes: 132
+  __dict_retain_str$i64:
+    calls: 2
+    bytes: 132
+  __eq_set$str:
+    calls: 3
+    bytes: 304
+  __eq_set$str$arr:
+    calls: 1
+    bytes: 300
+  __to_str_bool:
+    calls: 3
+    bytes: 232
+  __to_str_i64$opt:
+    calls: 1
+    bytes: 388
+  __to_str_u64:
+    calls: 6
+    bytes: 204
+  aipl_arr_drop_arr:
+    calls: 8
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 18
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 3
+    bytes: (external)
+  aipl_array_dec:
+    calls: 44
+    bytes: (external)
+  aipl_array_new:
+    calls: 9
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 20
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 17
+    bytes: (external)
+  aipl_dict_get:
+    calls: 1
+    bytes: (external)
+  aipl_dict_insert:
+    calls: 2
+    bytes: (external)
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_set_contains:
+    calls: 19
+    bytes: (external)
+  aipl_set_insert:
+    calls: 15
+    bytes: (external)
+  aipl_u64_len:
+    calls: 12
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 5
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  aipl_write_u64:
+    calls: 6
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 4928
+  total_size:
+    calls: 2
+    bytes: 232

@@ -1,0 +1,25 @@
+import { wrapping_add as + } from builtins;
+
+// A set or a dict may be an *array* element — both are heap blocks addressed by
+// an 8-byte pointer, the same shape a nested array element has, so the element
+// retain/drop helpers carry them (see `tests/cases/arrays/of_sets_and_dicts`).
+//
+// An optional core and a dict value are different: those store their payload
+// inline rather than behind those helpers, so neither takes a set or a dict yet.
+// This fixture pins that boundary — the positions that are still refused, and
+// the reason the message gives.
+fn opt_core() -> i64 {
+    let d: #{i64: i64}? = none;
+    0
+}
+
+fn dict_value() -> i64 {
+    let d: #{str: #{i64}} = #{};
+    0
+}
+
+fn main() -> i64 { opt_core() + dict_value() }
+--- errors ---
+error: fn "opt_core": a set or dict can be an array element but not an optional or dict element
+
+error: fn "dict_value": a set or dict can be an array element but not an optional or dict element

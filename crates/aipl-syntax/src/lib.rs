@@ -2414,6 +2414,8 @@ pub mod concrete {
                 t,
                 ConcreteType::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
                     | ConcreteType::Array(_)
+                    | ConcreteType::Set(_)
+                    | ConcreteType::Dict(_, _)
             )
     }
 
@@ -2498,14 +2500,17 @@ pub fn type_name(t: &Type) -> String {
 
 /// Valid array element types: the 8-byte value types — every integer width
 /// (`i8`..`i64`, `u8`..`u64`, each stored canonicalized in an 8-byte slot like
-/// `i64`), `bool`, `char`, `str`, and (nested) arrays, which are themselves
-/// 8-byte heap pointers. Structs and optionals are inline composites wider than
-/// 8 bytes and aren't yet supported as elements.
+/// `i64`), `bool`, `char`, `str`, and the heap-block types, which are themselves
+/// 8-byte pointers: (nested) arrays, sets and dicts. Structs and optionals are
+/// inline composites wider than 8 bytes and aren't yet supported as elements.
 pub fn is_array_elem(t: &Type) -> bool {
     is_int_ty(t)
         || matches!(
             t,
-            Type::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str) | Type::Array(_)
+            Type::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
+                | Type::Array(_)
+                | Type::Set(_)
+                | Type::Dict(_, _)
         )
 }
 
