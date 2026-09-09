@@ -585,14 +585,15 @@ gazelle! {
                       | TEMPLATE_MIDDLE expr template_rest => middle;
 
         // `#{ .. }` is a set literal (`#{a, b}`), a dict literal (`#{k: v}`), or
-        // an empty of either (`#{}` set, `#{:}` dict). One production handles
-        // all four so `expr` is reachable from a *single* place under the
-        // brace — having `expr` reachable two ways is what blew up the LR tables
-        // for the block grammar. Each entry is a key with an optional `: value`;
-        // the builder rejects a set/dict mix and chooses the literal kind.
+        // the empty `#{}`, which is *both*: an empty brace pair says nothing
+        // about which it is, so it takes its type from the use site (see
+        // `ExprKind::SetLit`). One production handles all three so `expr` is
+        // reachable from a *single* place under the brace — having `expr`
+        // reachable two ways is what blew up the LR tables for the block
+        // grammar. Each entry is a key with an optional `: value`; the builder
+        // rejects a set/dict mix and chooses the literal kind.
         brace_body = entry_list => entries
                    | entry_list COMMA => entries_trailing
-                   | COLON => empty_dict
                    | _ => empty_set;
         entry_list = entry => first | entry_list COMMA entry => rest;
         // `expr COLON expr` vs `expr` diverge on a single lookahead token
@@ -740,10 +741,11 @@ pub enum BraceEntry {
 }
 
 /// The parsed body of a `#{ .. }`: a list of entries (set or dict, decided by
-/// their kind), or one of the two empties (`#{}` set, `#{:}` dict).
+/// their kind), or the empty `#{}` — which is neither until its use site says
+/// so, and is carried as an empty set literal because that is the type `coerce`
+/// recognizes as the flexible one.
 pub enum BraceLit {
     Entries(Vec<BraceEntry>),
-    EmptyDict,
     EmptySet,
 }
 
@@ -2864,7 +2866,6 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
             // empty), like an array literal.
             aipl::Atom::BraceLit(hash_span, _, brace) => match brace {
                 BraceLit::EmptySet => Expr::new(ExprKind::SetLit(Vec::new()), hash_span),
-                BraceLit::EmptyDict => Expr::new(ExprKind::DictLit(Vec::new()), hash_span),
                 BraceLit::Entries(entries) => {
                     let has_pair = entries
                         .iter()
@@ -3249,7 +3250,6 @@ impl gazelle::Action<aipl::BraceBody<Self>> for Build {
             aipl::BraceBody::Entries(list) | aipl::BraceBody::EntriesTrailing(list) => {
                 BraceLit::Entries(list)
             }
-            aipl::BraceBody::EmptyDict => BraceLit::EmptyDict,
             aipl::BraceBody::EmptySet => BraceLit::EmptySet,
         })
     }

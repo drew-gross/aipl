@@ -38,15 +38,17 @@ fn sets(s: #{i64}) -> bool { s.is_nonempty() }.test({
 
 fn dicts(d: #{str: i64}) -> bool { d.is_nonempty() }.test({
     assert(dicts(#{"a": 1}));
-    // `#{:}` is the empty *dict* (`#{}` is the empty set).
-    assert(!dicts(#{:}));
+
+    // `#{}` is the empty literal for a dict as much as for a set; the
+    // parameter's type is what decides which one this is.
+    assert(!dicts(#{}));
 })
 --- performance ---
 allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 584
-instructions executed: 504
+instructions executed: 505
 binary size: 6136
   code: 3204
   data: 345

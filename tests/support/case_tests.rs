@@ -135,6 +135,7 @@ case_tests! {
     cases_conditionals_if_no_else = "cases/conditionals/if_no_else",
     cases_conditionals_if_picks_branch = "cases/conditionals/if_picks_branch",
     cases_dicts_basic = "cases/dicts/basic",
+    cases_dicts_empty_literal_flexes = "cases/dicts/empty_literal_flexes",
     cases_dicts_equality = "cases/dicts/equality",
     cases_dicts_err_dict_as_array_elem = "cases/dicts/err_dict_as_array_elem",
     cases_dicts_err_key_type = "cases/dicts/err_key_type",

@@ -35,7 +35,7 @@ fn dedup() -> #{i64: str} {
     assert(d.get(1).value_or("?") == "y");
 })
 
-fn make_empty() -> #{i64: str} { #{:} }.test({
+fn make_empty() -> #{i64: str} { #{} }.test({
     let d = make_empty();
     assert(d.is_empty());
     assert(d.get(1) == none); // absent
@@ -46,7 +46,7 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 576
-instructions executed: 1209
+instructions executed: 1210
 binary size: 10976
   code: 6444
   data: 702

@@ -1,0 +1,120 @@
+import {
+    equal as ==,
+    get,
+    is_empty,
+    len,
+    print,
+    to_str,
+    value_or,
+    wrapping_add as +,
+} from builtins;
+
+// `#{}` is the empty literal for a set *and* a dict, and which one it is comes
+// from the use site — the same way `[]`, `none` and a bare integer take their
+// type from context. An empty brace pair says nothing about which it is, so
+// there is nothing to tell apart at the parse and everything to decide later.
+fn empty_dict() -> #{str: i64} { #{} }
+
+fn empty_set() -> #{i64} { #{} }
+
+fn takes_dict(d: #{str: i64}) -> bool { d.is_empty() }
+
+fn takes_set(s: #{i64}) -> bool { s.is_empty() }
+
+// It flexes in a keyword-parameter default too, where the declared type decides.
+fn defaulted(d: #{str: i64} = #{}, s: #{i64} = #{}) -> u64 { d.len() + s.len() }
+
+fn main() !prints {
+    print(empty_dict().is_empty().to_str());
+    print(empty_set().is_empty().to_str());
+
+    // Argument position: the parameter's type decides.
+    print(takes_dict(#{}).to_str());
+    print(takes_set(#{}).to_str());
+    print(defaulted().to_str());
+
+    // A binding's annotation decides.
+    let d: #{str: i64} = #{};
+    let s: #{i64} = #{};
+    print(d.is_empty().to_str());
+    print(s.is_empty().to_str());
+
+    // It really is a dict, not a set that type-checked as one.
+    print((d.get("a") == none).to_str());
+    print(d.get("a").value_or(-1).to_str());
+
+    // Two empty dicts built this way are the same value.
+    let other: #{str: i64} = #{};
+    print((d == other).to_str());
+
+    // With no annotation there is nothing to decide from, so `#{}` settles on a
+    // set — the same way a bare `[]` keeps its placeholder element type. An
+    // empty dict binding is spelled by annotating it, as `d` above is.
+    let unannotated = #{};
+    print(unannotated.is_empty().to_str());
+}
+--- stdout ---
+true
+true
+true
+true
+0
+true
+true
+true
+-1
+true
+true
+--- performance ---
+allocations: 21
+deallocations: 21
+reallocations: 0
+bytes allocated: 535
+instructions executed: 600
+binary size: 4728
+  code: 2472
+  data: 47
+  metadata: 2209
+functions:
+  __eq_dict$str$i64:
+    calls: 1
+    bytes: 276
+  __eq_i64$opt:
+    calls: 1
+    bytes: 100
+  __to_str_bool:
+    calls: 9
+    bytes: 232
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_array_dec:
+    calls: 10
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 10
+    bytes: (external)
+  aipl_dict_get:
+    calls: 2
+    bytes: (external)
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 9
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1456

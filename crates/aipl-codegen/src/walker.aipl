@@ -1888,13 +1888,9 @@ fn array_atom(self: W) -> WDoc!FmtError {
     ok(WDoc { w: closed, doc: comma_list_docs(docs, Brackets) })
 }
 
-# `#{a, b}` (set) / `#{k: v}` (dict), and the empty-dict spelling `#{:}`.
+# `#{a, b}` (set) / `#{k: v}` (dict) / `#{}` (either — the use site decides).
 fn set_or_dict_atom(self: W) -> WDoc!FmtError {
     let opened = self.bump().w.expect("{")?.w;
-    if (opened.peek_text() == ":") {
-        let closed = opened.bump().w.expect("}")?.w;
-        return ok(WDoc { w: closed, doc: Text("#{:}") });
-    };
     let WDocs { w, docs } = opened.dict_entries([])?;
     let closed = w.expect("}")?.w;
     ok(WDoc { w: closed, doc: comma_list_docs(docs, HashBraces) })
@@ -2551,7 +2547,7 @@ fn walker_of(src: str) -> W!FmtError {
     assert(walker_of("[ ]")?.expr().rendered(100)? == "[]");
     assert(walker_of("#{ a , b }")?.expr().rendered(100)? == "#{a, b}");
     assert(walker_of("#{ k : v }")?.expr().rendered(100)? == "#{k: v}");
-    assert(walker_of("#{ : }")?.expr().rendered(100)? == "#{:}");
+    assert(walker_of("#{ }")?.expr().rendered(100)? == "#{}");
 
     // Struct construction, including the field shorthand.
     assert(walker_of("S { a : 1 , b }")?.expr().rendered(100)? == "S { a: 1, b }");
@@ -2931,15 +2927,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 115468
-deallocations: 115468
-reallocations: 1911
-bytes allocated: 6240998
-instructions executed: 22298691
-binary size: 8716960
-  code: 5503588
+allocations: 115345
+deallocations: 115345
+reallocations: 1910
+bytes allocated: 6237037
+instructions executed: 22276886
+binary size: 8713552
+  code: 5501564
   data: 27364
-  metadata: 3186008
+  metadata: 3184624
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2960,7 +2956,7 @@ functions:
     calls: 1
     bytes: 140
   __arr_drop___m9__Token$__m8__AiplTok:
-    calls: 1387
+    calls: 1386
     bytes: 388
   __arr_drop___m9__TokenRule$__m8__AiplTok:
     calls: 152
@@ -2984,7 +2980,7 @@ functions:
     calls: 1
     bytes: 140
   __arr_retain___m9__Token$__m8__AiplTok:
-    calls: 1089
+    calls: 1088
     bytes: 388
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
@@ -3002,7 +2998,7 @@ functions:
     calls: 50
     bytes: 252
   __builtin_count_while$char$lam65:
-    calls: 1215
+    calls: 1214
     bytes: 220
   __builtin_count_while$char$s0$lam103:
     calls: 2
@@ -3011,7 +3007,7 @@ functions:
     calls: 22
     bytes: 172
   __builtin_count_while$char$s0$lam73:
-    calls: 639
+    calls: 638
     bytes: 184
   __builtin_count_while$char$s0$lam76:
     calls: 0
@@ -3050,7 +3046,7 @@ functions:
     calls: 6
     bytes: 300
   __eq_char$opt:
-    calls: 691
+    calls: 690
     bytes: 100
   __lambda_38:
     calls: 0
@@ -3143,10 +3139,10 @@ functions:
     calls: 2
     bytes: 2608
   __m9__between_len:
-    calls: 617
+    calls: 616
     bytes: 752
   __m9__delimited_len:
-    calls: 1224
+    calls: 1222
     bytes: 1592
   __m9__finalize_template$__m8__AiplTok:
     calls: 1
@@ -3161,28 +3157,28 @@ functions:
     calls: 152
     bytes: 1520
   __m9__lex_step$__m8__AiplTok:
-    calls: 1974
+    calls: 1972
     bytes: 29196
   __m9__nested_len:
-    calls: 1082
+    calls: 1081
     bytes: 940
   __m9__step_result$__m8__AiplTok:
-    calls: 49262
+    calls: 49201
     bytes: 15088
   __m9__template_scan$__m8__AiplTok:
     calls: 1
     bytes: 2728
   __m9__template_step$__m8__AiplTok:
-    calls: 1214
+    calls: 1212
     bytes: 476
   __m9__to_eol_len:
     calls: 0
     bytes: 52
   __m9__to_eol_len$tail:
-    calls: 2166
+    calls: 2164
     bytes: 252
   __m9__to_eol_unless_len:
-    calls: 1082
+    calls: 1081
     bytes: 368
   __rec_drop___m1__Doc:
     calls: 2985
@@ -3201,7 +3197,7 @@ functions:
     bytes: 2188
   __test$walker_of:
     calls: 1
-    bytes: 4851252
+    bytes: 4851476
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
@@ -3209,28 +3205,28 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 4194
+    calls: 4190
     bytes: (external)
   aipl_arr_inc:
-    calls: 257118
+    calls: 256858
     bytes: (external)
   aipl_arr_reserve:
-    calls: 4272
+    calls: 4268
     bytes: (external)
   aipl_arr_slice:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 364536
+    calls: 364151
     bytes: (external)
   aipl_array_new:
-    calls: 104728
+    calls: 104603
     bytes: (external)
   aipl_array_push:
     calls: 1715
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1986
+    calls: 1985
     bytes: (external)
   aipl_array_with_cap:
     calls: 511
@@ -3293,7 +3289,7 @@ functions:
     calls: 56
     bytes: 5192
   bump:
-    calls: 1103
+    calls: 1102
     bytes: 1284
   call_arg:
     calls: 12
@@ -3308,7 +3304,7 @@ functions:
     calls: 6
     bytes: 6580
   comma_list_docs:
-    calls: 100
+    calls: 101
     bytes: 4640
   comment_starts_before:
     calls: 322
@@ -3317,7 +3313,7 @@ functions:
     calls: 0
     bytes: 3716
   dict_entries:
-    calls: 2
+    calls: 3
     bytes: 4540
   dict_value:
     calls: 1
@@ -3341,7 +3337,7 @@ functions:
     calls: 119
     bytes: 760
   fmt_kind:
-    calls: 1075
+    calls: 1074
     bytes: 3120
   fn_attrs:
     calls: 26
@@ -3413,7 +3409,7 @@ functions:
     calls: 2
     bytes: 12032
   more_before:
-    calls: 199
+    calls: 200
     bytes: 200
   mut_stmt:
     calls: 2
@@ -3477,7 +3473,7 @@ functions:
     bytes: 10904
   set_or_dict_atom:
     calls: 3
-    bytes: 5728
+    bytes: 3480
   set_or_dict_ty:
     calls: 4
     bytes: 6408
@@ -3533,7 +3529,7 @@ functions:
     calls: 1
     bytes: 988
   tok_text:
-    calls: 3481
+    calls: 3479
     bytes: 508
   trailing_comment:
     calls: 85

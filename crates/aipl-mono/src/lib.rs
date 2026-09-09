@@ -8297,7 +8297,7 @@ fn contains_inplace_hof_intrinsic(e: &Expr) -> bool {
 }
 
 /// Whether `e` (or any sub-expression) is a *context-typed* literal — `none`, or
-/// an empty `[]` / `#{}` / `#{:}` — whose type is fixed by its surroundings (the
+/// an empty `[]` / `#{}` — whose type is fixed by its surroundings (the
 /// enclosing function's return type, a sibling branch, a parameter type, …). The
 /// enclosing return type is dropped when inlining, so a function whose body holds
 /// such a literal is conservatively not inlined (it could otherwise leave the
@@ -8349,7 +8349,7 @@ fn replace_call(
 ) -> Expr {
     if !*replaced || sites == InlineSites::All {
         if let ExprKind::Call(name, args, _) = &e.kind {
-            // Context-typed arguments (`none`, empty `[]`/`#{}`/`#{:}`, an
+            // Context-typed arguments (`none`, empty `[]`/`#{}`, an
             // `ok(..)`/`some(..)` wrapping one) used to be skipped here: their
             // type came from `f`'s *parameter*, which the `let`-binding this
             // builds discards. They are now inlined like anything else, because

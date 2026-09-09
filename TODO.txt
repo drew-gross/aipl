@@ -170,7 +170,6 @@ syntax:
   limitation: a struct default must be a literal
   a lambda bound to a let is not a value (this would let test helpers move into the test, big cleanup)
   only allow doc comments at the start of lines
-  #{} should flex to empty set or empty dict
   allow default args to be implicitly optional so that you pass T explicitly, but if you pass nothing the callee gets none.
   expr! should return the err held in expr, or exit the test if expr is not an error (only valid in tests for now)
   converge arrays and string (for inlining, ropes, etc.)
@@ -230,7 +229,9 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 sets:
-  support iteration
+  Dicts and sets can't be array elements, optional cores, or struct fields at all, so #{} can't flex there either.
+  There's no dict-insert or dict-union builtin, so a dict can't be grown — which also means the empty-block representation can't be observed to differ.
+  An unannotated let x = #{}; still settles on a set, since there's no context to decide from. (maybe require the annotation?)
   support conversion to other containers
   support other types
 
@@ -249,7 +250,6 @@ parser:
   after the aipl parser is written in aipl make sure the repair() jank isn't necessary
 
 grammar:
-  make NestedIn
   make an ebnf loader as well as dumper
 
 utilities:
@@ -296,7 +296,6 @@ lint:
   lint errors should result in aipl check failing but not terminate compilation - it should still finish compiling run tests, and if there are test failures report them in addition to lint failures
   don't count locals toward unused imports lint - if the import can be removed without causing a compile error, it should trigger
   recognize ad-hoc implementations of min/max an request using the function
-  set w.pos = w.pos + 1; <--- should be set w.pos++;
   forbid unnecessary allow
   lint fix mode
     first need an import-insert probably

@@ -2658,7 +2658,9 @@ impl Cx<'_> {
             }
             ExprKind::SetLit(elems) => {
                 // Elements share one type (i64/bool/char/str); an empty `#{}` is
-                // `__none__` (coerces to any `T{}`). Dups dropped at runtime.
+                // `__none__`, which coerces to any `T{}` *and* to any `#{K: V}` —
+                // an empty brace pair does not say which it is, so `coerce`
+                // decides from the use site. Dups dropped at runtime.
                 let mut elem_ty = Type::NoneInner;
                 for (i, e) in elems.iter().enumerate() {
                     let t = self.check_expr(e, env, effects)?;
@@ -2681,8 +2683,10 @@ impl Cx<'_> {
             }
             ExprKind::DictLit(pairs) => {
                 // Keys share one scalar/str type; values share one value type.
-                // An empty `#{:}` is `#{__none__: __none__}` (coerces to any
-                // `#{K: V}`). Duplicate keys keep the last binding (at runtime).
+                // An empty dict literal is `#{__none__: __none__}` and coerces
+                // to any `#{K: V}` — though the parser no longer builds one, the
+                // empty `#{}` being a set literal that flexes. Duplicate keys
+                // keep the last binding (at runtime).
                 let mut key_ty = Type::NoneInner;
                 let mut val_ty = Type::NoneInner;
                 for (i, (k, v)) in pairs.iter().enumerate() {
@@ -4440,6 +4444,19 @@ fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     {
         return Ok(());
     }
+    // `#{}` is the empty literal for *both* a set and a dict, and which one it
+    // is comes from the use site — the same way `[]`, `none` and a bare integer
+    // take their type from context. The checker types it as `#{__none__}`
+    // because the parser has no way to tell the two apart from an empty brace
+    // pair, so a dict-shaped expectation accepts it here.
+    //
+    // Only the *empty* set: `#{__none__}` cannot arise any other way, since a
+    // non-empty set literal takes its element type from its first element.
+    if let (Type::Set(a), Type::Dict(_, _)) = (actual, expected) {
+        if is_none_inner(a) {
+            return Ok(());
+        }
+    }
     match (actual, expected) {
         (Type::Optional(a), Type::Optional(b)) => coerce(a, b),
         (Type::Array(a), Type::Array(b)) => coerce(a, b),
@@ -4630,7 +4647,7 @@ pub(crate) fn collect_var_bindings(
         (Type::Set(p), Type::Set(a)) if !is_none_inner(a) => collect_var_bindings(p, a, vars, map),
         (Type::Dict(pk, pv), Type::Dict(ak, av)) => {
             // Bind from whichever side carries concrete structure; an empty
-            // `#{:}` has `__none__` key/value and pins nothing.
+            // An empty dict literal has `__none__` key/value and pins nothing.
             if !is_none_inner(ak) {
                 collect_var_bindings(pk, ak, vars, map);
             }

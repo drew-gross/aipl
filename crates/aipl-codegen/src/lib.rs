@@ -12604,7 +12604,7 @@ fn emit_render_dict<M: Module>(
     val_ty: &ConcreteType,
     sink: Sink,
 ) -> Result<Value, Error> {
-    // An untyped empty `#{:}` has no key/value renderer to recurse into.
+    // An untyped empty dict literal has no key/value renderer to recurse into.
     if is_none_inner(key_ty) {
         return emit_lit(module, builder, cx, sink, b"{}");
     }
@@ -19098,7 +19098,8 @@ fn compile_expr_inner<M: Module>(
             // insert each pair via `aipl_dict_insert` (last-binding-wins). The
             // block carries the pair drop/retain helpers so it frees/retains each
             // pair's key and value; key membership compares by content for `str`.
-            // An empty `#{:}` is `__none__`-typed and coerces to any `#{K: V}`.
+            // An empty dict literal is `__none__`-typed and coerces to any
+            // `#{K: V}`; `#{}` is the spelling, and it flexes to a set too.
             let mut key_ty: Option<ConcreteType> = None;
             let mut val_ty: Option<ConcreteType> = None;
             let mut vals = Vec::with_capacity(pairs.len());

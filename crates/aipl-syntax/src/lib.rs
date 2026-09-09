@@ -820,7 +820,7 @@ pub mod ast {
         /// anything else sees it.
         Any,
         /// The placeholder element/inner of an untyped `none`, empty array
-        /// literal (`[]`), or empty set/dict literal (`#{}`/`#{:}`) — coerces to
+        /// literal (`[]`), or the empty brace literal (`#{}`) — coerces to
         /// any element/inner type at the use site (see [`crate::is_none_inner`]).
         NoneInner,
         /// Monomorphization-only: the pseudo-type a generic's type variable is
@@ -998,7 +998,7 @@ pub mod ast {
         /// later matters more than re-deriving it.
         ///
         /// Only *context-dependent* expressions carry one: a bare `none`, an
-        /// empty `[]`/`#{}`/`#{:}`, an `ok`/`err` whose other side is a
+        /// empty `[]`/`#{}`, an `ok`/`err` whose other side is a
         /// placeholder, and a generic constructor its own arguments don't pin.
         /// Their types come from where they sit, so any pass that *moves* them —
         /// inlining, folding — would otherwise change what they mean. Recording
@@ -1315,14 +1315,24 @@ pub mod ast {
         /// `#{e0, e1, ...}` — a set literal. Elements must share one type
         /// (i64/bool/char/str); duplicates are dropped at construction (by value
         /// for scalars, by content for `str`) so the value holds each distinct
-        /// element once. An empty `#{}` has element type `__none__` and coerces
-        /// to any `T{}`, like an empty `[]`.
+        /// element once.
+        ///
+        /// An empty `#{}` is parsed as this, with element type `__none__`, but it
+        /// is the empty literal for a **dict** as well: nothing in an empty brace
+        /// pair says which, so it takes its type from the use site the way `[]`,
+        /// `none` and a bare integer do (see `coerce`). `#{__none__}` cannot
+        /// arise any other way — a non-empty set takes its element type from its
+        /// first element — so that type *is* the marker.
         SetLit(Vec<Expr>),
         /// `#{k0: v0, k1: v1, ...}` — a dict literal. Keys must share one
         /// scalar/`str` type and values one value type; duplicate keys keep the
-        /// last binding (by value for scalars, by content for `str`). The empty
-        /// dict is written `#{:}` (`#{}` is the empty set); like an empty `[]`
-        /// its key/value types are `__none__` and coerce to any `#{K: V}`.
+        /// last binding (by value for scalars, by content for `str`).
+        ///
+        /// An empty dict is written `#{}`, which flexes to whichever of set or
+        /// dict the use site wants (see [`ExprKind::SetLit`]) — so an empty
+        /// `DictLit` never comes from the parser. With no context to decide from,
+        /// as in an unannotated binding, `#{}` settles on a set; annotate to get
+        /// a dict.
         DictLit(Vec<(Expr, Expr)>),
         /// `receiver[index]` — array indexing. Evaluates to `T?`: the
         /// element wrapped in `some` when in bounds, else `none`. An index
