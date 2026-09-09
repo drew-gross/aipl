@@ -23,11 +23,11 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 210
-instructions executed: 328
-binary size: 3816
-  code: 1688
+instructions executed: 356
+binary size: 3928
+  code: 1796
   data: 230
-  metadata: 1898
+  metadata: 1902
 functions:
   __test$describe:
     calls: 1
@@ -55,7 +55,7 @@ functions:
     bytes: (external)
   describe:
     calls: 4
-    bytes: 404
+    bytes: 512
   main:
     calls: 1
     bytes: 108

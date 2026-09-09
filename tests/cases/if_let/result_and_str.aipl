@@ -46,9 +46,9 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 105
-instructions executed: 220
-binary size: 2992
-  code: 1584
+instructions executed: 248
+binary size: 3216
+  code: 1808
   data: 1
   metadata: 1407
 functions:
@@ -63,7 +63,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1096
+    bytes: 1320
   safe_add:
     calls: 2
     bytes: 284

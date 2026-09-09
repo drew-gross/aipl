@@ -78,18 +78,18 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 704
-instructions executed: 2610
-binary size: 29664
-  code: 17792
+instructions executed: 2754
+binary size: 31136
+  code: 19268
   data: 1284
-  metadata: 10588
+  metadata: 10584
 functions:
   __test$lex:
     calls: 1
     bytes: 564
   __test$map_ok:
     calls: 1
-    bytes: 15288
+    bytes: 16764
   __test_try_fail_LexError:
     calls: 0
     bytes: 84

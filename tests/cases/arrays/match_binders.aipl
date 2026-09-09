@@ -57,11 +57,11 @@ allocations: 16
 deallocations: 16
 reallocations: 0
 bytes allocated: 673
-instructions executed: 741
-binary size: 5840
-  code: 3520
+instructions executed: 783
+binary size: 6000
+  code: 3684
   data: 1
-  metadata: 2319
+  metadata: 2315
 functions:
   __to_str_char:
     calls: 4
@@ -83,7 +83,7 @@ functions:
     bytes: (external)
   classify:
     calls: 6
-    bytes: 960
+    bytes: 1124
   main:
     calls: 1
     bytes: 2152

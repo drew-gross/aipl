@@ -752,11 +752,11 @@ allocations: 1085
 deallocations: 1085
 reallocations: 33
 bytes allocated: 93191
-instructions executed: 72776
-binary size: 129240
-  code: 80852
+instructions executed: 72961
+binary size: 130064
+  code: 81680
   data: 5034
-  metadata: 43354
+  metadata: 43350
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -832,7 +832,7 @@ functions:
     bytes: 11896
   __test$matcher_regex:
     calls: 1
-    bytes: 8316
+    bytes: 8736
   __test$re_escape:
     calls: 1
     bytes: 1104
@@ -934,13 +934,13 @@ functions:
     bytes: 928
   pat_json:
     calls: 2
-    bytes: 4488
+    bytes: 4600
   re_escape:
     calls: 42
     bytes: 1488
   rule_pats$Kind:
     calls: 2
-    bytes: 11356
+    bytes: 11652
   run_len:
     calls: 5
     bytes: 1340

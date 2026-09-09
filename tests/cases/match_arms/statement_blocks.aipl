@@ -95,9 +95,9 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 296
-instructions executed: 513
-binary size: 4184
-  code: 2168
+instructions executed: 548
+binary size: 4368
+  code: 2352
   data: 1
   metadata: 2015
 functions:
@@ -124,7 +124,7 @@ functions:
     bytes: 56
   classify:
     calls: 3
-    bytes: 748
+    bytes: 828
   main:
     calls: 1
-    bytes: 956
+    bytes: 1060

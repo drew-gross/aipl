@@ -45,12 +45,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 217
-binary size: 2024
-  code: 1180
+instructions executed: 245
+binary size: 2248
+  code: 1404
   data: 1
   metadata: 843
 functions:
   main:
     calls: 1
-    bytes: 1180
+    bytes: 1404

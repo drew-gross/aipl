@@ -681,9 +681,9 @@ allocations: 2576
 deallocations: 2576
 reallocations: 195
 bytes allocated: 186459
-instructions executed: 222065
-binary size: 239440
-  code: 151192
+instructions executed: 223310
+binary size: 242520
+  code: 154272
   data: 5068
   metadata: 83180
 functions:
@@ -761,13 +761,13 @@ functions:
     bytes: 3684
   __m1__span:
     calls: 1
-    bytes: 460
+    bytes: 524
   __m1__token_leaves:
     calls: 99
     bytes: 3648
   __m2__col_after:
     calls: 152
-    bytes: 544
+    bytes: 596
   __m2__fits:
     calls: 0
     bytes: 36
@@ -791,16 +791,16 @@ functions:
     bytes: 4968
   __m3__reindent_block:
     calls: 0
-    bytes: 4016
+    bytes: 4084
   __m8__desugar_opt$FKind:
     calls: 0
-    bytes: 644
+    bytes: 700
   __m8__desugar_rule$FKind:
     calls: 44
-    bytes: 14788
+    bytes: 15896
   __m8__failure_message:
     calls: 2
-    bytes: 404
+    bytes: 488
   __m8__group_styles$FKind:
     calls: 0
     bytes: 32
@@ -815,10 +815,10 @@ functions:
     bytes: 1300
   __m8__link_opt$FKind:
     calls: 0
-    bytes: 660
+    bytes: 716
   __m8__link_rule$FKind:
     calls: 44
-    bytes: 5232
+    bytes: 5600
   __m8__link_rules$FKind:
     calls: 0
     bytes: 832
@@ -944,16 +944,16 @@ functions:
     bytes: 444
   edge:
     calls: 24
-    bytes: 188
+    bytes: 236
   fmt_node$FKind$str$s1$lam23:
     calls: 1
-    bytes: 3792
+    bytes: 4072
   fmt_node$FKind$str$s1$lam31:
     calls: 1
-    bytes: 3792
+    bytes: 4072
   fmt_node$FKind$str$s1$lam34:
     calls: 17
-    bytes: 3792
+    bytes: 4072
   format_cst$FKind$str$s1$lam18:
     calls: 1
     bytes: 384
@@ -980,13 +980,13 @@ functions:
     bytes: 1876
   group_doc$FKind$str$s1$lam41:
     calls: 0
-    bytes: 2308
+    bytes: 2420
   group_doc$FKind$str$s1$lam48:
     calls: 0
-    bytes: 2308
+    bytes: 2420
   group_doc$FKind$str$s1$lam52:
     calls: 4
-    bytes: 2308
+    bytes: 2420
   inline_doc$lam21:
     calls: 58
     bytes: 2668

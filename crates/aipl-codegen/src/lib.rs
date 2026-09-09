@@ -18817,6 +18817,35 @@ fn compile_expr_inner<M: Module>(
                 if needs_drop(&at, structs) {
                     emit_retain(builder, module, builtins, structs, av, &at);
                 }
+                // A composite travels as a *pointer*, and an arm whose value is
+                // read straight out of the scrutinee hands back a pointer into
+                // it — `match (v) { Nm(n) => n, .. }` yields the address of the
+                // payload inside `v`'s own storage. The retain above covers what
+                // the value refers to (a `str`'s buffer) but not where the value
+                // itself lives, so once the scrutinee dies the bytes are gone and
+                // the result reads as empty. That is invisible while the
+                // scrutinee outlives the match — a borrowed parameter, say — and
+                // shows up the moment it does not, as when the scrutinee is a
+                // freshly built temporary.
+                //
+                // So copy it into a slot of this function's own frame, which
+                // outlives the merge. Unconditional for composites rather than
+                // only for values that provably alias: 24 bytes, against a
+                // use-after-free that depends on where the caller got its
+                // scrutinee.
+                let av = if is_composite(&at, structs) {
+                    let size = sret_size(&at, structs).unwrap_or(8);
+                    let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                        StackSlotKind::ExplicitSlot,
+                        size,
+                        3,
+                    ));
+                    let dst = builder.ins().stack_addr(types::I64, slot, 0);
+                    copy_composite(builder, dst, av, &at, structs);
+                    dst
+                } else {
+                    av
+                };
                 drop_scope(
                     builder,
                     module,

@@ -1,0 +1,112 @@
+import { join, map, print } from builtins;
+
+// A `match` arm whose value is read straight out of the scrutinee hands back a
+// pointer into the scrutinee's own storage, because a composite (here a `str`)
+// travels as a pointer. If the scrutinee is a freshly built boxed value, it dies
+// at the end of the enclosing scope and takes those bytes with it — so the arm's
+// result has to be copied into the enclosing function's frame, not aliased.
+//
+// The bug this locks down was invisible whenever the scrutinee outlived the
+// match, which is the usual case: `render_plain` below matches a borrowed
+// parameter and was always correct. `render` differs from it by one identity
+// copy, and printed `[ ]` instead of `[a b]`.
+variant R = Nm(str) | Seq(R[])
+
+// An identity walk: every case rebuilt from its own payload.
+fn copy(r: R) -> R!Error {
+    match (r) {
+        Nm(n) => ok(Nm(n)),
+        Seq(rs) => ok(Seq(rs.map(copy_or))),
+    }
+}
+
+fn copy_or(r: R) -> R {
+    match (copy(r)) {
+        ok(d) => d,
+        err(..) => r,
+    }
+}
+
+// Matches a fresh copy — the scrutinee is a temporary of this call.
+fn render(r: R) -> str {
+    let plain = copy_or(r);
+    match (plain) {
+        Nm(n) => n,
+        Seq(rs) => rs.map(render).join(sep=" "),
+    }
+}
+
+// The same, matching the borrowed parameter directly.
+fn render_plain(r: R) -> str {
+    match (r) {
+        Nm(n) => n,
+        Seq(rs) => rs.map(render_plain).join(sep=" "),
+    }
+}
+
+fn main() !prints {
+    let t = Seq([Nm("a"), Nm("b")]);
+    print(`copy at each level: [{render(t)}]`);
+    print(`no copy:            [{render_plain(t)}]`);
+    print(`copy once:          [{render_plain(copy_or(t))}]`);
+}
+--- stdout ---
+copy at each level: [a b]
+no copy:            [a b]
+copy once:          [a b]
+--- performance ---
+allocations: 26
+deallocations: 26
+reallocations: 6
+bytes allocated: 1637
+instructions executed: 1582
+binary size: 6496
+  code: 3712
+  data: 1
+  metadata: 2783
+functions:
+  __arr_drop_R:
+    calls: 3
+    bytes: 116
+  __arr_retain_R:
+    calls: 4
+    bytes: 116
+  __rec_drop_R:
+    calls: 11
+    bytes: 72
+  aipl_arr_inc:
+    calls: 7
+    bytes: (external)
+  aipl_array_dec:
+    calls: 13
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 10
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 5
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 11
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 57
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 46
+    bytes: (external)
+  copy_or:
+    calls: 8
+    bytes: 992
+  main:
+    calls: 1
+    bytes: 1088
+  render:
+    calls: 3
+    bytes: 680
+  render_plain:
+    calls: 6
+    bytes: 648

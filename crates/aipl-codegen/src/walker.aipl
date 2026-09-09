@@ -2923,9 +2923,9 @@ allocations: 114026
 deallocations: 114026
 reallocations: 1881
 bytes allocated: 6162650
-instructions executed: 21585865
-binary size: 8490816
-  code: 5358212
+instructions executed: 22023139
+binary size: 8495336
+  code: 5362732
   data: 27172
   metadata: 3105432
 functions:
@@ -3069,7 +3069,7 @@ functions:
     bytes: 140
   __m10__unescape:
     calls: 10
-    bytes: 1108
+    bytes: 1180
   __m11__process_raw_string:
     calls: 1
     bytes: 556
@@ -3081,7 +3081,7 @@ functions:
     bytes: 332
   __m1__col_after:
     calls: 969
-    bytes: 544
+    bytes: 596
   __m1__fits:
     calls: 0
     bytes: 36
@@ -3105,7 +3105,7 @@ functions:
     bytes: 4968
   __m2__reindent_block:
     calls: 2
-    bytes: 2832
+    bytes: 2928
   __m3__dedent:
     calls: 2
     bytes: 1276
@@ -3114,7 +3114,7 @@ functions:
     bytes: 90364
   __m8__char_lit_emit:
     calls: 1
-    bytes: 1648
+    bytes: 1772
   __m8__dedent_segments:
     calls: 0
     bytes: 272
@@ -3123,13 +3123,13 @@ functions:
     bytes: 196
   __m8__int_lit:
     calls: 22
-    bytes: 1296
+    bytes: 1364
   __m8__raw_tpl_kind:
     calls: 0
-    bytes: 2392
+    bytes: 2592
   __m8__tpl_kind:
     calls: 2
-    bytes: 2424
+    bytes: 2608
   __m9__between_len:
     calls: 609
     bytes: 752
@@ -3138,7 +3138,7 @@ functions:
     bytes: 1592
   __m9__finalize_template$__m8__AiplTok:
     calls: 1
-    bytes: 8464
+    bytes: 8904
   __m9__float_len:
     calls: 0
     bytes: 824
@@ -3150,13 +3150,13 @@ functions:
     bytes: 1520
   __m9__lex_step$__m8__AiplTok:
     calls: 1957
-    bytes: 28908
+    bytes: 29196
   __m9__nested_len:
     calls: 1070
     bytes: 940
   __m9__step_result$__m8__AiplTok:
     calls: 48649
-    bytes: 14224
+    bytes: 15088
   __m9__template_scan$__m8__AiplTok:
     calls: 1
     bytes: 2728
@@ -3282,7 +3282,7 @@ functions:
     bytes: 5192
   bump:
     calls: 1091
-    bytes: 1100
+    bytes: 1284
   call_arg:
     calls: 12
     bytes: 5216
@@ -3297,7 +3297,7 @@ functions:
     bytes: 6580
   comma_list_docs:
     calls: 98
-    bytes: 4168
+    bytes: 4640
   comment_starts_before:
     calls: 322
     bytes: 280
@@ -3321,7 +3321,7 @@ functions:
     bytes: 924
   err_here:
     calls: 5
-    bytes: 760
+    bytes: 848
   expect:
     calls: 465
     bytes: 1228
@@ -3330,7 +3330,7 @@ functions:
     bytes: 760
   fmt_kind:
     calls: 1063
-    bytes: 2524
+    bytes: 3120
   fn_attrs:
     calls: 26
     bytes: 5908
@@ -3345,10 +3345,10 @@ functions:
     bytes: 1904
   for_stmt:
     calls: 2
-    bytes: 12952
+    bytes: 13176
   format_program:
     calls: 8
-    bytes: 5212
+    bytes: 5328
   hug_close:
     calls: 0
     bytes: 732
@@ -3387,7 +3387,7 @@ functions:
     bytes: 3412
   lead:
     calls: 314
-    bytes: 1884
+    bytes: 1916
   let_stmt:
     calls: 3
     bytes: 14072
@@ -3516,16 +3516,16 @@ functions:
     bytes: 256
   template_scan:
     calls: 1
-    bytes: 2496
+    bytes: 2540
   template_verbatim:
     calls: 1
-    bytes: 900
+    bytes: 988
   tok_text:
     calls: 3425
-    bytes: 456
+    bytes: 508
   trailing_comment:
     calls: 85
-    bytes: 2188
+    bytes: 2344
   trim_last_break:
     calls: 0
     bytes: 32
@@ -3558,7 +3558,7 @@ functions:
     bytes: 2432
   walker_of:
     calls: 142
-    bytes: 3692
+    bytes: 3772
   while_stmt:
     calls: 1
     bytes: 4892

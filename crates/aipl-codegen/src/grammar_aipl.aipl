@@ -1189,11 +1189,11 @@ allocations: 1336972
 deallocations: 1336972
 reallocations: 7375
 bytes allocated: 116591668
-instructions executed: 173434931
-binary size: 738072
-  code: 490920
+instructions executed: 176264618
+binary size: 746256
+  code: 499100
   data: 13428
-  metadata: 233724
+  metadata: 233728
 functions:
   __arr_drop___m11__StepResult$__m10__AiplTok:
     calls: 5
@@ -1389,7 +1389,7 @@ functions:
     bytes: 140
   __m10__char_lit_emit:
     calls: 0
-    bytes: 1648
+    bytes: 1772
   __m10__dedent_segments:
     calls: 1
     bytes: 272
@@ -1398,13 +1398,13 @@ functions:
     bytes: 196
   __m10__int_lit:
     calls: 65
-    bytes: 1296
+    bytes: 1364
   __m10__raw_tpl_kind:
     calls: 2
-    bytes: 2392
+    bytes: 2592
   __m10__tpl_kind:
     calls: 6
-    bytes: 2424
+    bytes: 2608
   __m11__between_len:
     calls: 742
     bytes: 752
@@ -1413,7 +1413,7 @@ functions:
     bytes: 1592
   __m11__finalize_template$__m10__AiplTok:
     calls: 3
-    bytes: 8464
+    bytes: 8904
   __m11__float_len:
     calls: 0
     bytes: 824
@@ -1425,13 +1425,13 @@ functions:
     bytes: 1520
   __m11__lex_step$__m10__AiplTok:
     calls: 1997
-    bytes: 28908
+    bytes: 29196
   __m11__nested_len:
     calls: 1277
     bytes: 940
   __m11__step_result$__m10__AiplTok:
     calls: 58080
-    bytes: 14224
+    bytes: 15088
   __m11__template_scan$__m10__AiplTok:
     calls: 3
     bytes: 2728
@@ -1449,7 +1449,7 @@ functions:
     bytes: 368
   __m12__unescape:
     calls: 9
-    bytes: 1108
+    bytes: 1180
   __m13__process_raw_string:
     calls: 1
     bytes: 556
@@ -1470,7 +1470,7 @@ functions:
     bytes: 3160
   __m18__error_at$__m10__AiplTok$Ast:
     calls: 31
-    bytes: 3928
+    bytes: 4024
   __m18__far_miss:
     calls: 11413
     bytes: 1084
@@ -1485,7 +1485,7 @@ functions:
     bytes: 3100
   __m18__match_many$__m10__AiplTok$Ast:
     calls: 1113
-    bytes: 4560
+    bytes: 4680
   __m18__match_maybe$__m10__AiplTok$Ast:
     calls: 424
     bytes: 1076
@@ -1497,10 +1497,10 @@ functions:
     bytes: 1692
   __m18__match_prod$__m10__AiplTok$Ast:
     calls: 5171
-    bytes: 8804
+    bytes: 8972
   __m18__match_rule$__m10__AiplTok$Ast:
     calls: 36701
-    bytes: 14464
+    bytes: 15272
   __m18__match_then$__m10__AiplTok$Ast:
     calls: 9723
     bytes: 2128
@@ -1509,7 +1509,7 @@ functions:
     bytes: 624
   __m18__parse_prepared$__m10__AiplTok$Ast:
     calls: 101
-    bytes: 5152
+    bytes: 5288
   __m18__prepare$__m10__AiplTok$Ast:
     calls: 9
     bytes: 2068
@@ -1542,7 +1542,7 @@ functions:
     bytes: 860
   __m18__tok_text$__m10__AiplTok$Ast:
     calls: 11219
-    bytes: 1640
+    bytes: 1712
   __m18__trailing_trivia$__m10__AiplTok$Ast:
     calls: 140
     bytes: 1160
@@ -1560,7 +1560,7 @@ functions:
     bytes: 1084
   __m19__rule_first$__m10__AiplTok:
     calls: 26064
-    bytes: 6012
+    bytes: 6516
   __m19__union_syms$__m10__AiplTok:
     calls: 20016
     bytes: 736
@@ -1581,7 +1581,7 @@ functions:
     bytes: 444
   __m2__fmt_node$__m10__AiplTok$Ast$s1$lam29:
     calls: 135
-    bytes: 4880
+    bytes: 5244
   __m2__format_cst$__m10__AiplTok$Ast$s1$lam12:
     calls: 19
     bytes: 384
@@ -1590,13 +1590,13 @@ functions:
     bytes: 304
   __m2__group_doc$__m10__AiplTok$Ast$s1$lam73:
     calls: 12
-    bytes: 2308
+    bytes: 2420
   __m2__inline_doc$lam72:
     calls: 127
     bytes: 2668
   __m2__pieces$__m10__AiplTok$Ast$s1$lam70:
     calls: 159
-    bytes: 3404
+    bytes: 3612
   __m2__render_cst$__m10__AiplTok$Ast$s1$lam3:
     calls: 19
     bytes: 5268
@@ -1605,7 +1605,7 @@ functions:
     bytes: 4272
   __m3__col_after:
     calls: 102
-    bytes: 544
+    bytes: 596
   __m3__fits:
     calls: 0
     bytes: 36
@@ -1626,16 +1626,16 @@ functions:
     bytes: 688
   __m4__reindent_block:
     calls: 0
-    bytes: 2832
+    bytes: 2928
   __m5__dedent:
     calls: 1
     bytes: 1276
   __m9__desugar_opt$__m10__AiplTok:
     calls: 4386
-    bytes: 644
+    bytes: 700
   __m9__desugar_rule$__m10__AiplTok:
     calls: 102450
-    bytes: 14788
+    bytes: 15896
   __m9__group_styles$__m10__AiplTok:
     calls: 0
     bytes: 32
@@ -1650,10 +1650,10 @@ functions:
     bytes: 1300
   __m9__link_opt$__m10__AiplTok:
     calls: 4386
-    bytes: 660
+    bytes: 716
   __m9__link_rule$__m10__AiplTok:
     calls: 104490
-    bytes: 5232
+    bytes: 5600
   __m9__link_rules$__m10__AiplTok:
     calls: 19737
     bytes: 832
@@ -1683,7 +1683,7 @@ functions:
     bytes: 1300
   __test$aipl_parses:
     calls: 1
-    bytes: 19240
+    bytes: 20404
   __test$format_aipl_ty:
     calls: 1
     bytes: 8240
@@ -1740,7 +1740,7 @@ functions:
     bytes: 512
   aipl_parse_report:
     calls: 8
-    bytes: 664
+    bytes: 748
   aipl_rec_alloc:
     calls: 356702
     bytes: (external)
@@ -1785,7 +1785,7 @@ functions:
     bytes: 196
   lex_lossless:
     calls: 101
-    bytes: 96708
+    bytes: 96796
   main:
     calls: 1
     bytes: 348
@@ -1806,4 +1806,4 @@ functions:
     bytes: 7648
   why_prepared:
     calls: 9
-    bytes: 1480
+    bytes: 1760

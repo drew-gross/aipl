@@ -83,9 +83,9 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 672
-instructions executed: 1733
-binary size: 11600
-  code: 7464
+instructions executed: 1783
+binary size: 11912
+  code: 7776
   data: 51
   metadata: 4085
 functions:
@@ -109,16 +109,16 @@ functions:
     bytes: (external)
   build_array:
     calls: 1
-    bytes: 772
+    bytes: 816
   build_spread:
     calls: 1
-    bytes: 980
+    bytes: 1036
   build_struct:
     calls: 1
-    bytes: 564
+    bytes: 628
   build_variant:
     calls: 1
-    bytes: 640
+    bytes: 696
   main:
     calls: 1
-    bytes: 2964
+    bytes: 3056

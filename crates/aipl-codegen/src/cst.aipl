@@ -313,9 +313,9 @@ allocations: 576
 deallocations: 576
 reallocations: 40
 bytes allocated: 29070
-instructions executed: 29320
-binary size: 59656
-  code: 35348
+instructions executed: 29618
+binary size: 60176
+  code: 35868
   data: 2261
   metadata: 22047
 functions:
@@ -360,7 +360,7 @@ functions:
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 13296
+    bytes: 13492
   aipl_arr_drop_arr:
     calls: 85
     bytes: (external)
@@ -426,13 +426,13 @@ functions:
     bytes: 100
   own_token_text:
     calls: 3
-    bytes: 1232
+    bytes: 1316
   show:
     calls: 23
-    bytes: 2792
+    bytes: 2968
   span:
     calls: 5
-    bytes: 460
+    bytes: 524
   splice:
     calls: 0
     bytes: 32

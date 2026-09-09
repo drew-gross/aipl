@@ -1384,9 +1384,9 @@ allocations: 8732
 deallocations: 8732
 reallocations: 617
 bytes allocated: 557507
-instructions executed: 1113513
-binary size: 554504
-  code: 336288
+instructions executed: 1152194
+binary size: 560448
+  code: 342232
   data: 8772
   metadata: 209444
 functions:
@@ -1578,10 +1578,10 @@ functions:
     bytes: 3684
   __m1__show:
     calls: 184
-    bytes: 2792
+    bytes: 2968
   __m1__span:
     calls: 1
-    bytes: 460
+    bytes: 524
   __m1__splice:
     calls: 0
     bytes: 32
@@ -1605,19 +1605,19 @@ functions:
     bytes: 1084
   __m2__rule_first$Tok:
     calls: 149
-    bytes: 6012
+    bytes: 6516
   __m2__union_syms$Tok:
     calls: 84
     bytes: 736
   __m3__desugar_opt$Tok:
     calls: 42
-    bytes: 644
+    bytes: 700
   __m3__desugar_rule$Tok:
     calls: 459
-    bytes: 14788
+    bytes: 15896
   __m3__failure_message:
     calls: 36
-    bytes: 404
+    bytes: 488
   __m3__group_styles$Tok:
     calls: 0
     bytes: 32
@@ -1632,10 +1632,10 @@ functions:
     bytes: 1300
   __m3__link_opt$Tok:
     calls: 42
-    bytes: 660
+    bytes: 716
   __m3__link_rule$Tok:
     calls: 459
-    bytes: 5232
+    bytes: 5600
   __m3__link_rules$Tok:
     calls: 87
     bytes: 832
@@ -1653,7 +1653,7 @@ functions:
     bytes: 1592
   __m4__finalize_template$Tok:
     calls: 0
-    bytes: 4852
+    bytes: 5260
   __m4__float_len:
     calls: 0
     bytes: 824
@@ -1665,13 +1665,13 @@ functions:
     bytes: 1520
   __m4__lex_step$Tok:
     calls: 265
-    bytes: 24708
+    bytes: 24996
   __m4__nested_len:
     calls: 0
     bytes: 940
   __m4__step_result$Tok:
     calls: 706
-    bytes: 8364
+    bytes: 9188
   __m4__template_scan$Tok:
     calls: 0
     bytes: 2728
@@ -1785,7 +1785,7 @@ functions:
     bytes: 3160
   error_at$Tok$Node:
     calls: 34
-    bytes: 2920
+    bytes: 3032
   far_miss:
     calls: 113
     bytes: 1084
@@ -1800,16 +1800,16 @@ functions:
     bytes: 1888
   lex_toks:
     calls: 72
-    bytes: 696
+    bytes: 776
   lower_node$Tok$Node:
     calls: 18
-    bytes: 3416
+    bytes: 3844
   main:
     calls: 1
     bytes: 104
   match_many$Tok$Node:
     calls: 38
-    bytes: 4560
+    bytes: 4680
   match_maybe$Tok$Node:
     calls: 4
     bytes: 1076
@@ -1821,10 +1821,10 @@ functions:
     bytes: 1692
   match_prod$Tok$Node:
     calls: 166
-    bytes: 6752
+    bytes: 7068
   match_rule$Tok$Node:
     calls: 532
-    bytes: 6340
+    bytes: 7084
   match_then$Tok$Node:
     calls: 42
     bytes: 2128
@@ -1836,7 +1836,7 @@ functions:
     bytes: 624
   parse_prepared$Tok$Node:
     calls: 72
-    bytes: 5152
+    bytes: 5288
   parsed:
     calls: 5
     bytes: 452
@@ -1884,7 +1884,7 @@ functions:
     bytes: 2736
   tok_text$Tok$Node:
     calls: 165
-    bytes: 832
+    bytes: 904
   trailing_trivia$Tok$Node:
     calls: 72
     bytes: 760

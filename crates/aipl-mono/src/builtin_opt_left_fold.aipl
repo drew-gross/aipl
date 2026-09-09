@@ -90,9 +90,9 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 677
-instructions executed: 2651
-binary size: 10464
-  code: 6116
+instructions executed: 2672
+binary size: 10512
+  code: 6164
   data: 982
   metadata: 3366
 functions:
@@ -116,7 +116,7 @@ functions:
     bytes: 116
   __test$opt_left_fold:
     calls: 1
-    bytes: 4588
+    bytes: 4636
   aipl_arr_inc:
     calls: 1
     bytes: (external)

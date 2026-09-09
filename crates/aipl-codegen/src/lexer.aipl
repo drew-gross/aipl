@@ -1469,9 +1469,9 @@ allocations: 1604
 deallocations: 1604
 reallocations: 54
 bytes allocated: 108824
-instructions executed: 340670
-binary size: 2310448
-  code: 1545196
+instructions executed: 348015
+binary size: 2312440
+  code: 1547188
   data: 10524
   metadata: 754728
 functions:
@@ -1618,7 +1618,7 @@ functions:
     bytes: 96
   __m1__unescape:
     calls: 21
-    bytes: 1108
+    bytes: 1180
   __test$keep_skipped:
     calls: 1
     bytes: 25276
@@ -1684,13 +1684,13 @@ functions:
     bytes: 140
   finalize_template$Kind:
     calls: 13
-    bytes: 9960
+    bytes: 10376
   float_len:
     calls: 14
     bytes: 824
   int_tok:
     calls: 13
-    bytes: 1536
+    bytes: 1580
   interp_scan$Kind:
     calls: 9
     bytes: 2248
@@ -1702,7 +1702,7 @@ functions:
     bytes: 1520
   lex_step$Kind:
     calls: 171
-    bytes: 30672
+    bytes: 30960
   main:
     calls: 1
     bytes: 240
@@ -1714,10 +1714,10 @@ functions:
     bytes: 1824
   rawtpl_kind:
     calls: 3
-    bytes: 3040
+    bytes: 3208
   step_result$Kind:
     calls: 469
-    bytes: 16588
+    bytes: 17440
   template_scan$Kind:
     calls: 16
     bytes: 2728
@@ -1738,4 +1738,4 @@ functions:
     bytes: 144
   tpl_kind:
     calls: 17
-    bytes: 3072
+    bytes: 3224

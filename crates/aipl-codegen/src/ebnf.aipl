@@ -816,9 +816,9 @@ allocations: 2161
 deallocations: 2161
 reallocations: 144
 bytes allocated: 163295
-instructions executed: 193205
-binary size: 149832
-  code: 94984
+instructions executed: 199516
+binary size: 153168
+  code: 98320
   data: 3900
   metadata: 50948
 functions:
@@ -890,10 +890,10 @@ functions:
     bytes: 128
   __m2__desugar_opt$Kind:
     calls: 22
-    bytes: 644
+    bytes: 700
   __m2__desugar_rule$Kind:
     calls: 231
-    bytes: 14788
+    bytes: 15896
   __m2__group_styles$Kind:
     calls: 0
     bytes: 32
@@ -908,10 +908,10 @@ functions:
     bytes: 1300
   __m2__link_opt$Kind:
     calls: 12
-    bytes: 660
+    bytes: 716
   __m2__link_rule$Kind:
     calls: 139
-    bytes: 5232
+    bytes: 5600
   __m2__link_rules$Kind:
     calls: 27
     bytes: 832
@@ -1040,10 +1040,10 @@ functions:
     bytes: 456
   ebnf$Kind$Node:
     calls: 6
-    bytes: 2208
+    bytes: 2416
   first_msg:
     calls: 2
-    bytes: 480
+    bytes: 556
   first_precs$Kind:
     calls: 0
     bytes: 32
@@ -1070,19 +1070,19 @@ functions:
     bytes: 3468
   render_rule$Kind:
     calls: 92
-    bytes: 8192
+    bytes: 9004
   rep_suffix:
     calls: 10
     bytes: 724
   rule_first$Kind:
     calls: 228
-    bytes: 6012
+    bytes: 6516
   show_first$Kind:
     calls: 25
-    bytes: 1264
+    bytes: 1344
   show_first_sets$Kind$Node:
     calls: 5
-    bytes: 2540
+    bytes: 2608
   union_syms$Kind:
     calls: 99
     bytes: 736

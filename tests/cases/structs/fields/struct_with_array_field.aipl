@@ -20,15 +20,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 136
-instructions executed: 270
-binary size: 3272
-  code: 1428
+instructions executed: 284
+binary size: 3376
+  code: 1536
   data: 156
-  metadata: 1688
+  metadata: 1684
 functions:
   __test$make:
     calls: 1
-    bytes: 1328
+    bytes: 1436
   aipl_arr_inc:
     calls: 4
     bytes: (external)

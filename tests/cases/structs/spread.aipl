@@ -67,9 +67,9 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 206
-instructions executed: 542
-binary size: 4888
-  code: 2584
+instructions executed: 556
+binary size: 4992
+  code: 2688
   data: 47
   metadata: 2257
 functions:
@@ -99,4 +99,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2148
+    bytes: 2252

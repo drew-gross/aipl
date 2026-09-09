@@ -639,6 +639,7 @@ case_tests! {
     cases_tuples_vec_of_tuples = "cases/tuples/vec_of_tuples",
     cases_variants_basic = "cases/variants/basic",
     cases_variants_boxed_array_param = "cases/variants/boxed_array_param",
+    cases_variants_boxed_match_arm_payload = "cases/variants/boxed_match_arm_payload",
     cases_variants_case_name = "cases/variants/case_name",
     cases_variants_case_type = "cases/variants/case_type",
     cases_variants_ctor_as_fn_value = "cases/variants/ctor_as_fn_value",

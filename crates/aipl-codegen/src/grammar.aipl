@@ -808,11 +808,11 @@ allocations: 731
 deallocations: 731
 reallocations: 38
 bytes allocated: 56337
-instructions executed: 62441
-binary size: 138232
-  code: 84888
+instructions executed: 63876
+binary size: 139984
+  code: 86636
   data: 3492
-  metadata: 49852
+  metadata: 49856
 functions:
   __arr_drop_ListStyle:
     calls: 64
@@ -897,7 +897,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 43748
+    bytes: 43824
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -975,13 +975,13 @@ functions:
     bytes: (external)
   desugar_opt$Kind:
     calls: 12
-    bytes: 644
+    bytes: 700
   desugar_rule$Kind:
     calls: 99
-    bytes: 14788
+    bytes: 15896
   failure_message:
     calls: 2
-    bytes: 404
+    bytes: 488
   group_styles$Kind:
     calls: 0
     bytes: 32
@@ -999,10 +999,10 @@ functions:
     bytes: 1300
   link_opt$Kind:
     calls: 10
-    bytes: 660
+    bytes: 716
   link_rule$Kind:
     calls: 97
-    bytes: 5232
+    bytes: 5600
   link_rules$Kind:
     calls: 4
     bytes: 832

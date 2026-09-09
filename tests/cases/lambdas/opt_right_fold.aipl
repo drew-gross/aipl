@@ -39,9 +39,9 @@ allocations: 23
 deallocations: 23
 reallocations: 0
 bytes allocated: 1472
-instructions executed: 3005
-binary size: 10864
-  code: 6480
+instructions executed: 3119
+binary size: 11120
+  code: 6736
   data: 581
   metadata: 3803
 functions:
@@ -62,7 +62,7 @@ functions:
     bytes: 44
   __test$to_list_keeps_order:
     calls: 1
-    bytes: 4924
+    bytes: 5136
   aipl_array_dec:
     calls: 7
     bytes: (external)
@@ -101,4 +101,4 @@ functions:
     bytes: 128
   to_list:
     calls: 3
-    bytes: 968
+    bytes: 1012

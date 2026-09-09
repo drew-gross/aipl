@@ -25,9 +25,9 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 228
-instructions executed: 155
-binary size: 2136
-  code: 824
+instructions executed: 169
+binary size: 2208
+  code: 896
   data: 55
   metadata: 1257
 functions:
@@ -45,4 +45,4 @@ functions:
     bytes: 304
   text:
     calls: 2
-    bytes: 316
+    bytes: 388

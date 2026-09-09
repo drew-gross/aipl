@@ -740,9 +740,9 @@ allocations: 3910
 deallocations: 3910
 reallocations: 33
 bytes allocated: 387901
-instructions executed: 1000813
-binary size: 465792
-  code: 319052
+instructions executed: 1015749
+binary size: 468032
+  code: 321292
   data: 6748
   metadata: 139992
 functions:
@@ -859,7 +859,7 @@ functions:
     bytes: 1592
   __m1__finalize_template$AiplTok:
     calls: 3
-    bytes: 8464
+    bytes: 8904
   __m1__float_len:
     calls: 0
     bytes: 824
@@ -871,13 +871,13 @@ functions:
     bytes: 1520
   __m1__lex_step$AiplTok:
     calls: 91
-    bytes: 28908
+    bytes: 29196
   __m1__nested_len:
     calls: 56
     bytes: 940
   __m1__step_result$AiplTok:
     calls: 1835
-    bytes: 14224
+    bytes: 15088
   __m1__template_scan$AiplTok:
     calls: 3
     bytes: 2728
@@ -895,7 +895,7 @@ functions:
     bytes: 368
   __m2__unescape:
     calls: 8
-    bytes: 1108
+    bytes: 1180
   __m3__process_raw_string:
     calls: 2
     bytes: 1712
@@ -964,7 +964,7 @@ functions:
     bytes: (external)
   char_lit_emit:
     calls: 4
-    bytes: 1648
+    bytes: 1772
   dedent_segments:
     calls: 1
     bytes: 272
@@ -973,7 +973,7 @@ functions:
     bytes: 196
   int_lit:
     calls: 4
-    bytes: 1296
+    bytes: 1364
   lex_aipl:
     calls: 0
     bytes: 144
@@ -985,7 +985,7 @@ functions:
     bytes: 272
   raw_tpl_kind:
     calls: 1
-    bytes: 2392
+    bytes: 2592
   tpl_kind:
     calls: 3
-    bytes: 2424
+    bytes: 2608

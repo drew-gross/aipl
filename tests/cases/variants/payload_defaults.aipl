@@ -46,21 +46,21 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 402
-binary size: 4408
-  code: 2100
+instructions executed: 437
+binary size: 4672
+  code: 2364
   data: 388
   metadata: 1920
 functions:
   __test$color_of:
     calls: 1
-    bytes: 668
+    bytes: 772
   __test$coords:
     calls: 1
     bytes: 332
   __test$tag_of:
     calls: 1
-    bytes: 864
+    bytes: 1024
   aipl_assert:
     calls: 7
     bytes: (external)

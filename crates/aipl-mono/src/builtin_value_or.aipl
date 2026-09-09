@@ -71,9 +71,9 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 200
-instructions executed: 693
-binary size: 7456
-  code: 3396
+instructions executed: 728
+binary size: 7688
+  code: 3628
   data: 1173
   metadata: 2887
 functions:
@@ -82,7 +82,7 @@ functions:
     bytes: 104
   __test$value_or:
     calls: 1
-    bytes: 3184
+    bytes: 3416
   aipl_arr_inc:
     calls: 4
     bytes: (external)

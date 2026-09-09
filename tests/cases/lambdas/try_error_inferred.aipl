@@ -55,11 +55,11 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 534
-instructions executed: 1487
-binary size: 12176
-  code: 7712
+instructions executed: 1494
+binary size: 12232
+  code: 7764
   data: 67
-  metadata: 4397
+  metadata: 4401
 functions:
   __arr_drop_Wrapped:
     calls: 3
@@ -123,4 +123,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2152
+    bytes: 2204
