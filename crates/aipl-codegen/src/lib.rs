@@ -9223,16 +9223,22 @@ fn is_char_array(ty: &ConcreteType) -> bool {
 /// *loop* body: the per-iteration region track dies with the iteration, but the
 /// slot's own reference carries the current value across iterations.
 ///
-/// Non-`char[]` arrays and boxed (recursive) declared types: both are plain
-/// refcounted pointers, and both can be replaced from a nested scope
-/// (`set acc = Cons(x, acc)` in a loop body), where the value-track model alone
-/// would free the new value at the inner scope's exit and leave the slot
-/// dangling. `char[]` is str-shaped (different rc entry points and an inline
-/// representation that isn't a pointer), `str` has its own established slot
-/// model, and sets/dicts keep the value-track model until a case demands
-/// otherwise.
+/// Sets, dicts, non-`char[]` arrays and boxed (recursive) declared types: all
+/// are plain refcounted pointers, and all can be replaced from a nested scope
+/// (`set acc = Cons(x, acc)` in a loop body, `set acc = acc.union(s)` in a match
+/// arm), where the value-track model alone would free the new value at the inner
+/// scope's exit and leave the slot dangling — and leak the value it replaced,
+/// since nothing owned that one either. Sets and dicts kept the value-track
+/// model until `tests/cases/sets/union_from_array_elem.aipl` demanded otherwise;
+/// they share the array heap block, so they share its answer here too.
+///
+/// `char[]` is str-shaped (different rc entry points and an inline
+/// representation that isn't a pointer), and `str` has its own established slot
+/// model.
 fn mut_binding_owns_slot_ref(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
-    (matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty)) || is_boxed(ty, structs)
+    matches!(ty, ConcreteType::Set(_) | ConcreteType::Dict(_, _))
+        || (matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty))
+        || is_boxed(ty, structs)
 }
 
 /// Whether `ty`'s runtime value is str-shaped: a real `str`/`Error`/concat-str
@@ -18270,13 +18276,12 @@ fn compile_expr_inner<M: Module>(
                     }
                 }
             }
-            // For a `str` or (non-`char[]`) array binding (whose slot owns a
-            // reference on its current value — see `LetMut` and
-            // `mut_binding_owns_slot_ref`), snapshot the slot's current value so
-            // it can be released after the store. Read before evaluating the new
-            // value: `set s = f(s)` reads `s` but never writes it, so the
-            // snapshot holds. Sets/dicts and scalars keep the plain store (their
-            // in-place / value-track model).
+            // For a `str`, or for a binding whose slot owns a reference on its
+            // current value — a set, a dict, a non-`char[]` array, a boxed type;
+            // see `LetMut` and `mut_binding_owns_slot_ref` — snapshot the slot's
+            // current value so it can be released after the store. Read before
+            // evaluating the new value: `set s = f(s)` reads `s` but never writes
+            // it, so the snapshot holds. Scalars keep the plain store.
             let arr_slot_ref = mut_binding_owns_slot_ref(&expected_ty, structs);
             // `is_str_shaped`, matching `LetMut`: a `char[]` binding's slot owns
             // one reference like a `str`'s, so `set` has to maintain that here
@@ -18294,7 +18299,7 @@ fn compile_expr_inner<M: Module>(
             expect_type(&t, &expected_ty, "set", value.span.clone())?;
             if let Some(old) = old {
                 if arr_slot_ref {
-                    // Array: the slot takes its *own* reference on the new value
+                    // The slot takes its *own* reference on the new value
                     // (the value's existing ownership — a fresh literal's
                     // value-track, or a borrowed source binding — is untouched,
                     // preserving borrows of it), then releases its reference on

@@ -229,7 +229,7 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 sets:
-  fix bug from tests/cases/sets/union_from_array_elem.aipl
+  support #{T}?
   Dicts and sets can't be array elements, optional cores, or struct fields at all, so #{} can't flex there either.
   There's no dict-insert or dict-union builtin, so a dict can't be grown — which also means the empty-block representation can't be observed to differ.
   An unannotated let x = #{}; still settles on a set, since there's no context to decide from. (maybe require the annotation?)

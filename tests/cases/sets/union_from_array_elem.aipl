@@ -1,34 +1,29 @@
 import { len, print, to_str, union } from builtins;
 
-// !!! THIS CASE RECORDS A BUG. THE EXPECTED OUTPUT BELOW IS WRONG. !!!
+// Reassigning a `mut` set from inside a nested scope, where the new value is
+// built from an element borrowed out of an array.
 //
-// `union` with an operand borrowed out of an array corrupts the destination.
-// `acc` starts as `#{9}` and unions `#{1}`, so it holds two elements — and it
-// reads as 2 *inside* the arm that binds the element. Once that arm's scope
-// tears down, `acc` reads as 97. The array itself is undamaged.
+// This is a regression test for a use-after-free: a `mut` set binding used to
+// keep the *value-track* ownership model, where the sole reference on the
+// binding's current value belongs to the scope that created that value rather
+// than to the binding's own slot. That is fine while every assignment happens in
+// the binding's own scope, and wrong the moment one happens in a nested one: the
+// match arm's teardown released the value `acc` had just been assigned, so
+// `acc.len()` after the match read a freed block (97 under `aipl run`, 2043
+// under the case harness — a value that depends on how the process was started
+// is freed memory, not an answer). The replaced value leaked in the same step,
+// for the mirror-image reason: nothing owned it to release.
 //
-// So the arm's release is reaching a block `acc` has come to depend on.
+// The fix was to give sets and dicts the same slot-owned-reference model arrays
+// and boxed types already had — see `mut_binding_owns_slot_ref` in
+// `aipl-codegen`. The slot retains the incoming value and releases the outgoing
+// one, so the arm's teardown only releases the arm's own reference.
 //
-// The garbage value is stable for a given program *and execution mode* — 2043
-// under the case harness, 97 under `aipl run` on the same file — which is what
-// lets it be pinned here at all, and is itself evidence: a value that depends on
-// how the process was started is memory that was freed, not a computed answer.
-//
-// The stdout section says 97 so the suite stays green while this is iterated on.
-// **When the bug is fixed this case will fail, and the fix is to change the
-// expected output to 2** — not to re-record whatever the compiler then prints,
-// and not to run `fill_expected` over it.
-//
-// What is known:
-//   - It needs the operand to come from an array. The same union with a plain
-//     local, or with a call's result, is correct.
-//   - It is not about `str` — this reproduces with `#{i64}`.
-//   - It is not the in-place `set a = a.union(b)` optimization: disabling that
-//     changes nothing, and the copy path through a wrapper function fails too.
-//   - It is not the optional-of-set that indexing produces: binding an element
-//     with `match` and calling `len`/`has`/`union` on it is all correct.
-//   - The `for`-loop form of the same thing aborts the process outright, so it
-//     cannot be recorded here; only this bounded form can.
+// `union` is incidental — any heap value assigned from a nested scope did it,
+// and the same shape with an array binding was already correct. It is kept here
+// because the array element is what makes the shape realistic: this is the
+// accumulate-over-a-list-of-sets loop, written bounded so a failure prints
+// rather than aborts.
 //
 // Introduced by `25f946d` (sets and dicts as array elements).
 fn main() !prints {
@@ -37,68 +32,76 @@ fn main() !prints {
     match (ls[0]) {
         some(s) => {
             set acc = acc.union(s);
-            // Correct here.
             print(acc.len().to_str());
         },
         none => print("unreachable"),
     };
-    // Corrupt here. Should print 2.
+    // The assignment outlives the arm that made it.
     print(acc.len().to_str());
 
-    // The array survives — the damage is to the union's destination.
     print(ls.len().to_str());
+
+    // The loop this shape stands in for. Under the value-track model the
+    // per-iteration teardown freed the accumulator every trip, and this form
+    // aborted the process outright rather than printing a wrong number.
+    mut all: #{i64} = #{};
+    for (let s : ls) {
+        set all = all.union(s);
+    }
+    print(all.len().to_str());
 }
 --- stdout ---
 2
-2043
+2
+2
 2
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 12
+deallocations: 12
 reallocations: 0
-bytes allocated: 270
-instructions executed: 204
-binary size: 2736
-  code: 1212
+bytes allocated: 404
+instructions executed: 365
+binary size: 3520
+  code: 1684
   data: 1
-  metadata: 1523
+  metadata: 1835
 functions:
   __to_str_u64:
-    calls: 3
+    calls: 4
     bytes: 204
   aipl_arr_drop_arr:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 4
+    calls: 15
     bytes: (external)
   aipl_array_dec:
-    calls: 9
+    calls: 23
     bytes: (external)
   aipl_array_new:
     calls: 1
     bytes: (external)
   aipl_array_push_mut:
-    calls: 5
+    calls: 8
     bytes: (external)
   aipl_array_with_cap:
-    calls: 4
+    calls: 7
     bytes: (external)
   aipl_set_contains:
-    calls: 5
+    calls: 8
     bytes: (external)
   aipl_set_insert:
-    calls: 5
+    calls: 8
     bytes: (external)
   aipl_set_union:
-    calls: 1
+    calls: 3
     bytes: (external)
   aipl_u64_len:
-    calls: 6
+    calls: 8
     bytes: (external)
   aipl_write_u64:
-    calls: 3
+    calls: 4
     bytes: (external)
   main:
     calls: 1
-    bytes: 1008
+    bytes: 1480
