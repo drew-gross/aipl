@@ -121,11 +121,32 @@ pub(crate) fn tuple_struct_name(elems: &[Type]) -> String {
 /// by `lower_generics` (annotation lowering) and the checker/mono construction
 /// inference so both agree on the instance name.
 pub(crate) fn generic_instance_name(base: &str, args: &[Type]) -> String {
+    // A tuple reached through the generic path lands on the same struct as one
+    // written concretely, or the same tuple type would be two incompatible
+    // structs — `(Rule<Tok>, Rule<Tok>)` against `(Rule_Tok, Rule_Tok)`, which is
+    // exactly what a generic function handing a tuple to a concrete caller
+    // produces otherwise. The generic base carries its arity (`__tuple2`) so
+    // each arity can have a template of its own; the *instance* is named by its
+    // element types alone, which is what `tuple_struct_name` already spells.
+    if base.starts_with(TUPLE_TEMPLATE) {
+        return tuple_struct_name(args);
+    }
     format!(
         "{base}${}",
         args.iter().map(mangle_type).collect::<Vec<_>>().join("$")
     )
 }
+
+/// Prefix of the synthetic *template* a tuple with abstract elements lowers to:
+/// `__tuple2`, `__tuple3`, … one per arity. A tuple whose element types are all
+/// concrete skips this and is lowered straight to its instance
+/// ([`tuple_struct_name`]); only one that mentions a type variable needs a
+/// template for monomorphization to instantiate.
+///
+/// Deliberately a prefix of neither more nor less than `__tuple`, so that
+/// [`generic_instance_name`] can recognize it and hand back the very name the
+/// concrete route produces.
+pub(crate) const TUPLE_TEMPLATE: &str = "__tuple";
 
 /// Effects the language recognizes. `prints` = writes to stdout; `read_files` =
 /// reads from the filesystem; `write_files` = writes to the filesystem;
@@ -2516,6 +2537,17 @@ impl Cx<'_> {
                 let mut elem_tys: Vec<Type> = Vec::with_capacity(elems.len());
                 for e in elems {
                     elem_tys.push(self.check_expr(e, env, effects)?);
+                }
+                // A tuple over a type variable has no layout to register yet —
+                // which struct it becomes is only known once monomorphization
+                // binds that variable. It takes the abstract-application form
+                // instead, exactly as `lower_tuples` gives a *declared* one, so
+                // a literal and the type it is checked against agree.
+                if elem_tys.iter().any(mentions_typevar) {
+                    return Ok(Type::Generic(
+                        format!("{}{}", TUPLE_TEMPLATE, elem_tys.len()),
+                        elem_tys,
+                    ));
                 }
                 let name = tuple_struct_name(&elem_tys);
                 if !self.has_struct(&name) {

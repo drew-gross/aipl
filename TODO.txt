@@ -199,6 +199,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  pass expected-type context into tuples -> fix five bracket helpers for nested_in
   Make the language features powerful enough that we don't need builtin_return
   when all type args are just passed to a single arg type, and those types don't matter to the function internals, omitting them should be allowed e.g. fn prev_end<K: variant, A: any>(p: Parser<K, A>, i: u64)  becomes fn prev_end(p: Parser, i: u64)
   add `container` bound, or maybe monad

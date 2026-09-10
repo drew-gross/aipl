@@ -33,7 +33,6 @@ import {
     equal as ==,
     extend,
     find_index,
-    is_empty,
     is_some_and,
     join,
     len,
@@ -141,7 +140,7 @@ variant Rule<K: variant> =
     // and which of the four you picked is the thing that is easy to get subtly
     // wrong; here it is two arguments with names.
     //
-    // `nested_in` is the bracketed-list shorthand: given `[open, close]` it is a
+    // `nested_in` is the bracketed-list shorthand: given `(open, close)` it is a
     // `NestedIn` around this `Many`, which `desugar` rewrites it into before
     // anything else runs. Nearly every bracket pair in a real grammar holds a
     // list, and writing the brackets as an argument of the list beats wrapping
@@ -154,16 +153,18 @@ variant Rule<K: variant> =
     // *and* is never printed). Only `spaced` — whether flat brackets take inner
     // spaces, `{ a, b }` against `(a, b)` — cannot be derived, so it is here.
     //
-    // An array of two rather than a pair, because AIPL has no optional of a
-    // tuple and a generic struct's type parameter cannot be inferred from its
-    // field values. `desugar` refuses any other length.
+    // A pair, so "exactly two brackets" is the type rather than a length
+    // `desugar` has to check and a caller has to get right. It was an array
+    // until generic tuples worked — a tuple whose elements mention a type
+    // variable has no layout until monomorphization binds it, which is now
+    // what `lt_ty` defers to `instantiate_generic`.
     | Many(
         Rule<K>,
         min: u64 = 0,
         max?: u64 = none,
         sep?: Rule<K> = none,
         trailing_sep: bool = true,
-        nested_in: Rule<K>[] = [],
+        nested_in?: (Rule<K>, Rule<K>) = none,
         spaced: bool = false
     )
     // `r`, or nothing. Always matches.
@@ -365,7 +366,7 @@ fn opt_group_styles<K: variant>(r: Rule<K>?) -> ListStyle[] {
 fn group_count<K: variant>(r: Rule<K>) -> u64 { group_styles(r).len() }
 
 # `r` with every bracketed-list shorthand written out: a `Many` carrying
-# `nested_in=[open, close]` becomes the `NestedIn` it is shorthand for, wrapping
+# `nested_in=(open, close)` becomes the `NestedIn` it is shorthand for, wrapping
 # the same `Many` with the brackets removed.
 #
 # Run before anything else looks at a rule, so only one spelling ever reaches the
@@ -398,27 +399,26 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
                 sep?=desugar_opt(sep)?,
                 trailing_sep=trailing_sep,
             );
-            if (nested_in.is_empty()) {
-                return ok(inner);
-            };
-            if (nested_in.len() != 2) {
-                return err(ParseError {
-                    message: `nested_in takes an opening and a closing rule, got {nested_in.len()}`,
-                    span: 0..0,
-                });
-            };
-            let style = ListStyle {
-                sep: sep_spelling(sep)?,
-                spaced,
-                trailing: trailing_sep,
-                wraps: !max.is_some_and(|m| m == 1),
-            };
-            ok(NestedIn(
-                desugar_rule(nested_in[0].value_or_err(missing_bracket())?)?,
-                inner,
-                desugar_rule(nested_in[1].value_or_err(missing_bracket())?)?,
-                style=style,
-            ))
+
+            // The brackets are a pair or absent — there is no third case to
+            // check, which is the whole of what the tuple bought over an array.
+            match (nested_in) {
+                none => ok(inner),
+                some(brackets) => {
+                    let style = ListStyle {
+                        sep: sep_spelling(sep)?,
+                        spaced,
+                        trailing: trailing_sep,
+                        wraps: !max.is_some_and(|m| m == 1),
+                    };
+                    ok(NestedIn(
+                        desugar_rule(brackets.0)?,
+                        inner,
+                        desugar_rule(brackets.1)?,
+                        style=style,
+                    ))
+                },
+            }
         },
         Then(rs) => ok(Then(desugar_rules(rs)?)),
         OneOf(rs) => ok(OneOf(desugar_rules(rs)?)),
@@ -443,10 +443,6 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
         NamedIdx(i) => ok(NamedIdx(i)),
     }
 }
-
-# The array said it held two rules and then did not — unreachable past the length
-# check, and reported rather than assumed.
-fn missing_bracket() -> ParseError { message: "nested_in is missing a bracket", span: 0..0 }
 
 # How the printer should write this list's separator: the spelling of the `Many`'s
 # own separator, or the empty string for a juxtaposed list with none.
@@ -747,7 +743,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
         Term(Atom),
         sep=Literal(","),
         trailing_sep=false,
-        nested_in=[Literal("("), Literal(")")],
+        nested_in=(Literal("("), Literal(")")),
     );
     let longhand: Rule<Kind> = NestedIn(
         Literal("("),
@@ -767,7 +763,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 
     // A group bounded at one item is not a list, so `wraps` comes off `max` and
     // the shorthand says "a bracket pair holding one thing" without restating it.
-    let single: Rule<Kind> = Many(Term(Atom), min=1, max=1, nested_in=[Literal("("), Literal(")")]);
+    let single: Rule<Kind> = Many(Term(Atom), min=1, max=1, nested_in=(Literal("("), Literal(")")));
     let single_g: Grammar<Kind, Node> = Grammar {
         prods: [Production { name: "a", rule: single, build: Mk(keep), layout: Inline }],
     };
@@ -787,28 +783,21 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 
     // A juxtaposed list — no separator — carries the empty spelling, and
     // `spaced` is the one thing the `Many` cannot answer for itself.
-    let words: Rule<Kind> = Many(Term(Atom), nested_in=[Literal("{"), Literal("}")], spaced=true);
+    let words: Rule<Kind> = Many(Term(Atom), nested_in=(Literal("{"), Literal("}")), spaced=true);
     let words_g: Grammar<Kind, Node> = Grammar {
         prods: [Production { name: "a", rule: words, build: Mk(keep), layout: Inline }],
     };
     assert(link(words_g)?.groups == [ListStyle { sep: "", spaced: true }]);
 
-    // Two brackets exactly, and a separator the printer can write back.
-    let one_bracket: Rule<Kind> = Many(Term(Atom), nested_in=[Literal("(")]);
-    let one_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: one_bracket, build: Mk(keep), layout: Inline }],
-    };
-    assert(
-        link(one_g) == err(ParseError {
-            message: "nested_in takes an opening and a closing rule, got 1",
-            span: 0..0,
-        }),
-    );
+    // "Two brackets exactly" used to be a length check with a message of its
+    // own, asserted here. It is the type now — `nested_in` is a pair — so there
+    // is nothing left to assert: a caller that writes one bracket, or three,
+    // does not compile. What remains checkable is the separator, below.
 
     let odd_sep: Rule<Kind> = Many(
         Term(Atom),
         sep=Term(Atom),
-        nested_in=[Literal("("), Literal(")")],
+        nested_in=(Literal("("), Literal(")")),
     );
     let odd_g: Grammar<Kind, Node> = Grammar {
         prods: [Production { name: "a", rule: odd_sep, build: Mk(keep), layout: Inline }],
@@ -867,15 +856,15 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     }
 }
 --- performance ---
-allocations: 785
-deallocations: 785
-reallocations: 40
-bytes allocated: 60099
-instructions executed: 68316
-binary size: 150120
-  code: 92852
-  data: 3892
-  metadata: 53376
+allocations: 740
+deallocations: 740
+reallocations: 39
+bytes allocated: 58058
+instructions executed: 67284
+binary size: 147360
+  code: 90876
+  data: 3540
+  metadata: 52944
 functions:
   __arr_drop_ListStyle:
     calls: 70
@@ -884,10 +873,10 @@ functions:
     calls: 2
     bytes: 120
   __arr_drop_Production$Kind$Node:
-    calls: 34
+    calls: 33
     bytes: 188
   __arr_drop_Rule$Kind:
-    calls: 30
+    calls: 25
     bytes: 116
   __arr_retain_ListStyle:
     calls: 20
@@ -911,7 +900,7 @@ functions:
     calls: 1
     bytes: 412
   __builtin_find_index$str$lam8:
-    calls: 28
+    calls: 27
     bytes: 400
   __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam19:
     calls: 4
@@ -923,7 +912,7 @@ functions:
     calls: 6
     bytes: 284
   __eq_ParseError:
-    calls: 6
+    calls: 5
     bytes: 128
   __eq_Prec:
     calls: 1
@@ -935,14 +924,20 @@ functions:
     calls: 35
     bytes: 876
   __eq_Rule$Kind$arr:
-    calls: 7
+    calls: 3
     bytes: 300
   __eq_Rule$Kind$opt:
     calls: 4
     bytes: 92
   __eq___builtin_Span:
-    calls: 6
+    calls: 5
     bytes: 104
+  __eq___tuple$Rule_Kind$Rule_Kind:
+    calls: 0
+    bytes: 120
+  __eq___tuple$Rule_Kind$Rule_Kind$opt:
+    calls: 4
+    bytes: 92
   __eq_str$arr:
     calls: 3
     bytes: 364
@@ -953,14 +948,17 @@ functions:
     calls: 0
     bytes: 72
   __rec_drop_Rule$Kind:
-    calls: 293
-    bytes: 452
+    calls: 288
+    bytes: 464
+  __rec_drop___tuple$Rule_Kind$Rule_Kind:
+    calls: 4
+    bytes: 72
   __test$failure_message:
     calls: 1
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 49216
+    bytes: 49480
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -968,7 +966,7 @@ functions:
     calls: 0
     bytes: 824
   __to_str_u64:
-    calls: 3
+    calls: 2
     bytes: 204
   aipl_arr_drop_arr:
     calls: 4
@@ -977,7 +975,7 @@ functions:
     calls: 114
     bytes: (external)
   aipl_arr_inc:
-    calls: 954
+    calls: 897
     bytes: (external)
   aipl_arr_join:
     calls: 4
@@ -989,37 +987,37 @@ functions:
     calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 1432
+    calls: 1333
     bytes: (external)
   aipl_array_new:
-    calls: 393
+    calls: 352
     bytes: (external)
   aipl_array_push:
     calls: 41
     bytes: (external)
   aipl_array_push_mut:
-    calls: 46
+    calls: 45
     bytes: (external)
   aipl_array_with_cap:
-    calls: 27
+    calls: 26
     bytes: (external)
   aipl_assert:
-    calls: 30
+    calls: 29
     bytes: (external)
   aipl_rec_alloc:
-    calls: 293
+    calls: 292
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1588
+    calls: 1583
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 175
+    calls: 185
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1295
+    calls: 1291
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 175
+    calls: 185
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -1031,17 +1029,17 @@ functions:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 6
+    calls: 4
     bytes: (external)
   aipl_write_u64:
-    calls: 3
+    calls: 2
     bytes: (external)
   desugar_opt$Kind:
-    calls: 13
+    calls: 12
     bytes: 700
   desugar_rule$Kind:
-    calls: 104
-    bytes: 16684
+    calls: 102
+    bytes: 14040
   failure_message:
     calls: 2
     bytes: 488
@@ -1050,12 +1048,12 @@ functions:
     bytes: 32
   group_styles$Kind$tail:
     calls: 278
-    bytes: 3156
+    bytes: 3208
   keep:
     calls: 0
     bytes: 268
   link$Kind$Node:
-    calls: 19
+    calls: 18
     bytes: 2796
   link_nest$Kind:
     calls: 17
@@ -1065,7 +1063,7 @@ functions:
     bytes: 716
   link_rule$Kind:
     calls: 102
-    bytes: 5612
+    bytes: 5668
   link_rules$Kind:
     calls: 4
     bytes: 832
@@ -1076,7 +1074,7 @@ functions:
     calls: 22
     bytes: 956
   prod_names$Kind$Node:
-    calls: 23
+    calls: 22
     bytes: 492
   rule_of$Kind$Node:
     calls: 13

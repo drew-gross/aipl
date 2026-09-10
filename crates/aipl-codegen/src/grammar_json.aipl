@@ -198,7 +198,7 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
         Named("member"),
         sep=Lit(","),
         trailing_sep=false,
-        nested_in=[Lit("{"), Lit("}")],
+        nested_in=(Lit("{"), Lit("}")),
         spaced=true,
     );
     let r_member: Rule<JsonTok> = Then([Term(Str), Lit(":"), Named("value")]);
@@ -206,7 +206,7 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
         Named("value"),
         sep=Lit(","),
         trailing_sep=false,
-        nested_in=[Lit("["), Lit("]")],
+        nested_in=(Lit("["), Lit("]")),
     );
     let r_string: Rule<JsonTok> = Term(Str);
     let r_number: Rule<JsonTok> = Then([Maybe(Lit("-")), Term(Num)]);
@@ -492,15 +492,15 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
 # braces — is a list breaking or not breaking, which the layouts decide.
 fn json_space(l: str, r: str) -> bool { l == ":" }
 --- performance ---
-allocations: 36986
-deallocations: 36986
+allocations: 36720
+deallocations: 36720
 reallocations: 1230
-bytes allocated: 2645693
-instructions executed: 4587360
-binary size: 446368
-  code: 287052
-  data: 7948
-  metadata: 151368
+bytes allocated: 2637181
+instructions executed: 4576439
+binary size: 443496
+  code: 285084
+  data: 7828
+  metadata: 150584
 functions:
   __arr_drop_Json:
     calls: 147
@@ -530,7 +530,7 @@ functions:
     calls: 599
     bytes: 188
   __arr_drop___m3__Rule$JsonTok:
-    calls: 2165
+    calls: 2023
     bytes: 116
   __arr_drop___m4__Piece:
     calls: 271
@@ -741,7 +741,7 @@ functions:
     bytes: 6760
   __m13__match_rule$JsonTok$Json:
     calls: 2202
-    bytes: 7012
+    bytes: 7028
   __m13__match_then$JsonTok$Json:
     calls: 134
     bytes: 2128
@@ -807,7 +807,7 @@ functions:
     bytes: 32
   __m2__climb_precs$JsonTok$tail:
     calls: 30
-    bytes: 1748
+    bytes: 1816
   __m2__dq:
     calls: 23
     bytes: 456
@@ -828,13 +828,13 @@ functions:
     bytes: 3468
   __m2__render_rule$JsonTok:
     calls: 34
-    bytes: 9172
+    bytes: 9184
   __m2__rep_suffix:
     calls: 2
     bytes: 1440
   __m2__rule_first$JsonTok:
     calls: 72
-    bytes: 6516
+    bytes: 6544
   __m2__show_first$JsonTok:
     calls: 8
     bytes: 1384
@@ -849,7 +849,7 @@ functions:
     bytes: 700
   __m3__desugar_rule$JsonTok:
     calls: 2010
-    bytes: 16684
+    bytes: 14040
   __m3__failure_message:
     calls: 8
     bytes: 488
@@ -858,7 +858,7 @@ functions:
     bytes: 32
   __m3__group_styles$JsonTok$tail:
     calls: 4752
-    bytes: 3156
+    bytes: 3208
   __m3__link$JsonTok$Json:
     calls: 66
     bytes: 2796
@@ -870,7 +870,7 @@ functions:
     bytes: 716
   __m3__link_rule$JsonTok:
     calls: 2112
-    bytes: 5612
+    bytes: 5668
   __m3__link_rules$JsonTok:
     calls: 264
     bytes: 832
@@ -942,13 +942,16 @@ functions:
     bytes: 132
   __rec_drop___m3__Rule$JsonTok:
     calls: 6394
-    bytes: 452
+    bytes: 464
   __rec_drop___m5__Doc:
     calls: 439
     bytes: 184
   __rec_drop___m5__Work:
     calls: 1018
     bytes: 84
+  __rec_drop___tuple$__m3__Rule_JsonTok$__m3__Rule_JsonTok:
+    calls: 142
+    bytes: 72
   __test$escape_json:
     calls: 1
     bytes: 812
@@ -983,7 +986,7 @@ functions:
     calls: 2939
     bytes: (external)
   aipl_arr_inc:
-    calls: 97740
+    calls: 97019
     bytes: (external)
   aipl_arr_join:
     calls: 2057
@@ -998,10 +1001,10 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 124614
+    calls: 123485
     bytes: (external)
   aipl_array_new:
-    calls: 17789
+    calls: 17381
     bytes: (external)
   aipl_array_push:
     calls: 3110
@@ -1016,19 +1019,19 @@ functions:
     calls: 59
     bytes: (external)
   aipl_rec_alloc:
-    calls: 8803
+    calls: 8945
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 65018
+    calls: 64900
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 2886
+    calls: 3312
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 56215
+    calls: 55955
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 2886
+    calls: 3312
     bytes: (external)
   aipl_test_begin:
     calls: 6
@@ -1056,7 +1059,7 @@ functions:
     bytes: 464
   json_grammar:
     calls: 71
-    bytes: 7328
+    bytes: 7688
   lex_json:
     calls: 53
     bytes: 6700

@@ -1,0 +1,77 @@
+import { print, to_str } from builtins;
+
+// A tuple whose element types mention a type parameter.
+//
+// A tuple lowers to a synthetic struct named after its element types
+// (`__tuple$i64$str`), which works because those types name a layout. A tuple
+// over a type *variable* names none until monomorphization binds it, so it
+// lowers instead to a per-arity template (`__tuple2`) that the ordinary generic
+// machinery instantiates — the same road `Box<T>` takes.
+//
+// Both roads have to end at the same struct, or a tuple built in a generic
+// function and read by a concrete caller would be two incompatible types. They
+// do: an instance of a tuple template is named by its element types alone,
+// which is exactly what the concrete route spells.
+fn first<T: any>(p: (T, T)) -> T { p.0 }
+
+fn swap<A: any, B: any>(p: (A, B)) -> (B, A) { (p.1, p.0) }
+
+struct Box<T: any> { v: T }
+
+// Two levels: a tuple over a generic struct, so the element type is itself an
+// abstract application.
+fn unbox<T: any>(p: (Box<T>, Box<T>)) -> T { p.1.v }
+
+// A tuple *returned* from a generic function and consumed concretely — the
+// direction that catches the two naming routes disagreeing.
+fn pair_up<T: any>(a: T, b: T) -> (T, T) { (a, b) }
+
+fn main() !prints {
+    print(first((1, 2)).to_str());
+    print(first(("a", "b")));
+
+    let s = swap((1, "one"));
+    print(`{s.0} {s.1.to_str()}`);
+
+    print(unbox((Box { v: 7 }, Box { v: 8 })).to_str());
+
+    // Built generically, read concretely.
+    let p = pair_up(3, 4);
+    print(p.0.to_str());
+    print(first(p).to_str());
+
+    // The same tuple type written out concretely is the same type.
+    let q: (i64, i64) = (5, 6);
+    print(first(q).to_str());
+}
+--- stdout ---
+1
+a
+one 1
+8
+3
+3
+5
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 278
+instructions executed: 324
+binary size: 2776
+  code: 1332
+  data: 1
+  metadata: 1443
+functions:
+  __to_str_i64:
+    calls: 6
+    bytes: 204
+  aipl_i64_len:
+    calls: 12
+    bytes: (external)
+  aipl_write_i64:
+    calls: 6
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1128

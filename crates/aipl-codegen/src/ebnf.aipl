@@ -840,15 +840,15 @@ fn fixture() -> Grammar<Kind, Node> {
     }
 }
 --- performance ---
-allocations: 2199
-deallocations: 2199
+allocations: 2151
+deallocations: 2151
 reallocations: 144
-bytes allocated: 166786
-instructions executed: 203557
-binary size: 158944
-  code: 102532
-  data: 4108
-  metadata: 52304
+bytes allocated: 165250
+instructions executed: 205407
+binary size: 155464
+  code: 100320
+  data: 3988
+  metadata: 51156
 functions:
   __arr_drop_First$Kind:
     calls: 77
@@ -921,13 +921,13 @@ functions:
     bytes: 700
   __m2__desugar_rule$Kind:
     calls: 237
-    bytes: 16684
+    bytes: 14040
   __m2__group_styles$Kind:
     calls: 0
     bytes: 32
   __m2__group_styles$Kind$tail:
     calls: 262
-    bytes: 3156
+    bytes: 3208
   __m2__link$Kind$Node:
     calls: 9
     bytes: 2796
@@ -939,7 +939,7 @@ functions:
     bytes: 716
   __m2__link_rule$Kind:
     calls: 139
-    bytes: 5612
+    bytes: 5668
   __m2__link_rules$Kind:
     calls: 27
     bytes: 832
@@ -957,13 +957,13 @@ functions:
     bytes: 72
   __rec_drop___m2__Rule$Kind:
     calls: 476
-    bytes: 452
+    bytes: 464
   __test$can_start:
     calls: 1
     bytes: 900
   __test$ebnf:
     calls: 1
-    bytes: 12148
+    bytes: 12308
   __test$first_sets:
     calls: 1
     bytes: 5200
@@ -992,7 +992,7 @@ functions:
     calls: 66
     bytes: (external)
   aipl_arr_inc:
-    calls: 4178
+    calls: 4073
     bytes: (external)
   aipl_arr_join:
     calls: 34
@@ -1007,10 +1007,10 @@ functions:
     calls: 21
     bytes: (external)
   aipl_array_dec:
-    calls: 5492
+    calls: 5339
     bytes: (external)
   aipl_array_new:
-    calls: 691
+    calls: 643
     bytes: (external)
   aipl_array_push:
     calls: 301
@@ -1028,13 +1028,13 @@ functions:
     calls: 476
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 3384
+    calls: 3434
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 111
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2908
+    calls: 2958
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 111
@@ -1062,7 +1062,7 @@ functions:
     bytes: 32
   climb_precs$Kind$tail:
     calls: 90
-    bytes: 1748
+    bytes: 1816
   dq:
     calls: 47
     bytes: 456
@@ -1083,7 +1083,7 @@ functions:
     bytes: 356
   fixture:
     calls: 2
-    bytes: 5040
+    bytes: 5080
   keep:
     calls: 0
     bytes: 268
@@ -1098,13 +1098,13 @@ functions:
     bytes: 3468
   render_rule$Kind:
     calls: 98
-    bytes: 9128
+    bytes: 9144
   rep_suffix:
     calls: 13
     bytes: 1440
   rule_first$Kind:
     calls: 228
-    bytes: 6516
+    bytes: 6544
   show_first$Kind:
     calls: 25
     bytes: 1344

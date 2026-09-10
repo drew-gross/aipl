@@ -1106,16 +1106,36 @@ fn pl(name: str, rule: Rule<AiplTok>, expect_as: str) -> Production<AiplTok, Ast
 # The bracket pairs, for `Many`'s `nested_in`. A pair rather than two arguments
 # because that is what a bracket is, and naming them here keeps the lists below
 # reading as lists: `Many(param, sep=comma, nested_in=parens())`.
-fn parens() -> Rule<AiplTok>[] { [Lit("("), Lit(")")] }
+fn parens() -> (Rule<AiplTok>, Rule<AiplTok>) {
+    let open: Rule<AiplTok> = Lit("(");
+    let close: Rule<AiplTok> = Lit(")");
+    (open, close)
+}
 
-fn braces() -> Rule<AiplTok>[] { [Lit("{"), Lit("}")] }
+fn braces() -> (Rule<AiplTok>, Rule<AiplTok>) {
+    let open: Rule<AiplTok> = Lit("{");
+    let close: Rule<AiplTok> = Lit("}");
+    (open, close)
+}
 
-fn brackets() -> Rule<AiplTok>[] { [Lit("["), Lit("]")] }
+fn brackets() -> (Rule<AiplTok>, Rule<AiplTok>) {
+    let open: Rule<AiplTok> = Lit("[");
+    let close: Rule<AiplTok> = Lit("]");
+    (open, close)
+}
 
-fn angles() -> Rule<AiplTok>[] { [Lit("<"), Lit(">")] }
+fn angles() -> (Rule<AiplTok>, Rule<AiplTok>) {
+    let open: Rule<AiplTok> = Lit("<");
+    let close: Rule<AiplTok> = Lit(">");
+    (open, close)
+}
 
 # The same token both ends, which a lambda's parameter list is.
-fn pipes() -> Rule<AiplTok>[] { [Lit("|"), Lit("|")] }
+fn pipes() -> (Rule<AiplTok>, Rule<AiplTok>) {
+    let open: Rule<AiplTok> = Lit("|");
+    let close: Rule<AiplTok> = Lit("|");
+    (open, close)
+}
 
 # A bracketed group: `open`, whatever it holds, `close`, and how that lays out.
 # Shorter than the `NestedIn` it builds, because a grammar this size writes a lot
@@ -1137,7 +1157,7 @@ fn nest2(open1: str, open2: str, body: Rule<AiplTok>, close: str, style: ListSty
 # a width. It is still a group, so an unclosed one is reported against the token
 # that opened it.
 fn only(open: str, body: Rule<AiplTok>, close: str) -> Rule<AiplTok> {
-    Many(body, min=1, max=1, nested_in=[Lit(open), Lit(close)])
+    Many(body, min=1, max=1, nested_in=(Lit(open), Lit(close)))
 }
 
 # A comma-separated list that takes no trailing comma when it breaks, which most
@@ -1197,15 +1217,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1508505
-deallocations: 1508505
+allocations: 1492395
+deallocations: 1492395
 reallocations: 7799
-bytes allocated: 126829344
-instructions executed: 189781284
-binary size: 745728
-  code: 498356
-  data: 14148
-  metadata: 233224
+bytes allocated: 126313824
+instructions executed: 189844237
+binary size: 742008
+  code: 495744
+  data: 14028
+  metadata: 232236
 functions:
   __arr_drop___m11__StepResult$__m10__AiplTok:
     calls: 5
@@ -1241,7 +1261,7 @@ functions:
     calls: 8307
     bytes: 188
   __arr_drop___m9__Rule$__m10__AiplTok:
-    calls: 191569
+    calls: 185363
     bytes: 116
   __arr_retain___m11__StepResult$__m10__AiplTok:
     calls: 7
@@ -1512,7 +1532,7 @@ functions:
     bytes: 8972
   __m18__match_rule$__m10__AiplTok$Ast:
     calls: 44176
-    bytes: 15280
+    bytes: 15300
   __m18__match_then$__m10__AiplTok$Ast:
     calls: 11575
     bytes: 2128
@@ -1539,13 +1559,13 @@ functions:
     bytes: 44
   __m18__rule_labels$__m10__AiplTok$Ast$tail:
     calls: 18954
-    bytes: 8048
+    bytes: 8140
   __m18__rule_nullable$__m10__AiplTok:
     calls: 0
     bytes: 36
   __m18__rule_nullable$__m10__AiplTok$tail:
     calls: 8316
-    bytes: 1796
+    bytes: 1856
   __m18__seq_labels$__m10__AiplTok$Ast:
     calls: 0
     bytes: 44
@@ -1569,7 +1589,7 @@ functions:
     bytes: 1084
   __m19__rule_first$__m10__AiplTok:
     calls: 26496
-    bytes: 6516
+    bytes: 6544
   __m19__union_syms$__m10__AiplTok:
     calls: 20448
     bytes: 736
@@ -1644,13 +1664,13 @@ functions:
     bytes: 700
   __m9__desugar_rule$__m10__AiplTok:
     calls: 110856
-    bytes: 16684
+    bytes: 14040
   __m9__group_styles$__m10__AiplTok:
     calls: 0
     bytes: 32
   __m9__group_styles$__m10__AiplTok$tail:
     calls: 434384
-    bytes: 3156
+    bytes: 3208
   __m9__link$__m10__AiplTok$Ast:
     calls: 136
     bytes: 2796
@@ -1662,7 +1682,7 @@ functions:
     bytes: 716
   __m9__link_rule$__m10__AiplTok:
     calls: 114920
-    bytes: 5612
+    bytes: 5668
   __m9__link_rules$__m10__AiplTok:
     calls: 21216
     bytes: 832
@@ -1683,7 +1703,10 @@ functions:
     bytes: 84
   __rec_drop___m9__Rule$__m10__AiplTok:
     calls: 380329
-    bytes: 452
+    bytes: 464
+  __rec_drop___tuple$__m9__Rule___m10__AiplTok$__m9__Rule___m10__AiplTok:
+    calls: 6206
+    bytes: 72
   __test$aipl_parse_cst:
     calls: 1
     bytes: 1216
@@ -1712,7 +1735,7 @@ functions:
     calls: 101312
     bytes: (external)
   aipl_arr_inc:
-    calls: 3490952
+    calls: 3441059
     bytes: (external)
   aipl_arr_join:
     calls: 46935
@@ -1727,10 +1750,10 @@ functions:
     calls: 33
     bytes: (external)
   aipl_array_dec:
-    calls: 4575049
+    calls: 4502840
     bytes: (external)
   aipl_array_new:
-    calls: 729014
+    calls: 706698
     bytes: (external)
   aipl_array_push:
     calls: 166045
@@ -1754,19 +1777,19 @@ functions:
     calls: 8
     bytes: 748
   aipl_rec_alloc:
-    calls: 389906
+    calls: 396112
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2799573
+    calls: 2804993
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 85345
+    calls: 103963
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2409667
+    calls: 2408881
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 85345
+    calls: 103963
     bytes: (external)
   aipl_set_contains:
     calls: 59427
@@ -1792,15 +1815,21 @@ functions:
   aipl_write_u64:
     calls: 9
     bytes: (external)
+  angles:
+    calls: 321
+    bytes: 376
+  braces:
+    calls: 1391
+    bytes: 376
   expressions:
     calls: 214
-    bytes: 33484
+    bytes: 32888
   format_aipl_ty:
     calls: 20
     bytes: 808
   items:
     calls: 107
-    bytes: 31600
+    bytes: 30936
   keep:
     calls: 0
     bytes: 196
@@ -1815,19 +1844,25 @@ functions:
     bytes: 624
   only:
     calls: 3210
-    bytes: 464
+    bytes: 652
   p:
     calls: 8239
     bytes: 448
+  parens:
+    calls: 856
+    bytes: 376
   patterns:
     calls: 214
-    bytes: 7120
+    bytes: 7148
+  pipes:
+    calls: 428
+    bytes: 376
   statements:
     calls: 214
-    bytes: 24916
+    bytes: 24352
   types:
     calls: 214
-    bytes: 8068
+    bytes: 7812
   why_prepared:
     calls: 9
     bytes: 1760

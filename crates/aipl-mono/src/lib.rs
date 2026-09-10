@@ -409,13 +409,6 @@ pub fn lower_tuples(program: &Program) -> Program {
                     ..f.clone()
                 })
             }
-            // A generic template's field/payload types may still contain
-            // `Type::Generic` and its own type variables (e.g. a field typed
-            // `Emit<K>`); it isn't monomorphic, so it can't be tuple-lowered.
-            // Each concrete instance (synthesized by `lower_generics`) is an
-            // ordinary named decl and is lowered here like any other.
-            Item::Struct(s) if s.is_generic() => item.clone(),
-            Item::Variant(v) if v.is_generic() => item.clone(),
             Item::Struct(s) => Item::Struct(StructDecl {
                 name: s.name.clone(),
                 doc: s.doc.clone(),
@@ -459,7 +452,7 @@ pub fn lower_tuples(program: &Program) -> Program {
         .map(|name| {
             Item::Struct(StructDecl {
                 doc: None,
-                type_vars: Vec::new(),
+                type_vars: tuple_template_vars(&name),
                 fields: fields_map.remove(&name).unwrap(),
                 name,
             })
@@ -469,6 +462,80 @@ pub fn lower_tuples(program: &Program) -> Program {
     Program {
         items: synth,
         sources: program.sources.clone(),
+    }
+}
+
+/// The arity of the tuple instance `inst`, or `None` if it is not one.
+///
+/// A tuple instance is named by its element types alone (`__tuple$i64$str`), so
+/// its arity is the number of `$`-separated mangles after the prefix. Element
+/// mangles never contain a `$` themselves — `mangle_type` flattens one to `_` —
+/// so the split is exact.
+fn tuple_instance_arity(inst: &str) -> Option<usize> {
+    inst.strip_prefix(&format!("{}$", check::TUPLE_TEMPLATE))
+        .map(|rest| rest.split('$').count())
+}
+
+/// Whether the synthetic struct `inst` could be an instance of the template
+/// `base`.
+///
+/// Ordinarily an instance wears its template's name as a `base$` prefix. A
+/// tuple's does not: both routes to a tuple struct have to agree on one name
+/// (see `generic_instance_name`), and that name is the concrete one, which says
+/// nothing about which per-arity template built it. So a tuple instance belongs
+/// to the template of its own arity.
+fn tuple_instance_of(inst: &str, base: &str) -> bool {
+    match tuple_instance_arity(inst) {
+        Some(n) => base == format!("{}{n}", check::TUPLE_TEMPLATE),
+        None => inst.starts_with(&format!("{base}$")),
+    }
+}
+
+/// The `i`th type parameter of a tuple template. Named with a leading `_` so it
+/// cannot collide with a source type parameter, which is an ordinary identifier.
+fn tuple_var_name(i: usize) -> String {
+    format!("_T{i}")
+}
+
+/// The type parameters of the synthetic struct called `name`, which is a tuple
+/// template (`__tuple2`, `__tuple3`, …) or an ordinary monomorphic synthetic
+/// struct with none. Read off the name rather than carried alongside it: a
+/// template's arity *is* the digits in its name, so there is nothing to keep in
+/// step.
+fn tuple_template_vars(name: &str) -> Vec<TypeParam> {
+    let Some(arity) = name.strip_prefix(check::TUPLE_TEMPLATE) else {
+        return Vec::new();
+    };
+    // A concrete tuple's struct also starts with the prefix, but what follows is
+    // `$`-led element types rather than an arity.
+    let Ok(n) = arity.parse::<usize>() else {
+        return Vec::new();
+    };
+    (0..n)
+        .map(|i| TypeParam {
+            name: tuple_var_name(i),
+            bound: aipl_syntax::ast::Bound::Any,
+        })
+        .collect()
+}
+
+/// Whether `t` mentions a type variable anywhere — the question that decides
+/// whether a tuple has a layout yet.
+fn ty_has_var(t: &Type) -> bool {
+    match t {
+        Type::TypeVar(_) => true,
+        Type::Case(i) | Type::Optional(i) | Type::Array(i) | Type::Set(i) => ty_has_var(i),
+        Type::Dict(a, b) | Type::Result(a, b) => ty_has_var(a) || ty_has_var(b),
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(ty_has_var),
+        Type::Fn(ps, r) => ps.iter().any(ty_has_var) || ty_has_var(r),
+        Type::Primitive(_)
+        | Type::Named(_)
+        | Type::Unit
+        | Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => false,
     }
 }
 
@@ -482,6 +549,30 @@ fn lt_ty(
         Type::Case(v) => Type::Case(Box::new(lt_ty(v, fields_map, order))),
         Type::Tuple(elems) => {
             let lowered: Vec<Type> = elems.iter().map(|e| lt_ty(e, fields_map, order)).collect();
+            // A tuple whose elements are all concrete has a layout right here,
+            // so it is lowered straight to its own struct. One that mentions a
+            // type variable does not: it is a *template*, and which struct it
+            // becomes is only known once monomorphization binds that variable.
+            // So it takes the same road `Box<T>` does — an abstract
+            // `Type::Generic` that `instantiate_generic` specializes per
+            // substitution — and lands on the very struct the concrete route
+            // would have built, because `generic_instance_name` sends a tuple
+            // base back through `tuple_struct_name`.
+            if lowered.iter().any(ty_has_var) {
+                let name = format!("{}{}", check::TUPLE_TEMPLATE, lowered.len());
+                if !fields_map.contains_key(&name) {
+                    order.push(name.clone());
+                    let fs: Vec<FieldDecl> = (0..lowered.len())
+                        .map(|i| FieldDecl {
+                            name: format!("_{i}"),
+                            ty: Type::TypeVar(tuple_var_name(i)),
+                            default: None,
+                        })
+                        .collect();
+                    fields_map.insert(name.clone(), fs);
+                }
+                return Type::Generic(name, lowered);
+            }
             let name = check::tuple_struct_name(&lowered);
             if !fields_map.contains_key(&name) {
                 order.push(name.clone());
@@ -594,15 +685,18 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
             Box::new(lt_expr(b, fm, ord)),
             c.as_ref().map(|c| Box::new(lt_expr(c, fm, ord))),
         ),
+        // The annotation is lowered like any other declared type: `let p: (i64,
+        // str) = ..` has to name the same struct the value's tuple literal
+        // builds, since comparing the two is how the binding is checked.
         ExprKind::Let(n, ty, a, b) => ExprKind::Let(
             n.clone(),
-            ty.clone(),
+            ty.as_ref().map(|t| lt_ty(t, fm, ord)),
             Box::new(lt_expr(a, fm, ord)),
             Box::new(lt_expr(b, fm, ord)),
         ),
         ExprKind::LetMut(n, ty, a, b) => ExprKind::LetMut(
             n.clone(),
-            ty.clone(),
+            ty.as_ref().map(|t| lt_ty(t, fm, ord)),
             Box::new(lt_expr(a, fm, ord)),
             Box::new(lt_expr(b, fm, ord)),
         ),
@@ -4683,7 +4777,7 @@ impl Mono<'_> {
     /// is what keeps the mutual recursion below finite.
     fn instance_args_inner(&self, inst: &str) -> Option<(String, Vec<Type>)> {
         for (base, tmpl) in self.generic_structs {
-            if inst.starts_with(&format!("{base}$")) {
+            if tuple_instance_of(inst, base) {
                 if let Some(fields) = self
                     .structs
                     .get(inst)

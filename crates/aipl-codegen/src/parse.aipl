@@ -1454,15 +1454,15 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 9917
-deallocations: 9917
+allocations: 9797
+deallocations: 9797
 reallocations: 688
-bytes allocated: 624931
-instructions executed: 1281131
-binary size: 634416
-  code: 383616
-  data: 9684
-  metadata: 241116
+bytes allocated: 621091
+instructions executed: 1285560
+binary size: 631264
+  code: 381724
+  data: 9564
+  metadata: 239976
 functions:
   __arr_drop_Node:
     calls: 21
@@ -1679,7 +1679,7 @@ functions:
     bytes: 1084
   __m2__rule_first$Tok:
     calls: 149
-    bytes: 6516
+    bytes: 6544
   __m2__union_syms$Tok:
     calls: 84
     bytes: 736
@@ -1688,7 +1688,7 @@ functions:
     bytes: 700
   __m3__desugar_rule$Tok:
     calls: 504
-    bytes: 16684
+    bytes: 14040
   __m3__failure_message:
     calls: 39
     bytes: 488
@@ -1697,7 +1697,7 @@ functions:
     bytes: 32
   __m3__group_styles$Tok$tail:
     calls: 1052
-    bytes: 3156
+    bytes: 3208
   __m3__link$Tok$Node:
     calls: 95
     bytes: 2796
@@ -1709,7 +1709,7 @@ functions:
     bytes: 716
   __m3__link_rule$Tok:
     calls: 504
-    bytes: 5612
+    bytes: 5668
   __m3__link_rules$Tok:
     calls: 94
     bytes: 832
@@ -1772,10 +1772,10 @@ functions:
     bytes: 132
   __rec_drop___m3__Rule$Tok:
     calls: 1097
-    bytes: 452
+    bytes: 464
   __test$parse:
     calls: 1
-    bytes: 183604
+    bytes: 184024
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -1792,7 +1792,7 @@ functions:
     calls: 1249
     bytes: (external)
   aipl_arr_inc:
-    calls: 31760
+    calls: 31483
     bytes: (external)
   aipl_arr_join:
     calls: 157
@@ -1807,10 +1807,10 @@ functions:
     calls: 37
     bytes: (external)
   aipl_array_dec:
-    calls: 39360
+    calls: 38963
     bytes: (external)
   aipl_array_new:
-    calls: 4779
+    calls: 4659
     bytes: (external)
   aipl_array_push:
     calls: 648
@@ -1828,13 +1828,13 @@ functions:
     calls: 1519
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 11174
+    calls: 11282
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 315
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 9655
+    calls: 9763
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 315
@@ -1910,7 +1910,7 @@ functions:
     bytes: 7068
   match_rule$Tok$Node:
     calls: 591
-    bytes: 7096
+    bytes: 7120
   match_then$Tok$Node:
     calls: 49
     bytes: 2128
@@ -1946,13 +1946,13 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 130
-    bytes: 4632
+    bytes: 4732
   rule_nullable$Tok:
     calls: 0
     bytes: 36
   rule_nullable$Tok$tail:
     calls: 22
-    bytes: 1796
+    bytes: 1856
   seq_labels$Tok$Node:
     calls: 0
     bytes: 44

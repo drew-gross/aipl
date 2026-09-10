@@ -81,7 +81,7 @@
 
             <li id="item-OneOf"><code>OneOf(Rule&#60;K&#62;[])</code></li>
 
-            <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = .., max: u64? = .., sep: Rule&#60;K&#62;? = .., trailing_sep: bool = .., nested_in: Rule&#60;K&#62;[] = .., spaced: bool = ..)</code></li>
+            <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = .., max: u64? = .., sep: Rule&#60;K&#62;? = .., trailing_sep: bool = .., nested_in: (Rule&#60;K&#62;, Rule&#60;K&#62;)? = .., spaced: bool = ..)</code></li>
 
             <li id="item-Maybe"><code>Maybe(Rule&#60;K&#62;)</code></li>
 
@@ -206,7 +206,7 @@
           </h3>
           <pre class="signature"><code>pub fn desugar_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
 
-          <div class="doc"><p><code>r</code> with every bracketed-list shorthand written out: a <code>Many</code> carrying <code>nested_in=[open, close]</code> becomes the <code>NestedIn</code> it is shorthand for, wrapping the same <code>Many</code> with the brackets removed.</p><p>Run before anything else looks at a rule, so only one spelling ever reaches the driver, the formatter, the EBNF dump or the FIRST sets. That is the whole point of making it sugar rather than a second rule shape: the passes downstream stay unaware it exists.</p><p>The style is derived here — <code>sep</code> from the list's own separator, <code>trailing</code> from <code>trailing_sep</code>, <code>spaced</code> as given — so a grammar states each of those once. <code>wraps</code> comes from <code>max</code>: a <code>Many</code> in brackets is a list by construction and lists wrap, *unless* it is bounded at one item, which makes it a bracket pair holding one thing (<code>(expr)</code>, a block's braces) rather than a list. There is nothing to break at a width in that case, so it lays out inline.</p></div>
+          <div class="doc"><p><code>r</code> with every bracketed-list shorthand written out: a <code>Many</code> carrying <code>nested_in=(open, close)</code> becomes the <code>NestedIn</code> it is shorthand for, wrapping the same <code>Many</code> with the brackets removed.</p><p>Run before anything else looks at a rule, so only one spelling ever reaches the driver, the formatter, the EBNF dump or the FIRST sets. That is the whole point of making it sugar rather than a second rule shape: the passes downstream stay unaware it exists.</p><p>The style is derived here — <code>sep</code> from the list's own separator, <code>trailing</code> from <code>trailing_sep</code>, <code>spaced</code> as given — so a grammar states each of those once. <code>wraps</code> comes from <code>max</code>: a <code>Many</code> in brackets is a list by construction and lists wrap, *unless* it is bounded at one item, which makes it a bracket pair holding one thing (<code>(expr)</code>, a block's braces) rather than a list. There is nothing to break at a width in that case, so it lays out inline.</p></div>
 
 
         </section>
@@ -284,20 +284,6 @@
           <pre class="signature"><code>fn group_count&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; u64</code></pre>
 
           <div class="doc"><p>How many groups <code>r</code> holds — the amount <code>base</code> advances past it.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-missing_bracket">
-          <h3>
-            <a class="anchor" href="#item-missing_bracket">missing_bracket</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn missing_bracket() -&#62; ParseError</code></pre>
-
-          <div class="doc"><p>The array said it held two rules and then did not — unreachable past the length check, and reported rather than assumed.</p></div>
 
 
         </section>
