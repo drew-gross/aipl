@@ -358,10 +358,10 @@ deallocations: 48191
 reallocations: 2395
 bytes allocated: 2393261
 instructions executed: 6685863
-binary size: 402480
-  code: 258328
+binary size: 402312
+  code: 258216
   data: 5284
-  metadata: 138868
+  metadata: 138812
 functions:
   __arr_drop_Sexp:
     calls: 876
@@ -507,9 +507,6 @@ functions:
   __eq___m2__Sym$SexpKind$arr:
     calls: 5
     bytes: 284
-  __eq_char$opt:
-    calls: 0
-    bytes: 100
   __filter129$own0:
     calls: 883
     bytes: 332
@@ -530,16 +527,16 @@ functions:
     bytes: 4784
   __m11__float_len:
     calls: 0
-    bytes: 824
+    bytes: 816
   __m11__interp_scan$SexpKind:
     calls: 0
-    bytes: 2248
+    bytes: 2252
   __m11__lex$SexpKind:
     calls: 38
     bytes: 1520
   __m11__lex_step$SexpKind:
     calls: 1089
-    bytes: 24408
+    bytes: 24400
   __m11__nested_len:
     calls: 0
     bytes: 940

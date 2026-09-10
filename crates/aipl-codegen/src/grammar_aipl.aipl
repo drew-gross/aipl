@@ -1221,11 +1221,11 @@ allocations: 1492395
 deallocations: 1492395
 reallocations: 7799
 bytes allocated: 126313824
-instructions executed: 189844237
-binary size: 742008
-  code: 495744
+instructions executed: 189825353
+binary size: 741824
+  code: 495640
   data: 14028
-  metadata: 232236
+  metadata: 232156
 functions:
   __arr_drop___m11__StepResult$__m10__AiplTok:
     calls: 5
@@ -1380,9 +1380,6 @@ functions:
   __eq___m19__Sym$__m10__AiplTok$arr:
     calls: 1494
     bytes: 284
-  __eq_char$opt:
-    calls: 900
-    bytes: 100
   __eq_set$str:
     calls: 1314
     bytes: 304
@@ -1448,16 +1445,16 @@ functions:
     bytes: 8904
   __m11__float_len:
     calls: 0
-    bytes: 824
+    bytes: 816
   __m11__interp_scan$__m10__AiplTok:
     calls: 5
-    bytes: 2248
+    bytes: 2252
   __m11__lex$__m10__AiplTok:
     calls: 107
     bytes: 1520
   __m11__lex_step$__m10__AiplTok:
     calls: 2104
-    bytes: 29196
+    bytes: 29192
   __m11__nested_len:
     calls: 1349
     bytes: 940
@@ -1481,7 +1478,7 @@ functions:
     bytes: 368
   __m12__unescape:
     calls: 9
-    bytes: 1180
+    bytes: 1176
   __m13__process_raw_string:
     calls: 1
     bytes: 556
@@ -1490,7 +1487,7 @@ functions:
     bytes: 260
   __m15__trim_suffix:
     calls: 0
-    bytes: 332
+    bytes: 340
   __m16__strip_test_sections:
     calls: 97
     bytes: 692

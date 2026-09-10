@@ -1469,11 +1469,11 @@ allocations: 1604
 deallocations: 1604
 reallocations: 54
 bytes allocated: 108824
-instructions executed: 348015
-binary size: 2312440
-  code: 1547188
+instructions executed: 346230
+binary size: 2314944
+  code: 1548320
   data: 10524
-  metadata: 754728
+  metadata: 756100
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1532,9 +1532,6 @@ functions:
   __eq___builtin_Span:
     calls: 127
     bytes: 104
-  __eq_char$opt:
-    calls: 85
-    bytes: 100
   __lambda_0:
     calls: 0
     bytes: 128
@@ -1618,13 +1615,13 @@ functions:
     bytes: 96
   __m1__unescape:
     calls: 21
-    bytes: 1180
+    bytes: 1176
   __test$keep_skipped:
     calls: 1
     bytes: 25276
   __test$lex:
     calls: 1
-    bytes: 1418872
+    bytes: 1420116
   __test$span_str:
     calls: 1
     bytes: 3152
@@ -1687,13 +1684,13 @@ functions:
     bytes: 10376
   float_len:
     calls: 14
-    bytes: 824
+    bytes: 816
   int_tok:
     calls: 13
     bytes: 1580
   interp_scan$Kind:
     calls: 9
-    bytes: 2248
+    bytes: 2252
   keep_skipped$Kind:
     calls: 3
     bytes: 5956
@@ -1702,7 +1699,7 @@ functions:
     bytes: 1520
   lex_step$Kind:
     calls: 171
-    bytes: 30960
+    bytes: 30956
   main:
     calls: 1
     bytes: 240

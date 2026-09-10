@@ -2958,11 +2958,11 @@ allocations: 115345
 deallocations: 115345
 reallocations: 1910
 bytes allocated: 6237037
-instructions executed: 22281823
-binary size: 8725864
-  code: 5508876
+instructions executed: 22267341
+binary size: 8725680
+  code: 5508772
   data: 27364
-  metadata: 3189624
+  metadata: 3189544
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3072,9 +3072,6 @@ functions:
   __eq___m1__Doc$arr:
     calls: 6
     bytes: 300
-  __eq_char$opt:
-    calls: 690
-    bytes: 100
   __lambda_38:
     calls: 0
     bytes: 136
@@ -3104,7 +3101,7 @@ functions:
     bytes: 140
   __m10__unescape:
     calls: 10
-    bytes: 1180
+    bytes: 1176
   __m11__process_raw_string:
     calls: 1
     bytes: 556
@@ -3113,7 +3110,7 @@ functions:
     bytes: 260
   __m13__trim_suffix:
     calls: 2
-    bytes: 332
+    bytes: 340
   __m1__col_after:
     calls: 981
     bytes: 596
@@ -3176,16 +3173,16 @@ functions:
     bytes: 8904
   __m9__float_len:
     calls: 0
-    bytes: 824
+    bytes: 816
   __m9__interp_scan$__m8__AiplTok:
     calls: 1
-    bytes: 2248
+    bytes: 2252
   __m9__lex$__m8__AiplTok:
     calls: 152
     bytes: 1520
   __m9__lex_step$__m8__AiplTok:
     calls: 1972
-    bytes: 29196
+    bytes: 29192
   __m9__nested_len:
     calls: 1081
     bytes: 940

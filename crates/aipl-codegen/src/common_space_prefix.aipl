@@ -47,15 +47,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2403
-binary size: 4816
-  code: 2048
+instructions executed: 1458
+binary size: 4672
+  code: 1948
   data: 873
-  metadata: 1895
+  metadata: 1851
 functions:
-  __eq_char$opt:
-    calls: 48
-    bytes: 100
   __test$common_space_prefix:
     calls: 1
     bytes: 1580

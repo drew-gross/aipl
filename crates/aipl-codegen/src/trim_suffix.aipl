@@ -16,15 +16,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 339
-binary size: 2944
-  code: 1204
+instructions executed: 263
+binary size: 2816
+  code: 1112
   data: 241
-  metadata: 1499
+  metadata: 1463
 functions:
-  __eq_char$opt:
-    calls: 4
-    bytes: 100
   __test$trim_suffix:
     calls: 1
     bytes: 660
@@ -45,4 +42,4 @@ functions:
     bytes: 112
   trim_suffix:
     calls: 4
-    bytes: 332
+    bytes: 340

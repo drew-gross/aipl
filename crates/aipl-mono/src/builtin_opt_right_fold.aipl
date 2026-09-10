@@ -86,27 +86,24 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 640
-instructions executed: 2641
-binary size: 9632
-  code: 6056
+instructions executed: 2474
+binary size: 9448
+  code: 5960
   data: 774
-  metadata: 2802
+  metadata: 2714
 functions:
   __eq_i64$opt:
-    calls: 8
-    bytes: 100
-  __eq_str$opt:
-    calls: 1
+    calls: 2
     bytes: 100
   __filter5$own0:
     calls: 1
     bytes: 272
   __test$add:
     calls: 1
-    bytes: 116
+    bytes: 124
   __test$opt_right_fold:
     calls: 1
-    bytes: 4676
+    bytes: 4672
   aipl_arr_inc:
     calls: 1
     bytes: (external)

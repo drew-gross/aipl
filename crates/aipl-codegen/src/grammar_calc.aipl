@@ -465,11 +465,11 @@ allocations: 21742
 deallocations: 21742
 reallocations: 1022
 bytes allocated: 1307135
-instructions executed: 2563361
-binary size: 415608
-  code: 266660
+instructions executed: 2560463
+binary size: 415440
+  code: 266548
   data: 5852
-  metadata: 143096
+  metadata: 143040
 functions:
   __arr_drop_Calc:
     calls: 404
@@ -624,9 +624,6 @@ functions:
   __eq___m2__Sym$CalcTok$arr:
     calls: 7
     bytes: 284
-  __eq_char$opt:
-    calls: 138
-    bytes: 100
   __filter132$own0:
     calls: 447
     bytes: 332
@@ -644,16 +641,16 @@ functions:
     bytes: 4032
   __m11__float_len:
     calls: 0
-    bytes: 824
+    bytes: 816
   __m11__interp_scan$CalcTok:
     calls: 0
-    bytes: 2248
+    bytes: 2252
   __m11__lex$CalcTok:
     calls: 54
     bytes: 1520
   __m11__lex_step$CalcTok:
     calls: 444
-    bytes: 23420
+    bytes: 23412
   __m11__nested_len:
     calls: 0
     bytes: 940

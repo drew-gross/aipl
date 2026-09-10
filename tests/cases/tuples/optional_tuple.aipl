@@ -31,17 +31,17 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 233
-instructions executed: 505
-binary size: 5096
-  code: 2928
+instructions executed: 462
+binary size: 5048
+  code: 2876
   data: 47
-  metadata: 2121
+  metadata: 2125
 functions:
   __eq___tuple$i64$str:
     calls: 1
     bytes: 104
   __eq___tuple$i64$str$opt:
-    calls: 2
+    calls: 1
     bytes: 92
   __to_str_bool:
     calls: 2
@@ -63,4 +63,4 @@ functions:
     bytes: 604
   main:
     calls: 1
-    bytes: 1692
+    bytes: 1640

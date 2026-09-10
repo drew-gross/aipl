@@ -112,24 +112,24 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 12737
-binary size: 10000
-  code: 4504
+instructions executed: 12506
+binary size: 9920
+  code: 4512
   data: 1816
-  metadata: 3680
+  metadata: 3592
 functions:
   __builtin_count_while$char$s0$lam4:
     calls: 22
     bytes: 172
   __eq_i64$opt:
-    calls: 24
+    calls: 13
     bytes: 100
   __lambda_2:
     calls: 128
     bytes: 140
   __test$int_parse:
     calls: 1
-    bytes: 2956
+    bytes: 2964
   aipl_assert:
     calls: 24
     bytes: (external)

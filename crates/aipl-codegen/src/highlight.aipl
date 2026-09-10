@@ -752,11 +752,11 @@ allocations: 1085
 deallocations: 1085
 reallocations: 33
 bytes allocated: 93191
-instructions executed: 72961
-binary size: 130064
-  code: 81680
+instructions executed: 72879
+binary size: 130056
+  code: 81656
   data: 5034
-  metadata: 43350
+  metadata: 43366
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -801,7 +801,7 @@ functions:
     calls: 1
     bytes: 364
   __eq_str$opt:
-    calls: 6
+    calls: 4
     bytes: 100
   __lambda_0:
     calls: 0
@@ -832,7 +832,7 @@ functions:
     bytes: 11896
   __test$matcher_regex:
     calls: 1
-    bytes: 8736
+    bytes: 8712
   __test$re_escape:
     calls: 1
     bytes: 1104

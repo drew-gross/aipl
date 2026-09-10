@@ -860,11 +860,11 @@ allocations: 740
 deallocations: 740
 reallocations: 39
 bytes allocated: 58058
-instructions executed: 67284
-binary size: 147360
-  code: 90876
+instructions executed: 67263
+binary size: 148280
+  code: 91324
   data: 3540
-  metadata: 52944
+  metadata: 53416
 functions:
   __arr_drop_ListStyle:
     calls: 70
@@ -942,7 +942,7 @@ functions:
     calls: 3
     bytes: 364
   __eq_u64$opt:
-    calls: 6
+    calls: 5
     bytes: 100
   __rec_drop_Node:
     calls: 0
@@ -958,7 +958,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 49480
+    bytes: 49928
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84

@@ -34,11 +34,11 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 450
-instructions executed: 1341
-binary size: 7912
-  code: 4484
+instructions executed: 1215
+binary size: 7752
+  code: 4408
   data: 591
-  metadata: 2837
+  metadata: 2753
 functions:
   __builtin_find_if$char$lam10:
     calls: 1
@@ -67,18 +67,15 @@ functions:
   __builtin_find_if$i64$lam8:
     calls: 1
     bytes: 268
-  __eq_char$opt:
-    calls: 1
-    bytes: 100
   __eq_i64$opt:
-    calls: 7
+    calls: 2
     bytes: 100
   __filter12$own0:
     calls: 1
     bytes: 272
   __test$first_big:
     calls: 1
-    bytes: 1548
+    bytes: 1572
   aipl_arr_inc:
     calls: 1
     bytes: (external)

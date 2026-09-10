@@ -67,21 +67,21 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 483
-instructions executed: 1757
-binary size: 10024
-  code: 5832
+instructions executed: 1589
+binary size: 9976
+  code: 5848
   data: 809
-  metadata: 3383
+  metadata: 3319
 functions:
   __eq_u64$opt:
-    calls: 11
+    calls: 3
     bytes: 100
   __filter19$own0:
     calls: 1
     bytes: 272
   __test$find_index:
     calls: 1
-    bytes: 1940
+    bytes: 1956
   __test$is_nine:
     calls: 1
     bytes: 180

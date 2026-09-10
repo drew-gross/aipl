@@ -175,10 +175,10 @@ deallocations: 7292
 reallocations: 288
 bytes allocated: 880489
 instructions executed: 708328
-binary size: 231536
-  code: 167216
+binary size: 231384
+  code: 167120
   data: 3344
-  metadata: 60976
+  metadata: 60920
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -219,9 +219,6 @@ functions:
   __builtin_int_parse:
     calls: 0
     bytes: 1028
-  __eq_char$opt:
-    calls: 0
-    bytes: 100
   __lambda_0:
     calls: 0
     bytes: 136
@@ -254,7 +251,7 @@ functions:
     bytes: 260
   __m11__trim_suffix:
     calls: 0
-    bytes: 332
+    bytes: 340
   __m1__arr_fld:
     calls: 12
     bytes: 1036
@@ -308,7 +305,7 @@ functions:
     bytes: 724
   __m5__unescape:
     calls: 0
-    bytes: 1180
+    bytes: 1176
   __m6__char_lit_emit:
     calls: 0
     bytes: 1772

@@ -1,0 +1,85 @@
+import { equal as ==, is_nonempty, not_equal as !=, print, to_str } from builtins;
+
+// Comparing against `some(e)` asks the tag instead of building the value.
+//
+// `x == some(y)` reads as "is `x` this optional", and used to compile that way:
+// an optional was materialized out of `y` — a stack slot, a tag store, a payload
+// store, and for a heap payload a retain — then compared field by field against
+// `x`. The constructed value died the moment the comparison ended, and half of
+// it was a tag the comparison already knew. So the pass rewrites it to a match
+// on `x` that compares payloads directly, which is what the comparison did
+// anyway, minus the value it had to be handed.
+//
+// The `allocations:` counter is the assertion for the heap case below: without
+// the rewrite, building `some("a string long past the inline limit")` to throw
+// it away is an allocation this program never makes.
+fn matches(x: i64?, y: i64) -> bool { x == some(y) }
+
+// Both operand orders, and `!=` as well as `==`.
+fn differs(x: i64?, y: i64) -> bool { some(y) != x }
+
+// A result: which case carries the payload decides which arm compares.
+fn is_ok_with(r: i64!str, v: i64) -> bool { r == ok(v) }
+
+fn failed_with(r: i64!str, m: str) -> bool { r == err(m) }
+
+// A heap payload, where the construction also cost a retain.
+fn long() -> str { "a string long past the inline limit, so it lives on the heap" }
+
+fn is_long(x: str?) -> bool { x == some(long()) }
+
+fn main() !prints {
+    // The optionals come from a call rather than a literal so constant folding
+    // can't settle the comparison before this pass sees it.
+    let three: i64? = if ("x".is_nonempty()) { some(3) } else { none };
+    let absent: i64? = if ("".is_nonempty()) { some(3) } else { none };
+
+    print(matches(three, 3).to_str());
+    print(matches(three, 4).to_str());
+    print(matches(absent, 3).to_str());
+
+    print(differs(three, 3).to_str());
+    print(differs(absent, 3).to_str());
+
+    let ro: i64!str = if ("x".is_nonempty()) { ok(1) } else { err("no") };
+    print(is_ok_with(ro, 1).to_str());
+    print(is_ok_with(ro, 2).to_str());
+    print(failed_with(ro, "no").to_str());
+
+    // The miss path: `long()` is still called (it is the comparison's operand,
+    // and dropping it would be a behaviour change), but nothing is built to hold
+    // its result.
+    print(is_long(none).to_str());
+    print(is_long(some(long())).to_str());
+}
+--- stdout ---
+true
+false
+false
+false
+true
+true
+false
+false
+false
+true
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 0
+bytes allocated: 206
+instructions executed: 539
+binary size: 3672
+  code: 1836
+  data: 127
+  metadata: 1709
+functions:
+  __to_str_bool:
+    calls: 10
+    bytes: 232
+  aipl_write_bytes:
+    calls: 10
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1604

@@ -32,7 +32,9 @@ pub use check::check;
 mod fold;
 pub use fold::fold_constants;
 
+mod ctor_eq;
 mod fuse;
+pub use ctor_eq::unwrap_ctor_eq;
 pub use fuse::{effectful_fns, fuse_operations};
 
 mod sink;

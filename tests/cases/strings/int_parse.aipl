@@ -52,11 +52,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 6700
-binary size: 4056
-  code: 2684
+instructions executed: 6595
+binary size: 3976
+  code: 2644
   data: 1
-  metadata: 1371
+  metadata: 1331
 functions:
   __builtin_count_while$char$s0$lam4:
     calls: 9
@@ -65,11 +65,11 @@ functions:
     calls: 11
     bytes: 1028
   __eq_i64$opt:
-    calls: 11
+    calls: 6
     bytes: 100
   __lambda_2:
     calls: 86
     bytes: 140
   main:
     calls: 1
-    bytes: 1244
+    bytes: 1204

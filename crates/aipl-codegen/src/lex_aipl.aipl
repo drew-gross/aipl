@@ -740,11 +740,11 @@ allocations: 3910
 deallocations: 3910
 reallocations: 33
 bytes allocated: 387901
-instructions executed: 1015749
-binary size: 468032
-  code: 321292
+instructions executed: 1014678
+binary size: 468816
+  code: 321712
   data: 6748
-  metadata: 139992
+  metadata: 140356
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
@@ -815,9 +815,6 @@ functions:
   __eq___m1__Token$AiplTok$arr:
     calls: 29
     bytes: 284
-  __eq_char$opt:
-    calls: 51
-    bytes: 100
   __eq_str$opt:
     calls: 3
     bytes: 100
@@ -862,16 +859,16 @@ functions:
     bytes: 8904
   __m1__float_len:
     calls: 0
-    bytes: 824
+    bytes: 816
   __m1__interp_scan$AiplTok:
     calls: 1
-    bytes: 2248
+    bytes: 2252
   __m1__lex$AiplTok:
     calls: 20
     bytes: 1520
   __m1__lex_step$AiplTok:
     calls: 91
-    bytes: 29196
+    bytes: 29192
   __m1__nested_len:
     calls: 56
     bytes: 940
@@ -895,7 +892,7 @@ functions:
     bytes: 368
   __m2__unescape:
     calls: 8
-    bytes: 1180
+    bytes: 1176
   __m3__process_raw_string:
     calls: 2
     bytes: 1712
@@ -904,19 +901,19 @@ functions:
     bytes: 260
   __m8__trim_suffix:
     calls: 0
-    bytes: 332
+    bytes: 340
   __m9__strip_test_sections:
     calls: 2
     bytes: 692
   __test$lex_aipl:
     calls: 1
-    bytes: 130276
+    bytes: 130732
   __test$lex_aipl_stripped:
     calls: 1
     bytes: 7188
   __test$lex_aipl_tokens:
     calls: 1
-    bytes: 4956
+    bytes: 5024
   __test_try_fail___m1__LexError:
     calls: 0
     bytes: 84

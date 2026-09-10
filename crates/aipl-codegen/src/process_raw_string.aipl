@@ -54,11 +54,11 @@ allocations: 28
 deallocations: 28
 reallocations: 10
 bytes allocated: 1385
-instructions executed: 9992
-binary size: 8064
-  code: 4276
+instructions executed: 9546
+binary size: 7920
+  code: 4184
   data: 503
-  metadata: 3285
+  metadata: 3233
 functions:
   __builtin_all$char$s0$lam12:
     calls: 22
@@ -69,15 +69,12 @@ functions:
   __builtin_count_while$char$s0$lam4:
     calls: 0
     bytes: 172
-  __eq_char$opt:
-    calls: 22
-    bytes: 100
   __m4__trim_prefix:
     calls: 14
     bytes: 260
   __m5__trim_suffix:
     calls: 8
-    bytes: 332
+    bytes: 340
   __test$process_raw_string:
     calls: 1
     bytes: 1192

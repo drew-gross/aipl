@@ -496,11 +496,11 @@ allocations: 36720
 deallocations: 36720
 reallocations: 1230
 bytes allocated: 2637181
-instructions executed: 4576439
-binary size: 443496
-  code: 285084
+instructions executed: 4568067
+binary size: 443320
+  code: 284968
   data: 7828
-  metadata: 150584
+  metadata: 150524
 functions:
   __arr_drop_Json:
     calls: 147
@@ -646,9 +646,6 @@ functions:
   __eq___m2__Sym$JsonTok$arr:
     calls: 11
     bytes: 284
-  __eq_char$opt:
-    calls: 400
-    bytes: 100
   __filter130$own0:
     calls: 166
     bytes: 332
@@ -669,16 +666,16 @@ functions:
     bytes: 4784
   __m11__float_len:
     calls: 277
-    bytes: 824
+    bytes: 816
   __m11__interp_scan$JsonTok:
     calls: 0
-    bytes: 2248
+    bytes: 2252
   __m11__lex$JsonTok:
     calls: 53
     bytes: 1520
   __m11__lex_step$JsonTok:
     calls: 436
-    bytes: 24408
+    bytes: 24400
   __m11__nested_len:
     calls: 0
     bytes: 940
@@ -702,7 +699,7 @@ functions:
     bytes: 368
   __m12__unescape:
     calls: 35
-    bytes: 1180
+    bytes: 1176
   __m13__climb$JsonTok$Json:
     calls: 0
     bytes: 3160

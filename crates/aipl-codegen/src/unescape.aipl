@@ -79,15 +79,12 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 880
-instructions executed: 4761
-binary size: 12656
-  code: 7276
+instructions executed: 4005
+binary size: 12512
+  code: 7172
   data: 1084
-  metadata: 4296
+  metadata: 4256
 functions:
-  __eq_char$opt:
-    calls: 36
-    bytes: 100
   __test$escape_text:
     calls: 1
     bytes: 3924
@@ -111,4 +108,4 @@ functions:
     bytes: 180
   unescape:
     calls: 12
-    bytes: 1180
+    bytes: 1176

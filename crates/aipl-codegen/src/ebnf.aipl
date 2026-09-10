@@ -845,10 +845,10 @@ deallocations: 2151
 reallocations: 144
 bytes allocated: 165250
 instructions executed: 205407
-binary size: 155464
-  code: 100320
+binary size: 155560
+  code: 100348
   data: 3988
-  metadata: 51156
+  metadata: 51224
 functions:
   __arr_drop_First$Kind:
     calls: 77
@@ -966,7 +966,7 @@ functions:
     bytes: 12308
   __test$first_sets:
     calls: 1
-    bytes: 5200
+    bytes: 5228
   __test$rule_first:
     calls: 1
     bytes: 2296

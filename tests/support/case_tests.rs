@@ -455,6 +455,7 @@ case_tests! {
     cases_optimizations_const_fold_saturating = "cases/optimizations/const_fold_saturating",
     cases_optimizations_count_fusion = "cases/optimizations/count_fusion",
     cases_optimizations_count_fusion_effects = "cases/optimizations/count_fusion_effects",
+    cases_optimizations_ctor_eq_unwrap = "cases/optimizations/ctor_eq_unwrap",
     cases_optimizations_filter_map_fusion = "cases/optimizations/filter_map_fusion",
     cases_optimizations_inline_mutating_method = "cases/optimizations/inline_mutating_method",
     cases_optimizations_inline_small_stale_body = "cases/optimizations/inline_small_stale_body",

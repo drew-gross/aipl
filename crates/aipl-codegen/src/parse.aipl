@@ -1459,10 +1459,10 @@ deallocations: 9797
 reallocations: 688
 bytes allocated: 621091
 instructions executed: 1285560
-binary size: 631264
-  code: 381724
+binary size: 631016
+  code: 381472
   data: 9564
-  metadata: 239976
+  metadata: 239980
 functions:
   __arr_drop_Node:
     calls: 21
@@ -1605,9 +1605,6 @@ functions:
   __eq___m3__ParseError:
     calls: 1
     bytes: 128
-  __eq_char$opt:
-    calls: 0
-    bytes: 100
   __eq_set$str:
     calls: 44
     bytes: 304
@@ -1730,16 +1727,16 @@ functions:
     bytes: 5260
   __m4__float_len:
     calls: 0
-    bytes: 824
+    bytes: 816
   __m4__interp_scan$Tok:
     calls: 0
-    bytes: 2248
+    bytes: 2252
   __m4__lex$Tok:
     calls: 81
     bytes: 1520
   __m4__lex_step$Tok:
     calls: 310
-    bytes: 24996
+    bytes: 24988
   __m4__nested_len:
     calls: 0
     bytes: 940
@@ -1775,7 +1772,7 @@ functions:
     bytes: 464
   __test$parse:
     calls: 1
-    bytes: 184024
+    bytes: 183884
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84

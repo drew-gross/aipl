@@ -14,18 +14,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 116
-binary size: 1600
-  code: 568
+instructions executed: 95
+binary size: 1464
+  code: 472
   data: 95
-  metadata: 937
+  metadata: 897
 functions:
-  __eq_char$opt:
-    calls: 1
-    bytes: 100
   __test$first_not_z:
     calls: 1
-    bytes: 356
+    bytes: 360
   aipl_assert:
     calls: 2
     bytes: (external)

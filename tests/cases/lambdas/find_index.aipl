@@ -60,11 +60,11 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 722
-instructions executed: 2414
-binary size: 12288
-  code: 7352
+instructions executed: 2246
+binary size: 12240
+  code: 7368
   data: 997
-  metadata: 3939
+  metadata: 3875
 functions:
   __builtin_find_index$char$lam10:
     calls: 1
@@ -106,17 +106,17 @@ functions:
     calls: 2
     bytes: 400
   __eq_i64$opt:
-    calls: 2
+    calls: 1
     bytes: 100
   __eq_u64$opt:
-    calls: 9
+    calls: 2
     bytes: 100
   __filter14$own0:
     calls: 1
     bytes: 272
   __test$first_big:
     calls: 1
-    bytes: 2980
+    bytes: 2996
   aipl_arr_inc:
     calls: 1
     bytes: (external)

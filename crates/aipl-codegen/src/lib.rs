@@ -3857,6 +3857,12 @@ fn compile_program<M: Module>(
     let inlined =
         aipl_mono::fuse_operations(&inlined, &aipl_mono::effectful_fns(&check_program.items));
 
+    // Optimization: compare against `some(e)`/`ok(e)`/`err(e)` by asking the
+    // tag instead of building the value to compare with. Before folding, so a
+    // constant operand it leaves behind still folds, and before sinking, which
+    // is what decides whether that operand may move into the arm.
+    let inlined = aipl_mono::unwrap_ctor_eq(&inlined);
+
     // Optimization: fold constant subexpressions (`2 + 3` → `5`). Runs after
     // `check` so diagnostics always report against the unfolded source, and
     // after inlining so bodies folded here are the ones actually emitted.
