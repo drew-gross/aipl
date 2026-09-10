@@ -357,11 +357,11 @@ allocations: 48292
 deallocations: 48292
 reallocations: 2395
 bytes allocated: 2396493
-instructions executed: 6655827
-binary size: 402976
-  code: 258540
-  data: 5332
-  metadata: 139104
+instructions executed: 6686972
+binary size: 405632
+  code: 260444
+  data: 5404
+  metadata: 139784
 functions:
   __arr_drop_Sexp:
     calls: 876
@@ -435,58 +435,58 @@ functions:
   __arr_retain___m5__Doc:
     calls: 428
     bytes: 116
-  __builtin_all$char$s0$lam154:
+  __builtin_all$char$s0$lam159:
     calls: 51
     bytes: 212
-  __builtin_any$__m5__Doc$lam163:
+  __builtin_any$__m5__Doc$lam168:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam163$tail:
+  __builtin_any$__m5__Doc$lam168$tail:
     calls: 111
     bytes: 324
-  __builtin_count_while$char$lam89:
+  __builtin_count_while$char$lam91:
     calls: 178
     bytes: 220
-  __builtin_count_while$char$s0$lam117:
+  __builtin_count_while$char$s0$lam119:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam117$tail:
+  __builtin_count_while$char$s0$lam119$tail:
     calls: 13
     bytes: 256
-  __builtin_count_while$char$s0$lam132:
+  __builtin_count_while$char$s0$lam134:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam157:
+  __builtin_count_while$char$s0$lam162:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam97:
+  __builtin_count_while$char$s0$lam99:
     calls: 0
     bytes: 184
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m3__Prec$lam170:
+  __builtin_find_if$__m3__Prec$lam175:
     calls: 0
     bytes: 688
-  __builtin_find_index$str$lam49:
+  __builtin_find_index$str$lam51:
     calls: 100
     bytes: 400
-  __builtin_find_index$str$lam58:
+  __builtin_find_index$str$lam60:
     calls: 37
     bytes: 400
-  __builtin_find_index$str$lam79:
+  __builtin_find_index$str$lam81:
     calls: 100
     bytes: 400
   __builtin_intersperse$__m5__Doc:
     calls: 34
     bytes: 408
-  __builtin_try_map$__m1__Cst$Sexp$__m3__ParseError$lam101:
+  __builtin_try_map$__m1__Cst$Sexp$__m3__ParseError$lam103:
     calls: 883
     bytes: 748
-  __builtin_try_map$__m3__Production$SexpKind$Sexp$__m2__First<SexpKind>$__m3__ParseError$lam55:
+  __builtin_try_map$__m3__Production$SexpKind$Sexp$__m2__First<SexpKind>$__m3__ParseError$lam57:
     calls: 3
     bytes: 920
-  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam74:
+  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam76:
     calls: 51
     bytes: 720
   __eq_Sexp:
@@ -510,7 +510,7 @@ functions:
   __eq_char$opt:
     calls: 0
     bytes: 100
-  __filter127$own0:
+  __filter129$own0:
     calls: 883
     bytes: 332
   __lambda_21:
@@ -584,7 +584,7 @@ functions:
     bytes: 3844
   __m13__match_many$SexpKind$Sexp:
     calls: 448
-    bytes: 4680
+    bytes: 4904
   __m13__match_maybe$SexpKind$Sexp:
     calls: 0
     bytes: 1076
@@ -599,7 +599,7 @@ functions:
     bytes: 6760
   __m13__match_rule$SexpKind$Sexp:
     calls: 6493
-    bytes: 6832
+    bytes: 6844
   __m13__match_then$SexpKind$Sexp:
     calls: 0
     bytes: 2128
@@ -683,10 +683,10 @@ functions:
     bytes: 3468
   __m2__render_rule$SexpKind:
     calls: 9
-    bytes: 8944
+    bytes: 9072
   __m2__rep_suffix:
     calls: 1
-    bytes: 724
+    bytes: 1440
   __m2__rule_first$SexpKind:
     calls: 18
     bytes: 6516
@@ -704,7 +704,7 @@ functions:
     bytes: 700
   __m3__desugar_rule$SexpKind:
     calls: 357
-    bytes: 15896
+    bytes: 16684
   __m3__failure_message:
     calls: 5
     bytes: 488
@@ -725,7 +725,7 @@ functions:
     bytes: 716
   __m3__link_rule$SexpKind:
     calls: 400
-    bytes: 5600
+    bytes: 5612
   __m3__link_rules$SexpKind:
     calls: 50
     bytes: 832
@@ -738,28 +738,28 @@ functions:
   __m4__breaks_after:
     calls: 6
     bytes: 444
-  __m4__fmt_node$SexpKind$Sexp$s1$lam59:
+  __m4__fmt_node$SexpKind$Sexp$s1$lam61:
     calls: 89
     bytes: 4800
   __m4__format_cst$SexpKind$Sexp$s1$lam31:
     calls: 12
     bytes: 384
-  __m4__gap_wanted$lam128:
+  __m4__gap_wanted$lam130:
     calls: 148
     bytes: 144
-  __m4__group_doc$SexpKind$Sexp$s1$lam105:
+  __m4__group_doc$SexpKind$Sexp$s1$lam107:
     calls: 18
     bytes: 2420
-  __m4__inline_doc$lam104:
+  __m4__inline_doc$lam106:
     calls: 148
     bytes: 2668
-  __m4__pieces$SexpKind$Sexp$s1$lam102:
+  __m4__pieces$SexpKind$Sexp$s1$lam104:
     calls: 125
     bytes: 3612
   __m4__render_cst$SexpKind$Sexp$s1$lam8:
     calls: 12
     bytes: 5268
-  __m4__wrapped$lam129:
+  __m4__wrapped$lam131:
     calls: 18
     bytes: 4272
   __m5__col_after:
@@ -786,7 +786,7 @@ functions:
   __m6__reindent_block:
     calls: 0
     bytes: 4084
-  __map43:
+  __map45:
     calls: 0
     bytes: 380
   __rec_drop_Sexp:
@@ -926,7 +926,7 @@ functions:
     bytes: 460
   sexp_grammar:
     calls: 56
-    bytes: 1872
+    bytes: 1896
   shown:
     calls: 5
     bytes: 508

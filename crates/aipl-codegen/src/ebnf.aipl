@@ -138,6 +138,13 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     let r_empty: Rule<Kind> = Then(no_rules);
     let r_never: Rule<Kind> = OneOf(no_rules);
     let r_list: Rule<Kind> = Many(Term(Num), sep=some(Literal(",")), trailing_sep=false);
+
+    // Bounds. One-at-most is `?` and exactly-one is the body written alone,
+    // because those are what those bounds mean; anything else is the `{n,m}`
+    // longhand EBNF has no operator for.
+    let r_upto: Rule<Kind> = Many(Term(Num), max=some(1));
+    let r_exactly: Rule<Kind> = Many(Term(Num), min=1, max=some(1));
+    let r_range: Rule<Kind> = Many(Term(Num), min=two, max=some(4));
     let g = g_of([
         one("alt", r_alt),
         one("seq", r_seq),
@@ -148,6 +155,9 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
         one("empty", r_empty),
         one("never", r_never),
         one("list", r_list),
+        one("upto", r_upto),
+        one("exactly", r_exactly),
+        one("range", r_range),
     ]);
     assert(
         ebnf(g) == """
@@ -160,6 +170,9 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
             empty = (* empty *) ;
             never = (* never *) ;
             list = (Num ("," Num)*)? ;
+            upto = Num? ;
+            exactly = Num ;
+            range = Num{2,4} ;
         """,
     );
 
@@ -229,11 +242,11 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
                 Seq | Item => `({body})`,
             }
         },
-        Many(sub, min, sep, trailing_sep, _, _) => match (sep) {
-            some(s) => render_list(sub, s, min, trailing_sep, names),
+        Many(sub, min, max, sep, trailing_sep, _, _) => match (sep) {
+            some(s) => render_list(sub, s, min, max, trailing_sep, names),
             none => {
                 let body = render_rule(sub, names, Item);
-                `{body}{rep_suffix(min)}`
+                `{body}{rep_suffix(min, max)}`
             },
         },
         Maybe(sub) => {
@@ -258,19 +271,24 @@ fn render_nested<K: variant>(
     ctx: Ctx,
 ) -> str { render_rule(Then([open, body, close]), names, ctx) }
 
-# `*`, `+`, or the `{n,}` longhand for a minimum EBNF has no operator for. The
-# braces come from bindings rather than from the template, which has no escape
-# for a literal one.
-fn rep_suffix(min: u64) -> str {
-    if (min == 0) {
-        return "*";
-    };
-    if (min == 1) {
-        return "+";
-    };
+# `*`, `+`, `?`, or the `{n,}` / `{n,m}` longhand for the bounds EBNF has no
+# operator for. The braces come from bindings rather than from the template,
+# which has no escape for a literal one.
+#
+# A repetition bounded at one item is not a repetition: `min=1, max=1` is the
+# body written on its own, and `min=0, max=1` is `?` — the same thing `Maybe`
+# renders as, because it is the same rule.
+fn rep_suffix(min: u64, max: u64?) -> str {
     let open = "{";
     let close = "}";
-    `{open}{min},{close}`
+    match (max) {
+        some(m) => if (m == 1) {
+            if (min == 1) { "" } else { "?" }
+        } else {
+            `{open}{min},{m}{close}`
+        },
+        none => if (min == 0) { "*" } else { if (min == 1) { "+" } else { `{open}{min},{close}` } },
+    }
 }
 
 # A separated list, longhand: the first item, then as many `sep item` pairs as
@@ -280,6 +298,7 @@ fn render_list<K: variant>(
     item: Rule<K>,
     sep: Rule<K>,
     min: u64,
+    max: u64?,
     trailing_sep: bool,
     names: str[],
 ) -> str {
@@ -287,8 +306,17 @@ fn render_list<K: variant>(
     let s = render_rule(sep, names, Item);
 
     // One `sep item` pair is already spelled by the leading item, so the
-    // repetition carries one fewer than the minimum.
-    let pairs = if (min == 0) { rep_suffix(min) } else { rep_suffix(min - 1) };
+    // repetition carries one fewer than the minimum — and one fewer than the
+    // maximum, for the same reason.
+    let inner_max = match (max) {
+        some(m) => some(m - 1),
+        none => none,
+    };
+    let pairs = if (min == 0) {
+        rep_suffix(min, inner_max)
+    } else {
+        rep_suffix(min - 1, inner_max)
+    };
     let core = `{it} ({s} {it}){pairs}`;
     let body = if (trailing_sep) { `{core} {s}?` } else { core };
     if (min == 0) { `({body})?` } else { body }
@@ -341,7 +369,7 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
         // Not grouped into one alternation: `_` counts as a bound name, so
         // arms whose payloads differ only in how many slots they ignore are
         // refused as binding different names.
-        Many(sub, _, _, _, _, _) => climb_precs(sub),
+        Many(sub, _, _, _, _, _, _) => climb_precs(sub),
         Maybe(sub) => climb_precs(sub),
         // A group's parts in order, like any sequence.
         NestedIn(open, body, close, _) => first_precs([open, body, close]),
@@ -533,7 +561,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         },
         // A separated list begins with its item and never with its separator,
         // so the separator contributes nothing here.
-        Many(sub, min, sep, trailing_sep, _, _) => {
+        Many(sub, min, _, sep, trailing_sep, _, _) => {
             let First { syms, nullable } = rule_first(sub, sets)?;
             ok(First { syms, nullable: nullable || min == 0 })
         },
@@ -812,15 +840,15 @@ fn fixture() -> Grammar<Kind, Node> {
     }
 }
 --- performance ---
-allocations: 2161
-deallocations: 2161
+allocations: 2199
+deallocations: 2199
 reallocations: 144
-bytes allocated: 163295
-instructions executed: 199516
-binary size: 153168
-  code: 98320
-  data: 3900
-  metadata: 50948
+bytes allocated: 166786
+instructions executed: 203557
+binary size: 158944
+  code: 102532
+  data: 4108
+  metadata: 52304
 functions:
   __arr_drop_First$Kind:
     calls: 77
@@ -858,7 +886,7 @@ functions:
   __arr_retain___m2__Rule$Kind:
     calls: 307
     bytes: 116
-  __builtin_find_index$str$lam18:
+  __builtin_find_index$str$lam20:
     calls: 24
     bytes: 400
   __builtin_find_index$str$lam7:
@@ -867,7 +895,7 @@ functions:
   __builtin_try_map$__m2__Production$Kind$Node$First<Kind>$__m2__ParseError$lam15:
     calls: 17
     bytes: 920
-  __builtin_try_map$__m2__Rule$Kind$__m2__Rule<Kind>$__m2__ParseError$lam36:
+  __builtin_try_map$__m2__Rule$Kind$__m2__Rule<Kind>$__m2__ParseError$lam38:
     calls: 46
     bytes: 720
   __eq_First$Kind:
@@ -889,11 +917,11 @@ functions:
     calls: 1
     bytes: 128
   __m2__desugar_opt$Kind:
-    calls: 22
+    calls: 25
     bytes: 700
   __m2__desugar_rule$Kind:
-    calls: 231
-    bytes: 15896
+    calls: 237
+    bytes: 16684
   __m2__group_styles$Kind:
     calls: 0
     bytes: 32
@@ -911,7 +939,7 @@ functions:
     bytes: 716
   __m2__link_rule$Kind:
     calls: 139
-    bytes: 5600
+    bytes: 5612
   __m2__link_rules$Kind:
     calls: 27
     bytes: 832
@@ -921,21 +949,21 @@ functions:
   __m2__prod_names$Kind$Node:
     calls: 20
     bytes: 492
-  __map31:
+  __map33:
     calls: 0
     bytes: 380
   __rec_drop_Node:
     calls: 0
     bytes: 72
   __rec_drop___m2__Rule$Kind:
-    calls: 464
+    calls: 476
     bytes: 452
   __test$can_start:
     calls: 1
     bytes: 900
   __test$ebnf:
     calls: 1
-    bytes: 9624
+    bytes: 12148
   __test$first_sets:
     calls: 1
     bytes: 5200
@@ -955,7 +983,7 @@ functions:
     calls: 0
     bytes: 824
   __to_str_u64:
-    calls: 2
+    calls: 4
     bytes: 204
   aipl_arr_drop_arr:
     calls: 34
@@ -964,7 +992,7 @@ functions:
     calls: 66
     bytes: (external)
   aipl_arr_inc:
-    calls: 4166
+    calls: 4178
     bytes: (external)
   aipl_arr_join:
     calls: 34
@@ -979,16 +1007,16 @@ functions:
     calls: 21
     bytes: (external)
   aipl_array_dec:
-    calls: 5471
+    calls: 5492
     bytes: (external)
   aipl_array_new:
-    calls: 682
+    calls: 691
     bytes: (external)
   aipl_array_push:
     calls: 301
     bytes: (external)
   aipl_array_push_mut:
-    calls: 464
+    calls: 470
     bytes: (external)
   aipl_array_with_cap:
     calls: 122
@@ -997,19 +1025,19 @@ functions:
     calls: 23
     bytes: (external)
   aipl_rec_alloc:
-    calls: 464
+    calls: 476
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 3324
+    calls: 3384
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 105
+    calls: 111
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2860
+    calls: 2908
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 105
+    calls: 111
     bytes: (external)
   aipl_test_begin:
     calls: 6
@@ -1021,10 +1049,10 @@ functions:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 4
+    calls: 8
     bytes: (external)
   aipl_write_u64:
-    calls: 2
+    calls: 4
     bytes: (external)
   can_start$Kind:
     calls: 5
@@ -1033,7 +1061,7 @@ functions:
     calls: 0
     bytes: 32
   climb_precs$Kind$tail:
-    calls: 84
+    calls: 90
     bytes: 1748
   dq:
     calls: 47
@@ -1055,7 +1083,7 @@ functions:
     bytes: 356
   fixture:
     calls: 2
-    bytes: 4992
+    bytes: 5040
   keep:
     calls: 0
     bytes: 268
@@ -1066,14 +1094,14 @@ functions:
     calls: 1
     bytes: 452
   prec_note:
-    calls: 27
+    calls: 30
     bytes: 3468
   render_rule$Kind:
-    calls: 92
-    bytes: 9004
+    calls: 98
+    bytes: 9128
   rep_suffix:
-    calls: 10
-    bytes: 724
+    calls: 13
+    bytes: 1440
   rule_first$Kind:
     calls: 228
     bytes: 6516

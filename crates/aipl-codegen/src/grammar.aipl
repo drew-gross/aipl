@@ -34,12 +34,16 @@ import {
     extend,
     find_index,
     is_empty,
+    is_some_and,
     join,
     len,
+    less_than as <,
+    logical_not as !,
     map,
     not_equal as !=,
     push,
     try_map,
+    value_or,
     value_or_err,
     wrapping_add as +,
     wrapping_add_assign as +=,
@@ -104,10 +108,21 @@ variant Rule<K: variant> =
     | Then(Rule<K>[])
     // The first alternative that matches, in order.
     | OneOf(Rule<K>[])
-    // `r` repeated until it stops matching, at least `min` times — the default
-    // `0` is a PEG `*`, and `Many(r, min=1)` a `+`. A rule that can match empty
-    // input would spin here forever, so the driver refuses one outright rather
-    // than hanging.
+    // `r` repeated until it stops matching, at least `min` times and at most
+    // `max` — the defaults are a PEG `*`, `Many(r, min=1)` is a `+`, and
+    // `Many(r, min=1, max=1)` is exactly one. A rule that can match empty input
+    // would spin here forever, so the driver refuses one outright rather than
+    // hanging.
+    //
+    // A bound stops the repetition rather than failing it: the items past `max`
+    // are simply not this rule's, and the enclosing rule sees them. That is what
+    // makes `min=1, max=1` mean "one item, in brackets" when it carries a
+    // `nested_in` — a group that holds one thing rather than a list.
+    //
+    // `trailing_sep` still applies at the bound. A separator after the last item
+    // ends the list rather than starting the item that would have been next, so
+    // `Many(x, sep=comma, max=some(2))` takes `1, 2,` whole — the same answer it
+    // gives when the items run out instead.
     //
     // With a `sep` it is a *separated* list: `r`, then `sep r` for as long as
     // the separator keeps appearing. `trailing_sep` decides what happens to a
@@ -139,6 +154,7 @@ variant Rule<K: variant> =
     | Many(
         Rule<K>,
         min: u64 = 0,
+        max: u64? = none,
         sep: Rule<K>? = none,
         trailing_sep: bool = true,
         nested_in: Rule<K>[] = [],
@@ -222,6 +238,9 @@ variant Build<A: any> = Mk((str, Cst, A[]) -> A!ParseError)
 # is reported against the brace that opened it, but its contents are statements
 # rather than a list and breaking them at a width is not what a formatter does
 # with them. Such a group lays out `Inline`, like any other run of children.
+#
+# In the `nested_in` shorthand it is not written by hand: a `Many` bounded at one
+# item is not a list, so `desugar` reads `wraps: false` off `max=some(1)`.
 struct ListStyle { sep: str = ",", spaced: bool = false, trailing: bool = true, wraps: bool = true }
 
 # How a production's matched children are joined into a `Doc` — the formatting
@@ -313,7 +332,7 @@ fn group_styles<K: variant>(r: Rule<K>) -> ListStyle[] {
         // and the forwarding lambda that remains is what the lint objects to, so
         // the two rule each other out and the squelch is the only spelling left.
         Then(rs) | OneOf(rs) => rs.map(|sub| group_styles(sub)).join(), #[allow]
-        Many(sub, _, sep, _, _, _) => [..group_styles(sub), ..opt_group_styles(sep)],
+        Many(sub, _, _, sep, _, _, _) => [..group_styles(sub), ..opt_group_styles(sep)],
         Maybe(sub) => group_styles(sub),
         Climb(atom, _) => group_styles(atom),
         Term(..) | Literal(..) | Named(..) | NamedIdx(..) => [],
@@ -350,14 +369,26 @@ fn group_count<K: variant>(r: Rule<K>) -> u64 { group_styles(r).len() }
 #
 # The style is derived here — `sep` from the list's own separator, `trailing`
 # from `trailing_sep`, `spaced` as given — so a grammar states each of those
-# once. `wraps` is always true: a `Many` in brackets is a list by construction,
-# which is exactly the case that wraps.
+# once. `wraps` comes from `max`: a `Many` in brackets is a list by construction
+# and lists wrap, *unless* it is bounded at one item, which makes it a bracket
+# pair holding one thing (`(expr)`, a block's braces) rather than a list. There
+# is nothing to break at a width in that case, so it lays out inline.
 pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
     match (r) {
-        Many(sub, min, sep, trailing_sep, nested_in, spaced) => {
+        Many(sub, min, max, sep, trailing_sep, nested_in, spaced) => {
+            // `none` reads as "no bound", which is never below the minimum — so
+            // the check needs no case of its own for it.
+            let cap = max.value_or(min);
+            if (cap < min) {
+                return err(ParseError {
+                    message: `a repetition's max must be at least its min, got min={min}, max={cap}`,
+                    span: 0..0,
+                });
+            };
             let inner: Rule<K> = Many(
                 desugar_rule(sub)?,
                 min=min,
+                max=max,
                 sep=desugar_opt(sep)?,
                 trailing_sep=trailing_sep,
             );
@@ -370,7 +401,12 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
                     span: 0..0,
                 });
             };
-            let style = ListStyle { sep: sep_spelling(sep)?, spaced, trailing: trailing_sep };
+            let style = ListStyle {
+                sep: sep_spelling(sep)?,
+                spaced,
+                trailing: trailing_sep,
+                wraps: !max.is_some_and(|m| m == 1),
+            };
             ok(NestedIn(
                 desugar_rule(nested_in[0].value_or_err(missing_bracket())?)?,
                 inner,
@@ -466,9 +502,10 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
         OneOf(rs) => ok(OneOf(link_rules(rs, names, base)?)),
         // `desugar` has already rewritten a `nested_in` away, so the two slots
         // it fills are empty by the time anything is linked.
-        Many(sub, min, sep, trailing_sep, _, _) => ok(Many(
+        Many(sub, min, max, sep, trailing_sep, _, _) => ok(Many(
             link_rule(sub, names, base)?,
             min=min,
+            max=max,
             sep=link_opt(sep, names, base + group_count(sub))?,
             trailing_sep=trailing_sep,
         )),
@@ -722,6 +759,31 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     assert(link(short_g)?.groups == link(long_g)?.groups);
     assert(link(short_g)?.groups == [ListStyle { sep: ",", trailing: false }]);
 
+    // A group bounded at one item is not a list, so `wraps` comes off `max` and
+    // the shorthand says "a bracket pair holding one thing" without restating it.
+    let single: Rule<Kind> = Many(
+        Term(Atom),
+        min=1,
+        max=some(1),
+        nested_in=[Literal("("), Literal(")")],
+    );
+    let single_g: Grammar<Kind, Node> = Grammar {
+        prods: [Production { name: "a", rule: single, build: Mk(keep), layout: Inline }],
+    };
+    assert(link(single_g)?.groups == [ListStyle { sep: "", wraps: false }]);
+
+    // A maximum below the minimum is a rule that could never match.
+    let backwards: Rule<Kind> = Many(Term(Atom), min=2, max=some(1));
+    let back_g: Grammar<Kind, Node> = Grammar {
+        prods: [Production { name: "a", rule: backwards, build: Mk(keep), layout: Inline }],
+    };
+    assert(
+        link(back_g) == err(ParseError {
+            message: "a repetition's max must be at least its min, got min=2, max=1",
+            span: 0..0,
+        }),
+    );
+
     // A juxtaposed list — no separator — carries the empty spelling, and
     // `spaced` is the one thing the `Many` cannot answer for itself.
     let words: Rule<Kind> = Many(Term(Atom), nested_in=[Literal("{"), Literal("}")], spaced=true);
@@ -804,36 +866,36 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     }
 }
 --- performance ---
-allocations: 731
-deallocations: 731
-reallocations: 38
-bytes allocated: 56337
-instructions executed: 63876
-binary size: 139984
-  code: 86636
-  data: 3492
-  metadata: 49856
+allocations: 785
+deallocations: 785
+reallocations: 40
+bytes allocated: 60099
+instructions executed: 68316
+binary size: 150128
+  code: 92852
+  data: 3900
+  metadata: 53376
 functions:
   __arr_drop_ListStyle:
-    calls: 64
+    calls: 70
     bytes: 120
   __arr_drop_Prec:
     calls: 2
     bytes: 120
   __arr_drop_Production$Kind$Node:
-    calls: 31
+    calls: 34
     bytes: 188
   __arr_drop_Rule$Kind:
-    calls: 29
+    calls: 30
     bytes: 116
   __arr_retain_ListStyle:
-    calls: 19
+    calls: 20
     bytes: 120
   __arr_retain_Prec:
     calls: 0
     bytes: 120
   __arr_retain_Production$Kind$Node:
-    calls: 28
+    calls: 29
     bytes: 188
   __arr_retain_Rule$Kind:
     calls: 32
@@ -841,26 +903,26 @@ functions:
   __builtin_find_index$str$lam1:
     calls: 1
     bytes: 412
-  __builtin_find_index$str$lam11:
+  __builtin_find_index$str$lam13:
     calls: 9
     bytes: 400
   __builtin_find_index$str$lam3:
     calls: 1
     bytes: 412
   __builtin_find_index$str$lam8:
-    calls: 26
+    calls: 28
     bytes: 400
-  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam17:
+  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam19:
     calls: 4
     bytes: 720
   __eq_ListStyle:
-    calls: 15
+    calls: 16
     bytes: 200
   __eq_ListStyle$arr:
-    calls: 5
+    calls: 6
     bytes: 284
   __eq_ParseError:
-    calls: 5
+    calls: 6
     bytes: 128
   __eq_Prec:
     calls: 1
@@ -870,7 +932,7 @@ functions:
     bytes: 284
   __eq_Rule$Kind:
     calls: 35
-    bytes: 852
+    bytes: 876
   __eq_Rule$Kind$arr:
     calls: 7
     bytes: 300
@@ -878,26 +940,26 @@ functions:
     calls: 4
     bytes: 92
   __eq___builtin_Span:
-    calls: 5
+    calls: 6
     bytes: 104
   __eq_str$arr:
     calls: 3
     bytes: 364
   __eq_u64$opt:
-    calls: 2
+    calls: 6
     bytes: 100
   __rec_drop_Node:
     calls: 0
     bytes: 72
   __rec_drop_Rule$Kind:
-    calls: 277
+    calls: 293
     bytes: 452
   __test$failure_message:
     calls: 1
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 43824
+    bytes: 49216
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -905,58 +967,58 @@ functions:
     calls: 0
     bytes: 824
   __to_str_u64:
-    calls: 1
+    calls: 3
     bytes: 204
   aipl_arr_drop_arr:
     calls: 4
     bytes: (external)
   aipl_arr_extend:
-    calls: 107
+    calls: 114
     bytes: (external)
   aipl_arr_inc:
-    calls: 895
+    calls: 954
     bytes: (external)
   aipl_arr_join:
     calls: 4
     bytes: (external)
   aipl_arr_reserve:
-    calls: 65
+    calls: 70
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 1340
+    calls: 1432
     bytes: (external)
   aipl_array_new:
-    calls: 364
+    calls: 393
     bytes: (external)
   aipl_array_push:
-    calls: 40
+    calls: 41
     bytes: (external)
   aipl_array_push_mut:
-    calls: 44
+    calls: 46
     bytes: (external)
   aipl_array_with_cap:
-    calls: 25
+    calls: 27
     bytes: (external)
   aipl_assert:
-    calls: 28
+    calls: 30
     bytes: (external)
   aipl_rec_alloc:
-    calls: 277
+    calls: 293
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1512
+    calls: 1588
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 165
+    calls: 175
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1235
+    calls: 1295
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 165
+    calls: 175
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -968,17 +1030,17 @@ functions:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 2
+    calls: 6
     bytes: (external)
   aipl_write_u64:
-    calls: 1
+    calls: 3
     bytes: (external)
   desugar_opt$Kind:
-    calls: 12
+    calls: 13
     bytes: 700
   desugar_rule$Kind:
-    calls: 99
-    bytes: 15896
+    calls: 104
+    bytes: 16684
   failure_message:
     calls: 2
     bytes: 488
@@ -986,23 +1048,23 @@ functions:
     calls: 0
     bytes: 32
   group_styles$Kind$tail:
-    calls: 265
+    calls: 278
     bytes: 3156
   keep:
     calls: 0
     bytes: 268
   link$Kind$Node:
-    calls: 17
+    calls: 19
     bytes: 2796
   link_nest$Kind:
-    calls: 16
+    calls: 17
     bytes: 1300
   link_opt$Kind:
-    calls: 10
+    calls: 11
     bytes: 716
   link_rule$Kind:
-    calls: 97
-    bytes: 5600
+    calls: 102
+    bytes: 5612
   link_rules$Kind:
     calls: 4
     bytes: 832
@@ -1010,10 +1072,10 @@ functions:
     calls: 1
     bytes: 180
   nest_styles$Kind:
-    calls: 21
+    calls: 22
     bytes: 956
   prod_names$Kind$Node:
-    calls: 21
+    calls: 23
     bytes: 492
   rule_of$Kind$Node:
     calls: 13

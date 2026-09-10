@@ -682,10 +682,10 @@ deallocations: 2576
 reallocations: 195
 bytes allocated: 186459
 instructions executed: 223310
-binary size: 242520
-  code: 154272
-  data: 5068
-  metadata: 83180
+binary size: 243688
+  code: 155072
+  data: 5140
+  metadata: 83476
 functions:
   __arr_drop_Piece:
     calls: 118
@@ -723,7 +723,7 @@ functions:
   __arr_retain___m8__Rule$FKind:
     calls: 0
     bytes: 116
-  __builtin_all$char$s0$lam85:
+  __builtin_all$char$s0$lam87:
     calls: 17
     bytes: 212
   __builtin_any$__m2__Doc$lam33:
@@ -732,10 +732,10 @@ functions:
   __builtin_any$__m2__Doc$lam33$tail:
     calls: 103
     bytes: 324
-  __builtin_count_while$char$s0$lam66:
+  __builtin_count_while$char$s0$lam68:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam94:
+  __builtin_count_while$char$s0$lam96:
     calls: 0
     bytes: 172
   __builtin_drop_last$str:
@@ -744,13 +744,13 @@ functions:
   __builtin_find_index$str$lam37:
     calls: 26
     bytes: 400
-  __builtin_find_index$str$lam57:
+  __builtin_find_index$str$lam59:
     calls: 0
     bytes: 400
   __builtin_intersperse$__m2__Doc:
     calls: 28
     bytes: 408
-  __builtin_try_map$__m8__Rule$FKind$__m8__Rule<FKind>$__m8__ParseError$lam78:
+  __builtin_try_map$__m8__Rule$FKind$__m8__Rule<FKind>$__m8__ParseError$lam80:
     calls: 0
     bytes: 720
   __eq_str$arr:
@@ -797,7 +797,7 @@ functions:
     bytes: 700
   __m8__desugar_rule$FKind:
     calls: 44
-    bytes: 15896
+    bytes: 16684
   __m8__failure_message:
     calls: 2
     bytes: 488
@@ -818,7 +818,7 @@ functions:
     bytes: 716
   __m8__link_rule$FKind:
     calls: 44
-    bytes: 5600
+    bytes: 5612
   __m8__link_rules$FKind:
     calls: 0
     bytes: 832
@@ -969,10 +969,10 @@ functions:
   gap_wanted$lam32:
     calls: 72
     bytes: 144
-  gap_wanted$lam62:
+  gap_wanted$lam64:
     calls: 2
     bytes: 140
-  gap_wanted$lam75:
+  gap_wanted$lam77:
     calls: 32
     bytes: 468
   grammar_of:
@@ -1035,12 +1035,12 @@ functions:
   rendered:
     calls: 6
     bytes: 120
-  wrapped$lam63:
+  wrapped$lam65:
     calls: 0
     bytes: 4272
   wrapped$lam7:
     calls: 15
     bytes: 2680
-  wrapped$lam76:
+  wrapped$lam78:
     calls: 3
     bytes: 4272

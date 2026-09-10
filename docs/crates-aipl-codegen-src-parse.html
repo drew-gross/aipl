@@ -417,7 +417,7 @@
             <a class="anchor" href="#item-match_many">match_many</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+          <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
           <div class="doc"><p><code>sub</code> until it stops matching, at least <code>min</code> times — and, with a <code>sep</code>, with that separator between consecutive items.</p><p>A rule that can match empty input would repeat forever here, and AIPL has no <code>break</code> to escape with — so a zero-width iteration is refused outright, the same invariant <code>lexer.aipl</code> keeps by having no matcher accept empty input. It is a grammar bug, reported as one rather than hung on.</p><p>The separated case is the same loop with one step in front of each item after the first. What the separator matched is held back until an item follows it, because a separator with nothing after it is only part of the list when <code>trailing_sep</code> says so; otherwise the position rewinds to before it and the enclosing rule is the one that complains — which is how <code>[1, 2,]</code> can be either the list or a list followed by a stray comma.</p></div>
 

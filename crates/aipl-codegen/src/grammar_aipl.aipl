@@ -377,7 +377,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
     // Gazelle's right recursion, kept: after one expression the parser decides
     // whether a `;` made it a statement or its absence made it the block's
     // value, so the expression is parsed exactly once.
-    let block: Rule<AiplTok> = nest("{", Named("block_body"), "}", pair());
+    let block: Rule<AiplTok> = only("{", Named("block_body"), "}");
     let block_body: Rule<AiplTok> = Maybe(OneOf([
         Then([Named("kw_stmt"), Named("block_body")]),
         Then([Named("expr"), Named("block_tail")]),
@@ -386,7 +386,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
 
     // A loop body admits no trailing expression: its value could never be
     // observed, so every expression in it must be an `expr;` statement.
-    let loop_body: Rule<AiplTok> = nest("{", Named("loop_inner"), "}", pair());
+    let loop_body: Rule<AiplTok> = only("{", Named("loop_inner"), "}");
     let loop_inner: Rule<AiplTok> = Maybe(OneOf([
         Then([Named("kw_stmt"), Named("loop_inner")]),
         Then([Named("expr"), Lit(";"), Named("loop_inner")]),
@@ -470,7 +470,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
     let for_stmt: Rule<AiplTok> = OneOf([
         Then([
             Lit("for"),
-            nest(
+            only(
                 "(",
                 Then([
                     Lit("let"),
@@ -485,29 +485,27 @@ fn statements() -> Production<AiplTok, Ast>[] {
                     Named("expr"),
                 ]),
                 ")",
-                pair(),
             ),
             Named("loop_body"),
         ]),
         Then([
             Lit("for"),
-            nest(
+            only(
                 "(",
                 Then([Lit("let"), Term(Name), Lit(","), Term(Name), Lit(":"), Named("expr")]),
                 ")",
-                pair(),
             ),
             Named("loop_body"),
         ]),
         Then([
             Lit("for"),
-            nest("(", Then([Lit("let"), Term(Name), Lit(":"), Named("expr")]), ")", pair()),
+            only("(", Then([Lit("let"), Term(Name), Lit(":"), Named("expr")]), ")"),
             Named("loop_body"),
         ]),
     ]);
     let while_stmt: Rule<AiplTok> = Then([
         Lit("while"),
-        nest("(", Named("expr"), ")", pair()),
+        only("(", Named("expr"), ")"),
         Named("loop_body"),
     ]);
     let return_stmt: Rule<AiplTok> = Then([Lit("return"), Named("expr"), Lit(";")]);
@@ -560,22 +558,22 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([Lit("."), Term(IntLit)]),
         // The three index forms are bracket pairs, not lists: `a[..b]` holds one
         // expression and a `..`, and there is nothing in it to break at.
-        Then([nest("[", Then([Lit(".."), Named("expr")]), "]", pair())]),
-        Then([nest("[", Then([Named("expr"), Lit("..")]), "]", pair())]),
-        Then([nest("[", Named("expr"), "]", pair())]),
+        Then([only("[", Then([Lit(".."), Named("expr")]), "]")]),
+        Then([only("[", Then([Named("expr"), Lit("..")]), "]")]),
+        Then([only("[", Named("expr"), "]")]),
         Lit("?"),
     ]);
 
     let atom: Rule<AiplTok> = OneOf([
         Then([
             Lit("if"),
-            nest("(", Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), ")", pair()),
+            only("(", Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), ")"),
             Named("block"),
             Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
         Then([
             Lit("if"),
-            nest("(", Named("expr"), ")", pair()),
+            only("(", Named("expr"), ")"),
             Named("block"),
             Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
@@ -586,7 +584,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         // the wrong place to say it.
         Then([
             Lit("match"),
-            nest("(", Named("expr"), ")", pair()),
+            only("(", Named("expr"), ")"),
             Many(Named("match_arm"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
         ]),
         // A bracketed list that is neither the start nor the end of its
@@ -621,7 +619,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
             strict(),
         ),
         // A grouping paren holds one expression, so there is no list in it.
-        nest("(", Named("expr"), ")", pair()),
+        only("(", Named("expr"), ")"),
         nest("[", Named("args"), "]", loose()),
         nest2("#", "{", Named("brace_body"), "}", loose()),
         Named("template"),
@@ -638,13 +636,13 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     let else_branch: Rule<AiplTok> = OneOf([
         Then([
             Lit("if"),
-            nest("(", Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), ")", pair()),
+            only("(", Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), ")"),
             Named("block"),
             Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
         Then([
             Lit("if"),
-            nest("(", Named("expr"), ")", pair()),
+            only("(", Named("expr"), ")"),
             Named("block"),
             Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
@@ -1135,6 +1133,15 @@ fn nest2(open1: str, open2: str, body: Rule<AiplTok>, close: str, style: ListSty
     AiplTok
 > { NestedIn(Then([Lit(open1), Lit(open2)]), body, Lit(close), style=style) }
 
+# A bracket pair holding exactly one thing — a block's braces, a condition's
+# parentheses, a grouping paren. `min=1, max=1` is what says it is not a list,
+# and `desugar` reads that back as a group laid out inline rather than broken at
+# a width. It is still a group, so an unclosed one is reported against the token
+# that opened it.
+fn only(open: str, body: Rule<AiplTok>, close: str) -> Rule<AiplTok> {
+    Many(body, min=1, max=some(1), nested_in=[Lit(open), Lit(close)])
+}
+
 # A comma-separated list that takes no trailing comma when it breaks, which most
 # of AIPL's bracketed positions want.
 fn strict() -> ListStyle { trailing: false }
@@ -1146,12 +1153,6 @@ fn loose() -> ListStyle { ListStyle {} }
 # The same, in braces that read as words and so take inner spaces while flat:
 # `{ a, b }` against `(a, b)`.
 fn braced() -> ListStyle { spaced: true }
-
-# A pair that is a pair and nothing else: a block's braces, a condition's
-# parentheses. Recorded so an unclosed one is reported against the token that
-# opened it; laid out as though it were not a group at all, because statements
-# and conditions are not lists.
-fn pair() -> ListStyle { wraps: false }
 
 # A production whose parts are written against each other with no space between
 # them, whatever the spacing rule would otherwise say: `i64?[]`, `#{`.
@@ -1198,15 +1199,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1437360
-deallocations: 1437360
+allocations: 1483248
+deallocations: 1483248
 reallocations: 7799
-bytes allocated: 123089920
-instructions executed: 183917198
-binary size: 750440
-  code: 500848
-  data: 14076
-  metadata: 235516
+bytes allocated: 125050808
+instructions executed: 187096881
+binary size: 742808
+  code: 496352
+  data: 14148
+  metadata: 232308
 functions:
   __arr_drop___m11__StepResult$__m10__AiplTok:
     calls: 5
@@ -1224,7 +1225,7 @@ functions:
     calls: 36918
     bytes: 140
   __arr_drop___m1__Cst:
-    calls: 11809
+    calls: 11985
     bytes: 116
   __arr_drop___m2__Piece:
     calls: 247
@@ -1233,7 +1234,7 @@ functions:
     calls: 314
     bytes: 116
   __arr_drop___m9__ListStyle:
-    calls: 81192
+    calls: 88536
     bytes: 120
   __arr_drop___m9__Prec:
     calls: 214
@@ -1242,7 +1243,7 @@ functions:
     calls: 8307
     bytes: 188
   __arr_drop___m9__Rule$__m10__AiplTok:
-    calls: 182763
+    calls: 185973
     bytes: 116
   __arr_retain___m11__StepResult$__m10__AiplTok:
     calls: 7
@@ -1260,7 +1261,7 @@ functions:
     calls: 42921
     bytes: 140
   __arr_retain___m1__Cst:
-    calls: 11357
+    calls: 11445
     bytes: 116
   __arr_retain___m2__Piece:
     calls: 304
@@ -1269,7 +1270,7 @@ functions:
     calls: 397
     bytes: 116
   __arr_retain___m9__ListStyle:
-    calls: 47736
+    calls: 48688
     bytes: 120
   __arr_retain___m9__Prec:
     calls: 0
@@ -1280,52 +1281,52 @@ functions:
   __arr_retain___m9__Rule$__m10__AiplTok:
     calls: 256496
     bytes: 116
-  __builtin_all$__m9__Rule$__m10__AiplTok$lam144:
+  __builtin_all$__m9__Rule$__m10__AiplTok$lam149:
     calls: 0
     bytes: 36
-  __builtin_all$__m9__Rule$__m10__AiplTok$lam144$tail:
+  __builtin_all$__m9__Rule$__m10__AiplTok$lam149$tail:
     calls: 270
     bytes: 384
-  __builtin_all$char$s0$lam128:
+  __builtin_all$char$s0$lam133:
     calls: 79
     bytes: 212
-  __builtin_any$__m3__Doc$lam155:
+  __builtin_any$__m3__Doc$lam160:
     calls: 0
     bytes: 32
-  __builtin_any$__m3__Doc$lam155$tail:
+  __builtin_any$__m3__Doc$lam160$tail:
     calls: 145
     bytes: 324
-  __builtin_any$__m9__Rule$__m10__AiplTok$lam147:
+  __builtin_any$__m9__Rule$__m10__AiplTok$lam152:
     calls: 0
     bytes: 36
-  __builtin_any$__m9__Rule$__m10__AiplTok$lam147$tail:
+  __builtin_any$__m9__Rule$__m10__AiplTok$lam152$tail:
     calls: 108
     bytes: 380
   __builtin_count_while$char$lam54:
     calls: 1098
     bytes: 220
-  __builtin_count_while$char$s0$lam112:
+  __builtin_count_while$char$s0$lam101:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam114:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam112$tail:
+  __builtin_count_while$char$s0$lam114$tail:
     calls: 23
     bytes: 256
-  __builtin_count_while$char$s0$lam125:
+  __builtin_count_while$char$s0$lam130:
     calls: 65
     bytes: 172
-  __builtin_count_while$char$s0$lam127:
+  __builtin_count_while$char$s0$lam132:
     calls: 1
     bytes: 172
   __builtin_count_while$char$s0$lam62:
     calls: 854
     bytes: 184
-  __builtin_count_while$char$s0$lam99:
-    calls: 0
-    bytes: 172
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m9__Prec$lam159:
+  __builtin_find_if$__m9__Prec$lam164:
     calls: 145
     bytes: 688
   __builtin_find_index$str$lam15:
@@ -1334,7 +1335,7 @@ functions:
   __builtin_find_index$str$lam28:
     calls: 7344
     bytes: 400
-  __builtin_find_index$str$lam65:
+  __builtin_find_index$str$lam67:
     calls: 21590
     bytes: 400
   __builtin_int_parse:
@@ -1343,10 +1344,10 @@ functions:
   __builtin_intersperse$__m3__Doc:
     calls: 26
     bytes: 408
-  __builtin_try_map$__m9__Production$__m10__AiplTok$Ast$__m19__First<__m10__AiplTok>$__m9__ParseError$lam83:
+  __builtin_try_map$__m9__Production$__m10__AiplTok$Ast$__m19__First<__m10__AiplTok>$__m9__ParseError$lam85:
     calls: 72
     bytes: 920
-  __builtin_try_map$__m9__Rule$__m10__AiplTok$__m9__Rule<__m10__AiplTok>$__m9__ParseError$lam118:
+  __builtin_try_map$__m9__Rule$__m10__AiplTok$__m9__Rule<__m10__AiplTok>$__m9__ParseError$lam120:
     calls: 20808
     bytes: 720
   __eq___m19__First$__m10__AiplTok:
@@ -1397,7 +1398,7 @@ functions:
   __lambda_23:
     calls: 2
     bytes: 64
-  __lambda_95:
+  __lambda_97:
     calls: 59
     bytes: 140
   __m10__char_lit_emit:
@@ -1497,8 +1498,8 @@ functions:
     calls: 3243
     bytes: 3100
   __m18__match_many$__m10__AiplTok$Ast:
-    calls: 1333
-    bytes: 4680
+    calls: 1431
+    bytes: 4904
   __m18__match_maybe$__m10__AiplTok$Ast:
     calls: 447
     bytes: 1076
@@ -1512,8 +1513,8 @@ functions:
     calls: 6351
     bytes: 8972
   __m18__match_rule$__m10__AiplTok$Ast:
-    calls: 43835
-    bytes: 15272
+    calls: 43933
+    bytes: 15280
   __m18__match_then$__m10__AiplTok$Ast:
     calls: 11468
     bytes: 2128
@@ -1545,7 +1546,7 @@ functions:
     calls: 0
     bytes: 36
   __m18__rule_nullable$__m10__AiplTok$tail:
-    calls: 7992
+    calls: 8154
     bytes: 1796
   __m18__seq_labels$__m10__AiplTok$Ast:
     calls: 0
@@ -1595,22 +1596,22 @@ functions:
   __m2__format_cst$__m10__AiplTok$Ast$s1$lam12:
     calls: 20
     bytes: 384
-  __m2__gap_wanted$lam119:
+  __m2__gap_wanted$lam121:
     calls: 160
     bytes: 304
-  __m2__group_doc$__m10__AiplTok$Ast$s1$lam73:
+  __m2__group_doc$__m10__AiplTok$Ast$s1$lam75:
     calls: 13
     bytes: 2420
-  __m2__inline_doc$lam72:
+  __m2__inline_doc$lam74:
     calls: 137
     bytes: 2668
-  __m2__pieces$__m10__AiplTok$Ast$s1$lam70:
+  __m2__pieces$__m10__AiplTok$Ast$s1$lam72:
     calls: 170
     bytes: 3612
   __m2__render_cst$__m10__AiplTok$Ast$s1$lam3:
     calls: 20
     bytes: 5268
-  __m2__wrapped$lam120:
+  __m2__wrapped$lam122:
     calls: 13
     bytes: 4272
   __m3__col_after:
@@ -1641,16 +1642,16 @@ functions:
     calls: 1
     bytes: 1276
   __m9__desugar_opt$__m10__AiplTok:
-    calls: 4624
+    calls: 6664
     bytes: 700
   __m9__desugar_rule$__m10__AiplTok:
-    calls: 108137
-    bytes: 15896
+    calls: 108272
+    bytes: 16684
   __m9__group_styles$__m10__AiplTok:
     calls: 0
     bytes: 32
   __m9__group_styles$__m10__AiplTok$tail:
-    calls: 407184
+    calls: 427040
     bytes: 3156
   __m9__link$__m10__AiplTok$Ast:
     calls: 136
@@ -1659,16 +1660,16 @@ functions:
     calls: 6120
     bytes: 1300
   __m9__link_opt$__m10__AiplTok:
-    calls: 4624
+    calls: 6664
     bytes: 716
   __m9__link_rule$__m10__AiplTok:
-    calls: 110296
-    bytes: 5600
+    calls: 112336
+    bytes: 5612
   __m9__link_rules$__m10__AiplTok:
     calls: 20808
     bytes: 832
   __m9__nest_styles$__m10__AiplTok:
-    calls: 16320
+    calls: 16456
     bytes: 956
   __m9__prod_names$__m10__AiplTok$Ast:
     calls: 243
@@ -1683,7 +1684,7 @@ functions:
     calls: 657
     bytes: 84
   __rec_drop___m9__Rule$__m10__AiplTok:
-    calls: 368513
+    calls: 372593
     bytes: 452
   __test$aipl_parse_cst:
     calls: 1
@@ -1707,40 +1708,40 @@ functions:
     calls: 9
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 47021
+    calls: 47973
     bytes: (external)
   aipl_arr_extend:
-    calls: 87779
+    calls: 101283
     bytes: (external)
   aipl_arr_inc:
-    calls: 3323190
+    calls: 3444316
     bytes: (external)
   aipl_arr_join:
-    calls: 45167
+    calls: 46119
     bytes: (external)
   aipl_arr_reserve:
-    calls: 88931
+    calls: 102163
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 161338
+    calls: 164874
     bytes: (external)
   aipl_arr_sort:
     calls: 33
     bytes: (external)
   aipl_array_dec:
-    calls: 4348053
+    calls: 4510987
     bytes: (external)
   aipl_array_new:
-    calls: 679939
+    calls: 719667
     bytes: (external)
   aipl_array_push:
     calls: 160877
     bytes: (external)
   aipl_array_push_mut:
-    calls: 270459
+    calls: 273995
     bytes: (external)
   aipl_array_with_cap:
-    calls: 100899
+    calls: 101851
     bytes: (external)
   aipl_assert:
     calls: 100
@@ -1755,19 +1756,19 @@ functions:
     calls: 8
     bytes: 748
   aipl_rec_alloc:
-    calls: 378053
+    calls: 382133
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2682956
+    calls: 2742921
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 87685
+    calls: 85345
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2304903
+    calls: 2360788
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 87685
+    calls: 85345
     bytes: (external)
   aipl_set_contains:
     calls: 58671
@@ -1795,13 +1796,13 @@ functions:
     bytes: (external)
   expressions:
     calls: 214
-    bytes: 36788
+    bytes: 32956
   format_aipl_ty:
     calls: 20
     bytes: 808
   items:
     calls: 107
-    bytes: 29788
+    bytes: 30124
   keep:
     calls: 0
     bytes: 196
@@ -1814,18 +1815,21 @@ functions:
   nest2:
     calls: 642
     bytes: 624
+  only:
+    calls: 3210
+    bytes: 464
   p:
     calls: 8239
     bytes: 448
   patterns:
     calls: 214
-    bytes: 7076
+    bytes: 7120
   statements:
     calls: 214
-    bytes: 27532
+    bytes: 24916
   types:
     calls: 214
-    bytes: 7992
+    bytes: 8068
   why_prepared:
     calls: 9
     bytes: 1760

@@ -368,6 +368,20 @@
 
 
 
+        <section class="item" id="item-only">
+          <h3>
+            <a class="anchor" href="#item-only">only</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn only(open: str, body: Rule&#60;AiplTok&#62;, close: str) -&#62; Rule&#60;AiplTok&#62;</code></pre>
+
+          <div class="doc"><p>A bracket pair holding exactly one thing — a block's braces, a condition's parentheses, a grouping paren. <code>min=1, max=1</code> is what says it is not a list, and <code>desugar</code> reads that back as a group laid out inline rather than broken at a width. It is still a group, so an unclosed one is reported against the token that opened it.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-strict">
           <h3>
             <a class="anchor" href="#item-strict">strict</a>
@@ -404,20 +418,6 @@
           <pre class="signature"><code>fn braced() -&#62; ListStyle</code></pre>
 
           <div class="doc"><p>The same, in braces that read as words and so take inner spaces while flat: <code>{ a, b }</code> against <code>(a, b)</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-pair">
-          <h3>
-            <a class="anchor" href="#item-pair">pair</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn pair() -&#62; ListStyle</code></pre>
-
-          <div class="doc"><p>A pair that is a pair and nothing else: a block's braces, a condition's parentheses. Recorded so an unclosed one is reported against the token that opened it; laid out as though it were not a group at all, because statements and conditions are not lists.</p></div>
 
 
         </section>

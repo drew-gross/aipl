@@ -245,9 +245,9 @@
             <a class="anchor" href="#item-rep_suffix">rep_suffix</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn rep_suffix(min: u64) -&#62; str</code></pre>
+          <pre class="signature"><code>fn rep_suffix(min: u64, max: u64?) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>*</code>, <code>+</code>, or the <code>{n,}</code> longhand for a minimum EBNF has no operator for. The braces come from bindings rather than from the template, which has no escape for a literal one.</p></div>
+          <div class="doc"><p><code>*</code>, <code>+</code>, <code>?</code>, or the <code>{n,}</code> / <code>{n,m}</code> longhand for the bounds EBNF has no operator for. The braces come from bindings rather than from the template, which has no escape for a literal one.</p><p>A repetition bounded at one item is not a repetition: <code>min=1, max=1</code> is the body written on its own, and <code>min=0, max=1</code> is <code>?</code> — the same thing <code>Maybe</code> renders as, because it is the same rule.</p></div>
 
 
         </section>
@@ -259,7 +259,7 @@
             <a class="anchor" href="#item-render_list">render_list</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn render_list&#60;K: variant&#62;(item: Rule&#60;K&#62;, sep: Rule&#60;K&#62;, min: u64, trailing_sep: bool, names: str[]) -&#62; str</code></pre>
+          <pre class="signature"><code>fn render_list&#60;K: variant&#62;(item: Rule&#60;K&#62;, sep: Rule&#60;K&#62;, min: u64, max: u64?, trailing_sep: bool, names: str[]) -&#62; str</code></pre>
 
           <div class="doc"><p>A separated list, longhand: the first item, then as many <code>sep item</code> pairs as the minimum demands and more. The outer <code>?</code> on a zero-minimum list is not decoration — an empty list is a list, so the whole thing is optional.</p></div>
 

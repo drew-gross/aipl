@@ -44,6 +44,7 @@ import {
     first,
     is_empty,
     is_nonempty,
+    is_some,
     is_some_and,
     join,
     len,
@@ -293,10 +294,11 @@ fn match_rule<K: variant, A: any>(
         Literal(s) => ok(match_spelling(p, s, pos, far)),
         Then(rs) => match_then(p, rs, pos, cur, far),
         OneOf(rs) => match_one_of(p, rs, pos, cur, far),
-        Many(sub, min, sep, trailing_sep, _, _) => match_many(
+        Many(sub, min, max, sep, trailing_sep, _, _) => match_many(
             p,
             sub,
             min,
+            max,
             sep,
             trailing_sep,
             pos,
@@ -453,6 +455,7 @@ fn match_many<K: variant, A: any>(
     p: Parser<K, A>,
     sub: Rule<K>,
     min: u64,
+    max: u64?,
     sep: Rule<K>?,
     trailing_sep: bool,
     pos: u64,
@@ -464,41 +467,68 @@ fn match_many<K: variant, A: any>(
     mut f = far;
     mut n: u64 = 0;
     mut going = true;
+
     while (going) {
-        // Everything after the first item is preceded by the separator, when
-        // there is one. An unseparated list, and the first item of any list,
-        // take the empty step — so `before` and `after` coincide and the
-        // trailing-separator rule below never fires.
-        let before = cp;
-        let led = if (n == 0) { hit_nothing(cp, f) } else { match_sep(p, sep, cp, cur, f)? };
-        set f = led.far;
-        if (led.hit) {
-            let after = led.pos;
-            let st = match_rule(p, sub, after, cur, f)?;
-            set f = st.far;
-            if (st.hit) {
-                if (st.pos == after) {
-                    return err(ParseError {
-                        message: "a repetition matched empty input, which would repeat forever",
-                        span: 0..0,
-                    });
-                };
-                set acc.extend(led.kids);
-                set acc.extend(st.kids);
-                set cp = st.pos;
-                set n++;
-            } else {
-                // A separator with nothing after it.
-                if (trailing_sep && before != after) {
+        // Reaching `max` ends the repetition without failing it: a further item,
+        // and the separator that would have led it, are left where they are for
+        // the enclosing rule. So `Many(x, min=1, max=some(1))` consumes exactly
+        // one `x`, and a second `x` after it is simply not part of this rule.
+        //
+        // One thing at the bound is still the list's own, though: a *trailing*
+        // separator. It ends the list rather than starting the item that would
+        // have been next, so a list that accepts one accepts it here for the
+        // same reason it accepts one when the items run out. That case takes
+        // another look; every other stops without touching a token, which is
+        // what keeps a bounded repetition from recording an expectation at the
+        // position it stopped.
+        let at_max = max.is_some_and(|m| m <= n);
+        let sep_pending = trailing_sep && sep.is_some() && 0 < n;
+        if (at_max && !sep_pending) {
+            set going = false;
+        } else {
+            // Everything after the first item is preceded by the separator, when
+            // there is one. An unseparated list, and the first item of any list,
+            // take the empty step — so `before` and `after` coincide and the
+            // trailing-separator rule below never fires.
+            let before = cp;
+            let led = if (n == 0) { hit_nothing(cp, f) } else { match_sep(p, sep, cp, cur, f)? };
+            set f = led.far;
+            if (led.hit) {
+                let after = led.pos;
+                let st = match_rule(p, sub, after, cur, f)?;
+                set f = st.far;
+                if (st.hit && !at_max) {
+                    // An item that consumed nothing would be matched again at
+                    // the same position forever — but only if the repetition is
+                    // allowed to run that far. A `max` stops it, which is what
+                    // lets `Many(x, min=1, max=some(1))` hold a body that can be
+                    // empty: an empty block, a group around an optional thing.
+                    if (st.pos == after && !max.is_some()) {
+                        return err(ParseError {
+                            message: "a repetition matched empty input, which would repeat forever",
+                            span: 0..0,
+                        });
+                    };
                     set acc.extend(led.kids);
-                    set cp = after;
+                    set acc.extend(st.kids);
+                    set cp = st.pos;
+                    set n++;
                 } else {
-                    set cp = before;
+                    // A separator with nothing after it takes the trailing rule.
+                    // An item *did* follow, but we are at the bound and cannot
+                    // take it — so the separator leads something that is not
+                    // ours, and both are rewound.
+                    if (!st.hit && trailing_sep && before != after) {
+                        set acc.extend(led.kids);
+                        set cp = after;
+                    } else {
+                        set cp = before;
+                    };
+                    set going = false;
                 };
+            } else {
                 set going = false;
             };
-        } else {
-            set going = false;
         };
     }
     if (n < min) {
@@ -680,7 +710,7 @@ fn rule_labels<K: variant, A: any>(
         OneOf(rs) => rs.map(|sub| rule_labels(sub, prods, firsts, labels)).union_all(),
         // A repetition and an option both try their body at offset 0; a
         // separator is only ever reached after an item.
-        Many(sub, _, _, _, _, _) => rule_labels(sub, prods, firsts, labels),
+        Many(sub, _, _, _, _, _, _) => rule_labels(sub, prods, firsts, labels),
         Maybe(sub) => rule_labels(sub, prods, firsts, labels),
         Climb(atom, _) => rule_labels(atom, prods, firsts, labels),
         NestedIdx(_, open, body, close, _) => seq_labels(
@@ -731,7 +761,7 @@ fn rule_nullable<K: variant>(r: Rule<K>, firsts: First<K>[]) -> bool {
         Term(..) | Literal(..) | Named(..) | NestedIn(..) => false,
         Then(rs) => rs.all(|sub| rule_nullable(sub, firsts)),
         OneOf(rs) => rs.any(|sub| rule_nullable(sub, firsts)),
-        Many(sub, min, _, _, _, _) => min == 0 || rule_nullable(sub, firsts),
+        Many(sub, min, _, _, _, _, _) => min == 0 || rule_nullable(sub, firsts),
         Maybe(..) => true,
         Climb(atom, _) => rule_nullable(atom, firsts),
         NestedIdx(_, open, body, close, _) => rule_nullable(open, firsts) && rule_nullable(
@@ -1059,6 +1089,29 @@ pub fn parse<K: variant, A: any>(
         ) == "a repetition matched empty input, which would repeat forever",
     );
 
+    // ---- Many: a bounded repetition ----
+    //
+    // `max` stops the repetition rather than failing it, so what is left over is
+    // the enclosing rule's. Here the enclosing rule takes it, which is the whole
+    // observable difference between a bound and no bound.
+    let r_two: Rule<Tok> = Then([Many(Term(Word), max=some(2)), Many(Term(Num))]);
+    let g_two = g_of([one("t", r_two)]);
+    assert(shown("a b", g_two, "t")? == "(t a b)");
+    assert(shown("a b 1 2", g_two, "t")? == "(t a b 1 2)");
+
+    // The third word is past the bound and the `Num` list cannot take it. `Word`
+    // is *not* in the expected set: a bounded repetition stops rather than
+    // attempting an item it could not keep, so it records no expectation there.
+    assert(msg_of("a b c", g_two, "t") == "expected Num or end of input, found `c`");
+
+    // A bound is what makes a nullable body safe: it cannot repeat forever if it
+    // cannot repeat. This is the shape `only` in `grammar_aipl.aipl` is built
+    // from — a bracket pair around something that may be empty.
+    let r_once: Rule<Tok> = Many(Maybe(Term(Word)), min=1, max=some(1));
+    let g_once = g_of([one("o", r_once)]);
+    assert(shown("x", g_once, "o")? == "(o x)");
+    assert(shown("", g_once, "o")? == "(o)");
+
     // ---- Maybe: present and absent ----
     let r_opt: Rule<Tok> = Then([Term(Word), Maybe(Term(Num))]);
     let g_opt = g_of([one("m", r_opt)]);
@@ -1098,6 +1151,25 @@ pub fn parse<K: variant, A: any>(
     let trail = Many(Term(Num), sep=some(comma));
     let r_trail: Rule<Tok> = Then([Literal("["), trail, Literal("]")]);
     assert(shown("[1, 2,]", g_of([one("l", r_trail)]), "l")? == "(l [ 1 , 2 , ])");
+
+    // The bound and the trailing separator together. Reaching `max` ends the
+    // list, and a separator after the last item is still the list's own — it
+    // ends the list rather than starting the item that would have been next — so
+    // `trailing_sep` decides it exactly as it does when the items simply run out.
+    let bounded = Many(Term(Num), sep=some(comma), max=some(2));
+    let r_bounded: Rule<Tok> = Then([Literal("["), bounded, Literal("]")]);
+    let g_bounded = g_of([one("l", r_bounded)]);
+    assert(shown("[1, 2]", g_bounded, "l")? == "(l [ 1 , 2 ])");
+    assert(shown("[1, 2,]", g_bounded, "l")? == "(l [ 1 , 2 , ])");
+
+    // A third item is past the bound, so the separator leading it is not the
+    // list's: both are left where they are and the enclosing rule reports them.
+    assert(msg_of("[1, 2, 3]", g_bounded, "l") == "expected `]`, found `,`");
+    // The same list refusing the trailing separator leaves it behind instead.
+    let bounded_strict = Many(Term(Num), sep=some(comma), max=some(2), trailing_sep=false);
+    let r_bstrict: Rule<Tok> = Then([Literal("["), bounded_strict, Literal("]")]);
+    let g_bstrict = g_of([one("l", r_bstrict)]);
+    assert(msg_of("[1, 2,]", g_bstrict, "l") == "expected `]`, found `,`");
 
     // ---- Climb: precedence and associativity ----
     let plus = Prec { power: 1, right: false, ops: ["+"] };
@@ -1382,21 +1454,21 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 8937
-deallocations: 8937
-reallocations: 617
-bytes allocated: 565859
-instructions executed: 1146084
-binary size: 559928
-  code: 341700
-  data: 8772
-  metadata: 209456
+allocations: 9917
+deallocations: 9917
+reallocations: 688
+bytes allocated: 624931
+instructions executed: 1281131
+binary size: 634416
+  code: 383616
+  data: 9684
+  metadata: 241116
 functions:
   __arr_drop_Node:
     calls: 21
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 542
+    calls: 620
     bytes: 116
   __arr_drop___m2__First$Tok:
     calls: 68
@@ -1405,31 +1477,31 @@ functions:
     calls: 146
     bytes: 140
   __arr_drop___m3__ListStyle:
-    calls: 289
+    calls: 327
     bytes: 120
   __arr_drop___m3__Prec:
     calls: 2
     bytes: 120
   __arr_drop___m3__Production$Tok$Node:
-    calls: 149
+    calls: 162
     bytes: 188
   __arr_drop___m3__Rule$Tok:
-    calls: 433
+    calls: 472
     bytes: 116
   __arr_drop___m4__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_drop___m4__Token$Tok:
-    calls: 351
+    calls: 401
     bytes: 188
   __arr_drop___m4__TokenRule$Tok:
-    calls: 72
+    calls: 81
     bytes: 632
   __arr_retain_Node:
     calls: 18
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 478
+    calls: 557
     bytes: 116
   __arr_retain___m2__First$Tok:
     calls: 100
@@ -1438,70 +1510,70 @@ functions:
     calls: 115
     bytes: 140
   __arr_retain___m3__ListStyle:
-    calls: 105
+    calls: 112
     bytes: 120
   __arr_retain___m3__Prec:
     calls: 0
     bytes: 120
   __arr_retain___m3__Production$Tok$Node:
-    calls: 174
+    calls: 183
     bytes: 188
   __arr_retain___m3__Rule$Tok:
-    calls: 634
+    calls: 692
     bytes: 116
   __arr_retain___m4__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_retain___m4__Token$Tok:
-    calls: 213
+    calls: 247
     bytes: 188
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
     bytes: 632
-  __builtin_all$__m3__Rule$Tok$lam125:
+  __builtin_all$__m3__Rule$Tok$lam130:
     calls: 0
     bytes: 36
-  __builtin_all$__m3__Rule$Tok$lam125$tail:
+  __builtin_all$__m3__Rule$Tok$lam130$tail:
     calls: 0
     bytes: 384
-  __builtin_any$__m3__Rule$Tok$lam128:
+  __builtin_any$__m3__Rule$Tok$lam133:
     calls: 0
     bytes: 36
-  __builtin_any$__m3__Rule$Tok$lam128$tail:
+  __builtin_any$__m3__Rule$Tok$lam133$tail:
     calls: 0
     bytes: 380
-  __builtin_count_while$char$lam47:
-    calls: 162
+  __builtin_count_while$char$lam49:
+    calls: 192
     bytes: 220
-  __builtin_count_while$char$s0$lam55:
+  __builtin_count_while$char$s0$lam57:
     calls: 0
     bytes: 184
-  __builtin_count_while$char$s0$lam73:
+  __builtin_count_while$char$s0$lam75:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam73$tail:
+  __builtin_count_while$char$s0$lam75$tail:
     calls: 3
     bytes: 256
-  __builtin_find_if$__m3__Prec$lam137:
+  __builtin_find_if$__m3__Prec$lam142:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam21:
-    calls: 130
+    calls: 139
     bytes: 400
   __builtin_find_index$str$lam28:
-    calls: 72
+    calls: 81
     bytes: 400
-  __builtin_find_index$str$lam37:
+  __builtin_find_index$str$lam39:
     calls: 47
     bytes: 400
-  __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam85:
+  __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam87:
     calls: 18
     bytes: 748
-  __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam91:
+  __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam93:
     calls: 32
     bytes: 920
-  __builtin_try_map$__m3__Rule$Tok$__m3__Rule<Tok>$__m3__ParseError$lam57:
-    calls: 87
+  __builtin_try_map$__m3__Rule$Tok$__m3__Rule<Tok>$__m3__ParseError$lam59:
+    calls: 94
     bytes: 720
   __eq_Node:
     calls: 13
@@ -1542,7 +1614,7 @@ functions:
   __eq_set$str$arr:
     calls: 30
     bytes: 300
-  __filter105$own0:
+  __filter110$own0:
     calls: 18
     bytes: 332
   __lambda_0:
@@ -1558,13 +1630,13 @@ functions:
     calls: 0
     bytes: 128
   __lambda_23:
-    calls: 67
+    calls: 75
     bytes: 96
   __lambda_24:
     calls: 0
     bytes: 128
   __lambda_25:
-    calls: 27
+    calls: 38
     bytes: 96
   __lambda_3:
     calls: 0
@@ -1579,7 +1651,7 @@ functions:
     calls: 66
     bytes: 3684
   __m1__show:
-    calls: 184
+    calls: 208
     bytes: 2968
   __m1__span:
     calls: 1
@@ -1612,40 +1684,40 @@ functions:
     calls: 84
     bytes: 736
   __m3__desugar_opt$Tok:
-    calls: 42
+    calls: 54
     bytes: 700
   __m3__desugar_rule$Tok:
-    calls: 459
-    bytes: 15896
+    calls: 504
+    bytes: 16684
   __m3__failure_message:
-    calls: 36
+    calls: 39
     bytes: 488
   __m3__group_styles$Tok:
     calls: 0
     bytes: 32
   __m3__group_styles$Tok$tail:
-    calls: 953
+    calls: 1052
     bytes: 3156
   __m3__link$Tok$Node:
-    calls: 86
+    calls: 95
     bytes: 2796
   __m3__link_nest$Tok:
     calls: 18
     bytes: 1300
   __m3__link_opt$Tok:
-    calls: 42
+    calls: 54
     bytes: 716
   __m3__link_rule$Tok:
-    calls: 459
-    bytes: 5600
+    calls: 504
+    bytes: 5612
   __m3__link_rules$Tok:
-    calls: 87
+    calls: 94
     bytes: 832
   __m3__nest_styles$Tok:
     calls: 18
     bytes: 956
   __m3__prod_names$Tok$Node:
-    calls: 187
+    calls: 211
     bytes: 492
   __m4__between_len:
     calls: 0
@@ -1663,16 +1735,16 @@ functions:
     calls: 0
     bytes: 2248
   __m4__lex$Tok:
-    calls: 72
+    calls: 81
     bytes: 1520
   __m4__lex_step$Tok:
-    calls: 265
+    calls: 310
     bytes: 24996
   __m4__nested_len:
     calls: 0
     bytes: 940
   __m4__step_result$Tok:
-    calls: 706
+    calls: 826
     bytes: 9188
   __m4__template_scan$Tok:
     calls: 0
@@ -1696,14 +1768,14 @@ functions:
     calls: 30
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 349
+    calls: 392
     bytes: 132
   __rec_drop___m3__Rule$Tok:
-    calls: 989
+    calls: 1097
     bytes: 452
   __test$parse:
     calls: 1
-    bytes: 142724
+    bytes: 183604
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -1714,58 +1786,58 @@ functions:
     calls: 5
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 218
+    calls: 225
     bytes: (external)
   aipl_arr_extend:
-    calls: 1069
+    calls: 1249
     bytes: (external)
   aipl_arr_inc:
-    calls: 28485
+    calls: 31760
     bytes: (external)
   aipl_arr_join:
-    calls: 150
+    calls: 157
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1344
+    calls: 1556
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 438
+    calls: 456
     bytes: (external)
   aipl_arr_sort:
-    calls: 34
+    calls: 37
     bytes: (external)
   aipl_array_dec:
-    calls: 35307
+    calls: 39360
     bytes: (external)
   aipl_array_new:
-    calls: 4233
+    calls: 4779
     bytes: (external)
   aipl_array_push:
-    calls: 603
+    calls: 648
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1441
+    calls: 1533
     bytes: (external)
   aipl_array_with_cap:
-    calls: 1095
+    calls: 1174
     bytes: (external)
   aipl_assert:
-    calls: 64
+    calls: 73
     bytes: (external)
   aipl_rec_alloc:
-    calls: 1368
+    calls: 1519
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 10210
+    calls: 11174
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 271
+    calls: 315
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 8842
+    calls: 9655
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 271
+    calls: 315
     bytes: (external)
   aipl_set_contains:
     calls: 210
@@ -1798,10 +1870,10 @@ functions:
     calls: 15
     bytes: 3160
   error_at$Tok$Node:
-    calls: 34
+    calls: 37
     bytes: 3108
   far_miss:
-    calls: 113
+    calls: 122
     bytes: 1084
   far_unclosed:
     calls: 5
@@ -1810,10 +1882,10 @@ functions:
     calls: 22
     bytes: 228
   leaf_at$Tok$Node:
-    calls: 173
+    calls: 203
     bytes: 1888
   lex_toks:
-    calls: 72
+    calls: 81
     bytes: 776
   lower_node$Tok$Node:
     calls: 18
@@ -1822,10 +1894,10 @@ functions:
     calls: 1
     bytes: 104
   match_many$Tok$Node:
-    calls: 38
-    bytes: 4680
+    calls: 50
+    bytes: 4904
   match_maybe$Tok$Node:
-    calls: 4
+    calls: 6
     bytes: 1076
   match_nested$Tok$Node:
     calls: 15
@@ -1834,22 +1906,22 @@ functions:
     calls: 78
     bytes: 1692
   match_prod$Tok$Node:
-    calls: 166
+    calls: 175
     bytes: 7068
   match_rule$Tok$Node:
-    calls: 532
-    bytes: 7084
+    calls: 591
+    bytes: 7096
   match_then$Tok$Node:
-    calls: 42
+    calls: 49
     bytes: 2128
   parse$Tok$Node:
     calls: 5
     bytes: 380
   parse_cst$Tok$Node:
-    calls: 60
+    calls: 69
     bytes: 624
   parse_prepared$Tok$Node:
-    calls: 72
+    calls: 81
     bytes: 5288
   parsed:
     calls: 5
@@ -1858,13 +1930,13 @@ functions:
     calls: 12
     bytes: 2068
   prev_end$Tok$Node:
-    calls: 245
+    calls: 287
     bytes: 772
   pruned$Tok$Node:
     calls: 11
     bytes: 1344
   quoted:
-    calls: 92
+    calls: 98
     bytes: 456
   refuse:
     calls: 1
@@ -1888,19 +1960,19 @@ functions:
     calls: 22
     bytes: 908
   shown:
-    calls: 52
+    calls: 61
     bytes: 844
   shown_prepared:
     calls: 12
     bytes: 1304
   tok_rules:
-    calls: 69
+    calls: 78
     bytes: 2736
   tok_text$Tok$Node:
-    calls: 165
+    calls: 183
     bytes: 904
   trailing_trivia$Tok$Node:
-    calls: 72
+    calls: 84
     bytes: 760
   trivia_rules:
     calls: 3
