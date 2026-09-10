@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/ast.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/ast.aipl</code></h1>
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-Prim">
+          <h3>
+            <a class="anchor" href="#item-Prim">Prim</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Prim</code></pre>
+
+          <div class="doc"><p>The primitive types, <code>aipl_syntax::ast::Primitive</code> case for case.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-I8"><code>I8</code></li>
+
+            <li id="item-I16"><code>I16</code></li>
+
+            <li id="item-I32"><code>I32</code></li>
+
+            <li id="item-I64"><code>I64</code></li>
+
+            <li id="item-U8"><code>U8</code></li>
+
+            <li id="item-U16"><code>U16</code></li>
+
+            <li id="item-U32"><code>U32</code></li>
+
+            <li id="item-U64"><code>U64</code></li>
+
+            <li id="item-Bool"><code>Bool</code></li>
+
+            <li id="item-Char"><code>Char</code></li>
+
+            <li id="item-Str"><code>Str</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-prim_name">
+          <h3>
+            <a class="anchor" href="#item-prim_name">prim_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn prim_name(self: Prim) -&#62; str</code></pre>
+
+          <div class="doc"><p>The spelling that names this primitive in source. The inverse of <code>prim_from_name</code>, and the two are asserted to round-trip below.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-prim_from_name">
+          <h3>
+            <a class="anchor" href="#item-prim_from_name">prim_from_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn prim_from_name(name: str) -&#62; Prim?</code></pre>
+
+          <div class="doc"><p>The primitive a type identifier names, or <code>none</code> when it names something else — a struct, a variant, a type parameter, <code>Error</code>. Mirrors <code>Primitive::from_name</code>, which is what decides whether <code>base_ty</code>'s identifier lowers to <code>TyPrimitive</code> or <code>TyNamed</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Ty">
+          <h3>
+            <a class="anchor" href="#item-Ty">Ty</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Ty</code></pre>
+
+          <div class="doc"><p><code>aipl_syntax::ast::Type</code>, less the four checker sentinels (see the header).</p><p><code>TyTypeVar</code> is here for completeness rather than for the parser: a type parameter is written as an ordinary identifier and reaches the AST as <code>TyNamed</code>, and <code>promote_type_vars</code> is what turns the ones a signature declared into type variables afterwards.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-TyUnit"><code>TyUnit</code></li>
+
+            <li id="item-TyPrimitive"><code>TyPrimitive(Prim)</code></li>
+
+            <li id="item-TyNamed"><code>TyNamed(str)</code></li>
+
+            <li id="item-TyCase"><code>TyCase(Ty)</code></li>
+
+            <li id="item-TyTypeVar"><code>TyTypeVar(str)</code></li>
+
+            <li id="item-TyOptional"><code>TyOptional(Ty)</code></li>
+
+            <li id="item-TyArray"><code>TyArray(Ty)</code></li>
+
+            <li id="item-TySet"><code>TySet(Ty)</code></li>
+
+            <li id="item-TyDict"><code>TyDict(Ty, Ty)</code></li>
+
+            <li id="item-TyResult"><code>TyResult(Ty, Ty)</code></li>
+
+            <li id="item-TyFn"><code>TyFn(Ty[], Ty)</code></li>
+
+            <li id="item-TyTuple"><code>TyTuple(Ty[])</code></li>
+
+            <li id="item-TyGeneric"><code>TyGeneric(str, Ty[])</code></li>
+
+            <li id="item-TyAny"><code>TyAny</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-show_ty">
+          <h3>
+            <a class="anchor" href="#item-show_ty">show_ty</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_ty(self: Ty) -&#62; str</code></pre>
+
+          <div class="doc"><p>A type as a one-line structural dump: constructors named, leaves bare. It is the oracle the lowering's tests assert against, so it is deliberately *not* the source spelling — <code>Array(Optional(i64))</code> says which way <code>i64?[]</code> nested, where re-rendering the source could not.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_tys">
+          <h3>
+            <a class="anchor" href="#item-show_tys">show_tys</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_tys(self: Ty[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>The elements of a type list, comma-separated. An empty list renders empty, which is what <code>() -&gt; R</code> and <code>Foo&lt;&gt;</code> would need if either could be written.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Pat">
+          <h3>
+            <a class="anchor" href="#item-Pat">Pat</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Pat</code></pre>
+
+          <div class="doc"><p>The one type every <code>build</code> in <code>grammar_aipl.aipl</code> returns, whatever the production is about — <code>Build&lt;A&gt;</code> pins a single <code>A</code> for a whole grammar, so a grammar describing a language rather than one expression type carries the seam here. Each case is a node kind the lowering produces; <code>Ignored</code> is what a production with no lowering yet returns.</p><p>Two cases are not node kinds but the intermediate a production hands its parent. <code>ATys</code> is the *list* a production whose whole content is a comma-separated run of types lowers to, and the case it lands in is what tells <code>ty</code>'s alternatives apart — <code>(A, B)</code> and <code>A</code> reach <code>ty</code> as different <code>Ast</code> cases, so nothing has to count tokens to know which matched. <code>APayload</code> is a constructor pattern's slot list and whether it was written <code>..</code>, which is the pair <code>Pat</code>'s <code>PatCtor</code> needs and no node of its own. <code>aipl_syntax::ast::Pattern</code>. Its <code>Ctor</code> case is a struct variant there and a named payload here, which is as close as the two declarations get: the slot names are the same three, in the same order.</p><p><code>PatArray</code> — the destructuring <code>[a, b] =&gt; ..</code> arm — is absent for now. It holds a list of *expressions*, so it arrives with the expression lowering rather than with this one; nothing under the <code>pattern</code> production can produce it, which is why the pattern slice closes without it.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-PatCtor"><code>PatCtor(name: str, bindings: str[], ignore_payload: bool)</code></li>
+
+            <li id="item-PatStr"><code>PatStr(str)</code></li>
+
+            <li id="item-PatChar"><code>PatChar(char)</code></li>
+
+            <li id="item-PatWildcard"><code>PatWildcard</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-show_pat">
+          <h3>
+            <a class="anchor" href="#item-show_pat">show_pat</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_pat(self: Pat) -&#62; str</code></pre>
+
+          <div class="doc"><p>A pattern as a one-line dump, in the spelling that produced it: <code>Ctor(a, b)</code>, <code>Ctor(..)</code>, a bare name, <code>_</code>. The two literal forms are tagged, because their whole point is that they are values rather than names and <code>&quot;1&quot;</code> against <code>1</code> would otherwise read the same.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Ast">
+          <h3>
+            <a class="anchor" href="#item-Ast">Ast</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Ast</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+          <ul class="cases">
+
+            <li id="item-Ignored"><code>Ignored</code></li>
+
+            <li id="item-ATy"><code>ATy(Ty)</code></li>
+
+            <li id="item-ATys"><code>ATys(Ty[])</code></li>
+
+            <li id="item-APat"><code>APat(Pat)</code></li>
+
+            <li id="item-APayload"><code>APayload(str[], bool)</code></li>
+
+          </ul>
+
+        </section>
+
+
+      </section>
+
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

@@ -688,6 +688,7 @@ case_tests! {
     cases_variants_to_str = "cases/variants/to_str",
     cases_variants_variant_in_variant_payload = "cases/variants/variant_in_variant_payload",
     crates_aipl_codegen_src_assert_loc = "crates/aipl-codegen/src/assert_loc",
+    crates_aipl_codegen_src_ast = "crates/aipl-codegen/src/ast",
     crates_aipl_codegen_src_caret_block = "crates/aipl-codegen/src/caret_block",
     crates_aipl_codegen_src_clean_trailing_whitespace = "crates/aipl-codegen/src/clean_trailing_whitespace",
     crates_aipl_codegen_src_common_space_prefix = "crates/aipl-codegen/src/common_space_prefix",

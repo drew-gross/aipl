@@ -1,7 +1,19 @@
 // A lexer for AIPL itself, built on the `lexer.aipl` library: it pins the
 // library's generic `Token<K>`/`TokenRule<K>`/`lex<K>` to AIPL's own token-kind
 // variant `AiplTok` and describes AIPL's tokens as a plain `TokenRule` list.
-import { Span, equal as ==, int_parse, join, split, value_or_err } from builtins;
+import {
+    Span,
+    equal as ==,
+    int_parse,
+    join,
+    len,
+    logical_or as ||,
+    split,
+    starts_with,
+    value_or,
+    value_or_err,
+    wrapping_sub as -,
+} from builtins;
 import {
     Bare,
     Between,
@@ -238,6 +250,97 @@ fn char_lit_emit(text: str) -> AiplTok!str {
         _ => err("char literal must contain exactly one character"),
     }
 }
+
+# The value of a string literal written exactly as it sits in the source,
+# delimiters included — `"a\nb"`, `"""..."""`, `` `hi` ``, ```` ```hi``` ````.
+#
+# The rules above never need this: their matchers hand the emit the text
+# *between* the delimiters, already stripped. A parser `build` does, because all
+# it is given is the source and a span — so this is where stripping and decoding
+# are stated for a consumer that has the whole literal.
+#
+# It lives here, beside the rules, rather than in the parser, so the two answers
+# cannot drift; the assertions below feed this function's answer straight into
+# the token the lexer is expected to produce, which is what makes them one claim
+# rather than two.
+pub fn str_lit_value(text: str) -> str {
+    if (text.starts_with("\"\"\"") || text.starts_with("```")) {
+        return process_raw_string(text[3..text.len() - 3]);
+    };
+    text[1..text.len() - 1].unescape()
+}.test({
+    // A `"..."` literal: escapes decoded, nothing else.
+    let q = "\"a\\nb\"";
+    assert(str_lit_value(q) == "a\nb");
+    assert(
+        lex_aipl(q)? == LexResult {
+            tokens: [atok(q, StrLit(str_lit_value(q), Quoted), 0..q.len())],
+            trivia: [],
+        },
+    );
+
+    // A `"""..."""` literal: verbatim contents, de-dented as a block.
+    let raw = "\"\"\"a\"b\"\"\"";
+    assert(str_lit_value(raw) == "a\"b");
+    assert(
+        lex_aipl(raw)? == LexResult {
+            tokens: [atok(raw, StrLit(str_lit_value(raw), TripleQuoted), 0..raw.len())],
+            trivia: [],
+        },
+    );
+
+    // An interpolation-free template, which lexes to a `StrLit` like any other
+    // string — escape-decoded for the single-backtick form, verbatim for the
+    // triple.
+    let tpl = "`hi`";
+    assert(str_lit_value(tpl) == "hi");
+    assert(
+        lex_aipl(tpl)? == LexResult {
+            tokens: [atok(tpl, StrLit(str_lit_value(tpl), Backtick), 0..tpl.len())],
+            trivia: [],
+        },
+    );
+
+    let raw_tpl = "```a`b```";
+    assert(str_lit_value(raw_tpl) == "a`b");
+    assert(
+        lex_aipl(raw_tpl)? == LexResult {
+            tokens: [
+                atok(raw_tpl, StrLit(str_lit_value(raw_tpl), TripleBacktick), 0..raw_tpl.len()),
+            ],
+            trivia: [],
+        },
+    );
+
+    // The empty literal, where the strip has nothing left to take.
+    assert(str_lit_value("\"\"") == "");
+})
+
+# The `char` a char literal written as `text` denotes, delimiters included, or
+# `none` when it holds anything but exactly one character. The `none` is
+# unreachable from a lexed source — `char_lit_emit` refuses `''` and `'ab'` at
+# lex time — and is here so a consumer never has to assume that.
+pub fn char_lit_value(text: str) -> char? {
+    match (text[1..text.len() - 1].unescape()) {
+        [c] => some(c),
+        _ => none,
+    }
+}.test({
+    assert(char_lit_value("'x'") == some('x'));
+    assert(char_lit_value("'\\n'") == some('\n'));
+    assert(char_lit_value("'\\''") == some('\''));
+    let c = "'q'";
+    assert(
+        lex_aipl(c)? == LexResult {
+            tokens: [atok(c, CharTok(char_lit_value(c).value_or('?')), 0..c.len())],
+            trivia: [],
+        },
+    );
+
+    // The shapes the lexer refuses, which is why this returns an optional.
+    assert(char_lit_value("''") == none);
+    assert(char_lit_value("'ab'") == none);
+})
 
 # The AIPL rule set. Order is priority (the first matching rule wins): skipped
 # whitespace and recorded comments/markers first; then every keyword and
@@ -736,44 +839,44 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 3910
-deallocations: 3910
-reallocations: 33
-bytes allocated: 387901
-instructions executed: 1014678
-binary size: 468816
-  code: 321712
-  data: 6748
-  metadata: 140356
+allocations: 4307
+deallocations: 4307
+reallocations: 39
+bytes allocated: 465734
+instructions executed: 1159762
+binary size: 487136
+  code: 332452
+  data: 8228
+  metadata: 146456
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 1
     bytes: 140
   __arr_drop___m1__Token$AiplTok:
-    calls: 116
+    calls: 140
     bytes: 388
   __arr_drop___m1__TokenRule$AiplTok:
-    calls: 20
+    calls: 25
     bytes: 832
   __arr_retain___m1__StepResult$AiplTok:
     calls: 1
     bytes: 140
   __arr_retain___m1__Token$AiplTok:
-    calls: 63
+    calls: 72
     bytes: 388
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
     bytes: 832
-  __builtin_all$char$s0$lam51:
-    calls: 4
+  __builtin_all$char$s0$lam50:
+    calls: 16
     bytes: 212
   __builtin_count_while$char$lam15:
     calls: 49
     bytes: 220
   __builtin_count_while$char$s0$lam23:
-    calls: 28
+    calls: 33
     bytes: 184
-  __builtin_count_while$char$s0$lam30:
+  __builtin_count_while$char$s0$lam26:
     calls: 0
     bytes: 172
   __builtin_count_while$char$s0$lam43:
@@ -782,39 +885,42 @@ functions:
   __builtin_count_while$char$s0$lam43$tail:
     calls: 3
     bytes: 256
-  __builtin_count_while$char$s0$lam48:
-    calls: 4
+  __builtin_count_while$char$s0$lam49:
+    calls: 8
     bytes: 172
-  __builtin_count_while$char$s0$lam50:
-    calls: 2
+  __builtin_count_while$char$s0$lam51:
+    calls: 4
     bytes: 172
   __builtin_int_parse:
     calls: 4
     bytes: 1028
   __eq_AiplTok:
-    calls: 51
+    calls: 56
     bytes: 600
   __eq_StrStyle:
-    calls: 4
+    calls: 8
     bytes: 64
   __eq___builtin_Span:
-    calls: 56
+    calls: 61
     bytes: 104
   __eq___m1__LexError:
     calls: 5
     bytes: 128
   __eq___m1__LexResult$AiplTok:
-    calls: 14
+    calls: 19
     bytes: 120
   __eq___m1__SpanStr:
-    calls: 51
+    calls: 56
     bytes: 128
   __eq___m1__Token$AiplTok:
-    calls: 51
+    calls: 56
     bytes: 120
   __eq___m1__Token$AiplTok$arr:
-    calls: 29
+    calls: 39
     bytes: 284
+  __eq_char$opt:
+    calls: 2
+    bytes: 100
   __eq_str$opt:
     calls: 3
     bytes: 100
@@ -827,35 +933,35 @@ functions:
   __lambda_2:
     calls: 0
     bytes: 144
-  __lambda_26:
+  __lambda_3:
+    calls: 2
+    bytes: 164
+  __lambda_34:
     calls: 5
     bytes: 140
-  __lambda_3:
-    calls: 1
-    bytes: 164
   __lambda_4:
     calls: 0
     bytes: 144
   __lambda_5:
-    calls: 1
+    calls: 2
     bytes: 164
   __lambda_6:
     calls: 0
     bytes: 48
   __lambda_7:
-    calls: 2
+    calls: 3
     bytes: 64
   __m10__parse_test_section_header:
     calls: 3
     bytes: 744
   __m1__between_len:
-    calls: 24
+    calls: 29
     bytes: 752
   __m1__delimited_len:
-    calls: 45
+    calls: 52
     bytes: 1592
   __m1__finalize_template$AiplTok:
-    calls: 3
+    calls: 5
     bytes: 8904
   __m1__float_len:
     calls: 0
@@ -864,40 +970,40 @@ functions:
     calls: 1
     bytes: 2252
   __m1__lex$AiplTok:
-    calls: 20
+    calls: 25
     bytes: 1520
   __m1__lex_step$AiplTok:
-    calls: 91
+    calls: 96
     bytes: 29192
   __m1__nested_len:
-    calls: 56
+    calls: 61
     bytes: 940
   __m1__step_result$AiplTok:
-    calls: 1835
+    calls: 1987
     bytes: 15088
   __m1__template_scan$AiplTok:
-    calls: 3
+    calls: 5
     bytes: 2728
   __m1__template_step$AiplTok:
-    calls: 35
+    calls: 38
     bytes: 476
   __m1__to_eol_len:
     calls: 0
     bytes: 52
   __m1__to_eol_len$tail:
-    calls: 111
+    calls: 121
     bytes: 252
   __m1__to_eol_unless_len:
-    calls: 53
+    calls: 58
     bytes: 368
   __m2__unescape:
-    calls: 8
+    calls: 22
     bytes: 1176
   __m3__process_raw_string:
-    calls: 2
+    calls: 8
     bytes: 1712
   __m7__trim_prefix:
-    calls: 4
+    calls: 16
     bytes: 260
   __m8__trim_suffix:
     calls: 0
@@ -905,6 +1011,9 @@ functions:
   __m9__strip_test_sections:
     calls: 2
     bytes: 692
+  __test$char_lit_value:
+    calls: 1
+    bytes: 1856
   __test$lex_aipl:
     calls: 1
     bytes: 130732
@@ -914,6 +1023,9 @@ functions:
   __test$lex_aipl_tokens:
     calls: 1
     bytes: 5024
+  __test$str_lit_value:
+    calls: 1
+    bytes: 7932
   __test_try_fail___m1__LexError:
     calls: 0
     bytes: 84
@@ -921,49 +1033,52 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 180
+    calls: 194
     bytes: (external)
   aipl_arr_inc:
-    calls: 8163
+    calls: 8878
     bytes: (external)
   aipl_arr_reserve:
-    calls: 180
+    calls: 194
     bytes: (external)
   aipl_array_dec:
-    calls: 12068
+    calls: 13167
     bytes: (external)
   aipl_array_new:
-    calls: 3845
+    calls: 4197
     bytes: (external)
   aipl_array_push:
-    calls: 13
+    calls: 19
     bytes: (external)
   aipl_array_push_mut:
-    calls: 4
+    calls: 16
     bytes: (external)
   aipl_array_with_cap:
-    calls: 4
+    calls: 16
     bytes: (external)
   aipl_assert:
-    calls: 20
+    calls: 35
     bytes: (external)
   aipl_rules:
-    calls: 20
+    calls: 25
     bytes: 90364
   aipl_test_begin:
-    calls: 3
+    calls: 5
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 5
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   char_lit_emit:
-    calls: 4
+    calls: 5
     bytes: 1772
+  char_lit_value:
+    calls: 6
+    bytes: 300
   dedent_segments:
-    calls: 1
+    calls: 2
     bytes: 272
   doc_text:
     calls: 0
@@ -979,10 +1094,13 @@ functions:
     bytes: 488
   main:
     calls: 1
-    bytes: 272
+    bytes: 424
   raw_tpl_kind:
-    calls: 1
+    calls: 2
     bytes: 2592
+  str_lit_value:
+    calls: 9
+    bytes: 400
   tpl_kind:
-    calls: 3
+    calls: 4
     bytes: 2608

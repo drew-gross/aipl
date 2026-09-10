@@ -75,6 +75,34 @@
 
 
 
+        <section class="item" id="item-lower_aipl_ty">
+          <h3>
+            <a class="anchor" href="#item-lower_aipl_ty">lower_aipl_ty</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lower_aipl_ty(src: str) -&#62; Ty!ParseError</code></pre>
+
+          <div class="doc"><p>One AIPL **type**, lowered to the AST — the stage-5d claim for the slice that is finished, stated where it can be checked.</p><p><code>parse</code> is <code>parse_cst</code> followed by <code>lower</code>, so this is the whole pipeline: the concrete tree is built and discarded, and what comes back is a <code>Ty</code> that means the same thing <code>aipl_parser</code>'s build actions mean by it. The assertions below are written against <code>show_ty</code>'s structural dump rather than against a re-rendering of the source, because the question a lowering has to answer is which way <code>i64?[]</code> nested, and a re-rendering gives that back either way.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_aipl_pattern">
+          <h3>
+            <a class="anchor" href="#item-lower_aipl_pattern">lower_aipl_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lower_aipl_pattern(src: str) -&#62; Pat!ParseError</code></pre>
+
+          <div class="doc"><p>One AIPL **pattern**, lowered to the AST.</p><p>Patterns are the second slice that closes over itself: nothing under <code>pattern</code> reaches an expression, which is why the destructuring <code>[a, b]</code> arm — the one pattern shape that holds expressions — belongs to <code>match_arm</code> rather than here.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lex_lossless">
           <h3>
             <a class="anchor" href="#item-lex_lossless">lex_lossless</a>
@@ -126,26 +154,6 @@
 
           <div class="doc"><p>Whether <code>src</code> parses as AIPL. The FFI entry the corpus differential test calls: it compares this against <code>aipl_parser::parse</code> succeeding, file by file, over every <code>.aipl</code> in the repository.</p></div>
 
-
-        </section>
-
-
-
-        <section class="item" id="item-Ast">
-          <h3>
-            <a class="anchor" href="#item-Ast">Ast</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant Ast</code></pre>
-
-          <div class="doc"><p>The placeholder an AST would be. <code>Build</code> has no payload-free arm to mean &quot;nothing to lower&quot;, so a production with nothing to lower passes this.</p></div>
-
-
-          <ul class="cases">
-
-            <li id="item-Ignored"><code>Ignored</code></li>
-
-          </ul>
 
         </section>
 
@@ -242,6 +250,90 @@
 
 
 
+        <section class="item" id="item-as_pat">
+          <h3>
+            <a class="anchor" href="#item-as_pat">as_pat</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn as_pat(v: Ast, span: Span) -&#62; Pat!ParseError</code></pre>
+
+          <div class="doc"><p>The <code>Pat</code> a child lowered to.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-qualified_name">
+          <h3>
+            <a class="anchor" href="#item-qualified_name">qualified_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn qualified_name(src: str, toks: Span[], head: str) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>V.A</code> is one name with a dot in it, exactly as gazelle spells it — the qualification is not a separate field on the AST, so a qualified case and a bare one are the same shape from here on. Anything but a <code>.</code> in second position means this pattern was not qualified.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_ctor_payload">
+          <h3>
+            <a class="anchor" href="#item-lower_ctor_payload">lower_ctor_payload</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_ctor_payload(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>ctor_payload</code> — <code>Ctor(a, b)</code> names each slot, <code>Ctor(..)</code> says the case carries a payload this arm does not read. Neither alternative has an interior child: the bindings are <code>Name</code> terminals, so both are read off this node's own tokens with the separating commas dropped.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_pattern">
+          <h3>
+            <a class="anchor" href="#item-lower_pattern">lower_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_pattern(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>pattern</code> — the seven alternatives, told apart by the first token they matched.</p><p>A literal is what its delimiter says it is; everything else opens with an identifier or <code>none</code>, after which the payload child (present or not) and the <code>.</code> (present or not) settle the rest. <code>_</code> lexes as an ordinary identifier, so the wildcard arrives here as a nullary name and is recognised by spelling — and only when nullary, since <code>_(x)</code> is a constructor named <code>_</code> to gazelle too.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-pat_dump">
+          <h3>
+            <a class="anchor" href="#item-pat_dump">pat_dump</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn pat_dump(src: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>A lowered pattern as text, or the refusal that stopped it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ty_dump">
+          <h3>
+            <a class="anchor" href="#item-ty_dump">ty_dump</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn ty_dump(src: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>A lowered type as text, or the refusal that stopped it — so an assertion above reads as one line whichever it is.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-ty_space">
           <h3>
             <a class="anchor" href="#item-ty_space">ty_space</a>
@@ -277,7 +369,7 @@
           </h3>
           <pre class="signature"><code>fn p(name: str, rule: Rule&#60;AiplTok&#62;) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
 
-          <div class="doc"><p>One production with the trivial lowering, laid out <code>Inline</code>. Nothing here builds an AST — the tree is the product — so every production shares one <code>build</code>.</p><p><code>Inline</code> is the default in the same sense <code>expect_as: &quot;&quot;</code> is: it is what a production says when it has nothing particular to say. A production whose layout matters names it through <code>pw</code> or <code>pt</code> below.</p></div>
+          <div class="doc"><p>One production with the placeholder lowering, laid out <code>Inline</code>. A production that has been given a real one says so with <code>.with_build(..)</code>; until every one has, <code>keep</code> is what the rest pass.</p><p><code>Inline</code> is the default in the same sense <code>expect_as: &quot;&quot;</code> is: it is what a production says when it has nothing particular to say. A production whose layout matters names it through <code>pw</code> or <code>pt</code> below.</p></div>
 
 
         </section>
@@ -473,7 +565,133 @@
           </h3>
           <pre class="signature"><code>fn keep(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>What a production with no lowering yet passes. <code>Build</code> has no payload-free arm to mean &quot;nothing to lower&quot;, so <code>Ignored</code> — declared in <code>ast.aipl</code> beside the AST cases that are replacing it one production at a time — stands in.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-with_build">
+          <h3>
+            <a class="anchor" href="#item-with_build">with_build</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn with_build(self: Production&#60;AiplTok, Ast&#62;, build: Build&#60;Ast&#62;) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
+
+          <div class="doc"><p>The production <code>p</code>/<code>pl</code>/<code>pt</code> built, given a lowering. Attaching it here rather than as a fourth argument to each of the three keeps the production lists reading as one column of shapes, and keeps the shape helpers from multiplying by the two things a production says that are not its rule.</p><p>It takes the wrapped <code>Build</code>, not the function — a function value may be *called* through a parameter but not stored into a field or a constructor from one, so <code>Mk</code> has to be written at the call site where the name is still a name. See the constraint list in <code>PARSER_LIBRARY.md</code>.</p><p>It disappears with <code>keep</code>: once every production names a lowering, <code>build</code> is no more optional than <code>rule</code> is.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-as_ty">
+          <h3>
+            <a class="anchor" href="#item-as_ty">as_ty</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn as_ty(v: Ast, span: Span) -&#62; Ty!ParseError</code></pre>
+
+          <div class="doc"><p>The <code>Ty</code> a child lowered to, or a refusal naming what arrived instead. Every type production lowers to <code>ATy</code>; anything else here is a lowering bug rather than a bad program, which is why the message says so plainly.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-kid">
+          <h3>
+            <a class="anchor" href="#item-kid">kid</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn kid(kids: Ast[], i: u64, span: Span) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p>Child <code>i</code>, or a refusal. A <code>build</code> reads its children positionally, and a missing one means the rule and the lowering disagree about the production's shape — the failure mode this exists to name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tuple_ty">
+          <h3>
+            <a class="anchor" href="#item-tuple_ty">tuple_ty</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tuple_ty(ts: Ty[], example: str, span: Span) -&#62; Ty!ParseError</code></pre>
+
+          <div class="doc"><p>A parenthesized list used as a tuple. Gazelle validates the arity in its build action rather than in the grammar, for the reason this one does: <code>(A)</code> and <code>()</code> are parenthesized lists that parse, and only what follows them says whether they were meant as a tuple or as a function type's parameters. <code>example</code> completes the advice with the suffix that was actually written.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-named_ty">
+          <h3>
+            <a class="anchor" href="#item-named_ty">named_ty</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn named_ty(name: str) -&#62; Ty</code></pre>
+
+          <div class="doc"><p>What a bare type identifier names: a primitive, the anonymous bound <code>any</code>, or something declared elsewhere — a struct, a variant, a type parameter, <code>Error</code>. The same three-way decision <code>BaseTy::Named</code>'s action makes, in the same order.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_ty">
+          <h3>
+            <a class="anchor" href="#item-lower_ty">lower_ty</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_ty(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>ty</code> — the eight alternatives, told apart by their left child's <code>Ast</code> case and by the tokens this node matched itself.</p><p><code>!E</code> is the one alternative with no left operand at all: a result whose ok side is unit, which is why a single child under a <code>!</code> lowers to <code>TyResult(TyUnit, ..)</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_ty_parens">
+          <h3>
+            <a class="anchor" href="#item-lower_ty_parens">lower_ty_parens</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_ty_parens(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>ty_parens</code> — the parenthesized list every <code>(</code>-led type form opens with. It is the one production whose value is a list rather than a type, and that is what <code>lower_ty</code> reads to tell those forms from the unparenthesized ones.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_base_ty">
+          <h3>
+            <a class="anchor" href="#item-lower_base_ty">lower_base_ty</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_base_ty(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>base_ty</code> — a core and its <code>?</code>/<code>[]</code> suffix run, applied in source order, so <code>i64?[]</code> is an array of optionals and <code>i64[]?</code> an optional array. The suffixes are literals inside a <code>Many</code> and so are this node's own tokens; <code>[</code> contributes nothing and <code>]</code> is what closes an array suffix.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_ty_core">
+          <h3>
+            <a class="anchor" href="#item-lower_ty_core">lower_ty_core</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_ty_core(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>ty_core</code> — <code>#{K: V}</code>, <code>#{T}</code>, <code>Name&lt;A, B&gt;</code> and a bare <code>Name</code>. The <code>#</code> is what separates the two brace forms from the two name forms, and after that the child count says which of each pair matched.</p><p><code>Case&lt;V&gt;</code> borrows the generic-application syntax but is a type of its own: one case of a variant, carrying no payload. Spelled out here for the reason gazelle spells it out — so nothing downstream has to know that one base name is special.</p></div>
 
 
         </section>

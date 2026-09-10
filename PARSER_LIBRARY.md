@@ -23,14 +23,14 @@ their own:
 - [x] 5a Decide the bridge: how an AIPL parse becomes a Rust `Program`
 - [x] 5b Wire FIRST-set pruning into the driver, and re-measure
 - [x] 5c Extend the differential test from acceptance to shape (operator grouping)
-- [ ] 5d Lower AIPL's grammar to the AST
+- [ ] 5d Lower AIPL's grammar to the AST *(started: 6/54 productions)*
 - [ ] 5e Error-message parity against the corpus fixtures
 - [ ] 5f Side-channels: `#[allow]` spans, trailing whitespace, doc attachment
 - [ ] 5g The bootstrap procedure, and the `DOGFOOD_SOURCE_FILES` switch
 
-**5a is decided: lower in AIPL and marshal the result**, and 5b is measured. 5c
-is next: it is the oracle 5d needs, and worth having before the lowering rather
-than after it.
+**5a is decided: lower in AIPL and marshal the result**, 5b is measured, and 5c
+— the oracle 5d needs — is in place. 5d is under way; its table of finished
+slices is below.
 
 ## Context
 
@@ -43,7 +43,7 @@ project exists to remove:
 | gazelle LR(1) grammar | `crates/aipl-parser/src/lib.rs:18-504` | ~254 non-comment lines, 81 rules, 238 alternatives | the compiler's AST | by hand |
 | formatter token walker | `crates/aipl-codegen/src/walker.aipl` | 2920 code lines, 144 functions | a `Doc` layout tree | by hand |
 | TextMate grammar | `editors/vscode/syntaxes/aipl.tmLanguage.json` | 176 lines | editor scopes | **generated** (stage 2) |
-| the grammar as data | `crates/aipl-codegen/src/grammar_aipl.aipl` | 1144 code lines, 54 productions | a `Cst`, and nothing else yet | the replacement |
+| the grammar as data | `crates/aipl-codegen/src/grammar_aipl.aipl` | 1144 code lines, 54 productions | a `Cst`, and an AST for 6 of them | the replacement |
 
 CLAUDE.md still names the cost of the first two: *"Adding a syntax form means
 teaching two parsers: the gazelle grammar in `aipl-parser` **and** the
@@ -309,7 +309,7 @@ It only becomes worth revisiting if the tree can be got across the FFI once and
 cheaply — the same "no way to hold prepared state across calls" problem 5g has
 to answer.
 
-### 5d — Lower AIPL's grammar to the AST
+### 5d — Lower AIPL's grammar to the AST — **started, 6 of 54 productions**
 
 The bulk of the work. Declare `aipl_syntax`'s AST as AIPL types, replace
 `variant Ast = Ignored` with it, and write the 54 `build` functions against the
@@ -317,9 +317,77 @@ The bulk of the work. Declare `aipl_syntax`'s AST as AIPL types, replace
 tested (5a); what is left is the AST declaration, the lowering, and the Rust-side
 `FfiValue` → `Program` reconstruction.
 
+**Landed so far.** `crates/aipl-codegen/src/ast.aipl` holds the AST declaration,
+growing a node kind at a time rather than all at once — a declaration with no
+lowering yet has nothing to assert about it, and `.test` blocks are what every
+dogfooded file is held to. Two slices are lowered and tested end to end:
+
+| slice | productions | AST | entry point |
+|---|---|---|---|
+| types | `ty`, `ty_parens`, `base_ty`, `ty_core` | `Ty`, `Prim` | `lower_aipl_ty` |
+| patterns | `pattern`, `ctor_payload` | `Pat` | `lower_aipl_pattern` |
+
+Both are chosen for being *closed*: nothing under either reaches an expression,
+so each can be finished and judged on its own. That is also why `Pattern::Array`
+(the `[a, b] => ..` arm) is absent — it holds expressions, and it hangs off
+`match_arm`, not `pattern`.
+
+**Four things the first two slices settled**, all of which the rest inherits:
+
+- **A production tells its alternatives apart by its children's `Ast` case and
+  by its own tokens.** A `CTree` records which *production* matched, never which
+  alternative — so where an LR build action matches on a variant per alternative,
+  a `build` here asks two questions. `ty_parens` lowers to `ATys`, a list, and
+  every other type production to `ATy`, which is the whole reason `(A, B)!E` and
+  `A!E` can be told apart at `ty` without looking at a token; `own_token_text` —
+  the tokens this production matched *directly* — supplies the rest (`->`, `!`,
+  `?`, `[]`). Note a `nested_in` group's brackets **are** own tokens: `nodes`
+  and `own_tokens` both splice groups, so `Name ( payload )` has three.
+- **`Ast` carries intermediates, not only node kinds.** `ATys` is a list of
+  types and `APayload` a constructor pattern's slot list plus its `..` flag.
+  Neither is a node in `aipl_syntax`; both exist because `Build<A>` pins one `A`
+  and a production has to hand its parent *something*. This is the JSON grammar's
+  `JMember` seam at language scale, and it is where the honest cost of one
+  lowering type per grammar shows up.
+- **A literal's value is decoded from the source, not read off the token.** A
+  `build` gets `src` and the tree, and the token stream — where `lex_aipl`
+  already decoded every `StrLit` and `CharTok` — is not reachable from it.
+  `str_lit_value` and `char_lit_value` therefore live in `lex_aipl.aipl`, beside
+  the rules that decode the same bytes on the way in, and their tests feed their
+  answer straight into the token `lex_aipl` is expected to produce, so the two
+  cannot drift. Giving `Build` the token list would remove the split; it would
+  change the library's central signature for one consumer, so it is not done.
+- **`with_build` takes the wrapped `Build`, not the function.** See the
+  constraint below: a function value reached through a parameter may be called
+  and nothing else.
+
 Keeping the two AST declarations in step is the standing cost of this bridge. A
 test that walks both and compares shape — not just the differential in 5c — is
-worth having early.
+worth having early. The naming rule that makes it mechanical is already in force:
+**an AIPL case is its Rust case name behind a per-type tag**, so `Type::Optional`
+is `TyOptional` and stripping the tag has to give the Rust name back exactly. A
+tag is needed at all because constructors share one namespace per file and
+`Named` is already a `Rule`.
+
+**What is left, in the order it unblocks things.** Everything remaining depends
+on `Expr`, which is the one slice that cannot be deferred behind another:
+
+1. **Expressions** — `expr`, `unary`, `postfix`, `suffix`, `atom`, `else_branch`,
+   `template`, `args`, `arg`, `op_value`, `lambda`, `lambda_param`, `field_init`,
+   `brace_body`, `entry`, `shim_binding`. 32 `ExprKind` cases, and the slice the
+   other three wait on.
+2. **Statements** — `block`, `block_body`, `block_tail`, `loop_body`,
+   `loop_inner`, `kw_stmt` and the six statement productions. They lower to
+   `Expr` too (`Let`, `LetMut`, `Assign`, `For`, `While`, `Seq`), so they are
+   expressions in a trench coat and land with or just after slice 1.
+3. **Patterns, finished** — `match_arm`, `arm_body`, and `PatArray`.
+4. **Items** — `program`, `item`, `import_decl`, `import_name`, `operator`,
+   `function`, `effect`, `type_params`, `type_param`, `param`, `fn_body`,
+   `construct_fields`, `fn_attr`, `struct_decl`, `field_decl`, `variant_decl`,
+   `variant_case`, `case_param`. Several are closed today (`type_param`,
+   `effect`, `import_name`) but there is no reason to lower them ahead of the
+   `Expr` they will sit beside.
+5. **The Rust side** — `FfiValue` → `ast::Program`, and the shape test above.
 
 **While deciding which productions earn a node, collapse the wrapper lists.**
 `Many`'s `style?` argument exists for one shape: a group whose list lives one
@@ -396,6 +464,13 @@ the critical path; all are worth knowing before extending these files.
   `layout` has no default and every production states one. A *variant case*
   payload may default to a struct literal (`style: ListStyle = ListStyle {}`),
   which is why `NestedIn` can.
+- **A function value reached through a parameter can only be called.** It cannot
+  be stored into a struct field or handed to a constructor: `fn wrap(g: (i64) ->
+  i64) -> B { Mk(g) }` is "unknown identifier `g`", and so is the same `g` as a
+  field's value — while `Mk(top_level_fn)` is fine. So a helper that attaches a
+  lowering takes the already-wrapped `Build<Ast>` and the `Mk` is written at the
+  call site, where the name is still a name. Same family as the two entries
+  below, and the one that actually shaped an API here.
 - **A lambda bound to a `let` is not a value.** It cannot be called by name and
   cannot be passed where a function parameter is expected, so test helpers that
   would naturally be local lambdas are named top-level functions. (A lambda in

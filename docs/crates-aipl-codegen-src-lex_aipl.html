@@ -239,6 +239,34 @@
 
 
 
+        <section class="item" id="item-str_lit_value">
+          <h3>
+            <a class="anchor" href="#item-str_lit_value">str_lit_value</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn str_lit_value(text: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The value of a string literal written exactly as it sits in the source, delimiters included — <code>&quot;a\nb&quot;</code>, <code>&quot;&quot;&quot;...&quot;&quot;&quot;</code>, <code></code> <code>hi</code> <code></code>, <code></code><code></code> <code></code><code>hi</code><code></code> <code></code><code></code>.</p><p>The rules above never need this: their matchers hand the emit the text *between* the delimiters, already stripped. A parser <code>build</code> does, because all it is given is the source and a span — so this is where stripping and decoding are stated for a consumer that has the whole literal.</p><p>It lives here, beside the rules, rather than in the parser, so the two answers cannot drift; the assertions below feed this function's answer straight into the token the lexer is expected to produce, which is what makes them one claim rather than two.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-char_lit_value">
+          <h3>
+            <a class="anchor" href="#item-char_lit_value">char_lit_value</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn char_lit_value(text: str) -&#62; char?</code></pre>
+
+          <div class="doc"><p>The <code>char</code> a char literal written as <code>text</code> denotes, delimiters included, or <code>none</code> when it holds anything but exactly one character. The <code>none</code> is unreachable from a lexed source — <code>char_lit_emit</code> refuses <code>''</code> and <code>'ab'</code> at lex time — and is here so a consumer never has to assume that.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-aipl_rules">
           <h3>
             <a class="anchor" href="#item-aipl_rules">aipl_rules</a>

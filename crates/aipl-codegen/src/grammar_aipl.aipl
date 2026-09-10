@@ -35,10 +35,13 @@
 //   - `loop_body` likewise. A loop body admits no trailing expression at all,
 //     which is why it is a separate rule and not `block` with a flag.
 //
-// The lowering is trivial: every production shares one `build` that returns a
-// placeholder, because nothing here builds an AST. That is Stage 5's job. What
-// this file has to be right about is *what parses* and *the shape of the tree*,
-// which is what the `.test` blocks and the corpus differential test check.
+// The lowering is being written a slice at a time (stage 5d in
+// `PARSER_LIBRARY.md`). Types and patterns lower to the AST declared in
+// `ast.aipl`; every other production still shares one `build` that returns a
+// placeholder. What this file has to be right about either way is *what parses*
+// and *the shape of the tree*, which is what the `.test` blocks and the corpus
+// differential test check — and, for the slices that are done, *what it means*,
+// which is what `lower_aipl_ty` and `lower_aipl_pattern` assert.
 //
 // The rules are written in the library's own vocabulary — `Then`, `OneOf`,
 // `Many`, `Maybe`, `Term`, `Named`, and `Literal` under the
@@ -48,25 +51,65 @@
 // a rule made only of them has nothing to pin the type parameter, and the
 // annotation is what every constructor inside resolves from.
 import {
+    Span,
     contains,
     equal as ==,
     extend,
+    filter,
+    first,
+    is_empty,
     is_nonempty,
     len,
     less_than as <,
     less_than_or_equal as <=,
     logical_not as !,
     logical_or as ||,
+    map,
     map_err,
+    not_equal as !=,
     push,
+    starts_with,
+    try_map,
     value_or,
+    value_or_err,
     wrapping_add as +,
     wrapping_add_assign as +=,
     wrapping_sub as -,
 } from builtins;
-import { Cst, nodes, text, token_span } from "./cst.aipl";
+import {
+    APat,
+    APayload,
+    ATy,
+    ATys,
+    Ast,
+    Ignored,
+    Pat,
+    PatChar,
+    PatCtor,
+    PatStr,
+    PatWildcard,
+    Ty,
+    TyAny,
+    TyArray,
+    TyCase,
+    TyDict,
+    TyFn,
+    TyGeneric,
+    TyNamed,
+    TyOptional,
+    TyPrimitive,
+    TyResult,
+    TySet,
+    TyTuple,
+    TyUnit,
+    prim_from_name,
+    show_pat,
+    show_ty,
+} from "./ast.aipl";
+import { Cst, nodes, own_token_text, own_tokens, span, text, token_span } from "./cst.aipl";
 import { render_cst } from "./format.aipl";
 import {
+    Build,
     Climb,
     Grammar,
     Inline,
@@ -99,9 +142,11 @@ import {
     TemplateMid,
     TemplateTail,
     aipl_rules,
+    char_lit_value,
+    str_lit_value,
 } from "./lex_aipl.aipl";
 import { LexResult, keep_skipped, lex } from "./lexer.aipl";
-import { parse_cst, parse_prepared, prepare } from "./parse.aipl";
+import { parse, parse_cst, parse_prepared, prepare } from "./parse.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 
 // ---------- the grammar ----------
@@ -371,18 +416,18 @@ fn types() -> Production<AiplTok, Ast>[] {
     ]);
 
     [
-        pl("ty", ty, "a type"),
+        pl("ty", ty, "a type").with_build(Mk(lower_ty)),
         // Type position takes no trailing comma even when a list breaks — the
         // grammar says so twice, once with `trailing_sep: false` to the parser
         // and once with `strict()` to the printer.
-        p("ty_parens", ty_parens),
+        p("ty_parens", ty_parens).with_build(Mk(lower_ty_parens)),
         // A core and its `?`/`[]` suffixes are written against each other.
-        pt("base_ty", base_ty),
+        pt("base_ty", base_ty).with_build(Mk(lower_base_ty)),
         // Three bracket pairs across three alternatives — `#{k: v}`, `#{k}` and
         // `Name<A, B>` — and the fourth alternative has none. Each pair carries
         // its own style, so nothing here has to hold for the production as a
         // whole, and the bare-`Name` alternative simply has no group in it.
-        p("ty_core", ty_core),
+        p("ty_core", ty_core).with_build(Mk(lower_ty_core)),
     ]
 }
 
@@ -789,9 +834,102 @@ fn patterns() -> Production<AiplTok, Ast>[] {
     [
         p("match_arm", match_arm),
         p("arm_body", arm_body),
-        pl("pattern", pattern, "a pattern"),
-        p("ctor_payload", ctor_payload),
+        pl("pattern", pattern, "a pattern").with_build(Mk(lower_pattern)),
+        p("ctor_payload", ctor_payload).with_build(Mk(lower_ctor_payload)),
     ]
+}
+
+// ---------- lowering: patterns ----------
+//
+// The second slice, and the first that reads a literal's *value* rather than
+// its spelling. `str_lit_value`/`char_lit_value` live beside the lexer rules
+// that decode the same bytes on the way in, because a `build` is handed the
+// source and a span and has to strip the delimiters for itself.
+
+# The `Pat` a child lowered to.
+fn as_pat(v: Ast, span: Span) -> Pat!ParseError {
+    match (v) {
+        APat(pat) => ok(pat),
+        ATy(..) | ATys(..) | APayload(..) | Ignored => err(ParseError {
+            message: "expected a pattern",
+            span,
+        }),
+    }
+}
+
+# `V.A` is one name with a dot in it, exactly as gazelle spells it — the
+# qualification is not a separate field on the AST, so a qualified case and a
+# bare one are the same shape from here on. Anything but a `.` in second
+# position means this pattern was not qualified.
+fn qualified_name(src: str, toks: Span[], head: str) -> str {
+    match (toks[1]) {
+        some(dot) => if (src[dot] == ".") {
+            match (toks[2]) {
+                some(tail) => `{head}.{src[tail]}`,
+                none => head,
+            }
+        } else {
+            head
+        },
+        none => head,
+    }
+}
+
+# `ctor_payload` — `Ctor(a, b)` names each slot, `Ctor(..)` says the case carries
+# a payload this arm does not read. Neither alternative has an interior child:
+# the bindings are `Name` terminals, so both are read off this node's own tokens
+# with the separating commas dropped.
+fn lower_ctor_payload(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let names = node.own_tokens().map(|t| src[t]).filter(|s| s != ",");
+    let head = names
+        .first()
+        .value_or_err(ParseError { message: "a constructor payload matched no token", span: sp })?;
+    let no_bindings: str[] = [];
+    if (head == "..") {
+        return ok(APayload(no_bindings, true));
+    };
+    ok(APayload(names, false))
+}
+
+# `pattern` — the seven alternatives, told apart by the first token they matched.
+#
+# A literal is what its delimiter says it is; everything else opens with an
+# identifier or `none`, after which the payload child (present or not) and the
+# `.` (present or not) settle the rest. `_` lexes as an ordinary identifier, so
+# the wildcard arrives here as a nullary name and is recognised by spelling —
+# and only when nullary, since `_(x)` is a constructor named `_` to gazelle too.
+fn lower_pattern(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let toks = node.own_tokens();
+    let head = src[toks
+        .first()
+        .value_or_err(ParseError { message: "a pattern matched no token", span: sp })?];
+    if (head.starts_with("\"") || head.starts_with("`")) {
+        return ok(APat(PatStr(str_lit_value(head))));
+    };
+    if (head.starts_with("'")) {
+        let c = char_lit_value(head).value_or_err(ParseError {
+            message: "a char pattern holds exactly one character",
+            span: sp,
+        })?;
+        return ok(APat(PatChar(c)));
+    };
+    let name = qualified_name(src, toks, head);
+    if (kids.is_empty()) {
+        let no_bindings: str[] = [];
+        if (name == "_") {
+            return ok(APat(PatWildcard));
+        };
+        return ok(APat(PatCtor(name, no_bindings, false)));
+    };
+    match (kid(kids, 0, sp)?) {
+        APayload(bindings, ignore_payload) => ok(APat(PatCtor(name, bindings, ignore_payload))),
+        ATy(..) | ATys(..) | APat(..) | Ignored => err(ParseError {
+            message: "a constructor pattern has no payload",
+            span: sp,
+        }),
+    }
 }
 
 // ---------- entry points ----------
@@ -889,6 +1027,135 @@ pub fn format_aipl_ty(src: str, width: u64) -> str!ParseError {
     // A comment inside a type is not layout, so it survives.
     assert(format_aipl_ty("Map < str , /* k */ i64 >", 100)? == "Map<str, /* k */ i64>");
 })
+
+# One AIPL **type**, lowered to the AST — the stage-5d claim for the slice that
+# is finished, stated where it can be checked.
+#
+# `parse` is `parse_cst` followed by `lower`, so this is the whole pipeline: the
+# concrete tree is built and discarded, and what comes back is a `Ty` that means
+# the same thing `aipl_parser`'s build actions mean by it. The assertions below
+# are written against `show_ty`'s structural dump rather than against a
+# re-rendering of the source, because the question a lowering has to answer is
+# which way `i64?[]` nested, and a re-rendering gives that back either way.
+pub fn lower_aipl_ty(src: str) -> Ty!ParseError {
+    as_ty(parse(src, lex_lossless(src)?, aipl_grammar(), "ty")?, 0..src.len())
+}.test({
+    // Bare names: a primitive, the anonymous bound, and a declared name.
+    assert(ty_dump("i64") == "i64");
+    assert(ty_dump("str") == "str");
+    assert(ty_dump("any") == "any");
+    assert(ty_dump("Point") == "Point");
+    assert(ty_dump("T") == "T");
+
+    // The suffix run, in source order — this is the assertion that says the
+    // fold goes left to right and not the other way.
+    assert(ty_dump("i64?") == "Optional(i64)");
+    assert(ty_dump("i64[]") == "Array(i64)");
+    assert(ty_dump("i64?[]") == "Array(Optional(i64))");
+    assert(ty_dump("i64[]?") == "Optional(Array(i64))");
+    assert(ty_dump("i64[][]") == "Array(Array(i64))");
+
+    // Sets and dicts, and a suffix on one.
+    assert(ty_dump("#{str}") == "Set(str)");
+    assert(ty_dump("#{str: i64}") == "Dict(str, i64)");
+    assert(ty_dump("#{str: i64}[]") == "Array(Dict(str, i64))");
+    assert(ty_dump("#{i64}?") == "Optional(Set(i64))");
+    assert(ty_dump("#{str: i64[]}") == "Dict(str, Array(i64))");
+
+    // Generic application, and `Case<V>` — the one base name that is not one.
+    assert(ty_dump("Box<i64>") == "Generic(Box, i64)");
+    assert(ty_dump("Map<str, i64>") == "Generic(Map, str, i64)");
+    assert(ty_dump("Box<T>[]") == "Array(Generic(Box, T))");
+    assert(ty_dump("Case<V>") == "Case(V)");
+    assert(ty_dump("Case<A, B>") == "error: Case<V> takes one type argument, got 2");
+
+    // Results, including the void-ok form, whose ok side is unit.
+    assert(ty_dump("i64!str") == "Result(i64, str)");
+    assert(ty_dump("str[]!Error") == "Result(Array(str), Error)");
+    assert(ty_dump("!Error") == "Result((), Error)");
+
+    // The parenthesized forms. A function type takes any arity, a tuple needs
+    // two — so the same parenthesized list is fine on the left of `->` and a
+    // refusal on its own.
+    assert(ty_dump("(i64, str) -> bool") == "Fn([i64, str], bool)");
+    assert(ty_dump("(i64) -> str") == "Fn([i64], str)");
+    assert(ty_dump("() -> bool") == "Fn([], bool)");
+    assert(ty_dump("(i64) -> (str) -> bool") == "Fn([i64], Fn([str], bool))");
+    assert(ty_dump("(i64, str)") == "Tuple(i64, str)");
+    assert(ty_dump("(i64, str)[]") == "Array(Tuple(i64, str))");
+    assert(ty_dump("(i64, str)?") == "Optional(Tuple(i64, str))");
+    assert(ty_dump("(i64, str)!Error") == "Result(Tuple(i64, str), Error)");
+    assert(ty_dump("(Box<T>, i64[])") == "Tuple(Generic(Box, T), Array(i64))");
+
+    // The arity refusal names the suffix that was actually written, which is
+    // what makes the advice runnable rather than generic.
+    assert(ty_dump("(i64)") == "error: a tuple type needs at least 2 elements, e.g. (i64, str)");
+    assert(
+        ty_dump("(i64)[]") == "error: a tuple type needs at least 2 elements, e.g. (i64, str)[]",
+    );
+    assert(ty_dump("(i64)?") == "error: a tuple type needs at least 2 elements, e.g. (i64, str)?");
+    assert(
+        ty_dump(
+            "(i64)!Error",
+        ) == "error: a tuple type needs at least 2 elements, e.g. (i64, str)!Error",
+    );
+})
+
+# One AIPL **pattern**, lowered to the AST.
+#
+# Patterns are the second slice that closes over itself: nothing under `pattern`
+# reaches an expression, which is why the destructuring `[a, b]` arm — the one
+# pattern shape that holds expressions — belongs to `match_arm` rather than here.
+pub fn lower_aipl_pattern(src: str) -> Pat!ParseError {
+    as_pat(parse(src, lex_lossless(src)?, aipl_grammar(), "pattern")?, 0..src.len())
+}.test({
+    // The nullary forms, and the one identifier that is not a constructor.
+    assert(pat_dump("none") == "none");
+    assert(pat_dump("Circle") == "Circle");
+    assert(pat_dump("_") == "_");
+
+    // A payload, named slot by slot or ignored whole. The two are deliberately
+    // different patterns: `Circle` asserts the case carries nothing.
+    assert(pat_dump("some(v)") == "some(v)");
+    assert(pat_dump("Pair(a, b)") == "Pair(a, b)");
+    assert(pat_dump("Circle(..)") == "Circle(..)");
+    // `_` is a constructor name once it takes a payload, as it is under gazelle.
+    assert(pat_dump("_(x)") == "_(x)");
+
+    // `V.A` — the qualification is part of the name, not a field of its own.
+    assert(pat_dump("V.A") == "V.A");
+    assert(pat_dump("V.A(x)") == "V.A(x)");
+    assert(pat_dump("V.A(..)") == "V.A(..)");
+
+    // Literal patterns carry their *value*, so the escape is decoded and the
+    // delimiters are gone — which is the whole difference between a pattern
+    // that matches `a`-newline-`b` and one that matches a backslash.
+    assert(pat_dump("\"s\"") == "Str(s)");
+    assert(pat_dump("\"a\\nb\"") == "Str(a\nb)");
+    assert(pat_dump("'x'") == "Char(x)");
+    assert(pat_dump("'\\n'") == "Char(\n)");
+
+    // A template with no interpolation lexes as a string literal, so it is one
+    // here too.
+    assert(pat_dump("`t`") == "Str(t)");
+})
+
+# A lowered pattern as text, or the refusal that stopped it.
+fn pat_dump(src: str) -> str {
+    match (lower_aipl_pattern(src)) {
+        ok(pat) => pat.show_pat(),
+        err(e) => `error: {e.message}`,
+    }
+}
+
+# A lowered type as text, or the refusal that stopped it — so an assertion above
+# reads as one line whichever it is.
+fn ty_dump(src: str) -> str {
+    match (lower_aipl_ty(src)) {
+        ok(t) => t.show_ty(),
+        err(e) => `error: {e.message}`,
+    }
+}
 
 # The spacing rule for the productions annotated so far: spaces around `->`, a
 # space after the `:` of a dict type, and nothing anywhere else.
@@ -1160,9 +1427,9 @@ pub fn aipl_parses(src: str) -> bool {
 
 // ---------- production helpers ----------
 
-# One production with the trivial lowering, laid out `Inline`. Nothing here
-# builds an AST — the tree is the product — so every production shares one
-# `build`.
+# One production with the placeholder lowering, laid out `Inline`. A production
+# that has been given a real one says so with `.with_build(..)`; until every one
+# has, `keep` is what the rest pass.
 #
 # `Inline` is the default in the same sense `expect_as: ""` is: it is what a
 # production says when it has nothing particular to say. A production whose
@@ -1275,11 +1542,195 @@ fn pt(name: str, rule: Rule<AiplTok>) -> Production<AiplTok, Ast> {
     layout: Tight,
 }
 
-# The placeholder an AST would be. `Build` has no payload-free arm to mean
-# "nothing to lower", so a production with nothing to lower passes this.
-variant Ast = Ignored
-
+# What a production with no lowering yet passes. `Build` has no payload-free arm
+# to mean "nothing to lower", so `Ignored` — declared in `ast.aipl` beside the
+# AST cases that are replacing it one production at a time — stands in.
 fn keep(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError { ok(Ignored) }
+
+# The production `p`/`pl`/`pt` built, given a lowering. Attaching it here rather
+# than as a fourth argument to each of the three keeps the production lists
+# reading as one column of shapes, and keeps the shape helpers from multiplying
+# by the two things a production says that are not its rule.
+#
+# It takes the wrapped `Build`, not the function — a function value may be
+# *called* through a parameter but not stored into a field or a constructor from
+# one, so `Mk` has to be written at the call site where the name is still a
+# name. See the constraint list in `PARSER_LIBRARY.md`.
+#
+# It disappears with `keep`: once every production names a lowering, `build` is
+# no more optional than `rule` is.
+fn with_build(self: Production<AiplTok, Ast>, build: Build<Ast>) -> Production<AiplTok, Ast> {
+    ..self,
+    build,
+}
+
+// ---------- lowering: types ----------
+//
+// The first slice of stage 5d. Types are the one part of the grammar that
+// closes over itself — nothing under `ty` reaches an expression — so they are
+// where the lowering can be written and judged whole.
+//
+// Two things do the work that a `match` on the alternative would do in an LR
+// build action, since a `CTree` records which *production* matched and not
+// which of its alternatives:
+//
+//   - **The `Ast` case a child lowered to.** `ty_parens` lowers to `ATys`, a
+//     *list* of types, and every other type production to `ATy`. So `(A, B)!E`
+//     and `A!E` arrive at `ty` distinguishable without looking at a token: one
+//     has a list on the left and the other a type.
+//   - **The node's own tokens.** `own_token_text` is the tokens this production
+//     matched directly, with its children's left out — `->`, `!`, `?`, `[]` for
+//     `ty`, and the suffix run for `base_ty`. A production that matched none is
+//     the pass-through alternative.
+
+# The `Ty` a child lowered to, or a refusal naming what arrived instead. Every
+# type production lowers to `ATy`; anything else here is a lowering bug rather
+# than a bad program, which is why the message says so plainly.
+fn as_ty(v: Ast, span: Span) -> Ty!ParseError {
+    match (v) {
+        ATy(t) => ok(t),
+        ATys(..) => err(ParseError { message: "expected a type, got a list of types", span }),
+        APat(..) | APayload(..) | Ignored => err(ParseError { message: "expected a type", span }),
+    }
+}
+
+# Child `i`, or a refusal. A `build` reads its children positionally, and a
+# missing one means the rule and the lowering disagree about the production's
+# shape — the failure mode this exists to name.
+fn kid(kids: Ast[], i: u64, span: Span) -> Ast!ParseError {
+    kids[i].value_or_err(ParseError { message: `a production has no child {i}`, span })
+}
+
+# A parenthesized list used as a tuple. Gazelle validates the arity in its build
+# action rather than in the grammar, for the reason this one does: `(A)` and `()`
+# are parenthesized lists that parse, and only what follows them says whether
+# they were meant as a tuple or as a function type's parameters. `example`
+# completes the advice with the suffix that was actually written.
+fn tuple_ty(ts: Ty[], example: str, span: Span) -> Ty!ParseError {
+    if (ts.len() < 2) {
+        return err(ParseError {
+            message: `a tuple type needs at least 2 elements, e.g. (i64, str){example}`,
+            span,
+        });
+    };
+    ok(TyTuple(ts))
+}
+
+# What a bare type identifier names: a primitive, the anonymous bound `any`, or
+# something declared elsewhere — a struct, a variant, a type parameter, `Error`.
+# The same three-way decision `BaseTy::Named`'s action makes, in the same order.
+fn named_ty(name: str) -> Ty {
+    match (prim_from_name(name)) {
+        some(p) => TyPrimitive(p),
+        none => if (name == "any") { TyAny } else { TyNamed(name) },
+    }
+}
+
+# `ty` — the eight alternatives, told apart by their left child's `Ast` case and
+# by the tokens this node matched itself.
+#
+# `!E` is the one alternative with no left operand at all: a result whose ok side
+# is unit, which is why a single child under a `!` lowers to `TyResult(TyUnit, ..)`.
+fn lower_ty(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let ops = node.own_token_text(src);
+    let head = kid(kids, 0, sp)?;
+    if (kids.len() == 2) {
+        let rhs = as_ty(kid(kids, 1, sp)?, sp)?;
+        return match (head) {
+            // `(A, B) -> R` and `(A, B)!E`: a list on the left, and the token
+            // between says which.
+            ATys(ts) => if (ops == "->") {
+                ok(ATy(TyFn(ts, rhs)))
+            } else {
+                ok(ATy(TyResult(tuple_ty(ts, "!Error", sp)?, rhs)))
+            },
+            // `A!E`.
+            ATy(lhs) => ok(ATy(TyResult(lhs, rhs))),
+            APat(..) | APayload(..) | Ignored => err(ParseError {
+                message: "a type has an operand that is not a type",
+                span: sp,
+            }),
+        };
+    };
+    match (head) {
+        ATys(ts) => match (ops) {
+            "[]" => ok(ATy(TyArray(tuple_ty(ts, "[]", sp)?))),
+            "?" => ok(ATy(TyOptional(tuple_ty(ts, "?", sp)?))),
+            _ => ok(ATy(tuple_ty(ts, "", sp)?)),
+        },
+        ATy(t) => if (ops == "!") { ok(ATy(TyResult(TyUnit, t))) } else { ok(ATy(t)) },
+        APat(..) | APayload(..) | Ignored => err(ParseError {
+            message: "a type has an operand that is not a type",
+            span: sp,
+        }),
+    }
+}
+
+# `ty_parens` — the parenthesized list every `(`-led type form opens with. It is
+# the one production whose value is a list rather than a type, and that is what
+# `lower_ty` reads to tell those forms from the unparenthesized ones.
+fn lower_ty_parens(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    ok(ATys(kids.try_map(|k| as_ty(k, sp))?))
+}
+
+# `base_ty` — a core and its `?`/`[]` suffix run, applied in source order, so
+# `i64?[]` is an array of optionals and `i64[]?` an optional array. The suffixes
+# are literals inside a `Many` and so are this node's own tokens; `[` contributes
+# nothing and `]` is what closes an array suffix.
+fn lower_base_ty(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    mut t = as_ty(kid(kids, 0, sp)?, sp)?;
+    for (let tok : node.own_tokens()) {
+        let s = src[tok];
+        if (s == "?") {
+            set t = TyOptional(t);
+        };
+        if (s == "]") {
+            set t = TyArray(t);
+        };
+    }
+    ok(ATy(t))
+}
+
+# `ty_core` — `#{K: V}`, `#{T}`, `Name<A, B>` and a bare `Name`. The `#` is what
+# separates the two brace forms from the two name forms, and after that the
+# child count says which of each pair matched.
+#
+# `Case<V>` borrows the generic-application syntax but is a type of its own: one
+# case of a variant, carrying no payload. Spelled out here for the reason
+# gazelle spells it out — so nothing downstream has to know that one base name
+# is special.
+fn lower_ty_core(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let head_tok = node
+        .own_tokens()
+        .first()
+        .value_or_err(ParseError { message: "a type core matched no token", span: sp })?;
+    let head = src[head_tok];
+    if (head == "#") {
+        let inner = as_ty(kid(kids, 0, sp)?, sp)?;
+        if (kids.len() == 2) {
+            return ok(ATy(TyDict(inner, as_ty(kid(kids, 1, sp)?, sp)?)));
+        };
+        return ok(ATy(TySet(inner)));
+    };
+    if (kids.is_empty()) {
+        return ok(ATy(named_ty(head)));
+    };
+    let args = kids.try_map(|k| as_ty(k, sp))?;
+    if (head == "Case") {
+        if (args.len() != 1) {
+            return err(ParseError {
+                message: `Case<V> takes one type argument, got {args.len()}`,
+                span: sp,
+            });
+        };
+        return ok(ATy(TyCase(as_ty(kid(kids, 0, sp)?, sp)?)));
+    };
+    ok(ATy(TyGeneric(head, args)))
+}
 
 # Test shorthand, so an assertion reads as the source it is about.
 fn parses(src: str) -> bool { aipl_parses(src) }
@@ -1311,167 +1762,188 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1495621
-deallocations: 1495621
-reallocations: 8017
-bytes allocated: 154756615
-instructions executed: 189708969
-binary size: 757200
-  code: 507560
-  data: 14332
-  metadata: 235308
+allocations: 1983325
+deallocations: 1983325
+reallocations: 10380
+bytes allocated: 208299743
+instructions executed: 243503232
+binary size: 895272
+  code: 597156
+  data: 19532
+  metadata: 278584
 functions:
-  __arr_drop___m11__StepResult$__m10__AiplTok:
+  __arr_drop___m10__ListStyle:
+    calls: 92720
+    bytes: 120
+  __arr_drop___m10__Prec:
+    calls: 322
+    bytes: 120
+  __arr_drop___m10__Production$__m11__AiplTok$__m1__Ast:
+    calls: 11709
+    bytes: 188
+  __arr_drop___m10__Rule$__m11__AiplTok:
+    calls: 260315
+    bytes: 116
+  __arr_drop___m12__StepResult$__m11__AiplTok:
     calls: 5
     bytes: 140
-  __arr_drop___m11__Token$__m10__AiplTok:
-    calls: 2384
+  __arr_drop___m12__Token$__m11__AiplTok:
+    calls: 2718
     bytes: 388
-  __arr_drop___m11__TokenRule$__m10__AiplTok:
-    calls: 220
+  __arr_drop___m12__TokenRule$__m11__AiplTok:
+    calls: 322
     bytes: 832
-  __arr_drop___m19__First$__m10__AiplTok:
+  __arr_drop___m1__Ast:
+    calls: 190
+    bytes: 312
+  __arr_drop___m1__Ty:
+    calls: 27
+    bytes: 116
+  __arr_drop___m20__First$__m11__AiplTok:
     calls: 3897
     bytes: 116
-  __arr_drop___m19__Sym$__m10__AiplTok:
+  __arr_drop___m20__Sym$__m11__AiplTok:
     calls: 37350
     bytes: 140
-  __arr_drop___m1__Cst:
-    calls: 12084
+  __arr_drop___m2__Cst:
+    calls: 16447
     bytes: 116
-  __arr_drop___m2__Piece:
+  __arr_drop___m3__Piece:
     calls: 247
     bytes: 228
-  __arr_drop___m3__Doc:
+  __arr_drop___m4__Doc:
     calls: 314
     bytes: 116
-  __arr_drop___m9__ListStyle:
-    calls: 67832
+  __arr_retain___m10__ListStyle:
+    calls: 67830
     bytes: 120
-  __arr_drop___m9__Prec:
-    calls: 220
+  __arr_retain___m10__Prec:
+    calls: 0
     bytes: 120
-  __arr_drop___m9__Production$__m10__AiplTok$Ast:
-    calls: 8496
+  __arr_retain___m10__Production$__m11__AiplTok$__m1__Ast:
+    calls: 20974
     bytes: 188
-  __arr_drop___m9__Rule$__m10__AiplTok:
-    calls: 188660
+  __arr_retain___m10__Rule$__m11__AiplTok:
+    calls: 371640
     bytes: 116
-  __arr_retain___m11__StepResult$__m10__AiplTok:
+  __arr_retain___m12__StepResult$__m11__AiplTok:
     calls: 7
     bytes: 140
-  __arr_retain___m11__Token$__m10__AiplTok:
-    calls: 2164
+  __arr_retain___m12__Token$__m11__AiplTok:
+    calls: 2396
     bytes: 388
-  __arr_retain___m11__TokenRule$__m10__AiplTok:
-    calls: 7810
+  __arr_retain___m12__TokenRule$__m11__AiplTok:
+    calls: 11431
     bytes: 832
-  __arr_retain___m19__First$__m10__AiplTok:
+  __arr_retain___m1__Ast:
+    calls: 210
+    bytes: 312
+  __arr_retain___m1__Ty:
+    calls: 35
+    bytes: 116
+  __arr_retain___m20__First$__m11__AiplTok:
     calls: 8190
     bytes: 116
-  __arr_retain___m19__Sym$__m10__AiplTok:
+  __arr_retain___m20__Sym$__m11__AiplTok:
     calls: 43137
     bytes: 140
-  __arr_retain___m1__Cst:
-    calls: 11576
+  __arr_retain___m2__Cst:
+    calls: 14582
     bytes: 116
-  __arr_retain___m2__Piece:
+  __arr_retain___m3__Piece:
     calls: 304
     bytes: 228
-  __arr_retain___m3__Doc:
+  __arr_retain___m4__Doc:
     calls: 397
     bytes: 116
-  __arr_retain___m9__ListStyle:
-    calls: 49623
-    bytes: 120
-  __arr_retain___m9__Prec:
-    calls: 0
-    bytes: 120
-  __arr_retain___m9__Production$__m10__AiplTok$Ast:
-    calls: 15313
-    bytes: 188
-  __arr_retain___m9__Rule$__m10__AiplTok:
-    calls: 271884
-    bytes: 116
-  __builtin_all$__m9__Rule$__m10__AiplTok$lam153:
+  __builtin_all$__m10__Rule$__m11__AiplTok$lam177:
     calls: 0
     bytes: 36
-  __builtin_all$__m9__Rule$__m10__AiplTok$lam153$tail:
+  __builtin_all$__m10__Rule$__m11__AiplTok$lam177$tail:
     calls: 0
     bytes: 384
-  __builtin_all$char$s0$lam137:
+  __builtin_all$char$s0$lam161:
     calls: 79
     bytes: 212
-  __builtin_any$__m3__Doc$lam168:
-    calls: 0
-    bytes: 32
-  __builtin_any$__m3__Doc$lam168$tail:
-    calls: 145
-    bytes: 324
-  __builtin_any$__m9__Rule$__m10__AiplTok$lam156:
+  __builtin_any$__m10__Rule$__m11__AiplTok$lam180:
     calls: 0
     bytes: 36
-  __builtin_any$__m9__Rule$__m10__AiplTok$lam156$tail:
+  __builtin_any$__m10__Rule$__m11__AiplTok$lam180$tail:
     calls: 108
     bytes: 380
-  __builtin_count_while$char$lam56:
-    calls: 1115
+  __builtin_any$__m4__Doc$lam192:
+    calls: 0
+    bytes: 32
+  __builtin_any$__m4__Doc$lam192$tail:
+    calls: 145
+    bytes: 324
+  __builtin_count_while$char$lam57:
+    calls: 1215
     bytes: 220
-  __builtin_count_while$char$s0$lam109:
+  __builtin_count_while$char$s0$lam125:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam122:
+  __builtin_count_while$char$s0$lam138:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam122$tail:
-    calls: 23
+  __builtin_count_while$char$s0$lam138$tail:
+    calls: 28
     bytes: 256
-  __builtin_count_while$char$s0$lam134:
+  __builtin_count_while$char$s0$lam158:
     calls: 67
     bytes: 172
-  __builtin_count_while$char$s0$lam136:
+  __builtin_count_while$char$s0$lam160:
     calls: 1
     bytes: 172
-  __builtin_count_while$char$s0$lam64:
-    calls: 868
+  __builtin_count_while$char$s0$lam65:
+    calls: 997
     bytes: 184
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m9__Prec$lam172:
+  __builtin_find_if$__m10__Prec$lam196:
     calls: 148
     bytes: 688
   __builtin_find_index$str$lam15:
-    calls: 110
+    calls: 161
     bytes: 400
   __builtin_find_index$str$lam28:
-    calls: 7506
+    calls: 10260
     bytes: 400
-  __builtin_find_index$str$lam69:
-    calls: 22750
+  __builtin_find_index$str$lam85:
+    calls: 31675
     bytes: 400
   __builtin_int_parse:
     calls: 67
     bytes: 1028
-  __builtin_intersperse$__m3__Doc:
+  __builtin_intersperse$__m4__Doc:
     calls: 26
     bytes: 408
-  __builtin_try_map$__m9__Production$__m10__AiplTok$Ast$__m19__First<__m10__AiplTok>$__m9__ParseError$lam93:
+  __builtin_try_map$__m10__Production$__m11__AiplTok$__m1__Ast$__m20__First<__m11__AiplTok>$__m10__ParseError$lam109:
     calls: 72
     bytes: 920
-  __builtin_try_map$__m9__Rule$__m10__AiplTok$__m9__Rule<__m10__AiplTok>$__m9__ParseError$lam128:
-    calls: 21684
+  __builtin_try_map$__m10__Rule$__m11__AiplTok$__m10__Rule<__m11__AiplTok>$__m10__ParseError$lam148:
+    calls: 29640
     bytes: 720
-  __eq___m19__First$__m10__AiplTok:
+  __builtin_try_map$__m1__Ast$__m1__Ty$__m10__ParseError$lam68:
+    calls: 14
+    bytes: 1192
+  __builtin_try_map$__m1__Ast$__m1__Ty$__m10__ParseError$lam73:
+    calls: 6
+    bytes: 1192
+  __builtin_try_map$__m2__Cst$__m1__Ast$__m10__ParseError$lam157:
+    calls: 243
+    bytes: 1076
+  __eq___m20__First$__m11__AiplTok:
     calls: 1494
     bytes: 128
-  __eq___m19__First$__m10__AiplTok$arr:
+  __eq___m20__First$__m11__AiplTok$arr:
     calls: 72
     bytes: 284
-  __eq___m19__Sym$__m10__AiplTok:
+  __eq___m20__Sym$__m11__AiplTok:
     calls: 150390
     bytes: 144
-  __eq___m19__Sym$__m10__AiplTok$arr:
+  __eq___m20__Sym$__m11__AiplTok$arr:
     calls: 1494
     bytes: 284
   __eq_set$str:
@@ -1483,17 +1955,20 @@ functions:
   __eq_str$opt:
     calls: 175
     bytes: 100
-  __filter38$own0:
-    calls: 27
+  __filter39$own0:
+    calls: 270
     bytes: 332
-  __lambda_105:
+  __filter80$own0:
+    calls: 6
+    bytes: 428
+  __lambda_121:
     calls: 61
     bytes: 140
   __lambda_16:
     calls: 0
     bytes: 136
   __lambda_17:
-    calls: 351
+    calls: 429
     bytes: 104
   __lambda_18:
     calls: 0
@@ -1505,322 +1980,343 @@ functions:
     calls: 0
     bytes: 144
   __lambda_21:
-    calls: 3
+    calls: 5
     bytes: 164
   __lambda_22:
     calls: 0
     bytes: 48
   __lambda_23:
-    calls: 2
+    calls: 3
     bytes: 64
-  __m10__char_lit_emit:
+  __m10__desugar_opt$__m11__AiplTok:
+    calls: 11780
+    bytes: 700
+  __m10__desugar_rule$__m11__AiplTok:
+    calls: 154470
+    bytes: 11936
+  __m10__group_styles$__m11__AiplTok:
     calls: 0
+    bytes: 32
+  __m10__group_styles$__m11__AiplTok$tail:
+    calls: 532190
+    bytes: 4724
+  __m10__link$__m11__AiplTok$__m1__Ast:
+    calls: 190
+    bytes: 2796
+  __m10__link_opt$__m11__AiplTok:
+    calls: 11780
+    bytes: 716
+  __m10__link_rule$__m11__AiplTok:
+    calls: 154470
+    bytes: 8236
+  __m10__link_rules$__m11__AiplTok:
+    calls: 29640
+    bytes: 832
+  __m10__prod_names$__m11__AiplTok$__m1__Ast:
+    calls: 351
+    bytes: 492
+  __m11__char_lit_emit:
+    calls: 2
     bytes: 1772
-  __m10__dedent_segments:
+  __m11__dedent_segments:
     calls: 1
     bytes: 272
-  __m10__doc_text:
+  __m11__doc_text:
     calls: 8
     bytes: 196
-  __m10__int_lit:
+  __m11__int_lit:
     calls: 67
     bytes: 1364
-  __m10__raw_tpl_kind:
+  __m11__raw_tpl_kind:
     calls: 2
     bytes: 2592
-  __m10__tpl_kind:
-    calls: 6
-    bytes: 2608
-  __m11__between_len:
-    calls: 801
-    bytes: 752
-  __m11__delimited_len:
-    calls: 1599
-    bytes: 1592
-  __m11__finalize_template$__m10__AiplTok:
+  __m11__str_lit_value:
     calls: 3
+    bytes: 400
+  __m11__tpl_kind:
+    calls: 7
+    bytes: 2608
+  __m12__between_len:
+    calls: 930
+    bytes: 752
+  __m12__delimited_len:
+    calls: 1855
+    bytes: 1592
+  __m12__finalize_template$__m11__AiplTok:
+    calls: 4
     bytes: 8904
-  __m11__float_len:
+  __m12__float_len:
     calls: 0
     bytes: 816
-  __m11__interp_scan$__m10__AiplTok:
+  __m12__interp_scan$__m11__AiplTok:
     calls: 5
     bytes: 2252
-  __m11__lex$__m10__AiplTok:
-    calls: 110
+  __m12__lex$__m11__AiplTok:
+    calls: 161
     bytes: 1520
-  __m11__lex_step$__m10__AiplTok:
-    calls: 2138
+  __m12__lex_step$__m11__AiplTok:
+    calls: 2368
     bytes: 29192
-  __m11__nested_len:
-    calls: 1370
+  __m12__nested_len:
+    calls: 1578
     bytes: 940
-  __m11__step_result$__m10__AiplTok:
-    calls: 62539
+  __m12__step_result$__m11__AiplTok:
+    calls: 72409
     bytes: 15088
-  __m11__template_scan$__m10__AiplTok:
-    calls: 3
+  __m12__template_scan$__m11__AiplTok:
+    calls: 4
     bytes: 2728
-  __m11__template_step$__m10__AiplTok:
-    calls: 1595
+  __m12__template_step$__m11__AiplTok:
+    calls: 1845
     bytes: 476
-  __m11__to_eol_len:
+  __m12__to_eol_len:
     calls: 0
     bytes: 52
-  __m11__to_eol_len$tail:
-    calls: 2743
+  __m12__to_eol_len$tail:
+    calls: 3159
     bytes: 252
-  __m11__to_eol_unless_len:
-    calls: 1369
+  __m12__to_eol_unless_len:
+    calls: 1577
     bytes: 368
-  __m12__unescape:
-    calls: 9
+  __m13__unescape:
+    calls: 19
     bytes: 1176
-  __m13__process_raw_string:
+  __m14__process_raw_string:
     calls: 1
     bytes: 556
-  __m14__trim_prefix:
+  __m15__trim_prefix:
     calls: 18
     bytes: 260
-  __m15__trim_suffix:
+  __m16__trim_suffix:
     calls: 0
     bytes: 340
-  __m16__strip_test_sections:
+  __m17__strip_test_sections:
     calls: 103
     bytes: 692
-  __m17__parse_test_section_header:
+  __m18__parse_test_section_header:
     calls: 175
     bytes: 744
-  __m18__climb$__m10__AiplTok$Ast:
+  __m19__climb$__m11__AiplTok$__m1__Ast:
     calls: 199
     bytes: 3160
-  __m18__error_at$__m10__AiplTok$Ast:
+  __m19__error_at$__m11__AiplTok$__m1__Ast:
     calls: 34
     bytes: 4108
-  __m18__far_miss:
-    calls: 13592
+  __m19__far_miss:
+    calls: 15902
     bytes: 1084
-  __m18__far_unclosed:
+  __m19__far_unclosed:
     calls: 9
     bytes: 320
-  __m18__find_prec:
+  __m19__find_prec:
     calls: 151
     bytes: 228
-  __m18__leaf_at$__m10__AiplTok$Ast:
-    calls: 3297
+  __m19__leaf_at$__m11__AiplTok$__m1__Ast:
+    calls: 4095
     bytes: 3100
-  __m18__match_group$__m10__AiplTok$Ast:
-    calls: 4736
+  __m19__lower_node$__m11__AiplTok$__m1__Ast:
+    calls: 243
+    bytes: 4932
+  __m19__match_group$__m11__AiplTok$__m1__Ast:
+    calls: 6187
     bytes: 6196
-  __m18__match_many$__m10__AiplTok$Ast:
-    calls: 5909
+  __m19__match_many$__m11__AiplTok$__m1__Ast:
+    calls: 7621
     bytes: 1436
-  __m18__match_maybe$__m10__AiplTok$Ast:
+  __m19__match_maybe$__m11__AiplTok$__m1__Ast:
     calls: 460
     bytes: 1076
-  __m18__match_one_of$__m10__AiplTok$Ast:
-    calls: 3369
+  __m19__match_one_of$__m11__AiplTok$__m1__Ast:
+    calls: 4086
     bytes: 1692
-  __m18__match_prod$__m10__AiplTok$Ast:
-    calls: 6430
+  __m19__match_prod$__m11__AiplTok$__m1__Ast:
+    calls: 7795
     bytes: 8972
-  __m18__match_reps$__m10__AiplTok$Ast:
-    calls: 1593
+  __m19__match_reps$__m11__AiplTok$__m1__Ast:
+    calls: 1932
     bytes: 5120
-  __m18__match_rule$__m10__AiplTok$Ast:
-    calls: 44425
+  __m19__match_rule$__m11__AiplTok$__m1__Ast:
+    calls: 53439
     bytes: 14428
-  __m18__match_then$__m10__AiplTok$Ast:
-    calls: 11730
+  __m19__match_then$__m11__AiplTok$__m1__Ast:
+    calls: 13894
     bytes: 2128
-  __m18__parse_cst$__m10__AiplTok$Ast:
-    calls: 101
+  __m19__parse$__m11__AiplTok$__m1__Ast:
+    calls: 51
+    bytes: 592
+  __m19__parse_cst$__m11__AiplTok$__m1__Ast:
+    calls: 152
     bytes: 624
-  __m18__parse_prepared$__m10__AiplTok$Ast:
-    calls: 110
+  __m19__parse_prepared$__m11__AiplTok$__m1__Ast:
+    calls: 161
     bytes: 5288
-  __m18__prepare$__m10__AiplTok$Ast:
+  __m19__prepare$__m11__AiplTok$__m1__Ast:
     calls: 9
     bytes: 2068
-  __m18__prev_end$__m10__AiplTok$Ast:
-    calls: 3449
+  __m19__prev_end$__m11__AiplTok$__m1__Ast:
+    calls: 4349
     bytes: 1580
-  __m18__pruned$__m10__AiplTok$Ast:
+  __m19__pruned$__m11__AiplTok$__m1__Ast:
     calls: 70
     bytes: 1344
-  __m18__quoted:
-    calls: 17259
+  __m19__quoted:
+    calls: 19538
     bytes: 456
-  __m18__rule_labels$__m10__AiplTok$Ast:
+  __m19__rule_labels$__m11__AiplTok$__m1__Ast:
     calls: 0
     bytes: 44
-  __m18__rule_labels$__m10__AiplTok$Ast$tail:
+  __m19__rule_labels$__m11__AiplTok$__m1__Ast$tail:
     calls: 18954
     bytes: 8040
-  __m18__rule_nullable$__m10__AiplTok:
+  __m19__rule_nullable$__m11__AiplTok:
     calls: 0
     bytes: 36
-  __m18__rule_nullable$__m10__AiplTok$tail:
+  __m19__rule_nullable$__m11__AiplTok$tail:
     calls: 6534
     bytes: 1592
-  __m18__seq_labels$__m10__AiplTok$Ast:
+  __m19__seq_labels$__m11__AiplTok$__m1__Ast:
     calls: 0
     bytes: 44
-  __m18__seq_labels$__m10__AiplTok$Ast$tail:
+  __m19__seq_labels$__m11__AiplTok$__m1__Ast$tail:
     calls: 5346
     bytes: 908
-  __m18__tok_text$__m10__AiplTok$Ast:
-    calls: 13372
+  __m19__tok_text$__m11__AiplTok$__m1__Ast:
+    calls: 15937
     bytes: 1712
-  __m18__trailing_trivia$__m10__AiplTok$Ast:
-    calls: 152
+  __m19__trailing_trivia$__m11__AiplTok$__m1__Ast:
+    calls: 254
     bytes: 1160
-  __m19__can_start$__m10__AiplTok:
+  __m1__show_ty:
+    calls: 89
+    bytes: 4656
+  __m1__show_tys:
+    calls: 14
+    bytes: 460
+  __m20__can_start$__m11__AiplTok:
     calls: 180
     bytes: 600
-  __m19__first_sets$__m10__AiplTok$Ast:
+  __m20__first_sets$__m11__AiplTok$__m1__Ast:
     calls: 9
     bytes: 356
-  __m19__linked_first_sets$__m10__AiplTok$Ast:
+  __m20__linked_first_sets$__m11__AiplTok$__m1__Ast:
     calls: 9
     bytes: 1084
-  __m19__rule_first$__m10__AiplTok:
+  __m20__rule_first$__m11__AiplTok:
     calls: 26496
     bytes: 6188
-  __m19__union_syms$__m10__AiplTok:
+  __m20__union_syms$__m11__AiplTok:
     calls: 20448
     bytes: 736
-  __m1__first_token:
-    calls: 103
-    bytes: 660
-  __m1__first_token_of:
-    calls: 63
-    bytes: 320
-  __m1__flat_kids:
-    calls: 0
-    bytes: 32
-  __m1__flat_kids$tail:
-    calls: 31
-    bytes: 3832
-  __m1__last_token:
-    calls: 101
-    bytes: 660
-  __m1__last_token_of:
-    calls: 78
-    bytes: 396
-  __m1__leaves:
-    calls: 374
-    bytes: 3684
-  __m1__splice:
-    calls: 0
-    bytes: 32
-  __m1__splice$tail:
-    calls: 65
-    bytes: 612
-  __m1__text:
-    calls: 10
-    bytes: 476
-  __m1__token_leaves:
-    calls: 1334
-    bytes: 3648
-  __m20__line_at:
+  __m21__line_at:
     calls: 9
     bytes: 532
-  __m2__breaks_after:
+  __m2__first_token:
+    calls: 103
+    bytes: 660
+  __m2__first_token_of:
+    calls: 63
+    bytes: 320
+  __m2__flat_kids:
+    calls: 0
+    bytes: 32
+  __m2__flat_kids$tail:
+    calls: 549
+    bytes: 3832
+  __m2__last_token:
+    calls: 101
+    bytes: 660
+  __m2__last_token_of:
+    calls: 78
+    bytes: 396
+  __m2__leaves:
+    calls: 2307
+    bytes: 3684
+  __m2__span:
+    calls: 235
+    bytes: 524
+  __m2__splice:
+    calls: 0
+    bytes: 32
+  __m2__splice$tail:
+    calls: 1028
+    bytes: 612
+  __m2__text:
+    calls: 10
+    bytes: 476
+  __m2__token_leaves:
+    calls: 1334
+    bytes: 3648
+  __m3__breaks_after:
     calls: 1
     bytes: 444
-  __m2__fmt_node$__m10__AiplTok$Ast$s1$lam29:
+  __m3__fmt_node$__m11__AiplTok$__m1__Ast$s1$lam29:
     calls: 144
-    bytes: 5244
-  __m2__format_cst$__m10__AiplTok$Ast$s1$lam12:
+    bytes: 4800
+  __m3__format_cst$__m11__AiplTok$__m1__Ast$s1$lam12:
     calls: 20
     bytes: 384
-  __m2__gap_wanted$lam129:
+  __m3__gap_wanted$lam149:
     calls: 160
     bytes: 304
-  __m2__group_doc$__m10__AiplTok$Ast$s1$lam77:
+  __m3__group_doc$__m11__AiplTok$__m1__Ast$s1$lam93:
     calls: 13
     bytes: 2420
-  __m2__inline_doc$lam76:
+  __m3__inline_doc$lam92:
     calls: 137
     bytes: 2668
-  __m2__pieces$__m10__AiplTok$Ast$s1$lam74:
+  __m3__pieces$__m11__AiplTok$__m1__Ast$s1$lam90:
     calls: 170
     bytes: 3612
-  __m2__render_cst$__m10__AiplTok$Ast$s1$lam3:
+  __m3__render_cst$__m11__AiplTok$__m1__Ast$s1$lam3:
     calls: 20
     bytes: 5268
-  __m2__wrapped$lam130:
+  __m3__wrapped$lam150:
     calls: 13
     bytes: 4272
-  __m3__col_after:
+  __m4__col_after:
     calls: 108
     bytes: 596
-  __m3__fits:
+  __m4__fits:
     calls: 0
     bytes: 36
-  __m3__fits$tail:
+  __m4__fits$tail:
     calls: 278
     bytes: 2684
-  __m3__fits_atom:
+  __m4__fits_atom:
     calls: 0
     bytes: 52
-  __m3__fits_atom$tail:
+  __m4__fits_atom$tail:
     calls: 77
     bytes: 312
-  __m3__has_hard:
+  __m4__has_hard:
     calls: 0
     bytes: 32
-  __m3__has_hard$tail:
+  __m4__has_hard$tail:
     calls: 255
     bytes: 688
-  __m4__reindent_block:
+  __m5__reindent_block:
     calls: 0
     bytes: 2928
-  __m5__dedent:
+  __m6__dedent:
     calls: 1
     bytes: 1276
-  __m9__desugar_opt$__m10__AiplTok:
-    calls: 8618
-    bytes: 700
-  __m9__desugar_rule$__m10__AiplTok:
-    calls: 113007
-    bytes: 11936
-  __m9__group_styles$__m10__AiplTok:
-    calls: 0
-    bytes: 32
-  __m9__group_styles$__m10__AiplTok$tail:
-    calls: 389339
-    bytes: 4724
-  __m9__link$__m10__AiplTok$Ast:
-    calls: 139
-    bytes: 2796
-  __m9__link_opt$__m10__AiplTok:
-    calls: 8618
-    bytes: 716
-  __m9__link_rule$__m10__AiplTok:
-    calls: 113007
-    bytes: 8236
-  __m9__link_rules$__m10__AiplTok:
-    calls: 21684
-    bytes: 832
-  __m9__prod_names$__m10__AiplTok$Ast:
-    calls: 249
-    bytes: 492
-  __rec_drop___m1__Cst:
-    calls: 8617
+  __rec_drop___m10__Rule$__m11__AiplTok:
+    calls: 534759
+    bytes: 340
+  __rec_drop___m1__Ty:
+    calls: 96
+    bytes: 408
+  __rec_drop___m2__Cst:
+    calls: 10398
     bytes: 132
-  __rec_drop___m3__Doc:
+  __rec_drop___m4__Doc:
     calls: 382
     bytes: 184
-  __rec_drop___m3__Work:
+  __rec_drop___m4__Work:
     calls: 657
     bytes: 84
-  __rec_drop___m9__Rule$__m10__AiplTok:
-    calls: 380688
-    bytes: 340
-  __rec_drop___tuple$__m9__Rule___m10__AiplTok$__m9__Rule___m10__AiplTok:
-    calls: 21530
+  __rec_drop___tuple$__m10__Rule___m11__AiplTok$__m10__Rule___m11__AiplTok:
+    calls: 30302
     bytes: 72
   __test$aipl_node_spans:
     calls: 1
@@ -1837,35 +2333,41 @@ functions:
   __test$format_aipl_ty:
     calls: 1
     bytes: 8840
-  __test_try_fail___m9__ParseError:
+  __test$lower_aipl_pattern:
+    calls: 1
+    bytes: 2460
+  __test$lower_aipl_ty:
+    calls: 1
+    bytes: 6356
+  __test_try_fail___m10__ParseError:
     calls: 0
     bytes: 84
-  __to_str___m9__ParseError:
+  __to_str___m10__ParseError:
     calls: 0
     bytes: 824
   __to_str_u64:
-    calls: 9
+    calls: 10
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 48869
+    calls: 67799
     bytes: (external)
   aipl_arr_elem_ptr:
     calls: 78
     bytes: (external)
   aipl_arr_extend:
-    calls: 90376
+    calls: 121962
     bytes: (external)
   aipl_arr_inc:
-    calls: 3360449
+    calls: 4187449
     bytes: (external)
   aipl_arr_join:
-    calls: 47023
+    calls: 65959
     bytes: (external)
   aipl_arr_reserve:
-    calls: 74467
+    calls: 88592
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 169685
+    calls: 229466
     bytes: (external)
   aipl_arr_reverse:
     calls: 78
@@ -1874,25 +2376,25 @@ functions:
     calls: 34
     bytes: (external)
   aipl_array_dec:
-    calls: 4409428
+    calls: 5554606
     bytes: (external)
   aipl_array_new:
-    calls: 691914
+    calls: 907704
     bytes: (external)
   aipl_array_push:
-    calls: 169609
+    calls: 230417
     bytes: (external)
   aipl_array_push_mut:
-    calls: 279443
+    calls: 349884
     bytes: (external)
   aipl_array_with_cap:
-    calls: 101958
+    calls: 122269
     bytes: (external)
   aipl_assert:
-    calls: 113
+    calls: 164
     bytes: (external)
   aipl_grammar:
-    calls: 110
+    calls: 161
     bytes: 932
   aipl_node_spans:
     calls: 3
@@ -1904,19 +2406,19 @@ functions:
     calls: 8
     bytes: 748
   aipl_rec_alloc:
-    calls: 411874
+    calls: 576594
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 2793025
+    calls: 3788506
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 112749
+    calls: 158381
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2381151
+    calls: 3211912
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 112749
+    calls: 158381
     bytes: (external)
   aipl_set_contains:
     calls: 58509
@@ -1928,74 +2430,116 @@ functions:
     calls: 14418
     bytes: (external)
   aipl_test_begin:
-    calls: 5
+    calls: 7
     bytes: (external)
   aipl_test_end:
-    calls: 5
+    calls: 7
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 18
+    calls: 20
     bytes: (external)
   aipl_write_u64:
-    calls: 9
+    calls: 10
     bytes: (external)
   angles:
-    calls: 330
+    calls: 483
     bytes: 376
+  as_ty:
+    calls: 141
+    bytes: 1784
   braces:
-    calls: 1430
+    calls: 2093
     bytes: 376
   expressions:
-    calls: 220
+    calls: 322
     bytes: 32856
   format_aipl_ty:
     calls: 20
     bytes: 808
   items:
-    calls: 110
+    calls: 161
     bytes: 32060
   keep:
     calls: 0
-    bytes: 196
+    bytes: 608
+  kid:
+    calls: 164
+    bytes: 2260
   lex_lossless:
-    calls: 110
+    calls: 161
     bytes: 96796
+  lower_aipl_pattern:
+    calls: 15
+    bytes: 3248
+  lower_aipl_ty:
+    calls: 36
+    bytes: 1120
+  lower_base_ty:
+    calls: 65
+    bytes: 3500
+  lower_ctor_payload:
+    calls: 6
+    bytes: 3892
+  lower_pattern:
+    calls: 15
+    bytes: 10584
+  lower_ty:
+    calls: 75
+    bytes: 19252
+  lower_ty_core:
+    calls: 66
+    bytes: 13156
+  lower_ty_parens:
+    calls: 14
+    bytes: 1056
   main:
     calls: 1
-    bytes: 428
+    bytes: 588
   nest:
-    calls: 1980
+    calls: 2898
     bytes: 844
   nest2:
-    calls: 660
+    calls: 966
     bytes: 1016
   node_spans:
     calls: 27
     bytes: 756
   only:
-    calls: 3300
+    calls: 4830
     bytes: 792
   p:
-    calls: 8470
+    calls: 12397
     bytes: 448
   parens:
-    calls: 880
+    calls: 1288
     bytes: 376
+  pat_dump:
+    calls: 15
+    bytes: 2016
   patterns:
-    calls: 220
-    bytes: 6432
+    calls: 322
+    bytes: 6644
   pipes:
-    calls: 440
+    calls: 644
     bytes: 376
   statements:
-    calls: 220
+    calls: 322
     bytes: 24688
+  tuple_ty:
+    calls: 9
+    bytes: 556
+  ty_dump:
+    calls: 36
+    bytes: 552
   types:
-    calls: 220
-    bytes: 8188
+    calls: 322
+    bytes: 8600
   why_prepared:
     calls: 9
     bytes: 1760
+  with_build:
+    calls: 1932
+    bytes: 336
