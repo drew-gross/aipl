@@ -329,7 +329,6 @@ design:
   it's safe to call an untrusted function that doesn't declare any effects
   the most readable implementation is also the fastest
   apis should express intent
-  Put that on pause for now. I have a new design principle I want to add:: check should do everything by default. I don't want to have to separately run fmt and lint and test and etc. Flags to run narrower sets of checks are fine, but bare `check` should always run every known validations. Also: Check should run as much as it can. If the format step or the lint step fails, it should still run typechecking and codegen and even run the unit tests. Once we implement a recovering parser, it should even run the tests that aren't affected by the bad parse, or if one function fails to typecheck, the tests for the unrelated functions should still be run. Obviously actually implementing that will require substantial additional development, but it's a principle: a north star to guide future developement, not something to actually do right now.
 
 optimizations:
   loop invariant/match invariant/branch invariant code motion

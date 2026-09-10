@@ -91,3 +91,79 @@ type domain (`xs[i]` is `T?`), and it turns on whether the out-of-range case
 is something a caller plausibly wants to *branch* on. An index out of bounds
 usually is. A zero divisor usually is not — the caller who cares tests `b == 0`
 themselves, and the one who does not should not pay an unwrap.
+
+---
+
+## 2. `check` is the whole gate, and it reports everything it can
+
+Two halves, and they are the same idea from opposite ends.
+
+**Bare `aipl check` runs every validation there is.** Not formatting *or* lints
+*or* type checking *or* the tests — all of them, every time, from one command.
+Flags that narrow the run to a subset are fine and useful; what is not fine is a
+validation that only runs if you know to ask for it. A check you have to remember
+is a check that will be forgotten, and the tree it was guarding breaks anyway.
+
+**A failing validation must not suppress the others.** If formatting fails, type
+checking still runs. If a lint fires, codegen still runs and the tests still run.
+The output is everything wrong with the tree, found in one pass — not the first
+thing wrong with it.
+
+The reason is the round trip. A gate that stops at the first failure turns one
+run into as many runs as you have distinct problems, each paying the full cost of
+compiling the world, and each hiding whatever came after it. A developer who
+fixes a lint and then discovers a type error, fixes that and then discovers a
+failing test, has paid three times for information that was available the first
+time. Worse, they have been making decisions with a partial picture: the right
+fix for the lint is sometimes different once you know the type error exists.
+
+### Downstream decisions
+
+| Validation | Conforms | Behaviour |
+|---|---|---|
+| formatting | yes | an unformatted file is named on stderr, its tests still run, and the summary ends `N files need formatting` |
+| lints | **no** | a lint hit fails the load, so codegen and the file's tests never run |
+| parse errors | **no** | a file that does not parse contributes nothing else |
+| type errors | **no** | one bad function stops the whole file, including tests for unrelated ones |
+
+The formatting row is the shape the rest should take: a real failure, reported
+precisely, that costs the run its exit code and nothing else.
+
+### The staged version of "as much as it can"
+
+This is a direction, not a plan — nothing here is scheduled, and the rows above
+are allowed to keep saying **no** for as long as they do. What the principle
+settles is which way each of them should move when someone touches it, so that a
+change that makes a failure *more* contagious is recognizable as going the wrong
+way even if it is locally convenient.
+
+The three non-conforming rows are not one piece of work, and they get harder in
+order:
+
+1. **Lints should be non-fatal to the rest of the run.** A lint is a style
+   judgement about code that already parsed and type-checked, so nothing
+   downstream of it actually depends on it. This is the cheap one, and it is
+   pure sequencing.
+2. **A parse error should cost only what it actually broke.** With a recovering
+   parser, a file with one bad function still yields the others, and their tests
+   still run. This is what the parser library work (`PARSER_LIBRARY.md`) makes
+   possible — error recovery is named there as the thing `NestedIn` gives the
+   driver a place to hang.
+3. **A type error should cost only the function it is in.** If `f` does not type
+   check, `g`'s tests should still run. This needs failure to be per-definition
+   rather than per-file, which reaches into how the checker reports and how
+   codegen decides what to emit.
+
+Each is worth doing on its own; none is a prerequisite for the next.
+
+### What it does not mean
+
+It does not mean a check never fails. `check` exits non-zero when anything is
+wrong, and that is the whole point of it — the principle is about *how much it
+learned* before it did, not about whether it is allowed to be unhappy.
+
+It does not mean every validation belongs in the language. `cargo handoff` sits
+above `check` and does things that are properties of *this repository* rather
+than of an AIPL program — regenerating checked-in IR, refilling recorded metrics,
+keeping a `#[test]` list in step with a directory. Those stay where they are. The
+principle governs what it means to ask a program whether it is well-formed.
