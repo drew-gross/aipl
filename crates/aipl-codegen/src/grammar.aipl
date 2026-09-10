@@ -169,6 +169,12 @@ variant Rule<K: variant> =
     // against the one the rule actually matches, so a style that disagrees makes
     // the printer write a separator the parser will not accept. Derive where you
     // can, state it where the list is not this rule's.
+    //
+    // The shape that needs stating is a group holding a list that lives one
+    // production down, and inlining the list into the group removes it — at
+    // which point this argument, and the disagreement it admits, both go away.
+    // Which of those wrapper productions can fold is what the lowering decides;
+    // `PARSER_LIBRARY.md`'s 5d carries the plan.
     | Many(
         Rule<K>,
         min: u64 = 0,

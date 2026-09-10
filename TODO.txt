@@ -226,6 +226,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
+  formatter gets list separater directly off the Many
   aipl fmt breaks a long tuple literal across lines with a trailing comma, and the tuple grammar rejects one. Formatter should understand from the Many that it shouldn't emit trailing commas.
   Why the formatter isn't already a thin wrapper
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
@@ -240,7 +241,7 @@ sets:
   support other types
 
 parser:
-  remove NestedIn after souping up Many enough
+  remove expr_unary, it's silly
   a bracketed list's separator must be a literal, so the printer can write it back <--- lift this restriction
   trailing separater = Allowed | Disallowed | Required
   do we need NamedIdx when we have Named?

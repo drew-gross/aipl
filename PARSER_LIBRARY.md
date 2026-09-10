@@ -321,6 +321,39 @@ Keeping the two AST declarations in step is the standing cost of this bridge. A
 test that walks both and compares shape — not just the differential in 5c — is
 worth having early.
 
+**While deciding which productions earn a node, collapse the wrapper lists.**
+`Many`'s `style?` argument exists for one shape: a group whose list lives one
+production down.
+
+```aipl
+nest("(", Named("args"), ")", loose())   // this Many is min=1, max=1, no sep
+                                          // `args` is Many(Named("arg"), sep=Lit(","))
+```
+
+The group's own rule has no separator, so it cannot say how its contents lay
+out, and the style has to be stated instead of derived — 13 sites do this today
+(7 `loose()`, 5 `strict()`, 1 `braced()`). Stating it is what makes the printer
+and the parser able to disagree: nothing checks a written `sep` against the one
+the rule actually matches.
+
+Inlining the list into the group removes the whole class:
+
+```aipl
+Many(Named("arg"), sep=Lit(","), nested_in=parens())
+```
+
+Then every style is derived, `style?` goes away, and the disagreement becomes
+unrepresentable rather than merely documented. `ListStyle` could then plausibly
+stop being a table of its own — `groups` would hold the rules, and the formatter
+would read `sep`/`trailing`/`spaced` off the `Many` it is laying out instead of
+off a copy made at link time.
+
+It belongs *here* rather than in a formatting task because the only reason those
+wrapper productions exist is to give `build` a node to lower. Which of them earn
+that node is what writing the 54 lowering functions decides; the ones that do not
+can fold into their group as part of the same pass. Doing it earlier means
+guessing at the AST shape this stage settles.
+
 ### 5e — Error-message parity
 
 **170 corpus files carry `--- errors ---` blocks**, rendered byte-exact from

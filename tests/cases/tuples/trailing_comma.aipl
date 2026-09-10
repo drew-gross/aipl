@@ -1,0 +1,57 @@
+import { print, to_str } from builtins;
+
+// A tuple literal takes a trailing comma, like every other comma list in the
+// language — and has to, because `aipl fmt` writes one when it breaks a list
+// across lines. A printer that writes a separator the parser refuses is a
+// formatter that emits source it cannot read back, and this file is the proof
+// it does not: it is checked in already formatted, so the corpus formatting test
+// asserts the shape below is what the formatter produces, and running it at all
+// asserts the parser accepts that shape.
+fn wide() -> (str, str) {
+    (
+        "a fairly long string, long enough that the pair cannot fit on one line",
+        "and a second one just as long, so the formatter has to break the tuple",
+    )
+}
+
+// The same tuple written inline keeps no trailing comma — one is punctuation for
+// the broken layout, not part of the value.
+fn narrow() -> (i64, i64) { (1, 2) }
+
+// A trailing comma cannot follow the *first* element alone: `(a,)` would be a
+// one-element tuple, and there is no such thing. The comma hangs off the second
+// element onward, which is where a tuple starts being one.
+fn three() -> (i64, i64, i64) { (1, 2, 3) }
+
+fn main() !prints {
+    print(wide().0);
+    print(narrow().1.to_str());
+    print(three().2.to_str());
+}
+--- stdout ---
+a fairly long string, long enough that the pair cannot fit on one line
+2
+3
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 34
+instructions executed: 121
+binary size: 1952
+  code: 628
+  data: 175
+  metadata: 1149
+functions:
+  __to_str_i64:
+    calls: 2
+    bytes: 204
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 424

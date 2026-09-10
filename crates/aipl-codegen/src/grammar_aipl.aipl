@@ -617,15 +617,15 @@ fn expressions() -> Production<AiplTok, Ast>[] {
             Many(Named("field_init"), sep=Lit(","), nested_in=braces(), spaced=true),
         ]),
         Term(Name),
+        // A tuple literal takes a trailing comma like every other comma list,
+        // and prints one when it breaks — `loose()`, not `strict()`. The two
+        // have to agree: the printer writing a separator the parser refuses is
+        // a formatter that emits source it cannot read back.
         nest(
             "(",
-            Then([
-                Named("expr"),
-                Lit(","),
-                Many(Named("expr"), min=1, sep=Lit(","), trailing_sep=false),
-            ]),
+            Then([Named("expr"), Lit(","), Many(Named("expr"), min=1, sep=Lit(","))]),
             ")",
-            strict(),
+            loose(),
         ),
         // A grouping paren holds one expression, so there is no list in it.
         only("(", Named("expr"), ")"),

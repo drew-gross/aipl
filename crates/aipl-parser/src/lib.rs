@@ -553,7 +553,16 @@ gazelle! {
              | LPAREN expr RPAREN => paren
              // `(a, b, ...)` — a tuple literal (2+ elements). The COMMA after
              // the first expr unambiguously selects this over `paren`.
+             //
+             // A trailing comma is accepted, as every other comma list in the
+             // language accepts one — and must be, because `aipl fmt` writes one
+             // when it breaks a list across lines. It cannot follow the *first*
+             // element alone: `(a,)` would then be a one-element tuple, which
+             // there is no such thing as, and the shape is already spoken for by
+             // nothing at all. So the trailing comma hangs off `tuple_more`,
+             // which starts at the second element.
              | LPAREN expr COMMA tuple_more RPAREN => tuple_lit
+             | LPAREN expr COMMA tuple_more COMMA RPAREN => tuple_lit_trailing
              | IF LPAREN expr RPAREN block ELSE else_branch => if_else
              // Else-less `if` (statement position): yields unit, so its `then`
              // block must be unit-typed. Desugars to `if .. {} else {}`.
@@ -2852,7 +2861,9 @@ impl gazelle::Action<aipl::Atom<Self>> for Build {
                 Expr::new(ExprKind::Construct(name, fields), span)
             }
             aipl::Atom::Paren(e) => e,
-            aipl::Atom::TupleLit(first, rest) => {
+            // Both spellings build the same tuple; the trailing comma is
+            // punctuation `aipl fmt` adds when it breaks the list, not a slot.
+            aipl::Atom::TupleLit(first, rest) | aipl::Atom::TupleLitTrailing(first, rest) => {
                 let last_span = rest
                     .last()
                     .map(|e| e.span.clone())
