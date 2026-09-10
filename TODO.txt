@@ -75,6 +75,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  make nested_in a 2-item tuple
   In group_styles, rs.map(group_styles) is refused
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
   DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
@@ -162,7 +163,6 @@ math:
 syntax:
   generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
   make a syntax for ignoring the rest of the args in a match (just take the ones you want)
-  make a syntax for optional args where its implicily ? with default none, and providing make it some, but with the some implicit (none can't be provided explicitly)
   allow destructuring self while having it still be self e.g. fn foo(self: Span { start, end }). Maybe do this for other args too for doc purposes?
   limitation: a struct default must be a literal
   a lambda bound to a let is not a value (this would let test helpers move into the test, big cleanup)

@@ -297,7 +297,11 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
         K::Field(x, f) => rw(K::Field(Box::new(lcr_expr(x, ctors, scope)), f.clone())),
         K::Try(x) => rw(K::Try(Box::new(lcr_expr(x, ctors, scope)))),
         K::Return(x) => rw(K::Return(Box::new(lcr_expr(x, ctors, scope)))),
-        K::KwArg(name, x) => rw(K::KwArg(name.clone(), Box::new(lcr_expr(x, ctors, scope)))),
+        K::KwArg(name, x, fwd) => rw(K::KwArg(
+            name.clone(),
+            Box::new(lcr_expr(x, ctors, scope)),
+            *fwd,
+        )),
         K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
         K::Lambda(params, body) => {
             for p in params {
@@ -1402,6 +1406,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                             mutable: p.mutable,
                             variadic: p.variadic,
                             default: p.default.clone(),
+                            implicit_some: p.implicit_some,
                         }
                     })
                     .collect();
@@ -1514,6 +1519,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                             name: None,
                             ty,
                             default: None,
+                            implicit_some: false,
                         })
                         .collect(),
                 })
@@ -1770,6 +1776,7 @@ fn make_concrete(sig: &Signature, type_args: &[Type]) -> (Vec<Param>, Option<Typ
             mutable: p.mutable,
             variadic: p.variadic,
             default: p.default.clone(),
+            implicit_some: p.implicit_some,
         })
         .collect();
     let return_ty = sig.return_ty.as_ref().map(|t| subst_vars(t, &map));
@@ -2344,6 +2351,7 @@ impl Mono<'_> {
                             mutable: false,
                             variadic: false,
                             default: None,
+                            implicit_some: false,
                         });
                         cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
                     }
@@ -2525,6 +2533,7 @@ impl Mono<'_> {
                 mutable: p.mutable,
                 variadic: p.variadic,
                 default: p.default.clone(),
+                implicit_some: p.implicit_some,
             });
         }
         let ret = match &sig.return_ty {
@@ -2578,6 +2587,7 @@ impl Mono<'_> {
                 mutable: false,
                 variadic: false,
                 default: None,
+                implicit_some: false,
             })
             .collect();
         for (cn, ct) in captures {
@@ -2587,6 +2597,7 @@ impl Mono<'_> {
                 mutable: false,
                 variadic: false,
                 default: None,
+                implicit_some: false,
             });
         }
         self.concrete.insert(
@@ -2628,6 +2639,7 @@ impl Mono<'_> {
                 mutable: false,
                 variadic: false,
                 default: None,
+                implicit_some: false,
             });
             idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
             call_args.push(
@@ -2776,6 +2788,7 @@ impl Mono<'_> {
             mutable: false,
             variadic: false,
             default: None,
+            implicit_some: false,
         }];
         let mut call_args = vec![rarr];
         let pred_caps =
@@ -3066,6 +3079,7 @@ impl Mono<'_> {
             mutable: false,
             variadic: false,
             default: None,
+            implicit_some: false,
         }];
         let mut call_args = vec![rarr];
         let cap_idents =
@@ -3353,6 +3367,7 @@ impl Mono<'_> {
                 mutable: false,
                 variadic: false,
                 default: None,
+                implicit_some: false,
             },
             Param {
                 name: "$b".to_string(),
@@ -3360,6 +3375,7 @@ impl Mono<'_> {
                 mutable: false,
                 variadic: false,
                 default: None,
+                implicit_some: false,
             },
         ];
         let mut call_args = vec![rarr_a, rarr_b];
@@ -3373,6 +3389,7 @@ impl Mono<'_> {
                 mutable: false,
                 variadic: false,
                 default: None,
+                implicit_some: false,
             });
             cap_idents.push(Expr::new(ExprKind::Ident(cap), span.clone()));
             call_args.push(
@@ -3767,6 +3784,7 @@ impl Mono<'_> {
             mutable: false,
             variadic: false,
             default: None,
+            implicit_some: false,
         }];
         let mut call_args = vec![rarr];
         let cap_idents =
@@ -6788,6 +6806,7 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
             mutable: p.mutable,
             variadic: p.variadic,
             default: p.default.clone(),
+            implicit_some: p.implicit_some,
         });
     }
 

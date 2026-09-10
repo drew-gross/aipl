@@ -66,6 +66,24 @@ gazelle! {
             // `#{}` still has a location for diagnostics (like `[`).
             HASH: _,
             COMMA, COLON, ARROW, DOT, SEMI, EQ, QUESTION, FATARROW,
+            // `?:` — the marker of a parameter that may be *omitted* rather
+            // than one whose type is optional (`max?: u64 = none`). One
+            // terminal rather than `QUESTION COLON`, because the two spelled
+            // separately need two tokens of lookahead to tell
+            // `Circle(i64?)` from `Many(max?: u64 = none)`: after `IDENT` the
+            // `?` could still be the type's own optional marker, and only the
+            // token after it decides. Gluing the pair in `lexed_to_terminals`
+            // moves that decision into the lexer's half of the problem, where
+            // adjacency is a fact rather than a guess. Carries a span so the
+            // "default must be none" diagnostic can point at the marker.
+            QCOLON: _,
+            // `?=` — the *call-site* half of `?:`: `max?=opt` forwards an
+            // optional into a parameter whose call sites otherwise pass a bare
+            // value. One terminal for the same reason `QCOLON` is one: after an
+            // `IDENT` the `?` could still be the try operator, and only the
+            // token after it decides. Spanned so the "not that kind of
+            // parameter" diagnostic can point at the marker.
+            QEQ: _,
             BANG,
             // `++` — the increment statement `set n++;`. Carries a span so the
             // `+ 1` it desugars to (and the `+` import error it can raise) point
@@ -268,8 +286,9 @@ gazelle! {
         variant_case = IDENT => nullary
                      | IDENT LPAREN case_params RPAREN => with_payload;
         // A case's payload slots. Each is a bare type (`Circle(i64)`), a named
-        // type (`Circle(r: i64)`), or a named type with a default
-        // (`Circle(r: i64 = 1)`) — the same three shapes a parameter has, and
+        // type (`Circle(r: i64)`), a named type with a default
+        // (`Circle(r: i64 = 1)`), or the name-side-optional form
+        // (`Many(r, max?: u64 = none)`) — the same shapes a parameter has, and
         // the same meaning: a default makes the slot a keyword argument of the
         // constructor. A bare `IDENT` *is* a type (`base_ty`), so the choice
         // rests on one token of lookahead after it (`:` → named, else → the
@@ -278,7 +297,8 @@ gazelle! {
         case_params = case_param => first | case_params COMMA case_param => rest;
         case_param = ty => positional
                    | IDENT COLON ty => named
-                   | IDENT COLON ty EQ expr => named_with_default;
+                   | IDENT COLON ty EQ expr => named_with_default
+                   | IDENT QCOLON ty EQ expr => optional_with_default;
 
         fields = field_decl_list => present
                | field_decl_list COMMA => present_trailing
@@ -302,6 +322,11 @@ gazelle! {
         // makes it one — see `ast::Param::default`). After a complete `ty`,
         // one token of lookahead (`EQ` vs `OP` vs FOLLOW(param)) picks the
         // production, so the three forms never conflict.
+        // `k?: T = none` is the same keyword parameter with the `?` moved onto
+        // the *name*: the body still sees `T?`, but a caller passes a bare `T`
+        // and cannot pass `none` (see `ast::Param::implicit_some`). `?:` is one
+        // terminal — see `QCOLON`, which explains why the pair cannot be spelled
+        // as two here.
         // `Point { x, y }` destructures the argument in place of naming it,
         // exactly as `let Point { x, y } = ..` does — the pattern names the
         // struct, so nothing is written twice. Unambiguous after `IDENT`: one
@@ -311,6 +336,7 @@ gazelle! {
               | MUT IDENT COLON ty => mut_param
               | IDENT COLON ty OP => variadic_param
               | IDENT COLON ty EQ expr => with_default
+              | IDENT QCOLON ty EQ expr => optional_with_default
               | IDENT COLON ty OP EQ expr => variadic_with_default
               | IDENT LBRACE struct_field_bindings RBRACE => destructured;
 
@@ -687,6 +713,10 @@ gazelle! {
         // desugars to a binary lambda. A keyword argument is unambiguous too:
         // `=` (EQ) never follows an expression, so after an IDENT the EQ
         // lookahead selects this production over reducing the IDENT to an atom.
+        // `k?=v` forwards an optional into a `k?: T` parameter, whose call
+        // sites otherwise pass a bare `T` — the one thing that spelling cannot
+        // otherwise express, since a wrapper holding a `T?` has no way to hand
+        // it on. Only valid against such a parameter; the loader says so.
         // `..xs` — an array-literal spread. It rides on `arg` (rather than a
         // dedicated array-element rule) so `expr` stays reachable from exactly
         // one place here; a second path to `expr` is what blew the LR tables up
@@ -695,6 +725,7 @@ gazelle! {
         // literal — `args` is shared with calls and array patterns.
         arg = expr => expr | lambda => lambda | OP => op_value
             | IDENT EQ expr => kw_arg
+            | IDENT QEQ expr => kw_arg_forward
             | DOTDOT expr => spread;
         lambda = PIPE lambda_params PIPE expr => lambda_expr
                | OROR expr => lambda_noargs
@@ -772,6 +803,12 @@ impl aipl::Types for Build {
     type Stareq = Span;
     type Slasheq = Span;
     type Hash = Span;
+    /// The `?:` marker of an omit-able parameter, spanned so the "default must
+    /// be `none`" diagnostic can point at it.
+    type Qcolon = Span;
+    /// The `?=` marker of a forwarded optional argument, spanned for the same
+    /// reason [`Qcolon`](Self::Qcolon) is.
+    type Qeq = Span;
     type Builtins = Span;
     type Op = (BinOp, Span);
     type Binop = BinOp;
@@ -1270,16 +1307,28 @@ impl gazelle::Action<aipl::CaseParam<Self>> for Build {
                 name: None,
                 ty,
                 default: None,
+                implicit_some: false,
             },
             aipl::CaseParam::Named((name, _), ty) => CaseParam {
                 name: Some(name),
                 ty,
                 default: None,
+                implicit_some: false,
             },
             aipl::CaseParam::NamedWithDefault((name, _), ty, default) => CaseParam {
                 name: Some(name),
                 ty,
                 default: Some(default),
+                implicit_some: false,
+            },
+            // `k?: T = none` — the slot is optional to *supply*, so the stored
+            // type is the `T?` a match arm binds and the default is the `none`
+            // that was written; see `optional_default`, which checks it.
+            aipl::CaseParam::OptionalWithDefault((name, _), _, ty, default) => CaseParam {
+                name: Some(name),
+                ty: Type::Optional(Box::new(ty)),
+                default: Some(default),
+                implicit_some: true,
             },
         })
     }
@@ -1707,6 +1756,7 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
                     mutable: false,
                     variadic: false,
                     default: None,
+                    implicit_some: false,
                 },
                 fields,
                 span,
@@ -1720,6 +1770,7 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
                 mutable: false,
                 variadic: false,
                 default: None,
+                implicit_some: false,
             },
             aipl::Param::MutParam((name, _), ty) => Param {
                 name,
@@ -1727,6 +1778,7 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
                 mutable: true,
                 variadic: false,
                 default: None,
+                implicit_some: false,
             },
             // `k: T = expr` — a keyword parameter (the default is what makes
             // it one; see `ast::Param::default`).
@@ -1736,6 +1788,18 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
                 mutable: false,
                 variadic: false,
                 default: Some(default),
+                implicit_some: false,
+            },
+            // `k?: T = none` — the `?` moved onto the name. The body still sees
+            // `T?` and the default is still `none`; what changes is the call
+            // site, which passes a bare `T`. See `ast::Param::implicit_some`.
+            aipl::Param::OptionalWithDefault((name, _), _, ty, default) => Param {
+                name,
+                ty: Type::Optional(Box::new(ty)),
+                mutable: false,
+                variadic: false,
+                default: Some(default),
+                implicit_some: true,
             },
             // `x: T*` — a variadic parameter. The trailing operator must be `*`.
             // The stored type is the *sequence type* the body sees: `str` when
@@ -1747,6 +1811,7 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
                 mutable: false,
                 variadic: true,
                 default: None,
+                implicit_some: false,
             },
             // `k: T* = expr` — both at once: variadic in what it accepts (a
             // sequence, a bare element, or an optional one) and a keyword
@@ -1759,6 +1824,7 @@ impl gazelle::Action<aipl::Param<Self>> for Build {
                 mutable: false,
                 variadic: true,
                 default: Some(default),
+                implicit_some: false,
             },
             // Handled above: it is the one form that is not just a `Param`.
             aipl::Param::Destructured(..) => unreachable!(),
@@ -1779,6 +1845,7 @@ fn param_name_span(node: &aipl::Param<Build>) -> Span {
         aipl::Param::Param((_, s), _)
         | aipl::Param::MutParam((_, s), _)
         | aipl::Param::WithDefault((_, s), _, _)
+        | aipl::Param::OptionalWithDefault((_, s), _, _, _)
         | aipl::Param::VariadicParam((_, s), _, _)
         | aipl::Param::VariadicWithDefault((_, s), _, _, _) => s.clone(),
         aipl::Param::Destructured((_, s), _, _) => s.clone(),
@@ -3297,7 +3364,13 @@ impl gazelle::Action<aipl::Arg<Self>> for Build {
             // value. Resolved (and removed) by the loader's expansion.
             aipl::Arg::KwArg((name, name_span), value) => {
                 let span = join_spans(&name_span, &value.span);
-                Expr::new(ExprKind::KwArg(name, Box::new(value)), span)
+                Expr::new(ExprKind::KwArg(name, Box::new(value), false), span)
+            }
+            // `k?= expr` — the same keyword argument, forwarding an optional
+            // rather than the value inside one.
+            aipl::Arg::KwArgForward((name, name_span), _, value) => {
+                let span = join_spans(&name_span, &value.span);
+                Expr::new(ExprKind::KwArg(name, Box::new(value), true), span)
             }
             // `..xs`. `DOTDOT` carries no span, so the node takes the operand's
             // — errors point at what is being spread. Only an array literal
@@ -4207,7 +4280,59 @@ fn lexed_to_terminals(out: LexedOutput) -> Vec<(aipl::Terminal<Build>, Span)> {
         };
         pairs.push((term, span));
     }
-    pairs
+    glue_qcolon(pairs)
+}
+
+/// Rewrite each adjacent `?` `:` pair into the single `QCOLON` terminal, and
+/// each adjacent `?` `=` pair into `QEQ`.
+///
+/// "Adjacent" is literal: the `?` must end exactly where the next token begins,
+/// so `max?: u64` and `max?=opt` glue while `x? : y` — were anything to spell
+/// that — does not.
+///
+/// Both pairs are unspellable otherwise. Nothing puts a `:` straight after a
+/// `?`: a type's optional marker is followed by `=`, `,`, `)` or another type
+/// suffix, and the one place a `:` follows a type is a dict type, whose key may
+/// not be optional. Nothing puts a bare `=` there either — `?` ends an
+/// expression, and no assignment target ends in one. (`==` is its own token, so
+/// `a? == b` is untouched.)
+///
+/// The gluing is what lets an LR(1) grammar see these at all: spelled as two
+/// terminals, `Circle(i64?)` against `Many(max?: u64 = none)` — and `f(x?)`
+/// against `f(k?=v)` — need two tokens of lookahead. Done here rather than in
+/// the lexer because the lexer is the dogfooded `lex_aipl.aipl`, whose token
+/// kinds are baked into `dogfood.clif` and read by every parse of the compiler's
+/// own source. This pass needs neither.
+fn glue_qcolon(pairs: Vec<(aipl::Terminal<Build>, Span)>) -> Vec<(aipl::Terminal<Build>, Span)> {
+    use self::aipl::Terminal as T;
+
+    let mut out: Vec<(aipl::Terminal<Build>, Span)> = Vec::with_capacity(pairs.len());
+    let mut it = pairs.into_iter().peekable();
+    while let Some((term, span)) = it.next() {
+        if matches!(term, T::Question) {
+            let glued = match it.peek() {
+                Some((T::Colon, next)) if next.start == span.end => {
+                    Some((span.start..next.end, true))
+                }
+                Some((T::Eq, next)) if next.start == span.end => {
+                    Some((span.start..next.end, false))
+                }
+                _ => None,
+            };
+            if let Some((glued, is_colon)) = glued {
+                it.next();
+                let term = if is_colon {
+                    T::Qcolon(glued.clone())
+                } else {
+                    T::Qeq(glued.clone())
+                };
+                out.push((term, glued));
+                continue;
+            }
+        }
+        out.push((term, span));
+    }
+    out
 }
 
 pub fn parse(input: &str) -> Result<Program, Error> {
@@ -4345,7 +4470,7 @@ fn bake_asserts(e: &mut Expr, src: &str) {
         | ExprKind::Field(x, _)
         | ExprKind::Try(x)
         | ExprKind::Return(x)
-        | ExprKind::KwArg(_, x)
+        | ExprKind::KwArg(_, x, _)
         | ExprKind::Spread(x) => bake_asserts(x, src),
         ExprKind::Construct(_, inits) => {
             for fi in inits {
@@ -4448,6 +4573,8 @@ const SYMBOL_DISPLAY_NAMES: &[(&str, &str)] = &[
     ("SEMI", ";"),
     ("EQ", "="),
     ("QUESTION", "?"),
+    ("QCOLON", "?:"),
+    ("QEQ", "?="),
     ("FATARROW", "=>"),
     // Surfaces after a match pattern, where an alternation may follow.
     ("PIPE", "|"),

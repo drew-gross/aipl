@@ -142,9 +142,9 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     // Bounds. One-at-most is `?` and exactly-one is the body written alone,
     // because those are what those bounds mean; anything else is the `{n,m}`
     // longhand EBNF has no operator for.
-    let r_upto: Rule<Kind> = Many(Term(Num), max=some(1));
-    let r_exactly: Rule<Kind> = Many(Term(Num), min=1, max=some(1));
-    let r_range: Rule<Kind> = Many(Term(Num), min=two, max=some(4));
+    let r_upto: Rule<Kind> = Many(Term(Num), max=1);
+    let r_exactly: Rule<Kind> = Many(Term(Num), min=1, max=1);
+    let r_range: Rule<Kind> = Many(Term(Num), min=two, max=4);
     let g = g_of([
         one("alt", r_alt),
         one("seq", r_seq),

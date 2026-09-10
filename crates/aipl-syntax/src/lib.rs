@@ -587,6 +587,11 @@ pub mod ast {
         /// slots declared before it. The loader fills every omitted one at the
         /// construction site, so nothing downstream sees a partial payload.
         pub default: Option<Expr>,
+        /// `true` for a slot written `k?: T = none` — see
+        /// [`Param::implicit_some`], whose semantics this is one construction at
+        /// a time. `Many(x, max?: u64 = none)` is constructed `Many(r, max = 2)`
+        /// rather than `Many(r, max = some(2))`.
+        pub implicit_some: bool,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -620,6 +625,32 @@ pub mod ast {
         /// loader binds each name the default reads to the argument that call
         /// passes for it; see `aipl-loader`'s `kwargs` module.
         pub default: Option<Expr>,
+        /// `true` for a keyword parameter written `k?: T = none` — the `?` on
+        /// the *name* rather than the type. [`ty`](Param::ty) is still the
+        /// `T?` the body sees and [`default`](Param::default) is still `none`;
+        /// what this changes is the call site, which passes a bare `T`
+        /// (`max = 2`, not `max = some(2)`) and may not pass `none` at all.
+        ///
+        /// The two spellings describe the same parameter from opposite ends.
+        /// `k: T? = none` says what the *body* gets and makes every caller
+        /// restate it; `k?: T = none` says what a *caller* supplies and lets the
+        /// optional stay an implementation detail of "you may leave this out".
+        /// For an argument that is either given or absent — a bound, a limit —
+        /// the second is what the call site means, and `some(..)` at every site
+        /// is noise.
+        ///
+        /// The one shape a bare `T` cannot express is a wrapper passing on its
+        /// *own* optional. `k?= expr` is the escape: it supplies the `T?`
+        /// itself, unwrapped, and is accepted only against a parameter declared
+        /// this way (see [`ExprKind::KwArg`]). Omitting the argument and
+        /// forwarding a `none` are then the same thing, which is what lets a
+        /// wrapper pass its parameter through faithfully.
+        ///
+        /// The loader's `kwargs` module is the only pass that reads this: it
+        /// wraps each supplied argument in `some(..)` while expanding the call —
+        /// all but a forwarded one, which is already an optional — so nothing
+        /// downstream can tell the two spellings apart.
+        pub implicit_some: bool,
     }
 
     /// The language's built-in scalar primitive types: the fixed-width integers
@@ -1386,7 +1417,12 @@ pub mod ast {
         /// parameters and rewrites the call to plain positional arguments
         /// (erroring on any misuse), so every later pass can treat it as
         /// unreachable.
-        KwArg(String, Box<Expr>),
+        ///
+        /// The `bool` is the `name?= expr` spelling: the argument is an
+        /// *optional already*, passed through rather than wrapped. It is only
+        /// valid against a [`Param::implicit_some`] parameter, whose call sites
+        /// otherwise pass a bare `T` — see the `kwargs` module in `aipl-loader`.
+        KwArg(String, Box<Expr>, bool),
     }
 
     /// A lambda parameter: a name and an optional type annotation (inferred
@@ -2030,7 +2066,7 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
             out.insert("-".to_string());
             collect_operators(x, out);
         }
-        K::Field(x, _) | K::Try(x) | K::Return(x) | K::KwArg(_, x) | K::Spread(x) => {
+        K::Field(x, _) | K::Try(x) | K::Return(x) | K::KwArg(_, x, _) | K::Spread(x) => {
             collect_operators(x, out)
         }
         // An `Assign` LHS is a place (idents/fields only), so it can't
@@ -2890,7 +2926,7 @@ fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
         | K::Field(x, _)
         | K::Try(x)
         | K::Return(x)
-        | K::KwArg(_, x)
+        | K::KwArg(_, x, _)
         | K::Spread(x)
         | K::Lambda(_, x) => vec![x.as_mut()],
         K::Match(scrutinee, arms) => {
@@ -2952,7 +2988,7 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
         | K::Field(x, _)
         | K::Try(x)
         | K::Return(x)
-        | K::KwArg(_, x)
+        | K::KwArg(_, x, _)
         | K::Spread(x)
         | K::Lambda(_, x) => each_subexpr(x, f),
         K::Match(scrutinee, arms) => {
@@ -3089,7 +3125,7 @@ fn children(e: &ast::Expr) -> Vec<&ast::Expr> {
         | K::Field(x, _)
         | K::Try(x)
         | K::Return(x)
-        | K::KwArg(_, x)
+        | K::KwArg(_, x, _)
         | K::Spread(x)
         | K::Lambda(_, x) => vec![x],
         K::Match(scrutinee, arms) => {

@@ -1146,7 +1146,7 @@
           </h3>
           <pre class="signature"><code>fn case_params(self: W, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
 
-          <div class="doc"><p>The payload slots, up to (not consuming) the closing <code>)</code>. A slot is named when an identifier is followed by <code>:</code> — the same two-token look the grammar takes, and the only place a <code>:</code> can sit second in a type is a dict's <code>#{K: V}</code>, which starts with <code>#</code>. A named slot may carry a default, spaced like a parameter's.</p></div>
+          <div class="doc"><p>The payload slots, up to (not consuming) the closing <code>)</code>. A slot is named when an identifier is followed by <code>:</code> — the same two-token look the grammar takes, and the only place a <code>:</code> can sit second in a type is a dict's <code>#{K: V}</code>, which starts with <code>#</code>. A named slot may carry a default, spaced like a parameter's.</p><p><code>k?: T</code> is the omit-able slot (see <code>one_param</code>). It needs one token more of look than a plain named slot, and that is exactly the look the grammar cannot take — which is why <code>?:</code> reaches the parser as a single terminal there. Here the two are still separate tokens, so the third position is what tells <code>Circle(i64?)</code> from <code>Many(max?: u64 = none)</code>.</p></div>
 
 
         </section>
@@ -1438,7 +1438,7 @@
             <a class="anchor" href="#item-range_has_semi">range_has_semi</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_semi(self: W, __spat$51425: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_semi(self: W, __spat$52436: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 

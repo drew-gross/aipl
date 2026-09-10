@@ -6664,6 +6664,7 @@ fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
                 mutable: false,
                 variadic: false,
                 default: None,
+                implicit_some: false,
             }),
             [p] if p.ty == cli_args_ty() => wants_args = true,
             _ => {

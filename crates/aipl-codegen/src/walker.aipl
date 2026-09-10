@@ -920,6 +920,12 @@ fn variant_payload(self: W) -> WDoc!FmtError {
 # an identifier is followed by `:` — the same two-token look the grammar takes,
 # and the only place a `:` can sit second in a type is a dict's `#{K: V}`, which
 # starts with `#`. A named slot may carry a default, spaced like a parameter's.
+#
+# `k?: T` is the omit-able slot (see `one_param`). It needs one token more of
+# look than a plain named slot, and that is exactly the look the grammar cannot
+# take — which is why `?:` reaches the parser as a single terminal there. Here
+# the two are still separate tokens, so the third position is what tells
+# `Circle(i64?)` from `Many(max?: u64 = none)`.
 fn case_params(self: W, acc0: Doc[]) -> WDocs!FmtError {
     mut w = self;
     mut acc = acc0;
@@ -928,6 +934,10 @@ fn case_params(self: W, acc0: Doc[]) -> WDocs!FmtError {
             let n = w.bump();
             let t = n.w.expect(":")?.w.ty()?;
             WDocs { w: t.w, docs: [Text(n.text), Text(": "), t.doc] }
+        } else if (w.peek_text_n(1) == "?" && w.peek_text_n(2) == ":") {
+            let n = w.bump();
+            let t = n.w.bump().w.expect(":")?.w.ty()?;
+            WDocs { w: t.w, docs: [Text(`{n.text}?`), Text(": "), t.doc] }
         } else {
             let t = w.ty()?;
             WDocs { w: t.w, docs: [t.doc] }
@@ -1207,8 +1217,16 @@ fn one_param(self: W) -> WDoc!FmtError {
             doc: Concat([..m.docs, Text(`{n.text} \{ {ids.names.join(sep=", ")} }`)]),
         });
     };
-    let t = n.w.expect(":")?.w.ty()?;
-    let typed = [..m.docs, Text(n.text), Text(": "), t.doc];
+
+    // `k?: T = none` — the `?` marks a parameter that may be *omitted*, against
+    // `k: T?` where the type itself is optional. It belongs to the name, so it
+    // is written tight against it and the `:` follows exactly as it otherwise
+    // would.
+    let opt = n.w.peek_text() == "?";
+    let named = if (opt) { Text(`{n.text}?`) } else { Text(n.text) };
+    let after = if (opt) { n.w.bump().w } else { n.w };
+    let t = after.expect(":")?.w.ty()?;
+    let typed = [..m.docs, named, Text(": "), t.doc];
     // The variadic marker.
     let v = if (t.w.peek_text() == "*") {
         WDocs { w: t.w.bump().w, docs: typed.push(Text("*")) }
@@ -2181,6 +2199,15 @@ fn call_arg(self: W) -> WDoc!FmtError {
         return ok(WDoc { w: v.w, doc: Concat([Text(".."), v.doc]) });
     };
 
+    // `k?= expr` -> tight `k?=expr` — the same keyword argument forwarding an
+    // optional the caller already holds. Tested before the plain form, whose
+    // `=` sits one token later here.
+    if (self.peek_is(Ident) && self.peek_text_n(1) == "?" && self.peek_text_n(2) == "=") {
+        let n = self.bump();
+        let v = n.w.bump().w.bump().w.expr()?;
+        return ok(WDoc { w: v.w, doc: Concat([Text(`{n.text}?=`), v.doc]) });
+    };
+
     // `k = expr` -> tight `k=expr` (`==` is one token, so a lone `=` after an
     // identifier is unambiguous).
     if (self.peek_is(Ident) && self.peek_text_n(1) == "=") {
@@ -2931,11 +2958,11 @@ allocations: 115345
 deallocations: 115345
 reallocations: 1910
 bytes allocated: 6237037
-instructions executed: 22276886
-binary size: 8713552
-  code: 5501564
+instructions executed: 22281823
+binary size: 8725864
+  code: 5508876
   data: 27364
-  metadata: 3184624
+  metadata: 3189624
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3028,7 +3055,7 @@ functions:
     calls: 160
     bytes: 408
   __eq_FmtKind:
-    calls: 924
+    calls: 936
     bytes: 64
   __eq_FmtTok:
     calls: 0
@@ -3208,7 +3235,7 @@ functions:
     calls: 4190
     bytes: (external)
   aipl_arr_inc:
-    calls: 256858
+    calls: 256969
     bytes: (external)
   aipl_arr_reserve:
     calls: 4268
@@ -3217,7 +3244,7 @@ functions:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 364151
+    calls: 364262
     bytes: (external)
   aipl_array_new:
     calls: 104603
@@ -3238,13 +3265,13 @@ functions:
     calls: 7318
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 50312
+    calls: 50322
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 4437
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 42994
+    calls: 43004
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 4437
@@ -3293,7 +3320,7 @@ functions:
     bytes: 1284
   call_arg:
     calls: 12
-    bytes: 5216
+    bytes: 7908
   call_arg_list:
     calls: 19
     bytes: 796
@@ -3302,7 +3329,7 @@ functions:
     bytes: 2776
   case_params:
     calls: 6
-    bytes: 6580
+    bytes: 9968
   comma_list_docs:
     calls: 101
     bytes: 4640
@@ -3425,7 +3452,7 @@ functions:
     bytes: 532
   one_param:
     calls: 12
-    bytes: 12748
+    bytes: 13980
   params_until:
     calls: 26
     bytes: 2364
@@ -3442,7 +3469,7 @@ functions:
     calls: 3
     bytes: 3252
   peek_is:
-    calls: 924
+    calls: 936
     bytes: 288
   postfix:
     calls: 125
@@ -3529,7 +3556,7 @@ functions:
     calls: 1
     bytes: 988
   tok_text:
-    calls: 3479
+    calls: 3523
     bytes: 508
   trailing_comment:
     calls: 85

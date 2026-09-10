@@ -1,0 +1,101 @@
+import { print, value_or, wrapping_add as + } from builtins;
+
+// `k?: T = none` — a keyword parameter that may be *omitted*, as against
+// `k: T? = none`, whose type is optional.
+//
+// The two describe the same parameter from opposite ends. `k: T? = none` says
+// what the *body* gets and makes every caller restate it (`max = some(2)`);
+// `k?: T = none` says what a *caller* supplies and lets the optional stay an
+// implementation detail of "you may leave this out". For an argument that is
+// either given or absent — a bound, a limit — the second is what the call site
+// means, and `some(..)` at every site is noise.
+//
+// The body is unchanged either way: it sees `T?` and matches on it. Only the
+// call site moves, so the two spellings compile to the same call — the loader's
+// keyword-argument pass wraps each supplied argument in `some(..)` and nothing
+// downstream can tell them apart.
+fn clamp(x: u64, lo: u64 = 0, hi?: u64 = none) -> str { `{x} lo={lo} hi={hi.value_or(99)}` }
+
+// The same slot on a variant case's payload, which declares its keyword slots
+// exactly as a parameter list does.
+variant Rep = Bounded(str, min: u64 = 0, max?: u64 = none)
+
+fn show(r: Rep) -> str {
+    match (r) {
+        Bounded(s, min, max) => `{s} min={min} max={max.value_or(99)}`,
+    }
+}
+
+// A `?:` parameter is still an ordinary keyword parameter: it may be skipped
+// while a later one is given, and the body still sees an optional.
+fn describe(hi?: u64 = none) -> str {
+    match (hi) {
+        some(h) => `bounded at {h}`,
+        none => "unbounded",
+    }
+}
+
+fn main() !prints {
+    // Omitted: the body sees `none`.
+    print(clamp(5));
+    // Supplied: a bare `u64`, not `some(9)`.
+    print(clamp(5, hi=9));
+    print(clamp(5, lo=1, hi=9));
+    // The keyword parameters are still independent of each other.
+    print(clamp(5, lo=1));
+
+    print(show(Bounded("a")));
+    print(show(Bounded("b", max=3)));
+    print(show(Bounded("c", min=1, max=2)));
+
+    print(describe());
+    print(describe(hi=4));
+
+    // The value passed is an ordinary expression, evaluated once like any
+    // argument — nothing about `?:` is special at the call site beyond the
+    // missing `some(..)`.
+    let n: u64 = 2;
+    print(describe(hi=n + 1));
+    print(clamp(5, hi=n));
+}
+--- stdout ---
+5 lo=0 hi=99
+5 lo=0 hi=9
+5 lo=1 hi=9
+5 lo=1 hi=99
+a min=0 max=99
+b min=0 max=3
+c min=1 max=2
+unbounded
+bounded at 4
+bounded at 3
+5 lo=0 hi=2
+--- performance ---
+allocations: 57
+deallocations: 57
+reallocations: 0
+bytes allocated: 3386
+instructions executed: 1355
+binary size: 5896
+  code: 3568
+  data: 1
+  metadata: 2327
+functions:
+  __to_str_u64:
+    calls: 23
+    bytes: 204
+  aipl_u64_len:
+    calls: 46
+    bytes: (external)
+  aipl_write_u64:
+    calls: 23
+    bytes: (external)
+  clamp:
+    calls: 5
+    bytes: 580
+  main:
+    calls: 1
+    bytes: 2128
+  show:
+    calls: 3
+    bytes: 656

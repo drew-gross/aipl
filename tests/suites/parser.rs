@@ -119,6 +119,7 @@ fn function_with_one_param() {
             mutable: false,
             variadic: false,
             default: None,
+            implicit_some: false,
         }]
     );
     assert_eq!(f.body, ident("x"));

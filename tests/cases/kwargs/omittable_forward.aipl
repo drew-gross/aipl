@@ -1,0 +1,79 @@
+import { print, value_or } from builtins;
+
+// `k?=v` — the call-site escape for a `k?: T = none` parameter.
+//
+// Such a parameter is normally supplied as a bare `T`, which leaves one shape
+// unsayable: a wrapper that holds its *own* `T?` and wants to pass it on.
+// `clamp(5, hi=hi)` would wrap an optional in another one. `?=` says "this is
+// already the optional" and hands it through untouched.
+//
+// The two spellings are the two halves of the same parameter: `hi=9` supplies a
+// value, `hi?=o` supplies the presence-or-absence itself, and omitting it is the
+// same as forwarding a `none`.
+fn clamp(x: u64, hi?: u64 = none) -> str { `{x} hi={hi.value_or(99)}` }
+
+// The wrapper this exists for: `outer` has the same parameter and passes it on
+// without ever inspecting it.
+fn outer(x: u64, hi?: u64 = none) -> str { clamp(x, hi?=hi) }
+
+// Forwarding through two levels, so the value is not just wrapped and unwrapped
+// at one boundary.
+fn outer2(hi?: u64 = none) -> str { outer(7, hi?=hi) }
+
+fn main() !prints {
+    // Supplied and omitted, straight through.
+    print(clamp(5));
+    print(clamp(5, hi=9));
+
+    // The same, one wrapper deep.
+    print(outer(5));
+    print(outer(5, hi=9));
+
+    // And two.
+    print(outer2());
+    print(outer2(hi=1));
+
+    // Any expression of the optional type forwards, not just a parameter.
+    let o: u64? = some(3);
+    print(clamp(5, hi?=o));
+
+    // Forwarding a `none` is how "absent" travels: the same answer omitting it
+    // gives, which is what makes a wrapper's pass-through faithful.
+    let n: u64? = none;
+    print(clamp(5, hi?=n));
+}
+--- stdout ---
+5 hi=99
+5 hi=9
+5 hi=99
+5 hi=9
+7 hi=99
+7 hi=1
+5 hi=3
+5 hi=99
+--- performance ---
+allocations: 32
+deallocations: 32
+reallocations: 0
+bytes allocated: 1684
+instructions executed: 807
+binary size: 2552
+  code: 1200
+  data: 1
+  metadata: 1351
+functions:
+  __to_str_u64:
+    calls: 16
+    bytes: 204
+  aipl_u64_len:
+    calls: 32
+    bytes: (external)
+  aipl_write_u64:
+    calls: 16
+    bytes: (external)
+  clamp:
+    calls: 8
+    bytes: 408
+  main:
+    calls: 1
+    bytes: 588

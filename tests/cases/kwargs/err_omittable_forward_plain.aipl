@@ -1,0 +1,16 @@
+import { print } from builtins;
+
+// `?=` forwards an optional into a `k?: T` parameter. An ordinary keyword
+// parameter has nothing to forward — its argument is already whatever type it
+// declares — so the marker is refused rather than silently ignored.
+fn plain(k: u64 = 0) -> u64 { k }
+
+fn main() !prints {
+    print(plain(k?=some(1)));
+}
+--- errors ---
+error: fn "plain": keyword parameter "k" is not declared "k?: T", so "?=" has nothing to forward — pass it as "k = .."
+ --> ./tests/cases/kwargs/err_omittable_forward_plain.aipl:9:17
+  |
+9 |     print(plain(k?=some(1)));
+  |                 ^^^^^^^^^

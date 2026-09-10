@@ -1,0 +1,16 @@
+import { print, value_or } from builtins;
+
+fn clamp(x: u64, hi?: u64 = none) -> str { `{x} {hi.value_or(99)}` }
+
+// `none` is what *omitting* the argument yields, so writing it asks for the
+// default the long way. The `?:` form has no spelling for it on purpose: that
+// is the difference between it and `hi: u64? = none`.
+fn main() !prints {
+    print(clamp(5, hi=none));
+}
+--- errors ---
+error: fn "clamp": keyword argument "hi" cannot be "none" — leave it out instead, which is what yields none
+ --> ./tests/cases/kwargs/err_omittable_none.aipl:9:23
+  |
+9 |     print(clamp(5, hi=none));
+  |                       ^^^^

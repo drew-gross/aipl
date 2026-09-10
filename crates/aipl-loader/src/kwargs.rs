@@ -175,6 +175,11 @@ struct FnKwInfo {
     /// argument count.
     positional: Vec<String>,
     kw: Vec<(String, Expr)>,
+    /// Per keyword parameter, whether it was declared `k?: T = none` — see
+    /// [`aipl_syntax::ast::Param::implicit_some`]. A supplied argument for one
+    /// is wrapped in `some(..)` here, and an explicit `none` refused, so that by
+    /// the time the call leaves this pass the two spellings are the same call.
+    kw_implicit: Vec<bool>,
     /// Every parameter in declaration order, paired with the annotation to put
     /// on the call-site binding that stands in for it when a later default
     /// reads it — the parameter's declared type, so a bare literal argument
@@ -199,10 +204,14 @@ impl FnKwInfo {
     /// case's payload becomes (see [`case_params`]).
     fn from_params(name: &str, sig_params: &[Param]) -> Result<FnKwInfo, Error> {
         let mut kw: Vec<(String, Expr)> = Vec::new();
+        let mut kw_implicit: Vec<bool> = Vec::new();
         let mut positional = Vec::new();
         for p in sig_params {
             match &p.default {
-                Some(d) => kw.push((p.name.clone(), d.clone())),
+                Some(d) => {
+                    kw.push((p.name.clone(), d.clone()));
+                    kw_implicit.push(p.implicit_some);
+                }
                 None => {
                     if let Some((kw_name, kw_default)) = kw.last() {
                         return Err(Error::at(
@@ -217,6 +226,35 @@ impl FnKwInfo {
                     }
                     positional.push(p.name.clone());
                 }
+            }
+        }
+        // A `k?: T` parameter's default is not a free choice: the form's whole
+        // meaning is "leaving the argument out yields `none`", so any other
+        // default would be a value of `T?` no call site can spell — supplying
+        // the parameter passes a bare `T`, and `?=` passes an optional the
+        // caller already holds. Checked here rather than in the parser because
+        // it is a rule about the declaration, not about its shape: the AIPL
+        // grammar accepts the same syntax and the two must agree on what parses
+        // (`aipl_grammar_matches_gazelle_on_corpus`).
+        for p in sig_params {
+            if !p.implicit_some {
+                continue;
+            }
+            let Some(d) = &p.default else { continue };
+            if !matches!(d.kind, aipl_syntax::ast::ExprKind::None) {
+                return Err(Error::at(
+                    format!(
+                        "{}: parameter {:?} is declared \"{}?: T\", so its default must be \
+                         \"none\" — that is what leaving the argument out yields; write \
+                         \"{}: T = <default>\" for a parameter whose default a caller can \
+                         also pass",
+                        describe(name),
+                        p.name,
+                        p.name,
+                        p.name,
+                    ),
+                    d.span.clone(),
+                ));
             }
         }
         // A default is filled in at the call site from the arguments that call
@@ -256,6 +294,7 @@ impl FnKwInfo {
         Ok(FnKwInfo {
             positional,
             kw,
+            kw_implicit,
             params,
         })
     }
@@ -286,6 +325,7 @@ fn case_params(c: &VariantCase) -> Vec<Param> {
             mutable: false,
             variadic: false,
             default: slot.default.clone(),
+            implicit_some: slot.implicit_some,
         })
         .collect()
 }
@@ -667,10 +707,10 @@ impl Expander {
         // Split the positional prefix from the keyword tail, rejecting a
         // positional argument after a keyword one.
         let mut positional: Vec<Expr> = Vec::new();
-        let mut by_kw: Vec<(String, Expr, Span)> = Vec::new();
+        let mut by_kw: Vec<(String, Expr, Span, bool)> = Vec::new();
         for arg in args {
             match arg.kind {
-                ExprKind::KwArg(k, v) => by_kw.push((k, *v, arg.span)),
+                ExprKind::KwArg(k, v, fwd) => by_kw.push((k, *v, arg.span, fwd)),
                 _ if by_kw.is_empty() => positional.push(arg),
                 _ => {
                     return Err(Error::at(
@@ -687,7 +727,7 @@ impl Expander {
         let info = match self.fns.get(name) {
             Some(info) if !info.kw.is_empty() => info,
             found => {
-                if let Some((k, _, kspan)) = by_kw.first() {
+                if let Some((k, _, kspan, _)) = by_kw.first() {
                     // A known function whose parameter `k` exists but is
                     // positional gets the more specific message.
                     if found.is_some_and(|info| info.positional.iter().any(|p| p == k)) {
@@ -735,7 +775,7 @@ impl Expander {
         // Match each keyword argument to a keyword parameter by name.
         let kw_names: Vec<&str> = info.kw.iter().map(|(k, _)| k.as_str()).collect();
         let mut supplied: Vec<Option<Expr>> = vec![None; kw_names.len()];
-        for (k, v, kspan) in by_kw {
+        for (k, v, kspan, fwd) in by_kw {
             let Some(i) = kw_names.iter().position(|n| *n == k) else {
                 // Naming a *positional* parameter gets its own message: only a
                 // keyword parameter may be supplied by keyword.
@@ -769,7 +809,54 @@ impl Expander {
                     kspan,
                 ));
             }
-            supplied[i] = Some(v);
+            // `k?=v` forwards an optional that the caller already holds. It is
+            // the escape from the one thing the `k?: T` spelling cannot
+            // otherwise say — a wrapper passing its own optional on — so it is
+            // accepted only against such a parameter, where it means "this is
+            // already the `T?`, do not wrap it".
+            if fwd && !info.kw_implicit[i] {
+                return Err(Error::at(
+                    format!(
+                        "{}: keyword parameter {k:?} is not declared \"{k}?: T\", so \"?=\" \
+                         has nothing to forward — pass it as \"{k} = ..\"",
+                        describe(name),
+                    ),
+                    kspan,
+                ));
+            }
+            // A `k?: T = none` parameter is supplied as a bare `T`: the optional
+            // is what *omitting* it yields, so the call site never spells one.
+            // Wrapping here is the whole of the feature — after this pass the
+            // call is indistinguishable from one written `k = some(v)` against a
+            // `k: T? = none` parameter.
+            supplied[i] = Some(if info.kw_implicit[i] && !fwd {
+                if matches!(v.kind, ExprKind::None) {
+                    return Err(Error::at(
+                        format!(
+                            "{}: keyword argument {k:?} cannot be \"none\" — leave it out \
+                             instead, which is what yields none",
+                            describe(name),
+                        ),
+                        v.span.clone(),
+                    ));
+                }
+                // The mistake a reader of the old spelling makes. Left alone it
+                // wraps to `T??` and reports a type nobody wrote.
+                if matches!(&v.kind, ExprKind::Call(f, a, _) if f == "some" && a.len() == 1) {
+                    return Err(Error::at(
+                        format!(
+                            "{}: keyword argument {k:?} takes the value itself, not an \
+                             optional — drop the \"some(..)\"",
+                            describe(name),
+                        ),
+                        v.span.clone(),
+                    ));
+                }
+                let span = v.span.clone();
+                Expr::new(ExprKind::Call("some".to_string(), vec![v], false), span)
+            } else {
+                v
+            });
         }
 
         let params = info.params.clone();
@@ -922,10 +1009,10 @@ impl Expander {
                 let args: Vec<Expr> = args
                     .iter()
                     .map(|a| match &a.kind {
-                        ExprKind::KwArg(k, v) => {
+                        ExprKind::KwArg(k, v, fwd) => {
                             let v = self.expand_expr(v, locals)?;
                             Ok(Expr::new(
-                                ExprKind::KwArg(k.clone(), Box::new(v)),
+                                ExprKind::KwArg(k.clone(), Box::new(v), *fwd),
                                 a.span.clone(),
                             ))
                         }

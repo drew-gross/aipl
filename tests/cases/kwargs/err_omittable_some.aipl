@@ -1,0 +1,15 @@
+import { print, value_or } from builtins;
+
+fn clamp(x: u64, hi?: u64 = none) -> str { `{x} {hi.value_or(99)}` }
+
+// The mistake a reader of the `hi: u64? = none` spelling makes. It is caught
+// here rather than left to wrap into a `u64??` and report a type nobody wrote.
+fn main() !prints {
+    print(clamp(5, hi=some(3)));
+}
+--- errors ---
+error: fn "clamp": keyword argument "hi" takes the value itself, not an optional — drop the "some(..)"
+ --> ./tests/cases/kwargs/err_omittable_some.aipl:8:23
+  |
+8 |     print(clamp(5, hi=some(3)));
+  |                       ^^^^^^

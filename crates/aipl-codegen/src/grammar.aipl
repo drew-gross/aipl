@@ -119,9 +119,14 @@ variant Rule<K: variant> =
     // makes `min=1, max=1` mean "one item, in brackets" when it carries a
     // `nested_in` — a group that holds one thing rather than a list.
     //
+    // Written `max?: u64` rather than `max: u64?`: a caller passes the bound
+    // itself (`max=2`), and leaving it out is what yields `none`. A caller that
+    // already holds an optional — `link_rule` and `desugar_rule`, rebuilding a
+    // rule they took apart — forwards it with `max?=max`.
+    //
     // `trailing_sep` still applies at the bound. A separator after the last item
     // ends the list rather than starting the item that would have been next, so
-    // `Many(x, sep=comma, max=some(2))` takes `1, 2,` whole — the same answer it
+    // `Many(x, sep=comma, max=2)` takes `1, 2,` whole — the same answer it
     // gives when the items run out instead.
     //
     // With a `sep` it is a *separated* list: `r`, then `sep r` for as long as
@@ -154,7 +159,7 @@ variant Rule<K: variant> =
     | Many(
         Rule<K>,
         min: u64 = 0,
-        max: u64? = none,
+        max?: u64 = none,
         sep: Rule<K>? = none,
         trailing_sep: bool = true,
         nested_in: Rule<K>[] = [],
@@ -240,7 +245,7 @@ variant Build<A: any> = Mk((str, Cst, A[]) -> A!ParseError)
 # with them. Such a group lays out `Inline`, like any other run of children.
 #
 # In the `nested_in` shorthand it is not written by hand: a `Many` bounded at one
-# item is not a list, so `desugar` reads `wraps: false` off `max=some(1)`.
+# item is not a list, so `desugar` reads `wraps: false` off `max=1`.
 struct ListStyle { sep: str = ",", spaced: bool = false, trailing: bool = true, wraps: bool = true }
 
 # How a production's matched children are joined into a `Doc` — the formatting
@@ -388,7 +393,7 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
             let inner: Rule<K> = Many(
                 desugar_rule(sub)?,
                 min=min,
-                max=max,
+                max?=max,
                 sep=desugar_opt(sep)?,
                 trailing_sep=trailing_sep,
             );
@@ -505,7 +510,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
         Many(sub, min, max, sep, trailing_sep, _, _) => ok(Many(
             link_rule(sub, names, base)?,
             min=min,
-            max=max,
+            max?=max,
             sep=link_opt(sep, names, base + group_count(sub))?,
             trailing_sep=trailing_sep,
         )),
@@ -761,19 +766,14 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 
     // A group bounded at one item is not a list, so `wraps` comes off `max` and
     // the shorthand says "a bracket pair holding one thing" without restating it.
-    let single: Rule<Kind> = Many(
-        Term(Atom),
-        min=1,
-        max=some(1),
-        nested_in=[Literal("("), Literal(")")],
-    );
+    let single: Rule<Kind> = Many(Term(Atom), min=1, max=1, nested_in=[Literal("("), Literal(")")]);
     let single_g: Grammar<Kind, Node> = Grammar {
         prods: [Production { name: "a", rule: single, build: Mk(keep), layout: Inline }],
     };
     assert(link(single_g)?.groups == [ListStyle { sep: "", wraps: false }]);
 
     // A maximum below the minimum is a rule that could never match.
-    let backwards: Rule<Kind> = Many(Term(Atom), min=2, max=some(1));
+    let backwards: Rule<Kind> = Many(Term(Atom), min=2, max=1);
     let back_g: Grammar<Kind, Node> = Grammar {
         prods: [Production { name: "a", rule: backwards, build: Mk(keep), layout: Inline }],
     };

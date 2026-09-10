@@ -1,0 +1,16 @@
+import { print, value_or } from builtins;
+
+fn clamp(x: u64, hi?: u64 = none) -> str { `{x} {hi.value_or(99)}` }
+
+// `?=` is the *forwarding* form: it hands over an optional the caller already
+// holds. A bare value is what the plain `hi = 3` spelling takes, so passing one
+// here is a type error rather than a second way to spell the same call.
+fn main() !prints {
+    print(clamp(5, hi?=3));
+}
+--- errors ---
+error: fn "clamp" arg 1: expected u64?, got i64
+ --> ./tests/cases/kwargs/err_omittable_forward_value.aipl:9:24
+  |
+9 |     print(clamp(5, hi?=3));
+  |                        ^

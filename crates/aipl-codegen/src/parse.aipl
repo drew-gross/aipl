@@ -471,7 +471,7 @@ fn match_many<K: variant, A: any>(
     while (going) {
         // Reaching `max` ends the repetition without failing it: a further item,
         // and the separator that would have led it, are left where they are for
-        // the enclosing rule. So `Many(x, min=1, max=some(1))` consumes exactly
+        // the enclosing rule. So `Many(x, min=1, max=1)` consumes exactly
         // one `x`, and a second `x` after it is simply not part of this rule.
         //
         // One thing at the bound is still the list's own, though: a *trailing*
@@ -501,7 +501,7 @@ fn match_many<K: variant, A: any>(
                     // An item that consumed nothing would be matched again at
                     // the same position forever — but only if the repetition is
                     // allowed to run that far. A `max` stops it, which is what
-                    // lets `Many(x, min=1, max=some(1))` hold a body that can be
+                    // lets `Many(x, min=1, max=1)` hold a body that can be
                     // empty: an empty block, a group around an optional thing.
                     if (st.pos == after && !max.is_some()) {
                         return err(ParseError {
@@ -1094,7 +1094,7 @@ pub fn parse<K: variant, A: any>(
     // `max` stops the repetition rather than failing it, so what is left over is
     // the enclosing rule's. Here the enclosing rule takes it, which is the whole
     // observable difference between a bound and no bound.
-    let r_two: Rule<Tok> = Then([Many(Term(Word), max=some(2)), Many(Term(Num))]);
+    let r_two: Rule<Tok> = Then([Many(Term(Word), max=2), Many(Term(Num))]);
     let g_two = g_of([one("t", r_two)]);
     assert(shown("a b", g_two, "t")? == "(t a b)");
     assert(shown("a b 1 2", g_two, "t")? == "(t a b 1 2)");
@@ -1107,7 +1107,7 @@ pub fn parse<K: variant, A: any>(
     // A bound is what makes a nullable body safe: it cannot repeat forever if it
     // cannot repeat. This is the shape `only` in `grammar_aipl.aipl` is built
     // from — a bracket pair around something that may be empty.
-    let r_once: Rule<Tok> = Many(Maybe(Term(Word)), min=1, max=some(1));
+    let r_once: Rule<Tok> = Many(Maybe(Term(Word)), min=1, max=1);
     let g_once = g_of([one("o", r_once)]);
     assert(shown("x", g_once, "o")? == "(o x)");
     assert(shown("", g_once, "o")? == "(o)");
@@ -1156,7 +1156,7 @@ pub fn parse<K: variant, A: any>(
     // list, and a separator after the last item is still the list's own — it
     // ends the list rather than starting the item that would have been next — so
     // `trailing_sep` decides it exactly as it does when the items simply run out.
-    let bounded = Many(Term(Num), sep=some(comma), max=some(2));
+    let bounded = Many(Term(Num), sep=some(comma), max=2);
     let r_bounded: Rule<Tok> = Then([Literal("["), bounded, Literal("]")]);
     let g_bounded = g_of([one("l", r_bounded)]);
     assert(shown("[1, 2]", g_bounded, "l")? == "(l [ 1 , 2 ])");
@@ -1166,7 +1166,7 @@ pub fn parse<K: variant, A: any>(
     // list's: both are left where they are and the enclosing rule reports them.
     assert(msg_of("[1, 2, 3]", g_bounded, "l") == "expected `]`, found `,`");
     // The same list refusing the trailing separator leaves it behind instead.
-    let bounded_strict = Many(Term(Num), sep=some(comma), max=some(2), trailing_sep=false);
+    let bounded_strict = Many(Term(Num), sep=some(comma), max=2, trailing_sep=false);
     let r_bstrict: Rule<Tok> = Then([Literal("["), bounded_strict, Literal("]")]);
     let g_bstrict = g_of([one("l", r_bstrict)]);
     assert(msg_of("[1, 2,]", g_bstrict, "l") == "expected `]`, found `,`");
