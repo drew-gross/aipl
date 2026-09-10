@@ -497,6 +497,7 @@ case_tests! {
     cases_sets_set_param = "cases/sets/set_param",
     cases_sets_str_elements = "cases/sets/str_elements",
     cases_sets_union = "cases/sets/union",
+    cases_sets_union_from_array_elem = "cases/sets/union_from_array_elem",
     cases_strings_bool_to_str = "cases/strings/bool_to_str",
     cases_strings_compare = "cases/strings/compare",
     cases_strings_concat_concat_in_function_param = "cases/strings/concat/concat_in_function_param",

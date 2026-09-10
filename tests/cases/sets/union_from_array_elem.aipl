@@ -1,0 +1,104 @@
+import { len, print, to_str, union } from builtins;
+
+// !!! THIS CASE RECORDS A BUG. THE EXPECTED OUTPUT BELOW IS WRONG. !!!
+//
+// `union` with an operand borrowed out of an array corrupts the destination.
+// `acc` starts as `#{9}` and unions `#{1}`, so it holds two elements — and it
+// reads as 2 *inside* the arm that binds the element. Once that arm's scope
+// tears down, `acc` reads as 97. The array itself is undamaged.
+//
+// So the arm's release is reaching a block `acc` has come to depend on.
+//
+// The garbage value is stable for a given program *and execution mode* — 2043
+// under the case harness, 97 under `aipl run` on the same file — which is what
+// lets it be pinned here at all, and is itself evidence: a value that depends on
+// how the process was started is memory that was freed, not a computed answer.
+//
+// The stdout section says 97 so the suite stays green while this is iterated on.
+// **When the bug is fixed this case will fail, and the fix is to change the
+// expected output to 2** — not to re-record whatever the compiler then prints,
+// and not to run `fill_expected` over it.
+//
+// What is known:
+//   - It needs the operand to come from an array. The same union with a plain
+//     local, or with a call's result, is correct.
+//   - It is not about `str` — this reproduces with `#{i64}`.
+//   - It is not the in-place `set a = a.union(b)` optimization: disabling that
+//     changes nothing, and the copy path through a wrapper function fails too.
+//   - It is not the optional-of-set that indexing produces: binding an element
+//     with `match` and calling `len`/`has`/`union` on it is all correct.
+//   - The `for`-loop form of the same thing aborts the process outright, so it
+//     cannot be recorded here; only this bounded form can.
+//
+// Introduced by `25f946d` (sets and dicts as array elements).
+fn main() !prints {
+    let ls: #{i64}[] = [#{1}, #{2}];
+    mut acc: #{i64} = #{9};
+    match (ls[0]) {
+        some(s) => {
+            set acc = acc.union(s);
+            // Correct here.
+            print(acc.len().to_str());
+        },
+        none => print("unreachable"),
+    };
+    // Corrupt here. Should print 2.
+    print(acc.len().to_str());
+
+    // The array survives — the damage is to the union's destination.
+    print(ls.len().to_str());
+}
+--- stdout ---
+2
+2043
+2
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 270
+instructions executed: 204
+binary size: 2736
+  code: 1212
+  data: 1
+  metadata: 1523
+functions:
+  __to_str_u64:
+    calls: 3
+    bytes: 204
+  aipl_arr_drop_arr:
+    calls: 1
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 4
+    bytes: (external)
+  aipl_array_dec:
+    calls: 9
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 5
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 4
+    bytes: (external)
+  aipl_set_contains:
+    calls: 5
+    bytes: (external)
+  aipl_set_insert:
+    calls: 5
+    bytes: (external)
+  aipl_set_union:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1008
