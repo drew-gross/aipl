@@ -32,12 +32,12 @@ import {
 } from builtins;
 
 # An interior node is `CTree(prod, kids)`; a `CGroup` is the bracket pair a
-# `NestedIn` matched, holding its opening kids, the kids between the brackets,
+# bracketed repetition matched, holding its opening kids, the kids between the
 # and its closing kids as three runs.
 #
 # A group is *transparent*: it is not a production, it lowers to nothing of its
 # own, and `nodes` and `own_tokens` splice straight through it — so converting a
-# `Then([Lit("("), x, Lit(")")])` into a `NestedIn` leaves every `build` function
+# `Then([Lit("("), x, Lit(")")])` into a `nested_in` leaves every `build` function
 # reading exactly the children it read before. The only pass that sees a group is
 # the formatter, which is the pass that needs to know where the brackets are.
 variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[]) | CGroup(u64, Cst[], Cst[], Cst[])

@@ -90,8 +90,6 @@ import {
     Mk,
     Named,
     NamedIdx,
-    NestedIdx,
-    NestedIn,
     OneOf,
     ParseError,
     Prec,
@@ -167,7 +165,7 @@ fn far_miss(far: Far, pos: u64, label: str) -> Far {
 }
 
 # `far` with the opening bracket that went unclosed at its position. Set by a
-# `NestedIn` whose `open` matched and whose `close` did not, which is the only
+# bracketed repetition whose `open` matched and whose `close` did not, which is
 # time anything knows a bracket was left hanging.
 #
 # It rides on the furthest failure rather than aborting the parse, because under
@@ -294,79 +292,26 @@ fn match_rule<K: variant, A: any>(
         Literal(s) => ok(match_spelling(p, s, pos, far)),
         Then(rs) => match_then(p, rs, pos, cur, far),
         OneOf(rs) => match_one_of(p, rs, pos, cur, far),
-        Many(sub, min, max, sep, trailing_sep, _, _) => match_many(
+        Many(sub, min, max, sep, trailing_sep, nested_in, _, _, group) => match_many(
             p,
             sub,
             min,
             max,
             sep,
             trailing_sep,
+            nested_in,
+            group,
             pos,
             cur,
             far,
         ),
         Maybe(sub) => match_maybe(p, sub, pos, cur, far),
         NamedIdx(i) => match_prod(p, i, pos, far),
-        NestedIdx(gi, open, body, close, _) => match_nested(
-            p,
-            gi,
-            open,
-            body,
-            close,
-            pos,
-            cur,
-            far,
-        ),
         Climb(atom, precs) => match_climb(p, atom, precs, pos, cur, far),
         // `link` rewrites every one of these; reaching one means the grammar was
         // handed to the driver unlinked, which `parse_cst` makes impossible.
         Named(n) => err(ParseError { message: `unlinked rule reference "{n}"`, span: 0..0 }),
-        NestedIn(..) => err(ParseError { message: "unlinked group", span: 0..0 }),
     }
-}
-
-# A bracketed group: `open`, then `body`, then `close`, matched in order and kept
-# as one `CGroup` naming style `gi`. It parses exactly as `Then` of the three
-# would; what it adds is on either side of that.
-#
-# On the way in, the three runs stay separate in the tree, so the formatter knows
-# which tokens are brackets without inferring it from where they sit. On the way
-# out, a `close` that fails after `open` matched records the opening bracket's
-# span on the furthest failure — the parse still backtracks like any non-match,
-# but if nothing else works the message can say which bracket was left open.
-fn match_nested<K: variant, A: any>(
-    p: Parser<K, A>,
-    gi: u64,
-    open: Rule<K>,
-    body: Rule<K>,
-    close: Rule<K>,
-    pos: u64,
-    cur: u64,
-    far: Far,
-) -> Step!ParseError {
-    let so = match_rule(p, open, pos, cur, far)?;
-    if (!so.hit) {
-        return ok(no(so.far, pos));
-    };
-    let sb = match_rule(p, body, so.pos, cur, so.far)?;
-    if (!sb.hit) {
-        return ok(no(sb.far, pos));
-    };
-    let sc = match_rule(p, close, sb.pos, cur, sb.far)?;
-    if (!sc.hit) {
-        // Only when the close was wanted past the last token. Anywhere else
-        // there *is* a token sitting where the bracket should be, and "never
-        // closed" would be a lie: `[1, 2,]` fails at the trailing comma with the
-        // `]` in plain sight, and blaming the `[` would send the reader to the
-        // wrong end of the list. Running out of input is the case where the
-        // bracket really is hanging, and the case where the opener can be a
-        // screenful away.
-        if (p.toks.len() <= sb.pos) {
-            return ok(no(far_unclosed(sc.far, first_token(so.kids)), pos));
-        };
-        return ok(no(sc.far, pos));
-    };
-    ok(Step { hit: true, pos: sc.pos, kids: [CGroup(gi, so.kids, sb.kids, sc.kids)], far: sc.far })
 }
 
 # Any one token whose kind is the case `k` — `Term(Name)` matches every
@@ -458,10 +403,90 @@ fn match_many<K: variant, A: any>(
     max: u64?,
     sep: Rule<K>?,
     trailing_sep: bool,
+    nested_in: (Rule<K>, Rule<K>)?,
+    group: u64?,
     pos: u64,
     cur: u64,
     far: Far,
 ) -> Step!ParseError {
+    match (nested_in) {
+        none => match_reps(p, sub, min, max, sep, trailing_sep, pos, cur, far),
+        some(brackets) => {
+            // `link` stamps every bracketed repetition with its style's index;
+            // reaching one without means the grammar was handed to the driver
+            // unlinked, which `parse_cst` makes impossible.
+            let gi = group.value_or_err(ParseError { message: "unlinked group", span: 0..0 })?;
+            match_group(p, gi, brackets, sub, min, max, sep, trailing_sep, pos, cur, far)
+        },
+    }
+}
+
+# A bracketed repetition: `open`, then the items, then `close`, kept as one
+# `CGroup` naming style `gi`. It parses exactly as `Then` of the three would;
+# what it adds is on either side of that.
+#
+# On the way in, the three runs stay separate in the tree, so the formatter knows
+# which tokens are brackets without inferring it from where they sit. On the way
+# out, a `close` that fails after `open` matched records the opening bracket's
+# span on the furthest failure — the parse still backtracks like any non-match,
+# but if nothing else works the message can say which bracket was left open.
+fn match_group<K: variant, A: any>(
+    p: Parser<K, A>,
+    gi: u64,
+    brackets: (Rule<K>, Rule<K>),
+    sub: Rule<K>,
+    min: u64,
+    max: u64?,
+    sep: Rule<K>?,
+    trailing_sep: bool,
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    let so = match_rule(p, brackets.0, pos, cur, far)?;
+    if (!so.hit) {
+        return ok(no(so.far, pos));
+    };
+    let sb = match_reps(p, sub, min, max, sep, trailing_sep, so.pos, cur, so.far)?;
+    if (!sb.hit) {
+        return ok(no(sb.far, pos));
+    };
+    let sc = match_rule(p, brackets.1, sb.pos, cur, sb.far)?;
+    if (!sc.hit) {
+        // Only when the close was wanted past the last token. Anywhere else
+        // there *is* a token sitting where the bracket should be, and "never
+        // closed" would be a lie: `[1, 2,]` fails at the trailing comma with the
+        // `]` in plain sight, and blaming the `[` would send the reader to the
+        // wrong end of the list. Running out of input is the case where the
+        // bracket really is hanging, and the case where the opener can be a
+        // screenful away.
+        if (p.toks.len() <= sb.pos) {
+            return ok(no(far_unclosed(sc.far, first_token(so.kids)), pos));
+        };
+        return ok(no(sc.far, pos));
+    };
+    ok(Step { hit: true, pos: sc.pos, kids: [CGroup(gi, so.kids, sb.kids, sc.kids)], far: sc.far })
+}
+
+# The repetition itself, without brackets.
+fn match_reps<K: variant, A: any>(
+    p: Parser<K, A>,
+    sub: Rule<K>,
+    min: u64,
+    max: u64?,
+    sep: Rule<K>?,
+    trailing_sep: bool,
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    // Exactly one item, unseparated — what a bracket pair holding one thing
+    // desugars to, and by far the commonest repetition in a real grammar. The
+    // loop below would run one trip and one more to discover the bound, so this
+    // takes the rule directly.
+    if (min == 1 && max == some(1) && !sep.is_some()) {
+        return match_rule(p, sub, pos, cur, far);
+    };
     mut cp = pos;
     mut acc: Cst[] = [];
     mut f = far;
@@ -710,15 +735,15 @@ fn rule_labels<K: variant, A: any>(
         OneOf(rs) => rs.map(|sub| rule_labels(sub, prods, firsts, labels)).union_all(),
         // A repetition and an option both try their body at offset 0; a
         // separator is only ever reached after an item.
-        Many(sub, _, _, _, _, _, _) => rule_labels(sub, prods, firsts, labels),
+        // A bracketed repetition is reached through its opening bracket, so
+        // that is what is expected at its first token; an unbracketed one is
+        // reached through its body.
+        Many(sub, _, _, _, _, nested_in, _, _, _) => match (nested_in) {
+            some(brackets) => rule_labels(brackets.0, prods, firsts, labels),
+            none => rule_labels(sub, prods, firsts, labels),
+        },
         Maybe(sub) => rule_labels(sub, prods, firsts, labels),
         Climb(atom, _) => rule_labels(atom, prods, firsts, labels),
-        NestedIdx(_, open, body, close, _) => seq_labels(
-            [open, body, close],
-            prods,
-            firsts,
-            labels,
-        ),
         // The collapse `expect_as` exists for: a labelled production is one word
         // in a message, and its insides never surface.
         NamedIdx(i) => match (prods[i]) {
@@ -731,7 +756,7 @@ fn rule_labels<K: variant, A: any>(
         },
         // Unlinked — `parse_cst` links first, so neither is reachable from a
         // parse; an unlinked grammar simply prunes nothing.
-        Named(..) | NestedIn(..) => empty,
+        Named(..) => empty,
     }
 }
 
@@ -758,16 +783,20 @@ fn seq_labels<K: variant, A: any>(
 # along a sequence the first token can still be expected.
 fn rule_nullable<K: variant>(r: Rule<K>, firsts: First<K>[]) -> bool {
     match (r) {
-        Term(..) | Literal(..) | Named(..) | NestedIn(..) => false,
+        Term(..) | Literal(..) | Named(..) => false,
         Then(rs) => rs.all(|sub| rule_nullable(sub, firsts)),
         OneOf(rs) => rs.any(|sub| rule_nullable(sub, firsts)),
-        Many(sub, min, _, _, _, _, _) => min == 0 || rule_nullable(sub, firsts),
+        // A bracket pair always matches at least its two brackets, so a
+        // bracketed repetition is never nullable however small its minimum.
+        Many(sub, min, _, _, _, nested_in, _, _, _) => match (nested_in) {
+            some(brackets) => rule_nullable(brackets.0, firsts) && min == 0 && rule_nullable(
+                brackets.1,
+                firsts,
+            ),
+            none => min == 0 || rule_nullable(sub, firsts),
+        },
         Maybe(..) => true,
         Climb(atom, _) => rule_nullable(atom, firsts),
-        NestedIdx(_, open, body, close, _) => rule_nullable(open, firsts) && rule_nullable(
-            body,
-            firsts,
-        ) && rule_nullable(close, firsts),
         NamedIdx(i) => firsts[i].is_some_and(|f| f.nullable),
     }
 }
@@ -888,7 +917,7 @@ fn error_at<K: variant, A: any>(p: Parser<K, A>, src: str, far: Far) -> ParseErr
 # reader has to type something; the opener is named by line because pointing at
 # two places at once is what a single-span error cannot do.
 #
-# This is the whole reason `NestedIn` exists on the parsing side: a flat
+# This is the whole reason `nested_in` exists on the parsing side: a flat
 # `Then([Lit("("), .., Lit(")")])` fails at the close having forgotten there was
 # an open, and reports "expected `)`, found end of input" a hundred lines away
 # from the `(` that caused it.
@@ -1253,14 +1282,15 @@ pub fn parse<K: variant, A: any>(
 
     // ---- Groups ----
     //
-    // The same S-expression grammar with its brackets written as a `NestedIn`
-    // rather than a flat `Then`. It parses the same input to the same *lowered*
-    // value, because a group is transparent to everything but the formatter.
-    let g_list: Rule<Tok> = NestedIn(
-        Literal("("),
-        Many(NamedIdx(1), sep=Literal(",")),
-        Literal(")"),
-        style=ListStyle { spaced: true },
+    // The same S-expression grammar with its brackets written as the list's own
+    // `nested_in` rather than a flat `Then`. It parses the same input to the
+    // same *lowered* value, because a group is transparent to everything but the
+    // formatter.
+    let g_list: Rule<Tok> = Many(
+        NamedIdx(1),
+        sep=Literal(","),
+        nested_in=(Literal("("), Literal(")")),
+        spaced=true,
     );
     let g_item: Rule<Tok> = OneOf([Term(Word), Named("list")]);
     let g_grp = g_of([one("list", g_list), one("item", g_item)]);
@@ -1454,21 +1484,21 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 9797
-deallocations: 9797
+allocations: 9690
+deallocations: 9690
 reallocations: 688
-bytes allocated: 621091
-instructions executed: 1285560
-binary size: 631016
-  code: 381472
+bytes allocated: 690859
+instructions executed: 1277103
+binary size: 632848
+  code: 383692
   data: 9564
-  metadata: 239980
+  metadata: 239592
 functions:
   __arr_drop_Node:
     calls: 21
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 620
+    calls: 616
     bytes: 116
   __arr_drop___m2__First$Tok:
     calls: 68
@@ -1477,7 +1507,7 @@ functions:
     calls: 146
     bytes: 140
   __arr_drop___m3__ListStyle:
-    calls: 327
+    calls: 273
     bytes: 120
   __arr_drop___m3__Prec:
     calls: 2
@@ -1486,7 +1516,7 @@ functions:
     calls: 162
     bytes: 188
   __arr_drop___m3__Rule$Tok:
-    calls: 472
+    calls: 463
     bytes: 116
   __arr_drop___m4__StepResult$Tok:
     calls: 0
@@ -1501,7 +1531,7 @@ functions:
     calls: 18
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 557
+    calls: 556
     bytes: 116
   __arr_retain___m2__First$Tok:
     calls: 100
@@ -1530,16 +1560,16 @@ functions:
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
     bytes: 632
-  __builtin_all$__m3__Rule$Tok$lam130:
+  __builtin_all$__m3__Rule$Tok$lam124:
     calls: 0
     bytes: 36
-  __builtin_all$__m3__Rule$Tok$lam130$tail:
+  __builtin_all$__m3__Rule$Tok$lam124$tail:
     calls: 0
     bytes: 384
-  __builtin_any$__m3__Rule$Tok$lam133:
+  __builtin_any$__m3__Rule$Tok$lam127:
     calls: 0
     bytes: 36
-  __builtin_any$__m3__Rule$Tok$lam133$tail:
+  __builtin_any$__m3__Rule$Tok$lam127$tail:
     calls: 0
     bytes: 380
   __builtin_count_while$char$lam49:
@@ -1611,7 +1641,7 @@ functions:
   __eq_set$str$arr:
     calls: 30
     bytes: 300
-  __filter110$own0:
+  __filter106$own0:
     calls: 18
     bytes: 332
   __lambda_0:
@@ -1676,7 +1706,7 @@ functions:
     bytes: 1084
   __m2__rule_first$Tok:
     calls: 149
-    bytes: 6544
+    bytes: 6188
   __m2__union_syms$Tok:
     calls: 84
     bytes: 736
@@ -1684,8 +1714,8 @@ functions:
     calls: 54
     bytes: 700
   __m3__desugar_rule$Tok:
-    calls: 504
-    bytes: 14040
+    calls: 486
+    bytes: 11936
   __m3__failure_message:
     calls: 39
     bytes: 488
@@ -1693,26 +1723,20 @@ functions:
     calls: 0
     bytes: 32
   __m3__group_styles$Tok$tail:
-    calls: 1052
-    bytes: 3208
+    calls: 926
+    bytes: 4724
   __m3__link$Tok$Node:
     calls: 95
     bytes: 2796
-  __m3__link_nest$Tok:
-    calls: 18
-    bytes: 1300
   __m3__link_opt$Tok:
     calls: 54
     bytes: 716
   __m3__link_rule$Tok:
-    calls: 504
-    bytes: 5668
+    calls: 486
+    bytes: 8236
   __m3__link_rules$Tok:
     calls: 94
     bytes: 832
-  __m3__nest_styles$Tok:
-    calls: 18
-    bytes: 956
   __m3__prod_names$Tok$Node:
     calls: 211
     bytes: 492
@@ -1768,11 +1792,14 @@ functions:
     calls: 392
     bytes: 132
   __rec_drop___m3__Rule$Tok:
-    calls: 1097
-    bytes: 464
+    calls: 1060
+    bytes: 340
+  __rec_drop___tuple$__m3__Rule_Tok$__m3__Rule_Tok:
+    calls: 37
+    bytes: 72
   __test$parse:
     calls: 1
-    bytes: 183884
+    bytes: 186072
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -1786,16 +1813,16 @@ functions:
     calls: 225
     bytes: (external)
   aipl_arr_extend:
-    calls: 1249
+    calls: 1209
     bytes: (external)
   aipl_arr_inc:
-    calls: 31483
+    calls: 31232
     bytes: (external)
   aipl_arr_join:
     calls: 157
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1556
+    calls: 1498
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 456
@@ -1804,19 +1831,19 @@ functions:
     calls: 37
     bytes: (external)
   aipl_array_dec:
-    calls: 38963
+    calls: 38605
     bytes: (external)
   aipl_array_new:
-    calls: 4659
+    calls: 4574
     bytes: (external)
   aipl_array_push:
     calls: 648
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1533
+    calls: 1524
     bytes: (external)
   aipl_array_with_cap:
-    calls: 1174
+    calls: 1156
     bytes: (external)
   aipl_assert:
     calls: 73
@@ -1825,25 +1852,25 @@ functions:
     calls: 1519
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 11282
+    calls: 11092
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 315
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 9763
+    calls: 9573
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 315
     bytes: (external)
   aipl_set_contains:
-    calls: 210
+    calls: 201
     bytes: (external)
   aipl_set_insert:
-    calls: 172
+    calls: 163
     bytes: (external)
   aipl_set_union:
-    calls: 78
+    calls: 69
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -1890,24 +1917,27 @@ functions:
   main:
     calls: 1
     bytes: 104
+  match_group$Tok$Node:
+    calls: 15
+    bytes: 6196
   match_many$Tok$Node:
-    calls: 50
-    bytes: 4904
+    calls: 52
+    bytes: 1436
   match_maybe$Tok$Node:
     calls: 6
     bytes: 1076
-  match_nested$Tok$Node:
-    calls: 15
-    bytes: 5908
   match_one_of$Tok$Node:
     calls: 78
     bytes: 1692
   match_prod$Tok$Node:
     calls: 175
     bytes: 7068
+  match_reps$Tok$Node:
+    calls: 50
+    bytes: 5120
   match_rule$Tok$Node:
-    calls: 591
-    bytes: 7120
+    calls: 578
+    bytes: 6272
   match_then$Tok$Node:
     calls: 49
     bytes: 2128
@@ -1943,18 +1973,18 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 130
-    bytes: 4732
+    bytes: 4620
   rule_nullable$Tok:
     calls: 0
     bytes: 36
   rule_nullable$Tok$tail:
-    calls: 22
-    bytes: 1856
+    calls: 13
+    bytes: 1592
   seq_labels$Tok$Node:
     calls: 0
     bytes: 44
   seq_labels$Tok$Node$tail:
-    calls: 22
+    calls: 13
     bytes: 908
   shown:
     calls: 61

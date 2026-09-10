@@ -464,12 +464,12 @@ fn is_calc_op(self: str) -> bool {
 allocations: 21742
 deallocations: 21742
 reallocations: 1022
-bytes allocated: 1307135
-instructions executed: 2560463
-binary size: 415440
-  code: 266548
+bytes allocated: 1486847
+instructions executed: 2538804
+binary size: 415360
+  code: 267084
   data: 5852
-  metadata: 143040
+  metadata: 142424
 functions:
   __arr_drop_Calc:
     calls: 404
@@ -549,7 +549,7 @@ functions:
   __arr_retain___m5__Doc:
     calls: 228
     bytes: 116
-  __builtin_all$char$s0$lam156:
+  __builtin_all$char$s0$lam152:
     calls: 12
     bytes: 212
   __builtin_any$__m5__Doc$lam171:
@@ -573,7 +573,7 @@ functions:
   __builtin_count_while$char$s0$lam137:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam165:
+  __builtin_count_while$char$s0$lam161:
     calls: 0
     bytes: 172
   __builtin_count_while$char$s0$lam77:
@@ -693,24 +693,27 @@ functions:
   __m13__lower_node$CalcTok$Calc:
     calls: 447
     bytes: 3844
+  __m13__match_group$CalcTok$Calc:
+    calls: 0
+    bytes: 6196
   __m13__match_many$CalcTok$Calc:
     calls: 0
-    bytes: 4904
+    bytes: 1436
   __m13__match_maybe$CalcTok$Calc:
     calls: 0
     bytes: 1076
-  __m13__match_nested$CalcTok$Calc:
-    calls: 0
-    bytes: 5908
   __m13__match_one_of$CalcTok$Calc:
     calls: 342
     bytes: 1692
   __m13__match_prod$CalcTok$Calc:
     calls: 417
     bytes: 6272
+  __m13__match_reps$CalcTok$Calc:
+    calls: 0
+    bytes: 5120
   __m13__match_rule$CalcTok$Calc:
     calls: 1375
-    bytes: 6668
+    bytes: 5816
   __m13__match_then$CalcTok$Calc:
     calls: 206
     bytes: 2128
@@ -776,7 +779,7 @@ functions:
     bytes: 32
   __m2__climb_precs$CalcTok$tail:
     calls: 12
-    bytes: 1816
+    bytes: 1644
   __m2__dq:
     calls: 20
     bytes: 456
@@ -797,13 +800,13 @@ functions:
     bytes: 3468
   __m2__render_rule$CalcTok:
     calls: 13
-    bytes: 9112
+    bytes: 9416
   __m2__rep_suffix:
     calls: 0
     bytes: 1440
   __m2__rule_first$CalcTok:
     calls: 40
-    bytes: 6544
+    bytes: 6188
   __m2__show_first$CalcTok:
     calls: 3
     bytes: 1300
@@ -818,7 +821,7 @@ functions:
     bytes: 700
   __m3__desugar_rule$CalcTok:
     calls: 832
-    bytes: 14040
+    bytes: 11936
   __m3__failure_message:
     calls: 7
     bytes: 488
@@ -827,25 +830,19 @@ functions:
     bytes: 32
   __m3__group_styles$CalcTok$tail:
     calls: 1701
-    bytes: 3208
+    bytes: 4724
   __m3__link$CalcTok$Calc:
     calls: 63
     bytes: 2796
-  __m3__link_nest$CalcTok:
-    calls: 0
-    bytes: 1300
   __m3__link_opt$CalcTok:
     calls: 0
     bytes: 716
   __m3__link_rule$CalcTok:
     calls: 819
-    bytes: 5668
+    bytes: 8236
   __m3__link_rules$CalcTok:
     calls: 252
     bytes: 832
-  __m3__nest_styles$CalcTok:
-    calls: 0
-    bytes: 956
   __m3__prod_names$CalcTok$Calc:
     calls: 119
     bytes: 492
@@ -911,13 +908,16 @@ functions:
     bytes: 132
   __rec_drop___m3__Rule$CalcTok:
     calls: 2496
-    bytes: 464
+    bytes: 340
   __rec_drop___m5__Doc:
     calls: 175
     bytes: 184
   __rec_drop___m5__Work:
     calls: 184
     bytes: 84
+  __rec_drop___tuple$__m3__Rule_CalcTok$__m3__Rule_CalcTok:
+    calls: 0
+    bytes: 72
   __test$calc_cst:
     calls: 1
     bytes: 1396

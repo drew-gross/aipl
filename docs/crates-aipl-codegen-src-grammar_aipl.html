@@ -347,7 +347,7 @@
           </h3>
           <pre class="signature"><code>fn nest(open: str, body: Rule&#60;AiplTok&#62;, close: str, style: ListStyle) -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
-          <div class="doc"><p>A bracketed group: <code>open</code>, whatever it holds, <code>close</code>, and how that lays out. Shorter than the <code>NestedIn</code> it builds, because a grammar this size writes a lot of them and the four arguments matter more than the constructor's name.</p></div>
+          <div class="doc"><p>A bracketed group: <code>open</code>, whatever it holds, <code>close</code>, and how that lays out. Shorter than the <code>Many</code> it builds, because a grammar this size writes a lot of them and the four arguments matter more than the spelling.</p><p><code>min=1, max=1</code> is &quot;exactly one thing in brackets&quot; — the body is a single rule, not a list. The layout still is a list's, and <code>style</code> says so outright: what these groups hold is usually a production that is itself a list (<code>(args)</code>), and the <code>Many</code> holding it has no separator of its own to read one off.</p></div>
 
 
         </section>
@@ -375,7 +375,7 @@
           </h3>
           <pre class="signature"><code>fn only(open: str, body: Rule&#60;AiplTok&#62;, close: str) -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
-          <div class="doc"><p>A bracket pair holding exactly one thing — a block's braces, a condition's parentheses, a grouping paren. <code>min=1, max=1</code> is what says it is not a list, and <code>desugar</code> reads that back as a group laid out inline rather than broken at a width. It is still a group, so an unclosed one is reported against the token that opened it.</p></div>
+          <div class="doc"><p>A bracket pair holding exactly one thing — a block's braces, a condition's parentheses, a grouping paren. <code>nest</code> without a stated style: <code>min=1, max=1</code> is what says it is not a list, and <code>desugar</code> reads that back as a group laid out inline rather than broken at a width. It is still a group, so an unclosed one is reported against the token that opened it.</p></div>
 
 
         </section>

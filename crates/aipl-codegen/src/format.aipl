@@ -59,8 +59,8 @@ import {
     Inline,
     Layout,
     ListStyle,
+    Many,
     Mk,
-    NestedIn,
     ParseError,
     Production,
     Rule,
@@ -404,7 +404,7 @@ fn gap_wanted(prev: str, next: str, space: (str, str) -> bool) -> bool {
 # fit and otherwise one item per indented line.
 #
 # The brackets are read off the node, not inferred from it. That is the whole
-# difference `NestedIn` makes here: the group says which of its kids opened it
+# difference a group makes here: it says which of its kids opened it
 # and which closed it, so `#{a}` (a two-token bracket), `|a, b|` (the same token
 # both ends) and `match (e) { .. }` (two pairs in one production) are all just
 # groups, with nothing to guess and nothing to be wrong about.
@@ -445,7 +445,7 @@ fn wrapped(
 ) -> Doc {
     // A pair that is only a pair — a block's braces — is laid out like any other
     // run of children. The group still told the *parser* where the brackets are,
-    // which is the half of `NestedIn` that has nothing to do with layout.
+    // which is the half of a group that has nothing to do with layout.
     if (!st.wraps) {
         return inline_doc([..open, ..mid, ..close], space);
     };
@@ -629,7 +629,7 @@ fn group_prod(i: u64, st: ListStyle) -> Production<FKind, str> {
     let word: Rule<FKind> = Term(FWord);
     Production {
         name: `g{i}`,
-        rule: NestedIn(word, word, word, style=st),
+        rule: Many(word, min=1, max=1, nested_in=(word, word), style=st),
         build: Mk(nothing),
         layout: Inline,
     }
@@ -677,15 +677,15 @@ fn node_of(t: str) -> Piece { PNode(Text(t), t, t) }
 
 fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
 --- performance ---
-allocations: 2576
-deallocations: 2576
+allocations: 2607
+deallocations: 2607
 reallocations: 195
-bytes allocated: 186459
-instructions executed: 223310
-binary size: 239904
-  code: 152548
+bytes allocated: 194427
+instructions executed: 225944
+binary size: 239744
+  code: 152608
   data: 5020
-  metadata: 82336
+  metadata: 82116
 functions:
   __arr_drop_Piece:
     calls: 118
@@ -793,11 +793,11 @@ functions:
     calls: 0
     bytes: 4084
   __m8__desugar_opt$FKind:
-    calls: 0
+    calls: 6
     bytes: 700
   __m8__desugar_rule$FKind:
     calls: 44
-    bytes: 14040
+    bytes: 11936
   __m8__failure_message:
     calls: 2
     bytes: 488
@@ -806,25 +806,19 @@ functions:
     bytes: 32
   __m8__group_styles$FKind$tail:
     calls: 74
-    bytes: 3208
+    bytes: 4724
   __m8__link$FKind$str:
     calls: 8
     bytes: 3192
-  __m8__link_nest$FKind:
-    calls: 6
-    bytes: 1300
   __m8__link_opt$FKind:
-    calls: 0
+    calls: 6
     bytes: 716
   __m8__link_rule$FKind:
     calls: 44
-    bytes: 5668
+    bytes: 8236
   __m8__link_rules$FKind:
     calls: 0
     bytes: 832
-  __m8__nest_styles$FKind:
-    calls: 6
-    bytes: 956
   __rec_drop___m1__Cst:
     calls: 27
     bytes: 132
@@ -836,7 +830,10 @@ functions:
     bytes: 84
   __rec_drop___m8__Rule$FKind:
     calls: 94
-    bytes: 464
+    bytes: 340
+  __rec_drop___tuple$__m8__Rule_FKind$__m8__Rule_FKind:
+    calls: 13
+    bytes: 72
   __test$breaks_after:
     calls: 1
     bytes: 484
@@ -874,10 +871,10 @@ functions:
     calls: 31
     bytes: (external)
   aipl_arr_extend:
-    calls: 66
+    calls: 72
     bytes: (external)
   aipl_arr_inc:
-    calls: 2214
+    calls: 2244
     bytes: (external)
   aipl_arr_join:
     calls: 32
@@ -889,10 +886,10 @@ functions:
     calls: 88
     bytes: (external)
   aipl_array_dec:
-    calls: 3549
+    calls: 3597
     bytes: (external)
   aipl_array_new:
-    calls: 721
+    calls: 739
     bytes: (external)
   aipl_array_push:
     calls: 482
@@ -907,19 +904,19 @@ functions:
     calls: 45
     bytes: (external)
   aipl_rec_alloc:
-    calls: 1120
+    calls: 1133
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 8301
+    calls: 8369
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 690
+    calls: 703
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 7181
+    calls: 7236
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 690
+    calls: 703
     bytes: (external)
   aipl_test_begin:
     calls: 8
@@ -977,7 +974,7 @@ functions:
     bytes: 468
   grammar_of:
     calls: 2
-    bytes: 1876
+    bytes: 2264
   group_doc$FKind$str$s1$lam41:
     calls: 0
     bytes: 2420

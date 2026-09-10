@@ -26,7 +26,7 @@
           </h3>
           <pre class="signature"><code>variant Cst</code></pre>
 
-          <div class="doc"><p>An interior node is <code>CTree(prod, kids)</code>; a <code>CGroup</code> is the bracket pair a <code>NestedIn</code> matched, holding its opening kids, the kids between the brackets, and its closing kids as three runs.</p><p>A group is *transparent*: it is not a production, it lowers to nothing of its own, and <code>nodes</code> and <code>own_tokens</code> splice straight through it — so converting a <code>Then([Lit(&quot;(&quot;), x, Lit(&quot;)&quot;)])</code> into a <code>NestedIn</code> leaves every <code>build</code> function reading exactly the children it read before. The only pass that sees a group is the formatter, which is the pass that needs to know where the brackets are.</p></div>
+          <div class="doc"><p>An interior node is <code>CTree(prod, kids)</code>; a <code>CGroup</code> is the bracket pair a bracketed repetition matched, holding its opening kids, the kids between the and its closing kids as three runs.</p><p>A group is *transparent*: it is not a production, it lowers to nothing of its own, and <code>nodes</code> and <code>own_tokens</code> splice straight through it — so converting a <code>Then([Lit(&quot;(&quot;), x, Lit(&quot;)&quot;)])</code> into a <code>nested_in</code> leaves every <code>build</code> function reading exactly the children it read before. The only pass that sees a group is the formatter, which is the pass that needs to know where the brackets are.</p></div>
 
 
           <ul class="cases">

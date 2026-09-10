@@ -72,8 +72,6 @@ import {
     Mk,
     Named,
     NamedIdx,
-    NestedIdx,
-    NestedIn,
     OneOf,
     ParseError,
     Prec,
@@ -242,23 +240,35 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
                 Seq | Item => `({body})`,
             }
         },
-        Many(sub, min, max, sep, trailing_sep, _, _) => match (sep) {
-            some(s) => render_list(sub, s, min, max, trailing_sep, names),
-            none => {
-                let body = render_rule(sub, names, Item);
-                `{body}{rep_suffix(min, max)}`
-            },
+        // A bracketed repetition renders as the sequence it is — bracket,
+        // contents, bracket. EBNF has no way to say "and these two are a pair",
+        // and the reader does not need one: the brackets are right there.
+        Many(sub, min, max, sep, trailing_sep, nested_in, _, _, _) => {
+            let reps = match (sep) {
+                some(s) => render_list(sub, s, min, max, trailing_sep, names),
+                none => {
+                    let body = render_rule(sub, names, Item);
+                    `{body}{rep_suffix(min, max)}`
+                },
+            };
+            match (nested_in) {
+                none => reps,
+                some(brackets) => {
+                    let o = render_rule(brackets.0, names, Item);
+                    let c = render_rule(brackets.1, names, Item);
+                    let seq = `{o} {reps} {c}`;
+                    match (ctx) {
+                        Alt | Seq => seq,
+                        Item => `({seq})`,
+                    }
+                },
+            }
         },
         Maybe(sub) => {
             let body = render_rule(sub, names, Item);
             `{body}?`
         },
         Climb(atom, precs) => render_climb(atom, precs, names, ctx),
-        // A group renders as the sequence it is — brackets, contents, brackets.
-        // EBNF has no way to say "and these two are a pair", and the reader does
-        // not need one: the brackets are right there in the output.
-        NestedIn(open, body, close, _) => render_nested(open, body, close, names, ctx),
-        NestedIdx(_, open, body, close, _) => render_nested(open, body, close, names, ctx),
     }
 }
 
@@ -369,11 +379,13 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
         // Not grouped into one alternation: `_` counts as a bound name, so
         // arms whose payloads differ only in how many slots they ignore are
         // refused as binding different names.
-        Many(sub, _, _, _, _, _, _) => climb_precs(sub),
+        // A bracketed repetition begins with its opening bracket, so that is
+        // where a climb could sit; an unbracketed one begins with its body.
+        Many(sub, _, _, _, _, nested_in, _, _, _) => match (nested_in) {
+            some(brackets) => first_precs([brackets.0, sub]),
+            none => climb_precs(sub),
+        },
         Maybe(sub) => climb_precs(sub),
-        // A group's parts in order, like any sequence.
-        NestedIn(open, body, close, _) => first_precs([open, body, close]),
-        NestedIdx(_, open, body, close, _) => first_precs([open, body, close]),
         Term(..) | Literal(..) | Named(..) | NamedIdx(..) => [],
     }
 }
@@ -561,9 +573,16 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         },
         // A separated list begins with its item and never with its separator,
         // so the separator contributes nothing here.
-        Many(sub, min, _, sep, trailing_sep, _, _) => {
-            let First { syms, nullable } = rule_first(sub, sets)?;
-            ok(First { syms, nullable: nullable || min == 0 })
+        // A bracketed one begins with its opening bracket, and is never
+        // nullable: a bracket pair always matches at least its two brackets.
+        // Written as the sequence it is, so a nullable `open` still lets the
+        // body contribute.
+        Many(sub, min, _, sep, trailing_sep, nested_in, _, _, _) => match (nested_in) {
+            some(brackets) => rule_first(Then([brackets.0, sub, brackets.1]), sets),
+            none => {
+                let First { syms, nullable } = rule_first(sub, sets)?;
+                ok(First { syms, nullable: nullable || min == 0 })
+            },
         },
         Maybe(sub) => {
             let First { syms } = rule_first(sub, sets)?;
@@ -571,11 +590,6 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         },
         // A climb begins with its atom: an operator only ever appears after one.
         Climb(atom, precs) => rule_first(atom, sets),
-        // A group begins with its opening bracket, and is never nullable: a
-        // bracket pair always matches at least its two brackets. Written as the
-        // sequence it is, so a nullable `open` still lets the body contribute.
-        NestedIn(open, body, close, _) => rule_first(Then([open, body, close]), sets),
-        NestedIdx(_, open, body, close, _) => rule_first(Then([open, body, close]), sets),
         NamedIdx(i) => sets[i].value_or_err(ParseError {
             message: `no production at index {i}`,
             span: 0..0,
@@ -843,12 +857,12 @@ fn fixture() -> Grammar<Kind, Node> {
 allocations: 2151
 deallocations: 2151
 reallocations: 144
-bytes allocated: 165250
-instructions executed: 205407
-binary size: 155560
-  code: 100348
+bytes allocated: 199522
+instructions executed: 205274
+binary size: 155200
+  code: 100792
   data: 3988
-  metadata: 51224
+  metadata: 50420
 functions:
   __arr_drop_First$Kind:
     calls: 77
@@ -921,31 +935,25 @@ functions:
     bytes: 700
   __m2__desugar_rule$Kind:
     calls: 237
-    bytes: 14040
+    bytes: 11936
   __m2__group_styles$Kind:
     calls: 0
     bytes: 32
   __m2__group_styles$Kind$tail:
     calls: 262
-    bytes: 3208
+    bytes: 4724
   __m2__link$Kind$Node:
     calls: 9
     bytes: 2796
-  __m2__link_nest$Kind:
-    calls: 0
-    bytes: 1300
   __m2__link_opt$Kind:
     calls: 12
     bytes: 716
   __m2__link_rule$Kind:
     calls: 139
-    bytes: 5668
+    bytes: 8236
   __m2__link_rules$Kind:
     calls: 27
     bytes: 832
-  __m2__nest_styles$Kind:
-    calls: 0
-    bytes: 956
   __m2__prod_names$Kind$Node:
     calls: 20
     bytes: 492
@@ -957,13 +965,16 @@ functions:
     bytes: 72
   __rec_drop___m2__Rule$Kind:
     calls: 476
-    bytes: 464
+    bytes: 340
+  __rec_drop___tuple$__m2__Rule_Kind$__m2__Rule_Kind:
+    calls: 0
+    bytes: 72
   __test$can_start:
     calls: 1
     bytes: 900
   __test$ebnf:
     calls: 1
-    bytes: 12308
+    bytes: 13072
   __test$first_sets:
     calls: 1
     bytes: 5228
@@ -992,7 +1003,7 @@ functions:
     calls: 66
     bytes: (external)
   aipl_arr_inc:
-    calls: 4073
+    calls: 4115
     bytes: (external)
   aipl_arr_join:
     calls: 34
@@ -1007,7 +1018,7 @@ functions:
     calls: 21
     bytes: (external)
   aipl_array_dec:
-    calls: 5339
+    calls: 5381
     bytes: (external)
   aipl_array_new:
     calls: 643
@@ -1028,13 +1039,13 @@ functions:
     calls: 476
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 3434
+    calls: 3446
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 111
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2958
+    calls: 2970
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 111
@@ -1062,7 +1073,7 @@ functions:
     bytes: 32
   climb_precs$Kind$tail:
     calls: 90
-    bytes: 1816
+    bytes: 1644
   dq:
     calls: 47
     bytes: 456
@@ -1083,7 +1094,7 @@ functions:
     bytes: 356
   fixture:
     calls: 2
-    bytes: 5080
+    bytes: 5320
   keep:
     calls: 0
     bytes: 268
@@ -1098,13 +1109,13 @@ functions:
     bytes: 3468
   render_rule$Kind:
     calls: 98
-    bytes: 9144
+    bytes: 9440
   rep_suffix:
     calls: 13
     bytes: 1440
   rule_first$Kind:
     calls: 228
-    bytes: 6544
+    bytes: 6188
   show_first$Kind:
     calls: 25
     bytes: 1344

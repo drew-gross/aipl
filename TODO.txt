@@ -75,6 +75,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  fix all the join with empty sep
   make nested_in a 2-item tuple
   In group_styles, rs.map(group_styles) is refused
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
@@ -199,6 +200,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  (Rule<K>, Rule<K>)?!ParseError doesn't parse
   pass expected-type context into tuples -> fix five bracket helpers for nested_in
   Make the language features powerful enough that we don't need builtin_return
   when all type args are just passed to a single arg type, and those types don't matter to the function internals, omitting them should be allowed e.g. fn prev_end<K: variant, A: any>(p: Parser<K, A>, i: u64)  becomes fn prev_end(p: Parser, i: u64)
@@ -224,6 +226,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
+  aipl fmt breaks a long tuple literal across lines with a trailing comma, and the tuple grammar rejects one. Formatter should understand from the Many that it shouldn't emit trailing commas.
   Why the formatter isn't already a thin wrapper
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
@@ -330,7 +333,6 @@ design:
   apis should express intent
 
 optimizations:
-  should be able to optimize comparing a variant variable with a specific case e.g. my_var_1 == MyCase(my_var_2) shouldn't need to construct the MyCase, it can optimize to a case comparison then internals if case matches
   loop invariant/match invariant/branch invariant code motion
   unused variant elimination
   Niche-filled optionals — `T?` in a spare bit of `T`, no separate tag word. str has spare bits, should be no problem

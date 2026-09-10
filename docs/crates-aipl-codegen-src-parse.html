@@ -195,7 +195,7 @@
           </h3>
           <pre class="signature"><code>fn far_unclosed(far: Far, open: Span[]) -&#62; Far</code></pre>
 
-          <div class="doc"><p><code>far</code> with the opening bracket that went unclosed at its position. Set by a <code>NestedIn</code> whose <code>open</code> matched and whose <code>close</code> did not, which is the only time anything knows a bracket was left hanging.</p><p>It rides on the furthest failure rather than aborting the parse, because under ordered choice a group failing to close is an ordinary non-match: <code>(a)</code> is parsed by trying the tuple <code>(a, b)</code> first and letting it fail at the comma. So this only reaches the reader when *no* alternative worked, which is exactly when a hanging bracket is the likely cause.</p><p><code>match_nested</code> sets it only when the close was wanted past the last token — see there for why a closer failure is not evidence of anything. The first bracket to be blamed at a position keeps it. Groups fail from the inside out, so the first to record is the innermost one — and closing that is the edit the reader has to make first, even when an outer bracket is hanging too.</p></div>
+          <div class="doc"><p><code>far</code> with the opening bracket that went unclosed at its position. Set by a bracketed repetition whose <code>open</code> matched and whose <code>close</code> did not, which is time anything knows a bracket was left hanging.</p><p>It rides on the furthest failure rather than aborting the parse, because under ordered choice a group failing to close is an ordinary non-match: <code>(a)</code> is parsed by trying the tuple <code>(a, b)</code> first and letting it fail at the comma. So this only reaches the reader when *no* alternative worked, which is exactly when a hanging bracket is the likely cause.</p><p><code>match_nested</code> sets it only when the close was wanted past the last token — see there for why a closer failure is not evidence of anything. The first bracket to be blamed at a position keeps it. Groups fail from the inside out, so the first to record is the innermost one — and closing that is the edit the reader has to make first, even when an outer bracket is hanging too.</p></div>
 
 
         </section>
@@ -342,20 +342,6 @@
 
 
 
-        <section class="item" id="item-match_nested">
-          <h3>
-            <a class="anchor" href="#item-match_nested">match_nested</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn match_nested&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, gi: u64, open: Rule&#60;K&#62;, body: Rule&#60;K&#62;, close: Rule&#60;K&#62;, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
-
-          <div class="doc"><p>A bracketed group: <code>open</code>, then <code>body</code>, then <code>close</code>, matched in order and kept as one <code>CGroup</code> naming style <code>gi</code>. It parses exactly as <code>Then</code> of the three would; what it adds is on either side of that.</p><p>On the way in, the three runs stay separate in the tree, so the formatter knows which tokens are brackets without inferring it from where they sit. On the way out, a <code>close</code> that fails after <code>open</code> matched records the opening bracket's span on the furthest failure — the parse still backtracks like any non-match, but if nothing else works the message can say which bracket was left open.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-match_term">
           <h3>
             <a class="anchor" href="#item-match_term">match_term</a>
@@ -417,9 +403,37 @@
             <a class="anchor" href="#item-match_many">match_many</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+          <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, nested_in: (Rule&#60;K&#62;, Rule&#60;K&#62;)?, group: u64?, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
           <div class="doc"><p><code>sub</code> until it stops matching, at least <code>min</code> times — and, with a <code>sep</code>, with that separator between consecutive items.</p><p>A rule that can match empty input would repeat forever here, and AIPL has no <code>break</code> to escape with — so a zero-width iteration is refused outright, the same invariant <code>lexer.aipl</code> keeps by having no matcher accept empty input. It is a grammar bug, reported as one rather than hung on.</p><p>The separated case is the same loop with one step in front of each item after the first. What the separator matched is held back until an item follows it, because a separator with nothing after it is only part of the list when <code>trailing_sep</code> says so; otherwise the position rewinds to before it and the enclosing rule is the one that complains — which is how <code>[1, 2,]</code> can be either the list or a list followed by a stray comma.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_group">
+          <h3>
+            <a class="anchor" href="#item-match_group">match_group</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_group&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, gi: u64, brackets: (Rule&#60;K&#62;, Rule&#60;K&#62;), sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p>A bracketed repetition: <code>open</code>, then the items, then <code>close</code>, kept as one <code>CGroup</code> naming style <code>gi</code>. It parses exactly as <code>Then</code> of the three would; what it adds is on either side of that.</p><p>On the way in, the three runs stay separate in the tree, so the formatter knows which tokens are brackets without inferring it from where they sit. On the way out, a <code>close</code> that fails after <code>open</code> matched records the opening bracket's span on the furthest failure — the parse still backtracks like any non-match, but if nothing else works the message can say which bracket was left open.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_reps">
+          <h3>
+            <a class="anchor" href="#item-match_reps">match_reps</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_reps&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p>The repetition itself, without brackets.</p></div>
 
 
         </section>
@@ -629,7 +643,7 @@
           </h3>
           <pre class="signature"><code>fn unclosed_hint(src: str, open: Span[]) -&#62; str</code></pre>
 
-          <div class="doc"><p>The parenthetical naming the bracket that was never closed, or the empty string when no group got that far. The span stays on the *failure*, which is where the reader has to type something; the opener is named by line because pointing at two places at once is what a single-span error cannot do.</p><p>This is the whole reason <code>NestedIn</code> exists on the parsing side: a flat <code>Then([Lit(&quot;(&quot;), .., Lit(&quot;)&quot;)])</code> fails at the close having forgotten there was an open, and reports &quot;expected <code>)</code>, found end of input&quot; a hundred lines away from the <code>(</code> that caused it.</p></div>
+          <div class="doc"><p>The parenthetical naming the bracket that was never closed, or the empty string when no group got that far. The span stays on the *failure*, which is where the reader has to type something; the opener is named by line because pointing at two places at once is what a single-span error cannot do.</p><p>This is the whole reason <code>nested_in</code> exists on the parsing side: a flat <code>Then([Lit(&quot;(&quot;), .., Lit(&quot;)&quot;)])</code> fails at the close having forgotten there was an open, and reports &quot;expected <code>)</code>, found end of input&quot; a hundred lines away from the <code>(</code> that caused it.</p></div>
 
 
         </section>

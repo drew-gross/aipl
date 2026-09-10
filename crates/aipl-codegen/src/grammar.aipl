@@ -141,11 +141,11 @@ variant Rule<K: variant> =
     // wrong; here it is two arguments with names.
     //
     // `nested_in` is the bracketed-list shorthand: given `(open, close)` it is a
-    // `NestedIn` around this `Many`, which `desugar` rewrites it into before
+    // bracket pair around this `Many`, which is what makes it a *group* before
     // anything else runs. Nearly every bracket pair in a real grammar holds a
     // list, and writing the brackets as an argument of the list beats wrapping
     // the list in a separate rule — `Many(param, sep=comma, nested_in=parens())`
-    // against `NestedIn(Lit("("), Many(param, sep=comma), Lit(")"))`.
+    // against a separate production wrapping the list in brackets.
     //
     // The list's *style* is read off the `Many` rather than restated: `sep` from
     // this rule's own separator and `trailing` from `trailing_sep`, which is the
@@ -158,6 +158,17 @@ variant Rule<K: variant> =
     // until generic tuples worked — a tuple whose elements mention a type
     // variable has no layout until monomorphization binds it, which is now
     // what `lt_ty` defers to `instantiate_generic`.
+    //
+    // `style` states the group's layout outright instead of deriving it, and is
+    // what lets a bracket pair hold something whose list lives one production
+    // down: `(args)` is a group that wraps like a comma list, but the `Many`
+    // holding it has no separator of its own to read one off — `args` does.
+    // Given, it replaces the derivation entirely, `spaced` included.
+    //
+    // The freedom is real and so is the hazard: nothing checks a stated `sep`
+    // against the one the rule actually matches, so a style that disagrees makes
+    // the printer write a separator the parser will not accept. Derive where you
+    // can, state it where the list is not this rule's.
     | Many(
         Rule<K>,
         min: u64 = 0,
@@ -165,7 +176,9 @@ variant Rule<K: variant> =
         sep?: Rule<K> = none,
         trailing_sep: bool = true,
         nested_in?: (Rule<K>, Rule<K>) = none,
-        spaced: bool = false
+        spaced: bool = false,
+        style?: ListStyle = none,
+        group?: u64 = none
     )
     // `r`, or nothing. Always matches.
     | Maybe(Rule<K>)
@@ -175,34 +188,6 @@ variant Rule<K: variant> =
     // A reference to production `i`, and the *only* rule that builds a CST node
     // — one `CTree(i, ..)` per reference matched.
     | NamedIdx(u64)
-    // A bracketed group: `open`, then `body`, then `close`. It parses exactly as
-    // `Then([open, body, close])` would, and everything else about it is what
-    // that spelling throws away — that these two rules are a *pair*, and that
-    // what sits between them is a list laid out in `style`.
-    //
-    // Two things need that, for reasons that have nothing to do with each other.
-    // A parse that matches `open` and then fails to match `close` knows where
-    // the bracket was opened, which is the one fact an unclosed-bracket message
-    // needs and a flat `Then` cannot recover — it fails at the close having
-    // forgotten there was an open. And a formatter needs to know which run of
-    // tokens is a bracket in order to break a long list inside it; inferring
-    // that from a production's leading and trailing tokens works only when the
-    // production *is* one bracketed list, which forces a grammar to be carved up
-    // one bracket pair per production.
-    //
-    // A group that is not a list is a list of one item — `(expr)` and `if (c)`
-    // are `style`s with nothing to separate — so there is one case here, not two.
-    // `link` rewrites every one of these to a `NestedIdx`, moving the style into
-    // the grammar's `groups` table where a CST node can name it by index.
-    | NestedIn(Rule<K>, Rule<K>, Rule<K>, style: ListStyle = ListStyle {})
-    // A group whose style is `groups[i]`, and the only rule that builds a
-    // `CGroup` node. The linked form of `NestedIn`.
-    //
-    // It carries the style as well as the index, redundantly on purpose: the
-    // index is what a `CGroup` names, and the style is what lets `link` rebuild
-    // the same table from an already-linked grammar. Without it, linking twice
-    // would empty `groups` and leave every `CGroup` pointing at nothing.
-    | NestedIdx(u64, Rule<K>, Rule<K>, Rule<K>, style: ListStyle = ListStyle {})
     // Precedence climbing — an `atom`, then binary operators drawn from `precs`,
     // nested by binding power. Each application nests under the *enclosing*
     // production's index, so `1 + 2 * 3` yields a node per operand rather than
@@ -234,7 +219,7 @@ variant Build<A: any> = Mk((str, Cst, A[]) -> A!ParseError)
 # breaks.
 #
 # The brackets themselves are not here: they are the `open` and `close` rules of
-# the `NestedIn` this style belongs to, matched from the source like anything
+# the repetition this style belongs to, matched from the source like anything
 # else. A style is only the handful of decisions the brackets cannot answer. An
 # empty `sep` is the juxtaposed list, where items are separated by nothing but
 # the space between them: `(a b c)`, and every S-expression ever written. A group
@@ -260,7 +245,7 @@ struct ListStyle { sep: str = ",", spaced: bool = false, trailing: bool = true, 
 # the mechanical majority — the productions whose layout is fully determined by
 # the tokens they matched.
 #
-# Wrapping is not here, and that is the point of `NestedIn`. Where a list breaks
+# Wrapping is not here, and that is the point of `nested_in`. Where a list breaks
 # is a property of the bracket pair holding it, not of the production the pair
 # happens to sit in, so it is written at the brackets and read back off the
 # `CGroup` node they build. A production may hold several groups, each with its
@@ -310,9 +295,9 @@ struct Production<K: variant, A: any> {
 # `NamedIdx` and a `CTree` both name a production by its index here — so the
 # order of this array is part of a linked grammar's meaning.
 #
-# `groups` is the same idea for bracket pairs: `link` collects every `NestedIn`'s
-# `ListStyle` into it, in the order the rules mention them, and rewrites the rule
-# to a `NestedIdx` naming the entry. A `CGroup` node then carries an index rather
+# `groups` is the same idea for bracket pairs: `link` collects every bracketed
+# `ListStyle` into it, in the order the rules mention them, and stamps the rule
+# with the entry's index. A `CGroup` node then carries that index rather
 # than a style, which keeps the CST as free of layout as it is of production
 # names. It is empty on an unlinked grammar and written only by `link`, so no
 # grammar file ever spells it out.
@@ -331,28 +316,28 @@ pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods.map(|
 # rule it was linked from, which is what makes `link` idempotent.
 fn group_styles<K: variant>(r: Rule<K>) -> ListStyle[] {
     match (r) {
-        // The two spellings answer alike but cannot share an arm: alternatives
-        // must bind the same names, and the linked form has an index in front.
-        NestedIn(open, body, close, style) => nest_styles(open, body, close, style),
-        NestedIdx(_, open, body, close, style) => nest_styles(open, body, close, style),
         // `map(group_styles)` is refused — a function *value* cannot be generic —
         // and the forwarding lambda that remains is what the lint objects to, so
         // the two rule each other out and the squelch is the only spelling left.
         Then(rs) | OneOf(rs) => rs.map(|sub| group_styles(sub)).join(), #[allow]
-        Many(sub, _, _, sep, _, _, _) => [..group_styles(sub), ..opt_group_styles(sep)],
+        // A bracketed repetition is a group, and its own style comes first —
+        // before the brackets' insides and before its own body. `link_rule`
+        // hands out indices by walking this same tree the same way.
+        Many(sub, _, _, sep, _, nested_in, _, style, _) => match (nested_in) {
+            some(brackets) => [
+                style.value_or(ListStyle {}),
+                ..group_styles(brackets.0),
+                ..group_styles(sub),
+                ..opt_group_styles(sep),
+                ..group_styles(brackets.1),
+            ],
+            none => [..group_styles(sub), ..opt_group_styles(sep)],
+        },
         Maybe(sub) => group_styles(sub),
         Climb(atom, _) => group_styles(atom),
         Term(..) | Literal(..) | Named(..) | NamedIdx(..) => [],
     }
 }
-
-# One group's styles: its own first, then what its brackets hold.
-fn nest_styles<K: variant>(
-    open: Rule<K>,
-    body: Rule<K>,
-    close: Rule<K>,
-    style: ListStyle,
-) -> ListStyle[] { [style, ..group_styles(open), ..group_styles(body), ..group_styles(close)] }
 
 # `group_styles` reaching inside an optional, which `map` cannot.
 fn opt_group_styles<K: variant>(r: Rule<K>?) -> ListStyle[] {
@@ -365,14 +350,14 @@ fn opt_group_styles<K: variant>(r: Rule<K>?) -> ListStyle[] {
 # How many groups `r` holds — the amount `base` advances past it.
 fn group_count<K: variant>(r: Rule<K>) -> u64 { group_styles(r).len() }
 
-# `r` with every bracketed-list shorthand written out: a `Many` carrying
-# `nested_in=(open, close)` becomes the `NestedIn` it is shorthand for, wrapping
-# the same `Many` with the brackets removed.
+# `r` with every bracketed repetition's style settled: stated, or read off the
+# rule it belongs to.
 #
-# Run before anything else looks at a rule, so only one spelling ever reaches the
-# driver, the formatter, the EBNF dump or the FIRST sets. That is the whole point
-# of making it sugar rather than a second rule shape: the passes downstream stay
-# unaware it exists.
+# Run before anything else looks at a rule, so the style a group carries is
+# already the one it means by the time the driver, the formatter, the EBNF dump
+# or the FIRST sets see it. The rule shape is unchanged — a bracketed `Many` is
+# the storage form as well as the written one — so this only ever fills the slot
+# a caller left empty.
 #
 # The style is derived here — `sep` from the list's own separator, `trailing`
 # from `trailing_sep`, `spaced` as given — so a grammar states each of those
@@ -382,7 +367,7 @@ fn group_count<K: variant>(r: Rule<K>) -> u64 { group_styles(r).len() }
 # is nothing to break at a width in that case, so it lays out inline.
 pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
     match (r) {
-        Many(sub, min, max, sep, trailing_sep, nested_in, spaced) => {
+        Many(sub, min, max, sep, trailing_sep, nested_in, spaced, style, _) => {
             // `none` reads as "no bound", which is never below the minimum — so
             // the check needs no case of its own for it.
             let cap = max.value_or(min);
@@ -392,30 +377,39 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
                     span: 0..0,
                 });
             };
-            let inner: Rule<K> = Many(
-                desugar_rule(sub)?,
-                min=min,
-                max?=max,
-                sep?=desugar_opt(sep)?,
-                trailing_sep=trailing_sep,
-            );
 
             // The brackets are a pair or absent — there is no third case to
             // check, which is the whole of what the tuple bought over an array.
             match (nested_in) {
-                none => ok(inner),
+                none => ok(Many(
+                    desugar_rule(sub)?,
+                    min=min,
+                    max?=max,
+                    sep?=desugar_opt(sep)?,
+                    trailing_sep=trailing_sep,
+                    spaced=spaced,
+                )),
                 some(brackets) => {
-                    let style = ListStyle {
+                    // Stated, or read off the rule: the separator from its own
+                    // `sep`, `trailing` from `trailing_sep`, `spaced` as given,
+                    // and `wraps` from `max` — a repetition bounded at one item
+                    // is a bracket pair rather than a list, so it has nothing to
+                    // break at a width.
+                    let derived = ListStyle {
                         sep: sep_spelling(sep)?,
                         spaced,
                         trailing: trailing_sep,
                         wraps: !max.is_some_and(|m| m == 1),
                     };
-                    ok(NestedIn(
-                        desugar_rule(brackets.0)?,
-                        inner,
-                        desugar_rule(brackets.1)?,
-                        style=style,
+                    ok(Many(
+                        desugar_rule(sub)?,
+                        min=min,
+                        max?=max,
+                        sep?=desugar_opt(sep)?,
+                        trailing_sep=trailing_sep,
+                        nested_in=(desugar_rule(brackets.0)?, desugar_rule(brackets.1)?),
+                        spaced=spaced,
+                        style=style.value_or(derived),
                     ))
                 },
             }
@@ -424,19 +418,6 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
         OneOf(rs) => ok(OneOf(desugar_rules(rs)?)),
         Maybe(sub) => ok(Maybe(desugar_rule(sub)?)),
         Climb(atom, precs) => ok(Climb(desugar_rule(atom)?, precs)),
-        NestedIn(open, body, close, style) => ok(NestedIn(
-            desugar_rule(open)?,
-            desugar_rule(body)?,
-            desugar_rule(close)?,
-            style=style,
-        )),
-        NestedIdx(i, open, body, close, style) => ok(NestedIdx(
-            i,
-            desugar_rule(open)?,
-            desugar_rule(body)?,
-            desugar_rule(close)?,
-            style=style,
-        )),
         Term(k) => ok(Term(k)),
         Literal(s) => ok(Literal(s)),
         Named(n) => ok(Named(n)),
@@ -462,8 +443,6 @@ fn sep_spelling<K: variant>(sep: Rule<K>?) -> str!ParseError {
             | Maybe(..)
             | Named(..)
             | NamedIdx(..)
-            | NestedIn(..)
-            | NestedIdx(..)
             | Climb(..) => err(ParseError {
                 message: "a bracketed list's separator must be a literal, so the printer can write it back",
                 span: 0..0,
@@ -486,9 +465,9 @@ fn desugar_rules<K: variant>(rs: Rule<K>[]) -> Rule<K>[]!ParseError {
 }
 
 # One rule with every `Named(n)` in it rewritten to `NamedIdx(i)` and every
-# `NestedIn` to a `NestedIdx` naming its entry in the grammar's `groups` table.
-# Fails when a reference names no production — the error a grammar author most
-# wants caught before a parse rather than during one.
+# bracketed repetition given its entry in the grammar's `groups` table. Fails
+# when a reference names no production — the error a grammar author most wants
+# caught before a parse rather than during one.
 #
 # `base` is the index the first group in `r` takes; the rest follow in
 # `group_styles` order. It is threaded by arithmetic rather than by a running
@@ -502,46 +481,53 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
         )),
         Then(rs) => ok(Then(link_rules(rs, names, base)?)),
         OneOf(rs) => ok(OneOf(link_rules(rs, names, base)?)),
-        // `desugar` has already rewritten a `nested_in` away, so the two slots
-        // it fills are empty by the time anything is linked.
-        Many(sub, min, max, sep, trailing_sep, _, _) => ok(Many(
-            link_rule(sub, names, base)?,
-            min=min,
-            max?=max,
-            sep?=link_opt(sep, names, base + group_count(sub))?,
-            trailing_sep=trailing_sep,
-        )),
+        // A bracketed repetition takes `base` for itself and its insides follow,
+        // in the order `group_styles` reports them. Relinking one lands here too
+        // and reassigns the same index, which is what keeps `link` idempotent —
+        // and why the style rides on the rule rather than living in the table
+        // alone.
+        Many(sub, min, max, sep, trailing_sep, nested_in, spaced, style, _) => match (nested_in) {
+            none => ok(Many(
+                link_rule(sub, names, base)?,
+                min=min,
+                max?=max,
+                sep?=link_opt(sep, names, base + group_count(sub))?,
+                trailing_sep=trailing_sep,
+                spaced=spaced,
+                style?=style,
+            )),
+            some(brackets) => {
+                let inner = base + 1 + group_count(brackets.0);
+                let after_sub = inner + group_count(sub);
+
+                // Bound rather than written into the tuple: `aipl fmt` breaks a
+                // long tuple literal across lines with a trailing comma, which
+                // the tuple grammar does not accept.
+                let linked_open = link_rule(brackets.0, names, base + 1)?;
+                let linked_close = link_rule(brackets.1, names, after_sub + opt_group_count(sep))?;
+                ok(Many(
+                    link_rule(sub, names, inner)?,
+                    min=min,
+                    max?=max,
+                    sep?=link_opt(sep, names, after_sub)?,
+                    trailing_sep=trailing_sep,
+                    nested_in=(linked_open, linked_close),
+                    spaced=spaced,
+                    style?=style,
+                    group=base,
+                ))
+            },
+        },
         Maybe(sub) => ok(Maybe(link_rule(sub, names, base)?)),
         Climb(atom, precs) => ok(Climb(link_rule(atom, names, base)?, precs)),
-        NestedIn(open, body, close, style) => link_nest(open, body, close, style, names, base),
-        NestedIdx(_, open, body, close, style) => link_nest(open, body, close, style, names, base),
         Term(k) => ok(Term(k)),
         Literal(s) => ok(Literal(s)),
         NamedIdx(i) => ok(NamedIdx(i)),
     }
 }
 
-# One group, linked: it takes `base` itself and its insides follow, matching the
-# order `group_styles` reports them in. Relinking an already-linked group lands
-# here too and reassigns the same index, which is what keeps `link` idempotent.
-fn link_nest<K: variant>(
-    open: Rule<K>,
-    body: Rule<K>,
-    close: Rule<K>,
-    style: ListStyle,
-    names: str[],
-    base: u64,
-) -> Rule<K>!ParseError {
-    let ob = base + 1;
-    let bb = ob + group_count(open);
-    ok(NestedIdx(
-        base,
-        link_rule(open, names, ob)?,
-        link_rule(body, names, bb)?,
-        link_rule(close, names, bb + group_count(body))?,
-        style=style,
-    ))
-}
+# `group_count` reaching inside an optional, which `map` cannot.
+fn opt_group_count<K: variant>(r: Rule<K>?) -> u64 { opt_group_styles(r).len() }
 
 # A `Many`'s separator, linked — `none` stays `none`. Its own function because
 # `?` cannot reach inside an optional.
@@ -587,9 +573,9 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // Group indices are handed out across the whole grammar, production by
     // production, so `base` carries over rather than restarting — one flat table
     // for the same reason `prods` is one: an index is the whole address.
-    // Sugar first: a `Many` carrying `nested_in` becomes the `NestedIn` it stands
-    // for before a group index is handed out, so the two spellings cannot get
-    // different answers and nothing below this line knows the shorthand exists.
+    // Desugar first: a bracketed `Many` has its style settled — stated, or read
+    // off the rule — before a group index is handed out, so what the table holds
+    // is what the rule meant rather than what it wrote.
     mut prods: Production<K, A>[] = [];
     mut groups: ListStyle[] = [];
     for (let p : g.prods) {
@@ -683,49 +669,66 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // Groups are numbered across the whole grammar, a group before its insides,
     // in the order the rules mention them. `p` holds one directly and one nested
     // inside it; `q` follows, so its own group starts where `p` left off.
-    let inner: Rule<Kind> = NestedIn(
-        Literal("["),
+    let inner: Rule<Kind> = Many(
         Named("q"),
-        Literal("]"),
+        min=1,
+        max=1,
+        nested_in=(Literal("["), Literal("]")),
         style=ListStyle { sep: ";" },
     );
-    let outer: Rule<Kind> = NestedIn(Literal("("), inner, Literal(")"), style=ListStyle {});
+    let outer: Rule<Kind> = Many(
+        inner,
+        min=1,
+        max=1,
+        nested_in=(Literal("("), Literal(")")),
+        style=ListStyle {},
+    );
+    let q_rule: Rule<Kind> = Many(
+        Term(Atom),
+        min=1,
+        max=1,
+        nested_in=(Literal("{"), Literal("}")),
+        style=ListStyle { spaced: true },
+    );
     let nests: Grammar<Kind, Node> = Grammar {
         prods: [
             Production { name: "p", rule: outer, build: Mk(keep), layout: Inline },
-            Production {
-                name: "q",
-                rule: NestedIn(
-                    Literal("{"),
-                    Term(Atom),
-                    Literal("}"),
-                    style=ListStyle { spaced: true },
-                ),
-                build: Mk(keep),
-                layout: Inline,
-            },
+            Production { name: "q", rule: q_rule, build: Mk(keep), layout: Inline },
         ],
     };
     let ns = link(nests)?;
 
     // Three groups: `p`'s outer, `p`'s inner, then `q`'s.
     assert(ns.groups == [ListStyle {}, ListStyle { sep: ";" }, ListStyle { spaced: true }]);
+
+    // Linked, a group wears its index. The rule is otherwise the one written —
+    // there is no second spelling to rewrite into.
+    let linked_inner: Rule<Kind> = Many(
+        NamedIdx(1),
+        min=1,
+        max=1,
+        nested_in=(Literal("["), Literal("]")),
+        style=ListStyle { sep: ";" },
+        group=1,
+    );
     assert(
-        rule_of(ns, 0) == NestedIdx(
-            0,
-            Literal("("),
-            NestedIdx(1, Literal("["), NamedIdx(1), Literal("]"), style=ListStyle { sep: ";" }),
-            Literal(")"),
+        rule_of(ns, 0) == Many(
+            linked_inner,
+            min=1,
+            max=1,
+            nested_in=(Literal("("), Literal(")")),
             style=ListStyle {},
+            group=0,
         ),
     );
     assert(
-        rule_of(ns, 1) == NestedIdx(
-            2,
-            Literal("{"),
+        rule_of(ns, 1) == Many(
             Term(Atom),
-            Literal("}"),
+            min=1,
+            max=1,
+            nested_in=(Literal("{"), Literal("}")),
             style=ListStyle { spaced: true },
+            group=2,
         ),
     );
 
@@ -734,31 +737,21 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     assert(link(ns)?.groups == ns.groups);
     assert(rule_of(link(ns)?, 0) == rule_of(ns, 0));
 
-    // ---------- the `nested_in` shorthand ----------
+    // ---------- the derived style ----------
     //
-    // A bracketed list written the short way links to exactly what the long way
-    // links to. The style is derived: `,` from the separator, `trailing` from
-    // `trailing_sep`, `spaced` as given.
+    // A bracketed list states no style: `,` comes from its separator, `trailing`
+    // from `trailing_sep`, `spaced` as given, `wraps` from `max`. `desugar`
+    // settles it before `link` collects it, so what the table holds is what the
+    // rule meant rather than what it wrote.
     let sugar: Rule<Kind> = Many(
         Term(Atom),
         sep=Literal(","),
         trailing_sep=false,
         nested_in=(Literal("("), Literal(")")),
     );
-    let longhand: Rule<Kind> = NestedIn(
-        Literal("("),
-        Many(Term(Atom), sep=Literal(","), trailing_sep=false),
-        Literal(")"),
-        style=ListStyle { sep: ",", trailing: false },
-    );
     let short_g: Grammar<Kind, Node> = Grammar {
         prods: [Production { name: "a", rule: sugar, build: Mk(keep), layout: Inline }],
     };
-    let long_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: longhand, build: Mk(keep), layout: Inline }],
-    };
-    assert(rule_of(link(short_g)?, 0) == rule_of(link(long_g)?, 0));
-    assert(link(short_g)?.groups == link(long_g)?.groups);
     assert(link(short_g)?.groups == [ListStyle { sep: ",", trailing: false }]);
 
     // A group bounded at one item is not a list, so `wraps` comes off `max` and
@@ -815,7 +808,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
         prods: [
             Production {
                 name: "a",
-                rule: NestedIn(Literal("("), Named("nope"), Literal(")")),
+                rule: Many(Named("nope"), min=1, max=1, nested_in=(Literal("("), Literal(")"))),
                 build: Mk(keep),
                 layout: Inline,
             },
@@ -856,36 +849,36 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     }
 }
 --- performance ---
-allocations: 740
-deallocations: 740
-reallocations: 39
-bytes allocated: 58058
-instructions executed: 67263
-binary size: 148280
-  code: 91324
-  data: 3540
-  metadata: 53416
+allocations: 653
+deallocations: 653
+reallocations: 35
+bytes allocated: 65666
+instructions executed: 59575
+binary size: 137224
+  code: 86644
+  data: 3396
+  metadata: 47184
 functions:
   __arr_drop_ListStyle:
-    calls: 70
+    calls: 41
     bytes: 120
   __arr_drop_Prec:
     calls: 2
     bytes: 120
   __arr_drop_Production$Kind$Node:
-    calls: 33
+    calls: 28
     bytes: 188
   __arr_drop_Rule$Kind:
     calls: 25
     bytes: 116
   __arr_retain_ListStyle:
-    calls: 20
+    calls: 16
     bytes: 120
   __arr_retain_Prec:
     calls: 0
     bytes: 120
   __arr_retain_Production$Kind$Node:
-    calls: 29
+    calls: 25
     bytes: 188
   __arr_retain_Rule$Kind:
     calls: 32
@@ -900,17 +893,20 @@ functions:
     calls: 1
     bytes: 412
   __builtin_find_index$str$lam8:
-    calls: 27
+    calls: 23
     bytes: 400
   __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam19:
     calls: 4
     bytes: 720
   __eq_ListStyle:
-    calls: 16
+    calls: 14
     bytes: 200
   __eq_ListStyle$arr:
-    calls: 6
+    calls: 5
     bytes: 284
+  __eq_ListStyle$opt:
+    calls: 8
+    bytes: 92
   __eq_ParseError:
     calls: 5
     bytes: 128
@@ -921,44 +917,44 @@ functions:
     calls: 1
     bytes: 284
   __eq_Rule$Kind:
-    calls: 35
-    bytes: 876
+    calls: 29
+    bytes: 676
   __eq_Rule$Kind$arr:
     calls: 3
     bytes: 300
   __eq_Rule$Kind$opt:
-    calls: 4
+    calls: 8
     bytes: 92
   __eq___builtin_Span:
     calls: 5
     bytes: 104
   __eq___tuple$Rule_Kind$Rule_Kind:
-    calls: 0
+    calls: 5
     bytes: 120
   __eq___tuple$Rule_Kind$Rule_Kind$opt:
-    calls: 4
+    calls: 8
     bytes: 92
   __eq_str$arr:
     calls: 3
     bytes: 364
   __eq_u64$opt:
-    calls: 5
+    calls: 17
     bytes: 100
   __rec_drop_Node:
     calls: 0
     bytes: 72
   __rec_drop_Rule$Kind:
-    calls: 288
-    bytes: 464
+    calls: 226
+    bytes: 340
   __rec_drop___tuple$Rule_Kind$Rule_Kind:
-    calls: 4
+    calls: 36
     bytes: 72
   __test$failure_message:
     calls: 1
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 49928
+    bytes: 45756
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -972,52 +968,52 @@ functions:
     calls: 4
     bytes: (external)
   aipl_arr_extend:
-    calls: 114
+    calls: 95
     bytes: (external)
   aipl_arr_inc:
-    calls: 897
+    calls: 713
     bytes: (external)
   aipl_arr_join:
     calls: 4
     bytes: (external)
   aipl_arr_reserve:
-    calls: 70
+    calls: 41
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 1333
+    calls: 1092
     bytes: (external)
   aipl_array_new:
-    calls: 352
+    calls: 307
     bytes: (external)
   aipl_array_push:
-    calls: 41
+    calls: 37
     bytes: (external)
   aipl_array_push_mut:
-    calls: 45
+    calls: 41
     bytes: (external)
   aipl_array_with_cap:
-    calls: 26
+    calls: 22
     bytes: (external)
   aipl_assert:
-    calls: 29
+    calls: 27
     bytes: (external)
   aipl_rec_alloc:
-    calls: 292
+    calls: 262
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1583
+    calls: 1294
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 185
+    calls: 166
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1291
+    calls: 1032
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 185
+    calls: 166
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -1035,11 +1031,11 @@ functions:
     calls: 2
     bytes: (external)
   desugar_opt$Kind:
-    calls: 12
+    calls: 17
     bytes: 700
   desugar_rule$Kind:
-    calls: 102
-    bytes: 14040
+    calls: 78
+    bytes: 11936
   failure_message:
     calls: 2
     bytes: 488
@@ -1047,35 +1043,29 @@ functions:
     calls: 0
     bytes: 32
   group_styles$Kind$tail:
-    calls: 278
-    bytes: 3208
+    calls: 188
+    bytes: 4724
   keep:
     calls: 0
     bytes: 268
   link$Kind$Node:
-    calls: 18
+    calls: 14
     bytes: 2796
-  link_nest$Kind:
-    calls: 17
-    bytes: 1300
   link_opt$Kind:
-    calls: 11
+    calls: 16
     bytes: 716
   link_rule$Kind:
-    calls: 102
-    bytes: 5668
+    calls: 76
+    bytes: 8236
   link_rules$Kind:
     calls: 4
     bytes: 832
   main:
     calls: 1
     bytes: 180
-  nest_styles$Kind:
-    calls: 22
-    bytes: 956
   prod_names$Kind$Node:
-    calls: 22
+    calls: 18
     bytes: 492
   rule_of$Kind$Node:
-    calls: 13
+    calls: 11
     bytes: 820
