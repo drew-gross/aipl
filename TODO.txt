@@ -2,11 +2,6 @@
 instead. Looks like a small fix: both the checker (check.rs:2051) and codegen (lib.rs:11217) just hard-expect i64,
 while the ord-bound machinery already compares chars — and ord_bound.aipl's doc comment claims chars work with </>.
 
-Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
-Make the language features powerful enough that we don't need builtin_return
-make some_var[Span{ ... }] work
-generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
-
 variant:
   add a "variant without" option for concrete/generic type that lets you still pass a conrete type to functions that accept generic
   add an is keyword that matches cases and maybe replaces same_case (or maybe just a .is(CaseName) method?)
@@ -15,6 +10,7 @@ variant:
 
 projects:
   make some projects in AIPL, probably organized where it's a folder in this repo that would otherwise work standalone (i.e. aipl bin is copied in)
+  Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
 
 type system:
   apparently push and extend report type errors from codegen which is bad because it means unreachable code doesn't get fully typechecked
@@ -79,8 +75,6 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  use same_case in place of is_tree
-
   In group_styles, rs.map(group_styles) is refused
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
   DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
@@ -166,6 +160,7 @@ HOF:
 math:
 
 syntax:
+  generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
   make a syntax for ignoring the rest of the args in a match (just take the ones you want)
   make a syntax for optional args where its implicily ? with default none, and providing make it some, but with the some implicit (none can't be provided explicitly)
   allow destructuring self while having it still be self e.g. fn foo(self: Span { start, end }). Maybe do this for other args too for doc purposes?
@@ -204,6 +199,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  Make the language features powerful enough that we don't need builtin_return
   when all type args are just passed to a single arg type, and those types don't matter to the function internals, omitting them should be allowed e.g. fn prev_end<K: variant, A: any>(p: Parser<K, A>, i: u64)  becomes fn prev_end(p: Parser, i: u64)
   add `container` bound, or maybe monad
   After parsing we types should be "bounds" e.g. Is(ConcreteType), Bound(any), [Bound(a), Bound(b)]. Literals can have a type of OneOf(Case, CaseConstructor) or FlexInt, etc. Then they are unified by type checking.
@@ -333,6 +329,7 @@ design:
   apis should express intent
 
 optimizations:
+  should be able to optimize comparing a variant variable with a specific case e.g. my_var_1 == MyCase(my_var_2) shouldn't need to construct the MyCase, it can optimize to a case comparison then internals if case matches
   loop invariant/match invariant/branch invariant code motion
   unused variant elimination
   Niche-filled optionals — `T?` in a spare bit of `T`, no separate tag word. str has spare bits, should be no problem

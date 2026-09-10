@@ -496,11 +496,11 @@ allocations: 36986
 deallocations: 36986
 reallocations: 1230
 bytes allocated: 2645693
-instructions executed: 4579503
-binary size: 444032
-  code: 285344
+instructions executed: 4577095
+binary size: 443696
+  code: 285132
   data: 7876
-  metadata: 150812
+  metadata: 150688
 functions:
   __arr_drop_Json:
     calls: 147
@@ -574,28 +574,28 @@ functions:
   __arr_retain___m5__Doc:
     calls: 508
     bytes: 116
-  __builtin_all$char$s0$lam154:
+  __builtin_all$char$s0$lam155:
     calls: 44
     bytes: 212
-  __builtin_any$__m5__Doc$lam163:
+  __builtin_any$__m5__Doc$lam164:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam163$tail:
+  __builtin_any$__m5__Doc$lam164$tail:
     calls: 207
     bytes: 324
   __builtin_count_while$char$lam90:
     calls: 98
     bytes: 220
-  __builtin_count_while$char$s0$lam119:
+  __builtin_count_while$char$s0$lam118:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam119$tail:
+  __builtin_count_while$char$s0$lam118$tail:
     calls: 0
     bytes: 256
-  __builtin_count_while$char$s0$lam138:
+  __builtin_count_while$char$s0$lam133:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam157:
+  __builtin_count_while$char$s0$lam158:
     calls: 0
     bytes: 172
   __builtin_count_while$char$s0$lam98:
@@ -604,7 +604,7 @@ functions:
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m3__Prec$lam170:
+  __builtin_find_if$__m3__Prec$lam171:
     calls: 0
     bytes: 688
   __builtin_find_index$str$lam56:
@@ -619,7 +619,7 @@ functions:
   __builtin_intersperse$__m5__Doc:
     calls: 34
     bytes: 408
-  __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam103:
+  __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam102:
     calls: 166
     bytes: 748
   __builtin_try_map$__m3__Production$JsonTok$Json$__m2__First<JsonTok>$__m3__ParseError$lam62:
@@ -649,9 +649,9 @@ functions:
   __eq_char$opt:
     calls: 400
     bytes: 100
-  __filter99$own0:
+  __filter128$own0:
     calls: 166
-    bytes: 544
+    bytes: 332
   __lambda_22:
     calls: 0
     bytes: 128
@@ -889,22 +889,22 @@ functions:
   __m4__format_cst$JsonTok$Json$s1$lam32:
     calls: 13
     bytes: 384
-  __m4__gap_wanted$lam134:
+  __m4__gap_wanted$lam129:
     calls: 195
     bytes: 200
-  __m4__group_doc$JsonTok$Json$s1$lam107:
+  __m4__group_doc$JsonTok$Json$s1$lam106:
     calls: 19
     bytes: 2420
-  __m4__inline_doc$lam106:
+  __m4__inline_doc$lam105:
     calls: 163
     bytes: 2668
-  __m4__pieces$JsonTok$Json$s1$lam104:
+  __m4__pieces$JsonTok$Json$s1$lam103:
     calls: 169
     bytes: 3612
   __m4__render_cst$JsonTok$Json$s1$lam9:
     calls: 13
     bytes: 5268
-  __m4__wrapped$lam135:
+  __m4__wrapped$lam130:
     calls: 19
     bytes: 4272
   __m5__col_after:
@@ -983,7 +983,7 @@ functions:
     calls: 2939
     bytes: (external)
   aipl_arr_inc:
-    calls: 97879
+    calls: 97740
     bytes: (external)
   aipl_arr_join:
     calls: 2057
@@ -998,7 +998,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 124753
+    calls: 124614
     bytes: (external)
   aipl_array_new:
     calls: 17789

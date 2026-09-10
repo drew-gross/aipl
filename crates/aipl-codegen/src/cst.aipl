@@ -18,6 +18,7 @@
 // `tests/cases/variants/recursive_through_array.aipl`.
 import {
     Span,
+    case_of,
     equal as ==,
     filter,
     filter_map,
@@ -26,7 +27,6 @@ import {
     join,
     last,
     len,
-    logical_not as !,
     map,
     value_or,
 } from builtins;
@@ -41,19 +41,6 @@ import {
 # reading exactly the children it read before. The only pass that sees a group is
 # the formatter, which is the pass that needs to know where the brackets are.
 variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[]) | CGroup(u64, Cst[], Cst[], Cst[])
-
-# Whether `self` is an interior node. The parser's lowering pass hands a
-# production's `build` only the values of its *interior* children — a leaf has
-# no lowered value, and its text is reachable from the node's own span — so
-# this is the filter that decides what counts as a child.
-pub fn is_tree(self: Cst) -> bool {
-    match (self) {
-        CTree(..) => true,
-        // A group is not one: it is spliced away by `flat_kids` before anything
-        // asks, and reaching this with one means a caller walked raw kids.
-        CLeaf(..) | CTrivia(..) | CGroup(..) => false,
-    }
-}
 
 # Every leaf span under `self`, in source order — token leaves and trivia
 # alike. The whole losslessness property is stated in terms of this list: the
@@ -121,7 +108,12 @@ pub fn span(self: Cst) -> Span {
 # the child list a production's `build` is lowered against, so its order and
 # length are part of the contract between a grammar and its lowering functions:
 # one entry per `Named` reference the rule matched, in the order it matched them.
-pub fn nodes(self: Cst) -> Cst[] { self.flat_kids().filter(is_tree) }
+#
+# A leaf is dropped because the lowering pass has nothing to hand `build` for one
+# — it has no lowered value, and its text is reachable from the node's own span.
+# A `CGroup` never reaches the test: `flat_kids` splices it away first, which is
+# what makes a group transparent.
+pub fn nodes(self: Cst) -> Cst[] { self.flat_kids().filter(|k| k.case_of() == CTree) }
 
 # The direct kids of `self` with every group spliced in place — the one function
 # that makes a group transparent, and what `nodes` and `own_tokens` are both
@@ -210,9 +202,9 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     let src = "1 + 2";
     let t = CTree(1, [CLeaf(0..1), CTrivia(1..2), CLeaf(2..3), CTrivia(3..4), CLeaf(4..5)]);
 
-    assert(t.is_tree());
-    assert(!CLeaf(0..1).is_tree());
-    assert(!CTrivia(1..2).is_tree());
+    // What counts as an interior child: a `CTree` does, a `CLeaf` and a
+    // `CTrivia` do not.
+    assert(CTree(0, [CLeaf(0..1), t, CTrivia(1..2)]).nodes() == [t]);
 
     // Losslessness: the leaves tile the source, so the text comes back whole.
     assert(t.text(src) == src);
@@ -296,7 +288,6 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // `*` between the two groups is a direct leaf of the parent, and the two
     // bracketed expressions are its two interior children — exactly what the
     // same tree written with `Then` and no group would have handed a `build`.
-    assert(!grp.is_tree());
     assert(outer.nodes() == [inner, CTree(1, [CLeaf(11..12)])]);
     assert(outer.own_token_text(gs) == "()*()");
 
@@ -309,99 +300,84 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 576
-deallocations: 576
+allocations: 585
+deallocations: 585
 reallocations: 40
-bytes allocated: 29070
-instructions executed: 29618
-binary size: 60176
-  code: 35868
-  data: 2261
-  metadata: 22047
+bytes allocated: 29502
+instructions executed: 30466
+binary size: 54568
+  code: 32108
+  data: 2253
+  metadata: 20207
 functions:
   __arr_drop_Cst:
-    calls: 129
+    calls: 135
     bytes: 116
   __arr_retain_Cst:
-    calls: 62
+    calls: 63
     bytes: 116
   __eq_Cst:
-    calls: 17
+    calls: 23
     bytes: 360
   __eq_Cst$arr:
-    calls: 9
+    calls: 11
     bytes: 300
   __eq___builtin_Span:
-    calls: 25
+    calls: 30
     bytes: 104
   __eq___builtin_Span$arr:
     calls: 4
     bytes: 284
-  __filter0$own0:
-    calls: 1
-    bytes: 544
-  __filter1$own0:
-    calls: 1
-    bytes: 544
-  __filter5$own0:
-    calls: 1
-    bytes: 544
-  __filter6$own0:
-    calls: 1
-    bytes: 544
-  __filter7$own0:
-    calls: 1
-    bytes: 544
-  __filter8$own0:
-    calls: 1
-    bytes: 544
+  __filter4$own0:
+    calls: 7
+    bytes: 332
   __rec_drop_Cst:
-    calls: 54
+    calls: 55
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 13492
+    bytes: 12664
   aipl_arr_drop_arr:
-    calls: 85
+    calls: 86
     bytes: (external)
   aipl_arr_extend:
     calls: 24
     bytes: (external)
   aipl_arr_inc:
-    calls: 1243
+    calls: 1254
     bytes: (external)
   aipl_arr_join:
-    calls: 88
+    calls: 89
     bytes: (external)
   aipl_arr_reserve:
     calls: 12
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 167
+    calls: 170
     bytes: (external)
   aipl_array_dec:
-    calls: 1720
+    calls: 1739
     bytes: (external)
   aipl_array_new:
-    calls: 274
+    calls: 280
     bytes: (external)
   aipl_array_push_mut:
-    calls: 236
+    calls: 239
     bytes: (external)
   aipl_array_with_cap:
-    calls: 114
+    calls: 115
     bytes: (external)
   aipl_assert:
-    calls: 38
+    calls: 35
     bytes: (external)
   aipl_rec_alloc:
-    calls: 54
+    calls: 55
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 540
+    calls: 559
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 486
+    calls: 504
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -416,7 +392,7 @@ functions:
     calls: 0
     bytes: 32
   flat_kids$tail:
-    calls: 19
+    calls: 20
     bytes: 3832
   leaves:
     calls: 78
@@ -437,7 +413,7 @@ functions:
     calls: 0
     bytes: 32
   splice$tail:
-    calls: 68
+    calls: 71
     bytes: 612
   text:
     calls: 5

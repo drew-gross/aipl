@@ -45,20 +45,6 @@
 
 
 
-        <section class="item" id="item-is_tree">
-          <h3>
-            <a class="anchor" href="#item-is_tree">is_tree</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn is_tree(self: Cst) -&#62; bool</code></pre>
-
-          <div class="doc"><p>Whether <code>self</code> is an interior node. The parser's lowering pass hands a production's <code>build</code> only the values of its *interior* children — a leaf has no lowered value, and its text is reachable from the node's own span — so this is the filter that decides what counts as a child.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-leaves">
           <h3>
             <a class="anchor" href="#item-leaves">leaves</a>
@@ -136,7 +122,7 @@
           </h3>
           <pre class="signature"><code>pub fn nodes(self: Cst) -&#62; Cst[]</code></pre>
 
-          <div class="doc"><p>The interior children of <code>self</code> — its kids with the leaves dropped. This is the child list a production's <code>build</code> is lowered against, so its order and length are part of the contract between a grammar and its lowering functions: one entry per <code>Named</code> reference the rule matched, in the order it matched them.</p></div>
+          <div class="doc"><p>The interior children of <code>self</code> — its kids with the leaves dropped. This is the child list a production's <code>build</code> is lowered against, so its order and length are part of the contract between a grammar and its lowering functions: one entry per <code>Named</code> reference the rule matched, in the order it matched them.</p><p>A leaf is dropped because the lowering pass has nothing to hand <code>build</code> for one — it has no lowered value, and its text is reachable from the node's own span. A <code>CGroup</code> never reaches the test: <code>flat_kids</code> splices it away first, which is what makes a group transparent.</p></div>
 
 
         </section>
