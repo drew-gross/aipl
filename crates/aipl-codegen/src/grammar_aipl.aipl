@@ -127,7 +127,7 @@ fn items() -> Production<AiplTok, Ast>[] {
     // `import { a, b as c, equal as == } from "./x.aipl";` — or `from builtins`.
     let import_decl: Rule<AiplTok> = Then([
         Lit("import"),
-        Many(Named("import_name"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
+        Many(Named("import_name"), sep=Lit(","), nested_in=braces(), spaced=true),
         Lit("from"),
         OneOf([Term(StrLit), Lit("builtins")]),
         Lit(";"),
@@ -174,7 +174,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         Lit("fn"),
         Term(Name),
         Named("type_params"),
-        Many(Named("param"), sep=some(Lit(",")), nested_in=parens()),
+        Many(Named("param"), sep=Lit(","), nested_in=parens()),
         Many(Named("effect")),
         Maybe(Then([Lit("->"), Named("ty")])),
         Named("fn_body"),
@@ -187,7 +187,7 @@ fn items() -> Production<AiplTok, Ast>[] {
     let type_params: Rule<AiplTok> = Maybe(Many(
         Named("type_param"),
         min=1,
-        sep=some(Lit(",")),
+        sep=Lit(","),
         trailing_sep=false,
         nested_in=angles(),
     ));
@@ -212,10 +212,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         // `Point { x, y }` — the argument destructured in place of being named,
         // the same pattern `let Point { x, y } = v;` writes. It names no
         // parameter, so there is no `: T` to follow.
-        Then([
-            Term(Name),
-            Many(Term(Name), min=1, sep=some(Lit(",")), nested_in=braces(), spaced=true),
-        ]),
+        Then([Term(Name), Many(Term(Name), min=1, sep=Lit(","), nested_in=braces(), spaced=true)]),
     ]);
 
     // A body is a block, or the struct-literal shorthand. The shorthand is tried
@@ -226,16 +223,16 @@ fn items() -> Production<AiplTok, Ast>[] {
         Named("block"),
     ]);
     let construct_fields: Rule<AiplTok> = OneOf([
-        Then([Lit(".."), Named("expr"), Lit(","), Many(Named("field_init"), sep=some(Lit(",")))]),
+        Then([Lit(".."), Named("expr"), Lit(","), Many(Named("field_init"), sep=Lit(","))]),
         Then([
             Term(Name),
             Lit(":"),
             Named("expr"),
             Lit(","),
-            Many(Named("field_init"), sep=some(Lit(","))),
+            Many(Named("field_init"), sep=Lit(",")),
         ]),
         Then([Term(Name), Lit(":"), Named("expr")]),
-        Then([Term(Name), Lit(","), Many(Named("field_init"), sep=some(Lit(",")))]),
+        Then([Term(Name), Lit(","), Many(Named("field_init"), sep=Lit(","))]),
     ]);
 
     // `.test({ .. })`, the only attribute. The string-argument form parses
@@ -251,7 +248,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         Lit("struct"),
         Term(Name),
         Named("type_params"),
-        Many(Named("field_decl"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
+        Many(Named("field_decl"), sep=Lit(","), nested_in=braces(), spaced=true),
     ]);
     let field_decl: Rule<AiplTok> = OneOf([
         Then([Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr")]),
@@ -266,18 +263,12 @@ fn items() -> Production<AiplTok, Ast>[] {
         Named("type_params"),
         Lit("="),
         Maybe(Lit("|")),
-        Many(Named("variant_case"), min=1, sep=some(Lit("|")), trailing_sep=false),
+        Many(Named("variant_case"), min=1, sep=Lit("|"), trailing_sep=false),
     ]);
     let variant_case: Rule<AiplTok> = OneOf([
         Then([
             Term(Name),
-            Many(
-                Named("case_param"),
-                min=1,
-                sep=some(Lit(",")),
-                trailing_sep=false,
-                nested_in=parens(),
-            ),
+            Many(Named("case_param"), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens()),
         ]),
         Term(Name),
     ]);
@@ -328,7 +319,7 @@ fn types() -> Production<AiplTok, Ast>[] {
     // are four groups rather than a shape with no single pair to describe.
     let ty_parens: Rule<AiplTok> = Many(
         Named("ty"),
-        sep=some(Lit(",")),
+        sep=Lit(","),
         trailing_sep=false,
         nested_in=parens(),
     );
@@ -359,7 +350,7 @@ fn types() -> Production<AiplTok, Ast>[] {
         nest2("#", "{", Named("ty"), "}", strict()),
         Then([
             Term(Name),
-            Many(Named("ty"), min=1, sep=some(Lit(",")), trailing_sep=false, nested_in=angles()),
+            Many(Named("ty"), min=1, sep=Lit(","), trailing_sep=false, nested_in=angles()),
         ]),
         Term(Name),
     ]);
@@ -414,7 +405,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
     let let_stmt: Rule<AiplTok> = OneOf([
         Then([
             Lit("let"),
-            Many(Term(Name), min=1, sep=some(Lit(",")), trailing_sep=false, nested_in=parens()),
+            Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens()),
             Lit("="),
             Named("expr"),
             Lit(";"),
@@ -422,7 +413,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
         Then([
             Lit("let"),
             Term(Name),
-            Many(Term(Name), min=1, sep=some(Lit(",")), nested_in=braces(), spaced=true),
+            Many(Term(Name), min=1, sep=Lit(","), nested_in=braces(), spaced=true),
             Lit("="),
             Named("expr"),
             Lit(";"),
@@ -434,7 +425,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
         Then([
             Lit("mut"),
             Term(Name),
-            Many(Term(Name), min=1, sep=some(Lit(",")), nested_in=braces(), spaced=true),
+            Many(Term(Name), min=1, sep=Lit(","), nested_in=braces(), spaced=true),
             Lit("="),
             Named("expr"),
             Lit(";"),
@@ -466,7 +457,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
             Lit("set"),
             Term(Name),
             Lit("."),
-            Many(Term(Name), min=1, sep=some(Lit(".")), trailing_sep=false),
+            Many(Term(Name), min=1, sep=Lit("."), trailing_sep=false),
             Lit("="),
             Named("expr"),
             Lit(";"),
@@ -483,13 +474,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
                 "(",
                 Then([
                     Lit("let"),
-                    Many(
-                        Term(Name),
-                        min=1,
-                        sep=some(Lit(",")),
-                        trailing_sep=false,
-                        nested_in=parens(),
-                    ),
+                    Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens()),
                     Lit(":"),
                     Named("expr"),
                 ]),
@@ -594,7 +579,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([
             Lit("match"),
             only("(", Named("expr"), ")"),
-            Many(Named("match_arm"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
+            Many(Named("match_arm"), sep=Lit(","), nested_in=braces(), spaced=true),
         ]),
         // A bracketed list that is neither the start nor the end of its
         // alternative — the shape a leading/trailing token scan cannot see at
@@ -602,7 +587,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([
             Lit("shim"),
             Term(Name),
-            Many(Named("shim_binding"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
+            Many(Named("shim_binding"), sep=Lit(","), nested_in=braces(), spaced=true),
             Named("block"),
         ]),
         Term(IntLit),
@@ -614,7 +599,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([Term(Name), nest("(", Named("args"), ")", loose())]),
         Then([
             Term(Name),
-            Many(Named("field_init"), sep=some(Lit(",")), nested_in=braces(), spaced=true),
+            Many(Named("field_init"), sep=Lit(","), nested_in=braces(), spaced=true),
         ]),
         Term(Name),
         nest(
@@ -622,7 +607,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
             Then([
                 Named("expr"),
                 Lit(","),
-                Many(Named("expr"), min=1, sep=some(Lit(",")), trailing_sep=false),
+                Many(Named("expr"), min=1, sep=Lit(","), trailing_sep=false),
             ]),
             ")",
             strict(),
@@ -635,7 +620,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         // The same token opens and closes this one, which is the case a scan for
         // a leading and a trailing run of tokens could never tell from a list.
         Then([
-            Many(Named("lambda_param"), sep=some(Lit(",")), trailing_sep=false, nested_in=pipes()),
+            Many(Named("lambda_param"), sep=Lit(","), trailing_sep=false, nested_in=pipes()),
             Named("block"),
         ]),
     ]);
@@ -669,7 +654,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     ]);
 
     let shim_binding: Rule<AiplTok> = Then([Term(Name), Lit("="), Term(Name)]);
-    let args: Rule<AiplTok> = Many(Named("arg"), sep=some(Lit(",")));
+    let args: Rule<AiplTok> = Many(Named("arg"), sep=Lit(","));
 
     // The spread and the keyword argument lead with tokens no expression can, so
     // both must be tried before `expr` — after which a bare operator value and a
@@ -702,7 +687,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     ]);
     let lambda: Rule<AiplTok> = OneOf([
         Then([
-            Many(Named("lambda_param"), sep=some(Lit(",")), trailing_sep=false, nested_in=pipes()),
+            Many(Named("lambda_param"), sep=Lit(","), trailing_sep=false, nested_in=pipes()),
             Named("expr"),
         ]),
         Then([Lit("||"), Named("block")]),
@@ -723,7 +708,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     // nothing about which it is, so it takes its type from the use site. One
     // rule for all three, so `expr` is reachable from a single place under the
     // brace.
-    let brace_body: Rule<AiplTok> = Maybe(Many(Named("entry"), min=1, sep=some(Lit(","))));
+    let brace_body: Rule<AiplTok> = Maybe(Many(Named("entry"), min=1, sep=Lit(",")));
     let entry: Rule<AiplTok> = OneOf([
         Then([Named("expr"), Lit(":"), Named("expr")]),
         Named("expr"),
@@ -761,7 +746,7 @@ fn patterns() -> Production<AiplTok, Ast>[] {
     // what tells them apart.
     let match_arm: Rule<AiplTok> = OneOf([
         Then([
-            Many(Named("pattern"), min=2, sep=some(Lit("|")), trailing_sep=false),
+            Many(Named("pattern"), min=2, sep=Lit("|"), trailing_sep=false),
             Lit("=>"),
             Named("arm_body"),
         ]),
@@ -783,7 +768,7 @@ fn patterns() -> Production<AiplTok, Ast>[] {
     // this arm does not read.
     let ctor_payload: Rule<AiplTok> = OneOf([
         Lit(".."),
-        Many(Term(Name), min=1, sep=some(Lit(",")), trailing_sep=false),
+        Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false),
     ]);
 
     [

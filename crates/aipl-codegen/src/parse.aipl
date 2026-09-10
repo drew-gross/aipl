@@ -1138,7 +1138,7 @@ pub fn parse<K: variant, A: any>(
 
     // ---- Many with a separator, and the trailing-separator rule ----
     let comma: Rule<Tok> = Literal(",");
-    let nums = Many(Term(Num), sep=some(comma), trailing_sep=false);
+    let nums = Many(Term(Num), sep=comma, trailing_sep=false);
     let r_nums: Rule<Tok> = Then([Literal("["), nums, Literal("]")]);
     let g_nums = g_of([one("l", r_nums)]);
     assert(shown("[1, 2, 3]", g_nums, "l")? == "(l [ 1 , 2 , 3 ])");
@@ -1148,7 +1148,7 @@ pub fn parse<K: variant, A: any>(
     // With `trailing: false` the dangling separator is left for the enclosing
     // rule, which is what reports it.
     assert(msg_of("[1, 2,]", g_nums, "l") == "expected Num, found `]`");
-    let trail = Many(Term(Num), sep=some(comma));
+    let trail = Many(Term(Num), sep=comma);
     let r_trail: Rule<Tok> = Then([Literal("["), trail, Literal("]")]);
     assert(shown("[1, 2,]", g_of([one("l", r_trail)]), "l")? == "(l [ 1 , 2 , ])");
 
@@ -1156,7 +1156,7 @@ pub fn parse<K: variant, A: any>(
     // list, and a separator after the last item is still the list's own — it
     // ends the list rather than starting the item that would have been next — so
     // `trailing_sep` decides it exactly as it does when the items simply run out.
-    let bounded = Many(Term(Num), sep=some(comma), max=2);
+    let bounded = Many(Term(Num), sep=comma, max=2);
     let r_bounded: Rule<Tok> = Then([Literal("["), bounded, Literal("]")]);
     let g_bounded = g_of([one("l", r_bounded)]);
     assert(shown("[1, 2]", g_bounded, "l")? == "(l [ 1 , 2 ])");
@@ -1166,7 +1166,7 @@ pub fn parse<K: variant, A: any>(
     // list's: both are left where they are and the enclosing rule reports them.
     assert(msg_of("[1, 2, 3]", g_bounded, "l") == "expected `]`, found `,`");
     // The same list refusing the trailing separator leaves it behind instead.
-    let bounded_strict = Many(Term(Num), sep=some(comma), max=2, trailing_sep=false);
+    let bounded_strict = Many(Term(Num), sep=comma, max=2, trailing_sep=false);
     let r_bstrict: Rule<Tok> = Then([Literal("["), bounded_strict, Literal("]")]);
     let g_bstrict = g_of([one("l", r_bstrict)]);
     assert(msg_of("[1, 2,]", g_bstrict, "l") == "expected `]`, found `,`");
@@ -1258,7 +1258,7 @@ pub fn parse<K: variant, A: any>(
     // value, because a group is transparent to everything but the formatter.
     let g_list: Rule<Tok> = NestedIn(
         Literal("("),
-        Many(NamedIdx(1), sep=some(Literal(","))),
+        Many(NamedIdx(1), sep=Literal(",")),
         Literal(")"),
         style=ListStyle { spaced: true },
     );

@@ -196,7 +196,7 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
     // is written on the bracket pair.
     let r_object: Rule<JsonTok> = Many(
         Named("member"),
-        sep=some(Lit(",")),
+        sep=Lit(","),
         trailing_sep=false,
         nested_in=[Lit("{"), Lit("}")],
         spaced=true,
@@ -204,7 +204,7 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
     let r_member: Rule<JsonTok> = Then([Term(Str), Lit(":"), Named("value")]);
     let r_array: Rule<JsonTok> = Many(
         Named("value"),
-        sep=some(Lit(",")),
+        sep=Lit(","),
         trailing_sep=false,
         nested_in=[Lit("["), Lit("]")],
     );

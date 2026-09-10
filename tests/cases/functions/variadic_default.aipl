@@ -18,7 +18,7 @@ fn main() !prints {
     // Named: every variadic argument shape still works.
     print(to_str(count([1, 2], sep=5)));
     print(to_str(count([1, 2], sep=[5, 6])));
-    print(to_str(count([1, 2], sep=some(7))));
+    print(to_str(count([1, 2], sep=7)));
     print(to_str(count([1, 2], sep=none)));
 
     // The `str`/`char` ambiguity resolves from the *other* arguments, which are
@@ -45,20 +45,20 @@ allocations: 24
 deallocations: 24
 reallocations: 0
 bytes allocated: 748
-instructions executed: 493
-binary size: 4352
-  code: 2156
+instructions executed: 477
+binary size: 4304
+  code: 2120
   data: 1
-  metadata: 2195
+  metadata: 2183
 functions:
   __to_str_u64:
     calls: 9
     bytes: 204
   aipl_arr_inc:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 14
+    calls: 13
     bytes: (external)
   aipl_array_new:
     calls: 12
@@ -69,9 +69,6 @@ functions:
   aipl_write_u64:
     calls: 9
     bytes: (external)
-  count$i64$vo1:
-    calls: 2
-    bytes: 216
   main:
     calls: 1
-    bytes: 1736
+    bytes: 1916

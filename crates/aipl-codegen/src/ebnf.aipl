@@ -137,7 +137,7 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     let no_rules: Rule<Kind>[] = [];
     let r_empty: Rule<Kind> = Then(no_rules);
     let r_never: Rule<Kind> = OneOf(no_rules);
-    let r_list: Rule<Kind> = Many(Term(Num), sep=some(Literal(",")), trailing_sep=false);
+    let r_list: Rule<Kind> = Many(Term(Num), sep=Literal(","), trailing_sep=false);
 
     // Bounds. One-at-most is `?` and exactly-one is the body written alone,
     // because those are what those bounds mean; anything else is the `{n,m}`
@@ -817,7 +817,7 @@ fn first_msg(r: Rule<Kind>, sets: First<Kind>[]) -> str {
 # sequence, a precedence climb over two levels, an ordered choice with a nested
 # sequence in it, and an optional prefix in front of a one-or-more.
 fn fixture() -> Grammar<Kind, Node> {
-    let r_prog: Rule<Kind> = Many(Named("stmt"), sep=some(Literal(";")));
+    let r_prog: Rule<Kind> = Many(Named("stmt"), sep=Literal(";"));
     let r_stmt: Rule<Kind> = Then([Term(Name), Literal("="), Named("expr")]);
     let r_expr: Rule<Kind> = Climb(
         Named("atom"),

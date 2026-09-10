@@ -119,11 +119,6 @@ variant Rule<K: variant> =
     // makes `min=1, max=1` mean "one item, in brackets" when it carries a
     // `nested_in` — a group that holds one thing rather than a list.
     //
-    // Written `max?: u64` rather than `max: u64?`: a caller passes the bound
-    // itself (`max=2`), and leaving it out is what yields `none`. A caller that
-    // already holds an optional — `link_rule` and `desugar_rule`, rebuilding a
-    // rule they took apart — forwards it with `max?=max`.
-    //
     // `trailing_sep` still applies at the bound. A separator after the last item
     // ends the list rather than starting the item that would have been next, so
     // `Many(x, sep=comma, max=2)` takes `1, 2,` whole — the same answer it
@@ -133,6 +128,12 @@ variant Rule<K: variant> =
     // the separator keeps appearing. `trailing_sep` decides what happens to a
     // separator with nothing after it — consumed (`[1, 2,]` is the list) or
     // rewound and left for the enclosing rule to complain about.
+    //
+    // `sep` and `max` are both written with the `?` on the *name*: a caller
+    // gives the rule itself (`sep=Lit(",")`), and leaving it out is what yields
+    // `none`. A caller that already holds an optional — `link_rule` and
+    // `desugar_rule`, rebuilding a rule they took apart — forwards it with
+    // `sep?=..`.
     //
     // The two are orthogonal, and between them one rule covers every list a
     // grammar writes. An LR grammar spells each combination as its own wrapper
@@ -160,7 +161,7 @@ variant Rule<K: variant> =
         Rule<K>,
         min: u64 = 0,
         max?: u64 = none,
-        sep: Rule<K>? = none,
+        sep?: Rule<K> = none,
         trailing_sep: bool = true,
         nested_in: Rule<K>[] = [],
         spaced: bool = false
@@ -394,7 +395,7 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
                 desugar_rule(sub)?,
                 min=min,
                 max?=max,
-                sep=desugar_opt(sep)?,
+                sep?=desugar_opt(sep)?,
                 trailing_sep=trailing_sep,
             );
             if (nested_in.is_empty()) {
@@ -511,7 +512,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
             link_rule(sub, names, base)?,
             min=min,
             max?=max,
-            sep=link_opt(sep, names, base + group_count(sub))?,
+            sep?=link_opt(sep, names, base + group_count(sub))?,
             trailing_sep=trailing_sep,
         )),
         Maybe(sub) => ok(Maybe(link_rule(sub, names, base)?)),
@@ -644,7 +645,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
             Production { name: "a", rule: Maybe(Named("a")), build: Mk(keep), layout: Inline },
             Production {
                 name: "b",
-                rule: Many(Named("a"), sep=some(Literal(","))),
+                rule: Many(Named("a"), sep=Literal(",")),
                 build: Mk(keep),
                 layout: Inline,
             },
@@ -664,7 +665,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     };
     let ls = link(shapes)?;
     assert(rule_of(ls, 0) == Maybe(NamedIdx(0)));
-    assert(rule_of(ls, 1) == Many(NamedIdx(0), sep=some(Literal(","))));
+    assert(rule_of(ls, 1) == Many(NamedIdx(0), sep=Literal(",")));
     assert(rule_of(ls, 2) == Climb(NamedIdx(0), [Prec { power: 1, right: false, ops: ["+"] }]));
     assert(rule_of(ls, 3) == Many(NamedIdx(1), min=1));
 
@@ -744,13 +745,13 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // `trailing_sep`, `spaced` as given.
     let sugar: Rule<Kind> = Many(
         Term(Atom),
-        sep=some(Literal(",")),
+        sep=Literal(","),
         trailing_sep=false,
         nested_in=[Literal("("), Literal(")")],
     );
     let longhand: Rule<Kind> = NestedIn(
         Literal("("),
-        Many(Term(Atom), sep=some(Literal(",")), trailing_sep=false),
+        Many(Term(Atom), sep=Literal(","), trailing_sep=false),
         Literal(")"),
         style=ListStyle { sep: ",", trailing: false },
     );
@@ -806,7 +807,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 
     let odd_sep: Rule<Kind> = Many(
         Term(Atom),
-        sep=some(Term(Atom)),
+        sep=Term(Atom),
         nested_in=[Literal("("), Literal(")")],
     );
     let odd_g: Grammar<Kind, Node> = Grammar {
@@ -871,9 +872,9 @@ deallocations: 785
 reallocations: 40
 bytes allocated: 60099
 instructions executed: 68316
-binary size: 150128
+binary size: 150120
   code: 92852
-  data: 3900
+  data: 3892
   metadata: 53376
 functions:
   __arr_drop_ListStyle:
