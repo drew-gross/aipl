@@ -1,0 +1,115 @@
+import { equal as ==, filter, greater_than as >, len, union } from builtins;
+
+// The AIPL implementation of the `union_all` builtin. Monomorphization
+// registers this function under the canonical name `__builtin_union_all` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.union_all()` specializes
+// through the ordinary generic machinery — the in-file name `union_all` is only
+// for this file's own tests, which read exactly like user code.
+# Every element of every set in `self`, collected into one set — `union` folded
+# across a list. An empty list gives the empty set, and a one-element list gives
+# that set back unchanged. Generic over the element type and callable as a
+# method: `xs.union_all()`.
+#
+# This is the whole content of the `mut out = #{}; for (let s : xs) { set out =
+# out.union(s); }` longhand, which is why `union_loop_union_all` flags that shape
+# and points here.
+pub fn union_all<T: any>(self: #{T}[]) -> #{T} {
+    // `union_loop_union_all` flags this loop, correctly: it is the longhand the
+    // lint exists to replace. It is also the *implementation* of the shorthand,
+    // so taking the advice would have `union_all` call itself.
+    mut out: #{T} = #{}; #[allow]
+    for (let s : self) {
+        set out = out.union(s);
+    }
+    out
+}.test({
+    assert([#{1, 2}, #{2, 3}, #{4}].union_all() == #{1, 2, 3, 4}); // overlapping
+    assert(union_all([#{1}, #{2}]) == #{1, 2}); // free-call form
+    assert([#{7, 8}].union_all() == #{7, 8}); // one set, given back
+    assert([#{1}, #{1}, #{1}].union_all() == #{1}); // all duplicates collapse
+    // An empty *list* of sets, and a list of empty sets: both give the empty set.
+    let none_at_all: #{i64}[] = [#{1}].filter(|s| s.len() > 5);
+    assert(none_at_all.union_all() == #{});
+    let empties: #{i64}[] = [#{}, #{}];
+    assert(empties.union_all() == #{});
+    // A single empty set among non-empty ones contributes nothing.
+    assert([#{1}, #{}, #{2}].union_all() == #{1, 2});
+    // Any element type a set can hold.
+    assert([#{"a"}, #{"b", "a"}].union_all() == #{"a", "b"});
+    assert([#{'x'}, #{'y'}].union_all() == #{'x', 'y'});
+    assert([#{true}, #{false}].union_all() == #{false, true});
+})
+--- performance ---
+allocations: 71
+deallocations: 71
+reallocations: 0
+bytes allocated: 3117
+instructions executed: 2858
+binary size: 13752
+  code: 7848
+  data: 683
+  metadata: 5221
+functions:
+  __eq_set$bool:
+    calls: 1
+    bytes: 256
+  __eq_set$char:
+    calls: 1
+    bytes: 256
+  __eq_set$i64:
+    calls: 7
+    bytes: 256
+  __eq_set$str:
+    calls: 1
+    bytes: 304
+  __filter1$own0:
+    calls: 1
+    bytes: 336
+  __test$union_all:
+    calls: 1
+    bytes: 5904
+  aipl_arr_drop_arr:
+    calls: 10
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 99
+    bytes: (external)
+  aipl_array_dec:
+    calls: 170
+    bytes: (external)
+  aipl_array_new:
+    calls: 10
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 69
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 61
+    bytes: (external)
+  aipl_assert:
+    calls: 10
+    bytes: (external)
+  aipl_set_contains:
+    calls: 90
+    bytes: (external)
+  aipl_set_insert:
+    calls: 73
+    bytes: (external)
+  aipl_set_union:
+    calls: 20
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 108
+  union_all$i64:
+    calls: 7
+    bytes: 428

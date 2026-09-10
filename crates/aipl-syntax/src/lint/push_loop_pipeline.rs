@@ -1,7 +1,7 @@
 use crate::ast::{Expr, ExprKind, Program};
 use crate::Error;
 
-use super::{imported_as, lone_stmt, pushed_element, spans_its_text};
+use super::{imported_as, liftable, lone_stmt, pushed_element, spans_its_text};
 
 /// The local names this file's imports give the three builtins the
 /// [`push_loop_pipeline`] rewrite is written in terms of. `None` means the
@@ -24,23 +24,6 @@ pub(super) fn pipeline_names(program: &Program) -> PipelineNames {
         map: imported_as(program, "map"),
         filter: imported_as(program, "filter"),
     }
-}
-
-/// Whether `e` can be lifted into the pipeline's lambda: it must be
-/// [`lambda_safe`](super::lambda_safe()), and it may not mention `acc` — the
-/// array being accumulated — because the rewritten pipeline no longer has it
-/// (`out.len()` as a running index is the shape this catches).
-fn liftable(e: &Expr, acc: &str) -> bool {
-    if !super::lambda_safe(e) {
-        return false;
-    }
-    let mut ok = true;
-    crate::each_subexpr(e, &mut |x| {
-        if matches!(&x.kind, ExprKind::Ident(n) if n == acc) {
-            ok = false;
-        }
-    });
-    ok
 }
 
 /// ```text

@@ -1,0 +1,83 @@
+import { len, print, to_str, union } from builtins;
+
+// `mut out = #{}; for (let s : xs) { set out = out.union(s); }` — a set seeded
+// empty and grown by a loop that does nothing else. `union_all` says that in one
+// word, and says it up front: the reader learns what the set *is* without having
+// to run three statements to find out that nothing else happens to `out`.
+//
+// Neither `map` nor `union_all` is imported here, so every message names the
+// import its advice needs. The companion `union_loop_union_all_allow` has both.
+
+// The element unioned in unchanged — `union_all` alone.
+fn merged(xs: #{i64}[]) -> #{i64} {
+    mut out: #{i64} = #{};
+    for (let s : xs) {
+        set out = out.union(s);
+    }
+    out
+}
+
+fn ends(n: i64) -> #{i64} { #{n, n} }
+
+// Something derived from the element instead, which is the `map` the fold needs
+// first.
+fn all_ends(ns: i64[]) -> #{i64} {
+    mut acc: #{i64} = #{};
+    for (let n : ns) {
+        set acc = acc.union(ends(n));
+    }
+    acc
+}
+
+// The operands the other way round. Set union is commutative and its result is a
+// set, so this accumulates exactly the same set and gets the same advice.
+fn all_ends_flipped(ns: i64[]) -> #{i64} {
+    mut acc: #{i64} = #{};
+    for (let n : ns) {
+        set acc = ends(n).union(acc);
+    }
+    acc
+}
+
+fn pair(n: i64) -> #{i64}[] { [#{n}, #{n, n}] }
+
+// A call-shaped iterable can't be quoted back into the advice — its span stops
+// before its parens — so the message writes a placeholder in its place.
+fn from_call(n: i64) -> #{i64} {
+    mut out: #{i64} = #{};
+    for (let s : pair(n)) {
+        set out = out.union(s);
+    }
+    out
+}
+
+fn main() !prints {
+    print(merged([#{1}, #{2}]).len().to_str());
+    print(all_ends([1, 2]).len().to_str());
+    print(all_ends_flipped([1, 2]).len().to_str());
+    print(from_call(3).len().to_str());
+}
+--- errors ---
+error: "out" is seeded empty and unioned into by this loop and nothing else — write "mut out = xs.union_all();" and drop the loop, importing `union_all` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_union_loop_union_all.aipl:13:23
+   |
+13 |     mut out: #{i64} = #{};
+   |                       ^
+
+error: "acc" is seeded empty and unioned into by this loop and nothing else — write "mut acc = ns.map(|n| ..).union_all();" and drop the loop, importing `map` and `union_all` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_union_loop_union_all.aipl:25:23
+   |
+25 |     mut acc: #{i64} = #{};
+   |                       ^
+
+error: "acc" is seeded empty and unioned into by this loop and nothing else — write "mut acc = ns.map(|n| ..).union_all();" and drop the loop, importing `map` and `union_all` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_union_loop_union_all.aipl:35:23
+   |
+35 |     mut acc: #{i64} = #{};
+   |                       ^
+
+error: "out" is seeded empty and unioned into by this loop and nothing else — write "mut out = <iterable>.union_all();" and drop the loop, importing `union_all` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_union_loop_union_all.aipl:47:23
+   |
+47 |     mut out: #{i64} = #{};
+   |                       ^

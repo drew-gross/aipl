@@ -58,6 +58,7 @@ import {
     sort,
     try_map,
     union,
+    union_all,
     value_or,
     value_or_err,
     wrapping_add as +,
@@ -676,13 +677,7 @@ fn rule_labels<K: variant, A: any>(
         // A sequence is tried from its front, and past every element that can
         // match nothing — the same walk `rule_first` makes over terminals.
         Then(rs) => seq_labels(rs, prods, firsts, labels),
-        OneOf(rs) => {
-            mut out = empty;
-            for (let sub : rs) {
-                set out = out.union(rule_labels(sub, prods, firsts, labels));
-            }
-            out
-        },
+        OneOf(rs) => rs.map(|sub| rule_labels(sub, prods, firsts, labels)).union_all(),
         // A repetition and an option both try their body at offset 0; a
         // separator is only ever reached after an item.
         Many(sub, _, _, _, _, _) => rule_labels(sub, prods, firsts, labels),
@@ -1387,15 +1382,15 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 8885
-deallocations: 8885
+allocations: 8937
+deallocations: 8937
 reallocations: 617
-bytes allocated: 563747
-instructions executed: 1142978
-binary size: 559848
-  code: 341660
+bytes allocated: 565859
+instructions executed: 1146330
+binary size: 560256
+  code: 341912
   data: 8772
-  metadata: 209416
+  metadata: 209572
 functions:
   __arr_drop_Node:
     calls: 21
@@ -1463,16 +1458,16 @@ functions:
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
     bytes: 632
-  __builtin_all$__m3__Rule$Tok$lam119:
+  __builtin_all$__m3__Rule$Tok$lam124:
     calls: 0
     bytes: 36
-  __builtin_all$__m3__Rule$Tok$lam119$tail:
+  __builtin_all$__m3__Rule$Tok$lam124$tail:
     calls: 0
     bytes: 384
-  __builtin_any$__m3__Rule$Tok$lam122:
+  __builtin_any$__m3__Rule$Tok$lam127:
     calls: 0
     bytes: 36
-  __builtin_any$__m3__Rule$Tok$lam122$tail:
+  __builtin_any$__m3__Rule$Tok$lam127$tail:
     calls: 0
     bytes: 380
   __builtin_count_while$char$lam47:
@@ -1487,7 +1482,7 @@ functions:
   __builtin_count_while$char$s0$lam73$tail:
     calls: 3
     bytes: 256
-  __builtin_find_if$__m3__Prec$lam131:
+  __builtin_find_if$__m3__Prec$lam136:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam21:
@@ -1719,13 +1714,13 @@ functions:
     calls: 5
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 192
+    calls: 218
     bytes: (external)
   aipl_arr_extend:
     calls: 1069
     bytes: (external)
   aipl_arr_inc:
-    calls: 28386
+    calls: 28498
     bytes: (external)
   aipl_arr_join:
     calls: 150
@@ -1734,13 +1729,13 @@ functions:
     calls: 1344
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 382
+    calls: 438
     bytes: (external)
   aipl_arr_sort:
     calls: 34
     bytes: (external)
   aipl_array_dec:
-    calls: 35156
+    calls: 35320
     bytes: (external)
   aipl_array_new:
     calls: 4233
@@ -1749,10 +1744,10 @@ functions:
     calls: 603
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1385
+    calls: 1441
     bytes: (external)
   aipl_array_with_cap:
-    calls: 1043
+    calls: 1095
     bytes: (external)
   aipl_assert:
     calls: 64
@@ -1879,7 +1874,7 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 130
-    bytes: 4380
+    bytes: 4632
   rule_nullable$Tok:
     calls: 0
     bytes: 36

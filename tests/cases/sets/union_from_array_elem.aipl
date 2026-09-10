@@ -44,7 +44,11 @@ fn main() !prints {
     // The loop this shape stands in for. Under the value-track model the
     // per-iteration teardown freed the accumulator every trip, and this form
     // aborted the process outright rather than printing a wrong number.
-    mut all: #{i64} = #{};
+    //
+    // `union_loop_union_all` flags it, correctly — `ls.union_all()` is the
+    // spelling. The loop is the point here: the builtin is one call, and this
+    // case exists to drive the per-iteration reassignment the bug lived in.
+    mut all: #{i64} = #{}; #[allow]
     for (let s : ls) {
         set all = all.union(s);
     }

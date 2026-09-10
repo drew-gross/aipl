@@ -1198,15 +1198,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1433688
-deallocations: 1433688
+allocations: 1437360
+deallocations: 1437360
 reallocations: 7799
-bytes allocated: 122902000
-instructions executed: 183462356
-binary size: 749984
-  code: 500552
+bytes allocated: 123089920
+instructions executed: 183917198
+binary size: 750440
+  code: 500848
   data: 14076
-  metadata: 235356
+  metadata: 235516
 functions:
   __arr_drop___m11__StepResult$__m10__AiplTok:
     calls: 5
@@ -1280,52 +1280,52 @@ functions:
   __arr_retain___m9__Rule$__m10__AiplTok:
     calls: 256496
     bytes: 116
-  __builtin_all$__m9__Rule$__m10__AiplTok$lam139:
+  __builtin_all$__m9__Rule$__m10__AiplTok$lam144:
     calls: 0
     bytes: 36
-  __builtin_all$__m9__Rule$__m10__AiplTok$lam139$tail:
+  __builtin_all$__m9__Rule$__m10__AiplTok$lam144$tail:
     calls: 270
     bytes: 384
-  __builtin_all$char$s0$lam123:
+  __builtin_all$char$s0$lam128:
     calls: 79
     bytes: 212
-  __builtin_any$__m3__Doc$lam150:
+  __builtin_any$__m3__Doc$lam155:
     calls: 0
     bytes: 32
-  __builtin_any$__m3__Doc$lam150$tail:
+  __builtin_any$__m3__Doc$lam155$tail:
     calls: 145
     bytes: 324
-  __builtin_any$__m9__Rule$__m10__AiplTok$lam142:
+  __builtin_any$__m9__Rule$__m10__AiplTok$lam147:
     calls: 0
     bytes: 36
-  __builtin_any$__m9__Rule$__m10__AiplTok$lam142$tail:
+  __builtin_any$__m9__Rule$__m10__AiplTok$lam147$tail:
     calls: 108
     bytes: 380
   __builtin_count_while$char$lam54:
     calls: 1098
     bytes: 220
-  __builtin_count_while$char$s0$lam107:
+  __builtin_count_while$char$s0$lam112:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam107$tail:
+  __builtin_count_while$char$s0$lam112$tail:
     calls: 23
     bytes: 256
-  __builtin_count_while$char$s0$lam120:
+  __builtin_count_while$char$s0$lam125:
     calls: 65
     bytes: 172
-  __builtin_count_while$char$s0$lam122:
+  __builtin_count_while$char$s0$lam127:
     calls: 1
     bytes: 172
   __builtin_count_while$char$s0$lam62:
     calls: 854
     bytes: 184
-  __builtin_count_while$char$s0$lam94:
+  __builtin_count_while$char$s0$lam99:
     calls: 0
     bytes: 172
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m9__Prec$lam154:
+  __builtin_find_if$__m9__Prec$lam159:
     calls: 145
     bytes: 688
   __builtin_find_index$str$lam15:
@@ -1346,7 +1346,7 @@ functions:
   __builtin_try_map$__m9__Production$__m10__AiplTok$Ast$__m19__First<__m10__AiplTok>$__m9__ParseError$lam83:
     calls: 72
     bytes: 920
-  __builtin_try_map$__m9__Rule$__m10__AiplTok$__m9__Rule<__m10__AiplTok>$__m9__ParseError$lam113:
+  __builtin_try_map$__m9__Rule$__m10__AiplTok$__m9__Rule<__m10__AiplTok>$__m9__ParseError$lam118:
     calls: 20808
     bytes: 720
   __eq___m19__First$__m10__AiplTok:
@@ -1397,7 +1397,7 @@ functions:
   __lambda_23:
     calls: 2
     bytes: 64
-  __lambda_90:
+  __lambda_95:
     calls: 59
     bytes: 140
   __m10__char_lit_emit:
@@ -1540,7 +1540,7 @@ functions:
     bytes: 44
   __m18__rule_labels$__m10__AiplTok$Ast$tail:
     calls: 18630
-    bytes: 7752
+    bytes: 8048
   __m18__rule_nullable$__m10__AiplTok:
     calls: 0
     bytes: 36
@@ -1595,7 +1595,7 @@ functions:
   __m2__format_cst$__m10__AiplTok$Ast$s1$lam12:
     calls: 20
     bytes: 384
-  __m2__gap_wanted$lam114:
+  __m2__gap_wanted$lam119:
     calls: 160
     bytes: 304
   __m2__group_doc$__m10__AiplTok$Ast$s1$lam73:
@@ -1610,7 +1610,7 @@ functions:
   __m2__render_cst$__m10__AiplTok$Ast$s1$lam3:
     calls: 20
     bytes: 5268
-  __m2__wrapped$lam115:
+  __m2__wrapped$lam120:
     calls: 13
     bytes: 4272
   __m3__col_after:
@@ -1707,13 +1707,13 @@ functions:
     calls: 9
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 45185
+    calls: 47021
     bytes: (external)
   aipl_arr_extend:
     calls: 87779
     bytes: (external)
   aipl_arr_inc:
-    calls: 3305586
+    calls: 3323190
     bytes: (external)
   aipl_arr_join:
     calls: 45167
@@ -1722,13 +1722,13 @@ functions:
     calls: 88931
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 152536
+    calls: 161338
     bytes: (external)
   aipl_arr_sort:
     calls: 33
     bytes: (external)
   aipl_array_dec:
-    calls: 4326777
+    calls: 4348053
     bytes: (external)
   aipl_array_new:
     calls: 679939
@@ -1737,10 +1737,10 @@ functions:
     calls: 160877
     bytes: (external)
   aipl_array_push_mut:
-    calls: 261657
+    calls: 270459
     bytes: (external)
   aipl_array_with_cap:
-    calls: 97227
+    calls: 100899
     bytes: (external)
   aipl_assert:
     calls: 100

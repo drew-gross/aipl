@@ -1,0 +1,232 @@
+import {
+    greater_than as >,
+    is_nonempty,
+    join,
+    len,
+    map,
+    print,
+    push,
+    sort,
+    to_str,
+    union,
+    union_all,
+} from builtins;
+
+// The shapes the union-loop lint must leave alone. It rewrites exactly one
+// shape — a `mut acc = #{};` whose very next statement is a loop doing nothing
+// but unioning one thing into it — so everything here compiles.
+
+fn show(s: #{i64}) -> str {
+    mut out: i64[] = []; #[allow]
+    for (let x : s) {
+        set out.push(x);
+    }
+    out.sort().map(to_str).join(sep=",")
+}
+
+// The loop does something else as well. `union_all` has nowhere to put it.
+fn logged(xs: #{i64}[]) !prints -> #{i64} {
+    mut out: #{i64} = #{};
+    for (let s : xs) {
+        print(s.len().to_str());
+        set out = out.union(s);
+    }
+    out
+}
+
+// An early exit out of the loop. This is a fold that stops, which `union_all`
+// cannot express — it is `seq_labels` in `crates/aipl-codegen/src/parse.aipl`,
+// which unions each element's labels in until one of them is non-nullable.
+fn upto_three(xs: #{i64}[]) -> #{i64} {
+    mut out: #{i64} = #{};
+    for (let s : xs) {
+        set out = out.union(s);
+        if (out.len() > 3) {
+            return out;
+        };
+    }
+    out
+}
+
+// A guard. `xs.filter(..).union_all()` would say it, but the predicate would
+// have to be one on whole *sets* — a different and much rarer thing to write
+// than a predicate on elements — so this is left alone rather than advised on
+// the strength of a shape match.
+fn nonempty_only(xs: #{i64}[]) -> #{i64} {
+    mut out: #{i64} = #{};
+    for (let s : xs) {
+        if (s.is_nonempty()) {
+            set out = out.union(s);
+        };
+    }
+    out
+}
+
+// The seed is not empty, so the fold starts from a value `union_all` has no
+// parameter for.
+fn merged_onto(xs: #{i64}[]) -> #{i64} {
+    mut out: #{i64} = #{99};
+    for (let s : xs) {
+        set out = out.union(s);
+    }
+    out
+}
+
+fn take(s: #{i64}, n: u64) -> #{i64} { if (s.len() > n) { s } else { #{} } }
+
+// The unioned expression reads the set being built, so it depends on how much
+// the loop has already done — which no `map` lambda can see.
+fn while_small(xs: #{i64}[]) -> #{i64} {
+    mut out: #{i64} = #{};
+    for (let s : xs) {
+        set out = out.union(take(s, out.len()));
+    }
+    out
+}
+
+fn lookup(s: #{i64}) -> #{i64}!str { if (s.is_nonempty()) { ok(s) } else { err("empty") } }
+
+// A `?` in the unioned expression returns from *this* function; lifting it into
+// a lambda would return from the lambda instead.
+fn checked(xs: #{i64}[]) -> #{i64}!str {
+    mut out: #{i64} = #{};
+    for (let s : xs) {
+        set out = out.union(lookup(s)?);
+    }
+    ok(out)
+}
+
+// Neither operand is the accumulator, so the loop is not a fold onto it at all
+// — every iteration throws away what the last one wrote.
+fn last_wins(xs: #{i64}[], other: #{i64}) -> #{i64} {
+    mut out: #{i64} = #{};
+    for (let s : xs) {
+        set out = s.union(other);
+    }
+    out
+}
+
+// A statement between the seed and the loop, which could read `out` while it is
+// still empty — an order the rewrite would not preserve.
+fn announced(xs: #{i64}[]) !prints -> #{i64} {
+    mut out: #{i64} = #{};
+    print(out.len().to_str());
+    for (let s : xs) {
+        set out = out.union(s);
+    }
+    out
+}
+
+// Not a loop at all: a bounded fold written out. The lint wants a `for`.
+fn two(a: #{i64}, b: #{i64}) -> #{i64} {
+    mut out: #{i64} = #{};
+    set out = out.union(a);
+    set out = out.union(b);
+    out
+}
+
+fn main() !prints {
+    let xs: #{i64}[] = [#{1}, #{2, 3}];
+    print(show(logged(xs)));
+    print(show(upto_three([#{1, 2}, #{3, 4}, #{5}])));
+    print(show(nonempty_only([#{1}, #{}, #{2}])));
+    print(show(merged_onto(xs)));
+    print(show(while_small(xs)));
+    match (checked(xs)) {
+        ok(s) => print(show(s)),
+        err(e) => print(e),
+    };
+    print(show(last_wins(xs, #{7})));
+    print(show(announced(xs)));
+    print(show(two(#{1}, #{2})));
+    // The rewrite of the one shape that *is* flagged, for contrast.
+    print(show(xs.union_all()));
+}
+--- stdout ---
+1
+2
+1,2,3
+1,2,3,4
+1,2
+1,2,3,99
+1,2,3
+1,2,3
+2,3,7
+0
+1,2,3
+1,2
+1,2,3
+--- performance ---
+allocations: 147
+deallocations: 147
+reallocations: 20
+bytes allocated: 5776
+instructions executed: 5821
+binary size: 13600
+  code: 7956
+  data: 1
+  metadata: 5643
+functions:
+  __to_str_i64:
+    calls: 30
+    bytes: 204
+  __to_str_u64:
+    calls: 3
+    bytes: 204
+  aipl_arr_drop_arr:
+    calls: 3
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 148
+    bytes: (external)
+  aipl_arr_sort:
+    calls: 10
+    bytes: (external)
+  aipl_array_dec:
+    calls: 252
+    bytes: (external)
+  aipl_array_new:
+    calls: 13
+    bytes: (external)
+  aipl_array_push:
+    calls: 30
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 87
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 51
+    bytes: (external)
+  aipl_i64_len:
+    calls: 60
+    bytes: (external)
+  aipl_set_contains:
+    calls: 57
+    bytes: (external)
+  aipl_set_insert:
+    calls: 57
+    bytes: (external)
+  aipl_set_union:
+    calls: 20
+    bytes: (external)
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 30
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
+  checked:
+    calls: 1
+    bytes: 984
+  main:
+    calls: 1
+    bytes: 5204
+  show:
+    calls: 10
+    bytes: 796
+  upto_three:
+    calls: 1
+    bytes: 564

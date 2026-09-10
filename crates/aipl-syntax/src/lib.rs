@@ -2294,7 +2294,7 @@ fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
 fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
-// `value_or`, and `value_or_err` are
+// `union_all`, `value_or`, and `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
 // which is the single source of both their body and their signature.
 // `aipl_mono::aipl_builtin_sig_decls()` feeds those signatures to the checker and
@@ -2626,6 +2626,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "monotonic_now",
     "execute_program",
     "union",
+    "union_all",
     "get",
     "contains_key",
     "hash",

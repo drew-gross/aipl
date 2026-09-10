@@ -25,7 +25,7 @@ import {
 // `slice_from_zero_allow`, `incr_by_one_allow`, `fn_body_type_stutter_allow`,
 // `len_gt_zero_allow`, `is_empty_longhand_allow`, `push_loop_pipeline_allow`,
 // `return_loop_find_if_allow`, `return_loop_find_index_allow`,
-// `return_loop_any_all_allow`), and its own
+// `return_loop_any_all_allow`, `union_loop_union_all_allow`), and its own
 // passing case
 // for the shapes it must *not* flag (`slice_whole_allow`,
 // `slice_from_zero_open_end`, `field_init_range_value`,
@@ -34,7 +34,7 @@ import {
 // `len_gt_zero_user_lt`, `is_empty_longhand_not_flagged`,
 // `is_empty_longhand_user_len`, `push_loop_pipeline_not_flagged`,
 // `return_loop_find_if_not_flagged`, `return_loop_find_index_not_flagged`,
-// `return_loop_any_all_not_flagged`).
+// `return_loop_any_all_not_flagged`, `union_loop_union_all_not_flagged`).
 
 struct Point { x: i64, y: i64 }
 

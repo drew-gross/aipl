@@ -32,6 +32,7 @@ mod slice_from_zero;
 mod slice_to_len;
 mod slice_whole;
 mod step_by_one;
+mod union_loop_union_all;
 mod unused_imports;
 
 use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
@@ -60,6 +61,7 @@ use self::slice_from_zero::slice_from_zero;
 use self::slice_to_len::slice_to_len;
 use self::slice_whole::slice_whole;
 use self::step_by_one::{matching_steps, step_by_one};
+use self::union_loop_union_all::{union_loop_union_all, union_names};
 use self::unused_imports::unused_imports;
 
 /// Run every lint over `program` — function bodies, `.test` blocks, and
@@ -107,6 +109,13 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     let pipeline = pipeline_names(program);
     each_expr(program, &mut |e| {
         push_loop_pipeline(e, src, &pipeline, &mut hits)
+    });
+    // The set-valued sibling of the pipeline lint, and disjoint from it: that
+    // one's seed is an empty *array* filled by `push`, this one's an empty set
+    // grown by `union`.
+    let unions = union_names(program);
+    each_expr(program, &mut |e| {
+        union_loop_union_all(e, src, &unions, &mut hits)
     });
     // Same precondition, and the two shapes are disjoint: a seed followed by
     // a loop is the pipeline's, a seed followed by pushes is the literal's.
@@ -216,6 +225,26 @@ fn imported_as(program: &Program, builtin: &str) -> Option<String> {
             .find(|n| n.name == builtin)
             .map(|n| n.local().to_string())
     })
+}
+
+/// Whether `e` can be lifted into a rewritten pipeline's lambda: it must be
+/// [`lambda_safe`], and it may not mention `acc` — the binding being
+/// accumulated — because the rewrite no longer has it (`out.len()` as a running
+/// index is the shape this catches).
+///
+/// Shared by the two accumulate-in-a-loop lints, which have to agree on what a
+/// liftable expression is: they differ only in what the loop does with it.
+fn liftable(e: &Expr, acc: &str) -> bool {
+    if !lambda_safe(e) {
+        return false;
+    }
+    let mut ok = true;
+    crate::each_subexpr(e, &mut |x| {
+        if matches!(&x.kind, ExprKind::Ident(n) if n == acc) {
+            ok = false;
+        }
+    });
+    ok
 }
 
 /// Whether `e` can be moved into a lambda unchanged. A `?` propagation returns

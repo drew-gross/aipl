@@ -79,6 +79,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  use same_case in place of is_tree
+
   In group_styles, rs.map(group_styles) is refused
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
   DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
@@ -229,7 +231,6 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 sets:
-  there should be a union_all that turns a list of sets into a set by unioning them all
   support #{T}?
   bug: #{} does not flex through a generic parameter.
   Dicts and sets can't be optional cores or dict elements, so #{} can't flex there either.

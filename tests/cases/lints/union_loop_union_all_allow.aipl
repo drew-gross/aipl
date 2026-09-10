@@ -1,0 +1,134 @@
+import { join, map, print, push, sort, to_str, union, union_all } from builtins;
+
+// `#[allow]` keeps the loop — the escape hatch every lint carries.
+//
+// The marker goes on the `mut out = #{};` seed, which is where this lint points.
+// That is deliberate: `#[allow]` is line-scoped, so a hit spanning the loop
+// could never be squelched — the marker would have to go on the `for (..) {`
+// header, and `aipl fmt` moves one written there onto a line of its own, where
+// it squelches nothing. The seed is a short statement that always occupies one
+// line, so it always takes a trailing marker and keeps it through `aipl fmt`.
+//
+// `map` and `union_all` are both imported here, so the advice names no import —
+// the branch the `err_union_loop_union_all` companion cannot reach, since it
+// imports neither.
+fn merged(xs: #{i64}[]) -> #{i64} {
+    mut out: #{i64} = #{}; #[allow]
+    for (let s : xs) {
+        set out = out.union(s);
+    }
+    out
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by side
+// and proven to agree.
+fn merged_short(xs: #{i64}[]) -> #{i64} { xs.union_all() }
+
+fn ends(n: i64) -> #{i64} { #{n, n} }
+
+// The same pair for the mapped form.
+fn all_ends(ns: i64[]) -> #{i64} {
+    mut out: #{i64} = #{}; #[allow]
+    for (let n : ns) {
+        set out = out.union(ends(n));
+    }
+    out
+}
+
+fn all_ends_short(ns: i64[]) -> #{i64} { ns.map(ends).union_all() }
+
+// A set is unordered, so every comparison here sorts first.
+fn show(s: #{i64}) -> str {
+    mut out: i64[] = []; #[allow]
+    for (let x : s) {
+        set out.push(x);
+    }
+    out.sort().map(to_str).join(sep=",")
+}
+
+fn main() !prints {
+    print(show(merged([#{1, 2}, #{2, 3}])));
+    print(show(merged_short([#{1, 2}, #{2, 3}])));
+    print(show(all_ends([4, 5])));
+    print(show(all_ends_short([4, 5])));
+
+    // An empty list of sets, both ways.
+    let none_at_all: #{i64}[] = [];
+    print(`[{show(merged(none_at_all))}]`);
+    print(`[{show(merged_short(none_at_all))}]`);
+}
+--- stdout ---
+1,2,3
+1,2,3
+4,5
+4,5
+[]
+[]
+--- performance ---
+allocations: 74
+deallocations: 74
+reallocations: 8
+bytes allocated: 3028
+instructions executed: 2539
+binary size: 7744
+  code: 4276
+  data: 1
+  metadata: 3467
+functions:
+  __builtin_union_all$i64:
+    calls: 3
+    bytes: 428
+  __to_str_i64:
+    calls: 10
+    bytes: 204
+  aipl_arr_drop_arr:
+    calls: 3
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 65
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 2
+    bytes: (external)
+  aipl_arr_sort:
+    calls: 6
+    bytes: (external)
+  aipl_array_dec:
+    calls: 121
+    bytes: (external)
+  aipl_array_new:
+    calls: 11
+    bytes: (external)
+  aipl_array_push:
+    calls: 10
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 40
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 29
+    bytes: (external)
+  aipl_i64_len:
+    calls: 20
+    bytes: (external)
+  aipl_set_contains:
+    calls: 34
+    bytes: (external)
+  aipl_set_insert:
+    calls: 34
+    bytes: (external)
+  aipl_set_union:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 10
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2420
+  merged:
+    calls: 2
+    bytes: 428
+  show:
+    calls: 6
+    bytes: 796
