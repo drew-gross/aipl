@@ -14,6 +14,7 @@
 //! with gazelle on none of them.
 
 use aipl::{Engine, FfiValue};
+use aipl_syntax::ast::ExprKind;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -233,6 +234,193 @@ fn aipl_grammar_matches_gazelle_on_corpus() {
             rejected > 20,
             "expected the corpus's syntax-error fixtures to be rejected by both; \
              only {rejected} were. A grammar that accepts everything agrees with nothing."
+        );
+    });
+}
+
+/// Sources chosen to exercise the places two grammars can agree about
+/// *acceptance* and still disagree about *shape*: precedence, associativity,
+/// ordered choice, and the bracket groups that carry a list's layout.
+///
+/// A fixture rather than the corpus, deliberately. The sweep was tried and
+/// abandoned twice — see `PARSER_LIBRARY.md` — because a second FFI call per
+/// file re-parses it, doubling a differential that already takes over a minute,
+/// and the spans of a compiler-sized source cross as a six-figure array of
+/// numbers. These are a fixed cost that catches the same class of bug: a
+/// precedence table read backwards, an ordered choice that commits too early, a
+/// group whose brackets land on the wrong node.
+const SHAPE_FIXTURES: &[&str] = &[
+    // Precedence across every level, so a table read in the wrong order shows.
+    "fn f(a: i64, b: i64, c: i64) -> i64 { a + b * c }",
+    "fn f(a: i64, b: i64, c: i64) -> i64 { a * b + c }",
+    "fn f(a: i64, b: i64, c: i64) -> bool { a + b < c }",
+    "fn f(a: bool, b: bool, c: bool) -> bool { a || b && c }",
+    "fn f(a: i64, b: i64, c: i64) -> bool { a < b == b < c }",
+    // Associativity: `-` groups left, so `a - b - c` is `(a - b) - c`.
+    "fn f(a: i64, b: i64, c: i64) -> i64 { a - b - c }",
+    "fn f(a: i64, b: i64, c: i64) -> i64 { a / b / c }",
+    // Parentheses against the same expression unparenthesized.
+    "fn f(a: i64, b: i64, c: i64) -> i64 { (a + b) * c }",
+    "fn f(a: i64, b: i64, c: i64) -> i64 { a + (b * c) }",
+    // Unary against binary, and a unary on a call.
+    "fn f(a: i64, b: i64) -> i64 { -a + b }",
+    "fn f(a: bool, b: bool) -> bool { !a || b }",
+    // Postfix chains: field, index, slice, call, `?` — the ordered-choice pile.
+    "fn f(xs: i64[]) -> i64? { xs[0] }",
+    "fn f(xs: i64[]) -> i64[] { xs[1..2] }",
+    "fn f(s: str) -> u64 { s.len() }",
+    "fn f(xs: i64[][]) -> i64? { xs[0].value_or([])[1] }",
+    // Groups: a bracketed list, a nested one, and a block.
+    "fn f() -> i64[] { [1, 2, 3] }",
+    "fn f() -> i64[][] { [[1], [2, 3]] }",
+    "fn f(a: i64) -> i64 { if (a < 1) { 2 } else { 3 } }",
+    // A call whose arguments are themselves expressions with precedence.
+    "fn g(x: i64, y: i64) -> i64 { x }\nfn f(a: i64, b: i64) -> i64 { g(a + b, a * b) }",
+    // A match, where arms are ordered choice at the statement level.
+    "fn f(x: i64?) -> i64 { match (x) { some(v) => v + 1, none => 0 } }",
+    // Longer chains, where a left-associative table read right-to-left shows up
+    // as a differently shaped spine rather than as a single swapped pair.
+    "fn f(a: i64, b: i64, c: i64, d: i64) -> i64 { a + b + c + d }",
+    "fn f(a: i64, b: i64, c: i64, d: i64) -> i64 { a - b - c - d }",
+    "fn f(a: i64, b: i64, c: i64, d: i64) -> i64 { a + b - c + d }",
+    "fn f(a: i64, b: i64, c: i64, d: i64) -> i64 { a * b + c * d }",
+    "fn f(a: i64, b: i64, c: i64, d: i64) -> i64 { a + b * c - d }",
+    "fn f(a: i64, b: i64, c: i64, d: i64) -> i64 { a / b * c / d }",
+    "fn f(a: i64, b: i64, c: i64, d: i64) -> i64 { a % b + c % d }",
+    // Every band of the table against its neighbours, so an off-by-one level
+    // shows: arithmetic against comparison, comparison against equality,
+    // equality against the logical connectives.
+    "fn f(a: i64, b: i64, c: i64, d: i64) -> bool { a + b < c * d }",
+    "fn f(a: i64, b: i64, c: i64, d: i64) -> bool { a < b == c < d }",
+    "fn f(a: bool, b: bool, c: bool, d: bool) -> bool { a && b || c && d }",
+    "fn f(a: i64, b: i64, c: bool) -> bool { a < b && c }",
+    "fn f(a: i64, b: i64, c: bool) -> bool { c || a == b }",
+    // Concatenation, which sits at its own level.
+    "fn f(a: str, b: str, c: str) -> str { a +++ b +++ c }",
+];
+
+/// The AIPL grammar's tree groups expressions the way gazelle's does.
+///
+/// Acceptance agreement (above) says the two admit the same language; it says
+/// nothing about *structure*, and structure is what a lowering will read. Two
+/// grammars can accept `a + b * c` and disagree about which operator binds
+/// tighter, and nothing in this file would have noticed.
+///
+/// The comparison is **subset, not equality**: every span gazelle records for an
+/// expression must be a token span of some node in the CST. The concrete tree
+/// keeps productions the AST has no node for — `postfix`, `atom`, the plumbing
+/// ordered choice needs — so it always has strictly more spans. An extra one is
+/// noise; a missing one means the two disagree about where an expression starts
+/// or ends, which is what a precedence or associativity bug looks like.
+#[test]
+fn aipl_grammar_groups_expressions_like_gazelle() {
+    on_big_stack(|| {
+        let engine = compile_grammar();
+        let mut disagreements: Vec<String> = Vec::new();
+        let mut compared = 0usize;
+
+        for src in SHAPE_FIXTURES {
+            let program = match aipl::parse(src) {
+                Ok(p) => p,
+                Err(e) => panic!("fixture does not parse with gazelle: {src:?}: {e}"),
+            };
+            let spans =
+                match engine.call_values("aipl_node_spans", &[FfiValue::Str(src.to_string())]) {
+                    Ok(FfiValue::Res(Ok(boxed))) => match *boxed {
+                        FfiValue::Array(v) => v,
+                        other => panic!("aipl_node_spans({src:?}) is not an array: {other:?}"),
+                    },
+                    other => panic!("aipl_node_spans({src:?}): {other:?}"),
+                };
+            let mut cst: Vec<(usize, usize)> = Vec::with_capacity(spans.len() / 2);
+            for pair in spans.chunks(2) {
+                let [FfiValue::Int(lo), FfiValue::Int(hi)] = pair else {
+                    panic!("aipl_node_spans({src:?}) is not pairs of ints: {pair:?}");
+                };
+                cst.push((*lo as usize, *hi as usize));
+            }
+
+            aipl_syntax::each_expr(&program, &mut |e| {
+                // Operator applications only, and that is the point rather than
+                // a concession. Precedence and associativity are what two
+                // grammars can disagree about while accepting the same text, and
+                // an operator call is where they are decided — `a + b * c` is
+                // one grouping or the other, and its span runs operand to
+                // operand either way.
+                //
+                // Every other shape carries a span gazelle keeps for diagnostics
+                // rather than as a record of extent, and comparing those means
+                // chasing conventions instead of grammar: a bracketed form's
+                // span stops before its closing bracket (`[1, 2, 3]` spans
+                // `[1, 2, 3`), a call's before its parens — the same thing the
+                // lint driver's `spans_its_text` documents from the other side —
+                // and unary `-`/`!` leave their own operator out. None of that
+                // is a disagreement about shape, and none of it would be caught
+                // by looking harder.
+                let ExprKind::Call(callee, args, _) = &e.kind else {
+                    return;
+                };
+                if args.len() != 2 || !aipl_syntax::is_operator_name(callee) {
+                    return;
+                }
+                if e.span.start >= e.span.end {
+                    return;
+                }
+                // An operator's span runs from its left operand's start to its
+                // right operand's end, which is the true extent only while both
+                // operands record theirs. A *parenthesized* operand does not —
+                // its span is what is inside the parens — and neither does a
+                // unary `-`/`!`, which leaves its own operator out. Either way
+                // the operator above it inherits a span one character short, and
+                // the mismatch says nothing about grouping.
+                //
+                // Detected by looking at the neighbouring byte rather than at
+                // the AST, which records no parentheses at all. It over-skips —
+                // the `+` in `f(a + b)` is faithful and is skipped anyway — and
+                // that only ever costs coverage. The inner assertions survive:
+                // in `(a + b) * c` the `*` is skipped while the `+` inside it is
+                // compared, and it is the `+` that says which way the grouping
+                // went.
+                let before = src.as_bytes().get(e.span.start.wrapping_sub(1)).copied();
+                let after = src.as_bytes().get(e.span.end).copied();
+                let delimited = e.span.start > 0
+                    && matches!(before, Some(b'(') | Some(b'-') | Some(b'!'))
+                    || matches!(after, Some(b')'));
+                if delimited {
+                    return;
+                }
+                compared += 1;
+                if !cst.contains(&(e.span.start, e.span.end)) {
+                    disagreements.push(format!(
+                        "{src:?}: gazelle groups {callee:?} over {:?} at {}..{}, which is \
+                         no node of the AIPL grammar's tree",
+                        &src[e.span.clone()],
+                        e.span.start,
+                        e.span.end
+                    ));
+                }
+            });
+        }
+
+        assert!(
+            disagreements.is_empty(),
+            "{} expression span(s) of {compared} have no counterpart:\n{}",
+            disagreements.len(),
+            disagreements
+                .iter()
+                .take(20)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        // The floor is a guard against the comparison quietly emptying out — a
+        // skip rule that widened, or a fixture list that lost its operators,
+        // would leave this passing on nothing. It sits below the 52 the
+        // fixtures currently reach so that adding one is not a chore.
+        assert!(
+            compared >= 40,
+            "expected the fixtures to exercise a good many operator applications; \
+             only {compared} did"
         );
     });
 }

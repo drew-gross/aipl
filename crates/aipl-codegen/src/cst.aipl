@@ -24,10 +24,12 @@ import {
     filter_map,
     first,
     is_empty,
+    is_some,
     join,
     last,
     len,
     map,
+    reverse,
     value_or,
 } from builtins;
 
@@ -80,6 +82,85 @@ pub fn token_leaves(self: Cst) -> Span[] {
             ..close.map(token_leaves).join(),
         ],
     }
+}
+
+# The span `self`'s own *tokens* cover: its first token leaf's start through its
+# last token leaf's end, or `none` when it holds no token at all (an interior
+# node for a production that matched empty input).
+#
+# `span` reaches back over the trivia in front of the first token, because
+# trivia attaches to the token that follows it and losslessness needs it counted
+# somewhere. That makes `span` the wrong thing to compare against another
+# parser's spans, which are token-tight — every comparison is off by the leading
+# whitespace. This is the tight one.
+#
+# Found by descending to the leftmost and rightmost token rather than by
+# collecting every token under `self` and taking the ends: `token_leaves` walks
+# the whole subtree, and asking it at every node in a tree is quadratic in the
+# tree. These two stop at the first token they reach.
+pub fn token_span(self: Cst) -> Span? {
+    match (self.first_token()) {
+        some(f) => match (self.last_token()) {
+            some(l) => some(f.start..l.end),
+            none => none,
+        },
+        none => none,
+    }
+}
+
+# The leftmost token span under `self`, or `none` if it holds none.
+fn first_token(self: Cst) -> Span? {
+    match (self) {
+        CLeaf(sp) => some(sp),
+        CTrivia(..) => none,
+        CTree(_, kids) => first_token_of(kids),
+        CGroup(_, open, body, close) => match (first_token_of(open)) {
+            some(sp) => some(sp),
+            none => match (first_token_of(body)) {
+                some(sp) => some(sp),
+                none => first_token_of(close),
+            },
+        },
+    }
+}
+
+# The rightmost token span under `self`, or `none` if it holds none.
+fn last_token(self: Cst) -> Span? {
+    match (self) {
+        CLeaf(sp) => some(sp),
+        CTrivia(..) => none,
+        CTree(_, kids) => last_token_of(kids),
+        CGroup(_, open, body, close) => match (last_token_of(close)) {
+            some(sp) => some(sp),
+            none => match (last_token_of(body)) {
+                some(sp) => some(sp),
+                none => last_token_of(open),
+            },
+        },
+    }
+}
+
+# The first of `ks` that holds a token, and its leftmost one. Stops there rather
+# than walking the rest.
+fn first_token_of(ks: Cst[]) -> Span? {
+    for (let k : ks) {
+        let hit = k.first_token();
+        if (hit.is_some()) {
+            return hit;
+        };
+    }
+    none
+}
+
+# `first_token_of` from the other end.
+fn last_token_of(ks: Cst[]) -> Span? {
+    for (let k : ks.reverse()) {
+        let hit = k.last_token();
+        if (hit.is_some()) {
+            return hit;
+        };
+    }
+    none
 }
 
 # The text of the tokens under `self`, trivia dropped and nothing inserted
@@ -206,6 +287,22 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // `CTrivia` do not.
     assert(CTree(0, [CLeaf(0..1), t, CTrivia(1..2)]).nodes() == [t]);
 
+    // `token_span` is `span` with the trivia at either edge left out. They agree
+    // here because `t` opens and closes on a token...
+    assert(t.span() == 0..5);
+    assert(t.token_span() == some(0..5));
+
+    // ...and disagree the moment one edge is trivia, which is the whole reason
+    // the tight one exists: another parser's spans start at the token.
+    let padded = CTree(1, [CTrivia(0..1), CLeaf(1..2), CTrivia(2..3)]);
+    assert(padded.span() == 0..3);
+    assert(padded.token_span() == some(1..2));
+
+    // A node holding no token has no token span — an interior node for a
+    // production that matched empty input.
+    let blank = CTree(1, [CTrivia(0..1)]);
+    assert(blank.token_span() == none);
+
     // Losslessness: the leaves tile the source, so the text comes back whole.
     assert(t.text(src) == src);
     assert(t.leaves().len() == 5);
@@ -300,18 +397,18 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 585
-deallocations: 585
+allocations: 609
+deallocations: 609
 reallocations: 40
-bytes allocated: 29502
-instructions executed: 30466
-binary size: 54568
-  code: 32108
-  data: 2253
-  metadata: 20207
+bytes allocated: 30894
+instructions executed: 32508
+binary size: 59760
+  code: 35504
+  data: 2525
+  metadata: 21731
 functions:
   __arr_drop_Cst:
-    calls: 135
+    calls: 137
     bytes: 116
   __arr_retain_Cst:
     calls: 63
@@ -323,61 +420,70 @@ functions:
     calls: 11
     bytes: 300
   __eq___builtin_Span:
-    calls: 30
+    calls: 34
     bytes: 104
   __eq___builtin_Span$arr:
     calls: 4
     bytes: 284
+  __eq___builtin_Span$opt:
+    calls: 1
+    bytes: 92
   __filter4$own0:
     calls: 7
     bytes: 332
   __rec_drop_Cst:
-    calls: 55
+    calls: 61
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 12664
+    bytes: 13644
   aipl_arr_drop_arr:
-    calls: 86
+    calls: 88
+    bytes: (external)
+  aipl_arr_elem_ptr:
+    calls: 3
     bytes: (external)
   aipl_arr_extend:
     calls: 24
     bytes: (external)
   aipl_arr_inc:
-    calls: 1254
+    calls: 1305
     bytes: (external)
   aipl_arr_join:
-    calls: 89
+    calls: 91
     bytes: (external)
   aipl_arr_reserve:
     calls: 12
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 170
+    calls: 178
+    bytes: (external)
+  aipl_arr_reverse:
+    calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 1739
+    calls: 1808
     bytes: (external)
   aipl_array_new:
-    calls: 280
+    calls: 292
     bytes: (external)
   aipl_array_push_mut:
-    calls: 239
+    calls: 247
     bytes: (external)
   aipl_array_with_cap:
-    calls: 115
+    calls: 117
     bytes: (external)
   aipl_assert:
-    calls: 35
+    calls: 40
     bytes: (external)
   aipl_rec_alloc:
-    calls: 55
+    calls: 61
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 559
+    calls: 580
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 504
+    calls: 519
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -388,14 +494,26 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  first_token:
+    calls: 7
+    bytes: 660
+  first_token_of:
+    calls: 3
+    bytes: 320
   flat_kids:
     calls: 0
     bytes: 32
   flat_kids$tail:
     calls: 20
     bytes: 3832
+  last_token:
+    calls: 5
+    bytes: 660
+  last_token_of:
+    calls: 2
+    bytes: 396
   leaves:
-    calls: 78
+    calls: 88
     bytes: 3684
   main:
     calls: 1
@@ -407,7 +525,7 @@ functions:
     calls: 23
     bytes: 2968
   span:
-    calls: 5
+    calls: 7
     bytes: 524
   splice:
     calls: 0
@@ -421,6 +539,9 @@ functions:
   token_leaves:
     calls: 38
     bytes: 3648
+  token_span:
+    calls: 3
+    bytes: 288
   token_text:
     calls: 5
     bytes: 476

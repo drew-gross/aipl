@@ -89,6 +89,20 @@
 
 
 
+        <section class="item" id="item-aipl_node_spans">
+          <h3>
+            <a class="anchor" href="#item-aipl_node_spans">aipl_node_spans</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn aipl_node_spans(src: str) -&#62; u64[]!ParseError</code></pre>
+
+          <div class="doc"><p>What this grammar makes of <code>src</code>, in one string: empty when it parses *and* its concrete tree reconstructs the source byte for byte, and otherwise a line beginning <code>error:</code> (it did not parse, with the message) or <code>lossless:</code> (it did, but the tree lost bytes). Every interior node's *token* span, flattened to <code>[start, end, start, end, ..]</code>.</p><p>The FFI entry the tree differential calls. Its question is whether the two grammars agree about *shape*, not just about acceptance — whether they group <code>a + b * c</code> the same way — and spans are how to ask it without writing a renderer for each side and diffing the output, which is most of the work of lowering, done twice. Both sides already carry a span on every node.</p><p>Token spans, not <code>span</code>: trivia attaches in front of the token that follows it, so a node's plain span reaches back over the whitespace before it while gazelle's spans are token-tight. Comparing the two without this is off by the leading whitespace at every node (see <code>token_span</code>).</p><p>Flat pairs rather than a nested shape because this crosses the FFI, where an array of numbers is the cheapest thing to marshal. A node holding no token contributes nothing — there is no span to compare.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-aipl_parse_report">
           <h3>
             <a class="anchor" href="#item-aipl_parse_report">aipl_parse_report</a>
@@ -96,7 +110,7 @@
           </h3>
           <pre class="signature"><code>pub fn aipl_parse_report(src: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>What this grammar makes of <code>src</code>, in one string: empty when it parses *and* its concrete tree reconstructs the source byte for byte, and otherwise a line beginning <code>error:</code> (it did not parse, with the message) or <code>lossless:</code> (it did, but the tree lost bytes).</p><p>The FFI entry the corpus differential test calls — one crossing and one parse per file, checking both properties at once. Rejection is half the comparison: a grammar that accepts everything agrees with nothing.</p></div>
+          <div class="doc"><p>The FFI entry the corpus differential test calls — one crossing and one parse per file, checking both properties at once. Rejection is half the comparison: a grammar that accepts everything agrees with nothing.</p></div>
 
 
         </section>
@@ -236,6 +250,20 @@
           <pre class="signature"><code>fn ty_space(l: str, r: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>The spacing rule for the productions annotated so far: spaces around <code>-&gt;</code>, a space after the <code>:</code> of a dict type, and nothing anywhere else.</p><p>Everything else a reader would call spacing in a type is a list separating its items, which the <code>Wrap</code> layouts do, or a suffix written against its core, which <code>Tight</code> does. That is the shape the rule takes in a real language: a handful of tokens that want air, and silence for the rest.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-node_spans">
+          <h3>
+            <a class="anchor" href="#item-node_spans">node_spans</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn node_spans(t: Cst) -&#62; u64[]</code></pre>
+
+          <div class="doc"><p>Every interior node's token span under <code>t</code>, itself included, depth first.</p></div>
 
 
         </section>

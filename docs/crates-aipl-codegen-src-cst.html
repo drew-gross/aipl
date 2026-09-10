@@ -87,6 +87,20 @@
 
 
 
+        <section class="item" id="item-token_span">
+          <h3>
+            <a class="anchor" href="#item-token_span">token_span</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn token_span(self: Cst) -&#62; Span?</code></pre>
+
+          <div class="doc"><p>The span <code>self</code>'s own *tokens* cover: its first token leaf's start through its last token leaf's end, or <code>none</code> when it holds no token at all (an interior node for a production that matched empty input).</p><p><code>span</code> reaches back over the trivia in front of the first token, because trivia attaches to the token that follows it and losslessness needs it counted somewhere. That makes <code>span</code> the wrong thing to compare against another parser's spans, which are token-tight — every comparison is off by the leading whitespace. This is the tight one.</p><p>Found by descending to the leftmost and rightmost token rather than by collecting every token under <code>self</code> and taking the ends: <code>token_leaves</code> walks the whole subtree, and asking it at every node in a tree is quadratic in the tree. These two stop at the first token they reach.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-token_text">
           <h3>
             <a class="anchor" href="#item-token_text">token_text</a>
@@ -176,6 +190,62 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-first_token">
+          <h3>
+            <a class="anchor" href="#item-first_token">first_token</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn first_token(self: Cst) -&#62; Span?</code></pre>
+
+          <div class="doc"><p>The leftmost token span under <code>self</code>, or <code>none</code> if it holds none.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-last_token">
+          <h3>
+            <a class="anchor" href="#item-last_token">last_token</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn last_token(self: Cst) -&#62; Span?</code></pre>
+
+          <div class="doc"><p>The rightmost token span under <code>self</code>, or <code>none</code> if it holds none.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-first_token_of">
+          <h3>
+            <a class="anchor" href="#item-first_token_of">first_token_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn first_token_of(ks: Cst[]) -&#62; Span?</code></pre>
+
+          <div class="doc"><p>The first of <code>ks</code> that holds a token, and its leftmost one. Stops there rather than walking the rest.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-last_token_of">
+          <h3>
+            <a class="anchor" href="#item-last_token_of">last_token_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn last_token_of(ks: Cst[]) -&#62; Span?</code></pre>
+
+          <div class="doc"><p><code>first_token_of</code> from the other end.</p></div>
+
+
+        </section>
+
 
 
         <section class="item" id="item-flat_kids">
