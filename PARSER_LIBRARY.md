@@ -376,6 +376,13 @@ the critical path; all are worth knowing before extending these files.
   out, so `group_styles` in `grammar.aipl` carries an `#[allow]` with no other
   spelling available. A lint whose advice does not compile; worth fixing.
 - **`# ` opens a doc comment**, so `# { str }` is not a set type. Write `#{str}`.
+- **`#{}` does not flex through a generic parameter.** It flexes fine against
+  an annotation or a declared field type, but `labels[i].value_or(#{})` is
+  "conflicting types for `T`: `#{str}` vs `#{__none__}`" — the receiver pins
+  `T` and the literal is matched against it rather than taking it. So the
+  label functions each open with a `let empty: #{str} = #{};` and pass that.
+  The same is true of `[]`, but an empty array is rarely written in argument
+  position, whereas an empty set is the natural default for a fold.
 
 ## Naming
 

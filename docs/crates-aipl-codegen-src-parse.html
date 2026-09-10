@@ -515,9 +515,9 @@
             <a class="anchor" href="#item-label_sets">label_sets</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn label_sets&#60;K: variant, A: any&#62;(prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[]) -&#62; str[][]</code></pre>
+          <pre class="signature"><code>fn label_sets&#60;K: variant, A: any&#62;(prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[]) -&#62; #{str}[]</code></pre>
 
-          <div class="doc"><p>The expectation labels each production would record on failing at its own first token, in grammar order — the FIRST set computed over *labels* rather than terminals, so a labelled sub-production contributes its label and a transparent one contributes its insides.</p><p>This exists so pruning is invisible. <code>match_prod</code>'s label branch already makes a pruned *labelled* production observationally identical to an attempted one; a transparent production has no label, and what it would have recorded is exactly this. Without it, skipping a production silently drops entries from the &quot;expected a, b, or c&quot; set of any error reported at that position — which the driver's own tests catch, seven of them.</p><p>A fixed point for the same reason <code>first_sets</code> is one: a transparent production referencing another is not answerable until that one is.</p><p>The result is a *set* in everything but representation: <code>error_at</code> sorts before rendering, so the order these accumulate in is not observable. It stays a deduped <code>str[]</code> only because a <code>#{str}</code> cannot be iterated, and the labels have to be folded into <code>Far</code> one at a time.</p></div>
+          <div class="doc"><p>The expectation labels each production would record on failing at its own first token, in grammar order — the FIRST set computed over *labels* rather than terminals, so a labelled sub-production contributes its label and a transparent one contributes its insides.</p><p>This exists so pruning is invisible. <code>match_prod</code>'s label branch already makes a pruned *labelled* production observationally identical to an attempted one; a transparent production has no label, and what it would have recorded is exactly this. Without it, skipping a production silently drops entries from the &quot;expected a, b, or c&quot; set of any error reported at that position — which the driver's own tests catch, seven of them.</p><p>A fixed point for the same reason <code>first_sets</code> is one: a transparent production referencing another is not answerable until that one is.</p><p>These really are sets, and are spelled as sets. That also makes the fixed point's own test exact: <code>#{str}</code> equality is membership, so a round that reaches the same labels by a different route ends the loop instead of spinning — where deduped arrays would have compared unequal on order alone.</p></div>
 
 
         </section>
@@ -529,7 +529,7 @@
             <a class="anchor" href="#item-rule_labels">rule_labels</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn rule_labels&#60;K: variant, A: any&#62;(r: Rule&#60;K&#62;, prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: str[][]) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn rule_labels&#60;K: variant, A: any&#62;(r: Rule&#60;K&#62;, prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: #{str}[]) -&#62; #{str}</code></pre>
 
           <div class="doc"><p>The labels <code>r</code> would record at its own first token, given the round's <code>labels</code>.</p></div>
 
@@ -543,7 +543,7 @@
             <a class="anchor" href="#item-seq_labels">seq_labels</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn seq_labels&#60;K: variant, A: any&#62;(rs: Rule&#60;K&#62;[], prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: str[][]) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn seq_labels&#60;K: variant, A: any&#62;(rs: Rule&#60;K&#62;[], prods: Production&#60;K, A&#62;[], firsts: First&#60;K&#62;[], labels: #{str}[]) -&#62; #{str}</code></pre>
 
           <div class="doc"><p><code>rule_labels</code> across a sequence: each element in turn, stopping after the first that cannot match nothing.</p></div>
 
@@ -560,20 +560,6 @@
           <pre class="signature"><code>fn rule_nullable&#60;K: variant&#62;(r: Rule&#60;K&#62;, firsts: First&#60;K&#62;[]) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether <code>r</code> can match nothing at all — read off the FIRST sets for a reference, and structural everywhere else. Only <code>seq_labels</code> needs it, to know how far along a sequence the first token can still be expected.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-union_labels">
-          <h3>
-            <a class="anchor" href="#item-union_labels">union_labels</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn union_labels(a: str[], b: str[]) -&#62; str[]</code></pre>
-
-          <div class="doc"><p><code>a</code> then whatever in <code>b</code> is not already there. Only the deduplication matters — <code>error_at</code> sorts — so this is a set union written the long way, for want of an iterable set.</p></div>
 
 
         </section>

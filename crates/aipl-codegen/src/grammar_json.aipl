@@ -497,8 +497,8 @@ deallocations: 36986
 reallocations: 1230
 bytes allocated: 2645693
 instructions executed: 4579503
-binary size: 444024
-  code: 285336
+binary size: 444032
+  code: 285344
   data: 7876
   metadata: 150812
 functions:
@@ -759,7 +759,7 @@ functions:
     bytes: 648
   __m13__pruned$JsonTok$Json:
     calls: 0
-    bytes: 1336
+    bytes: 1344
   __m13__quoted:
     calls: 403
     bytes: 456

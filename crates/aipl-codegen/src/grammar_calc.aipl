@@ -466,8 +466,8 @@ deallocations: 21742
 reallocations: 1022
 bytes allocated: 1307135
 instructions executed: 2568675
-binary size: 416936
-  code: 267348
+binary size: 416944
+  code: 267356
   data: 5900
   metadata: 143688
 functions:
@@ -731,7 +731,7 @@ functions:
     bytes: 500
   __m13__pruned$CalcTok$Calc:
     calls: 0
-    bytes: 1336
+    bytes: 1344
   __m13__quoted:
     calls: 164
     bytes: 456

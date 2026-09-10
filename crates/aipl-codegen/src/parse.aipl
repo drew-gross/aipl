@@ -57,6 +57,7 @@ import {
     not_equal as !=,
     sort,
     try_map,
+    union,
     value_or,
     value_or_err,
     wrapping_add as +,
@@ -141,7 +142,7 @@ struct Parser<K: variant, A: any> {
     // The expectation labels each production would record on failing at its own
     // first token — what makes pruning invisible to error messages. See
     // `label_sets`.
-    labels: str[][],
+    labels: #{str}[],
 }
 
 # `far` updated with "`label` was expected at `pos`". Deeper wins outright;
@@ -618,8 +619,9 @@ fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str,
     if (!expect_as.is_empty()) {
         return no(far_miss(far, pos, expect_as), pos);
     };
+    let empty: #{str} = #{};
     mut f = far;
-    for (let l : p.labels[i].value_or([])) {
+    for (let l : p.labels[i].value_or(empty)) {
         set f = far_miss(f, pos, l);
     }
     no(f, pos)
@@ -640,12 +642,12 @@ fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str,
 # A fixed point for the same reason `first_sets` is one: a transparent production
 # referencing another is not answerable until that one is.
 #
-# The result is a *set* in everything but representation: `error_at` sorts before
-# rendering, so the order these accumulate in is not observable. It stays a
-# deduped `str[]` only because a `#{str}` cannot be iterated, and the labels have
-# to be folded into `Far` one at a time.
-fn label_sets<K: variant, A: any>(prods: Production<K, A>[], firsts: First<K>[]) -> str[][] {
-    let empty: str[] = [];
+# These really are sets, and are spelled as sets. That also makes the fixed
+# point's own test exact: `#{str}` equality is membership, so a round that
+# reaches the same labels by a different route ends the loop instead of spinning
+# — where deduped arrays would have compared unequal on order alone.
+fn label_sets<K: variant, A: any>(prods: Production<K, A>[], firsts: First<K>[]) -> #{str}[] {
+    let empty: #{str} = #{};
     mut labels = prods.map(|pr| empty);
     mut going = true;
     while (going) {
@@ -665,18 +667,19 @@ fn rule_labels<K: variant, A: any>(
     r: Rule<K>,
     prods: Production<K, A>[],
     firsts: First<K>[],
-    labels: str[][],
-) -> str[] {
+    labels: #{str}[],
+) -> #{str} {
+    let empty: #{str} = #{};
     match (r) {
-        Term(k) => [k.case_name()],
-        Literal(s) => [quoted(s)],
+        Term(k) => #{k.case_name()},
+        Literal(s) => #{quoted(s)},
         // A sequence is tried from its front, and past every element that can
         // match nothing — the same walk `rule_first` makes over terminals.
         Then(rs) => seq_labels(rs, prods, firsts, labels),
         OneOf(rs) => {
-            mut out: str[] = [];
+            mut out = empty;
             for (let sub : rs) {
-                set out = union_labels(out, rule_labels(sub, prods, firsts, labels));
+                set out = out.union(rule_labels(sub, prods, firsts, labels));
             }
             out
         },
@@ -695,15 +698,15 @@ fn rule_labels<K: variant, A: any>(
         // in a message, and its insides never surface.
         NamedIdx(i) => match (prods[i]) {
             some(pr) => if (pr.expect_as.is_empty()) {
-                labels[i].value_or([])
+                labels[i].value_or(empty)
             } else {
-                [pr.expect_as]
+                #{pr.expect_as}
             },
-            none => [],
+            none => empty,
         },
         // Unlinked — `parse_cst` links first, so neither is reachable from a
         // parse; an unlinked grammar simply prunes nothing.
-        Named(..) | NestedIn(..) => [],
+        Named(..) | NestedIn(..) => empty,
     }
 }
 
@@ -713,11 +716,11 @@ fn seq_labels<K: variant, A: any>(
     rs: Rule<K>[],
     prods: Production<K, A>[],
     firsts: First<K>[],
-    labels: str[][],
-) -> str[] {
-    mut out: str[] = [];
+    labels: #{str}[],
+) -> #{str} {
+    mut out: #{str} = #{};
     for (let sub : rs) {
-        set out = union_labels(out, rule_labels(sub, prods, firsts, labels));
+        set out = out.union(rule_labels(sub, prods, firsts, labels));
         if (!rule_nullable(sub, firsts)) {
             return out;
         };
@@ -742,19 +745,6 @@ fn rule_nullable<K: variant>(r: Rule<K>, firsts: First<K>[]) -> bool {
         ) && rule_nullable(close, firsts),
         NamedIdx(i) => firsts[i].is_some_and(|f| f.nullable),
     }
-}
-
-# `a` then whatever in `b` is not already there. Only the deduplication matters —
-# `error_at` sorts — so this is a set union written the long way, for want of an
-# iterable set.
-fn union_labels(a: str[], b: str[]) -> str[] {
-    mut out = a;
-    for (let l : b) {
-        if (!out.contains(l)) {
-            set out = [..out, l];
-        };
-    }
-    out
 }
 
 # The precedence level `text` belongs to, if it binds at least as tightly as
@@ -858,8 +848,9 @@ fn error_at<K: variant, A: any>(p: Parser<K, A>, src: str, far: Far) -> ParseErr
     // expected set into a `BTreeSet` (`friendly_syntax_error`), which is the
     // behaviour this has to match when it takes over.
     //
-    // It also means nothing upstream has to preserve order: `far_miss` and
-    // `label_sets` dedupe, and are free to do it however they like.
+    // It also means nothing upstream has to preserve order: `far_miss` dedupes
+    // by hand and `label_sets` is set-valued, and both are free to arrive at
+    // their contents in whatever order they like.
     //
     // `a`, `a or b`, `a, b, or c` — the Oxford list `join`'s two extra
     // separators write directly.
@@ -911,7 +902,7 @@ pub fn parse_cst<K: variant, A: any>(
     // analysis reused across parses is a 2x win. So a one-shot parse links and
     // nothing more, and the driver simply finds no FIRST set to prune on.
     let none_yet: First<K>[] = [];
-    let no_labels: str[][] = [];
+    let no_labels: #{str}[] = [];
     let prep = Prepared { grammar: link(g)?, firsts: none_yet, labels: no_labels };
     parse_prepared(src, lexed, prep, start)
 }
@@ -927,7 +918,7 @@ pub fn parse_cst<K: variant, A: any>(
 # and matches every production it reaches; the parse is identical, only slower.
 # Analysis is a cost worth paying exactly once per grammar and never once per
 # source.
-struct Prepared<K: variant, A: any> { grammar: Grammar<K, A>, firsts: First<K>[], labels: str[][] }
+struct Prepared<K: variant, A: any> { grammar: Grammar<K, A>, firsts: First<K>[], labels: #{str}[] }
 
 # `g` linked and analysed — build it once, parse with it many times. Fails the
 # way `link` does: an unresolved reference, or a duplicate rule name.
@@ -1396,15 +1387,15 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 8766
-deallocations: 8766
+allocations: 8885
+deallocations: 8885
 reallocations: 617
-bytes allocated: 559867
-instructions executed: 1152432
-binary size: 560640
-  code: 342308
+bytes allocated: 563747
+instructions executed: 1142978
+binary size: 559848
+  code: 341660
   data: 8772
-  metadata: 209560
+  metadata: 209416
 functions:
   __arr_drop_Node:
     calls: 21
@@ -1550,10 +1541,10 @@ functions:
   __eq_char$opt:
     calls: 0
     bytes: 100
-  __eq_str$arr:
+  __eq_set$str:
     calls: 44
-    bytes: 364
-  __eq_str$arr$arr:
+    bytes: 304
+  __eq_set$str$arr:
     calls: 30
     bytes: 300
   __filter82$own0:
@@ -1734,13 +1725,13 @@ functions:
     calls: 1069
     bytes: (external)
   aipl_arr_inc:
-    calls: 28834
+    calls: 28386
     bytes: (external)
   aipl_arr_join:
     calls: 150
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1418
+    calls: 1344
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 382
@@ -1749,19 +1740,19 @@ functions:
     calls: 34
     bytes: (external)
   aipl_array_dec:
-    calls: 35485
+    calls: 35156
     bytes: (external)
   aipl_array_new:
-    calls: 4357
+    calls: 4233
     bytes: (external)
   aipl_array_push:
     calls: 603
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1287
+    calls: 1385
     bytes: (external)
   aipl_array_with_cap:
-    calls: 726
+    calls: 1043
     bytes: (external)
   aipl_assert:
     calls: 64
@@ -1780,6 +1771,15 @@ functions:
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 271
+    bytes: (external)
+  aipl_set_contains:
+    calls: 210
+    bytes: (external)
+  aipl_set_insert:
+    calls: 172
+    bytes: (external)
+  aipl_set_union:
+    calls: 78
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -1867,7 +1867,7 @@ functions:
     bytes: 772
   pruned$Tok$Node:
     calls: 11
-    bytes: 1336
+    bytes: 1344
   quoted:
     calls: 92
     bytes: 456
@@ -1879,7 +1879,7 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 130
-    bytes: 4224
+    bytes: 4380
   rule_nullable$Tok:
     calls: 0
     bytes: 36
@@ -1891,7 +1891,7 @@ functions:
     bytes: 44
   seq_labels$Tok$Node$tail:
     calls: 22
-    bytes: 860
+    bytes: 908
   shown:
     calls: 52
     bytes: 844
@@ -1910,6 +1910,3 @@ functions:
   trivia_rules:
     calls: 3
     bytes: 3368
-  union_labels:
-    calls: 78
-    bytes: 800

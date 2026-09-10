@@ -358,8 +358,8 @@ deallocations: 48292
 reallocations: 2395
 bytes allocated: 2396493
 instructions executed: 6667656
-binary size: 403304
-  code: 258744
+binary size: 403312
+  code: 258752
   data: 5332
   metadata: 139228
 functions:
@@ -617,7 +617,7 @@ functions:
     bytes: 648
   __m13__pruned$SexpKind$Sexp:
     calls: 0
-    bytes: 1336
+    bytes: 1344
   __m13__quoted:
     calls: 454
     bytes: 456

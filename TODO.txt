@@ -229,8 +229,10 @@ formatter:
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
 
 sets:
+  there should be a union_all that turns a list of sets into a set by unioning them all
   support #{T}?
-  Dicts and sets can't be array elements, optional cores, or struct fields at all, so #{} can't flex there either.
+  bug: #{} does not flex through a generic parameter.
+  Dicts and sets can't be optional cores or dict elements, so #{} can't flex there either.
   There's no dict-insert or dict-union builtin, so a dict can't be grown — which also means the empty-block representation can't be observed to differ.
   An unannotated let x = #{}; still settles on a set, since there's no context to decide from. (maybe require the annotation?)
   support conversion to other containers
@@ -240,7 +242,6 @@ parser:
   remove NestedIn after souping up Many enough
   a bracketed list's separator must be a literal, so the printer can write it back <--- lift this restriction
   trailing separater = Allowed | Disallowed | Required
-  union_labels should just be set union. Why is this a vec?
   do we need NamedIdx when we have Named?
   after gazelle is retired, allow doc comments for variant cases
   minimize rule binding shorthand necessity by improving the type system

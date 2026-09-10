@@ -1198,15 +1198,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1416788
-deallocations: 1416788
+allocations: 1433688
+deallocations: 1433688
 reallocations: 7799
-bytes allocated: 122792120
-instructions executed: 187180702
-binary size: 750776
-  code: 501196
+bytes allocated: 122902000
+instructions executed: 183462356
+binary size: 749984
+  code: 500552
   data: 14076
-  metadata: 235504
+  metadata: 235356
 functions:
   __arr_drop___m11__StepResult$__m10__AiplTok:
     calls: 5
@@ -1364,10 +1364,10 @@ functions:
   __eq_char$opt:
     calls: 900
     bytes: 100
-  __eq_str$arr:
+  __eq_set$str:
     calls: 1314
-    bytes: 364
-  __eq_str$arr$arr:
+    bytes: 304
+  __eq_set$str$arr:
     calls: 54
     bytes: 300
   __eq_str$opt:
@@ -1531,7 +1531,7 @@ functions:
     bytes: 1580
   __m18__pruned$__m10__AiplTok$Ast:
     calls: 70
-    bytes: 1336
+    bytes: 1344
   __m18__quoted:
     calls: 17099
     bytes: 456
@@ -1540,7 +1540,7 @@ functions:
     bytes: 44
   __m18__rule_labels$__m10__AiplTok$Ast$tail:
     calls: 18630
-    bytes: 7592
+    bytes: 7752
   __m18__rule_nullable$__m10__AiplTok:
     calls: 0
     bytes: 36
@@ -1552,16 +1552,13 @@ functions:
     bytes: 44
   __m18__seq_labels$__m10__AiplTok$Ast$tail:
     calls: 6102
-    bytes: 860
+    bytes: 908
   __m18__tok_text$__m10__AiplTok$Ast:
     calls: 13194
     bytes: 1712
   __m18__trailing_trivia$__m10__AiplTok$Ast:
     calls: 148
     bytes: 1160
-  __m18__union_labels:
-    calls: 15012
-    bytes: 800
   __m19__can_start$__m10__AiplTok:
     calls: 180
     bytes: 600
@@ -1716,13 +1713,13 @@ functions:
     calls: 87779
     bytes: (external)
   aipl_arr_inc:
-    calls: 3395388
+    calls: 3305586
     bytes: (external)
   aipl_arr_join:
     calls: 45167
     bytes: (external)
   aipl_arr_reserve:
-    calls: 103889
+    calls: 88931
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 152536
@@ -1731,19 +1728,19 @@ functions:
     calls: 33
     bytes: (external)
   aipl_array_dec:
-    calls: 4399679
+    calls: 4326777
     bytes: (external)
   aipl_array_new:
-    calls: 696256
+    calls: 679939
     bytes: (external)
   aipl_array_push:
     calls: 160877
     bytes: (external)
   aipl_array_push_mut:
-    calls: 225081
+    calls: 261657
     bytes: (external)
   aipl_array_with_cap:
-    calls: 49052
+    calls: 97227
     bytes: (external)
   aipl_assert:
     calls: 100
@@ -1771,6 +1768,15 @@ functions:
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 87685
+    bytes: (external)
+  aipl_set_contains:
+    calls: 58671
+    bytes: (external)
+  aipl_set_insert:
+    calls: 54261
+    bytes: (external)
+  aipl_set_union:
+    calls: 15012
     bytes: (external)
   aipl_test_begin:
     calls: 4
