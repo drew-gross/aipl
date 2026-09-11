@@ -77,7 +77,7 @@ highlighter:
 misc cleanup:
   section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
-  Remove the C prefix from the CST types. the caller can import as if necessary.
+  Remove the C prefix from the CST types, the Ty prefix from the Ty variant, Pat from Pat, Suf from Suffix, B from BraceEntry, Bound from Bound, A from Ast, W from Work, P from Piece, J from Json,
   In group_styles, rs.map(group_styles) is refused
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
   DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
@@ -335,7 +335,6 @@ design:
   it's safe to call an untrusted function that doesn't declare any effects
   the most readable implementation is also the fastest
   apis should express intent
-  import as is super powerful. Leverage it. Don't add prefixes to types to distinguish what they are, the caller can import as if they need to distinguish. Don't add a namespaces-like feature to the language, import as can handle it.
 
 optimizations:
   owned spread: { ..var, field: f } should edit var if it's uniquely owned

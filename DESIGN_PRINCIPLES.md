@@ -167,3 +167,78 @@ above `check` and does things that are properties of *this repository* rather
 than of an AIPL program — regenerating checked-in IR, refilling recorded metrics,
 keeping a `#[test]` list in step with a directory. Those stay where they are. The
 principle governs what it means to ask a program whether it is well-formed.
+
+---
+
+## 3. `import .. as` is the namespace
+
+**The importer names what it imports.** Every name a file uses from outside is
+brought in by an `import` list, and any entry in that list may be renamed on the
+way in: `import { Literal as Lit } from "./grammar.aipl";`. That one form does
+the whole job that qualified paths, module prefixes and naming conventions do in
+other languages, and it does it at the only place where a clash is actually
+observable — the file that holds both names.
+
+Two consequences, one for the language and one for the code written in it:
+
+- **The language does not grow a namespace feature.** No qualified paths
+  (`doc.print`, `doc::print`), no `import * as doc`, no nested modules, no
+  visibility scopes finer than "exported from this file or not". Each of those
+  is a second mechanism for a problem `as` already solves, and a second
+  mechanism means every reader learns both and every tool handles both.
+- **A definition takes the plain name for what it is.** A type is not
+  prefixed to say which family it belongs to, and a function is not suffixed
+  to say which type it works on. `doc.aipl` exports `print`, not `print_doc`;
+  `ast.aipl` should export `Str`, not `EStr`. The file the definition lives in
+  is its namespace, and a caller who imports two `Str`s writes
+  `import { Str as ExprStr }` for the one it has to tell apart — paying the
+  prefix only where the ambiguity is real, and choosing a name that says what
+  the ambiguity *was*.
+
+The reason to push this hard rather than merely allow it is that the
+alternative is paid by everyone. A prefix chosen at the definition is carried by
+every importer, including the overwhelming majority that import only one of the
+things it disambiguates against. A namespace feature is the same cost moved into
+the grammar: it lets the definition stay plain, but only by making every use
+site spell the path. `as` puts the cost where the clash is and nowhere else.
+
+### Downstream decisions
+
+| Decision | Conforms | Shape |
+|---|---|---|
+| operators | yes | no operator is ambient; `import { equal as == }` is the *only* way to get one, and where a semantics must be chosen the alias records it: `wrapping_add as +` |
+| `Literal as Lit` in the grammar files | yes | a shortening, not a disambiguation — `as` is also how a file picks the name that reads best in *its* code |
+| `doc.aipl`'s `print` | yes | a caller that also uses the builtin `print` imports it as `print_doc`; the definition stays plain |
+| the AST case families (`EStr`/`PatStr`/`TyNamed`, `SLet`, `A..`) | **no** | prefixed at the definition, so every importer carries the prefix |
+| `FmtError`/`ParseError`/`LexError` | **no** | each lives in its own file, so `Error` with an `as` at the one site that holds two would do |
+
+The two **no** rows are inherited, not chosen, and the move is in the same
+direction as §2's: an edit that touches one of these should leave the plain name
+behind it, not add another prefix beside it.
+
+### One definition-side rule falls out of it
+
+`as` renames at the file boundary, so it cannot separate two names that are
+declared in the *same* file. `ast.aipl` holds `Ty`, `ExprKind`, `Pat` and
+`Stmt` together, and each has a string case, so within that file *something*
+has to tell `Str` from `Str` — and today that something is the prefix. That is
+the actual constraint the prefixes were answering, and the answer to it is
+**one variant family per file**, not a naming convention: split the declarations
+so each file exports the plain names, and let the file that needs several of
+them rename on import. The same goes for any pair of definitions that would
+want a prefix to coexist — a shared file is the wrong unit, not a reason to
+prefix.
+
+### What it does not mean
+
+It does not mean names should be short or generic for their own sake. `print`
+is right for `doc.aipl` because printing is the file's one job; a file that
+exports twenty things still gives each a name that says what it does. The rule
+is about not encoding *which module* into the name — the module already says
+that.
+
+It does not mean a rename is free for the reader. A file that imports `Str as
+ExprStr` has made `ExprStr` a name a reader must look up, exactly as they would
+have had to look up `EStr`. The difference is that this lookup is in the import
+list at the top of the file they are already reading, and only in the files
+that needed it.
