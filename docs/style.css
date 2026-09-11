@@ -143,6 +143,7 @@ pre code { background: none; padding: 0; }
 
 ul.cases { list-style: none; margin: 0.5rem 0 0; padding: 0; }
 ul.cases li { padding: 0.15rem 0; }
+ul.cases li .doc { margin: 0.25rem 0 0.5rem 1.5rem; }
 
 .kind {
   border-radius: 999px;

@@ -31,31 +31,57 @@
 
           <ul class="cases">
 
-            <li id="item-Keyword"><code>Keyword</code></li>
+            <li id="item-Keyword"><code>Keyword</code>
 
-            <li id="item-Constant"><code>Constant</code></li>
+            </li>
 
-            <li id="item-BuiltinType"><code>BuiltinType</code></li>
+            <li id="item-Constant"><code>Constant</code>
 
-            <li id="item-Ident"><code>Ident</code></li>
+            </li>
 
-            <li id="item-Num"><code>Num</code></li>
+            <li id="item-BuiltinType"><code>BuiltinType</code>
 
-            <li id="item-StrTok"><code>StrTok</code></li>
+            </li>
 
-            <li id="item-CharTok"><code>CharTok</code></li>
+            <li id="item-Ident"><code>Ident</code>
 
-            <li id="item-Op"><code>Op</code></li>
+            </li>
 
-            <li id="item-Punct"><code>Punct</code></li>
+            <li id="item-Num"><code>Num</code>
 
-            <li id="item-TplHead"><code>TplHead</code></li>
+            </li>
 
-            <li id="item-TplMid"><code>TplMid</code></li>
+            <li id="item-StrTok"><code>StrTok</code>
 
-            <li id="item-TplTail"><code>TplTail</code></li>
+            </li>
 
-            <li id="item-DocTok"><code>DocTok</code></li>
+            <li id="item-CharTok"><code>CharTok</code>
+
+            </li>
+
+            <li id="item-Op"><code>Op</code>
+
+            </li>
+
+            <li id="item-Punct"><code>Punct</code>
+
+            </li>
+
+            <li id="item-TplHead"><code>TplHead</code>
+
+            </li>
+
+            <li id="item-TplMid"><code>TplMid</code>
+
+            </li>
+
+            <li id="item-TplTail"><code>TplTail</code>
+
+            </li>
+
+            <li id="item-DocTok"><code>DocTok</code>
+
+            </li>
 
           </ul>
 
@@ -159,19 +185,33 @@
 
           <ul class="cases">
 
-            <li id="item-Parens"><code>Parens</code></li>
+            <li id="item-Parens"><code>Parens</code>
 
-            <li id="item-Brackets"><code>Brackets</code></li>
+            </li>
 
-            <li id="item-HashBraces"><code>HashBraces</code></li>
+            <li id="item-Brackets"><code>Brackets</code>
 
-            <li id="item-SpacedBraces"><code>SpacedBraces</code></li>
+            </li>
 
-            <li id="item-Angles"><code>Angles</code></li>
+            <li id="item-HashBraces"><code>HashBraces</code>
 
-            <li id="item-TyParens"><code>TyParens</code></li>
+            </li>
 
-            <li id="item-SpacedBracesNoTrailing"><code>SpacedBracesNoTrailing</code></li>
+            <li id="item-SpacedBraces"><code>SpacedBraces</code>
+
+            </li>
+
+            <li id="item-Angles"><code>Angles</code>
+
+            </li>
+
+            <li id="item-TyParens"><code>TyParens</code>
+
+            </li>
+
+            <li id="item-SpacedBracesNoTrailing"><code>SpacedBracesNoTrailing</code>
+
+            </li>
 
           </ul>
 
@@ -1104,7 +1144,7 @@
           </h3>
           <pre class="signature"><code>fn variant_item(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p><code>variant V = A | B(i64)</code>. Flat when it fits; broken to one case per line with a leading <code>| </code> — including the first case, so every case aligns under one <code>|</code>. A case's leading comment sits above it and, being a hard line, forces the broken layout.</p></div>
+          <div class="doc"><p><code>variant V = A | B(i64)</code>. Flat when it fits; broken to one case per line with a leading <code>| </code> — including the first case, so every case aligns under one <code>|</code>. A case's leading comment or <code># ..</code> doc lines sit above it and, being hard lines, force the broken layout.</p></div>
 
 
         </section>
@@ -1118,7 +1158,35 @@
           </h3>
           <pre class="signature"><code>fn variant_cases(self: W, acc0: VCase[]) -&#62; WCases!FmtError</code></pre>
 
-          <div class="doc"><p>Each case carries its own leading comments and any same-line trailing comment, so a comment written between two arms stays between them.</p></div>
+          <div class="doc"><p>Each case carries its own leading comments, its <code># ..</code> doc lines and any same-line trailing comment, so a comment written between two arms stays between them. The <code>|</code> in front of a case is dropped here — the layout decides whether to put one back — and it is read *after* the docs, which is where the grammar has it: the docs sit above the <code>|</code>, not between it and the name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-doc_lines">
+          <h3>
+            <a class="anchor" href="#item-doc_lines">doc_lines</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn doc_lines(self: W, acc0: Doc[]) -&#62; WDocs</code></pre>
+
+          <div class="doc"><p><code># ..</code> lines at the cursor, one <code>Text</code> and a hard line each — the same verbatim treatment <code>item</code> gives a declaration's docs.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-case_follows">
+          <h3>
+            <a class="anchor" href="#item-case_follows">case_follows</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn case_follows(self: W) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether another case starts at the cursor: its <code>|</code>, possibly under <code># ..</code> lines. Doc lines followed by anything else belong to the next item.</p></div>
 
 
         </section>
@@ -1438,7 +1506,7 @@
             <a class="anchor" href="#item-range_has_semi">range_has_semi</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_semi(self: W, __spat$52423: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_semi(self: W, __spat$53028: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 

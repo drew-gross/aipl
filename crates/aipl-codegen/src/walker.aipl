@@ -858,20 +858,13 @@ struct WCases { w: W, cases: VCase[] }
 
 # `variant V = A | B(i64)`. Flat when it fits; broken to one case per line with a
 # leading `| ` — including the first case, so every case aligns under one `|`.
-# A case's leading comment sits above it and, being a hard line, forces the
-# broken layout.
+# A case's leading comment or `# ..` doc lines sit above it and, being hard
+# lines, force the broken layout.
 fn variant_item(self: W) -> WDoc!FmtError {
     let n = self.expect("variant")?.w.bump();
     let tps = n.w.type_params()?;
     let eq = tps.w.expect("=")?.w;
-
-    // The source may already carry the leading `|` (the grammar allows it, and
-    // it is what this formatter emits when the cases break). Drop it here and
-    // let the layout decide whether to put one back. A comment written between
-    // `=` and that `|` is untouched — comments ride their own stream, so the
-    // first case's `lead()` still finds it.
-    let start = if (eq.peek_text() == "|") { eq.bump().w } else { eq };
-    let cs = start.variant_cases([])?;
+    let cs = eq.variant_cases([])?;
     ok(WDoc {
         w: cs.w,
         doc: group(Concat([
@@ -883,30 +876,58 @@ fn variant_item(self: W) -> WDoc!FmtError {
     })
 }
 
-# Each case carries its own leading comments and any same-line trailing comment,
-# so a comment written between two arms stays between them.
+# Each case carries its own leading comments, its `# ..` doc lines and any
+# same-line trailing comment, so a comment written between two arms stays
+# between them. The `|` in front of a case is dropped here — the layout decides
+# whether to put one back — and it is read *after* the docs, which is where the
+# grammar has it: the docs sit above the `|`, not between it and the name.
 fn variant_cases(self: W, acc0: VCase[]) -> WCases!FmtError {
     mut w = self;
     mut acc = acc0;
     mut more = true;
     while (more) {
         let l = w.lead();
-        let n = l.w.bump();
+        let d = l.w.doc_lines([]);
+        let start = if (d.w.peek_text() == "|") { d.w.bump().w } else { d.w };
+        let n = start.bump();
         let payload = if (n.w.peek_text() == "(") {
             n.w.variant_payload()?
         } else {
             WDoc { w: n.w, doc: Text("") }
         };
         let tc = payload.w.trailing_comment();
-        set acc.push(VCase { lead: l.doc, body: Concat([Text(n.text), payload.doc, tc.doc]) });
-        if (tc.w.peek_text() == "|") {
-            set w = tc.w.bump().w;
-        } else {
-            set w = tc.w;
-            set more = false;
-        };
+        set acc.push(VCase {
+            lead: Concat([l.doc, Concat(d.docs)]),
+            body: Concat([Text(n.text), payload.doc, tc.doc]),
+        });
+        set w = tc.w;
+        set more = w.case_follows();
     }
     ok(WCases { w, cases: acc })
+}
+
+# `# ..` lines at the cursor, one `Text` and a hard line each — the same
+# verbatim treatment `item` gives a declaration's docs.
+fn doc_lines(self: W, acc0: Doc[]) -> WDocs {
+    mut w = self;
+    mut acc = acc0;
+    while (w.peek_is(DocTok)) {
+        let line = w.bump();
+        set acc.push(Text(line.text));
+        set acc.push(HardLine);
+        set w = line.w;
+    }
+    WDocs { w, docs: acc }
+}
+
+# Whether another case starts at the cursor: its `|`, possibly under `# ..`
+# lines. Doc lines followed by anything else belong to the next item.
+fn case_follows(self: W) -> bool {
+    mut n: u64 = 0;
+    while (self.peek_is_n(n, DocTok)) {
+        set n++;
+    }
+    self.peek_text_n(n) == "|"
 }
 
 # A case's payload: `(A, B)`, `(r: i64)`, or `(r: i64 = 1)`.
@@ -2948,6 +2969,26 @@ fn walker_of(src: str) -> W!FmtError {
             .variant_item()
             .rendered(5)? == "variant V =\n    | A\n    | B\n",
     );
+
+    // A case's `# ..` lines sit above its `|`, verbatim, and force the broken
+    // layout however much room there is — a documented case cannot share a
+    // line. Cases without docs are unaffected, and the docs stay with their
+    // case whichever position it holds.
+    assert(
+        walker_of(
+            "variant V =\n    # Round.\n    # Radius.\n    | A(i64)\n    | B\n    # Cornered.\n    | C",
+        )?
+            .variant_item()
+            .rendered(
+                100,
+            )? == "variant V =\n    # Round.\n    # Radius.\n    | A(i64)\n    | B\n    # Cornered.\n    | C\n",
+    );
+    // Written flat with the docs on the first case, the docs still win.
+    assert(
+        walker_of("variant V =\n    # Doc.\n    A | B")?
+            .variant_item()
+            .rendered(100)? == "variant V =\n    # Doc.\n    | A\n    | B\n",
+    );
 })
 
 # Render what a walker step produced at the given width — the round trip a
@@ -2958,15 +2999,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 115076
-deallocations: 115076
-reallocations: 1876
-bytes allocated: 6203693
-instructions executed: 22366599
-binary size: 8724120
-  code: 5507760
-  data: 27596
-  metadata: 3188764
+allocations: 117097
+deallocations: 117097
+reallocations: 1914
+bytes allocated: 6317700
+instructions executed: 22740865
+binary size: 8951864
+  code: 5651220
+  data: 28436
+  metadata: 3272208
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2978,19 +3019,19 @@ functions:
     calls: 11
     bytes: 120
   __arr_drop_VCase:
-    calls: 20
+    calls: 25
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1512
+    calls: 1567
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
     calls: 1
     bytes: 140
   __arr_drop___m9__Token$__m8__AiplTok:
-    calls: 1383
+    calls: 1409
     bytes: 388
   __arr_drop___m9__TokenRule$__m8__AiplTok:
-    calls: 152
+    calls: 154
     bytes: 832
   __arr_retain_ImportEntry:
     calls: 30
@@ -3002,16 +3043,16 @@ functions:
     calls: 13
     bytes: 120
   __arr_retain_VCase:
-    calls: 27
+    calls: 35
     bytes: 140
   __arr_retain___m1__Doc:
-    calls: 1589
+    calls: 1628
     bytes: 116
   __arr_retain___m9__StepResult$__m8__AiplTok:
     calls: 1
     bytes: 140
   __arr_retain___m9__Token$__m8__AiplTok:
-    calls: 1085
+    calls: 1107
     bytes: 388
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
@@ -3023,13 +3064,13 @@ functions:
     calls: 0
     bytes: 32
   __builtin_any$__m1__Doc$lam46$tail:
-    calls: 588
+    calls: 644
     bytes: 324
   __builtin_count_is_at_least$char$s0:
     calls: 50
     bytes: 252
   __builtin_count_while$char$lam65:
-    calls: 1214
+    calls: 1239
     bytes: 220
   __builtin_count_while$char$s0$lam103:
     calls: 2
@@ -3038,7 +3079,7 @@ functions:
     calls: 22
     bytes: 172
   __builtin_count_while$char$s0$lam73:
-    calls: 638
+    calls: 646
     bytes: 184
   __builtin_count_while$char$s0$lam76:
     calls: 0
@@ -3047,16 +3088,16 @@ functions:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam97$tail:
-    calls: 14
+    calls: 18
     bytes: 256
   __builtin_int_parse:
     calls: 22
     bytes: 1028
   __builtin_intersperse$__m1__Doc:
-    calls: 160
+    calls: 162
     bytes: 408
   __eq_FmtKind:
-    calls: 936
+    calls: 976
     bytes: 64
   __eq_FmtTok:
     calls: 0
@@ -3077,7 +3118,7 @@ functions:
     calls: 0
     bytes: 136
   __lambda_39:
-    calls: 325
+    calls: 333
     bytes: 104
   __lambda_40:
     calls: 0
@@ -3107,34 +3148,34 @@ functions:
     calls: 1
     bytes: 556
   __m12__trim_prefix:
-    calls: 12
+    calls: 20
     bytes: 260
   __m13__trim_suffix:
     calls: 2
     bytes: 340
   __m1__col_after:
-    calls: 981
+    calls: 1006
     bytes: 596
   __m1__fits:
     calls: 0
     bytes: 36
   __m1__fits$tail:
-    calls: 1683
+    calls: 1733
     bytes: 2684
   __m1__fits_atom:
     calls: 0
     bytes: 52
   __m1__fits_atom$tail:
-    calls: 585
+    calls: 588
     bytes: 312
   __m1__has_hard:
     calls: 0
     bytes: 32
   __m1__has_hard$tail:
-    calls: 1531
+    calls: 1607
     bytes: 688
   __m1__print:
-    calls: 152
+    calls: 154
     bytes: 4268
   __m2__reindent_block:
     calls: 2
@@ -3143,10 +3184,10 @@ functions:
     calls: 2
     bytes: 1276
   __m6__trim_end_while$lam22:
-    calls: 405
+    calls: 418
     bytes: 300
   __m8__aipl_rules:
-    calls: 152
+    calls: 154
     bytes: 90364
   __m8__char_lit_emit:
     calls: 1
@@ -3155,7 +3196,7 @@ functions:
     calls: 0
     bytes: 272
   __m8__doc_text:
-    calls: 5
+    calls: 9
     bytes: 196
   __m8__int_lit:
     calls: 22
@@ -3167,10 +3208,10 @@ functions:
     calls: 2
     bytes: 2608
   __m9__between_len:
-    calls: 616
+    calls: 624
     bytes: 752
   __m9__delimited_len:
-    calls: 1222
+    calls: 1238
     bytes: 1592
   __m9__finalize_template$__m8__AiplTok:
     calls: 1
@@ -3182,40 +3223,40 @@ functions:
     calls: 1
     bytes: 2028
   __m9__lex$__m8__AiplTok:
-    calls: 152
+    calls: 154
     bytes: 1328
   __m9__lex_step$__m8__AiplTok:
-    calls: 1972
+    calls: 2011
     bytes: 29192
   __m9__nested_len:
-    calls: 1081
+    calls: 1103
     bytes: 940
   __m9__step_result$__m8__AiplTok:
-    calls: 49201
+    calls: 49947
     bytes: 15088
   __m9__template_scan$__m8__AiplTok:
     calls: 1
     bytes: 2728
   __m9__template_step$__m8__AiplTok:
-    calls: 1212
+    calls: 1228
     bytes: 476
   __m9__to_eol_len:
     calls: 0
     bytes: 52
   __m9__to_eol_len$tail:
-    calls: 2164
+    calls: 2208
     bytes: 252
   __m9__to_eol_unless_len:
-    calls: 1081
+    calls: 1103
     bytes: 368
   __map24$own0:
-    calls: 152
+    calls: 154
     bytes: 428
   __rec_drop___m1__Doc:
-    calls: 2985
+    calls: 3109
     bytes: 184
   __rec_drop___m1__Work:
-    calls: 4333
+    calls: 4502
     bytes: 84
   __test$binding_ann:
     calls: 1
@@ -3228,7 +3269,7 @@ functions:
     bytes: 2188
   __test$walker_of:
     calls: 1
-    bytes: 4851368
+    bytes: 4993520
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
@@ -3236,49 +3277,49 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 4190
+    calls: 4270
     bytes: (external)
   aipl_arr_inc:
-    calls: 252702
+    calls: 257011
     bytes: (external)
   aipl_arr_reserve:
-    calls: 4268
+    calls: 4348
     bytes: (external)
   aipl_arr_slice:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 359684
+    calls: 365693
     bytes: (external)
   aipl_array_new:
-    calls: 104755
+    calls: 106399
     bytes: (external)
   aipl_array_push:
-    calls: 1707
+    calls: 1759
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1740
+    calls: 1782
     bytes: (external)
   aipl_array_with_cap:
-    calls: 359
+    calls: 363
     bytes: (external)
   aipl_assert:
-    calls: 196
+    calls: 198
     bytes: (external)
   aipl_rec_alloc:
-    calls: 7318
+    calls: 7611
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 50315
+    calls: 52316
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 4437
+    calls: 4610
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 42997
+    calls: 44705
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 4437
+    calls: 4610
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -3297,9 +3338,9 @@ functions:
     bytes: 76
   atom:
     calls: 125
-    bytes: 2836
+    bytes: 2904
   base_ty:
-    calls: 78
+    calls: 79
     bytes: 4340
   binding_ann:
     calls: 7
@@ -3320,11 +3361,11 @@ functions:
     calls: 56
     bytes: 5192
   bump:
-    calls: 1102
+    calls: 1124
     bytes: 1284
   call_arg:
     calls: 12
-    bytes: 7908
+    bytes: 7920
   call_arg_list:
     calls: 19
     bytes: 796
@@ -3332,13 +3373,13 @@ functions:
     calls: 22
     bytes: 2776
   case_params:
-    calls: 6
+    calls: 7
     bytes: 9968
   comma_list_docs:
-    calls: 101
+    calls: 102
     bytes: 4640
   comment_starts_before:
-    calls: 322
+    calls: 327
     bytes: 280
   construct_body:
     calls: 0
@@ -3362,13 +3403,13 @@ functions:
     calls: 5
     bytes: 848
   expect:
-    calls: 467
+    calls: 472
     bytes: 1228
   expr:
     calls: 119
     bytes: 760
   fmt_kind:
-    calls: 1074
+    calls: 1096
     bytes: 3120
   fn_attrs:
     calls: 26
@@ -3393,7 +3434,7 @@ functions:
     bytes: 732
   hugs_sole_arg:
     calls: 19
-    bytes: 1308
+    bytes: 1312
   ident_list:
     calls: 9
     bytes: 1708
@@ -3414,7 +3455,7 @@ functions:
     bytes: 4104
   item:
     calls: 22
-    bytes: 2632
+    bytes: 2636
   lambda:
     calls: 3
     bytes: 6672
@@ -3425,7 +3466,7 @@ functions:
     calls: 3
     bytes: 3412
   lead:
-    calls: 314
+    calls: 319
     bytes: 1916
   let_stmt:
     calls: 3
@@ -3440,16 +3481,16 @@ functions:
     calls: 2
     bytes: 11936
   more_before:
-    calls: 200
+    calls: 202
     bytes: 200
   mut_stmt:
     calls: 2
     bytes: 7100
   name_atom:
     calls: 82
-    bytes: 5728
+    bytes: 5740
   named_ty:
-    calls: 74
+    calls: 75
     bytes: 4112
   next_start:
     calls: 50
@@ -3468,13 +3509,13 @@ functions:
     bytes: 11104
   pattern:
     calls: 3
-    bytes: 8508
+    bytes: 8516
   pattern_alts:
     calls: 3
     bytes: 3092
-  peek_is:
-    calls: 936
-    bytes: 288
+  peek_is_n:
+    calls: 991
+    bytes: 296
   postfix:
     calls: 125
     bytes: 5640
@@ -3494,7 +3535,7 @@ functions:
     calls: 119
     bytes: 2352
   rendered:
-    calls: 130
+    calls: 132
     bytes: 572
   sep_entry:
     calls: 41
@@ -3560,10 +3601,10 @@ functions:
     calls: 1
     bytes: 988
   tok_text:
-    calls: 3523
+    calls: 3567
     bytes: 508
   trailing_comment:
-    calls: 85
+    calls: 90
     bytes: 2344
   trim_last_break:
     calls: 0
@@ -3575,28 +3616,28 @@ functions:
     calls: 1
     bytes: 2932
   ty:
-    calls: 84
+    calls: 85
     bytes: 5024
   ty_list:
     calls: 10
     bytes: 2364
   type_params:
-    calls: 49
+    calls: 51
     bytes: 5788
   unary:
     calls: 127
     bytes: 1884
   variant_cases:
-    calls: 13
-    bytes: 4180
+    calls: 15
+    bytes: 5916
   variant_item:
-    calls: 13
-    bytes: 7144
+    calls: 15
+    bytes: 6600
   variant_payload:
-    calls: 6
+    calls: 7
     bytes: 2432
   walker_of:
-    calls: 144
+    calls: 146
     bytes: 3772
   while_stmt:
     calls: 1

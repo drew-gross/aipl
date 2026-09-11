@@ -234,6 +234,12 @@ struct SymbolSection {
 struct CaseRow {
     anchor: String,
     detail: String,
+    /// The case's own `# ..` lines, rendered like a declaration's — see
+    /// [`doc_html`]. Empty when it has none: a case without docs is listed
+    /// bare rather than marked undocumented, since the variant's docs usually
+    /// cover it.
+    doc: String,
+    has_doc: bool,
 }
 
 impl FilePage {
@@ -246,9 +252,12 @@ impl FilePage {
             // separate thing to read about.
             if sym.kind == SymbolKind::Case {
                 if let Some(parent) = symbols.last_mut() {
+                    let doc = sym.doc.as_deref().unwrap_or_default();
                     parent.cases.push(CaseRow {
                         anchor: anchor(&sym.name),
                         detail: sym.detail.clone(),
+                        doc: doc_html(doc),
+                        has_doc: !doc.trim().is_empty(),
                     });
                     continue;
                 }
@@ -458,7 +467,11 @@ mod tests {
 
 struct Point { x: i64, y: i64 }
 
-variant Shape = Circle(r: i64) | Empty
+# A shape.
+variant Shape =
+    # A circle of radius `r`.
+    | Circle(r: i64)
+    | Empty
 
 # The area of `s`.
 #
@@ -542,6 +555,23 @@ fn private_helper() -> i64 { 1 }
         assert!(page.contains("variant Shape"));
         // A case is listed under its variant rather than as a section of its own.
         assert!(page.contains("Circle(r: i64)"));
+    }
+
+    /// A case's own `# ..` lines are rendered under it, the same way a
+    /// declaration's are; a case without any is listed bare.
+    #[test]
+    fn a_case_shows_its_own_docs() {
+        let (_d, out) = site();
+        let page = read(&out, "src-shapes.html");
+        let circle = page.find("Circle(r: i64)").expect("the case");
+        let empty = page.find(">Empty<").expect("the bare case");
+        let doc = page
+            .find("<p>A circle of radius <code>r</code>.</p>")
+            .expect("the case doc");
+        assert!(circle < doc && doc < empty, "{page}");
+        // The variant's own docs are above its cases, not merged into one.
+        assert!(page.contains("<p>A shape.</p>"), "{page}");
+        assert!(!page.contains("A shape. A circle"), "{page}");
     }
 
     /// The two sections, and which side of the line each declaration lands on.

@@ -14,7 +14,11 @@
 {% if !symbol.cases.is_empty() %}
           <ul class="cases">
 {% for case in symbol.cases %}
-            <li id="{{ case.anchor }}"><code>{{ case.detail }}</code></li>
+            <li id="{{ case.anchor }}"><code>{{ case.detail }}</code>
+{% if case.has_doc %}
+              <div class="doc">{{ case.doc|safe }}</div>
+{% endif %}
+            </li>
 {% endfor %}
           </ul>
 {% endif %}

@@ -87,69 +87,133 @@
 
           <ul class="cases">
 
-            <li id="item-Num"><code>Num(i64)</code></li>
+            <li id="item-Num"><code>Num(i64)</code>
 
-            <li id="item-Bool"><code>Bool(bool)</code></li>
+            </li>
 
-            <li id="item-Str"><code>Str(str)</code></li>
+            <li id="item-Bool"><code>Bool(bool)</code>
 
-            <li id="item-Char"><code>Char(char)</code></li>
+            </li>
 
-            <li id="item-Ident"><code>Ident(str)</code></li>
+            <li id="item-Str"><code>Str(str)</code>
 
-            <li id="item-Call"><code>Call(name: str, args: Expr[], method_style: bool)</code></li>
+            </li>
 
-            <li id="item-Neg"><code>Neg(Expr)</code></li>
+            <li id="item-Char"><code>Char(char)</code>
 
-            <li id="item-If"><code>If(Expr, Expr, Expr)</code></li>
+            </li>
 
-            <li id="item-Construct"><code>Construct(str, FieldInit[])</code></li>
+            <li id="item-Ident"><code>Ident(str)</code>
 
-            <li id="item-Field"><code>Field(Expr, str)</code></li>
+            </li>
 
-            <li id="item-Let"><code>Let(name: str, ty: Ty?, value: Expr, body: Expr)</code></li>
+            <li id="item-Call"><code>Call(name: str, args: Expr[], method_style: bool)</code>
 
-            <li id="item-LetMut"><code>LetMut(name: str, ty: Ty?, value: Expr, body: Expr)</code></li>
+            </li>
 
-            <li id="item-Assign"><code>Assign(lhs: Expr, value: Expr, body: Expr)</code></li>
+            <li id="item-Neg"><code>Neg(Expr)</code>
 
-            <li id="item-For"><code>For(name: str, iterable: Expr, body: Expr)</code></li>
+            </li>
 
-            <li id="item-While"><code>While(cond: Expr, body: Expr)</code></li>
+            <li id="item-If"><code>If(Expr, Expr, Expr)</code>
 
-            <li id="item-Shim"><code>Shim(effect: str, bindings: (str, str)[], body: Expr)</code></li>
+            </li>
 
-            <li id="item-None"><code>None</code></li>
+            <li id="item-Construct"><code>Construct(str, FieldInit[])</code>
 
-            <li id="item-Match"><code>Match(Expr, MatchArm[])</code></li>
+            </li>
 
-            <li id="item-IfLet"><code>IfLet(MatchArm, Expr, Expr)</code></li>
+            <li id="item-Field"><code>Field(Expr, str)</code>
 
-            <li id="item-ArrayLit"><code>ArrayLit(Expr[])</code></li>
+            </li>
 
-            <li id="item-Spread"><code>Spread(Expr)</code></li>
+            <li id="item-Let"><code>Let(name: str, ty: Ty?, value: Expr, body: Expr)</code>
 
-            <li id="item-SetLit"><code>SetLit(Expr[])</code></li>
+            </li>
 
-            <li id="item-DictLit"><code>DictLit((Expr, Expr)[])</code></li>
+            <li id="item-LetMut"><code>LetMut(name: str, ty: Ty?, value: Expr, body: Expr)</code>
 
-            <li id="item-Index"><code>Index(Expr, Expr)</code></li>
+            </li>
 
-            <li id="item-Slice"><code>Slice(Expr, Expr, Expr?)</code></li>
+            <li id="item-Assign"><code>Assign(lhs: Expr, value: Expr, body: Expr)</code>
 
-            <li id="item-Try"><code>Try(Expr)</code></li>
+            </li>
 
-            <li id="item-Unit"><code>Unit</code></li>
+            <li id="item-For"><code>For(name: str, iterable: Expr, body: Expr)</code>
 
-            <li id="item-Seq"><code>Seq(Expr, Expr)</code></li>
+            </li>
 
-            <li id="item-Return"><code>Return(Expr)</code></li>
+            <li id="item-While"><code>While(cond: Expr, body: Expr)</code>
 
-            <li id="item-Lambda"><code>Lambda(LambdaParam[], Expr)</code></li>
+            </li>
 
-            <li id="item-TupleLit"><code>TupleLit(Expr[])</code></li>
+            <li id="item-Shim"><code>Shim(effect: str, bindings: (str, str)[], body: Expr)</code>
 
-            <li id="item-KwArg"><code>KwArg(name: str, value: Expr, forwarded: bool)</code></li>
+            </li>
+
+            <li id="item-None"><code>None</code>
+
+            </li>
+
+            <li id="item-Match"><code>Match(Expr, MatchArm[])</code>
+
+            </li>
+
+            <li id="item-IfLet"><code>IfLet(MatchArm, Expr, Expr)</code>
+
+            </li>
+
+            <li id="item-ArrayLit"><code>ArrayLit(Expr[])</code>
+
+            </li>
+
+            <li id="item-Spread"><code>Spread(Expr)</code>
+
+            </li>
+
+            <li id="item-SetLit"><code>SetLit(Expr[])</code>
+
+            </li>
+
+            <li id="item-DictLit"><code>DictLit((Expr, Expr)[])</code>
+
+            </li>
+
+            <li id="item-Index"><code>Index(Expr, Expr)</code>
+
+            </li>
+
+            <li id="item-Slice"><code>Slice(Expr, Expr, Expr?)</code>
+
+            </li>
+
+            <li id="item-Try"><code>Try(Expr)</code>
+
+            </li>
+
+            <li id="item-Unit"><code>Unit</code>
+
+            </li>
+
+            <li id="item-Seq"><code>Seq(Expr, Expr)</code>
+
+            </li>
+
+            <li id="item-Return"><code>Return(Expr)</code>
+
+            </li>
+
+            <li id="item-Lambda"><code>Lambda(LambdaParam[], Expr)</code>
+
+            </li>
+
+            <li id="item-TupleLit"><code>TupleLit(Expr[])</code>
+
+            </li>
+
+            <li id="item-KwArg"><code>KwArg(name: str, value: Expr, forwarded: bool)</code>
+
+            </li>
 
           </ul>
 

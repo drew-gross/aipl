@@ -42,25 +42,33 @@ import { trim_end_while } from "./trim_end_while.aipl";
 // (`INDENT` in the Rust `doc.rs`; inlined as the literal 4 below since AIPL has
 // no module constants.)
 
+# A layout tree: the layouts a printer may choose from, with the width limit
+# deciding which. Each `Group` renders flat when it fits and breaks otherwise,
+# and every other case says what it contributes in each of those two states.
 variant Doc =
+    # A verbatim literal. A multi-line one forces a break.
     | Text(str)
+    # A sequence, laid out in order.
     | Concat(Doc[])
+    # A space when flat, a newline when broken.
     | Line
+    # Nothing when flat, a newline when broken.
     | SoftLine
+    # Always a newline.
     | HardLine
+    # Always a blank line.
     | BlankLine
+    # One indentation level deeper.
     | Indent(Doc)
+    # Flat if it fits; the flag says it never can (see `group`).
     | Group(bool, Doc)
+    # Text that appears only when the enclosing group breaks.
     | IfBroken(str)
+    # A zero-width forced break.
     | BreakParent
+    # A verbatim multi-line atom, re-aligned around its column by
+    # `reindent_block`.
     | RawBlock(str)
-
-// Doc arms, in order: `Text` verbatim literal (multi-line forces a break);
-// `Concat` a sequence; `Line` (space/newline), `SoftLine` (nothing/newline),
-// `HardLine` (always newline), `BlankLine` (always a blank line); `Indent` one
-// deeper level; `Group(forced, inner)` flat-if-fits (`forced` = can-never-flat);
-// `IfBroken` text only when the group breaks; `BreakParent` a zero-width
-// force-break; `RawBlock` a verbatim multi-line atom re-aligned via `reindent_block`.
 
 # The printer's work-stack, as a cons-list of `(indent-columns, flat?, doc)`
 # frames — the tail-recursive analog of the Rust printer's `Vec` work stack.

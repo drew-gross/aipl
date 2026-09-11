@@ -35,7 +35,10 @@ pub fn doubled(n: i64) -> i64 { n + n }
 # A point in the plane.
 struct Point { x: i64 }
 # Either something or nothing.
-variant Maybe = Yes | No
+variant Maybe =
+    # Something.
+    | Yes
+    | No
 ";
     let out = run_doc(src);
     // Single-line doc, indented under the function name.
@@ -58,5 +61,15 @@ variant Maybe = Yes | No
     assert!(
         out.contains("Maybe\n    Either something or nothing.\n"),
         "missing variant doc:\n{out}"
+    );
+    // A documented case is printed as `Variant.Case`; an undocumented one is
+    // skipped like any other undocumented declaration.
+    assert!(
+        out.contains("Maybe.Yes\n    Something.\n"),
+        "missing case doc:\n{out}"
+    );
+    assert!(
+        !out.contains("Maybe.No"),
+        "undocumented case leaked:\n{out}"
     );
 }

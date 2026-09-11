@@ -15,8 +15,13 @@ pub fn add(a: i64, b: i64) -> i64 { a + b }.test({
 # A point in the plane.
 struct Point { x: i64, y: i64 }
 
-# Something or nothing.
-variant Maybe = Yes | No
+# Something or nothing. A variant's cases take `# ..` lines of their own,
+# written above the case's `|`; a documented case always breaks the variant
+# onto one case per line.
+variant Maybe =
+    # The something.
+    | Yes
+    | No
 
 // `//` comments are untouched: only `#` documents, so the banner style below
 // still means nothing to the parser.

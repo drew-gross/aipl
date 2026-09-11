@@ -26,32 +26,76 @@
           </h3>
           <pre class="signature"><code>variant Doc</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>A layout tree: the layouts a printer may choose from, with the width limit deciding which. Each <code>Group</code> renders flat when it fits and breaks otherwise, and every other case says what it contributes in each of those two states.</p></div>
 
 
           <ul class="cases">
 
-            <li id="item-Text"><code>Text(str)</code></li>
+            <li id="item-Text"><code>Text(str)</code>
 
-            <li id="item-Concat"><code>Concat(Doc[])</code></li>
+              <div class="doc"><p>A verbatim literal. A multi-line one forces a break.</p></div>
 
-            <li id="item-Line"><code>Line</code></li>
+            </li>
 
-            <li id="item-SoftLine"><code>SoftLine</code></li>
+            <li id="item-Concat"><code>Concat(Doc[])</code>
 
-            <li id="item-HardLine"><code>HardLine</code></li>
+              <div class="doc"><p>A sequence, laid out in order.</p></div>
 
-            <li id="item-BlankLine"><code>BlankLine</code></li>
+            </li>
 
-            <li id="item-Indent"><code>Indent(Doc)</code></li>
+            <li id="item-Line"><code>Line</code>
 
-            <li id="item-Group"><code>Group(bool, Doc)</code></li>
+              <div class="doc"><p>A space when flat, a newline when broken.</p></div>
 
-            <li id="item-IfBroken"><code>IfBroken(str)</code></li>
+            </li>
 
-            <li id="item-BreakParent"><code>BreakParent</code></li>
+            <li id="item-SoftLine"><code>SoftLine</code>
 
-            <li id="item-RawBlock"><code>RawBlock(str)</code></li>
+              <div class="doc"><p>Nothing when flat, a newline when broken.</p></div>
+
+            </li>
+
+            <li id="item-HardLine"><code>HardLine</code>
+
+              <div class="doc"><p>Always a newline.</p></div>
+
+            </li>
+
+            <li id="item-BlankLine"><code>BlankLine</code>
+
+              <div class="doc"><p>Always a blank line.</p></div>
+
+            </li>
+
+            <li id="item-Indent"><code>Indent(Doc)</code>
+
+              <div class="doc"><p>One indentation level deeper.</p></div>
+
+            </li>
+
+            <li id="item-Group"><code>Group(bool, Doc)</code>
+
+              <div class="doc"><p>Flat if it fits; the flag says it never can (see <code>group</code>).</p></div>
+
+            </li>
+
+            <li id="item-IfBroken"><code>IfBroken(str)</code>
+
+              <div class="doc"><p>Text that appears only when the enclosing group breaks.</p></div>
+
+            </li>
+
+            <li id="item-BreakParent"><code>BreakParent</code>
+
+              <div class="doc"><p>A zero-width forced break.</p></div>
+
+            </li>
+
+            <li id="item-RawBlock"><code>RawBlock(str)</code>
+
+              <div class="doc"><p>A verbatim multi-line atom, re-aligned around its column by <code>reindent_block</code>.</p></div>
+
+            </li>
 
           </ul>
 
@@ -71,9 +115,13 @@
 
           <ul class="cases">
 
-            <li id="item-Nil"><code>Nil</code></li>
+            <li id="item-Nil"><code>Nil</code>
 
-            <li id="item-Cons"><code>Cons(u64, bool, Doc, Work)</code></li>
+            </li>
+
+            <li id="item-Cons"><code>Cons(u64, bool, Doc, Work)</code>
+
+            </li>
 
           </ul>
 

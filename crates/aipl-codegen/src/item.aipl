@@ -148,10 +148,11 @@ fn show_field_decl(self: FieldDecl) -> str {
 }
 
 fn show_case(self: VariantCase) -> str {
+    let head = `{show_doc(self.doc)}{self.name}`;
     if (self.payload.is_empty()) {
-        return self.name;
+        return head;
     };
-    `{self.name}({self.payload.map(show_case_param).join(sep=", ")})`
+    `{head}({self.payload.map(show_case_param).join(sep=", ")})`
 }
 
 fn show_case_param(self: CaseParam) -> str {
@@ -187,10 +188,10 @@ deallocations: 19
 reallocations: 2
 bytes allocated: 1414
 instructions executed: 1133
-binary size: 72472
-  code: 47808
+binary size: 73704
+  code: 48620
   data: 206
-  metadata: 24458
+  metadata: 24878
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -287,7 +288,7 @@ functions:
     bytes: 188
   show_case:
     calls: 0
-    bytes: 2060
+    bytes: 2872
   show_default:
     calls: 1
     bytes: 420

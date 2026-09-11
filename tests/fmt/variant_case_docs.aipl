@@ -1,0 +1,28 @@
+# A shape.
+variant Shape =
+  # A circle of radius `r`.
+  # Round.
+  | Circle(r: i64)
+  | Empty
+     # Cornered.
+     | Rect(i64, i64)
+variant Flat =
+    # Documented, so it cannot stay flat.
+    A | B
+fn main() { }
+--- formatted ---
+# A shape.
+variant Shape =
+    # A circle of radius `r`.
+    # Round.
+    | Circle(r: i64)
+    | Empty
+    # Cornered.
+    | Rect(i64, i64)
+
+variant Flat =
+    # Documented, so it cannot stay flat.
+    | A
+    | B
+
+fn main() {}

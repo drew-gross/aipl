@@ -485,14 +485,30 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
             aipl::ast::Item::Variant(v) => (&v.name, &v.doc),
             aipl::ast::Item::Import(_) => continue,
         };
-        let Some(doc) = doc else { continue };
-        println!("{name}");
-        for line in doc.lines() {
-            println!("    {line}");
+        if let Some(doc) = doc {
+            print_doc(name, doc);
         }
-        println!();
+        // A variant's cases carry docs of their own, printed as `Variant.Case`
+        // so a case reads as the alternative of its type that it is.
+        if let aipl::ast::Item::Variant(v) = item {
+            for case in &v.cases {
+                if let Some(doc) = &case.doc {
+                    print_doc(&format!("{}.{}", v.name, case.name), doc);
+                }
+            }
+        }
     }
     Ok(())
+}
+
+/// One documented name: the name on its own line, its doc lines indented
+/// beneath it, and a blank line after.
+fn print_doc(name: &str, doc: &str) {
+    println!("{name}");
+    for line in doc.lines() {
+        println!("    {line}");
+    }
+    println!();
 }
 
 /// `docs [path...] [-o <dir>] [--name <title>]` — write an HTML documentation

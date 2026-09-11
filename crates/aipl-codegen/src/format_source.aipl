@@ -73,10 +73,10 @@ deallocations: 2103
 reallocations: 29
 bytes allocated: 125498
 instructions executed: 419611
-binary size: 1031520
-  code: 669020
+binary size: 1033800
+  code: 670328
   data: 2235
-  metadata: 360265
+  metadata: 361237
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -287,7 +287,7 @@ functions:
     bytes: 2464
   __m6__atom:
     calls: 0
-    bytes: 2836
+    bytes: 2904
   __m6__base_ty:
     calls: 0
     bytes: 4340
@@ -314,7 +314,7 @@ functions:
     bytes: 1284
   __m6__call_arg:
     calls: 0
-    bytes: 7908
+    bytes: 7920
   __m6__call_arg_list:
     calls: 0
     bytes: 796
@@ -380,7 +380,7 @@ functions:
     bytes: 732
   __m6__hugs_sole_arg:
     calls: 0
-    bytes: 1308
+    bytes: 1312
   __m6__ident_list:
     calls: 0
     bytes: 1708
@@ -401,7 +401,7 @@ functions:
     bytes: 4104
   __m6__item:
     calls: 3
-    bytes: 2632
+    bytes: 2636
   __m6__lambda:
     calls: 0
     bytes: 6672
@@ -431,7 +431,7 @@ functions:
     bytes: 7100
   __m6__name_atom:
     calls: 0
-    bytes: 5728
+    bytes: 5740
   __m6__named_ty:
     calls: 0
     bytes: 4112
@@ -452,13 +452,13 @@ functions:
     bytes: 11104
   __m6__pattern:
     calls: 0
-    bytes: 8508
+    bytes: 8516
   __m6__pattern_alts:
     calls: 0
     bytes: 3092
-  __m6__peek_is:
+  __m6__peek_is_n:
     calls: 3
-    bytes: 288
+    bytes: 296
   __m6__postfix:
     calls: 0
     bytes: 5640
@@ -569,10 +569,10 @@ functions:
     bytes: 1884
   __m6__variant_cases:
     calls: 0
-    bytes: 4180
+    bytes: 5916
   __m6__variant_item:
     calls: 0
-    bytes: 7144
+    bytes: 6600
   __m6__variant_payload:
     calls: 0
     bytes: 2432

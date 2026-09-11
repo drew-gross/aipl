@@ -31,9 +31,13 @@
 
           <ul class="cases">
 
-            <li id="item-NoValue"><code>NoValue</code></li>
+            <li id="item-NoValue"><code>NoValue</code>
 
-            <li id="item-StrVal"><code>StrVal(str)</code></li>
+            </li>
+
+            <li id="item-StrVal"><code>StrVal(str)</code>
+
+            </li>
 
           </ul>
 
@@ -95,13 +99,21 @@
 
           <ul class="cases">
 
-            <li id="item-Plain"><code>Plain</code></li>
+            <li id="item-Plain"><code>Plain</code>
 
-            <li id="item-Head"><code>Head</code></li>
+            </li>
 
-            <li id="item-Middle"><code>Middle</code></li>
+            <li id="item-Head"><code>Head</code>
 
-            <li id="item-Tail"><code>Tail</code></li>
+            </li>
+
+            <li id="item-Middle"><code>Middle</code>
+
+            </li>
+
+            <li id="item-Tail"><code>Tail</code>
+
+            </li>
 
           </ul>
 
@@ -121,15 +133,25 @@
 
           <ul class="cases">
 
-            <li id="item-Bare"><code>Bare(K)</code></li>
+            <li id="item-Bare"><code>Bare(K)</code>
 
-            <li id="item-Of"><code>Of((str) -&#62; K)</code></li>
+            </li>
 
-            <li id="item-OfSeg"><code>OfSeg((str, Seg) -&#62; K)</code></li>
+            <li id="item-Of"><code>Of((str) -&#62; K)</code>
 
-            <li id="item-Try"><code>Try((str) -&#62; K!str)</code></li>
+            </li>
 
-            <li id="item-TrySeg"><code>TrySeg((str, Seg) -&#62; K!str)</code></li>
+            <li id="item-OfSeg"><code>OfSeg((str, Seg) -&#62; K)</code>
+
+            </li>
+
+            <li id="item-Try"><code>Try((str) -&#62; K!str)</code>
+
+            </li>
+
+            <li id="item-TrySeg"><code>TrySeg((str, Seg) -&#62; K!str)</code>
+
+            </li>
 
           </ul>
 
@@ -163,29 +185,53 @@
 
           <ul class="cases">
 
-            <li id="item-CharRun"><code>CharRun(cont: str, first: str = ..)</code></li>
+            <li id="item-CharRun"><code>CharRun(cont: str, first: str = ..)</code>
 
-            <li id="item-OneChar"><code>OneChar(str)</code></li>
+            </li>
 
-            <li id="item-Exact"><code>Exact(str)</code></li>
+            <li id="item-OneChar"><code>OneChar(str)</code>
 
-            <li id="item-Keyword"><code>Keyword(str, str)</code></li>
+            </li>
 
-            <li id="item-Delimited"><code>Delimited(str, str)</code></li>
+            <li id="item-Exact"><code>Exact(str)</code>
 
-            <li id="item-Between"><code>Between(str, str)</code></li>
+            </li>
 
-            <li id="item-Nested"><code>Nested(str, str)</code></li>
+            <li id="item-Keyword"><code>Keyword(str, str)</code>
 
-            <li id="item-Template"><code>Template(str, str, (str[]) -&#62; str[])</code></li>
+            </li>
 
-            <li id="item-ToEol"><code>ToEol(str)</code></li>
+            <li id="item-Delimited"><code>Delimited(str, str)</code>
 
-            <li id="item-ToEolUnless"><code>ToEolUnless(marker: str, blocked: str)</code></li>
+            </li>
 
-            <li id="item-Float"><code>Float</code></li>
+            <li id="item-Between"><code>Between(str, str)</code>
 
-            <li id="item-Int"><code>Int</code></li>
+            </li>
+
+            <li id="item-Nested"><code>Nested(str, str)</code>
+
+            </li>
+
+            <li id="item-Template"><code>Template(str, str, (str[]) -&#62; str[])</code>
+
+            </li>
+
+            <li id="item-ToEol"><code>ToEol(str)</code>
+
+            </li>
+
+            <li id="item-ToEolUnless"><code>ToEolUnless(marker: str, blocked: str)</code>
+
+            </li>
+
+            <li id="item-Float"><code>Float</code>
+
+            </li>
+
+            <li id="item-Int"><code>Int</code>
+
+            </li>
 
           </ul>
 
@@ -261,49 +307,93 @@
 
           <ul class="cases">
 
-            <li id="item-Ws"><code>Ws</code></li>
+            <li id="item-Ws"><code>Ws</code>
 
-            <li id="item-Ident"><code>Ident(str)</code></li>
+            </li>
 
-            <li id="item-IntTok"><code>IntTok(i64)</code></li>
+            <li id="item-Ident"><code>Ident(str)</code>
 
-            <li id="item-Digits"><code>Digits</code></li>
+            </li>
 
-            <li id="item-Op"><code>Op</code></li>
+            <li id="item-IntTok"><code>IntTok(i64)</code>
 
-            <li id="item-Kw"><code>Kw</code></li>
+            </li>
 
-            <li id="item-Punct"><code>Punct</code></li>
+            <li id="item-Digits"><code>Digits</code>
 
-            <li id="item-Dot"><code>Dot</code></li>
+            </li>
 
-            <li id="item-FloatTok"><code>FloatTok</code></li>
+            <li id="item-Op"><code>Op</code>
 
-            <li id="item-Str"><code>Str(str)</code></li>
+            </li>
 
-            <li id="item-Raw"><code>Raw(str)</code></li>
+            <li id="item-Kw"><code>Kw</code>
 
-            <li id="item-Block"><code>Block(str)</code></li>
+            </li>
 
-            <li id="item-Comment"><code>Comment</code></li>
+            <li id="item-Punct"><code>Punct</code>
 
-            <li id="item-Allow"><code>Allow</code></li>
+            </li>
 
-            <li id="item-Tpl"><code>Tpl(str)</code></li>
+            <li id="item-Dot"><code>Dot</code>
 
-            <li id="item-TplHead"><code>TplHead(str)</code></li>
+            </li>
 
-            <li id="item-TplMid"><code>TplMid(str)</code></li>
+            <li id="item-FloatTok"><code>FloatTok</code>
 
-            <li id="item-TplTail"><code>TplTail(str)</code></li>
+            </li>
 
-            <li id="item-RawTpl"><code>RawTpl(str)</code></li>
+            <li id="item-Str"><code>Str(str)</code>
 
-            <li id="item-RawTplHead"><code>RawTplHead(str)</code></li>
+            </li>
 
-            <li id="item-RawTplMid"><code>RawTplMid(str)</code></li>
+            <li id="item-Raw"><code>Raw(str)</code>
 
-            <li id="item-RawTplTail"><code>RawTplTail(str)</code></li>
+            </li>
+
+            <li id="item-Block"><code>Block(str)</code>
+
+            </li>
+
+            <li id="item-Comment"><code>Comment</code>
+
+            </li>
+
+            <li id="item-Allow"><code>Allow</code>
+
+            </li>
+
+            <li id="item-Tpl"><code>Tpl(str)</code>
+
+            </li>
+
+            <li id="item-TplHead"><code>TplHead(str)</code>
+
+            </li>
+
+            <li id="item-TplMid"><code>TplMid(str)</code>
+
+            </li>
+
+            <li id="item-TplTail"><code>TplTail(str)</code>
+
+            </li>
+
+            <li id="item-RawTpl"><code>RawTpl(str)</code>
+
+            </li>
+
+            <li id="item-RawTplHead"><code>RawTplHead(str)</code>
+
+            </li>
+
+            <li id="item-RawTplMid"><code>RawTplMid(str)</code>
+
+            </li>
+
+            <li id="item-RawTplTail"><code>RawTplTail(str)</code>
+
+            </li>
 
           </ul>
 

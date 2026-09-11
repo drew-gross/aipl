@@ -75,6 +75,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  improve unescape using the for (let i, c : v) syntax
   section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
   In group_styles, rs.map(group_styles) is refused
@@ -228,9 +229,14 @@ companion_files.aipl:
 formatter:
   wrap comments
   formatter gets list separater directly off the Many
-  aipl fmt breaks a long tuple literal across lines with a trailing comma, and the tuple grammar rejects one. Formatter should understand from the Many that it shouldn't emit trailing commas.
   Why the formatter isn't already a thin wrapper
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
+  if a list contains a single template string, it should put the ( and the opening """ on the same line e.g.
+    foo("""
+      this
+      is
+      valid
+    """)
 
 sets:
   support #{T}?
@@ -246,7 +252,6 @@ parser:
   a bracketed list's separator must be a literal, so the printer can write it back <--- lift this restriction
   trailing separater = Allowed | Disallowed | Required
   do we need NamedIdx when we have Named?
-  after gazelle is retired, allow doc comments for variant cases
   minimize rule binding shorthand necessity by improving the type system
   chage Far to use a set of expected
   Mk should accept fns that only need kids
@@ -607,6 +612,7 @@ docs:
   make docs renderer part of check
   doc comments for structs/variants
   make the types and etc. into links
+  the docs are showing a mangled name for tm_json, please fix
 
 cache the compiled module on disk instead of using clif ir (expensive to parse)
 
