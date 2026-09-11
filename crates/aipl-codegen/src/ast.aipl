@@ -3,396 +3,55 @@
 // the type the compiler's passes actually run on: the bridge marshals a value of
 // this shape across the FFI and the Rust side rebuilds an `ast::Program` from it.
 //
+// It is declared across several files, one per case family, because
+// constructors share one namespace per file and the families reuse names
+// (`Str` is a primitive, an expression and a pattern; `Unit` a type and an
+// expression): `prim.aipl`, `ty.aipl`, `expr.aipl`, `pat.aipl`, `suffix.aipl`,
+// `brace_entry.aipl`, `bound.aipl`, `item.aipl` and `parsed.aipl`. A file that
+// needs two of a name renames one on import — which is why this one imports
+// `Ty as TyNode`: its own `Ty` case wraps it.
+//
 // Two rules keep the two declarations comparable by eye and, later, by test:
 //
-//   - **A case here is its Rust case name behind a per-type tag.** `Type::Named`
-//     is `TyNamed`, `Type::Optional` is `TyOptional`. The tag is not decoration:
-//     constructors share one namespace per file, and `Named` is already a `Rule`
-//     constructor every grammar file imports. Stripping the tag has to give the
-//     Rust name back exactly, so the mapping stays mechanical.
+//   - **A case here is its Rust case name, bare.** `Type::Named` is `Named`,
+//     `Type::Optional` is `Optional`, `ExprKind::Call` is `Call`. The mapping
+//     the FFI bridge (`ffi_ast.rs`) applies is the identity, so a case it does
+//     not know about is a case the two declarations disagree about.
 //   - **Only what the parser can produce is declared.** `Type` carries four
 //     sentinels no source text spells — `NoneInner`, `EmptyArrayArg`,
 //     `NoneLiteralArg`, `ConcatStr` — invented by the checker for literals whose
 //     type is still open. They are deliberately absent; a lowering that produced
 //     one would be a bug.
 //
-// `Ast` at the bottom is the single type `Build<A>` pins for the whole grammar,
-// so every production lowers to it whatever it is about, with a case per node
-// kind the lowering produces.
+// `Ast` below is the single type `Build<A>` pins for the whole grammar, so every
+// production lowers to it whatever it is about, with a case per node kind the
+// lowering produces.
+import { equal as == } from builtins;
+import { BraceEntry } from "./brace_entry.aipl";
 import {
-    Span,
-    equal as ==,
-    filter_map,
-    first,
-    is_empty,
-    join,
-    logical_not as !,
-    map,
-} from builtins;
-
-# The primitive types, `aipl_syntax::ast::Primitive` case for case.
-variant Prim = I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64 | Bool | Char | Str
-
-# The spelling that names this primitive in source. The inverse of
-# `prim_from_name`, and the two are asserted to round-trip below.
-pub fn prim_name(self: Prim) -> str {
-    match (self) {
-        I8 => "i8",
-        I16 => "i16",
-        I32 => "i32",
-        I64 => "i64",
-        U8 => "u8",
-        U16 => "u16",
-        U32 => "u32",
-        U64 => "u64",
-        Bool => "bool",
-        Char => "char",
-        Str => "str",
-    }
-}.test({
-    assert(I64.prim_name() == "i64");
-    assert(Str.prim_name() == "str");
-    assert(U8.prim_name() == "u8");
-})
-
-# The primitive a type identifier names, or `none` when it names something else
-# — a struct, a variant, a type parameter, `Error`. Mirrors
-# `Primitive::from_name`, which is what decides whether `base_ty`'s identifier
-# lowers to `TyPrimitive` or `TyNamed`.
-pub fn prim_from_name(name: str) -> Prim? {
-    match (name) {
-        "i8" => some(I8),
-        "i16" => some(I16),
-        "i32" => some(I32),
-        "i64" => some(I64),
-        "u8" => some(U8),
-        "u16" => some(U16),
-        "u32" => some(U32),
-        "u64" => some(U64),
-        "bool" => some(Bool),
-        "char" => some(Char),
-        "str" => some(Str),
-        _ => none,
-    }
-}.test({
-    assert(prim_from_name("i64") == some(I64));
-    assert(prim_from_name("bool") == some(Bool));
-    // Not a primitive: a user type, a bound, and a name that only looks close.
-    assert(prim_from_name("Point") == none);
-    assert(prim_from_name("any") == none);
-    assert(prim_from_name("i65") == none);
-    // Round-trips, which is the property the two functions have to keep.
-    assert(prim_from_name(I8.prim_name()) == some(I8));
-    assert(prim_from_name(Char.prim_name()) == some(Char));
-})
-
-# `aipl_syntax::ast::Type`, less the four checker sentinels (see the header).
-#
-# `TyTypeVar` is here for completeness rather than for the parser: a type
-# parameter is written as an ordinary identifier and reaches the AST as
-# `TyNamed`, and `promote_type_vars` is what turns the ones a signature declared
-# into type variables afterwards.
-variant Ty =
-    | TyUnit
-    | TyPrimitive(Prim)
-    | TyNamed(str)
-    | TyCase(Ty)
-    | TyTypeVar(str)
-    | TyOptional(Ty)
-    | TyArray(Ty)
-    | TySet(Ty)
-    | TyDict(Ty, Ty)
-    | TyResult(Ty, Ty)
-    | TyFn(Ty[], Ty)
-    | TyTuple(Ty[])
-    | TyGeneric(str, Ty[])
-    | TyAny
-
-# A type as a one-line structural dump: constructors named, leaves bare. It is
-# the oracle the lowering's tests assert against, so it is deliberately *not*
-# the source spelling — `Array(Optional(i64))` says which way `i64?[]` nested,
-# where re-rendering the source could not.
-pub fn show_ty(self: Ty) -> str {
-    match (self) {
-        TyUnit => "()",
-        TyPrimitive(p) => p.prim_name(),
-        TyNamed(n) => n,
-        TyAny => "any",
-        TyTypeVar(n) => `TypeVar({n})`,
-        TyCase(t) => `Case({t.show_ty()})`,
-        TyOptional(t) => `Optional({t.show_ty()})`,
-        TyArray(t) => `Array({t.show_ty()})`,
-        TySet(t) => `Set({t.show_ty()})`,
-        TyDict(k, v) => `Dict({k.show_ty()}, {v.show_ty()})`,
-        TyResult(o, e) => `Result({o.show_ty()}, {e.show_ty()})`,
-        TyFn(ps, r) => `Fn([{show_tys(ps)}], {r.show_ty()})`,
-        TyTuple(ts) => `Tuple({show_tys(ts)})`,
-        TyGeneric(n, args) => `Generic({n}, {show_tys(args)})`,
-    }
-}.test({
-    let i64_ty: Ty = TyPrimitive(I64);
-    assert(i64_ty.show_ty() == "i64");
-    assert(TyArray(TyOptional(i64_ty)).show_ty() == "Array(Optional(i64))");
-    assert(TyDict(TyPrimitive(Str), i64_ty).show_ty() == "Dict(str, i64)");
-    assert(TyResult(TyUnit, TyNamed("Error")).show_ty() == "Result((), Error)");
-    assert(TyFn([i64_ty, TyPrimitive(Str)], TyUnit).show_ty() == "Fn([i64, str], ())");
-    assert(TyTuple([i64_ty, TyAny]).show_ty() == "Tuple(i64, any)");
-    assert(TyGeneric("Box", [TyNamed("T")]).show_ty() == "Generic(Box, T)");
-    assert(TyCase(TyNamed("V")).show_ty() == "Case(V)");
-    assert(TySet(i64_ty).show_ty() == "Set(i64)");
-    assert(TyTypeVar("T").show_ty() == "TypeVar(T)");
-})
-
-# The elements of a type list, comma-separated. An empty list renders empty,
-# which is what `() -> R` and `Foo<>` would need if either could be written.
-pub fn show_tys(self: Ty[]) -> str { self.map(show_ty).join(sep=", ") }.test({
-    let empty: Ty[] = [];
-    assert(empty.show_tys() == "");
-    assert([TyUnit].show_tys() == "()");
-    assert([TyPrimitive(I64), TyNamed("P")].show_tys() == "i64, P");
-})
-
-# `aipl_syntax::ast::Expr` — a kind, the span it was written at, and (for a
-# block) where its *value* is.
-#
-# The span is this node's *token* span, which is a superset of gazelle's:
-# gazelle's are kept for diagnostics rather than as a record of extent, so a
-# bracketed form's stops before its closing bracket and a unary leaves its own
-# operator out. `aipl_spans_contain_gazelles` is where that is stated and
-# checked; 5e in `PARSER_LIBRARY.md` is where it is argued.
-#
-# `value_span` is a block's tail position: `fn f() -> str { let a = 1; a }`
-# returns the `a`, but the body's span starts at the `let`, so a return-type
-# error would underline the binding. It is recorded while the block is being
-# built, where the tail is in hand, rather than re-walked at every diagnostic.
-#
-# Rust spells it `Option<Box<Span>>`; here it is a plain `Span` with the *empty*
-# one meaning "none", which is the convention already in force for a location
-# that does not exist (see `join_spans`). A struct field cannot be an optional
-# struct anyway — see the constraint list in `PARSER_LIBRARY.md` — and the two
-# spellings mean the same thing, since a recorded value span is never empty: the
-# repair that fills it in runs first.
-#
-# The `ty` field `Expr` carries in Rust is absent — nothing the parser sets it.
-struct Expr { kind: ExprKind, span: Span, value_span: Span }
-
-# One field of a struct literal. A `..base` spread rides as an init with an
-# empty name whose *value* is the `ESpread` — the value is what identifies it,
-# exactly as an array-literal spread is identified by being a spread element.
-struct FieldInit { name: str, value: Expr }
-
-# One parameter of a lambda. `ty` is the annotation from `|x: i64| ..`, absent
-# for the bare `|x| ..` form.
-struct LambdaParam { name: str, ty: Ty?, span: Span }
-
-# One arm of a `match`, and the `then` half of an `if let`. Its span is the
-# *pattern's*, so a diagnostic points at what selected the arm rather than at
-# everything it does.
-struct MatchArm { pattern: Pat, body: Expr, span: Span }
-
-# `aipl_syntax::ast::ExprKind`, all 32 cases.
-#
-# Several surface forms are gone by the time they get here, because the AST is
-# where the language stops having them: an operator is an `ECall` on its
-# spelling, a range is an `EConstruct` of the builtin `Span`, a template is a
-# chain of concat calls, and a block is a right-nested `ESeq`. That is the same
-# set of desugarings gazelle's build actions do, in the same places.
-#
-# `ECall`'s `method_style` is the one bit that says which spelling was written:
-# `recv.f(a)` is stored as the free call `f(recv, a)` with the flag set, so the
-# receiver is `args[0]` either way.
-variant ExprKind =
-    | ENum(i64)
-    | EBool(bool)
-    | EStr(str)
-    | EChar(char)
-    | EIdent(str)
-    | ECall(name: str, args: Expr[], method_style: bool)
-    | ENeg(Expr)
-    | EIf(Expr, Expr, Expr)
-    | EConstruct(str, FieldInit[])
-    | EField(Expr, str)
-    | ELet(name: str, ty: Ty?, value: Expr, body: Expr)
-    | ELetMut(name: str, ty: Ty?, value: Expr, body: Expr)
-    | EAssign(lhs: Expr, value: Expr, body: Expr)
-    | EFor(name: str, iterable: Expr, body: Expr)
-    | EWhile(cond: Expr, body: Expr)
-    | EShim(effect: str, bindings: (str, str)[], body: Expr)
-    | ENone
-    | EMatch(Expr, MatchArm[])
-    | EIfLet(MatchArm, Expr, Expr)
-    | EArrayLit(Expr[])
-    | ESpread(Expr)
-    | ESetLit(Expr[])
-    | EDictLit((Expr, Expr)[])
-    | EIndex(Expr, Expr)
-    | ESlice(Expr, Expr, Expr?)
-    | ETry(Expr)
-    | EUnit
-    | ESeq(Expr, Expr)
-    | EReturn(Expr)
-    | ELambda(LambdaParam[], Expr)
-    | ETupleLit(Expr[])
-    | EKwArg(name: str, value: Expr, forwarded: bool)
-
-# An expression as a one-line structural dump. Spans are left out: they are what
-# 5e has to settle and what would make every assertion unreadable in the
-# meantime, and none of them is what a lowering test is asking about.
-#
-# A free call renders `f(a, b)` and a method call `a.f(b)`, so the `method_style`
-# flag is visible without a tag of its own — the two spellings are the two
-# things it distinguishes.
-pub fn show_expr(self: Expr) -> str {
-    match (self.kind) {
-        ENum(n) => `{n}`,
-        EBool(b) => if (b) { "true" } else { "false" },
-        EStr(s) => `Str({s})`,
-        EChar(c) => `Char({c})`,
-        EIdent(n) => n,
-        ECall(name, args, method_style) => show_call(name, args, method_style),
-        ENeg(e) => `Neg({e.show_expr()})`,
-        EIf(c, t, f) => `If({c.show_expr()}, {t.show_expr()}, {f.show_expr()})`,
-        EConstruct(name, fields) => `Construct({name}, [{show_field_inits(fields)}])`,
-        EField(e, name) => `{e.show_expr()}.{name}`,
-        ELet(name, ty, value, body) => `Let({name}{show_ann(ty)}, {value.show_expr()}, {body.show_expr()})`,
-        ELetMut(name, ty, value, body) => `Mut({name}{show_ann(ty)}, {value.show_expr()}, {body.show_expr()})`,
-        EAssign(lhs, value, body) => `Assign({lhs.show_expr()}, {value.show_expr()}, {body.show_expr()})`,
-        EFor(name, iterable, body) => `For({name}, {iterable.show_expr()}, {body.show_expr()})`,
-        EWhile(cond, body) => `While({cond.show_expr()}, {body.show_expr()})`,
-        EShim(effect, bindings, body) => `Shim({effect}, [{show_binds(bindings)}], {body.show_expr()})`,
-        ENone => "none",
-        EMatch(e, arms) => `Match({e.show_expr()}, [{show_arms(arms)}])`,
-        EIfLet(arm, e, f) => `IfLet({arm.show_arm()}, {e.show_expr()}, {f.show_expr()})`,
-        EArrayLit(es) => `[{show_exprs(es)}]`,
-        ESpread(e) => `..{e.show_expr()}`,
-        ESetLit(es) => `Set([{show_exprs(es)}])`,
-        EDictLit(ps) => `Dict([{ps.map(show_dict_entry).join(sep=", ")}])`,
-        EIndex(a, i) => `Index({a.show_expr()}, {i.show_expr()})`,
-        ESlice(a, lo, hi) => `Slice({a.show_expr()}, {lo.show_expr()}, {show_opt_expr(hi)})`,
-        ETry(e) => `Try({e.show_expr()})`,
-        EUnit => "()",
-        ESeq(a, b) => `Seq({a.show_expr()}, {b.show_expr()})`,
-        EReturn(e) => `Return({e.show_expr()})`,
-        ELambda(ps, body) => `Lambda([{ps.map(show_lambda_param).join(sep=", ")}], {body.show_expr()})`,
-        ETupleLit(es) => `Tuple({show_exprs(es)})`,
-        EKwArg(name, value, forwarded) => if (forwarded) {
-            `KwFwd({name}, {value.show_expr()})`
-        } else {
-            `Kw({name}, {value.show_expr()})`
-        },
-    }
-}.test({
-    let three = num(3);
-    assert(three.show_expr() == "3");
-    assert(ident("x").show_expr() == "x");
-    assert(expr(EStr("hi")).show_expr() == "Str(hi)");
-    assert(expr(EChar('c')).show_expr() == "Char(c)");
-    assert(expr(EBool(true)).show_expr() == "true");
-    assert(expr(ENone).show_expr() == "none");
-    assert(expr(EUnit).show_expr() == "()");
-    assert(expr(ENeg(three)).show_expr() == "Neg(3)");
-    // The two call spellings, which is what `method_style` is for.
-    assert(expr(ECall("+", [three, three], false)).show_expr() == "+(3, 3)");
-    assert(expr(ECall("f", [ident("xs"), three], true)).show_expr() == "xs.f(3)");
-    assert(expr(ECall("f", [ident("xs")], true)).show_expr() == "xs.f()");
-    assert(expr(EField(ident("p"), "x")).show_expr() == "p.x");
-    assert(expr(ESpread(ident("xs"))).show_expr() == "..xs");
-    assert(expr(EArrayLit([three, three])).show_expr() == "[3, 3]");
-    assert(expr(ETupleLit([three, ident("x")])).show_expr() == "Tuple(3, x)");
-    assert(expr(ESetLit([three])).show_expr() == "Set([3])");
-    assert(expr(EDictLit([(three, ident("v"))])).show_expr() == "Dict([3: v])");
-    assert(expr(ESlice(ident("s"), three, none)).show_expr() == "Slice(s, 3, )");
-    assert(expr(ESlice(ident("s"), three, some(three))).show_expr() == "Slice(s, 3, 3)");
-
-    // The annotation is written where the source writes it, and vanishes when
-    // there is none.
-    let i64_ty: Ty = TyPrimitive(I64);
-    assert(expr(ELet("x", none, three, ident("x"))).show_expr() == "Let(x, 3, x)");
-    assert(expr(ELetMut("x", some(i64_ty), three, ident("x"))).show_expr() == "Mut(x: i64, 3, x)");
-    assert(
-        expr(EShim(
-            "prints",
-            [("print", "p")],
-            three,
-        )).show_expr() == "Shim(prints, [print = p], 3)",
-    );
-    let arm = MatchArm { pattern: PatCtor("some", ["v"], false), body: ident("v"), span: 0..0 };
-    assert(expr(EMatch(ident("o"), [arm])).show_expr() == "Match(o, [some(v) => v])");
-    assert(
-        expr(ELambda(
-            [LambdaParam { name: "x", ty: none, span: 0..0 }],
-            three,
-        )).show_expr() == "Lambda([x], 3)",
-    );
-    assert(
-        expr(ELambda(
-            [LambdaParam { name: "x", ty: some(i64_ty), span: 0..0 }],
-            three,
-        )).show_expr() == "Lambda([x: i64], 3)",
-    );
-})
-
-# An `Expr` at an empty span — the shorthand this file's own tests are written
-# with, and the one every synthesized node uses (a template's `Str` segments,
-# an else-less `if`'s unit branch, an open slice's `0`).
-pub fn expr(kind: ExprKind) -> Expr { kind, span: 0..0, value_span: 0..0 }
-
-# The two synthesized leaves that come up most.
-pub fn num(v: i64) -> Expr { expr(ENum(v)) }
-
-pub fn ident(name: str) -> Expr { expr(EIdent(name)) }
-
-# One match arm as `pattern => body`.
-pub fn show_arm(self: MatchArm) -> str { `{self.pattern.show_pat()} => {self.body.show_expr()}` }
-
-fn show_arms(self: MatchArm[]) -> str { self.map(show_arm).join(sep=", ") }
-
-# A call, in the spelling its `method_style` flag says was written: the receiver
-# is `args[0]` for a method call and an ordinary argument for a free one.
-fn show_call(name: str, args: Expr[], method_style: bool) -> str {
-    if (!method_style) {
-        return `{name}({show_exprs(args)})`;
-    };
-    match (args.first()) {
-        some(recv) => `{recv.show_expr()}.{name}({show_exprs(args[1..])})`,
-        none => `{name}({show_exprs(args)})`,
-    }
-}
-
-pub fn show_exprs(self: Expr[]) -> str { self.map(show_expr).join(sep=", ") }
-
-fn show_opt_expr(self: Expr?) -> str {
-    match (self) {
-        some(e) => e.show_expr(),
-        none => "",
-    }
-}
-
-# `: T` when a binding or a lambda parameter was annotated, and nothing when it
-# was not — so the dump reads like the source did.
-fn show_ann(self: Ty?) -> str {
-    match (self) {
-        some(t) => `: {t.show_ty()}`,
-        none => "",
-    }
-}
-
-fn show_lambda_param(self: LambdaParam) -> str { `{self.name}{show_ann(self.ty)}` }
-
-fn show_field_init(self: FieldInit) -> str {
-    if (self.name.is_empty()) {
-        return self.value.show_expr();
-    };
-    `{self.name}: {self.value.show_expr()}`
-}
-
-fn show_field_inits(self: FieldInit[]) -> str { self.map(show_field_init).join(sep=", ") }
-
-fn show_dict_entry(self: (Expr, Expr)) -> str { `{self.0.show_expr()}: {self.1.show_expr()}` }
-
-fn show_binds(self: (str, str)[]) -> str { self.map(show_bind).join(sep=", ") }
-
-fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
+    Expr as ExprNode,
+    FieldInit as FieldInitNode,
+    LambdaParam as LambdaParamNode,
+    MatchArm,
+    num,
+} from "./expr.aipl";
+import {
+    CaseParam as CaseParamNode,
+    FieldDecl as FieldDeclNode,
+    Function as FunctionNode,
+    ImportDecl,
+    ImportName as ImportNameNode,
+    Item as ItemNode,
+    Program as ProgramNode,
+    StructDecl,
+    TypeParam as TypeParamNode,
+    VariantCase as VariantCaseNode,
+    VariantDecl,
+} from "./item.aipl";
+import { FnAttr, ParsedBody, ParsedParam, Stmt as StmtNode } from "./parsed.aipl";
+import { Pat as PatNode } from "./pat.aipl";
+import { Suffix as SuffixNode, Try } from "./suffix.aipl";
+import { Ty as TyNode, Unit } from "./ty.aipl";
 
 # The one type every `build` in `grammar_aipl.aipl` returns, whatever the
 # production is about — `Build<A>` pins a single `A` for a whole grammar, so a
@@ -400,653 +59,136 @@ fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
 # here. Each case is a node kind the lowering produces.
 #
 # Two cases are not node kinds but the intermediate a production hands its
-# parent. `ATys` is the *list* a production whose whole content is a
+# parent. `Tys` is the *list* a production whose whole content is a
 # comma-separated run of types lowers to, and the case it lands in is what tells
 # `ty`'s alternatives apart — `(A, B)` and `A` reach `ty` as different `Ast`
-# cases, so nothing has to count tokens to know which matched. `APayload` is a
+# cases, so nothing has to count tokens to know which matched. `Payload` is a
 # constructor pattern's slot list and whether it was written `..`, which is the
-# pair `Pat`'s `PatCtor` needs and no node of its own.
-# `aipl_syntax::ast::Pattern`. Its `Ctor` case is a struct variant there and a
-# named payload here, which is as close as the two declarations get: the slot
-# names are the same three, in the same order.
-#
-# `PatArray` — the destructuring `[a, b] => ..` arm — holds a list of
-# *expressions*, which is why nothing under the `pattern` production produces
-# one: it hangs off `match_arm`, where the elements are an ordinary `args` list.
-variant Pat =
-    | PatCtor(name: str, bindings: str[], ignore_payload: bool)
-    | PatStr(str)
-    | PatChar(char)
-    | PatArray(Expr[])
-    | PatWildcard
-
-# A pattern as a one-line dump, in the spelling that produced it: `Ctor(a, b)`,
-# `Ctor(..)`, a bare name, `_`. The two literal forms are tagged, because their
-# whole point is that they are values rather than names and `"1"` against `1`
-# would otherwise read the same.
-pub fn show_pat(self: Pat) -> str {
-    match (self) {
-        PatWildcard => "_",
-        PatStr(s) => `Str({s})`,
-        PatChar(c) => `Char({c})`,
-        PatArray(elems) => `[{show_exprs(elems)}]`,
-        PatCtor(name, bindings, ignore_payload) => if (ignore_payload) {
-            `{name}(..)`
-        } else {
-            if (bindings.is_empty()) { name } else { `{name}({bindings.join(sep=", ")})` }
-        },
-    }
-}.test({
-    let no_bindings: str[] = [];
-    assert(PatWildcard.show_pat() == "_");
-    assert(PatCtor("none", no_bindings, false).show_pat() == "none");
-    assert(PatCtor("some", ["v"], false).show_pat() == "some(v)");
-    assert(PatCtor("Pair", ["a", "b"], false).show_pat() == "Pair(a, b)");
-    assert(PatCtor("Circle", no_bindings, true).show_pat() == "Circle(..)");
-    assert(PatStr("hi").show_pat() == "Str(hi)");
-    assert(PatChar('x').show_pat() == "Char(x)");
-    assert(PatArray([num(1), ident("x")]).show_pat() == "[1, x]");
-})
-
-# The names a pattern binds, in order — `Pattern::bindings` in Rust. It is what
-# an arm's alternatives must agree on, so that a shared body means the same
-# thing whichever alternative matched.
-#
-# An array pattern binds its `EIdent` elements and nothing else: a literal
-# element is a value to match, not a name to bind.
-pub fn pat_bindings(self: Pat) -> str[] {
-    match (self) {
-        PatCtor(_, bindings, _) => bindings,
-        PatArray(elems) => elems.filter_map(is_ident, ident_name),
-        PatStr(..) | PatChar(..) | PatWildcard => no_names(),
-    }
-}.test({
-    let none_bound: str[] = [];
-    assert(PatCtor("Pair", ["a", "b"], false).pat_bindings() == ["a", "b"]);
-    assert(PatCtor("Circle", none_bound, true).pat_bindings() == none_bound);
-    assert(PatWildcard.pat_bindings() == none_bound);
-    assert(PatStr("s").pat_bindings() == none_bound);
-    // A literal element of an array pattern is matched, not bound.
-    assert(PatArray([ident("a"), num(1), ident("b")]).pat_bindings() == ["a", "b"]);
-})
-
-# The empty binding list, which `#{}`'s sibling problem makes worth naming: an
-# empty array literal does not flex through a generic parameter, so a `[]`
-# written in argument or return position needs somewhere to be annotated.
-fn no_names() -> str[] { [] }
-
-fn is_ident(self: Expr) -> bool {
-    if (let EIdent(..) = self.kind) {
-        return true;
-    };
-    false
-}
-
-fn ident_name(self: Expr) -> str {
-    if (let EIdent(name) = self.kind) {
-        return name;
-    };
-    ""
-}
-
-# How a pattern is named in the "alternatives must bind the same names"
-# diagnostic: the constructor for a constructor pattern, and a description for
-# the literal forms, which bind nothing and so only ever appear on the side that
-# binds nothing.
-pub fn pat_label(self: Pat) -> str {
-    match (self) {
-        PatCtor(name, _, _) => `"{name}"`,
-        PatStr(..) => "a string pattern",
-        PatChar(..) => "a char pattern",
-        PatArray(..) => "an array pattern",
-        PatWildcard => "\"_\"",
-    }
-}.test({
-    let none_bound: str[] = [];
-    assert(PatCtor("some", ["v"], false).pat_label() == "\"some\"");
-    assert(PatWildcard.pat_label() == "\"_\"");
-    assert(PatStr("s").pat_label() == "a string pattern");
-    assert(PatArray([ident("a")]).pat_label() == "an array pattern");
-    assert(PatChar('c').pat_label() == "a char pattern");
-    assert(PatCtor("none", none_bound, false).pat_label() == "\"none\"");
-})
-
-# The binder list as the same diagnostic writes it: each name quoted, or the
-# word "nothing" when there are none.
-pub fn binder_list(self: str[]) -> str {
-    if (self.is_empty()) {
-        return "nothing";
-    };
-    self.map(quoted).join(sep=", ")
-}.test({
-    let none_bound: str[] = [];
-    assert(none_bound.binder_list() == "nothing");
-    assert(["v"].binder_list() == "\"v\"");
-    assert(["a", "b"].binder_list() == "\"a\", \"b\"");
-})
-
-fn quoted(self: str) -> str { `"{self}"` }
-
-# One postfix step, before it has a receiver to apply to. `postfix` is an atom
-# followed by a run of these, and a `suffix` on its own is not an expression —
-# which is why it needs a shape of its own rather than an `Expr`.
-#
-# A tuple index is a `SufField`: `p.0` is the field named `_0`, which is how the
-# AST spells it and why nothing downstream has to know tuples have a second
-# syntax for their fields.
-variant Suffix =
-    | SufField(str)
-    | SufMethod(name: str, args: Expr[])
-    | SufIndex(Expr)
-    | SufSliceFrom(Expr)
-    | SufSliceTo(Expr)
-    | SufTry
-
-# One entry of a `#{ .. }` literal, before it is known whether the literal is a
-# set or a dict. Every entry has to be one or the other consistently, and the
-# entries are not all in scope until the whole body is lowered — so the decision
-# belongs to `atom`, and this is what `brace_body` hands it.
-variant BraceEntry = BKey(Expr) | BPair(Expr, Expr)
-
-# `aipl_syntax::ast::Bound` — a constraint on a declared type variable. `any`
-# accepts anything, `ord` narrows to the primitives usable with `<`/`>`, and
-# `variant` to the tagged types a `match` can inspect.
-variant Bound = BoundAny | BoundOrd | BoundVariant
-
-# The bound a keyword names, or `none` when it names none of them. The
-# `variant` bound has a keyword of its own in the grammar and so never reaches
-# here.
-pub fn bound_from_name(name: str) -> Bound? {
-    match (name) {
-        "any" => some(BoundAny),
-        "ord" => some(BoundOrd),
-        _ => none,
-    }
-}.test({
-    assert(bound_from_name("any") == some(BoundAny));
-    assert(bound_from_name("ord") == some(BoundOrd));
-    assert(bound_from_name("eq") == none);
-
-    // `variant` is its own keyword in type-parameter position, so it is not a
-    // bound *name* — the grammar tells the two apart before this is asked.
-    assert(bound_from_name("variant") == none);
-})
-
-pub fn show_bound(self: Bound) -> str {
-    match (self) {
-        BoundAny => "any",
-        BoundOrd => "ord",
-        BoundVariant => "variant",
-    }
-}
-
-struct TypeParam { name: str, bound: Bound }
-
-variant ImportSource = ImportPath(path: str, span: Span) | ImportBuiltins(span: Span)
-
-struct ImportName { name: str, alias: str?, span: Span }
-
-struct ImportDecl { names: ImportName[], source: ImportSource }
-
-# One declared parameter. `ty` is the type the *body* sees, which is not always
-# the one written: a variadic `x: T*` stores the sequence type, and a `k?: T`
-# stores `T?` with `implicit_some` recording that the call site passes a bare
-# `T`.
-struct Param {
-    name: str,
-    ty: Ty,
-    mutable: bool,
-    variadic: bool,
-    default: Expr?,
-    implicit_some: bool,
-}
-
-struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], return_ty: Ty? }
-
-struct Function { name: str, is_pub: bool, sig: Signature, body: Expr, test_body: Expr?, doc: str? }
-
-struct FieldDecl { name: str, ty: Ty, default: Expr? }
-
-struct StructDecl { name: str, doc: str?, type_vars: TypeParam[], fields: FieldDecl[] }
-
-# One payload slot of a variant case. A positional slot has no name; the three
-# named forms differ only in whether they carry a default and whether the `?`
-# moved onto the name.
-struct CaseParam { name: str?, ty: Ty, default: Expr?, implicit_some: bool }
-
-struct VariantCase { name: str, doc: str?, payload: CaseParam[] }
-
-struct VariantDecl { name: str, doc: str?, type_vars: TypeParam[], cases: VariantCase[] }
-
-variant Item =
-    | ItemFn(Function)
-    | ItemStruct(StructDecl)
-    | ItemVariant(VariantDecl)
-    | ItemImport(ImportDecl)
-
-# `aipl_syntax::ast::Program`, less its `sources` map: a single parsed file has
-# none, and the loader fills one in when it flattens several files together.
-struct Program { items: Item[] }
-
-# A parsed function body, before the return type is in scope to name the struct
-# the shorthand constructs. Gazelle's `ParsedBody`, and parser-local for the
-# same reason: by the time a `Function` is built the sugar is gone.
-variant ParsedBody = PBlock(Expr) | PConstruct(FieldInit[], Span)
-
-# A parameter as written, before the destructuring form is taken apart.
-# `fields` is empty for every ordinary parameter and holds the pattern's field
-# names for `Point { x, y }`, whose `Param` is the synthetic scrutinee the
-# function's own lowering then binds those fields off.
-struct ParsedParam { param: Param, fields: str[], span: Span }
-
-# One `.test({ .. })` attribute: its block, and the span of the attribute name,
-# which is where a duplicate is reported.
-struct FnAttr { body: Expr, span: Span }
-
-# A whole program as text, one item per line — the oracle the item lowering's
-# tests assert against. Near the source it came from rather than structural,
-# because an item's shape is its declaration and a dump that hid that would be
-# harder to read than the thing it describes.
-pub fn show_program(self: Program) -> str { self.items.map(show_item).join(sep="\n") }
-
-pub fn show_item(self: Item) -> str {
-    match (self) {
-        ItemFn(f) => show_fn(f),
-        ItemStruct(s) => `{show_doc(s.doc)}struct {s.name}{show_type_params(s.type_vars)}({s.fields.map(show_field_decl).join(sep=", ")})`,
-        ItemVariant(v) => `{show_doc(v.doc)}variant {v.name}{show_type_params(v.type_vars)}({v.cases.map(show_case).join(sep=" | ")})`,
-        ItemImport(d) => `import [{d.names.map(show_import_name).join(sep=", ")}] from {show_import_source(d.source)}`,
-    }
-}
-
-fn show_fn(self: Function) -> str {
-    let vis = if (self.is_pub) { "pub " } else { "" };
-    let sig = self.sig;
-    let ret = match (sig.return_ty) {
-        some(t) => ` -> {t.show_ty()}`,
-        none => "",
-    };
-    let effects = sig.effects.map(effect_marker).join();
-    let test = match (self.test_body) {
-        some(b) => ` .test({b.show_expr()})`,
-        none => "",
-    };
-    `{show_doc(self.doc)}{vis}fn {self.name}{show_type_params(sig.type_vars)}({sig.params.map(show_param).join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}`
-}
-
-fn effect_marker(self: str) -> str { ` !{self}` }
-
-fn show_doc(self: str?) -> str {
-    match (self) {
-        some(d) => `doc({d}) `,
-        none => "",
-    }
-}
-
-fn show_type_params(self: TypeParam[]) -> str {
-    if (self.is_empty()) {
-        return "";
-    };
-    `<{self.map(show_type_param).join(sep=", ")}>`
-}
-
-fn show_type_param(self: TypeParam) -> str { `{self.name}: {self.bound.show_bound()}` }
-
-fn show_param(self: Param) -> str {
-    let prefix = if (self.mutable) { "mut " } else { "" };
-    let opt = if (self.implicit_some) { "?" } else { "" };
-    let star = if (self.variadic) { "*" } else { "" };
-    `{prefix}{self.name}{opt}: {self.ty.show_ty()}{star}{show_default(self.default)}`
-}
-
-fn show_default(self: Expr?) -> str {
-    match (self) {
-        some(e) => ` = {e.show_expr()}`,
-        none => "",
-    }
-}
-
-fn show_field_decl(self: FieldDecl) -> str {
-    `{self.name}: {self.ty.show_ty()}{show_default(self.default)}`
-}
-
-fn show_case(self: VariantCase) -> str {
-    if (self.payload.is_empty()) {
-        return self.name;
-    };
-    `{self.name}({self.payload.map(show_case_param).join(sep=", ")})`
-}
-
-fn show_case_param(self: CaseParam) -> str {
-    match (self.name) {
-        some(n) => `{n}{opt_marker(self.implicit_some)}: {self.ty.show_ty()}{show_default(self.default)}`,
-        none => self.ty.show_ty(),
-    }
-}
-
-fn opt_marker(self: bool) -> str {
-    if (self) {
-        return "?";
-    };
-    ""
-}
-
-fn show_import_name(self: ImportName) -> str {
-    match (self.alias) {
-        some(a) => `{self.name} as {a}`,
-        none => self.name,
-    }
-}
-
-fn show_import_source(self: ImportSource) -> str {
-    match (self) {
-        ImportPath(path, _) => `"{path}"`,
-        ImportBuiltins(..) => "builtins",
-    }
-}
-
-# One keyword statement, after its own production has read it and before the
-# rest of the block is in scope. `wrap_stmt` is what folds it together with that
-# rest, and several of these fold into *several* nodes — which is why a
-# statement cannot simply lower to an `Expr` the way an expression does.
-#
-# It mirrors gazelle's `StmtSpec`, which is a parser-local type there for the
-# same reason it is one here: the AST has no statement node, so this shape
-# exists only between the production and the fold.
-variant Stmt =
-    | SLet(name: str, name_span: Span, ty: Ty?, value: Expr)
-    | SMut(name: str, name_span: Span, ty: Ty?, value: Expr)
-    | SLetTuple(names: str[], value: Expr, span: Span)
-    | SLetStruct(struct_name: str, fields: str[], value: Expr, span: Span)
-    | SMutStruct(struct_name: str, fields: str[], value: Expr, span: Span)
-    | SAssign(lhs: Expr, value: Expr, span: Span)
-    | SFor(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, span: Span)
-    | SWhile(cond: Expr, body: Expr, span: Span)
-    | SReturn(value: Expr, span: Span)
-
+# pair `Pat`'s `Ctor` needs and no node of its own.
 variant Ast =
-    | ATy(Ty)
-    | ATys(Ty[])
-    | APat(Pat)
-    | APayload(str[], bool)
-    | AExpr(Expr)
-    | AExprs(Expr[])
-    | ASuffix(Suffix)
-    | AFieldInit(FieldInit)
-    | ALambdaParam(LambdaParam)
-    | AEntry(BraceEntry)
-    | AEntries(BraceEntry[])
-    | AArms(MatchArm[])
-    | AShimBind(str, str)
-    | AStmt(Stmt)
-    | AName(str)
-    | AProgram(Program)
-    | AItem(Item)
-    | AImport(ImportDecl)
-    | AImportName(ImportName)
-    | AFunction(Function)
-    | ATypeParams(TypeParam[])
-    | ATypeParam(TypeParam)
-    | AParam(ParsedParam)
-    | ABody(ParsedBody)
-    | AFieldInits(FieldInit[])
-    | AAttr(FnAttr)
-    | AStruct(StructDecl)
-    | AFieldDecl(FieldDecl)
-    | AVariant(VariantDecl)
-    | AVariantCase(VariantCase)
-    | ACaseParam(CaseParam)
+    | Ty(TyNode)
+    | Tys(TyNode[])
+    | Pat(PatNode)
+    | Payload(str[], bool)
+    | Expr(ExprNode)
+    | Exprs(ExprNode[])
+    | Suffix(SuffixNode)
+    | FieldInit(FieldInitNode)
+    | LambdaParam(LambdaParamNode)
+    | Entry(BraceEntry)
+    | Entries(BraceEntry[])
+    | Arms(MatchArm[])
+    | ShimBind(str, str)
+    | Stmt(StmtNode)
+    | Name(str)
+    | Program(ProgramNode)
+    | Item(ItemNode)
+    | Import(ImportDecl)
+    | ImportName(ImportNameNode)
+    | Function(FunctionNode)
+    | TypeParams(TypeParamNode[])
+    | TypeParam(TypeParamNode)
+    | Param(ParsedParam)
+    | Body(ParsedBody)
+    | FieldInits(FieldInitNode[])
+    | Attr(FnAttr)
+    | Struct(StructDecl)
+    | FieldDecl(FieldDeclNode)
+    | Variant(VariantDecl)
+    | VariantCase(VariantCaseNode)
+    | CaseParam(CaseParamNode)
 
 # What a child lowered to, as a noun a refusal can name. Every mismatch here is
 # a lowering bug rather than a bad program — the grammar guarantees the shape —
-# so the message says which two shapes disagreed and leaves it at that.
 pub fn ast_case_name(self: Ast) -> str {
     match (self) {
-        ATy(..) => "a type",
-        ATys(..) => "a list of types",
-        APat(..) => "a pattern",
-        APayload(..) => "a constructor payload",
-        AExpr(..) => "an expression",
-        AExprs(..) => "a list of expressions",
-        ASuffix(..) => "a postfix suffix",
-        AFieldInit(..) => "a field initializer",
-        ALambdaParam(..) => "a lambda parameter",
-        AEntry(..) => "a brace-literal entry",
-        AEntries(..) => "a list of brace-literal entries",
-        AArms(..) => "a list of match arms",
-        AShimBind(..) => "a shim binding",
-        AStmt(..) => "a statement",
-        AName(..) => "a name",
-        AProgram(..) => "a program",
-        AItem(..) => "an item",
-        AImport(..) => "an import",
-        AImportName(..) => "an imported name",
-        AFunction(..) => "a function",
-        ATypeParams(..) => "a type parameter list",
-        ATypeParam(..) => "a type parameter",
-        AParam(..) => "a parameter",
-        ABody(..) => "a function body",
-        AFieldInits(..) => "a field initializer list",
-        AAttr(..) => "a function attribute",
-        AStruct(..) => "a struct declaration",
-        AFieldDecl(..) => "a field declaration",
-        AVariant(..) => "a variant declaration",
-        AVariantCase(..) => "a variant case",
-        ACaseParam(..) => "a case parameter",
+        Ty(..) => "a type",
+        Tys(..) => "a list of types",
+        Pat(..) => "a pattern",
+        Payload(..) => "a constructor payload",
+        Expr(..) => "an expression",
+        Exprs(..) => "a list of expressions",
+        Suffix(..) => "a postfix suffix",
+        FieldInit(..) => "a field initializer",
+        LambdaParam(..) => "a lambda parameter",
+        Entry(..) => "a brace-literal entry",
+        Entries(..) => "a list of brace-literal entries",
+        Arms(..) => "a list of match arms",
+        ShimBind(..) => "a shim binding",
+        Stmt(..) => "a statement",
+        Name(..) => "a name",
+        Program(..) => "a program",
+        Item(..) => "an item",
+        Import(..) => "an import",
+        ImportName(..) => "an imported name",
+        Function(..) => "a function",
+        TypeParams(..) => "a type parameter list",
+        TypeParam(..) => "a type parameter",
+        Param(..) => "a parameter",
+        Body(..) => "a function body",
+        FieldInits(..) => "a field initializer list",
+        Attr(..) => "a function attribute",
+        Struct(..) => "a struct declaration",
+        FieldDecl(..) => "a field declaration",
+        Variant(..) => "a variant declaration",
+        VariantCase(..) => "a variant case",
+        CaseParam(..) => "a case parameter",
     }
 }.test({
-    assert(ATy(TyUnit).ast_case_name() == "a type");
-    assert(AExpr(num(1)).ast_case_name() == "an expression");
-    assert(ASuffix(SufTry).ast_case_name() == "a postfix suffix");
+    assert(Ty(Unit).ast_case_name() == "a type");
+    assert(Expr(num(1)).ast_case_name() == "an expression");
+    assert(Suffix(Try).ast_case_name() == "a postfix suffix");
 })
 --- performance ---
-allocations: 368
-deallocations: 368
-reallocations: 27
-bytes allocated: 26644
-instructions executed: 17243
-binary size: 179120
-  code: 113232
-  data: 6425
-  metadata: 59463
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 240
+instructions executed: 352
+binary size: 55648
+  code: 36196
+  data: 309
+  metadata: 19143
 functions:
-  __arr_drop_Expr:
-    calls: 11
-    bytes: 116
-  __arr_drop_LambdaParam:
-    calls: 2
-    bytes: 172
-  __arr_drop_MatchArm:
+  __rec_drop___m2__Expr:
     calls: 1
-    bytes: 116
-  __arr_drop_Ty:
-    calls: 5
-    bytes: 116
-  __arr_drop___tuple$Expr$Expr:
-    calls: 1
-    bytes: 116
-  __arr_drop___tuple$str$str:
-    calls: 1
-    bytes: 140
-  __arr_retain_Expr:
-    calls: 2
-    bytes: 116
-  __arr_retain_LambdaParam:
-    calls: 0
-    bytes: 172
-  __arr_retain_MatchArm:
-    calls: 0
-    bytes: 116
-  __arr_retain_Ty:
-    calls: 0
-    bytes: 116
-  __arr_retain___tuple$Expr$Expr:
-    calls: 0
-    bytes: 116
-  __arr_retain___tuple$str$str:
-    calls: 0
-    bytes: 140
-  __eq_Bound:
-    calls: 0
-    bytes: 64
-  __eq_Bound$opt:
-    calls: 2
-    bytes: 92
-  __eq_Prim:
-    calls: 0
-    bytes: 64
-  __eq_Prim$opt:
-    calls: 3
-    bytes: 92
-  __eq_str$arr:
-    calls: 5
-    bytes: 364
-  __rec_drop_Expr:
-    calls: 44
     bytes: 36
-  __rec_drop_ExprKind:
-    calls: 44
+  __rec_drop___m2__ExprKind:
+    calls: 1
     bytes: 1260
-  __rec_drop_MatchArm:
+  __rec_drop___m5__Ty:
     calls: 1
-    bytes: 72
-  __rec_drop_Pat:
-    calls: 20
-    bytes: 136
-  __rec_drop_Ty:
-    calls: 24
     bytes: 408
-  __rec_drop___tuple$Expr$Expr:
-    calls: 1
-    bytes: 72
   __test$ast_case_name:
     calls: 1
     bytes: 34376
-  __test$binder_list:
-    calls: 1
-    bytes: 832
-  __test$bound_from_name:
-    calls: 1
-    bytes: 1384
-  __test$pat_bindings:
-    calls: 1
-    bytes: 2384
-  __test$pat_label:
-    calls: 1
-    bytes: 6136
-  __test$prim_from_name:
-    calls: 1
-    bytes: 2740
-  __test$prim_name:
-    calls: 1
-    bytes: 3232
-  __test$show_expr:
-    calls: 1
-    bytes: 14296
-  __test$show_pat:
-    calls: 1
-    bytes: 2824
-  __test$show_ty:
-    calls: 1
-    bytes: 3228
-  __test$show_tys:
-    calls: 1
-    bytes: 796
-  __to_str_i64:
-    calls: 19
-    bytes: 204
-  aipl_arr_inc:
-    calls: 35
-    bytes: (external)
-  aipl_arr_slice:
-    calls: 2
-    bytes: (external)
-  aipl_array_dec:
-    calls: 93
-    bytes: (external)
-  aipl_array_new:
-    calls: 35
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 28
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 21
-    bytes: (external)
   aipl_assert:
-    calls: 77
-    bytes: (external)
-  aipl_i64_len:
-    calls: 38
+    calls: 3
     bytes: (external)
   aipl_rec_alloc:
-    calls: 134
+    calls: 3
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 272
+    calls: 5
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 73
+    calls: 1
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 138
+    calls: 2
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 73
+    calls: 1
     bytes: (external)
   aipl_test_begin:
-    calls: 11
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 11
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  aipl_write_i64:
-    calls: 19
-    bytes: (external)
-  binder_list:
-    calls: 3
-    bytes: 740
-  ident_name:
-    calls: 2
-    bytes: 2928
-  is_ident:
-    calls: 3
-    bytes: 2804
   main:
     calls: 1
-    bytes: 824
-  pat_bindings:
-    calls: 5
-    bytes: 792
-  prim_from_name:
-    calls: 7
-    bytes: 1228
-  show_ann:
-    calls: 4
-    bytes: 416
-  show_arm:
-    calls: 1
-    bytes: 476
-  show_call:
-    calls: 3
-    bytes: 1560
-  show_expr:
-    calls: 56
-    bytes: 16984
-  show_exprs:
-    calls: 7
-    bytes: 460
-  show_field_init:
-    calls: 0
-    bytes: 620
-  show_pat:
-    calls: 9
-    bytes: 1640
-  show_ty:
-    calls: 29
-    bytes: 4656
-  show_tys:
-    calls: 6
-    bytes: 460
+    bytes: 116

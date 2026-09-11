@@ -1,0 +1,100 @@
+// The primitive types of AIPL's own syntax tree — `aipl_syntax::ast::Primitive`
+// case for case. One of the files the AST is declared across; see `ast.aipl`.
+import { equal as == } from builtins;
+
+# The primitive types, `aipl_syntax::ast::Primitive` case for case.
+variant Prim = I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64 | Bool | Char | Str
+
+# The spelling that names this primitive in source. The inverse of
+# `prim_from_name`, and the two are asserted to round-trip below.
+pub fn prim_name(self: Prim) -> str {
+    match (self) {
+        I8 => "i8",
+        I16 => "i16",
+        I32 => "i32",
+        I64 => "i64",
+        U8 => "u8",
+        U16 => "u16",
+        U32 => "u32",
+        U64 => "u64",
+        Bool => "bool",
+        Char => "char",
+        Str => "str",
+    }
+}.test({
+    assert(I64.prim_name() == "i64");
+    assert(Str.prim_name() == "str");
+    assert(U8.prim_name() == "u8");
+})
+
+# The primitive a type identifier names, or `none` when it names something else
+# — a struct, a variant, a type parameter, `Error`. Mirrors
+# `Primitive::from_name`, which is what decides whether `base_ty`'s identifier
+# lowers to `Primitive` or `Named`.
+pub fn prim_from_name(name: str) -> Prim? {
+    match (name) {
+        "i8" => some(I8),
+        "i16" => some(I16),
+        "i32" => some(I32),
+        "i64" => some(I64),
+        "u8" => some(U8),
+        "u16" => some(U16),
+        "u32" => some(U32),
+        "u64" => some(U64),
+        "bool" => some(Bool),
+        "char" => some(Char),
+        "str" => some(Str),
+        _ => none,
+    }
+}.test({
+    assert(prim_from_name("i64") == some(I64));
+    assert(prim_from_name("bool") == some(Bool));
+    // Not a primitive: a user type, a bound, and a name that only looks close.
+    assert(prim_from_name("Point") == none);
+    assert(prim_from_name("any") == none);
+    assert(prim_from_name("i65") == none);
+    // Round-trips, which is the property the two functions have to keep.
+    assert(prim_from_name(I8.prim_name()) == some(I8));
+    assert(prim_from_name(Char.prim_name()) == some(Char));
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 1148
+binary size: 11088
+  code: 7540
+  data: 609
+  metadata: 2939
+functions:
+  __eq_Prim:
+    calls: 0
+    bytes: 64
+  __eq_Prim$opt:
+    calls: 3
+    bytes: 92
+  __test$prim_from_name:
+    calls: 1
+    bytes: 2740
+  __test$prim_name:
+    calls: 1
+    bytes: 3232
+  aipl_assert:
+    calls: 10
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 184
+  prim_from_name:
+    calls: 7
+    bytes: 1228

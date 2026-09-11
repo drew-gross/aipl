@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/parsed.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/parsed.aipl</code></h1>
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-Stmt">
+          <h3>
+            <a class="anchor" href="#item-Stmt">Stmt</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Stmt</code></pre>
+
+          <div class="doc"><p>One keyword statement, after its own production has read it and before the rest of the block is in scope. <code>wrap_stmt</code> is what folds it together with that rest, and several of these fold into *several* nodes — which is why a statement cannot simply lower to an <code>Expr</code> the way an expression does.</p><p>It mirrors gazelle's <code>StmtSpec</code>, which is a parser-local type there for the same reason it is one here: the AST has no statement node, so this shape exists only between the production and the fold.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Let"><code>Let(name: str, name_span: Span, ty: Ty?, value: Expr)</code></li>
+
+            <li id="item-Mut"><code>Mut(name: str, name_span: Span, ty: Ty?, value: Expr)</code></li>
+
+            <li id="item-LetTuple"><code>LetTuple(names: str[], value: Expr, span: Span)</code></li>
+
+            <li id="item-LetStruct"><code>LetStruct(struct_name: str, fields: str[], value: Expr, span: Span)</code></li>
+
+            <li id="item-MutStruct"><code>MutStruct(struct_name: str, fields: str[], value: Expr, span: Span)</code></li>
+
+            <li id="item-Assign"><code>Assign(lhs: Expr, value: Expr, span: Span)</code></li>
+
+            <li id="item-For"><code>For(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, span: Span)</code></li>
+
+            <li id="item-While"><code>While(cond: Expr, body: Expr, span: Span)</code></li>
+
+            <li id="item-Return"><code>Return(value: Expr, span: Span)</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-ParsedBody">
+          <h3>
+            <a class="anchor" href="#item-ParsedBody">ParsedBody</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ParsedBody</code></pre>
+
+          <div class="doc"><p>A parsed function body, before the return type is in scope to name the struct the shorthand constructs. Gazelle's <code>ParsedBody</code>, and parser-local for the same reason: by the time a <code>Function</code> is built the sugar is gone.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Block"><code>Block(Expr)</code></li>
+
+            <li id="item-Construct"><code>Construct(FieldInit[], Span)</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-ParsedParam">
+          <h3>
+            <a class="anchor" href="#item-ParsedParam">ParsedParam</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ParsedParam</code></pre>
+
+          <div class="doc"><p>A parameter as written, before the destructuring form is taken apart. <code>fields</code> is empty for every ordinary parameter and holds the pattern's field names for <code>Point { x, y }</code>, whose <code>Param</code> is the synthetic scrutinee the function's own lowering then binds those fields off.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-FnAttr">
+          <h3>
+            <a class="anchor" href="#item-FnAttr">FnAttr</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct FnAttr</code></pre>
+
+          <div class="doc"><p>One <code>.test({ .. })</code> attribute: its block, and the span of the attribute name, which is where a duplicate is reported.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-resolve_body">
+          <h3>
+            <a class="anchor" href="#item-resolve_body">resolve_body</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn resolve_body(name: str, body: ParsedBody, return_ty: Ty?) -&#62; Expr!ParseError</code></pre>
+
+          <div class="doc"><p>The body, with the struct-literal shorthand resolved. What it builds is exactly the <code>EConstruct</code> the long form parses to, so nothing downstream of the parser sees the sugar at all.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-construct_ty_name">
+          <h3>
+            <a class="anchor" href="#item-construct_ty_name">construct_ty_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn construct_ty_name(name: str, return_ty: Ty?, span: Span) -&#62; str!ParseError</code></pre>
+
+          <div class="doc"><p>The shorthand names no type, so the return type has to. A generic return (<code>-&gt; Pair&lt;i64&gt;</code>) contributes its base name and infers its arguments, exactly as writing <code>Pair { .. }</code> would.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

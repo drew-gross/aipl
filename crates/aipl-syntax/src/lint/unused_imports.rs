@@ -111,18 +111,26 @@ fn referenced_names(program: &Program) -> HashSet<String> {
         }
         ExprKind::Match(_, arms) => {
             for arm in arms {
-                if let Pattern::Ctor { name, .. } = &arm.pattern {
-                    // A `V.A` path names the variant as well as the case.
-                    if let Some((v, _)) = name.split_once('.') {
-                        out.insert(v.to_string());
-                    }
-                    out.insert(name.clone());
-                }
+                collect_pattern_names(&arm.pattern, &mut out);
             }
         }
+        // `if (let P = e)` is one arm without the `match`; its pattern names
+        // a constructor just as an arm's does.
+        ExprKind::IfLet(arm, _, _) => collect_pattern_names(&arm.pattern, &mut out),
         _ => {}
     });
     out
+}
+
+/// The constructor a pattern names, if it names one. A `V.A` path names the
+/// variant as well as the case.
+fn collect_pattern_names(pattern: &Pattern, out: &mut HashSet<String>) {
+    if let Pattern::Ctor { name, .. } = pattern {
+        if let Some((v, _)) = name.split_once('.') {
+            out.insert(v.to_string());
+        }
+        out.insert(name.clone());
+    }
 }
 
 /// Every name `ty` mentions, so an import used only in a type position still

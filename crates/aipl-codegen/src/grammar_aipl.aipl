@@ -92,157 +92,78 @@ import {
     wrapping_sub as -,
 } from builtins;
 import {
-    AArms,
-    AAttr,
-    ABody,
-    ACaseParam,
-    AEntries,
-    AEntry,
-    AExpr,
-    AExprs,
-    AFieldDecl,
-    AFieldInit,
-    AFieldInits,
-    AFunction,
-    AImport,
-    AImportName,
-    AItem,
-    ALambdaParam,
-    AName,
-    AParam,
-    APat,
-    APayload,
-    AProgram,
-    AShimBind,
-    AStmt,
-    AStruct,
-    ASuffix,
-    ATy,
-    ATypeParam,
-    ATypeParams,
-    ATys,
-    AVariant,
-    AVariantCase,
+    Arms as AArms,
     Ast,
-    BKey,
-    BPair,
-    BoundAny,
-    BoundVariant,
-    BraceEntry,
-    CaseParam,
-    Char,
-    EArrayLit,
-    EAssign,
-    EBool,
-    ECall,
-    EChar,
-    EConstruct,
-    EDictLit,
-    EField,
-    EFor,
-    EIdent,
-    EIf,
-    EIfLet,
-    EIndex,
-    EKwArg,
-    ELambda,
-    ELet,
-    ELetMut,
-    EMatch,
-    ENeg,
-    ENone,
-    ENum,
-    EReturn,
-    ESeq,
-    ESetLit,
-    EShim,
-    ESlice,
-    ESpread,
-    EStr,
-    ETry,
-    ETupleLit,
-    EUnit,
-    EWhile,
-    Expr,
-    ExprKind,
-    FieldDecl,
-    FieldInit,
-    FnAttr,
-    Function,
-    ImportBuiltins,
-    ImportDecl,
-    ImportName,
-    ImportPath,
-    Item,
-    ItemFn,
-    ItemImport,
-    ItemStruct,
-    ItemVariant,
-    LambdaParam,
-    MatchArm,
-    PBlock,
-    PConstruct,
-    Param,
-    ParsedBody,
-    ParsedParam,
-    Pat,
-    PatArray,
-    PatChar,
-    PatCtor,
-    PatStr,
-    PatWildcard,
-    Program,
-    SAssign,
-    SFor,
-    SLet,
-    SLetStruct,
-    SLetTuple,
-    SMut,
-    SMutStruct,
-    SReturn,
-    SWhile,
-    Signature,
-    Stmt,
-    Str,
-    StructDecl,
-    SufField,
-    SufIndex,
-    SufMethod,
-    SufSliceFrom,
-    SufSliceTo,
-    SufTry,
-    Suffix,
-    Ty,
-    TyAny,
-    TyArray,
-    TyCase,
-    TyDict,
-    TyFn,
-    TyGeneric,
-    TyNamed,
-    TyOptional,
-    TyPrimitive,
-    TyResult,
-    TySet,
-    TyTuple,
-    TyUnit,
-    TypeParam,
-    U64,
-    VariantCase,
-    VariantDecl,
+    Attr as AAttr,
+    Body as ABody,
+    CaseParam as ACaseParam,
+    Entries as AEntries,
+    Entry as AEntry,
+    Expr as AExpr,
+    Exprs as AExprs,
+    FieldDecl as AFieldDecl,
+    FieldInit as AFieldInit,
+    FieldInits as AFieldInits,
+    Function as AFunction,
+    Import as AImport,
+    ImportName as AImportName,
+    Item as AItem,
+    LambdaParam as ALambdaParam,
+    Name as AName,
+    Param as AParam,
+    Pat as APat,
+    Payload as APayload,
+    Program as AProgram,
+    ShimBind as AShimBind,
+    Stmt as AStmt,
+    Struct as AStruct,
+    Suffix as ASuffix,
+    Ty as ATy,
+    TypeParam as ATypeParam,
+    TypeParams as ATypeParams,
+    Tys as ATys,
+    Variant as AVariant,
+    VariantCase as AVariantCase,
     ast_case_name,
-    binder_list,
-    bound_from_name,
-    num,
-    pat_bindings,
-    pat_label,
-    prim_from_name,
-    show_expr,
-    show_pat,
-    show_program,
-    show_ty,
 } from "./ast.aipl";
+import { Any as BoundAny, Variant as BoundVariant, bound_from_name } from "./bound.aipl";
+import { BraceEntry, Key, Pair, brace_literal } from "./brace_entry.aipl";
 import { Cst, nodes, own_token_text, own_tokens, span, text, token_span } from "./cst.aipl";
+import {
+    ArrayLit,
+    Assign,
+    Bool,
+    Call,
+    Char,
+    Construct,
+    Expr,
+    Field,
+    FieldInit,
+    For,
+    Ident,
+    If,
+    IfLet,
+    KwArg,
+    Lambda,
+    LambdaParam,
+    Let,
+    LetMut,
+    Match,
+    MatchArm,
+    Neg,
+    None,
+    Num,
+    Return,
+    Seq,
+    Shim,
+    Spread,
+    Str,
+    TupleLit,
+    Unit,
+    While,
+    at,
+    show_expr,
+} from "./expr.aipl";
 import { find_trailing_whitespace } from "./find_trailing_whitespace.aipl";
 import { render_cst } from "./format.aipl";
 import {
@@ -266,6 +187,28 @@ import {
     Tight,
 } from "./grammar.aipl";
 import {
+    Builtins,
+    CaseParam,
+    FieldDecl,
+    Fn as ItemFn,
+    Function,
+    Import as ItemImport,
+    ImportDecl,
+    ImportName,
+    Item,
+    Param,
+    Path,
+    Program,
+    Signature,
+    Struct as ItemStruct,
+    StructDecl,
+    TypeParam,
+    Variant as ItemVariant,
+    VariantCase,
+    VariantDecl,
+    show_program,
+} from "./item.aipl";
+import {
     AiplTok,
     AllowMarker,
     CharTok,
@@ -287,7 +230,65 @@ import {
 } from "./lex_aipl.aipl";
 import { LexResult, keep_skipped, lex } from "./lexer.aipl";
 import { parse, parse_cst, parse_prepared, prepare } from "./parse.aipl";
+import {
+    Assign as SAssign,
+    Block as PBlock,
+    Construct as PConstruct,
+    FnAttr,
+    For as SFor,
+    Let as SLet,
+    LetStruct as SLetStruct,
+    LetTuple as SLetTuple,
+    Mut as SMut,
+    MutStruct as SMutStruct,
+    ParsedBody,
+    ParsedParam,
+    Return as SReturn,
+    Stmt,
+    While as SWhile,
+    resolve_body,
+} from "./parsed.aipl";
+import {
+    Array as PatArray,
+    Char as PatChar,
+    Ctor as PatCtor,
+    Pat,
+    Str as PatStr,
+    Wildcard as PatWildcard,
+    binder_list,
+    pat_bindings,
+    pat_label,
+    show_pat,
+} from "./pat.aipl";
+import { Char as CharPrim, Str as StrPrim, U64, prim_from_name } from "./prim.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
+import {
+    Field as SufField,
+    Index as SufIndex,
+    Method as SufMethod,
+    SliceFrom as SufSliceFrom,
+    SliceTo as SufSliceTo,
+    Suffix,
+    Try as SufTry,
+    apply_suffix,
+} from "./suffix.aipl";
+import {
+    Any as TyAny,
+    Array as TyArray,
+    Case as TyCase,
+    Dict as TyDict,
+    Fn as TyFn,
+    Generic as TyGeneric,
+    Named as TyNamed,
+    Optional as TyOptional,
+    Primitive as TyPrimitive,
+    Result as TyResult,
+    Set as TySet,
+    Tuple as TyTuple,
+    Ty,
+    Unit as TyUnit,
+    show_ty,
+} from "./ty.aipl";
 
 // ---------- the grammar ----------
 
@@ -296,7 +297,7 @@ import { strip_test_sections } from "./strip_test_sections.aipl";
 #
 # Split across five builder functions purely for reading — the array they
 # concatenate to is one flat production list, and position in it is identity
-# (a linked `NamedIdx` and a `CTree` both name a production by its index).
+# (a linked `NamedIdx` and a `Tree` both name a production by its index).
 pub fn aipl_grammar() -> Grammar<AiplTok, Ast> {
     prods: [..items(), ..types(), ..statements(), ..expressions(), ..patterns()],
 }
@@ -1004,9 +1005,6 @@ fn patterns() -> Production<AiplTok, Ast>[] {
 // receiver yet, and an entry is not known to be a set element or a dict pair
 // until the whole body is in scope.
 
-# An expression node at a span.
-fn at(kind: ExprKind, span: Span) -> Expr { kind, span, value_span: 0..0 }
-
 # Two spans as the one that covers both — `aipl_syntax::join_spans`, mirrored.
 #
 # The rule that matters is the empty one: an *empty* span is the "no location"
@@ -1130,14 +1128,14 @@ fn lower_expr(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let op = node.own_token_text(src);
     if (op == "..") {
         return ok(AExpr(at(
-            EConstruct(
+            Construct(
                 "__builtin_Span",
                 [FieldInit { name: "start", value: lhs }, FieldInit { name: "end", value: rhs }],
             ),
             tsp,
         )));
     };
-    ok(AExpr(at(ECall(op, [lhs, rhs], false), tsp)))
+    ok(AExpr(at(Call(op, [lhs, rhs], false), tsp)))
 }
 
 # `unary` — `-x`, `!x`, or the postfix it wraps. Unary `-` is the one operator
@@ -1149,10 +1147,10 @@ fn lower_unary(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let tsp = node.tok_span();
     let op = node.own_token_text(src);
     if (op == "-") {
-        return ok(AExpr(at(ENeg(inner), tsp)));
+        return ok(AExpr(at(Neg(inner), tsp)));
     };
     if (op == "!") {
-        return ok(AExpr(at(ECall("!", [inner], false), tsp)));
+        return ok(AExpr(at(Call("!", [inner], false), tsp)));
     };
     ok(AExpr(inner))
 }
@@ -1169,56 +1167,6 @@ fn lower_postfix(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         set e = apply_suffix(e, suf, join_spans(e.span, end));
     }
     ok(AExpr(e))
-}
-
-# One postfix step, given the receiver it applies to. A method call folds the
-# receiver in as `args[0]` and flags the method form, so `recv.f(a)` is stored
-# exactly as the free call `f(recv, a)`.
-fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
-    match (suf) {
-        SufField(name) => at(EField(recv, name), span),
-        SufMethod(name, args) => at(ECall(name, [recv, ..args], true), span),
-        SufIndex(index) => index_or_slice(recv, index, span),
-        SufSliceFrom(lo) => at(ESlice(recv, lo, none), span),
-        // `recv[..end]` is `recv[0..end]`: the start clamps to `[0, len]`
-        // regardless, so a synthetic `0` is the whole difference.
-        SufSliceTo(hi) => at(ESlice(recv, num(0), some(hi)), span),
-        SufTry => at(ETry(recv), span),
-    }
-}
-
-# `recv[a..b]` — a range literal written *as* an index is the closed slice form,
-# folded straight into a `Slice` rather than constructing a `Span` only to
-# unpack it at runtime. A range that arrives as a *value* (`recv[s]`, a call
-# result) stays an index and takes the `Span`-index sugar path instead.
-fn index_or_slice(recv: Expr, index: Expr, span: Span) -> Expr {
-    match (index.range_bounds()) {
-        some(b) => at(ESlice(recv, b.0, some(b.1)), span),
-        none => at(EIndex(recv, index), span),
-    }
-}
-
-# The two ends of `self`, if it is the `Span` construct a range desugars to.
-fn range_bounds(self: Expr) -> (Expr, Expr)? {
-    if (let EConstruct(name, inits) = self.kind) {
-        if (name == "__builtin_Span") {
-            return two_values(inits);
-        };
-    };
-    none
-}
-
-fn two_values(self: FieldInit[]) -> (Expr, Expr)? {
-    if (self.len() != 2) {
-        return none;
-    };
-    match (self.first()) {
-        some(a) => match (self.last()) {
-            some(b) => some((a.value, b.value)),
-            none => none,
-        },
-        none => none,
-    }
 }
 
 # `suffix` — the seven postfix steps. `.` opens the three member forms, `[` the
@@ -1290,13 +1238,13 @@ fn lower_atom(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         return ok(AExpr(shim_expr(src, node, kids, sp)?));
     };
     if (head == "true") {
-        return ok(AExpr(at(EBool(true), tsp)));
+        return ok(AExpr(at(Bool(true), tsp)));
     };
     if (head == "false") {
-        return ok(AExpr(at(EBool(false), tsp)));
+        return ok(AExpr(at(Bool(false), tsp)));
     };
     if (head == "none") {
-        return ok(AExpr(at(ENone, tsp)));
+        return ok(AExpr(at(None, tsp)));
     };
 
     // A grouping paren holds one expression; a tuple holds two or more, which
@@ -1305,11 +1253,11 @@ fn lower_atom(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         if (kids.len() == 1) {
             return ok(AExpr(kid_expr(kids, 0, sp)?));
         };
-        return ok(AExpr(at(ETupleLit(kids.try_map(|k| as_expr(k, sp))?), tsp)));
+        return ok(AExpr(at(TupleLit(kids.try_map(|k| as_expr(k, sp))?), tsp)));
     };
     // The array literal is the one place a `..` spread survives.
     if (head == "[") {
-        return ok(AExpr(at(EArrayLit(as_exprs(kid(kids, 0, sp)?, sp)?), tsp)));
+        return ok(AExpr(at(ArrayLit(as_exprs(kid(kids, 0, sp)?, sp)?), tsp)));
     };
     if (head == "#") {
         return ok(AExpr(brace_literal(as_entries(kid(kids, 0, sp)?, sp)?, tsp)?));
@@ -1318,17 +1266,17 @@ fn lower_atom(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         return ok(AExpr(lambda_of(kids, tsp, sp)?));
     };
     if (head.starts_with("\"") || head.starts_with("`")) {
-        return ok(AExpr(at(EStr(str_lit_value(head)), tsp)));
+        return ok(AExpr(at(Str(str_lit_value(head)), tsp)));
     };
     if (head.starts_with("'")) {
         let c = char_lit_value(head).value_or_err(ParseError {
             message: "a char literal holds exactly one character",
             span: sp,
         })?;
-        return ok(AExpr(at(EChar(c), tsp)));
+        return ok(AExpr(at(Char(c), tsp)));
     };
     if (let some(n) = head.int_parse()) {
-        return ok(AExpr(at(ENum(n), tsp)));
+        return ok(AExpr(at(Num(n), tsp)));
     };
 
     // What is left opens with an identifier, and the token after it says which
@@ -1336,12 +1284,12 @@ fn lower_atom(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let second = tok_text(src, toks, 1);
     if (second == "(") {
         let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a call argument list")?;
-        return ok(AExpr(at(ECall(head, args, false), tsp)));
+        return ok(AExpr(at(Call(head, args, false), tsp)));
     };
     if (second == "{") {
-        return ok(AExpr(at(EConstruct(head, kids.try_map(|k| as_field_init(k, sp))?), tsp)));
+        return ok(AExpr(at(Construct(head, kids.try_map(|k| as_field_init(k, sp))?), tsp)));
     };
-    ok(AExpr(at(EIdent(head), tsp)))
+    ok(AExpr(at(Ident(head), tsp)))
 }
 
 # `match (e) { .. }` — every arm child is already a *list* of arms, since an
@@ -1352,7 +1300,7 @@ fn match_expr(kids: Ast[], tsp: Span, sp: Span) -> Expr!ParseError {
     for (let k : kids[1..]) {
         set arms.extend(as_arms(k, sp)?);
     }
-    ok(at(EMatch(scrutinee, arms), tsp))
+    ok(at(Match(scrutinee, arms), tsp))
 }
 
 # `shim <effect> { op = f, .. } { body }`. Spanned over `shim <effect>` rather
@@ -1365,7 +1313,7 @@ fn shim_expr(src: str, node: Cst, kids: Ast[], sp: Span) -> Expr!ParseError {
     let head = toks
         .first()
         .value_or_err(ParseError { message: "a shim matched no token", span: sp })?;
-    ok(at(EShim(tok_text(src, toks, 1), binds, body), join_spans(head, toks[1].value_or(head))))
+    ok(at(Shim(tok_text(src, toks, 1), binds, body), join_spans(head, toks[1].value_or(head))))
 }
 
 # Where own token `i` ends, for the nodes whose span stops partway through them.
@@ -1389,11 +1337,11 @@ fn lower_if(src: str, node: Cst, kids: Ast[]) -> Expr!ParseError {
             body: kid_expr(kids, 2, sp)?,
             span: sub_span(subs, 0, tsp),
         };
-        return ok(at(EIfLet(arm, kid_expr(kids, 1, sp)?, else_or_unit(kids, 3, tsp, sp)?), tsp));
+        return ok(at(IfLet(arm, kid_expr(kids, 1, sp)?, else_or_unit(kids, 3, tsp, sp)?), tsp));
     };
     let cond = kid_expr(kids, 0, sp)?;
     let then_branch = kid_expr(kids, 1, sp)?;
-    ok(at(EIf(cond, then_branch, else_or_unit(kids, 2, tsp, sp)?), tsp))
+    ok(at(If(cond, then_branch, else_or_unit(kids, 2, tsp, sp)?), tsp))
 }
 
 # The `else` branch, or the synthetic unit an else-less `if` gets — so it is
@@ -1401,7 +1349,7 @@ fn lower_if(src: str, node: Cst, kids: Ast[]) -> Expr!ParseError {
 fn else_or_unit(kids: Ast[], i: u64, tsp: Span, sp: Span) -> Expr!ParseError {
     match (kids[i]) {
         some(k) => as_expr(k, sp),
-        none => ok(at(EUnit, tsp)),
+        none => ok(at(Unit, tsp)),
     }
 }
 
@@ -1413,37 +1361,6 @@ fn lower_else_branch(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         return ok(AExpr(kid_expr(kids, 0, sp)?));
     };
     ok(AExpr(lower_if(src, node, kids)?))
-}
-
-# `#{ .. }` — a set, a dict, or an empty of either, which is both until its use
-# site says. Mixing the two spellings is refused here, where the whole body is
-# in scope for the first time.
-fn brace_literal(entries: BraceEntry[], span: Span) -> Expr!ParseError {
-    mut keys: Expr[] = [];
-    mut pairs: (Expr, Expr)[] = [];
-    for (let e : entries) {
-        match (e) {
-            BKey(k) => {
-                set keys.push(k);
-            },
-            BPair(k, v) => {
-                set pairs.push((k, v));
-            },
-        };
-    }
-    if (keys.is_nonempty() && pairs.is_nonempty()) {
-        return err(ParseError { message: brace_mix_message(), span });
-    };
-    if (pairs.is_nonempty()) {
-        return ok(at(EDictLit(pairs), span));
-    };
-    ok(at(ESetLit(keys), span))
-}
-
-fn brace_mix_message() -> str {
-    """
-        a "#{ .. }" literal can't mix set elements and "key: value" pairs — use either all bare elements (a set) or all pairs (a dict)
-    """
 }
 
 # `template` — the head, the interpolations, the tail. The segments are decoded
@@ -1461,11 +1378,11 @@ fn lower_template(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `__aipl_concat`. Built right to left because that is the shape gazelle's
 # right-recursive `template_rest` produces, and the two trees have to agree.
 fn template_chain(segs: str[], exprs: Expr[], sp: Span) -> Expr {
-    mut acc = at(EStr(seg_at(segs, exprs.len())), sp);
+    mut acc = at(Str(seg_at(segs, exprs.len())), sp);
     mut i = exprs.len();
     while (i > 0) {
         set i--;
-        let text = at(EStr(seg_at(segs, i)), sp);
+        let text = at(Str(seg_at(segs, i)), sp);
         set acc = concat_call(concat_call(text, interp_call(expr_at(exprs, i, sp))), acc);
     }
     acc
@@ -1473,19 +1390,19 @@ fn template_chain(segs: str[], exprs: Expr[], sp: Span) -> Expr {
 
 fn seg_at(self: str[], i: u64) -> str { self[i].value_or("") }
 
-fn expr_at(self: Expr[], i: u64, sp: Span) -> Expr { self[i].value_or(at(EUnit, sp)) }
+fn expr_at(self: Expr[], i: u64, sp: Span) -> Expr { self[i].value_or(at(Unit, sp)) }
 
 # `__template_interp` passes a `str` through unchanged and widens a `char` to
 # its one-character `str`, so neither picks up the quotes `to_str` renders
 # around a text scalar; anything else it converts.
 fn interp_call(e: Expr) -> Expr {
     let span = e.span;
-    at(ECall("__template_interp", [e], false), span)
+    at(Call("__template_interp", [e], false), span)
 }
 
 fn concat_call(a: Expr, b: Expr) -> Expr {
     let span = join_spans(a.span, b.span);
-    at(ECall("__aipl_concat", [a, b], false), span)
+    at(Call("__aipl_concat", [a, b], false), span)
 }
 
 # `args` — the comma-separated list every call, array literal and array pattern
@@ -1500,7 +1417,7 @@ fn lower_args(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # admits one everywhere and only the array literal leaves it in place.
 fn no_spread(args: Expr[], context: str) -> Expr[]!ParseError {
     for (let a : args) {
-        if (let ESpread(..) = a.kind) {
+        if (let Spread(..) = a.kind) {
             return err(ParseError {
                 message: `\`..\` spread is only allowed in an array literal, not in {context}`,
                 span: a.span,
@@ -1526,14 +1443,14 @@ fn lower_arg(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     // operand's span and an error points at what is being spread.
     if (head == "..") {
         let span = value.span;
-        return ok(AExpr(at(ESpread(value), span)));
+        return ok(AExpr(at(Spread(value), span)));
     };
     // `k = v`, or `k?= v` forwarding an optional into a `k?: T` parameter.
     let name_span = toks
         .first()
         .value_or_err(ParseError { message: "a keyword argument has no name", span: sp })?;
     let span = join_spans(name_span, value.span);
-    ok(AExpr(at(EKwArg(head, value, tok_text(src, toks, 1) == "?"), span)))
+    ok(AExpr(at(KwArg(head, value, tok_text(src, toks, 1) == "?"), span)))
 }
 
 # `op_value` — an operator passed as a value (`apply(2, 3, +)`) is a binary
@@ -1542,14 +1459,14 @@ fn lower_arg(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 fn lower_op_value(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let tsp = node.tok_span();
     let body = at(
-        ECall(node.own_token_text(src), [at(EIdent("lhs"), tsp), at(EIdent("rhs"), tsp)], false),
+        Call(node.own_token_text(src), [at(Ident("lhs"), tsp), at(Ident("rhs"), tsp)], false),
         tsp,
     );
     let params = [
         LambdaParam { name: "lhs", ty: none, span: tsp },
         LambdaParam { name: "rhs", ty: none, span: tsp },
     ];
-    ok(AExpr(at(ELambda(params, body), tsp)))
+    ok(AExpr(at(Lambda(params, body), tsp)))
 }
 
 # `lambda` — `|a, b| body`, or the no-parameter `|| body`. The `||` is one
@@ -1564,7 +1481,7 @@ fn lower_lambda(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         let body = kid_expr(kids, 0, sp)?;
         let span = body.span;
         let no_params: LambdaParam[] = [];
-        return ok(AExpr(at(ELambda(no_params, body), span)));
+        return ok(AExpr(at(Lambda(no_params, body), span)));
     };
     ok(AExpr(lambda_of(kids, node.tok_span(), sp)?))
 }
@@ -1575,7 +1492,7 @@ fn lower_lambda(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 fn lambda_of(kids: Ast[], span: Span, sp: Span) -> Expr!ParseError {
     let last = kids.len() - 1;
     let body = kid_expr(kids, last, sp)?;
-    ok(at(ELambda(kids[..last].try_map(|k| as_lambda_param(k, sp))?, body), span))
+    ok(at(Lambda(kids[..last].try_map(|k| as_lambda_param(k, sp))?, body), span))
 }
 
 fn lower_lambda_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
@@ -1600,12 +1517,12 @@ fn lower_field_init(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     if (head == "..") {
         let base = kid_expr(kids, 0, sp)?;
         let span = base.span;
-        return ok(AFieldInit(FieldInit { name: "", value: at(ESpread(base), span) }));
+        return ok(AFieldInit(FieldInit { name: "", value: at(Spread(base), span) }));
     };
     if (kids.is_empty()) {
         // `x` is `x: x`, spanned at the field name.
         let span = toks.first().value_or(node.tok_span());
-        return ok(AFieldInit(FieldInit { name: head, value: at(EIdent(head), span) }));
+        return ok(AFieldInit(FieldInit { name: head, value: at(Ident(head), span) }));
     };
     ok(AFieldInit(FieldInit { name: head, value: kid_expr(kids, 0, sp)? }))
 }
@@ -1619,9 +1536,9 @@ fn lower_entry(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let key = kid_expr(kids, 0, sp)?;
     if (kids.len() == 1) {
-        return ok(AEntry(BKey(key)));
+        return ok(AEntry(Key(key)));
     };
-    ok(AEntry(BPair(key, kid_expr(kids, 1, sp)?)))
+    ok(AEntry(Pair(key, kid_expr(kids, 1, sp)?)))
 }
 
 fn lower_shim_binding(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
@@ -1663,21 +1580,21 @@ fn lower_block(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # per statement in *this* block — nested blocks repair their own, so the total
 # work is one pass over the program rather than one per nesting level.
 fn repair_block_value(e: Expr, brace: Span) -> (Expr, Span) {
-    if (let ESeq(head, tail) = e.kind) {
+    if (let Seq(head, tail) = e.kind) {
         let inner = repair_block_value(tail, brace);
-        return (at(ESeq(head, inner.0), e.span), inner.1);
+        return (at(Seq(head, inner.0), e.span), inner.1);
     };
-    if (let ELet(name, ty, value, body) = e.kind) {
+    if (let Let(name, ty, value, body) = e.kind) {
         let inner = repair_block_value(body, brace);
-        return (at(ELet(name, ty, value, inner.0), e.span), inner.1);
+        return (at(Let(name, ty, value, inner.0), e.span), inner.1);
     };
-    if (let ELetMut(name, ty, value, body) = e.kind) {
+    if (let LetMut(name, ty, value, body) = e.kind) {
         let inner = repair_block_value(body, brace);
-        return (at(ELetMut(name, ty, value, inner.0), e.span), inner.1);
+        return (at(LetMut(name, ty, value, inner.0), e.span), inner.1);
     };
-    if (let EAssign(lhs, value, body) = e.kind) {
+    if (let Assign(lhs, value, body) = e.kind) {
         let inner = repair_block_value(body, brace);
-        return (at(EAssign(lhs, value, inner.0), e.span), inner.1);
+        return (at(Assign(lhs, value, inner.0), e.span), inner.1);
     };
     if (e.span.start == e.span.end) {
         return (at(e.kind, brace), brace);
@@ -1694,7 +1611,7 @@ fn lower_block_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     // that from the block's own `{`, which is a side-channel this does not have
     // yet (5f).
     if (kids.is_empty()) {
-        return ok(AExpr(at(EUnit, 0..0)));
+        return ok(AExpr(at(Unit, 0..0)));
     };
 
     // A keyword statement and the rest of the block, folded into the chain the
@@ -1710,7 +1627,7 @@ fn lower_block_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     match (as_exprs(kid(kids, 1, sp)?, sp)?.first()) {
         some(rest) => {
             let span = join_spans(value.span, rest.span);
-            ok(AExpr(at(ESeq(value, rest), span)))
+            ok(AExpr(at(Seq(value, rest), span)))
         },
         none => ok(AExpr(value)),
     }
@@ -1727,8 +1644,8 @@ fn lower_block_tail(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 // ---------- lowering: statements ----------
 //
 // AIPL has no statement node. A block is a right-nested chain of the four
-// expression kinds that carry a "rest" — `ELet`, `ELetMut`, `EAssign` and
-// `ESeq` — so a statement is only meaningful once the rest of the block is in
+// expression kinds that carry a "rest" — `Let`, `LetMut`, `Assign` and
+// `Seq` — so a statement is only meaningful once the rest of the block is in
 // scope. `Stmt` is the shape in between, and `wrap_stmt` is the fold.
 //
 // Four statements are *several* nodes rather than one, and that is the whole
@@ -1839,11 +1756,11 @@ fn lower_assign_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     // operator carry the operator's own span, so a missing import points at it.
     if (op == "++" || op == "--") {
         let value = at(
-            ECall(op, [at(EIdent(name), name_span), at(ENum(1), op_span)], false),
+            Call(op, [at(Ident(name), name_span), at(Num(1), op_span)], false),
             join_spans(name_span, op_span),
         );
         let span = join_spans(name_span, op_span);
-        return ok(AStmt(SAssign(at(EIdent(name), name_span), value, span)));
+        return ok(AStmt(SAssign(at(Ident(name), name_span), value, span)));
     };
 
     // `set n += e;` is `set n = n += e;`, where `+=` is its own operator (gated
@@ -1851,15 +1768,15 @@ fn lower_assign_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     if (compound_ops().contains(op)) {
         let rhs = kid_expr(kids, 0, sp)?;
         let span = join_spans(name_span, rhs.span);
-        let value = at(ECall(op, [at(EIdent(name), name_span), rhs], false), op_span);
-        return ok(AStmt(SAssign(at(EIdent(name), name_span), value, span)));
+        let value = at(Call(op, [at(Ident(name), name_span), rhs], false), op_span);
+        return ok(AStmt(SAssign(at(Ident(name), name_span), value, span)));
     };
     if (op == ".") {
         return ok(AStmt(dotted_assign(src, node, kids, name, name_span)?));
     };
     let value = kid_expr(kids, 0, sp)?;
     let span = join_spans(name_span, value.span);
-    ok(AStmt(SAssign(at(EIdent(name), name_span), value, span)))
+    ok(AStmt(SAssign(at(Ident(name), name_span), value, span)))
 }
 
 fn compound_ops() -> str[] { ["+=", "-=", "*=", "/="] }
@@ -1869,7 +1786,7 @@ fn compound_ops() -> str[] { ["+=", "-=", "*=", "/="] }
 fn dotted_assign(src: str, node: Cst, kids: Ast[], name: str, name_span: Span) -> Stmt!ParseError {
     let sp = node.span();
     let toks = node.own_tokens();
-    let recv = at(EIdent(name), name_span);
+    let recv = at(Ident(name), name_span);
 
     // `set recv.method(args);` is `set recv = recv.method(args)`: the receiver
     // folds in as `args[0]` and the call is flagged method-style, exactly as it
@@ -1882,8 +1799,8 @@ fn dotted_assign(src: str, node: Cst, kids: Ast[], name: str, name_span: Span) -
             none => toks[3].value_or(name_span),
         };
         let span = join_spans(name_span, end);
-        let value = at(ECall(tok_text(src, toks, 3), [recv, ..args], true), span);
-        return ok(SAssign(at(EIdent(name), name_span), value, span));
+        let value = at(Call(tok_text(src, toks, 3), [recv, ..args], true), span);
+        return ok(SAssign(at(Ident(name), name_span), value, span));
     };
 
     // `set recv.f.g = e;` — the LHS is a `Field` chain, exactly as `recv.f.g`
@@ -1893,7 +1810,7 @@ fn dotted_assign(src: str, node: Cst, kids: Ast[], name: str, name_span: Span) -
     mut lhs = recv;
     for (let i, t : toks) {
         if (i > 2 && src[t] != "." && src[t] != "=" && src[t] != ";") {
-            set lhs = at(EField(lhs, src[t]), join_spans(name_span, t));
+            set lhs = at(Field(lhs, src[t]), join_spans(name_span, t));
         };
     }
     ok(SAssign(lhs, value, join_spans(name_span, value.span)))
@@ -1956,25 +1873,25 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
     match (stmt) {
         SLet(name, name_span, ty, value) => {
             let span = join_spans(name_span, acc.span);
-            at(ELet(name, ty, value, acc), span)
+            at(Let(name, ty, value, acc), span)
         },
         SMut(name, name_span, ty, value) => {
             let span = join_spans(name_span, acc.span);
-            at(ELetMut(name, ty, value, acc), span)
+            at(LetMut(name, ty, value, acc), span)
         },
         // The statement's own span, not the usual join with the rest of the
         // block: an error against this node (an immutable target, an unknown
         // field) should point at the statement, not at whatever follows it.
-        SAssign(lhs, value, span) => at(EAssign(lhs, value, acc), span),
+        SAssign(lhs, value, span) => at(Assign(lhs, value, acc), span),
         SWhile(cond, body, while_span) => {
             let span = join_spans(while_span, acc.span);
-            seq(at(EWhile(cond, body), while_span), acc, span)
+            seq(at(While(cond, body), while_span), acc, span)
         },
         // The rest of the block is unreachable after a `return`, but it stays in
         // the tree so the checker and codegen see a well-formed block.
         SReturn(value, ret_span) => {
             let span = join_spans(ret_span, acc.span);
-            seq(at(EReturn(value), ret_span), acc, span)
+            seq(at(Return(value), ret_span), acc, span)
         },
         SFor(name, name_span, index, iterable, body, for_span) => {
             for_chain(name, name_span, index, iterable, body, for_span, acc)
@@ -1983,7 +1900,7 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
             let tmp = `__tpat${tup_span.start}`;
             let inner = bind_fields(names, tmp, tup_span, acc, tuple_slot_names(names));
             let span = join_spans(tup_span, inner.span);
-            at(ELet(tmp, none, value, inner), span)
+            at(Let(tmp, none, value, inner), span)
         },
         SLetStruct(struct_name, fields, value, span) => {
             destructure_struct(struct_name, fields, value, span, acc, false)
@@ -1994,7 +1911,7 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
     }
 }
 
-fn seq(head: Expr, rest: Expr, span: Span) -> Expr { at(ESeq(head, rest), span) }
+fn seq(head: Expr, rest: Expr, span: Span) -> Expr { at(Seq(head, rest), span) }
 
 # The field names a tuple pattern reads: `_0`, `_1`, ... one per binder, which is
 # how the AST spells a tuple's slots.
@@ -2025,13 +1942,13 @@ fn bind_fields_mut(
     mut i = names.len();
     while (i > 0) {
         set i--;
-        let field = at(EField(at(EIdent(tmp), span), fields[i].value_or("")), span);
+        let field = at(Field(at(Ident(tmp), span), fields[i].value_or("")), span);
         let inner_span = join_spans(span, result.span);
         let name = names[i].value_or("");
         set result = if (mutable) {
-            at(ELetMut(name, none, field, result), inner_span)
+            at(LetMut(name, none, field, result), inner_span)
         } else {
-            at(ELet(name, none, field, result), inner_span)
+            at(Let(name, none, field, result), inner_span)
         };
     }
     result
@@ -2054,7 +1971,7 @@ fn destructure_struct(
     let tmp = `__spat${span.start}`;
     let inner = bind_fields_mut(fields, tmp, span, acc, fields, mutable);
     let outer_span = join_spans(span, inner.span);
-    at(ELet(tmp, some(TyNamed(struct_name)), value, inner), outer_span)
+    at(Let(tmp, some(TyNamed(struct_name)), value, inner), outer_span)
 }
 
 # The `for` loop and the rest of the block. An indexed loop is a plain one over
@@ -2079,30 +1996,30 @@ fn for_chain(
     let idx = index.value_or("");
     if (!index.is_some()) {
         let span = join_spans(name_span, acc.span);
-        return seq(at(EFor(name, iterable, body), for_span), acc, span);
+        return seq(at(For(name, iterable, body), for_span), acc, span);
     };
     let tmp = `__idx${iterable.span.start}`;
     let body_span = body.span;
     let bump = at(
-        EAssign(
-            at(EIdent(tmp), name_span),
+        Assign(
+            at(Ident(tmp), name_span),
             at(
-                ECall(
+                Call(
                     "__builtin_wrapping_add",
-                    [at(EIdent(tmp), name_span), at(ENum(1), name_span)],
+                    [at(Ident(tmp), name_span), at(Num(1), name_span)],
                     false,
                 ),
                 name_span,
             ),
-            at(EUnit, name_span),
+            at(Unit, name_span),
         ),
         name_span,
     );
     let counted = seq(body, bump, body_span);
-    let bound = at(ELet(idx, none, at(EIdent(tmp), name_span), counted), body_span);
+    let bound = at(Let(idx, none, at(Ident(tmp), name_span), counted), body_span);
     let span = join_spans(name_span, acc.span);
-    let rest = seq(at(EFor(name, iterable, bound), for_span), acc, span);
-    at(ELetMut(tmp, some(TyPrimitive(U64)), at(ENum(0), name_span), rest), span)
+    let rest = seq(at(For(name, iterable, bound), for_span), acc, span);
+    at(LetMut(tmp, some(TyPrimitive(U64)), at(Num(0), name_span), rest), span)
 }
 
 # `while (cond) { body }`. No keyword or paren token carries a span of its own,
@@ -2140,7 +2057,7 @@ fn lower_loop_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 fn lower_loop_inner(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     if (kids.is_empty()) {
-        return ok(AExpr(at(ENum(0), 0..0)));
+        return ok(AExpr(at(Num(0), 0..0)));
     };
     let head = kid(kids, 0, sp)?;
     let rest = kid_expr(kids, 1, sp)?;
@@ -2317,7 +2234,7 @@ fn lower_pattern(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 //     documentation, since it brings a name in rather than declaring one.
 //   - **The `{ field: value }` body shorthand resolves at `function`**, which
 //     is the first place the return type and the field list are both in scope.
-//     What it builds is exactly the `EConstruct` the long form parses to, so
+//     What it builds is exactly the `Construct` the long form parses to, so
 //     nothing downstream sees the sugar.
 
 fn as_name(v: Ast, span: Span) -> str!ParseError {
@@ -2440,9 +2357,9 @@ fn lower_import_decl(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let text = tok_text(src, toks, i);
     let span = toks[i].value_or(node.tok_span());
     if (text == "builtins") {
-        return ok(AImport(ImportDecl { names, source: ImportBuiltins(span) }));
+        return ok(AImport(ImportDecl { names, source: Builtins(span) }));
     };
-    ok(AImport(ImportDecl { names, source: ImportPath(str_lit_value(text), span) }))
+    ok(AImport(ImportDecl { names, source: Path(str_lit_value(text), span) }))
 }
 
 # `import_name` — a name, an aliased name, or a bare operator spelling. The span
@@ -2574,8 +2491,8 @@ fn lower_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # recoverable from it.
 fn variadic_seq_ty(elem: Ty) -> Ty {
     if (let TyPrimitive(p) = elem) {
-        if (p == Char) {
-            return TyPrimitive(Str);
+        if (p == CharPrim) {
+            return TyPrimitive(StrPrim);
         };
     };
     TyArray(elem)
@@ -2601,19 +2518,19 @@ fn lower_construct_fields(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let name_span = toks.first().value_or(node.tok_span());
 
     // `{ ..base, rest.. }` — the spread rides as a nameless init holding an
-    // `ESpread`, exactly as in a written struct literal, so the loader expands
+    // `Spread`, exactly as in a written struct literal, so the loader expands
     // it with no knowledge that it came from the shorthand.
     if (head == "..") {
         let base = kid_expr(kids, 0, sp)?;
         let span = base.span;
-        let first = FieldInit { name: "", value: at(ESpread(base), span) };
+        let first = FieldInit { name: "", value: at(Spread(base), span) };
         return ok(AFieldInits([first, ..kids[1..].try_map(|k| as_field_init(k, sp))?]));
     };
 
     // `{ name, rest.. }` — a leading shorthand field, which is also how the
     // trailing-comma form `{ x, }` spells a lone one.
     if (tok_text(src, toks, 1) == ",") {
-        let first = FieldInit { name: head, value: at(EIdent(head), name_span) };
+        let first = FieldInit { name: head, value: at(Ident(head), name_span) };
         return ok(AFieldInits([first, ..kids.try_map(|k| as_field_init(k, sp))?]));
     };
     let first = FieldInit { name: head, value: kid_expr(kids, 0, sp)? };
@@ -2735,7 +2652,7 @@ fn lower_function(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     mut params: ParsedParam[] = [];
     mut effects: str[] = [];
     mut return_ty: Ty? = none;
-    mut body: ParsedBody = PBlock(at(EUnit, sp));
+    mut body: ParsedBody = PBlock(at(Unit, sp));
     mut test_body: Expr? = none;
     for (let k : kids) {
         if (let ATypeParams(tps) = k) {
@@ -2778,39 +2695,6 @@ fn lower_function(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 
 fn param_of(self: ParsedParam) -> Param { self.param }
 
-# The body, with the struct-literal shorthand resolved. What it builds is
-# exactly the `EConstruct` the long form parses to, so nothing downstream of the
-# parser sees the sugar at all.
-fn resolve_body(name: str, body: ParsedBody, return_ty: Ty?) -> Expr!ParseError {
-    match (body) {
-        PBlock(e) => ok(e),
-        PConstruct(fields, span) => {
-            let ty_name = construct_ty_name(name, return_ty, span)?;
-            ok(at(EConstruct(ty_name, fields), span))
-        },
-    }
-}
-
-# The shorthand names no type, so the return type has to. A generic return
-# (`-> Pair<i64>`) contributes its base name and infers its arguments, exactly
-# as writing `Pair { .. }` would.
-fn construct_ty_name(name: str, return_ty: Ty?, span: Span) -> str!ParseError {
-    let declared = return_ty.value_or_err(ParseError {
-        message: `fn "{name}": a \`\{ field: value, .. }\` body needs a struct return type to name, but this function declares no return type; add \`-> Struct\`, or give the literal its type`,
-        span,
-    })?;
-    if (let TyNamed(n) = declared) {
-        return ok(n);
-    };
-    if (let TyGeneric(base, _) = declared) {
-        return ok(base);
-    };
-    err(ParseError {
-        message: `fn "{name}": a \`\{ field: value, .. }\` body needs a struct return type to name, but this function returns {declared.show_ty()}; give the literal its type, or return a struct`,
-        span,
-    })
-}
-
 # `Point { x, y }` in parameter position: the fields are bound off the synthetic
 # scrutinee at the top of the body — the shape `let Point { x, y } = v;`
 # produces, minus the `let`, the value being already bound by being an argument.
@@ -2826,9 +2710,9 @@ fn bind_param_fields(params: ParsedParam[], body: Expr) -> Expr {
 fn bind_one_param(p: ParsedParam, body: Expr) -> Expr {
     mut result = body;
     for (let field : p.fields.reverse()) {
-        let read = at(EField(at(EIdent(p.param.name), p.span), field), p.span);
+        let read = at(Field(at(Ident(p.param.name), p.span), field), p.span);
         let span = join_spans(p.span, result.span);
-        set result = at(ELet(field, none, read, result), span);
+        set result = at(Let(field, none, read, result), span);
     }
     result
 }
@@ -3965,7 +3849,7 @@ fn pt(name: str, rule: Rule<AiplTok>, build: Build<Ast>) -> Production<AiplTok, 
 // where the lowering can be written and judged whole.
 //
 // Two things do the work that a `match` on the alternative would do in an LR
-// build action, since a `CTree` records which *production* matched and not
+// build action, since a `Tree` records which *production* matched and not
 // which of its alternatives:
 //
 //   - **The `Ast` case a child lowered to.** `ty_parens` lowers to `ATys`, a
@@ -4158,220 +4042,220 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2955858
-deallocations: 2955858
-reallocations: 322532
-bytes allocated: 279142583
-instructions executed: 398729471
-binary size: 4837024
-  code: 3157720
+allocations: 2955867
+deallocations: 2955867
+reallocations: 322523
+bytes allocated: 279142959
+instructions executed: 398728445
+binary size: 4848736
+  code: 3165880
   data: 42684
-  metadata: 1636620
+  metadata: 1640172
 functions:
-  __arr_drop___m11__ListStyle:
-    calls: 158600
-    bytes: 120
-  __arr_drop___m11__Prec:
-    calls: 592
-    bytes: 120
-  __arr_drop___m11__Production$__m12__AiplTok$__m1__Ast:
-    calls: 2989
-    bytes: 188
-  __arr_drop___m11__Rule$__m12__AiplTok:
-    calls: 182840
+  __arr_drop___m11__ParsedParam:
+    calls: 15
+    bytes: 232
+  __arr_drop___m14__Piece:
+    calls: 194
+    bytes: 228
+  __arr_drop___m15__Doc:
+    calls: 281
     bytes: 116
-  __arr_drop___m13__StepResult$__m12__AiplTok:
-    calls: 6
-    bytes: 140
-  __arr_drop___m13__Token$__m12__AiplTok:
-    calls: 4875
-    bytes: 388
-  __arr_drop___m13__TokenRule$__m12__AiplTok:
-    calls: 592
-    bytes: 832
   __arr_drop___m1__Ast:
     calls: 1779
     bytes: 3256
-  __arr_drop___m1__BraceEntry:
+  __arr_drop___m22__StepResult$__m21__AiplTok:
+    calls: 6
+    bytes: 140
+  __arr_drop___m22__Token$__m21__AiplTok:
+    calls: 4875
+    bytes: 388
+  __arr_drop___m22__TokenRule$__m21__AiplTok:
+    calls: 592
+    bytes: 832
+  __arr_drop___m2__BraceEntry:
     calls: 4
     bytes: 184
-  __arr_drop___m1__CaseParam:
-    calls: 3
-    bytes: 212
-  __arr_drop___m1__Expr:
-    calls: 69
-    bytes: 116
-  __arr_drop___m1__FieldDecl:
-    calls: 4
-    bytes: 196
-  __arr_drop___m1__FieldInit:
-    calls: 17
-    bytes: 116
-  __arr_drop___m1__ImportName:
-    calls: 4
-    bytes: 172
-  __arr_drop___m1__Item:
-    calls: 24
-    bytes: 660
-  __arr_drop___m1__LambdaParam:
-    calls: 4
-    bytes: 172
-  __arr_drop___m1__MatchArm:
-    calls: 15
-    bytes: 116
-  __arr_drop___m1__Param:
-    calls: 10
-    bytes: 196
-  __arr_drop___m1__ParsedParam:
-    calls: 15
-    bytes: 232
-  __arr_drop___m1__Pat:
-    calls: 11
-    bytes: 116
-  __arr_drop___m1__Ty:
-    calls: 19
-    bytes: 116
-  __arr_drop___m1__TypeParam:
-    calls: 3
-    bytes: 120
-  __arr_drop___m1__VariantCase:
-    calls: 1
-    bytes: 204
-  __arr_drop___m21__First$__m12__AiplTok:
+  __arr_drop___m30__First$__m21__AiplTok:
     calls: 81
     bytes: 116
-  __arr_drop___m21__Sym$__m12__AiplTok:
+  __arr_drop___m30__Sym$__m21__AiplTok:
     calls: 37350
     bytes: 140
-  __arr_drop___m2__Cst:
+  __arr_drop___m3__Expr:
+    calls: 70
+    bytes: 116
+  __arr_drop___m3__FieldInit:
+    calls: 17
+    bytes: 116
+  __arr_drop___m3__LambdaParam:
+    calls: 4
+    bytes: 172
+  __arr_drop___m3__MatchArm:
+    calls: 15
+    bytes: 116
+  __arr_drop___m4__Pat:
+    calls: 11
+    bytes: 116
+  __arr_drop___m6__Ty:
+    calls: 19
+    bytes: 116
+  __arr_drop___m7__ListStyle:
+    calls: 158600
+    bytes: 120
+  __arr_drop___m7__Prec:
+    calls: 592
+    bytes: 120
+  __arr_drop___m7__Production$__m21__AiplTok$__m1__Ast:
+    calls: 2989
+    bytes: 188
+  __arr_drop___m7__Rule$__m21__AiplTok:
+    calls: 182840
+    bytes: 116
+  __arr_drop___m8__Cst:
     calls: 31233
     bytes: 116
-  __arr_drop___m4__Piece:
-    calls: 194
-    bytes: 228
-  __arr_drop___m5__Doc:
-    calls: 281
-    bytes: 116
-  __arr_drop___tuple$__m1__Expr$__m1__Expr:
+  __arr_drop___m9__CaseParam:
+    calls: 3
+    bytes: 212
+  __arr_drop___m9__FieldDecl:
+    calls: 4
+    bytes: 196
+  __arr_drop___m9__ImportName:
+    calls: 4
+    bytes: 172
+  __arr_drop___m9__Item:
+    calls: 24
+    bytes: 660
+  __arr_drop___m9__Param:
+    calls: 10
+    bytes: 196
+  __arr_drop___m9__TypeParam:
+    calls: 3
+    bytes: 120
+  __arr_drop___m9__VariantCase:
+    calls: 1
+    bytes: 204
+  __arr_drop___tuple$__m3__Expr$__m3__Expr:
     calls: 3
     bytes: 116
   __arr_drop___tuple$str$str:
     calls: 1
     bytes: 140
-  __arr_retain___m11__ListStyle:
-    calls: 116025
-    bytes: 120
-  __arr_retain___m11__Prec:
-    calls: 0
-    bytes: 120
-  __arr_retain___m11__Production$__m12__AiplTok$__m1__Ast:
-    calls: 18734
-    bytes: 188
-  __arr_retain___m11__Rule$__m12__AiplTok:
-    calls: 368550
+  __arr_retain___m11__ParsedParam:
+    calls: 18
+    bytes: 232
+  __arr_retain___m14__Piece:
+    calls: 251
+    bytes: 228
+  __arr_retain___m15__Doc:
+    calls: 364
     bytes: 116
-  __arr_retain___m13__StepResult$__m12__AiplTok:
-    calls: 8
-    bytes: 140
-  __arr_retain___m13__Token$__m12__AiplTok:
-    calls: 4283
-    bytes: 388
-  __arr_retain___m13__TokenRule$__m12__AiplTok:
-    calls: 21016
-    bytes: 832
   __arr_retain___m1__Ast:
     calls: 2050
     bytes: 3256
-  __arr_retain___m1__BraceEntry:
+  __arr_retain___m22__StepResult$__m21__AiplTok:
+    calls: 8
+    bytes: 140
+  __arr_retain___m22__Token$__m21__AiplTok:
+    calls: 4283
+    bytes: 388
+  __arr_retain___m22__TokenRule$__m21__AiplTok:
+    calls: 21016
+    bytes: 832
+  __arr_retain___m2__BraceEntry:
     calls: 7
     bytes: 184
-  __arr_retain___m1__CaseParam:
-    calls: 4
-    bytes: 212
-  __arr_retain___m1__Expr:
-    calls: 48
-    bytes: 116
-  __arr_retain___m1__FieldDecl:
-    calls: 7
-    bytes: 196
-  __arr_retain___m1__FieldInit:
-    calls: 16
-    bytes: 116
-  __arr_retain___m1__ImportName:
-    calls: 7
-    bytes: 172
-  __arr_retain___m1__Item:
-    calls: 26
-    bytes: 660
-  __arr_retain___m1__LambdaParam:
-    calls: 3
-    bytes: 172
-  __arr_retain___m1__MatchArm:
-    calls: 20
-    bytes: 116
-  __arr_retain___m1__Param:
-    calls: 13
-    bytes: 196
-  __arr_retain___m1__ParsedParam:
-    calls: 18
-    bytes: 232
-  __arr_retain___m1__Pat:
-    calls: 14
-    bytes: 116
-  __arr_retain___m1__Ty:
-    calls: 27
-    bytes: 116
-  __arr_retain___m1__TypeParam:
-    calls: 5
-    bytes: 120
-  __arr_retain___m1__VariantCase:
-    calls: 4
-    bytes: 204
-  __arr_retain___m21__First$__m12__AiplTok:
+  __arr_retain___m30__First$__m21__AiplTok:
     calls: 4374
     bytes: 116
-  __arr_retain___m21__Sym$__m12__AiplTok:
+  __arr_retain___m30__Sym$__m21__AiplTok:
     calls: 43137
     bytes: 140
-  __arr_retain___m2__Cst:
+  __arr_retain___m3__Expr:
+    calls: 49
+    bytes: 116
+  __arr_retain___m3__FieldInit:
+    calls: 16
+    bytes: 116
+  __arr_retain___m3__LambdaParam:
+    calls: 3
+    bytes: 172
+  __arr_retain___m3__MatchArm:
+    calls: 20
+    bytes: 116
+  __arr_retain___m4__Pat:
+    calls: 14
+    bytes: 116
+  __arr_retain___m6__Ty:
+    calls: 27
+    bytes: 116
+  __arr_retain___m7__ListStyle:
+    calls: 116025
+    bytes: 120
+  __arr_retain___m7__Prec:
+    calls: 0
+    bytes: 120
+  __arr_retain___m7__Production$__m21__AiplTok$__m1__Ast:
+    calls: 18734
+    bytes: 188
+  __arr_retain___m7__Rule$__m21__AiplTok:
+    calls: 368550
+    bytes: 116
+  __arr_retain___m8__Cst:
     calls: 20726
     bytes: 116
-  __arr_retain___m4__Piece:
-    calls: 251
-    bytes: 228
-  __arr_retain___m5__Doc:
-    calls: 364
-    bytes: 116
-  __arr_retain___tuple$__m1__Expr$__m1__Expr:
+  __arr_retain___m9__CaseParam:
+    calls: 4
+    bytes: 212
+  __arr_retain___m9__FieldDecl:
+    calls: 7
+    bytes: 196
+  __arr_retain___m9__ImportName:
+    calls: 7
+    bytes: 172
+  __arr_retain___m9__Item:
+    calls: 26
+    bytes: 660
+  __arr_retain___m9__Param:
+    calls: 13
+    bytes: 196
+  __arr_retain___m9__TypeParam:
+    calls: 5
+    bytes: 120
+  __arr_retain___m9__VariantCase:
+    calls: 4
+    bytes: 204
+  __arr_retain___tuple$__m3__Expr$__m3__Expr:
     calls: 3
     bytes: 116
   __arr_retain___tuple$str$str:
     calls: 1
     bytes: 140
-  __builtin_all$__m11__Rule$__m12__AiplTok$lam309:
+  __builtin_all$__m7__Rule$__m21__AiplTok$lam309:
     calls: 0
     bytes: 36
-  __builtin_all$__m11__Rule$__m12__AiplTok$lam309$tail:
+  __builtin_all$__m7__Rule$__m21__AiplTok$lam309$tail:
     calls: 0
     bytes: 384
   __builtin_all$char$s0$lam291:
     calls: 79
     bytes: 212
-  __builtin_any$__m11__Prec$lam321:
-    calls: 402
-    bytes: 276
-  __builtin_any$__m11__Rule$__m12__AiplTok$lam312:
-    calls: 0
-    bytes: 36
-  __builtin_any$__m11__Rule$__m12__AiplTok$lam312$tail:
-    calls: 108
-    bytes: 380
-  __builtin_any$__m5__Doc$lam322:
+  __builtin_any$__m15__Doc$lam322:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam322$tail:
+  __builtin_any$__m15__Doc$lam322$tail:
     calls: 145
     bytes: 324
+  __builtin_any$__m7__Prec$lam321:
+    calls: 402
+    bytes: 276
+  __builtin_any$__m7__Rule$__m21__AiplTok$lam312:
+    calls: 0
+    bytes: 36
+  __builtin_any$__m7__Rule$__m21__AiplTok$lam312$tail:
+    calls: 108
+    bytes: 380
   __builtin_count_while$char$lam74:
     calls: 2188
     bytes: 220
@@ -4393,7 +4277,7 @@ functions:
   __builtin_count_while$char$s0$lam82:
     calls: 1801
     bytes: 184
-  __builtin_find_if$__m11__Prec$lam326:
+  __builtin_find_if$__m7__Prec$lam326:
     calls: 346
     bytes: 688
   __builtin_find_index$str$lam194:
@@ -4408,85 +4292,85 @@ functions:
   __builtin_int_parse:
     calls: 370
     bytes: 1028
-  __builtin_intersperse$__m5__Doc:
+  __builtin_intersperse$__m15__Doc:
     calls: 26
     bytes: 408
-  __builtin_try_map$__m11__Production$__m12__AiplTok$__m1__Ast$__m21__First<__m12__AiplTok>$__m11__ParseError$lam222:
-    calls: 72
-    bytes: 828
-  __builtin_try_map$__m11__Rule$__m12__AiplTok$__m11__Rule<__m12__AiplTok>$__m11__ParseError$lam282:
-    calls: 50700
-    bytes: 632
-  __builtin_try_map$__m1__Ast$__m1__BraceEntry$__m11__ParseError$lam179:
+  __builtin_try_map$__m1__Ast$__m2__BraceEntry$__m7__ParseError$lam179:
     calls: 5
     bytes: 9436
-  __builtin_try_map$__m1__Ast$__m1__CaseParam$__m11__ParseError$lam137:
-    calls: 4
-    bytes: 9500
-  __builtin_try_map$__m1__Ast$__m1__Expr$__m11__ParseError$lam150:
+  __builtin_try_map$__m1__Ast$__m3__Expr$__m7__ParseError$lam150:
     calls: 40
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__Expr$__m11__ParseError$lam157:
+  __builtin_try_map$__m1__Ast$__m3__Expr$__m7__ParseError$lam157:
     calls: 2
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__Expr$__m11__ParseError$lam164:
+  __builtin_try_map$__m1__Ast$__m3__Expr$__m7__ParseError$lam164:
     calls: 1
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__Expr$__m11__ParseError$lam172:
+  __builtin_try_map$__m1__Ast$__m3__Expr$__m7__ParseError$lam172:
     calls: 32
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__FieldDecl$__m11__ParseError$lam128:
-    calls: 4
-    bytes: 9488
-  __builtin_try_map$__m1__Ast$__m1__FieldInit$__m11__ParseError$lam108:
+  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam108:
     calls: 1
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__FieldInit$__m11__ParseError$lam111:
+  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam111:
     calls: 1
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__FieldInit$__m11__ParseError$lam114:
+  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam114:
     calls: 4
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__FieldInit$__m11__ParseError$lam117:
+  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam117:
     calls: 4
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__FieldInit$__m11__ParseError$lam120:
+  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam120:
     calls: 0
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__FieldInit$__m11__ParseError$lam123:
+  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam123:
     calls: 0
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__FieldInit$__m11__ParseError$lam160:
+  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam160:
     calls: 3
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__ImportName$__m11__ParseError$lam90:
-    calls: 4
-    bytes: 9436
-  __builtin_try_map$__m1__Ast$__m1__Item$__m11__ParseError$lam85:
-    calls: 24
-    bytes: 10400
-  __builtin_try_map$__m1__Ast$__m1__LambdaParam$__m11__ParseError$lam279:
+  __builtin_try_map$__m1__Ast$__m3__LambdaParam$__m7__ParseError$lam279:
     calls: 3
     bytes: 9452
-  __builtin_try_map$__m1__Ast$__m1__Pat$__m11__ParseError$lam182:
+  __builtin_try_map$__m1__Ast$__m4__Pat$__m7__ParseError$lam182:
     calls: 11
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__Ty$__m11__ParseError$lam141:
+  __builtin_try_map$__m1__Ast$__m6__Ty$__m7__ParseError$lam141:
     calls: 14
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__Ty$__m11__ParseError$lam146:
+  __builtin_try_map$__m1__Ast$__m6__Ty$__m7__ParseError$lam146:
     calls: 6
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__TypeParam$__m11__ParseError$lam97:
+  __builtin_try_map$__m1__Ast$__m9__CaseParam$__m7__ParseError$lam137:
+    calls: 4
+    bytes: 9500
+  __builtin_try_map$__m1__Ast$__m9__FieldDecl$__m7__ParseError$lam128:
+    calls: 4
+    bytes: 9488
+  __builtin_try_map$__m1__Ast$__m9__ImportName$__m7__ParseError$lam90:
+    calls: 4
+    bytes: 9436
+  __builtin_try_map$__m1__Ast$__m9__Item$__m7__ParseError$lam85:
+    calls: 24
+    bytes: 10400
+  __builtin_try_map$__m1__Ast$__m9__TypeParam$__m7__ParseError$lam97:
     calls: 29
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m1__VariantCase$__m11__ParseError$lam133:
+  __builtin_try_map$__m1__Ast$__m9__VariantCase$__m7__ParseError$lam133:
     calls: 1
     bytes: 9456
-  __builtin_try_map$__m1__Ast$__tuple$str$str$__m11__ParseError$lam276:
+  __builtin_try_map$__m1__Ast$__tuple$str$str$__m7__ParseError$lam276:
     calls: 1
     bytes: 9360
-  __builtin_try_map$__m2__Cst$__m1__Ast$__m11__ParseError$lam216:
+  __builtin_try_map$__m7__Production$__m21__AiplTok$__m1__Ast$__m30__First<__m21__AiplTok>$__m7__ParseError$lam222:
+    calls: 72
+    bytes: 828
+  __builtin_try_map$__m7__Rule$__m21__AiplTok$__m7__Rule<__m21__AiplTok>$__m7__ParseError$lam282:
+    calls: 50700
+    bytes: 632
+  __builtin_try_map$__m8__Cst$__m1__Ast$__m7__ParseError$lam216:
     calls: 2023
     bytes: 6792
   __builtin_value_or$__builtin_Span:
@@ -4498,24 +4382,24 @@ functions:
   __eq___builtin_Span$arr:
     calls: 2
     bytes: 284
-  __eq___m11__ParseError:
-    calls: 0
-    bytes: 128
-  __eq___m11__ParseError$opt:
-    calls: 1
-    bytes: 92
-  __eq___m21__First$__m12__AiplTok:
+  __eq___m30__First$__m21__AiplTok:
     calls: 1494
     bytes: 128
-  __eq___m21__First$__m12__AiplTok$arr:
+  __eq___m30__First$__m21__AiplTok$arr:
     calls: 72
     bytes: 284
-  __eq___m21__Sym$__m12__AiplTok:
+  __eq___m30__Sym$__m21__AiplTok:
     calls: 150390
     bytes: 144
-  __eq___m21__Sym$__m12__AiplTok$arr:
+  __eq___m30__Sym$__m21__AiplTok$arr:
     calls: 1494
     bytes: 284
+  __eq___m7__ParseError:
+    calls: 0
+    bytes: 128
+  __eq___m7__ParseError$opt:
+    calls: 1
+    bytes: 92
   __eq_set$str:
     calls: 1314
     bytes: 304
@@ -4567,434 +4451,452 @@ functions:
   __lambda_37:
     calls: 4
     bytes: 64
-  __m10__trim_end_while$lam48:
-    calls: 43
-    bytes: 300
-  __m11__desugar_opt$__m12__AiplTok:
-    calls: 20150
-    bytes: 700
-  __m11__desugar_rule$__m12__AiplTok:
-    calls: 264225
-    bytes: 11936
-  __m11__group_styles$__m12__AiplTok:
-    calls: 0
-    bytes: 32
-  __m11__group_styles$__m12__AiplTok$tail:
-    calls: 910325
-    bytes: 4724
-  __m11__link$__m12__AiplTok$__m1__Ast:
-    calls: 325
-    bytes: 2604
-  __m11__link_opt$__m12__AiplTok:
-    calls: 20150
-    bytes: 716
-  __m11__link_rule$__m12__AiplTok:
-    calls: 264225
-    bytes: 8236
-  __m11__link_rules$__m12__AiplTok:
-    calls: 50700
-    bytes: 732
-  __m11__prod_names$__m12__AiplTok$__m1__Ast:
-    calls: 621
-    bytes: 492
-  __m12__char_lit_emit:
-    calls: 3
-    bytes: 1772
-  __m12__char_lit_value:
-    calls: 3
-    bytes: 300
-  __m12__dedent_segments:
-    calls: 1
-    bytes: 272
-  __m12__doc_text:
-    calls: 12
-    bytes: 196
-  __m12__int_lit:
-    calls: 156
-    bytes: 1364
-  __m12__raw_tpl_kind:
-    calls: 2
-    bytes: 2592
-  __m12__str_lit_value:
-    calls: 6
-    bytes: 400
-  __m12__template_segments:
-    calls: 1
-    bytes: 1652
-  __m12__tpl_kind:
-    calls: 9
-    bytes: 2608
-  __m13__between_len:
-    calls: 1645
-    bytes: 752
-  __m13__delimited_len:
-    calls: 3281
-    bytes: 1592
-  __m13__finalize_template$__m12__AiplTok:
+  __m11__construct_ty_name:
     calls: 5
-    bytes: 8712
-  __m13__float_len:
-    calls: 0
-    bytes: 816
-  __m13__interp_scan$__m12__AiplTok:
-    calls: 6
-    bytes: 2028
-  __m13__lex$__m12__AiplTok:
-    calls: 296
-    bytes: 1328
-  __m13__lex_step$__m12__AiplTok:
-    calls: 4266
-    bytes: 29192
-  __m13__nested_len:
-    calls: 2844
-    bytes: 940
-  __m13__step_result$__m12__AiplTok:
-    calls: 129689
-    bytes: 15088
-  __m13__template_scan$__m12__AiplTok:
-    calls: 5
-    bytes: 2728
-  __m13__template_step$__m12__AiplTok:
-    calls: 3265
-    bytes: 476
-  __m13__to_eol_len:
-    calls: 0
-    bytes: 52
-  __m13__to_eol_len$tail:
-    calls: 5690
-    bytes: 252
-  __m13__to_eol_unless_len:
-    calls: 2842
-    bytes: 368
-  __m14__unescape:
-    calls: 32
-    bytes: 1176
-  __m15__process_raw_string:
-    calls: 1
-    bytes: 556
-  __m16__trim_prefix:
-    calls: 34
-    bytes: 260
-  __m17__trim_suffix:
-    calls: 0
-    bytes: 340
-  __m18__strip_test_sections:
-    calls: 138
-    bytes: 692
-  __m19__parse_test_section_header:
-    calls: 220
-    bytes: 744
-  __m1__binder_list:
-    calls: 4
-    bytes: 740
-  __m1__ident_name:
-    calls: 0
-    bytes: 2928
-  __m1__is_ident:
-    calls: 0
-    bytes: 2804
-  __m1__opt_marker:
+    bytes: 3128
+  __m11__resolve_body:
+    calls: 20
+    bytes: 912
+  __m12__range_bounds:
     calls: 3
-    bytes: 188
-  __m1__pat_bindings:
-    calls: 25
-    bytes: 792
-  __m1__show_ann:
-    calls: 26
-    bytes: 416
-  __m1__show_arm:
-    calls: 13
-    bytes: 476
-  __m1__show_call:
-    calls: 53
-    bytes: 1560
-  __m1__show_case:
-    calls: 4
-    bytes: 2060
-  __m1__show_default:
-    calls: 23
-    bytes: 420
-  __m1__show_expr:
-    calls: 425
-    bytes: 16984
-  __m1__show_exprs:
-    calls: 60
-    bytes: 460
-  __m1__show_field_init:
-    calls: 11
-    bytes: 620
-  __m1__show_pat:
-    calls: 28
-    bytes: 1640
-  __m1__show_program:
-    calls: 22
-    bytes: 13616
-  __m1__show_ty:
-    calls: 132
-    bytes: 4656
-  __m1__show_type_params:
-    calls: 21
-    bytes: 1272
-  __m1__show_tys:
-    calls: 14
-    bytes: 460
-  __m20__climb$__m12__AiplTok$__m1__Ast:
-    calls: 515
-    bytes: 3388
-  __m20__error_at$__m12__AiplTok$__m1__Ast:
-    calls: 36
-    bytes: 4108
-  __m20__far_miss:
-    calls: 27314
-    bytes: 1084
-  __m20__far_unclosed:
-    calls: 9
-    bytes: 320
-  __m20__find_prec:
-    calls: 431
-    bytes: 228
-  __m20__leaf_at$__m12__AiplTok$__m1__Ast:
-    calls: 6318
-    bytes: 404
-  __m20__lower_node$__m12__AiplTok$__m1__Ast:
-    calls: 2023
-    bytes: 22856
-  __m20__match_group$__m12__AiplTok$__m1__Ast:
-    calls: 8801
-    bytes: 6196
-  __m20__match_many$__m12__AiplTok$__m1__Ast:
-    calls: 10889
-    bytes: 1436
-  __m20__match_maybe$__m12__AiplTok$__m1__Ast:
-    calls: 757
-    bytes: 1076
-  __m20__match_one_of$__m12__AiplTok$__m1__Ast:
-    calls: 6518
-    bytes: 1692
-  __m20__match_prod$__m12__AiplTok$__m1__Ast:
-    calls: 11899
-    bytes: 8972
-  __m20__match_reps$__m12__AiplTok$__m1__Ast:
-    calls: 2853
-    bytes: 4928
-  __m20__match_rule$__m12__AiplTok$__m1__Ast:
-    calls: 85704
-    bytes: 14428
-  __m20__match_then$__m12__AiplTok$__m1__Ast:
-    calls: 23006
-    bytes: 2036
-  __m20__parse$__m12__AiplTok$__m1__Ast:
-    calls: 186
-    bytes: 3688
-  __m20__parse_cst$__m12__AiplTok$__m1__Ast:
-    calls: 287
-    bytes: 624
-  __m20__parse_prepared$__m12__AiplTok$__m1__Ast:
-    calls: 296
-    bytes: 9136
-  __m20__prepare$__m12__AiplTok$__m1__Ast:
-    calls: 9
-    bytes: 2068
-  __m20__pruned$__m12__AiplTok$__m1__Ast:
-    calls: 70
-    bytes: 1344
-  __m20__quoted:
-    calls: 29038
-    bytes: 456
-  __m20__rule_labels$__m12__AiplTok$__m1__Ast:
-    calls: 0
-    bytes: 44
-  __m20__rule_labels$__m12__AiplTok$__m1__Ast$tail:
-    calls: 18954
-    bytes: 8040
-  __m20__rule_nullable$__m12__AiplTok:
-    calls: 0
-    bytes: 36
-  __m20__rule_nullable$__m12__AiplTok$tail:
-    calls: 6534
-    bytes: 1592
-  __m20__seq_labels$__m12__AiplTok$__m1__Ast:
-    calls: 0
-    bytes: 44
-  __m20__seq_labels$__m12__AiplTok$__m1__Ast$tail:
-    calls: 5346
-    bytes: 908
-  __m20__tok_text$__m12__AiplTok$__m1__Ast:
-    calls: 26707
-    bytes: 1712
-  __m20__trivia_span$__m12__AiplTok:
-    calls: 1424
-    bytes: 1568
-  __m21__can_start$__m12__AiplTok:
-    calls: 180
-    bytes: 600
-  __m21__first_sets$__m12__AiplTok$__m1__Ast:
-    calls: 9
-    bytes: 356
-  __m21__linked_first_sets$__m12__AiplTok$__m1__Ast:
-    calls: 9
-    bytes: 1084
-  __m21__rule_first$__m12__AiplTok:
-    calls: 26496
-    bytes: 6188
-  __m21__union_syms$__m12__AiplTok:
-    calls: 20448
-    bytes: 736
-  __m22__line_at:
-    calls: 9
-    bytes: 532
-  __m2__first_leaf:
-    calls: 6425
-    bytes: 696
-  __m2__first_leaf_of:
-    calls: 4583
-    bytes: 320
-  __m2__first_token:
-    calls: 2136
-    bytes: 660
-  __m2__first_token_of:
-    calls: 1236
-    bytes: 320
-  __m2__flat_kids:
-    calls: 0
-    bytes: 32
-  __m2__flat_kids$tail:
-    calls: 3963
-    bytes: 3832
-  __m2__last_leaf:
-    calls: 7146
-    bytes: 696
-  __m2__last_leaf_of:
-    calls: 5304
-    bytes: 524
-  __m2__last_token:
-    calls: 2083
-    bytes: 660
-  __m2__last_token_of:
-    calls: 1488
-    bytes: 524
-  __m2__leaves:
-    calls: 374
-    bytes: 3684
-  __m2__own_token_text:
-    calls: 379
-    bytes: 1268
-  __m2__span:
-    calls: 1950
-    bytes: 236
-  __m2__splice:
-    calls: 0
-    bytes: 32
-  __m2__splice$tail:
-    calls: 9186
-    bytes: 612
-  __m2__text:
-    calls: 10
-    bytes: 472
-  __m2__token_leaves:
-    calls: 1334
-    bytes: 3648
-  __m2__token_span:
-    calls: 599
-    bytes: 288
-  __m3__find_trailing_whitespace:
+    bytes: 2960
+  __m12__two_values:
+    calls: 1
+    bytes: 1124
+  __m13__find_trailing_whitespace:
     calls: 3
     bytes: 500
-  __m3__line_end_span:
+  __m13__line_end_span:
     calls: 4
     bytes: 176
-  __m4__breaks_after:
+  __m14__breaks_after:
     calls: 1
     bytes: 444
-  __m4__fmt_node$__m12__AiplTok$__m1__Ast$s1$lam43:
+  __m14__fmt_node$__m21__AiplTok$__m1__Ast$s1$lam43:
     calls: 144
     bytes: 4800
-  __m4__format_cst$__m12__AiplTok$__m1__Ast$s1$lam16:
+  __m14__format_cst$__m21__AiplTok$__m1__Ast$s1$lam16:
     calls: 20
     bytes: 384
-  __m4__gap_wanted$lam283:
+  __m14__gap_wanted$lam283:
     calls: 160
     bytes: 304
-  __m4__group_doc$__m12__AiplTok$__m1__Ast$s1$lam202:
+  __m14__group_doc$__m21__AiplTok$__m1__Ast$s1$lam202:
     calls: 13
     bytes: 2420
-  __m4__inline_doc$lam201:
+  __m14__inline_doc$lam201:
     calls: 137
     bytes: 2428
-  __m4__pieces$__m12__AiplTok$__m1__Ast$s1$lam199:
+  __m14__pieces$__m21__AiplTok$__m1__Ast$s1$lam199:
     calls: 170
     bytes: 3400
-  __m4__render_cst$__m12__AiplTok$__m1__Ast$s1$lam3:
+  __m14__render_cst$__m21__AiplTok$__m1__Ast$s1$lam3:
     calls: 20
     bytes: 4580
-  __m4__wrapped$lam284:
+  __m14__wrapped$lam284:
     calls: 13
     bytes: 4272
-  __m5__col_after:
+  __m15__col_after:
     calls: 108
     bytes: 596
-  __m5__fits:
+  __m15__fits:
     calls: 0
     bytes: 36
-  __m5__fits$tail:
+  __m15__fits$tail:
     calls: 278
     bytes: 2684
-  __m5__fits_atom:
+  __m15__fits_atom:
     calls: 0
     bytes: 52
-  __m5__fits_atom$tail:
+  __m15__fits_atom$tail:
     calls: 77
     bytes: 312
-  __m5__has_hard:
+  __m15__has_hard:
     calls: 0
     bytes: 32
-  __m5__has_hard$tail:
+  __m15__has_hard$tail:
     calls: 255
     bytes: 688
-  __m6__reindent_block:
+  __m16__reindent_block:
     calls: 0
     bytes: 3092
-  __m7__dedent:
+  __m17__dedent:
     calls: 1
     bytes: 1276
+  __m20__trim_end_while$lam48:
+    calls: 43
+    bytes: 300
+  __m21__char_lit_emit:
+    calls: 3
+    bytes: 1772
+  __m21__char_lit_value:
+    calls: 3
+    bytes: 300
+  __m21__dedent_segments:
+    calls: 1
+    bytes: 272
+  __m21__doc_text:
+    calls: 12
+    bytes: 196
+  __m21__int_lit:
+    calls: 156
+    bytes: 1364
+  __m21__raw_tpl_kind:
+    calls: 2
+    bytes: 2592
+  __m21__str_lit_value:
+    calls: 6
+    bytes: 400
+  __m21__template_segments:
+    calls: 1
+    bytes: 1652
+  __m21__tpl_kind:
+    calls: 9
+    bytes: 2608
+  __m22__between_len:
+    calls: 1645
+    bytes: 752
+  __m22__delimited_len:
+    calls: 3281
+    bytes: 1592
+  __m22__finalize_template$__m21__AiplTok:
+    calls: 5
+    bytes: 8712
+  __m22__float_len:
+    calls: 0
+    bytes: 816
+  __m22__interp_scan$__m21__AiplTok:
+    calls: 6
+    bytes: 2028
+  __m22__lex$__m21__AiplTok:
+    calls: 296
+    bytes: 1328
+  __m22__lex_step$__m21__AiplTok:
+    calls: 4266
+    bytes: 29192
+  __m22__nested_len:
+    calls: 2844
+    bytes: 940
+  __m22__step_result$__m21__AiplTok:
+    calls: 129689
+    bytes: 15088
+  __m22__template_scan$__m21__AiplTok:
+    calls: 5
+    bytes: 2728
+  __m22__template_step$__m21__AiplTok:
+    calls: 3265
+    bytes: 476
+  __m22__to_eol_len:
+    calls: 0
+    bytes: 52
+  __m22__to_eol_len$tail:
+    calls: 5690
+    bytes: 252
+  __m22__to_eol_unless_len:
+    calls: 2842
+    bytes: 368
+  __m23__unescape:
+    calls: 32
+    bytes: 1176
+  __m24__process_raw_string:
+    calls: 1
+    bytes: 556
+  __m25__trim_prefix:
+    calls: 34
+    bytes: 260
+  __m26__trim_suffix:
+    calls: 0
+    bytes: 340
+  __m27__strip_test_sections:
+    calls: 138
+    bytes: 692
+  __m28__parse_test_section_header:
+    calls: 220
+    bytes: 744
+  __m29__climb$__m21__AiplTok$__m1__Ast:
+    calls: 515
+    bytes: 3388
+  __m29__error_at$__m21__AiplTok$__m1__Ast:
+    calls: 36
+    bytes: 4108
+  __m29__far_miss:
+    calls: 27314
+    bytes: 1084
+  __m29__far_unclosed:
+    calls: 9
+    bytes: 320
+  __m29__find_prec:
+    calls: 431
+    bytes: 228
+  __m29__leaf_at$__m21__AiplTok$__m1__Ast:
+    calls: 6318
+    bytes: 404
+  __m29__lower_node$__m21__AiplTok$__m1__Ast:
+    calls: 2023
+    bytes: 22856
+  __m29__match_group$__m21__AiplTok$__m1__Ast:
+    calls: 8801
+    bytes: 6196
+  __m29__match_many$__m21__AiplTok$__m1__Ast:
+    calls: 10889
+    bytes: 1436
+  __m29__match_maybe$__m21__AiplTok$__m1__Ast:
+    calls: 757
+    bytes: 1076
+  __m29__match_one_of$__m21__AiplTok$__m1__Ast:
+    calls: 6518
+    bytes: 1692
+  __m29__match_prod$__m21__AiplTok$__m1__Ast:
+    calls: 11899
+    bytes: 8972
+  __m29__match_reps$__m21__AiplTok$__m1__Ast:
+    calls: 2853
+    bytes: 4928
+  __m29__match_rule$__m21__AiplTok$__m1__Ast:
+    calls: 85704
+    bytes: 14428
+  __m29__match_then$__m21__AiplTok$__m1__Ast:
+    calls: 23006
+    bytes: 2036
+  __m29__parse$__m21__AiplTok$__m1__Ast:
+    calls: 186
+    bytes: 3688
+  __m29__parse_cst$__m21__AiplTok$__m1__Ast:
+    calls: 287
+    bytes: 624
+  __m29__parse_prepared$__m21__AiplTok$__m1__Ast:
+    calls: 296
+    bytes: 9136
+  __m29__prepare$__m21__AiplTok$__m1__Ast:
+    calls: 9
+    bytes: 2068
+  __m29__pruned$__m21__AiplTok$__m1__Ast:
+    calls: 70
+    bytes: 1344
+  __m29__quoted:
+    calls: 29038
+    bytes: 456
+  __m29__rule_labels$__m21__AiplTok$__m1__Ast:
+    calls: 0
+    bytes: 44
+  __m29__rule_labels$__m21__AiplTok$__m1__Ast$tail:
+    calls: 18954
+    bytes: 8040
+  __m29__rule_nullable$__m21__AiplTok:
+    calls: 0
+    bytes: 36
+  __m29__rule_nullable$__m21__AiplTok$tail:
+    calls: 6534
+    bytes: 1592
+  __m29__seq_labels$__m21__AiplTok$__m1__Ast:
+    calls: 0
+    bytes: 44
+  __m29__seq_labels$__m21__AiplTok$__m1__Ast$tail:
+    calls: 5346
+    bytes: 908
+  __m29__tok_text$__m21__AiplTok$__m1__Ast:
+    calls: 26707
+    bytes: 1712
+  __m29__trivia_span$__m21__AiplTok:
+    calls: 1424
+    bytes: 1568
+  __m2__brace_literal:
+    calls: 5
+    bytes: 1900
+  __m30__can_start$__m21__AiplTok:
+    calls: 180
+    bytes: 600
+  __m30__first_sets$__m21__AiplTok$__m1__Ast:
+    calls: 9
+    bytes: 356
+  __m30__linked_first_sets$__m21__AiplTok$__m1__Ast:
+    calls: 9
+    bytes: 1084
+  __m30__rule_first$__m21__AiplTok:
+    calls: 26496
+    bytes: 6188
+  __m30__union_syms$__m21__AiplTok:
+    calls: 20448
+    bytes: 736
+  __m31__line_at:
+    calls: 9
+    bytes: 532
+  __m3__at:
+    calls: 2
+    bytes: 152
+  __m3__show_ann:
+    calls: 26
+    bytes: 416
+  __m3__show_arm:
+    calls: 13
+    bytes: 476
+  __m3__show_call:
+    calls: 53
+    bytes: 1560
+  __m3__show_expr:
+    calls: 425
+    bytes: 16984
+  __m3__show_exprs:
+    calls: 60
+    bytes: 460
+  __m3__show_field_init:
+    calls: 11
+    bytes: 620
+  __m4__binder_list:
+    calls: 4
+    bytes: 740
+  __m4__ident_name:
+    calls: 0
+    bytes: 2928
+  __m4__is_ident:
+    calls: 0
+    bytes: 2804
+  __m4__pat_bindings:
+    calls: 25
+    bytes: 792
+  __m4__show_pat:
+    calls: 28
+    bytes: 1640
+  __m6__show_ty:
+    calls: 132
+    bytes: 4656
+  __m6__show_tys:
+    calls: 14
+    bytes: 460
+  __m7__desugar_opt$__m21__AiplTok:
+    calls: 20150
+    bytes: 700
+  __m7__desugar_rule$__m21__AiplTok:
+    calls: 264225
+    bytes: 11936
+  __m7__group_styles$__m21__AiplTok:
+    calls: 0
+    bytes: 32
+  __m7__group_styles$__m21__AiplTok$tail:
+    calls: 910325
+    bytes: 4724
+  __m7__link$__m21__AiplTok$__m1__Ast:
+    calls: 325
+    bytes: 2604
+  __m7__link_opt$__m21__AiplTok:
+    calls: 20150
+    bytes: 716
+  __m7__link_rule$__m21__AiplTok:
+    calls: 264225
+    bytes: 8236
+  __m7__link_rules$__m21__AiplTok:
+    calls: 50700
+    bytes: 732
+  __m7__prod_names$__m21__AiplTok$__m1__Ast:
+    calls: 621
+    bytes: 492
+  __m8__first_leaf:
+    calls: 6425
+    bytes: 696
+  __m8__first_leaf_of:
+    calls: 4583
+    bytes: 320
+  __m8__first_token:
+    calls: 2136
+    bytes: 660
+  __m8__first_token_of:
+    calls: 1236
+    bytes: 320
+  __m8__flat_kids:
+    calls: 0
+    bytes: 32
+  __m8__flat_kids$tail:
+    calls: 3963
+    bytes: 3832
+  __m8__last_leaf:
+    calls: 7146
+    bytes: 696
+  __m8__last_leaf_of:
+    calls: 5304
+    bytes: 524
+  __m8__last_token:
+    calls: 2083
+    bytes: 660
+  __m8__last_token_of:
+    calls: 1488
+    bytes: 524
+  __m8__leaves:
+    calls: 374
+    bytes: 3684
+  __m8__own_token_text:
+    calls: 379
+    bytes: 1268
+  __m8__span:
+    calls: 1950
+    bytes: 236
+  __m8__splice:
+    calls: 0
+    bytes: 32
+  __m8__splice$tail:
+    calls: 9186
+    bytes: 612
+  __m8__text:
+    calls: 10
+    bytes: 472
+  __m8__token_leaves:
+    calls: 1334
+    bytes: 3648
+  __m8__token_span:
+    calls: 599
+    bytes: 288
+  __m9__opt_marker:
+    calls: 3
+    bytes: 188
+  __m9__show_case:
+    calls: 4
+    bytes: 2060
+  __m9__show_default:
+    calls: 23
+    bytes: 420
+  __m9__show_program:
+    calls: 22
+    bytes: 13616
+  __m9__show_type_params:
+    calls: 21
+    bytes: 1272
   __map50$own0:
     calls: 20
     bytes: 428
-  __rec_drop___m11__Rule$__m12__AiplTok:
-    calls: 942594
-    bytes: 340
-  __rec_drop___m1__Expr:
-    calls: 615
-    bytes: 36
-  __rec_drop___m1__ExprKind:
-    calls: 519
-    bytes: 1260
-  __rec_drop___m1__FieldInit:
-    calls: 17
-    bytes: 72
-  __rec_drop___m1__MatchArm:
-    calls: 13
-    bytes: 72
-  __rec_drop___m1__Pat:
-    calls: 32
-    bytes: 136
-  __rec_drop___m1__Ty:
-    calls: 145
-    bytes: 408
-  __rec_drop___m2__Cst:
-    calls: 11025
-    bytes: 132
-  __rec_drop___m5__Doc:
+  __rec_drop___m15__Doc:
     calls: 382
     bytes: 184
-  __rec_drop___m5__Work:
+  __rec_drop___m15__Work:
     calls: 657
     bytes: 84
-  __rec_drop___tuple$__m11__Rule___m12__AiplTok$__m11__Rule___m12__AiplTok:
-    calls: 53522
+  __rec_drop___m3__Expr:
+    calls: 615
+    bytes: 36
+  __rec_drop___m3__ExprKind:
+    calls: 519
+    bytes: 1260
+  __rec_drop___m3__FieldInit:
+    calls: 17
     bytes: 72
-  __rec_drop___tuple$__m1__Expr$__m1__Expr:
+  __rec_drop___m3__MatchArm:
+    calls: 13
+    bytes: 72
+  __rec_drop___m4__Pat:
+    calls: 32
+    bytes: 136
+  __rec_drop___m6__Ty:
+    calls: 145
+    bytes: 408
+  __rec_drop___m7__Rule$__m21__AiplTok:
+    calls: 942594
+    bytes: 340
+  __rec_drop___m8__Cst:
+    calls: 11025
+    bytes: 132
+  __rec_drop___tuple$__m3__Expr$__m3__Expr:
     calls: 4
+    bytes: 72
+  __rec_drop___tuple$__m7__Rule___m21__AiplTok$__m7__Rule___m21__AiplTok:
+    calls: 53522
     bytes: 72
   __test$aipl_node_spans:
     calls: 1
@@ -5035,10 +4937,10 @@ functions:
   __test$lower_aipl_ty:
     calls: 1
     bytes: 6356
-  __test_try_fail___m11__ParseError:
+  __test_try_fail___m7__ParseError:
     calls: 0
     bytes: 84
-  __to_str___m11__ParseError:
+  __to_str___m7__ParseError:
     calls: 0
     bytes: 824
   __to_str_i64:
@@ -5057,7 +4959,7 @@ functions:
     calls: 208126
     bytes: (external)
   aipl_arr_inc:
-    calls: 6028137
+    calls: 6028161
     bytes: (external)
   aipl_arr_join:
     calls: 114473
@@ -5078,16 +4980,16 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 7914246
+    calls: 7914279
     bytes: (external)
   aipl_array_new:
     calls: 1561273
     bytes: (external)
   aipl_array_push:
-    calls: 4494
+    calls: 4498
     bytes: (external)
   aipl_array_push_mut:
-    calls: 927711
+    calls: 927707
     bytes: (external)
   aipl_array_with_cap:
     calls: 168276
@@ -5117,13 +5019,13 @@ functions:
     calls: 1009525
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 5201668
+    calls: 5201669
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 280036
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 4192143
+    calls: 4192144
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 280036
@@ -5224,12 +5126,9 @@ functions:
   as_variant_case:
     calls: 4
     bytes: 6312
-  at:
-    calls: 550
-    bytes: 152
   bind_fields_mut:
     calls: 4
-    bytes: 1804
+    bytes: 2156
   binder_names:
     calls: 0
     bytes: 44
@@ -5239,30 +5138,24 @@ functions:
   block_dump:
     calls: 29
     bytes: 552
-  brace_literal:
-    calls: 5
-    bytes: 1616
   braces:
     calls: 3848
     bytes: 376
   concat_call:
     calls: 2
-    bytes: 336
-  construct_ty_name:
-    calls: 5
-    bytes: 3128
+    bytes: 416
   destructure_struct:
     calls: 2
-    bytes: 660
+    bytes: 736
   doc_block:
     calls: 27
     bytes: 724
   dotted_assign:
     calls: 3
-    bytes: 22488
+    bytes: 22828
   else_or_unit:
     calls: 10
-    bytes: 13144
+    bytes: 13236
   expr_dump:
     calls: 72
     bytes: 552
@@ -5274,7 +5167,7 @@ functions:
     bytes: 888
   for_chain:
     calls: 3
-    bytes: 2700
+    bytes: 3420
   for_tuple:
     calls: 2
     bytes: 2172
@@ -5295,7 +5188,7 @@ functions:
     bytes: 6532
   lambda_of:
     calls: 3
-    bytes: 804
+    bytes: 908
   lex_lossless:
     calls: 296
     bytes: 96796
@@ -5316,7 +5209,7 @@ functions:
     bytes: 6928
   lower_arg:
     calls: 25
-    bytes: 32064
+    bytes: 32248
   lower_args:
     calls: 32
     bytes: 9876
@@ -5325,10 +5218,10 @@ functions:
     bytes: 9884
   lower_assign_stmt:
     calls: 10
-    bytes: 41328
+    bytes: 41984
   lower_atom:
     calls: 245
-    bytes: 213480
+    bytes: 214660
   lower_base_ty:
     calls: 105
     bytes: 23992
@@ -5340,7 +5233,7 @@ functions:
     bytes: 11180
   lower_block_body:
     calls: 97
-    bytes: 96508
+    bytes: 96788
   lower_block_tail:
     calls: 40
     bytes: 9876
@@ -5352,7 +5245,7 @@ functions:
     bytes: 41036
   lower_construct_fields:
     calls: 5
-    bytes: 51416
+    bytes: 51596
   lower_ctor_payload:
     calls: 15
     bytes: 18500
@@ -5367,13 +5260,13 @@ functions:
     bytes: 19876
   lower_expr:
     calls: 257
-    bytes: 27088
+    bytes: 27268
   lower_field_decl:
     calls: 7
     bytes: 27588
   lower_field_init:
     calls: 8
-    bytes: 28348
+    bytes: 28524
   lower_fn_attr:
     calls: 5
     bytes: 13116
@@ -5385,10 +5278,10 @@ functions:
     bytes: 34200
   lower_function:
     calls: 21
-    bytes: 57784
+    bytes: 58124
   lower_if:
     calls: 10
-    bytes: 23552
+    bytes: 23704
   lower_import_decl:
     calls: 4
     bytes: 18240
@@ -5403,7 +5296,7 @@ functions:
     bytes: 13116
   lower_lambda:
     calls: 3
-    bytes: 21284
+    bytes: 21372
   lower_lambda_param:
     calls: 3
     bytes: 30908
@@ -5415,7 +5308,7 @@ functions:
     bytes: 9884
   lower_loop_inner:
     calls: 11
-    bytes: 51120
+    bytes: 51112
   lower_match_arm:
     calls: 12
     bytes: 55512
@@ -5424,7 +5317,7 @@ functions:
     bytes: 256
   lower_op_value:
     calls: 1
-    bytes: 7584
+    bytes: 7904
   lower_operator:
     calls: 3
     bytes: 6476
@@ -5436,7 +5329,7 @@ functions:
     bytes: 61312
   lower_postfix:
     calls: 240
-    bytes: 25612
+    bytes: 26176
   lower_program:
     calls: 24
     bytes: 9884
@@ -5454,7 +5347,7 @@ functions:
     bytes: 75116
   lower_template:
     calls: 1
-    bytes: 12920
+    bytes: 13388
   lower_ty:
     calls: 115
     bytes: 186664
@@ -5472,7 +5365,7 @@ functions:
     bytes: 9876
   lower_unary:
     calls: 243
-    bytes: 23280
+    bytes: 23452
   lower_variant_case:
     calls: 4
     bytes: 11224
@@ -5487,7 +5380,7 @@ functions:
     bytes: 1064
   match_expr:
     calls: 5
-    bytes: 9824
+    bytes: 10000
   nest:
     calls: 5328
     bytes: 844
@@ -5524,24 +5417,18 @@ functions:
   program_dump:
     calls: 27
     bytes: 552
-  range_bounds:
-    calls: 3
-    bytes: 2960
   repair_block_value:
     calls: 103
-    bytes: 12492
-  resolve_body:
-    calls: 20
-    bytes: 828
+    bytes: 12932
   same_bindings:
     calls: 11
     bytes: 3880
   seq:
-    calls: 1
-    bytes: 180
+    calls: 12
+    bytes: 264
   shim_expr:
     calls: 1
-    bytes: 3088
+    bytes: 3168
   statements:
     calls: 592
     bytes: 25020
@@ -5551,9 +5438,6 @@ functions:
   tuple_ty:
     calls: 9
     bytes: 556
-  two_values:
-    calls: 1
-    bytes: 1124
   ty_dump:
     calls: 36
     bytes: 552
@@ -5568,7 +5452,7 @@ functions:
     bytes: 1760
   wrap_stmt:
     calls: 26
-    bytes: 3072
+    bytes: 3388
   wrong_kind:
     calls: 0
     bytes: 8848

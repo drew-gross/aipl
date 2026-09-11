@@ -1,0 +1,259 @@
+// `aipl_syntax::ast::Pattern` as AIPL declares it. One of the files the AST is
+// declared across; see `ast.aipl`.
+import { equal as ==, filter_map, is_empty, join, map } from builtins;
+import { Expr, Ident, ident, num, show_exprs } from "./expr.aipl";
+
+# `aipl_syntax::ast::Pattern`. Its `Ctor` case is a struct variant there and a
+# named payload here, which is as close as the two declarations get: the slot
+# names are the same three, in the same order.
+#
+# `Array` — the destructuring `[a, b] => ..` arm — holds a list of
+# *expressions*, which is why nothing under the `pattern` production produces
+# one: it hangs off `match_arm`, where the elements are an ordinary `args` list.
+variant Pat =
+    | Ctor(name: str, bindings: str[], ignore_payload: bool)
+    | Str(str)
+    | Char(char)
+    | Array(Expr[])
+    | Wildcard
+
+# A pattern as a one-line dump, in the spelling that produced it: `Ctor(a, b)`,
+# `Ctor(..)`, a bare name, `_`. The two literal forms are tagged, because their
+# whole point is that they are values rather than names and `"1"` against `1`
+# would otherwise read the same.
+pub fn show_pat(self: Pat) -> str {
+    match (self) {
+        Wildcard => "_",
+        Str(s) => `Str({s})`,
+        Char(c) => `Char({c})`,
+        Array(elems) => `[{show_exprs(elems)}]`,
+        Ctor(name, bindings, ignore_payload) => if (ignore_payload) {
+            `{name}(..)`
+        } else {
+            if (bindings.is_empty()) { name } else { `{name}({bindings.join(sep=", ")})` }
+        },
+    }
+}.test({
+    let no_bindings: str[] = [];
+    assert(Wildcard.show_pat() == "_");
+    assert(Ctor("none", no_bindings, false).show_pat() == "none");
+    assert(Ctor("some", ["v"], false).show_pat() == "some(v)");
+    assert(Ctor("Pair", ["a", "b"], false).show_pat() == "Pair(a, b)");
+    assert(Ctor("Circle", no_bindings, true).show_pat() == "Circle(..)");
+    assert(Str("hi").show_pat() == "Str(hi)");
+    assert(Char('x').show_pat() == "Char(x)");
+    assert(Array([num(1), ident("x")]).show_pat() == "[1, x]");
+})
+
+# The names a pattern binds, in order — `Pattern::bindings` in Rust. It is what
+# an arm's alternatives must agree on, so that a shared body means the same
+# thing whichever alternative matched.
+#
+# An array pattern binds its `Ident` elements and nothing else: a literal
+# element is a value to match, not a name to bind.
+pub fn pat_bindings(self: Pat) -> str[] {
+    match (self) {
+        Ctor(_, bindings, _) => bindings,
+        Array(elems) => elems.filter_map(is_ident, ident_name),
+        Str(..) | Char(..) | Wildcard => no_names(),
+    }
+}.test({
+    let none_bound: str[] = [];
+    assert(Ctor("Pair", ["a", "b"], false).pat_bindings() == ["a", "b"]);
+    assert(Ctor("Circle", none_bound, true).pat_bindings() == none_bound);
+    assert(Wildcard.pat_bindings() == none_bound);
+    assert(Str("s").pat_bindings() == none_bound);
+    // A literal element of an array pattern is matched, not bound.
+    assert(Array([ident("a"), num(1), ident("b")]).pat_bindings() == ["a", "b"]);
+})
+
+# The empty binding list, which `#{}`'s sibling problem makes worth naming: an
+# empty array literal does not flex through a generic parameter, so a `[]`
+# written in argument or return position needs somewhere to be annotated.
+fn no_names() -> str[] { [] }
+
+fn is_ident(self: Expr) -> bool {
+    if (let Ident(..) = self.kind) {
+        return true;
+    };
+    false
+}
+
+fn ident_name(self: Expr) -> str {
+    if (let Ident(name) = self.kind) {
+        return name;
+    };
+    ""
+}
+
+# How a pattern is named in the "alternatives must bind the same names"
+# diagnostic: the constructor for a constructor pattern, and a description for
+# the literal forms, which bind nothing and so only ever appear on the side that
+# binds nothing.
+pub fn pat_label(self: Pat) -> str {
+    match (self) {
+        Ctor(name, _, _) => `"{name}"`,
+        Str(..) => "a string pattern",
+        Char(..) => "a char pattern",
+        Array(..) => "an array pattern",
+        Wildcard => "\"_\"",
+    }
+}.test({
+    let none_bound: str[] = [];
+    assert(Ctor("some", ["v"], false).pat_label() == "\"some\"");
+    assert(Wildcard.pat_label() == "\"_\"");
+    assert(Str("s").pat_label() == "a string pattern");
+    assert(Array([ident("a")]).pat_label() == "an array pattern");
+    assert(Char('c').pat_label() == "a char pattern");
+    assert(Ctor("none", none_bound, false).pat_label() == "\"none\"");
+})
+
+# The binder list as the same diagnostic writes it: each name quoted, or the
+# word "nothing" when there are none.
+pub fn binder_list(self: str[]) -> str {
+    if (self.is_empty()) {
+        return "nothing";
+    };
+    self.map(quoted).join(sep=", ")
+}.test({
+    let none_bound: str[] = [];
+    assert(none_bound.binder_list() == "nothing");
+    assert(["v"].binder_list() == "\"v\"");
+    assert(["a", "b"].binder_list() == "\"a\", \"b\"");
+})
+
+fn quoted(self: str) -> str { `"{self}"` }
+--- performance ---
+allocations: 81
+deallocations: 81
+reallocations: 6
+bytes allocated: 5860
+instructions executed: 3460
+binary size: 77960
+  code: 49264
+  data: 1654
+  metadata: 27042
+functions:
+  __arr_drop___m1__Expr:
+    calls: 3
+    bytes: 116
+  __arr_retain___m1__Expr:
+    calls: 0
+    bytes: 116
+  __eq_str$arr:
+    calls: 5
+    bytes: 364
+  __m1__show_ann:
+    calls: 0
+    bytes: 416
+  __m1__show_arm:
+    calls: 0
+    bytes: 476
+  __m1__show_call:
+    calls: 0
+    bytes: 1560
+  __m1__show_expr:
+    calls: 2
+    bytes: 16984
+  __m1__show_exprs:
+    calls: 1
+    bytes: 460
+  __m1__show_field_init:
+    calls: 0
+    bytes: 620
+  __m3__show_ty:
+    calls: 0
+    bytes: 4656
+  __m3__show_tys:
+    calls: 0
+    bytes: 460
+  __rec_drop_Pat:
+    calls: 19
+    bytes: 136
+  __rec_drop___m1__Expr:
+    calls: 6
+    bytes: 36
+  __rec_drop___m1__ExprKind:
+    calls: 6
+    bytes: 1260
+  __test$binder_list:
+    calls: 1
+    bytes: 832
+  __test$pat_bindings:
+    calls: 1
+    bytes: 2384
+  __test$pat_label:
+    calls: 1
+    bytes: 6136
+  __test$show_pat:
+    calls: 1
+    bytes: 2824
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  aipl_arr_inc:
+    calls: 20
+    bytes: (external)
+  aipl_array_dec:
+    calls: 41
+    bytes: (external)
+  aipl_array_new:
+    calls: 17
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 7
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 4
+    bytes: (external)
+  aipl_assert:
+    calls: 22
+    bytes: (external)
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 31
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 43
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 6
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 12
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 6
+    bytes: (external)
+  aipl_test_begin:
+    calls: 4
+    bytes: (external)
+  aipl_test_end:
+    calls: 4
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  binder_list:
+    calls: 3
+    bytes: 740
+  ident_name:
+    calls: 2
+    bytes: 2928
+  is_ident:
+    calls: 3
+    bytes: 2804
+  main:
+    calls: 1
+    bytes: 320
+  pat_bindings:
+    calls: 5
+    bytes: 792
+  show_pat:
+    calls: 8
+    bytes: 1640

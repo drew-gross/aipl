@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/expr.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/expr.aipl</code></h1>
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-Expr">
+          <h3>
+            <a class="anchor" href="#item-Expr">Expr</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Expr</code></pre>
+
+          <div class="doc"><p>block) where its *value* is.</p><p>The span is this node's *token* span, which is a superset of gazelle's: gazelle's are kept for diagnostics rather than as a record of extent, so a bracketed form's stops before its closing bracket and a unary leaves its own operator out. <code>aipl_spans_contain_gazelles</code> is where that is stated and checked; 5e in <code>PARSER_LIBRARY.md</code> is where it is argued.</p><p><code>value_span</code> is a block's tail position: <code>fn f() -&gt; str { let a = 1; a }</code> returns the <code>a</code>, but the body's span starts at the <code>let</code>, so a return-type error would underline the binding. It is recorded while the block is being built, where the tail is in hand, rather than re-walked at every diagnostic.</p><p>Rust spells it <code>Option&lt;Box&lt;Span&gt;&gt;</code>; here it is a plain <code>Span</code> with the *empty* one meaning &quot;none&quot;, which is the convention already in force for a location that does not exist (see <code>join_spans</code>). A struct field cannot be an optional struct anyway — see the constraint list in <code>PARSER_LIBRARY.md</code> — and the two spellings mean the same thing, since a recorded value span is never empty: the repair that fills it in runs first.</p><p>The <code>ty</code> field <code>Expr</code> carries in Rust is absent — nothing the parser sets it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-FieldInit">
+          <h3>
+            <a class="anchor" href="#item-FieldInit">FieldInit</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct FieldInit</code></pre>
+
+          <div class="doc"><p>One field of a struct literal. A <code>..base</code> spread rides as an init with an empty name whose *value* is the <code>Spread</code> — the value is what identifies it, exactly as an array-literal spread is identified by being a spread element.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-LambdaParam">
+          <h3>
+            <a class="anchor" href="#item-LambdaParam">LambdaParam</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct LambdaParam</code></pre>
+
+          <div class="doc"><p>One parameter of a lambda. <code>ty</code> is the annotation from <code>|x: i64| ..</code>, absent for the bare <code>|x| ..</code> form.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-MatchArm">
+          <h3>
+            <a class="anchor" href="#item-MatchArm">MatchArm</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct MatchArm</code></pre>
+
+          <div class="doc"><p>One arm of a <code>match</code>, and the <code>then</code> half of an <code>if let</code>. Its span is the *pattern's*, so a diagnostic points at what selected the arm rather than at everything it does.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ExprKind">
+          <h3>
+            <a class="anchor" href="#item-ExprKind">ExprKind</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ExprKind</code></pre>
+
+          <div class="doc"><p><code>aipl_syntax::ast::ExprKind</code>, all 32 cases.</p><p>Several surface forms are gone by the time they get here, because the AST is where the language stops having them: an operator is an <code>Call</code> on its spelling, a range is an <code>Construct</code> of the builtin <code>Span</code>, a template is a chain of concat calls, and a block is a right-nested <code>Seq</code>. That is the same set of desugarings gazelle's build actions do, in the same places.</p><p><code>Call</code>'s <code>method_style</code> is the one bit that says which spelling was written: <code>recv.f(a)</code> is stored as the free call <code>f(recv, a)</code> with the flag set, so the receiver is <code>args[0]</code> either way.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Num"><code>Num(i64)</code></li>
+
+            <li id="item-Bool"><code>Bool(bool)</code></li>
+
+            <li id="item-Str"><code>Str(str)</code></li>
+
+            <li id="item-Char"><code>Char(char)</code></li>
+
+            <li id="item-Ident"><code>Ident(str)</code></li>
+
+            <li id="item-Call"><code>Call(name: str, args: Expr[], method_style: bool)</code></li>
+
+            <li id="item-Neg"><code>Neg(Expr)</code></li>
+
+            <li id="item-If"><code>If(Expr, Expr, Expr)</code></li>
+
+            <li id="item-Construct"><code>Construct(str, FieldInit[])</code></li>
+
+            <li id="item-Field"><code>Field(Expr, str)</code></li>
+
+            <li id="item-Let"><code>Let(name: str, ty: Ty?, value: Expr, body: Expr)</code></li>
+
+            <li id="item-LetMut"><code>LetMut(name: str, ty: Ty?, value: Expr, body: Expr)</code></li>
+
+            <li id="item-Assign"><code>Assign(lhs: Expr, value: Expr, body: Expr)</code></li>
+
+            <li id="item-For"><code>For(name: str, iterable: Expr, body: Expr)</code></li>
+
+            <li id="item-While"><code>While(cond: Expr, body: Expr)</code></li>
+
+            <li id="item-Shim"><code>Shim(effect: str, bindings: (str, str)[], body: Expr)</code></li>
+
+            <li id="item-None"><code>None</code></li>
+
+            <li id="item-Match"><code>Match(Expr, MatchArm[])</code></li>
+
+            <li id="item-IfLet"><code>IfLet(MatchArm, Expr, Expr)</code></li>
+
+            <li id="item-ArrayLit"><code>ArrayLit(Expr[])</code></li>
+
+            <li id="item-Spread"><code>Spread(Expr)</code></li>
+
+            <li id="item-SetLit"><code>SetLit(Expr[])</code></li>
+
+            <li id="item-DictLit"><code>DictLit((Expr, Expr)[])</code></li>
+
+            <li id="item-Index"><code>Index(Expr, Expr)</code></li>
+
+            <li id="item-Slice"><code>Slice(Expr, Expr, Expr?)</code></li>
+
+            <li id="item-Try"><code>Try(Expr)</code></li>
+
+            <li id="item-Unit"><code>Unit</code></li>
+
+            <li id="item-Seq"><code>Seq(Expr, Expr)</code></li>
+
+            <li id="item-Return"><code>Return(Expr)</code></li>
+
+            <li id="item-Lambda"><code>Lambda(LambdaParam[], Expr)</code></li>
+
+            <li id="item-TupleLit"><code>TupleLit(Expr[])</code></li>
+
+            <li id="item-KwArg"><code>KwArg(name: str, value: Expr, forwarded: bool)</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-show_expr">
+          <h3>
+            <a class="anchor" href="#item-show_expr">show_expr</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_expr(self: Expr) -&#62; str</code></pre>
+
+          <div class="doc"><p>An expression as a one-line structural dump. Spans are left out: they are what 5e has to settle and what would make every assertion unreadable in the meantime, and none of them is what a lowering test is asking about.</p><p>A free call renders <code>f(a, b)</code> and a method call <code>a.f(b)</code>, so the <code>method_style</code> flag is visible without a tag of its own — the two spellings are the two things it distinguishes.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-at">
+          <h3>
+            <a class="anchor" href="#item-at">at</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn at(kind: ExprKind, span: Span) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>An <code>Expr</code> at an empty span — the shorthand this file's own tests are written with, and the one every synthesized node uses (a template's <code>Str</code> segments, An expression node at a span — the constructor every lowering uses.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-expr">
+          <h3>
+            <a class="anchor" href="#item-expr">expr</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn expr(kind: ExprKind) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>an else-less <code>if</code>'s unit branch, an open slice's <code>0</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-num">
+          <h3>
+            <a class="anchor" href="#item-num">num</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn num(v: i64) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>The two synthesized leaves that come up most.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ident">
+          <h3>
+            <a class="anchor" href="#item-ident">ident</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn ident(name: str) -&#62; Expr</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_arm">
+          <h3>
+            <a class="anchor" href="#item-show_arm">show_arm</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_arm(self: MatchArm) -&#62; str</code></pre>
+
+          <div class="doc"><p>One match arm as <code>pattern =&gt; body</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_exprs">
+          <h3>
+            <a class="anchor" href="#item-show_exprs">show_exprs</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_exprs(self: Expr[]) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-show_arms">
+          <h3>
+            <a class="anchor" href="#item-show_arms">show_arms</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_arms(self: MatchArm[]) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_call">
+          <h3>
+            <a class="anchor" href="#item-show_call">show_call</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_call(name: str, args: Expr[], method_style: bool) -&#62; str</code></pre>
+
+          <div class="doc"><p>A call, in the spelling its <code>method_style</code> flag says was written: the receiver is <code>args[0]</code> for a method call and an ordinary argument for a free one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_opt_expr">
+          <h3>
+            <a class="anchor" href="#item-show_opt_expr">show_opt_expr</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_opt_expr(self: Expr?) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_ann">
+          <h3>
+            <a class="anchor" href="#item-show_ann">show_ann</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_ann(self: Ty?) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>: T</code> when a binding or a lambda parameter was annotated, and nothing when it was not — so the dump reads like the source did.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_lambda_param">
+          <h3>
+            <a class="anchor" href="#item-show_lambda_param">show_lambda_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_lambda_param(self: LambdaParam) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_field_init">
+          <h3>
+            <a class="anchor" href="#item-show_field_init">show_field_init</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_field_init(self: FieldInit) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_field_inits">
+          <h3>
+            <a class="anchor" href="#item-show_field_inits">show_field_inits</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_field_inits(self: FieldInit[]) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_dict_entry">
+          <h3>
+            <a class="anchor" href="#item-show_dict_entry">show_dict_entry</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_dict_entry(self: (Expr, Expr)) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_binds">
+          <h3>
+            <a class="anchor" href="#item-show_binds">show_binds</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_binds(self: (str, str)[]) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_bind">
+          <h3>
+            <a class="anchor" href="#item-show_bind">show_bind</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_bind(self: (str, str)) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

@@ -2,15 +2,19 @@
 //! parser hands back.
 //!
 //! This is the far side of the bridge stage 5a of `PARSER_LIBRARY.md` chose:
-//! `grammar_aipl.aipl` lowers a parse to the AST declared in `ast.aipl`, that
+//! `grammar_aipl.aipl` lowers a parse to the AST declared in `ast.aipl` and the
+//! files beside it, that
 //! value crosses the FFI, and this reconstructs the `Program` the compiler's
 //! passes actually run on.
 //!
 //! **It is a mapping, not a translation.** Every name here is the one the AIPL
-//! declaration uses, and the AIPL declaration's names are the Rust ones behind a
-//! per-type tag — `Type::Optional` is `TyOptional`, `ExprKind::Call` is `ECall`.
-//! So a case this file does not know about is a case the two declarations
-//! disagree about, and it is reported as exactly that rather than guessed at.
+//! declaration uses, and the AIPL declaration's names are the Rust ones, bare —
+//! `Type::Optional` is `Optional`, `ExprKind::Call` is `Call`; the families
+//! that reuse a name live in separate files (`ty.aipl`, `expr.aipl`, ...) and
+//! the marshalled value carries the case name only, so `Str` the primitive,
+//! `Str` the expression and `Str` the pattern never meet here. A case this
+//! file does not know about is a case the two declarations disagree about, and
+//! it is reported as exactly that rather than guessed at.
 //!
 //! What crosses, by shape: a struct as `Struct` with its field names, a variant
 //! as `Variant` with its constructor name and positional payload, an optional as
@@ -102,10 +106,10 @@ fn program(v: &FfiValue) -> R<ast::Program> {
 fn item(v: &FfiValue) -> R<ast::Item> {
     let (case, payload) = variant(v)?;
     Ok(match case {
-        "ItemFn" => ast::Item::Fn(function(at(payload, 0, case)?)?),
-        "ItemStruct" => ast::Item::Struct(struct_decl(at(payload, 0, case)?)?),
-        "ItemVariant" => ast::Item::Variant(variant_decl(at(payload, 0, case)?)?),
-        "ItemImport" => ast::Item::Import(import_decl(at(payload, 0, case)?)?),
+        "Fn" => ast::Item::Fn(function(at(payload, 0, case)?)?),
+        "Struct" => ast::Item::Struct(struct_decl(at(payload, 0, case)?)?),
+        "Variant" => ast::Item::Variant(variant_decl(at(payload, 0, case)?)?),
+        "Import" => ast::Item::Import(import_decl(at(payload, 0, case)?)?),
         other => return Err(unknown("Item", other)),
     })
 }
@@ -148,9 +152,9 @@ fn type_param(v: &FfiValue) -> R<ast::TypeParam> {
 fn bound(v: &FfiValue) -> R<ast::Bound> {
     let (case, _) = variant(v)?;
     Ok(match case {
-        "BoundAny" => ast::Bound::Any,
-        "BoundOrd" => ast::Bound::Ord,
-        "BoundVariant" => ast::Bound::Variant,
+        "Any" => ast::Bound::Any,
+        "Ord" => ast::Bound::Ord,
+        "Variant" => ast::Bound::Variant,
         other => return Err(unknown("Bound", other)),
     })
 }
@@ -216,11 +220,11 @@ fn import_name(v: &FfiValue) -> R<ast::ImportName> {
 fn import_source(v: &FfiValue) -> R<ast::ImportSource> {
     let (case, payload) = variant(v)?;
     Ok(match case {
-        "ImportPath" => ast::ImportSource::Path {
+        "Path" => ast::ImportSource::Path {
             path: text(at(payload, 0, case)?)?,
             span: span(at(payload, 1, case)?)?,
         },
-        "ImportBuiltins" => ast::ImportSource::Builtins {
+        "Builtins" => ast::ImportSource::Builtins {
             span: span(at(payload, 0, case)?)?,
         },
         other => return Err(unknown("ImportSource", other)),
@@ -232,23 +236,23 @@ fn ty(v: &FfiValue) -> R<ast::Type> {
     let (case, payload) = variant(v)?;
     let one = |i: usize| -> R<Box<T>> { Ok(Box::new(ty(at(payload, i, case)?)?)) };
     Ok(match case {
-        "TyUnit" => T::Unit,
-        "TyPrimitive" => T::Primitive(primitive(at(payload, 0, case)?)?),
-        "TyNamed" => T::Named(text(at(payload, 0, case)?)?),
-        "TyCase" => T::Case(one(0)?),
-        "TyTypeVar" => T::TypeVar(text(at(payload, 0, case)?)?),
-        "TyOptional" => T::Optional(one(0)?),
-        "TyArray" => T::Array(one(0)?),
-        "TySet" => T::Set(one(0)?),
-        "TyDict" => T::Dict(one(0)?, one(1)?),
-        "TyResult" => T::Result(one(0)?, one(1)?),
-        "TyFn" => T::Fn(each(at(payload, 0, case)?, ty)?, one(1)?),
-        "TyTuple" => T::Tuple(each(at(payload, 0, case)?, ty)?),
-        "TyGeneric" => T::Generic(
+        "Unit" => T::Unit,
+        "Primitive" => T::Primitive(primitive(at(payload, 0, case)?)?),
+        "Named" => T::Named(text(at(payload, 0, case)?)?),
+        "Case" => T::Case(one(0)?),
+        "TypeVar" => T::TypeVar(text(at(payload, 0, case)?)?),
+        "Optional" => T::Optional(one(0)?),
+        "Array" => T::Array(one(0)?),
+        "Set" => T::Set(one(0)?),
+        "Dict" => T::Dict(one(0)?, one(1)?),
+        "Result" => T::Result(one(0)?, one(1)?),
+        "Fn" => T::Fn(each(at(payload, 0, case)?, ty)?, one(1)?),
+        "Tuple" => T::Tuple(each(at(payload, 0, case)?, ty)?),
+        "Generic" => T::Generic(
             text(at(payload, 0, case)?)?,
             each(at(payload, 1, case)?, ty)?,
         ),
-        "TyAny" => T::Any,
+        "Any" => T::Any,
         other => return Err(unknown("Ty", other)),
     })
 }
@@ -275,15 +279,15 @@ fn primitive(v: &FfiValue) -> R<ast::Primitive> {
 fn pattern(v: &FfiValue) -> R<ast::Pattern> {
     let (case, payload) = variant(v)?;
     Ok(match case {
-        "PatCtor" => ast::Pattern::Ctor {
+        "Ctor" => ast::Pattern::Ctor {
             name: text(at(payload, 0, case)?)?,
             bindings: each(at(payload, 1, case)?, text)?,
             ignore_payload: flag(at(payload, 2, case)?)?,
         },
-        "PatStr" => ast::Pattern::Str(text(at(payload, 0, case)?)?),
-        "PatChar" => ast::Pattern::Char(byte(at(payload, 0, case)?)?),
-        "PatArray" => ast::Pattern::Array(each(at(payload, 0, case)?, expr)?),
-        "PatWildcard" => ast::Pattern::Wildcard,
+        "Str" => ast::Pattern::Str(text(at(payload, 0, case)?)?),
+        "Char" => ast::Pattern::Char(byte(at(payload, 0, case)?)?),
+        "Array" => ast::Pattern::Array(each(at(payload, 0, case)?, expr)?),
+        "Wildcard" => ast::Pattern::Wildcard,
         other => return Err(unknown("Pat", other)),
     })
 }
@@ -331,60 +335,60 @@ fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {
     let sub = |i: usize| -> R<Box<ast::Expr>> { Ok(Box::new(expr(at(payload, i, case)?)?)) };
     let name = |i: usize| -> R<String> { text(at(payload, i, case)?) };
     Ok(match case {
-        "ENum" => K::Num(int(at(payload, 0, case)?)?),
-        "EBool" => K::Bool(flag(at(payload, 0, case)?)?),
-        "EStr" => K::Str(name(0)?),
-        "EChar" => K::Char(byte(at(payload, 0, case)?)?),
-        "EIdent" => K::Ident(name(0)?),
-        "ECall" => K::Call(
+        "Num" => K::Num(int(at(payload, 0, case)?)?),
+        "Bool" => K::Bool(flag(at(payload, 0, case)?)?),
+        "Str" => K::Str(name(0)?),
+        "Char" => K::Char(byte(at(payload, 0, case)?)?),
+        "Ident" => K::Ident(name(0)?),
+        "Call" => K::Call(
             name(0)?,
             each(at(payload, 1, case)?, expr)?,
             flag(at(payload, 2, case)?)?,
         ),
-        "ENeg" => K::Neg(sub(0)?),
-        "EIf" => K::If(sub(0)?, sub(1)?, sub(2)?),
-        "EConstruct" => K::Construct(name(0)?, each(at(payload, 1, case)?, field_init)?),
-        "EField" => K::Field(sub(0)?, name(1)?),
-        "ELet" => K::Let(
+        "Neg" => K::Neg(sub(0)?),
+        "If" => K::If(sub(0)?, sub(1)?, sub(2)?),
+        "Construct" => K::Construct(name(0)?, each(at(payload, 1, case)?, field_init)?),
+        "Field" => K::Field(sub(0)?, name(1)?),
+        "Let" => K::Let(
             name(0)?,
             maybe(at(payload, 1, case)?, ty)?,
             sub(2)?,
             sub(3)?,
         ),
-        "ELetMut" => K::LetMut(
+        "LetMut" => K::LetMut(
             name(0)?,
             maybe(at(payload, 1, case)?, ty)?,
             sub(2)?,
             sub(3)?,
         ),
-        "EAssign" => K::Assign(sub(0)?, sub(1)?, sub(2)?),
-        "EFor" => K::For(name(0)?, sub(1)?, sub(2)?),
-        "EWhile" => K::While(sub(0)?, sub(1)?),
-        "EShim" => K::Shim(name(0)?, each(at(payload, 1, case)?, name_pair)?, sub(2)?),
-        "ENone" => K::None,
-        "EMatch" => K::Match(sub(0)?, each(at(payload, 1, case)?, match_arm)?),
-        "EIfLet" => K::IfLet(
+        "Assign" => K::Assign(sub(0)?, sub(1)?, sub(2)?),
+        "For" => K::For(name(0)?, sub(1)?, sub(2)?),
+        "While" => K::While(sub(0)?, sub(1)?),
+        "Shim" => K::Shim(name(0)?, each(at(payload, 1, case)?, name_pair)?, sub(2)?),
+        "None" => K::None,
+        "Match" => K::Match(sub(0)?, each(at(payload, 1, case)?, match_arm)?),
+        "IfLet" => K::IfLet(
             Box::new(match_arm(at(payload, 0, case)?)?),
             sub(1)?,
             sub(2)?,
         ),
-        "EArrayLit" => K::ArrayLit(each(at(payload, 0, case)?, expr)?),
-        "ESpread" => K::Spread(sub(0)?),
-        "ESetLit" => K::SetLit(each(at(payload, 0, case)?, expr)?),
-        "EDictLit" => K::DictLit(each(at(payload, 0, case)?, expr_pair)?),
-        "EIndex" => K::Index(sub(0)?, sub(1)?),
-        "ESlice" => K::Slice(
+        "ArrayLit" => K::ArrayLit(each(at(payload, 0, case)?, expr)?),
+        "Spread" => K::Spread(sub(0)?),
+        "SetLit" => K::SetLit(each(at(payload, 0, case)?, expr)?),
+        "DictLit" => K::DictLit(each(at(payload, 0, case)?, expr_pair)?),
+        "Index" => K::Index(sub(0)?, sub(1)?),
+        "Slice" => K::Slice(
             sub(0)?,
             sub(1)?,
             maybe(at(payload, 2, case)?, expr)?.map(Box::new),
         ),
-        "ETry" => K::Try(sub(0)?),
-        "EUnit" => K::Unit,
-        "ESeq" => K::Seq(sub(0)?, sub(1)?),
-        "EReturn" => K::Return(sub(0)?),
-        "ELambda" => K::Lambda(each(at(payload, 0, case)?, lambda_param)?, sub(1)?),
-        "ETupleLit" => K::TupleLit(each(at(payload, 0, case)?, expr)?),
-        "EKwArg" => K::KwArg(name(0)?, sub(1)?, flag(at(payload, 2, case)?)?),
+        "Try" => K::Try(sub(0)?),
+        "Unit" => K::Unit,
+        "Seq" => K::Seq(sub(0)?, sub(1)?),
+        "Return" => K::Return(sub(0)?),
+        "Lambda" => K::Lambda(each(at(payload, 0, case)?, lambda_param)?, sub(1)?),
+        "TupleLit" => K::TupleLit(each(at(payload, 0, case)?, expr)?),
+        "KwArg" => K::KwArg(name(0)?, sub(1)?, flag(at(payload, 2, case)?)?),
         other => return Err(unknown("ExprKind", other)),
     })
 }

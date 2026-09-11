@@ -138,7 +138,7 @@
           </h3>
           <pre class="signature"><code>variant Layout</code></pre>
 
-          <div class="doc"><p>How a production's matched children are joined into a <code>Doc</code> — the formatting half of a language description, read by <code>format.aipl</code> exactly as <code>Rule</code> is read by <code>parse.aipl</code>.</p><p>The vocabulary is deliberately small, and it is not the whole of a formatter: comment attachment, call hugging and chain breaking are judgement about *this* language and do not fall out of any grammar. What these two do cover is the mechanical majority — the productions whose layout is fully determined by the tokens they matched.</p><p>Wrapping is not here, and that is the point of <code>nested_in</code>. Where a list breaks is a property of the bracket pair holding it, not of the production the pair happens to sit in, so it is written at the brackets and read back off the <code>CGroup</code> node they build. A production may hold several groups, each with its own style — <code>match (e) { .. }</code> is two — which is exactly what a single field on the production could not say.</p></div>
+          <div class="doc"><p>How a production's matched children are joined into a <code>Doc</code> — the formatting half of a language description, read by <code>format.aipl</code> exactly as <code>Rule</code> is read by <code>parse.aipl</code>.</p><p>The vocabulary is deliberately small, and it is not the whole of a formatter: comment attachment, call hugging and chain breaking are judgement about *this* language and do not fall out of any grammar. What these two do cover is the mechanical majority — the productions whose layout is fully determined by the tokens they matched.</p><p>Wrapping is not here, and that is the point of <code>nested_in</code>. Where a list breaks is a property of the bracket pair holding it, not of the production the pair happens to sit in, so it is written at the brackets and read back off the <code>Group</code> node they build. A production may hold several groups, each with its own style — <code>match (e) { .. }</code> is two — which is exactly what a single field on the production could not say.</p></div>
 
 
           <ul class="cases">
@@ -174,7 +174,7 @@
           </h3>
           <pre class="signature"><code>struct Grammar&#60;K: variant, A: any&#62;</code></pre>
 
-          <div class="doc"><p>A whole language: its productions, in order. Position is identity — a <code>NamedIdx</code> and a <code>CTree</code> both name a production by its index here — so the order of this array is part of a linked grammar's meaning.</p><p><code>groups</code> is the same idea for bracket pairs: <code>link</code> collects every bracketed <code>ListStyle</code> into it, in the order the rules mention them, and stamps the rule with the entry's index. A <code>CGroup</code> node then carries that index rather than a style, which keeps the CST as free of layout as it is of production names. It is empty on an unlinked grammar and written only by <code>link</code>, so no grammar file ever spells it out.</p></div>
+          <div class="doc"><p>A whole language: its productions, in order. Position is identity — a <code>NamedIdx</code> and a <code>Tree</code> both name a production by its index here — so the order of this array is part of a linked grammar's meaning.</p><p><code>groups</code> is the same idea for bracket pairs: <code>link</code> collects every bracketed <code>ListStyle</code> into it, in the order the rules mention them, and stamps the rule with the entry's index. A <code>Group</code> node then carries that index rather than a style, which keeps the CST as free of layout as it is of production names. It is empty on an unlinked grammar and written only by <code>link</code>, so no grammar file ever spells it out.</p></div>
 
 
         </section>
@@ -237,7 +237,7 @@
           </h3>
           <pre class="signature"><code>fn group_styles&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; ListStyle[]</code></pre>
 
-          <div class="doc"><p>Every group style in <code>r</code>, in the order the rules mention them: a group's own style first, then the styles inside its brackets. That order is the contract with <code>link_rule</code>, which hands out indices by walking the same tree the same way — get the two out of step and a <code>CGroup</code> names another group's style.</p><p>Both spellings answer, so an already-linked rule reports the same list as the rule it was linked from, which is what makes <code>link</code> idempotent.</p></div>
+          <div class="doc"><p>Every group style in <code>r</code>, in the order the rules mention them: a group's own style first, then the styles inside its brackets. That order is the contract with <code>link_rule</code>, which hands out indices by walking the same tree the same way — get the two out of step and a <code>Group</code> names another group's style.</p><p>Both spellings answer, so an already-linked rule reports the same list as the rule it was linked from, which is what makes <code>link</code> idempotent.</p></div>
 
 
         </section>

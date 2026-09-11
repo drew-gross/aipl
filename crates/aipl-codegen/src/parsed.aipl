@@ -1,0 +1,230 @@
+// The shapes that exist only between a production and the fold that consumes
+// it: a keyword statement before the rest of its block is in scope, a function
+// body before its return type is, a parameter before its destructuring is
+// taken apart, and a `.test` attribute. None is a node of the AST proper. One
+// of the files the AST is declared across; see `ast.aipl`.
+import { Span, equal as ==, is_err_and, value_or_err } from builtins;
+import { Construct as ConstructExpr, Expr, FieldInit, at, num, show_expr } from "./expr.aipl";
+import { ParseError } from "./grammar.aipl";
+import { Param } from "./item.aipl";
+import { Generic, Named, Ty, Unit, show_ty } from "./ty.aipl";
+
+# One keyword statement, after its own production has read it and before the
+# rest of the block is in scope. `wrap_stmt` is what folds it together with that
+# rest, and several of these fold into *several* nodes — which is why a
+# statement cannot simply lower to an `Expr` the way an expression does.
+#
+# It mirrors gazelle's `StmtSpec`, which is a parser-local type there for the
+# same reason it is one here: the AST has no statement node, so this shape
+# exists only between the production and the fold.
+variant Stmt =
+    | Let(name: str, name_span: Span, ty: Ty?, value: Expr)
+    | Mut(name: str, name_span: Span, ty: Ty?, value: Expr)
+    | LetTuple(names: str[], value: Expr, span: Span)
+    | LetStruct(struct_name: str, fields: str[], value: Expr, span: Span)
+    | MutStruct(struct_name: str, fields: str[], value: Expr, span: Span)
+    | Assign(lhs: Expr, value: Expr, span: Span)
+    | For(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, span: Span)
+    | While(cond: Expr, body: Expr, span: Span)
+    | Return(value: Expr, span: Span)
+
+# A parsed function body, before the return type is in scope to name the struct
+# the shorthand constructs. Gazelle's `ParsedBody`, and parser-local for the
+# same reason: by the time a `Function` is built the sugar is gone.
+variant ParsedBody = Block(Expr) | Construct(FieldInit[], Span)
+
+# A parameter as written, before the destructuring form is taken apart.
+# `fields` is empty for every ordinary parameter and holds the pattern's field
+# names for `Point { x, y }`, whose `Param` is the synthetic scrutinee the
+# function's own lowering then binds those fields off.
+struct ParsedParam { param: Param, fields: str[], span: Span }
+
+# One `.test({ .. })` attribute: its block, and the span of the attribute name,
+# which is where a duplicate is reported.
+struct FnAttr { body: Expr, span: Span }
+
+# The body, with the struct-literal shorthand resolved. What it builds is
+# exactly the `EConstruct` the long form parses to, so nothing downstream of the
+# parser sees the sugar at all.
+pub fn resolve_body(name: str, body: ParsedBody, return_ty: Ty?) -> Expr!ParseError {
+    match (body) {
+        Block(e) => ok(e),
+        Construct(fields, span) => {
+            let ty_name = construct_ty_name(name, return_ty, span)?;
+            ok(at(ConstructExpr(ty_name, fields), span))
+        },
+    }
+}.test({
+    assert(resolve_body("f", Block(num(1)), none)?.show_expr() == "1");
+    let fields = [FieldInit { name: "x", value: num(1) }];
+    let shorthand = Construct(fields, 0..0);
+    assert(resolve_body("f", shorthand, some(Named("P")))?.show_expr() == "Construct(P, [x: 1])");
+    // A generic return contributes its base name.
+    assert(
+        resolve_body(
+            "f",
+            shorthand,
+            some(Generic("Pair", [Named("T")])),
+        )?.show_expr() == "Construct(Pair, [x: 1])",
+    );
+    // No return type, or one that is not a struct, has nothing to name.
+    assert(resolve_body("f", shorthand, none).is_err_and(|e| e.span == 0..0));
+    assert(resolve_body("f", shorthand, some(Unit)).is_err_and(|e| e.span == 0..0));
+})
+
+# The shorthand names no type, so the return type has to. A generic return
+# (`-> Pair<i64>`) contributes its base name and infers its arguments, exactly
+# as writing `Pair { .. }` would.
+fn construct_ty_name(name: str, return_ty: Ty?, span: Span) -> str!ParseError {
+    let declared = return_ty.value_or_err(ParseError {
+        message: `fn "{name}": a \`\{ field: value, .. }\` body needs a struct return type to name, but this function declares no return type; add \`-> Struct\`, or give the literal its type`,
+        span,
+    })?;
+    if (let Named(n) = declared) {
+        return ok(n);
+    };
+    if (let Generic(base, _) = declared) {
+        return ok(base);
+    };
+    err(ParseError {
+        message: `fn "{name}": a \`\{ field: value, .. }\` body needs a struct return type to name, but this function returns {declared.show_ty()}; give the literal its type, or return a struct`,
+        span,
+    })
+}
+--- performance ---
+allocations: 40
+deallocations: 40
+reallocations: 2
+bytes allocated: 2897
+instructions executed: 2158
+binary size: 61640
+  code: 38572
+  data: 1236
+  metadata: 21832
+functions:
+  __arr_drop___m1__Expr:
+    calls: 0
+    bytes: 116
+  __arr_drop___m1__FieldInit:
+    calls: 1
+    bytes: 116
+  __arr_drop___m4__Ty:
+    calls: 1
+    bytes: 116
+  __arr_retain___m1__Expr:
+    calls: 0
+    bytes: 116
+  __arr_retain___m1__FieldInit:
+    calls: 0
+    bytes: 116
+  __arr_retain___m4__Ty:
+    calls: 0
+    bytes: 116
+  __eq___builtin_Span:
+    calls: 2
+    bytes: 104
+  __m1__show_ann:
+    calls: 0
+    bytes: 416
+  __m1__show_arm:
+    calls: 0
+    bytes: 2028
+  __m1__show_call:
+    calls: 0
+    bytes: 1560
+  __m1__show_expr:
+    calls: 5
+    bytes: 16984
+  __m1__show_exprs:
+    calls: 0
+    bytes: 460
+  __m1__show_field_init:
+    calls: 2
+    bytes: 620
+  __m4__show_ty:
+    calls: 1
+    bytes: 4656
+  __m4__show_tys:
+    calls: 0
+    bytes: 460
+  __rec_drop___m1__Expr:
+    calls: 4
+    bytes: 36
+  __rec_drop___m1__ExprKind:
+    calls: 4
+    bytes: 1260
+  __rec_drop___m1__FieldInit:
+    calls: 1
+    bytes: 72
+  __rec_drop___m4__Ty:
+    calls: 4
+    bytes: 408
+  __test$resolve_body:
+    calls: 1
+    bytes: 3548
+  __test_try_fail___m5__ParseError:
+    calls: 0
+    bytes: 84
+  __to_str___m5__ParseError:
+    calls: 0
+    bytes: 824
+  __to_str_i64:
+    calls: 3
+    bytes: 204
+  aipl_arr_inc:
+    calls: 10
+    bytes: (external)
+  aipl_array_dec:
+    calls: 14
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 2
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 2
+    bytes: (external)
+  aipl_assert:
+    calls: 5
+    bytes: (external)
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 13
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 41
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 5
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 28
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 5
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  construct_ty_name:
+    calls: 4
+    bytes: 3128
+  main:
+    calls: 1
+    bytes: 112
+  resolve_body:
+    calls: 5
+    bytes: 912

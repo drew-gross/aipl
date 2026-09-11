@@ -26,18 +26,18 @@
           </h3>
           <pre class="signature"><code>variant Cst</code></pre>
 
-          <div class="doc"><p>An interior node is <code>CTree(prod, kids)</code>; a <code>CGroup</code> is the bracket pair a bracketed repetition matched, holding its opening kids, the kids between the and its closing kids as three runs.</p><p>A group is *transparent*: it is not a production, it lowers to nothing of its own, and <code>nodes</code> and <code>own_tokens</code> splice straight through it — so converting a <code>Then([Lit(&quot;(&quot;), x, Lit(&quot;)&quot;)])</code> into a <code>nested_in</code> leaves every <code>build</code> function reading exactly the children it read before. The only pass that sees a group is the formatter, which is the pass that needs to know where the brackets are.</p></div>
+          <div class="doc"><p>An interior node is <code>Tree(prod, kids)</code>; a <code>Group</code> is the bracket pair a bracketed repetition matched, holding its opening kids, the kids between the and its closing kids as three runs.</p><p>A group is *transparent*: it is not a production, it lowers to nothing of its own, and <code>nodes</code> and <code>own_tokens</code> splice straight through it — so converting a <code>Then([Lit(&quot;(&quot;), x, Lit(&quot;)&quot;)])</code> into a <code>nested_in</code> leaves every <code>build</code> function reading exactly the children it read before. The only pass that sees a group is the formatter, which is the pass that needs to know where the brackets are.</p></div>
 
 
           <ul class="cases">
 
-            <li id="item-CLeaf"><code>CLeaf(Span)</code></li>
+            <li id="item-Leaf"><code>Leaf(Span)</code></li>
 
-            <li id="item-CTrivia"><code>CTrivia(Span)</code></li>
+            <li id="item-Trivia"><code>Trivia(Span)</code></li>
 
-            <li id="item-CTree"><code>CTree(u64, Cst[])</code></li>
+            <li id="item-Tree"><code>Tree(u64, Cst[])</code></li>
 
-            <li id="item-CGroup"><code>CGroup(u64, Cst[], Cst[], Cst[])</code></li>
+            <li id="item-Group"><code>Group(u64, Cst[], Cst[], Cst[])</code></li>
 
           </ul>
 
@@ -136,7 +136,7 @@
           </h3>
           <pre class="signature"><code>pub fn nodes(self: Cst) -&#62; Cst[]</code></pre>
 
-          <div class="doc"><p>The interior children of <code>self</code> — its kids with the leaves dropped. This is the child list a production's <code>build</code> is lowered against, so its order and length are part of the contract between a grammar and its lowering functions: one entry per <code>Named</code> reference the rule matched, in the order it matched them.</p><p>A leaf is dropped because the lowering pass has nothing to hand <code>build</code> for one — it has no lowered value, and its text is reachable from the node's own span. A <code>CGroup</code> never reaches the test: <code>flat_kids</code> splices it away first, which is what makes a group transparent.</p></div>
+          <div class="doc"><p>The interior children of <code>self</code> — its kids with the leaves dropped. This is the child list a production's <code>build</code> is lowered against, so its order and length are part of the contract between a grammar and its lowering functions: one entry per <code>Named</code> reference the rule matched, in the order it matched them.</p><p>A leaf is dropped because the lowering pass has nothing to hand <code>build</code> for one — it has no lowered value, and its text is reachable from the node's own span. A <code>Group</code> never reaches the test: <code>flat_kids</code> splices it away first, which is what makes a group transparent.</p></div>
 
 
         </section>

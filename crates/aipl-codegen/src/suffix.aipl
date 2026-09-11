@@ -1,0 +1,233 @@
+// One postfix step of AIPL's syntax tree and what applying it to a receiver
+// means. One of the files the AST is declared across; see `ast.aipl`.
+import { Span, equal as ==, first, last, len, not_equal as != } from builtins;
+import {
+    Call,
+    Construct,
+    Expr,
+    Field as FieldExpr,
+    FieldInit,
+    Index as IndexExpr,
+    Slice,
+    Try as TryExpr,
+    at,
+    ident,
+    num,
+    show_expr,
+} from "./expr.aipl";
+
+# One postfix step, before it has a receiver to apply to. `postfix` is an atom
+# followed by a run of these, and a `suffix` on its own is not an expression —
+# which is why it needs a shape of its own rather than an `Expr`.
+#
+# A tuple index is a `Field`: `p.0` is the field named `_0`, which is how the
+# AST spells it and why nothing downstream has to know tuples have a second
+# syntax for their fields.
+variant Suffix =
+    | Field(str)
+    | Method(name: str, args: Expr[])
+    | Index(Expr)
+    | SliceFrom(Expr)
+    | SliceTo(Expr)
+    | Try
+
+# One postfix step, given the receiver it applies to. A method call folds the
+# receiver in as `args[0]` and flags the method form, so `recv.f(a)` is stored
+# exactly as the free call `f(recv, a)`.
+pub fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
+    match (suf) {
+        Field(name) => at(FieldExpr(recv, name), span),
+        Method(name, args) => at(Call(name, [recv, ..args], true), span),
+        Index(index) => index_or_slice(recv, index, span),
+        SliceFrom(lo) => at(Slice(recv, lo, none), span),
+        // `recv[..end]` is `recv[0..end]`: the start clamps to `[0, len]`
+        // regardless, so a synthetic `0` is the whole difference.
+        SliceTo(hi) => at(Slice(recv, num(0), some(hi)), span),
+        Try => at(TryExpr(recv), span),
+    }
+}.test({
+    let p = ident("p");
+    assert(apply_suffix(p, Field("x"), 0..0).show_expr() == "p.x");
+    assert(apply_suffix(p, Method("f", [num(1)]), 0..0).show_expr() == "p.f(1)");
+    assert(apply_suffix(p, Index(num(1)), 0..0).show_expr() == "Index(p, 1)");
+    assert(apply_suffix(p, SliceFrom(num(1)), 0..0).show_expr() == "Slice(p, 1, )");
+    assert(apply_suffix(p, SliceTo(num(2)), 0..0).show_expr() == "Slice(p, 0, 2)");
+    assert(apply_suffix(p, Try, 0..0).show_expr() == "Try(p)");
+    // A range literal written as an index is the closed slice form.
+    let range = at(
+        Construct(
+            "__builtin_Span",
+            [FieldInit { name: "start", value: num(1) }, FieldInit { name: "end", value: num(2) }],
+        ),
+        0..0,
+    );
+    assert(apply_suffix(p, Index(range), 0..0).show_expr() == "Slice(p, 1, 2)");
+})
+
+# `recv[a..b]` — a range literal written *as* an index is the closed slice form,
+# folded straight into a `Slice` rather than constructing a `Span` only to
+# unpack it at runtime. A range that arrives as a *value* (`recv[s]`, a call
+# result) stays an index and takes the `Span`-index sugar path instead.
+fn index_or_slice(recv: Expr, index: Expr, span: Span) -> Expr {
+    match (index.range_bounds()) {
+        some(b) => at(Slice(recv, b.0, some(b.1)), span),
+        none => at(IndexExpr(recv, index), span),
+    }
+}
+
+# The two ends of `self`, if it is the `Span` construct a range desugars to.
+fn range_bounds(self: Expr) -> (Expr, Expr)? {
+    if (let Construct(name, inits) = self.kind) {
+        if (name == "__builtin_Span") {
+            return two_values(inits);
+        };
+    };
+    none
+}
+
+fn two_values(self: FieldInit[]) -> (Expr, Expr)? {
+    if (self.len() != 2) {
+        return none;
+    };
+    match (self.first()) {
+        some(a) => match (self.last()) {
+            some(b) => some((a.value, b.value)),
+            none => none,
+        },
+        none => none,
+    }
+}
+--- performance ---
+allocations: 78
+deallocations: 78
+reallocations: 2
+bytes allocated: 5870
+instructions executed: 3627
+binary size: 65072
+  code: 41228
+  data: 646
+  metadata: 23198
+functions:
+  __arr_drop___m1__Expr:
+    calls: 3
+    bytes: 116
+  __arr_drop___m1__FieldInit:
+    calls: 1
+    bytes: 116
+  __arr_retain___m1__Expr:
+    calls: 2
+    bytes: 116
+  __arr_retain___m1__FieldInit:
+    calls: 0
+    bytes: 116
+  __m1__show_ann:
+    calls: 0
+    bytes: 416
+  __m1__show_arm:
+    calls: 0
+    bytes: 2028
+  __m1__show_call:
+    calls: 1
+    bytes: 1560
+  __m1__show_expr:
+    calls: 21
+    bytes: 16984
+  __m1__show_exprs:
+    calls: 1
+    bytes: 460
+  __m1__show_field_init:
+    calls: 0
+    bytes: 620
+  __m4__show_ty:
+    calls: 0
+    bytes: 4656
+  __m4__show_tys:
+    calls: 0
+    bytes: 460
+  __rec_drop___m1__Expr:
+    calls: 16
+    bytes: 36
+  __rec_drop___m1__ExprKind:
+    calls: 16
+    bytes: 1260
+  __rec_drop___m1__FieldInit:
+    calls: 2
+    bytes: 72
+  __rec_drop___tuple$__m1__Expr$__m1__Expr:
+    calls: 1
+    bytes: 72
+  __test$apply_suffix:
+    calls: 1
+    bytes: 4720
+  __to_str_i64:
+    calls: 7
+    bytes: 204
+  aipl_arr_extend:
+    calls: 1
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 8
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 13
+    bytes: (external)
+  aipl_array_new:
+    calls: 3
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 1
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_assert:
+    calls: 7
+    bytes: (external)
+  aipl_i64_len:
+    calls: 14
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 35
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 105
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 32
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 70
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 32
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 7
+    bytes: (external)
+  apply_suffix:
+    calls: 7
+    bytes: 3020
+  main:
+    calls: 1
+    bytes: 112
+  range_bounds:
+    calls: 2
+    bytes: 2960
+  two_values:
+    calls: 1
+    bytes: 1124

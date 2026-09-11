@@ -41,28 +41,6 @@
 
 
 
-        <section class="item" id="item-Sexp">
-          <h3>
-            <a class="anchor" href="#item-Sexp">Sexp</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant Sexp</code></pre>
-
-          <div class="doc"><p>The AST an S-expression lowers to: a bare atom, or a list of them. Recursive through an array, so a <code>Sexp</code> is a refcounted heap block — the shape a <code>build</code> function value had to be proven able to return.</p></div>
-
-
-          <ul class="cases">
-
-            <li id="item-SAtom"><code>SAtom(str)</code></li>
-
-            <li id="item-SList"><code>SList(Sexp[])</code></li>
-
-          </ul>
-
-        </section>
-
-
-
         <section class="item" id="item-sexp_grammar">
           <h3>
             <a class="anchor" href="#item-sexp_grammar">sexp_grammar</a>
@@ -99,20 +77,6 @@
           <pre class="signature"><code>pub fn parse_sexp(src: str) -&#62; Sexp!ParseError</code></pre>
 
           <div class="doc"><p>The <code>Sexp</code> <code>src</code> denotes: lex, parse to a concrete tree, lower it through the grammar's <code>build</code> functions.</p><p>Fails with a <code>ParseError</code> carrying the span of the offending token, from either half of the front end — a lex error is reported in the same shape.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-render_sexp">
-          <h3>
-            <a class="anchor" href="#item-render_sexp">render_sexp</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn render_sexp(self: Sexp) -&#62; str</code></pre>
-
-          <div class="doc"><p><code>self</code> printed back as S-expression source, in the one canonical spelling: atoms as themselves, a list as its elements joined by single spaces.</p><p>Round-trips with <code>parse_sexp</code> — <code>parse_sexp(render_sexp(v)) == v</code> for every <code>v</code> — which is what makes the pair a usable end-to-end check of the library.</p></div>
 
 
         </section>
@@ -190,20 +154,6 @@
           <pre class="signature"><code>fn lex_sexp(src: str) -&#62; LexResult&#60;SexpKind&#62;!ParseError</code></pre>
 
           <div class="doc"><p>Lexing and parsing report failure in the same shape but not the same type, so the conversion happens once, here.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-depth">
-          <h3>
-            <a class="anchor" href="#item-depth">depth</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn depth(self: Sexp) -&#62; u64</code></pre>
-
-          <div class="doc"><p>How deeply <code>self</code> nests: an atom is 0, a list one more than its deepest element. The deep-nesting assertion's whole content — a parse that silently stopped early would show up here as a shallower tree.</p></div>
 
 
         </section>

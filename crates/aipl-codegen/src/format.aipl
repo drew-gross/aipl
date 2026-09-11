@@ -41,7 +41,7 @@ import {
     wrapping_add as +,
     wrapping_increment as ++,
 } from builtins;
-import { CGroup, CLeaf, CTree, CTrivia, Cst, span, token_leaves } from "./cst.aipl";
+import { Cst, Group, Leaf, Tree, Trivia, span, token_leaves } from "./cst.aipl";
 import {
     Concat,
     Doc,
@@ -77,16 +77,16 @@ import {
 # comment, and nowhere else.
 variant Piece =
     // A token the grammar matched, and its spelling.
-    | PTok(str)
+    | Tok(str)
     // An interior child: its finished `Doc`, and the spellings of its first and
     // last tokens. Those two are what the spacing rule is asked about, since a
     // child's edges are what its neighbours touch. Both are `""` for a child
     // that matched no tokens at all, which an empty `Many` produces.
-    | PNode(Doc, str, str)
+    | Node(Doc, str, str)
     // A comment, verbatim, and whether the source put a newline after it. That
     // flag is not style: a line comment swallows the rest of its line, so
     // getting it wrong changes what the output means.
-    | PNote(str, bool)
+    | Note(str, bool)
 
 # The `Doc` that lays `node` out, given the grammar it was parsed with.
 #
@@ -124,8 +124,8 @@ fn fmt_node<K: variant, A: any>(
     match (node) {
         // Reached only when a caller hands a leaf straight in; the driver turns
         // a node's own leaves into pieces rather than recursing into them.
-        CLeaf(sp) | CTrivia(sp) => ok(Text(src[sp])),
-        CTree(i, kids) => {
+        Leaf(sp) | Trivia(sp) => ok(Text(src[sp])),
+        Tree(i, kids) => {
             let layout = g.prods[i].value_or_err(ParseError {
                 message: `no production at index {i}`,
                 span: node.span(),
@@ -140,7 +140,7 @@ fn fmt_node<K: variant, A: any>(
         },
         // A group reached directly, rather than as a child of the production
         // holding it — the same layout either way.
-        CGroup(gi, open, body, close) => group_doc(g, src, gi, open, body, close, space),
+        Group(gi, open, body, close) => group_doc(g, src, gi, open, body, close, space),
     }
 }.test({
     // Two productions, one per layout, one group style, and a tree written out
@@ -151,23 +151,23 @@ fn fmt_node<K: variant, A: any>(
     //                  1
     //        012345678901234
     let src = "{ a: 1, b: -2 }";
-    let grp = CGroup(
+    let grp = Group(
         0,
-        [CLeaf(0..1)],
+        [Leaf(0..1)],
         [
-            CTrivia(1..2),
+            Trivia(1..2),
             kv(2),
-            CTrivia(4..5),
-            CLeaf(5..6),
-            CLeaf(6..7),
-            CTrivia(7..8),
+            Trivia(4..5),
+            Leaf(5..6),
+            Leaf(6..7),
+            Trivia(7..8),
             kv(8),
-            CTrivia(10..11),
-            CTree(2, [CLeaf(11..12), CLeaf(12..13)]),
+            Trivia(10..11),
+            Tree(2, [Leaf(11..12), Leaf(12..13)]),
         ],
-        [CTrivia(13..14), CLeaf(14..15)],
+        [Trivia(13..14), Leaf(14..15)],
     );
-    let tree = CTree(0, [grp]);
+    let tree = Tree(0, [grp]);
 
     // The group wraps, `Inline` lays out `a:` (a space after the colon, none
     // before it), and `Tight` gives `-2` (no space, whatever the rule says).
@@ -182,18 +182,18 @@ fn fmt_node<K: variant, A: any>(
     assert(rendered(g, src, grp, 80)? == "{ a: 1, b: -2 }");
 
     // A leaf handed straight in is its own text.
-    assert(rendered(g, src, CLeaf(2..3), 80)? == "a");
+    assert(rendered(g, src, Leaf(2..3), 80)? == "a");
 
     // A tree that does not belong to the grammar is the one way this fails.
     let stray: Cst[] = [];
-    assert(rendered(g, src, CTree(9, stray), 80).failure_message() == "no production at index 9");
+    assert(rendered(g, src, Tree(9, stray), 80).failure_message() == "no production at index 9");
 
     // So is a group naming a style the table has no entry for.
     assert(
         rendered(
             g,
             src,
-            CGroup(9, stray, stray, stray),
+            Group(9, stray, stray, stray),
             80,
         ).failure_message() == "no group at index 9",
     );
@@ -210,7 +210,7 @@ pub fn render_cst<K: variant, A: any>(
 ) -> str!ParseError { ok(format_cst(g, src, node, space)?.print(width)) }.test({
     let g = grammar_of([Inline], []);
     let src = "a b";
-    let tree = CTree(0, [CLeaf(0..1), CTrivia(1..2), CLeaf(2..3)]);
+    let tree = Tree(0, [Leaf(0..1), Trivia(1..2), Leaf(2..3)]);
     assert(render_cst(g, src, tree, always_space, 80)? == "a b");
     assert(render_cst(g, src, tree, never_space, 80)? == "ab");
 })
@@ -228,20 +228,20 @@ fn pieces<K: variant, A: any>(
     mut out: Piece[] = [];
     for (let k : kids) {
         match (k) {
-            CLeaf(sp) => {
-                set out.push(PTok(src[sp]));
+            Leaf(sp) => {
+                set out.push(Tok(src[sp]));
             },
             // Whitespace is the author's spacing and this pass replaces it;
             // anything else the lexer set aside is a comment, and survives.
-            CTrivia(sp) => {
+            Trivia(sp) => {
                 if (!src[sp].is_all_whitespace()) {
-                    set out.push(PNote(src[sp], breaks_after(src, sp.end)));
+                    set out.push(Note(src[sp], breaks_after(src, sp.end)));
                 };
             },
-            CTree(..) | CGroup(..) => {
+            Tree(..) | Group(..) => {
                 let d = fmt_node(g, src, k, space)?;
                 let ts = k.token_leaves();
-                set out.push(PNode(d, edge(src, ts.first()), edge(src, ts.last())));
+                set out.push(Node(d, edge(src, ts.first()), edge(src, ts.last())));
             },
         };
     }
@@ -291,8 +291,8 @@ fn edge(src: str, sp: Span?) -> str {
 # child that happens to render as `,` is not mistaken for it.
 fn is_sep(self: Piece, sep: str) -> bool {
     match (self) {
-        PTok(t) => t == sep,
-        PNode(..) | PNote(..) => false,
+        Tok(t) => t == sep,
+        Node(..) | Note(..) => false,
     }
 }
 
@@ -300,8 +300,8 @@ fn is_sep(self: Piece, sep: str) -> bool {
 # but a comment does: a comment belongs to the item it was written against.
 fn starts_item(self: Piece) -> bool {
     match (self) {
-        PTok(..) | PNode(..) => true,
-        PNote(..) => false,
+        Tok(..) | Node(..) => true,
+        Note(..) => false,
     }
 }
 
@@ -313,18 +313,18 @@ fn starts_item(self: Piece) -> bool {
 # spacing, it is what the comment means.
 fn tight(ps: Piece[]) -> Doc { Concat(ps.map(piece_doc)) }.test({
     let nothing: Piece[] = [];
-    assert(tight([PTok("-"), PTok("2")]).at(80) == "-2");
+    assert(tight([Tok("-"), Tok("2")]).at(80) == "-2");
     assert(tight(nothing).at(80) == "");
-    assert(tight([PTok("a"), PNote("/* c */", false), PTok("b")]).at(80) == "a/* c */b");
-    assert(tight([PTok("a"), PNote("// c", true), PTok("b")]).at(80) == "a// c\nb\n");
+    assert(tight([Tok("a"), Note("/* c */", false), Tok("b")]).at(80) == "a/* c */b");
+    assert(tight([Tok("a"), Note("// c", true), Tok("b")]).at(80) == "a// c\nb\n");
 })
 
 # One piece as a `Doc`, with nothing added around it.
 fn piece_doc(self: Piece) -> Doc {
     match (self) {
-        PTok(t) => Text(t),
-        PNode(d, _, _) => d,
-        PNote(t, brk) => if (brk) { Concat([Text(t), HardLine]) } else { Text(t) },
+        Tok(t) => Text(t),
+        Node(d, _, _) => d,
+        Note(t, brk) => if (brk) { Concat([Text(t), HardLine]) } else { Text(t) },
     }
 }
 
@@ -338,14 +338,14 @@ fn inline_doc(ps: Piece[], space: (str, str) -> bool) -> Doc {
     mut prev = "";
     for (let p : ps) {
         match (p) {
-            PTok(t) => {
+            Tok(t) => {
                 if (gap_wanted(prev, t, space)) {
                     set out.push(Text(" "));
                 };
                 set out.push(Text(t));
                 set prev = t;
             },
-            PNode(d, f, l) => {
+            Node(d, f, l) => {
                 if (gap_wanted(prev, f, space)) {
                     set out.push(Text(" "));
                 };
@@ -358,7 +358,7 @@ fn inline_doc(ps: Piece[], space: (str, str) -> bool) -> Doc {
             // is prose, not punctuation — and then either ends the line or is
             // followed by one space. Either way what comes next starts fresh, so
             // the rule is never asked across a comment.
-            PNote(t, brk) => {
+            Note(t, brk) => {
                 if (prev != "") {
                     set out.push(Text(" "));
                 };
@@ -371,28 +371,24 @@ fn inline_doc(ps: Piece[], space: (str, str) -> bool) -> Doc {
     Concat(out)
 }.test({
     let nothing: Piece[] = [];
-    assert(inline_doc([PTok("a"), PTok(":"), PTok("1")], colon_space).at(80) == "a: 1");
+    assert(inline_doc([Tok("a"), Tok(":"), Tok("1")], colon_space).at(80) == "a: 1");
     assert(inline_doc(nothing, colon_space).at(80) == "");
 
     // A child contributes its edges, not its whole text: the rule is asked about
     // `:` and `x`, never about the child's interior.
-    let kid = PNode(Text("x + y"), "x", "y");
-    assert(inline_doc([PTok(":"), kid, PTok(":")], colon_space).at(80) == ": x + y:");
+    let kid = Node(Text("x + y"), "x", "y");
+    assert(inline_doc([Tok(":"), kid, Tok(":")], colon_space).at(80) == ": x + y:");
 
     // A child that matched nothing leaves no gap behind it.
-    let empty_kid = PNode(Concat([]), "", "");
-    assert(inline_doc([PTok(":"), empty_kid, PTok("z")], colon_space).at(80) == ": z");
+    let empty_kid = Node(Concat([]), "", "");
+    assert(inline_doc([Tok(":"), empty_kid, Tok("z")], colon_space).at(80) == ": z");
 
     // A comment ending a source line ends the formatted line too.
     assert(
-        inline_doc([PTok("a"), PNote("// c", true), PTok("b")], colon_space).at(
-            80,
-        ) == "a // c\nb\n",
+        inline_doc([Tok("a"), Note("// c", true), Tok("b")], colon_space).at(80) == "a // c\nb\n",
     );
     assert(
-        inline_doc([PTok("a"), PNote("/*c*/", false), PTok("b")], colon_space).at(
-            80,
-        ) == "a /*c*/ b",
+        inline_doc([Tok("a"), Note("/*c*/", false), Tok("b")], colon_space).at(80) == "a /*c*/ b",
     );
 })
 
@@ -402,7 +398,7 @@ fn gap_wanted(prev: str, next: str, space: (str, str) -> bool) -> bool {
     prev != "" && next != "" && space(prev, next)
 }
 
-# A `CGroup` laid out: its brackets around its contents, on one line while they
+# A `Group` laid out: its brackets around its contents, on one line while they
 # fit and otherwise one item per indented line.
 #
 # The brackets are read off the node, not inferred from it. That is the whole
@@ -474,9 +470,9 @@ fn wrapped(
     group(Concat(parts))
 }.test({
     let parens = ListStyle { spaced: false };
-    let lp = [PTok("(")];
-    let rp = [PTok(")")];
-    let three = [node_of("a"), PTok(","), node_of("b"), PTok(","), node_of("c")];
+    let lp = [Tok("(")];
+    let rp = [Tok(")")];
+    let three = [node_of("a"), Tok(","), node_of("b"), Tok(","), node_of("c")];
 
     assert(wrapped(lp, three, rp, parens, never_space).at(80) == "(a, b, c)");
     assert(wrapped(lp, three, rp, parens, never_space).at(5) == "(\n    a,\n    b,\n    c,\n)\n");
@@ -485,29 +481,29 @@ fn wrapped(
     let nothing: Piece[] = [];
     assert(wrapped(lp, nothing, rp, parens, never_space).at(80) == "()");
     let braces = ListStyle { spaced: true };
-    assert(wrapped([PTok("{")], nothing, [PTok("}")], braces, never_space).at(80) == "{}");
+    assert(wrapped([Tok("{")], nothing, [Tok("}")], braces, never_space).at(80) == "{}");
 
     // A bracket spelled as two tokens is one bracket: the group said so, and
     // nothing here counts token runs to find out.
     assert(
-        wrapped([PTok("#"), PTok("{")], [node_of("a")], [PTok("}")], parens, never_space).at(
+        wrapped([Tok("#"), Tok("{")], [node_of("a")], [Tok("}")], parens, never_space).at(
             80,
         ) == "#{a}",
     );
 
     // The same token at both ends is no harder, which is what a lead/tail scan
     // could never tell apart from a list of one item.
-    let pipes = [PTok("|")];
+    let pipes = [Tok("|")];
     assert(
-        wrapped(pipes, [node_of("a"), PTok(","), node_of("b")], pipes, parens, never_space).at(
+        wrapped(pipes, [node_of("a"), Tok(","), node_of("b")], pipes, parens, never_space).at(
             80,
         ) == "|a, b|",
     );
 
     // Words-style braces gain inner spaces flat, and lose them broken.
-    let pair = [node_of("a"), PTok(","), node_of("b")];
-    let lb = [PTok("{")];
-    let rb = [PTok("}")];
+    let pair = [node_of("a"), Tok(","), node_of("b")];
+    let lb = [Tok("{")];
+    let rb = [Tok("}")];
     assert(wrapped(lb, pair, rb, braces, never_space).at(80) == "{ a, b }");
     assert(wrapped(lb, pair, rb, braces, never_space).at(5) == "{\n    a,\n    b,\n}\n");
 
@@ -541,7 +537,7 @@ fn wrapped(
     // bracket it lands on is meaning, and that is what is asserted here. The old
     // token-run scan had no place to put it at all.
     assert(
-        wrapped(lp, [node_of("a")], [PNote("/*c*/", false), PTok(")")], parens, never_space).at(
+        wrapped(lp, [node_of("a")], [Note("/*c*/", false), Tok(")")], parens, never_space).at(
             80,
         ) == "(a/*c*/ )",
     );
@@ -577,20 +573,18 @@ fn list_items(mid: Piece[], ListStyle { sep }, space: (str, str) -> bool) -> Doc
     items
 }.test({
     let nothing: Piece[] = [];
-    let a = PNode(Text("a"), "a", "a");
-    let b = PNode(Text("b"), "b", "b");
+    let a = Node(Text("a"), "a", "a");
+    let b = Node(Text("b"), "b", "b");
 
-    assert(texts(list_items([a, PTok(","), b], ListStyle {}, never_space)) == ["a", "b"]);
+    assert(texts(list_items([a, Tok(","), b], ListStyle {}, never_space)) == ["a", "b"]);
     assert(list_items(nothing, ListStyle {}, never_space).is_empty());
     // A trailing separator in the source leaves no empty item behind it.
-    assert(
-        texts(list_items([a, PTok(","), b, PTok(",")], ListStyle {}, never_space)) == ["a", "b"],
-    );
+    assert(texts(list_items([a, Tok(","), b, Tok(",")], ListStyle {}, never_space)) == ["a", "b"]);
     // Juxtaposed: every child is its own item.
     assert(texts(list_items([a, b], ListStyle { sep: "" }, never_space)) == ["a", "b"]);
     // A comment rides with the item it was written against, not on its own.
     assert(
-        texts(list_items([PNote("/*x*/", false), a, PTok(","), b], ListStyle {}, never_space)) == [
+        texts(list_items([Note("/*x*/", false), a, Tok(","), b], ListStyle {}, never_space)) == [
             "/*x*/ a",
             "b",
         ],
@@ -604,11 +598,11 @@ fn list_items(mid: Piece[], ListStyle { sep }, space: (str, str) -> bool) -> Doc
 // whose trees can be written out by hand. `FKind` rather than `Kind`: a
 // test-only variant named `Kind` collides with a constructor `lexer.aipl`
 // declares, and the bare view drops one of the two silently.
-variant FKind = FWord
+variant FKind = Word
 
 # A grammar of one production per layout, in order, so a hand-built
-# `CTree(i, ..)` picks a layout by its index — followed by one throwaway
-# production per group style, so a hand-built `CGroup(i, ..)` picks a style by
+# `Tree(i, ..)` picks a layout by its index — followed by one throwaway
+# production per group style, so a hand-built `Group(i, ..)` picks a style by
 # its index too.
 #
 # The styles cannot simply be handed over: `groups` is `link`'s output, rebuilt
@@ -628,7 +622,7 @@ fn grammar_of(layouts: Layout[], groups: ListStyle[]) -> Grammar<FKind, str> {
 
 # A production whose whole purpose is to carry one group style into `groups`.
 fn group_prod(i: u64, st: ListStyle) -> Production<FKind, str> {
-    let word: Rule<FKind> = Term(FWord);
+    let word: Rule<FKind> = Term(Word);
     Production {
         name: `g{i}`,
         rule: Many(word, min=1, max=1, nested_in=(word, word), style=st),
@@ -640,7 +634,7 @@ fn group_prod(i: u64, st: ListStyle) -> Production<FKind, str> {
 # Distinct names because `format_cst` links, and `link` refuses a grammar with
 # two productions of one name.
 fn prod_of(i: u64, l: Layout) -> Production<FKind, str> {
-    let word: Rule<FKind> = Term(FWord);
+    let word: Rule<FKind> = Term(Word);
     Production { name: `p{i}`, rule: word, build: Mk(nothing), layout: l }
 }
 
@@ -672,10 +666,10 @@ fn at(self: Doc, width: u64) -> str { self.print(width) }
 
 # A two-leaf node at `at`, standing in for a production that matched a key and
 # its colon — enough shape for the driver's tests without a parse.
-fn kv(at: u64) -> Cst { CTree(1, [CLeaf(at..at + 1), CLeaf(at + 1..at + 2)]) }
+fn kv(at: u64) -> Cst { Tree(1, [Leaf(at..at + 1), Leaf(at + 1..at + 2)]) }
 
 # A child piece that renders as `t` and has `t` at both edges.
-fn node_of(t: str) -> Piece { PNode(Text(t), t, t) }
+fn node_of(t: str) -> Piece { Node(Text(t), t, t) }
 
 fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
 --- performance ---
@@ -684,9 +678,9 @@ deallocations: 2388
 reallocations: 349
 bytes allocated: 171827
 instructions executed: 237224
-binary size: 232384
+binary size: 232328
   code: 148848
-  data: 5076
+  data: 5020
   metadata: 78460
 functions:
   __arr_drop_Piece:

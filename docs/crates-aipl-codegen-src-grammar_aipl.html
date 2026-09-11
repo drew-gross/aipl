@@ -26,7 +26,7 @@
           </h3>
           <pre class="signature"><code>pub fn aipl_grammar() -&#62; Grammar&#60;AiplTok, Ast&#62;</code></pre>
 
-          <div class="doc"><p>AIPL's grammar: the productions the driver in <code>parse.aipl</code> parses AIPL with, starting at <code>program</code>.</p><p>Split across five builder functions purely for reading — the array they concatenate to is one flat production list, and position in it is identity (a linked <code>NamedIdx</code> and a <code>CTree</code> both name a production by its index).</p></div>
+          <div class="doc"><p>AIPL's grammar: the productions the driver in <code>parse.aipl</code> parses AIPL with, starting at <code>program</code>.</p><p>Split across five builder functions purely for reading — the array they concatenate to is one flat production list, and position in it is identity (a linked <code>NamedIdx</code> and a <code>Tree</code> both name a production by its index).</p></div>
 
 
         </section>
@@ -348,20 +348,6 @@
 
 
 
-        <section class="item" id="item-at">
-          <h3>
-            <a class="anchor" href="#item-at">at</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn at(kind: ExprKind, span: Span) -&#62; Expr</code></pre>
-
-          <div class="doc"><p>An expression node at a span.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-join_spans">
           <h3>
             <a class="anchor" href="#item-join_spans">join_spans</a>
@@ -600,62 +586,6 @@
 
 
 
-        <section class="item" id="item-apply_suffix">
-          <h3>
-            <a class="anchor" href="#item-apply_suffix">apply_suffix</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -&#62; Expr</code></pre>
-
-          <div class="doc"><p>One postfix step, given the receiver it applies to. A method call folds the receiver in as <code>args[0]</code> and flags the method form, so <code>recv.f(a)</code> is stored exactly as the free call <code>f(recv, a)</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-index_or_slice">
-          <h3>
-            <a class="anchor" href="#item-index_or_slice">index_or_slice</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn index_or_slice(recv: Expr, index: Expr, span: Span) -&#62; Expr</code></pre>
-
-          <div class="doc"><p><code>recv[a..b]</code> — a range literal written *as* an index is the closed slice form, folded straight into a <code>Slice</code> rather than constructing a <code>Span</code> only to unpack it at runtime. A range that arrives as a *value* (<code>recv[s]</code>, a call result) stays an index and takes the <code>Span</code>-index sugar path instead.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-range_bounds">
-          <h3>
-            <a class="anchor" href="#item-range_bounds">range_bounds</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn range_bounds(self: Expr) -&#62; (Expr, Expr)?</code></pre>
-
-          <div class="doc"><p>The two ends of <code>self</code>, if it is the <code>Span</code> construct a range desugars to.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-two_values">
-          <h3>
-            <a class="anchor" href="#item-two_values">two_values</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn two_values(self: FieldInit[]) -&#62; (Expr, Expr)?</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
         <section class="item" id="item-lower_suffix">
           <h3>
             <a class="anchor" href="#item-lower_suffix">lower_suffix</a>
@@ -776,34 +706,6 @@
           <pre class="signature"><code>fn lower_else_branch(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>else_branch</code> — a block, or another <code>if</code> in the else position. The block form is the one with no token of its own.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-brace_literal">
-          <h3>
-            <a class="anchor" href="#item-brace_literal">brace_literal</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn brace_literal(entries: BraceEntry[], span: Span) -&#62; Expr!ParseError</code></pre>
-
-          <div class="doc"><p><code>#{ .. }</code> — a set, a dict, or an empty of either, which is both until its use site says. Mixing the two spellings is refused here, where the whole body is in scope for the first time.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-brace_mix_message">
-          <h3>
-            <a class="anchor" href="#item-brace_mix_message">brace_mix_message</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn brace_mix_message() -&#62; str</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -1995,34 +1897,6 @@
           <pre class="signature"><code>fn param_of(self: ParsedParam) -&#62; Param</code></pre>
 
           <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-resolve_body">
-          <h3>
-            <a class="anchor" href="#item-resolve_body">resolve_body</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn resolve_body(name: str, body: ParsedBody, return_ty: Ty?) -&#62; Expr!ParseError</code></pre>
-
-          <div class="doc"><p>The body, with the struct-literal shorthand resolved. What it builds is exactly the <code>EConstruct</code> the long form parses to, so nothing downstream of the parser sees the sugar at all.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-construct_ty_name">
-          <h3>
-            <a class="anchor" href="#item-construct_ty_name">construct_ty_name</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn construct_ty_name(name: str, return_ty: Ty?, span: Span) -&#62; str!ParseError</code></pre>
-
-          <div class="doc"><p>The shorthand names no type, so the return type has to. A generic return (<code>-&gt; Pair&lt;i64&gt;</code>) contributes its base name and infers its arguments, exactly as writing <code>Pair { .. }</code> would.</p></div>
 
 
         </section>

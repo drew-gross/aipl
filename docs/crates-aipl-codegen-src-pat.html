@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>crates/aipl-codegen/src/pat.aipl — AIPL</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <a class="home" href="index.html">AIPL</a>
+    </header>
+    <main>
+
+      <h1><code>crates/aipl-codegen/src/pat.aipl</code></h1>
+
+
+      <section class="group">
+        <h2 id="public">Public</h2>
+
+
+        <section class="item" id="item-Pat">
+          <h3>
+            <a class="anchor" href="#item-Pat">Pat</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Pat</code></pre>
+
+          <div class="doc"><p><code>aipl_syntax::ast::Pattern</code>. Its <code>Ctor</code> case is a struct variant there and a named payload here, which is as close as the two declarations get: the slot names are the same three, in the same order.</p><p><code>Array</code> — the destructuring <code>[a, b] =&gt; ..</code> arm — holds a list of *expressions*, which is why nothing under the <code>pattern</code> production produces one: it hangs off <code>match_arm</code>, where the elements are an ordinary <code>args</code> list.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Ctor"><code>Ctor(name: str, bindings: str[], ignore_payload: bool)</code></li>
+
+            <li id="item-Str"><code>Str(str)</code></li>
+
+            <li id="item-Char"><code>Char(char)</code></li>
+
+            <li id="item-Array"><code>Array(Expr[])</code></li>
+
+            <li id="item-Wildcard"><code>Wildcard</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-show_pat">
+          <h3>
+            <a class="anchor" href="#item-show_pat">show_pat</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_pat(self: Pat) -&#62; str</code></pre>
+
+          <div class="doc"><p>A pattern as a one-line dump, in the spelling that produced it: <code>Ctor(a, b)</code>, <code>Ctor(..)</code>, a bare name, <code>_</code>. The two literal forms are tagged, because their whole point is that they are values rather than names and <code>&quot;1&quot;</code> against <code>1</code> would otherwise read the same.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-pat_bindings">
+          <h3>
+            <a class="anchor" href="#item-pat_bindings">pat_bindings</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn pat_bindings(self: Pat) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The names a pattern binds, in order — <code>Pattern::bindings</code> in Rust. It is what an arm's alternatives must agree on, so that a shared body means the same thing whichever alternative matched.</p><p>An array pattern binds its <code>Ident</code> elements and nothing else: a literal element is a value to match, not a name to bind.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-pat_label">
+          <h3>
+            <a class="anchor" href="#item-pat_label">pat_label</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn pat_label(self: Pat) -&#62; str</code></pre>
+
+          <div class="doc"><p>How a pattern is named in the &quot;alternatives must bind the same names&quot; diagnostic: the constructor for a constructor pattern, and a description for the literal forms, which bind nothing and so only ever appear on the side that binds nothing.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binder_list">
+          <h3>
+            <a class="anchor" href="#item-binder_list">binder_list</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn binder_list(self: str[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>The binder list as the same diagnostic writes it: each name quoted, or the word &quot;nothing&quot; when there are none.</p></div>
+
+
+        </section>
+
+
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-no_names">
+          <h3>
+            <a class="anchor" href="#item-no_names">no_names</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn no_names() -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The empty binding list, which <code>#{}</code>'s sibling problem makes worth naming: an empty array literal does not flex through a generic parameter, so a <code>[]</code> written in argument or return position needs somewhere to be annotated.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_ident">
+          <h3>
+            <a class="anchor" href="#item-is_ident">is_ident</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_ident(self: Expr) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ident_name">
+          <h3>
+            <a class="anchor" href="#item-ident_name">ident_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn ident_name(self: Expr) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-quoted">
+          <h3>
+            <a class="anchor" href="#item-quoted">quoted</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn quoted(self: str) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+      </section>
+
+
+    </main>
+    <footer>Generated by <code>aipl docs</code>.</footer>
+  </body>
+</html>

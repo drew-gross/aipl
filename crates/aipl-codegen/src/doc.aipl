@@ -64,7 +64,7 @@ variant Doc =
 
 # The printer's work-stack, as a cons-list of `(indent-columns, flat?, doc)`
 # frames — the tail-recursive analog of the Rust printer's `Vec` work stack.
-variant Work = WNil | WCons(u64, bool, Doc, Work)
+variant Work = Nil | Cons(u64, bool, Doc, Work)
 
 // ---------- constructors ----------
 
@@ -99,7 +99,7 @@ fn has_hard(self: Doc) -> bool {
 # spaces; trailing whitespace is stripped from every line, and the result ends
 # in a newline whenever it spans more than one line.
 pub fn print(self: Doc, width: u64) -> str {
-    let pieces = go(width, 0, WCons(0, false, self, WNil), []);
+    let pieces = go(width, 0, Cons(0, false, self, Nil), []);
     cleanup(pieces.join())
 }
 
@@ -119,10 +119,10 @@ fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -> str[] {
     mut running = true;
     while (running) {
         match (work) {
-            WNil => {
+            Nil => {
                 set running = false;
             },
-            WCons(sp, flat, d, rest) => match (d) {
+            Cons(sp, flat, d, rest) => match (d) {
                 Text(s) => {
                     set acc.push(s);
                     set col = col_after(col, s);
@@ -166,11 +166,11 @@ fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -> str[] {
                     set work = rest;
                 },
                 Indent(inner) => {
-                    set work = WCons(sp + 4, flat, inner, rest);
+                    set work = Cons(sp + 4, flat, inner, rest);
                 },
                 Group(forced, inner) => {
                     let mode = group_flat(forced, width, col, sp, inner, rest);
-                    set work = WCons(sp, mode, inner, rest);
+                    set work = Cons(sp, mode, inner, rest);
                 },
                 IfBroken(s) => if (flat) {
                     set work = rest;
@@ -194,7 +194,7 @@ fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -> str[] {
 # so a line already past the limit floors at 0 rather than going negative — the
 # same thing the Rust printer gets from `usize::saturating_sub`.
 fn group_flat(forced: bool, width: u64, col: u64, sp: u64, inner: Doc, rest: Work) -> bool {
-    if (forced) { false } else { fits(width - col, WCons(sp, true, inner, rest)) }
+    if (forced) { false } else { fits(width - col, Cons(sp, true, inner, rest)) }
 }
 
 # Would the pending work — the flat candidate followed by the outer frames, each
@@ -206,18 +206,18 @@ fn group_flat(forced: bool, width: u64, col: u64, sp: u64, inner: Doc, rest: Wor
 # wrapped-around remainder.
 fn fits(budget: u64, work: Work) -> bool {
     match (work) {
-        WNil => true,
-        WCons(sp, flat, d, rest) => match (d) {
+        Nil => true,
+        Cons(sp, flat, d, rest) => match (d) {
             Text(s) | RawBlock(s) => fits_atom(budget, s, flat, rest),
             Concat(ds) => fits(budget, prepend(ds, sp, flat, rest)),
             Line => if (flat) { fits_after(budget, 1, rest) } else { true },
             SoftLine => if (flat) { fits(budget, rest) } else { true },
             HardLine | BlankLine => true,
-            Indent(inner) => fits(budget, WCons(sp, flat, inner, rest)),
+            Indent(inner) => fits(budget, Cons(sp, flat, inner, rest)),
             Group(forced, inner) => if (forced) {
                 !flat
             } else {
-                fits(budget, WCons(sp, flat, inner, rest))
+                fits(budget, Cons(sp, flat, inner, rest))
             },
             IfBroken(s) => if (flat) {
                 fits(budget, rest)
@@ -248,7 +248,7 @@ fn fits_atom(budget: u64, s: str, flat: bool, rest: Work) -> bool {
 # Prepend an array of children onto the work-list so `ds[0]` is processed first:
 # a right fold over `ds`, each frame carrying the parent's indent and mode.
 fn prepend(ds: Doc[], sp: u64, flat: bool, rest: Work) -> Work {
-    ds.right_fold(rest, |d, work| WCons(sp, flat, d, work))
+    ds.right_fold(rest, |d, work| Cons(sp, flat, d, work))
 }
 
 # The column just past `text` when appended at column `col`: the length of its

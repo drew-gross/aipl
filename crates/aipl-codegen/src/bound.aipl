@@ -1,0 +1,70 @@
+// `aipl_syntax::ast::Bound` as AIPL declares it. One of the files the AST is
+// declared across; see `ast.aipl`.
+import { equal as == } from builtins;
+
+# `aipl_syntax::ast::Bound` — a constraint on a declared type variable. `any`
+# accepts anything, `ord` narrows to the primitives usable with `<`/`>`, and
+# `variant` to the tagged types a `match` can inspect.
+variant Bound = Any | Ord | Variant
+
+# The bound a keyword names, or `none` when it names none of them. The
+# `variant` bound has a keyword of its own in the grammar and so never reaches
+# here.
+pub fn bound_from_name(name: str) -> Bound? {
+    match (name) {
+        "any" => some(Any),
+        "ord" => some(Ord),
+        _ => none,
+    }
+}.test({
+    assert(bound_from_name("any") == some(Any));
+    assert(bound_from_name("ord") == some(Ord));
+    assert(bound_from_name("eq") == none);
+
+    // `variant` is its own keyword in type-parameter position, so it is not a
+    // bound *name* — the grammar tells the two apart before this is asked.
+    assert(bound_from_name("variant") == none);
+})
+
+pub fn show_bound(self: Bound) -> str {
+    match (self) {
+        Any => "any",
+        Ord => "ord",
+        Variant => "variant",
+    }
+}
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 264
+binary size: 3136
+  code: 1660
+  data: 245
+  metadata: 1231
+functions:
+  __eq_Bound:
+    calls: 0
+    bytes: 64
+  __eq_Bound$opt:
+    calls: 2
+    bytes: 92
+  __test$bound_from_name:
+    calls: 1
+    bytes: 1384
+  aipl_assert:
+    calls: 4
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 120

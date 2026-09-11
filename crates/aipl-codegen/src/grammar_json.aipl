@@ -9,16 +9,16 @@
 //
 // Two things worth reading before the grammar:
 //
-//   - **Numbers stay text.** `JNumber` carries the source spelling rather than a
+//   - **Numbers stay text.** `Number` carries the source spelling rather than a
 //     parsed value. JSON's number syntax is wider than any one AIPL type (an
 //     arbitrary-precision integer is legal JSON), so *what a number means* is the
 //     consumer's policy, exactly as it is for the lexer's `Int`/`Float`, which
 //     hand over their digits unparsed for the same reason.
-//   - **`JMember` is where a uniform lowering type shows its seam.** `Build<A>`
+//   - **`Member` is where a uniform lowering type shows its seam.** `Build<A>`
 //     pins one `A` for every production in a grammar, so the `member` production
 //     — whose natural result is a key/value *pair*, not a JSON value — has to
 //     lower to a `Json` too. It gets a case of its own, meaningful only as an
-//     element of a `JObject`. That is the honest cost of one lowering type per
+//     element of a `Object`. That is the honest cost of one lowering type per
 //     grammar, and it is worth knowing before the grammar describes AIPL itself,
 //     where the AST has many more shapes than its expression type.
 import {
@@ -79,16 +79,16 @@ import { unescape } from "./unescape.aipl";
 # string token tell itself apart from a number, which is all `Term` needs.
 variant JsonTok = Str(str) | Num | Kw | Punct
 
-# The AST. `JNumber` keeps the source spelling (see the header); `JMember` is a
-# key/value pair and is meaningful only inside a `JObject`.
+# The AST. `Number` keeps the source spelling (see the header); `Member` is a
+# key/value pair and is meaningful only inside a `Object`.
 variant Json =
-    | JNull
-    | JBool(bool)
-    | JNumber(str)
-    | JString(str)
-    | JArray(Json[])
-    | JObject(Json[])
-    | JMember(str, Json)
+    | Null
+    | Bool(bool)
+    | Number(str)
+    | String(str)
+    | Array(Json[])
+    | Object(Json[])
+    | Member(str, Json)
 
 # Whitespace is recorded as **trivia** rather than skipped, so the concrete tree
 # covers every byte of the source and reconstructs it exactly. JSON has no
@@ -131,9 +131,9 @@ fn lower_value(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
         })
 }
 
-fn lower_object(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(JObject(kids)) }
+fn lower_object(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(Object(kids)) }
 
-fn lower_array(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(JArray(kids)) }
+fn lower_array(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(Array(kids)) }
 
 # A member's value is its one interior child; its key is the string token in
 # front of the `:`, which is a *leaf* and so has no lowered value — the node's
@@ -146,24 +146,24 @@ fn lower_member(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
     let value = kids
         .first()
         .value_or_err(ParseError { message: "a member has no value", span: node.span() })?;
-    ok(JMember(unquote(src[key]).unescape(), value))
+    ok(Member(unquote(src[key]).unescape(), value))
 }
 
 fn lower_string(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
-    ok(JString(unquote(node.token_text(src)).unescape()))
+    ok(String(unquote(node.token_text(src)).unescape()))
 }
 
 # The spelling, sign included — `token_text` runs the matched tokens together
 # with nothing between them, which is exactly right for `-` followed by digits.
 fn lower_number(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
-    ok(JNumber(node.token_text(src)))
+    ok(Number(node.token_text(src)))
 }
 
 fn lower_bool(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
-    ok(JBool(node.token_text(src) == "true"))
+    ok(Bool(node.token_text(src) == "true"))
 }
 
-fn lower_null(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(JNull) }
+fn lower_null(src: str, node: Cst, kids: Json[]) -> Json!ParseError { ok(Null) }
 
 # `s` without its first and last byte — a string token's surrounding quotes. The
 # lexer guarantees both are there (a `Delimited` match spans them), so this needs
@@ -308,47 +308,47 @@ pub fn json_cst(src: str) -> Cst!ParseError {
 # The `Json` `src` denotes: lex, parse to a concrete tree, lower it through
 # the grammar's `build` functions.
 #
-# Numbers arrive as their source spelling (`JNumber("1e9")`), since JSON's
+# Numbers arrive as their source spelling (`Number("1e9")`), since JSON's
 # number syntax is wider than any one AIPL type — parsing one is the
 # consumer's policy.
 pub fn parse_json(src: str) -> Json!ParseError {
     parse(src, lex_json(src)?, json_grammar(), "value")
 }.test({
     // ---- the terminal classes, one at a time ----
-    assert(parse_json("null")? == JNull);
-    assert(parse_json("true")? == JBool(true));
-    assert(parse_json("false")? == JBool(false));
-    assert(parse_json("\"hi\"")? == JString("hi"));
-    assert(parse_json("42")? == JNumber("42"));
-    assert(parse_json("3.14")? == JNumber("3.14"));
-    assert(parse_json("1e9")? == JNumber("1e9"));
+    assert(parse_json("null")? == Null);
+    assert(parse_json("true")? == Bool(true));
+    assert(parse_json("false")? == Bool(false));
+    assert(parse_json("\"hi\"")? == String("hi"));
+    assert(parse_json("42")? == Number("42"));
+    assert(parse_json("3.14")? == Number("3.14"));
+    assert(parse_json("1e9")? == Number("1e9"));
 
     // The sign is the grammar's, not the lexer's, so it reads back attached.
-    assert(parse_json("-7")? == JNumber("-7"));
-    assert(parse_json("-2.5")? == JNumber("-2.5"));
+    assert(parse_json("-7")? == Number("-7"));
+    assert(parse_json("-2.5")? == Number("-2.5"));
 
     // Escapes are decoded on the way into the AST.
-    assert(parse_json("\"a\\nb\"")? == JString("a\nb"));
-    assert(parse_json("\"q\\\"q\"")? == JString("q\"q"));
+    assert(parse_json("\"a\\nb\"")? == String("a\nb"));
+    assert(parse_json("\"q\\\"q\"")? == String("q\"q"));
 
     // ---- arrays: a separated `Many`, and the empty case ----
-    assert(parse_json("[]")? == JArray([]));
-    assert(parse_json("[1]")? == JArray([JNumber("1")]));
-    assert(parse_json("[1, true, null]")? == JArray([JNumber("1"), JBool(true), JNull]));
+    assert(parse_json("[]")? == Array([]));
+    assert(parse_json("[1]")? == Array([Number("1")]));
+    assert(parse_json("[1, true, null]")? == Array([Number("1"), Bool(true), Null]));
     // Nesting, which is what makes the CST and the parse recursive.
-    assert(parse_json("[[1], []]")? == JArray([JArray([JNumber("1")]), JArray([])]));
+    assert(parse_json("[[1], []]")? == Array([Array([Number("1")]), Array([])]));
 
     // ---- objects ----
-    assert(parse_json("{}")? == JObject([]));
-    assert(parse_json("""{"a": 1}""")? == JObject([JMember("a", JNumber("1"))]));
+    assert(parse_json("{}")? == Object([]));
+    assert(parse_json("""{"a": 1}""")? == Object([Member("a", Number("1"))]));
     assert(
-        parse_json("""{"a": 1, "b": [2]}""")? == JObject([
-            JMember("a", JNumber("1")),
-            JMember("b", JArray([JNumber("2")])),
+        parse_json("""{"a": 1, "b": [2]}""")? == Object([
+            Member("a", Number("1")),
+            Member("b", Array([Number("2")])),
         ]),
     );
     // A key with an escape in it goes through the same decoding as a value.
-    assert(parse_json("""{"a\tb": null}""")? == JObject([JMember("a\tb", JNull)]));
+    assert(parse_json("""{"a\tb": null}""")? == Object([Member("a\tb", Null)]));
 
     // ---- strict about trailing separators ----
     //
@@ -377,17 +377,17 @@ pub fn parse_json(src: str) -> Json!ParseError {
 # `v` a parse produced — which is what makes the pair a usable end-to-end check
 # of the library.
 #
-# A bare `JMember` renders as the `"key":value` it is; it is only meaningful
-# inside a `JObject`, which is where a parse ever puts one.
+# A bare `Member` renders as the `"key":value` it is; it is only meaningful
+# inside a `Object`, which is where a parse ever puts one.
 pub fn render_json(self: Json) -> str {
     match (self) {
-        JNull => "null",
-        JBool(b) => if (b) { "true" } else { "false" },
-        JNumber(n) => n,
-        JString(s) => `"{escape_json(s)}"`,
-        JArray(xs) => `[{xs.map(render_json).join(sep=",")}]`,
-        JObject(ms) => `\{{ms.map(render_json).join(sep=",")}}`,
-        JMember(k, v) => `"{escape_json(k)}":{v.render_json()}`,
+        Null => "null",
+        Bool(b) => if (b) { "true" } else { "false" },
+        Number(n) => n,
+        String(s) => `"{escape_json(s)}"`,
+        Array(xs) => `[{xs.map(render_json).join(sep=",")}]`,
+        Object(ms) => `\{{ms.map(render_json).join(sep=",")}}`,
+        Member(k, v) => `"{escape_json(k)}":{v.render_json()}`,
     }
 }.test({
     // ---- round trip: parse -> lower -> render -> parse ----
@@ -409,9 +409,9 @@ pub fn render_json(self: Json) -> str {
     assert(esc.render_json() == """{"a\"b":"c\nd"}""");
     assert(parse_json(esc.render_json())? == esc);
 
-    assert(render_json(JArray([])) == "[]");
-    assert(render_json(JObject([])) == "{}");
-    assert(render_json(JMember("k", JNull)) == "\"k\":null");
+    assert(render_json(Array([])) == "[]");
+    assert(render_json(Object([])) == "{}");
+    assert(render_json(Member("k", Null)) == "\"k\":null");
 })
 
 # The inverse of the `unescape` lowering applies: the two characters JSON
@@ -452,7 +452,7 @@ fn escape_json(s: str) -> str {
 fn msg_of(src: str) -> str { parse_json(src).map_ok(render_json).failure_message() }
 
 # The concrete tree, rendered against the production names — the debug view a
-# tree assertion reads better as than a nested `CTree` literal.
+# tree assertion reads better as than a nested `Tree` literal.
 fn shown(src: str) -> str!ParseError { ok(json_cst(src)?.show(src, prod_names(json_grammar()))) }
 
 # `src` reformatted: parse it to the concrete tree, then lay that out at `width`.
@@ -499,9 +499,9 @@ deallocations: 33069
 reallocations: 4003
 bytes allocated: 2610026
 instructions executed: 4392195
-binary size: 443648
+binary size: 443600
   code: 286648
-  data: 7908
+  data: 7860
   metadata: 149092
 functions:
   __arr_drop_Json:

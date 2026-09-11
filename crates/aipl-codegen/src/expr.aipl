@@ -1,0 +1,390 @@
+// `aipl_syntax::ast::Expr` and `ExprKind` as AIPL declares them, with the
+// structural dump the lowering's tests assert against. One of the files the
+// AST is declared across; see `ast.aipl`.
+import { Span, equal as ==, first, is_empty, join, logical_not as !, map } from builtins;
+import { Ctor, Pat, show_pat } from "./pat.aipl";
+import { I64 } from "./prim.aipl";
+import { Primitive, Ty, show_ty } from "./ty.aipl";
+
+# block) where its *value* is.
+#
+# The span is this node's *token* span, which is a superset of gazelle's:
+# gazelle's are kept for diagnostics rather than as a record of extent, so a
+# bracketed form's stops before its closing bracket and a unary leaves its own
+# operator out. `aipl_spans_contain_gazelles` is where that is stated and
+# checked; 5e in `PARSER_LIBRARY.md` is where it is argued.
+#
+# `value_span` is a block's tail position: `fn f() -> str { let a = 1; a }`
+# returns the `a`, but the body's span starts at the `let`, so a return-type
+# error would underline the binding. It is recorded while the block is being
+# built, where the tail is in hand, rather than re-walked at every diagnostic.
+#
+# Rust spells it `Option<Box<Span>>`; here it is a plain `Span` with the *empty*
+# one meaning "none", which is the convention already in force for a location
+# that does not exist (see `join_spans`). A struct field cannot be an optional
+# struct anyway — see the constraint list in `PARSER_LIBRARY.md` — and the two
+# spellings mean the same thing, since a recorded value span is never empty: the
+# repair that fills it in runs first.
+#
+# The `ty` field `Expr` carries in Rust is absent — nothing the parser sets it.
+struct Expr { kind: ExprKind, span: Span, value_span: Span }
+
+# One field of a struct literal. A `..base` spread rides as an init with an
+# empty name whose *value* is the `Spread` — the value is what identifies it,
+# exactly as an array-literal spread is identified by being a spread element.
+struct FieldInit { name: str, value: Expr }
+
+# One parameter of a lambda. `ty` is the annotation from `|x: i64| ..`, absent
+# for the bare `|x| ..` form.
+struct LambdaParam { name: str, ty: Ty?, span: Span }
+
+# One arm of a `match`, and the `then` half of an `if let`. Its span is the
+# *pattern's*, so a diagnostic points at what selected the arm rather than at
+# everything it does.
+struct MatchArm { pattern: Pat, body: Expr, span: Span }
+
+# `aipl_syntax::ast::ExprKind`, all 32 cases.
+#
+# Several surface forms are gone by the time they get here, because the AST is
+# where the language stops having them: an operator is an `Call` on its
+# spelling, a range is an `Construct` of the builtin `Span`, a template is a
+# chain of concat calls, and a block is a right-nested `Seq`. That is the same
+# set of desugarings gazelle's build actions do, in the same places.
+#
+# `Call`'s `method_style` is the one bit that says which spelling was written:
+# `recv.f(a)` is stored as the free call `f(recv, a)` with the flag set, so the
+# receiver is `args[0]` either way.
+variant ExprKind =
+    | Num(i64)
+    | Bool(bool)
+    | Str(str)
+    | Char(char)
+    | Ident(str)
+    | Call(name: str, args: Expr[], method_style: bool)
+    | Neg(Expr)
+    | If(Expr, Expr, Expr)
+    | Construct(str, FieldInit[])
+    | Field(Expr, str)
+    | Let(name: str, ty: Ty?, value: Expr, body: Expr)
+    | LetMut(name: str, ty: Ty?, value: Expr, body: Expr)
+    | Assign(lhs: Expr, value: Expr, body: Expr)
+    | For(name: str, iterable: Expr, body: Expr)
+    | While(cond: Expr, body: Expr)
+    | Shim(effect: str, bindings: (str, str)[], body: Expr)
+    | None
+    | Match(Expr, MatchArm[])
+    | IfLet(MatchArm, Expr, Expr)
+    | ArrayLit(Expr[])
+    | Spread(Expr)
+    | SetLit(Expr[])
+    | DictLit((Expr, Expr)[])
+    | Index(Expr, Expr)
+    | Slice(Expr, Expr, Expr?)
+    | Try(Expr)
+    | Unit
+    | Seq(Expr, Expr)
+    | Return(Expr)
+    | Lambda(LambdaParam[], Expr)
+    | TupleLit(Expr[])
+    | KwArg(name: str, value: Expr, forwarded: bool)
+
+# An expression as a one-line structural dump. Spans are left out: they are what
+# 5e has to settle and what would make every assertion unreadable in the
+# meantime, and none of them is what a lowering test is asking about.
+#
+# A free call renders `f(a, b)` and a method call `a.f(b)`, so the `method_style`
+# flag is visible without a tag of its own — the two spellings are the two
+# things it distinguishes.
+pub fn show_expr(self: Expr) -> str {
+    match (self.kind) {
+        Num(n) => `{n}`,
+        Bool(b) => if (b) { "true" } else { "false" },
+        Str(s) => `Str({s})`,
+        Char(c) => `Char({c})`,
+        Ident(n) => n,
+        Call(name, args, method_style) => show_call(name, args, method_style),
+        Neg(e) => `Neg({e.show_expr()})`,
+        If(c, t, f) => `If({c.show_expr()}, {t.show_expr()}, {f.show_expr()})`,
+        Construct(name, fields) => `Construct({name}, [{show_field_inits(fields)}])`,
+        Field(e, name) => `{e.show_expr()}.{name}`,
+        Let(name, ty, value, body) => `Let({name}{show_ann(ty)}, {value.show_expr()}, {body.show_expr()})`,
+        LetMut(name, ty, value, body) => `Mut({name}{show_ann(ty)}, {value.show_expr()}, {body.show_expr()})`,
+        Assign(lhs, value, body) => `Assign({lhs.show_expr()}, {value.show_expr()}, {body.show_expr()})`,
+        For(name, iterable, body) => `For({name}, {iterable.show_expr()}, {body.show_expr()})`,
+        While(cond, body) => `While({cond.show_expr()}, {body.show_expr()})`,
+        Shim(effect, bindings, body) => `Shim({effect}, [{show_binds(bindings)}], {body.show_expr()})`,
+        None => "none",
+        Match(e, arms) => `Match({e.show_expr()}, [{show_arms(arms)}])`,
+        IfLet(arm, e, f) => `IfLet({arm.show_arm()}, {e.show_expr()}, {f.show_expr()})`,
+        ArrayLit(es) => `[{show_exprs(es)}]`,
+        Spread(e) => `..{e.show_expr()}`,
+        SetLit(es) => `Set([{show_exprs(es)}])`,
+        DictLit(ps) => `Dict([{ps.map(show_dict_entry).join(sep=", ")}])`,
+        Index(a, i) => `Index({a.show_expr()}, {i.show_expr()})`,
+        Slice(a, lo, hi) => `Slice({a.show_expr()}, {lo.show_expr()}, {show_opt_expr(hi)})`,
+        Try(e) => `Try({e.show_expr()})`,
+        Unit => "()",
+        Seq(a, b) => `Seq({a.show_expr()}, {b.show_expr()})`,
+        Return(e) => `Return({e.show_expr()})`,
+        Lambda(ps, body) => `Lambda([{ps.map(show_lambda_param).join(sep=", ")}], {body.show_expr()})`,
+        TupleLit(es) => `Tuple({show_exprs(es)})`,
+        KwArg(name, value, forwarded) => if (forwarded) {
+            `KwFwd({name}, {value.show_expr()})`
+        } else {
+            `Kw({name}, {value.show_expr()})`
+        },
+    }
+}.test({
+    let three = num(3);
+    assert(three.show_expr() == "3");
+    assert(ident("x").show_expr() == "x");
+    assert(expr(Str("hi")).show_expr() == "Str(hi)");
+    assert(expr(Char('c')).show_expr() == "Char(c)");
+    assert(expr(Bool(true)).show_expr() == "true");
+    assert(expr(None).show_expr() == "none");
+    assert(expr(Unit).show_expr() == "()");
+    assert(expr(Neg(three)).show_expr() == "Neg(3)");
+    // The two call spellings, which is what `method_style` is for.
+    assert(expr(Call("+", [three, three], false)).show_expr() == "+(3, 3)");
+    assert(expr(Call("f", [ident("xs"), three], true)).show_expr() == "xs.f(3)");
+    assert(expr(Call("f", [ident("xs")], true)).show_expr() == "xs.f()");
+    assert(expr(Field(ident("p"), "x")).show_expr() == "p.x");
+    assert(expr(Spread(ident("xs"))).show_expr() == "..xs");
+    assert(expr(ArrayLit([three, three])).show_expr() == "[3, 3]");
+    assert(expr(TupleLit([three, ident("x")])).show_expr() == "Tuple(3, x)");
+    assert(expr(SetLit([three])).show_expr() == "Set([3])");
+    assert(expr(DictLit([(three, ident("v"))])).show_expr() == "Dict([3: v])");
+    assert(expr(Slice(ident("s"), three, none)).show_expr() == "Slice(s, 3, )");
+    assert(expr(Slice(ident("s"), three, some(three))).show_expr() == "Slice(s, 3, 3)");
+
+    // The annotation is written where the source writes it, and vanishes when
+    // there is none.
+    let i64_ty: Ty = Primitive(I64);
+    assert(expr(Let("x", none, three, ident("x"))).show_expr() == "Let(x, 3, x)");
+    assert(expr(LetMut("x", some(i64_ty), three, ident("x"))).show_expr() == "Mut(x: i64, 3, x)");
+    assert(
+        expr(Shim("prints", [("print", "p")], three)).show_expr() == "Shim(prints, [print = p], 3)",
+    );
+    let arm = MatchArm { pattern: Ctor("some", ["v"], false), body: ident("v"), span: 0..0 };
+    assert(expr(Match(ident("o"), [arm])).show_expr() == "Match(o, [some(v) => v])");
+    assert(
+        expr(Lambda(
+            [LambdaParam { name: "x", ty: none, span: 0..0 }],
+            three,
+        )).show_expr() == "Lambda([x], 3)",
+    );
+    assert(
+        expr(Lambda(
+            [LambdaParam { name: "x", ty: some(i64_ty), span: 0..0 }],
+            three,
+        )).show_expr() == "Lambda([x: i64], 3)",
+    );
+})
+
+# An `Expr` at an empty span — the shorthand this file's own tests are written
+# with, and the one every synthesized node uses (a template's `Str` segments,
+# An expression node at a span — the constructor every lowering uses.
+pub fn at(kind: ExprKind, span: Span) -> Expr { kind, span, value_span: 0..0 }
+
+# an else-less `if`'s unit branch, an open slice's `0`).
+pub fn expr(kind: ExprKind) -> Expr { kind, span: 0..0, value_span: 0..0 }
+
+# The two synthesized leaves that come up most.
+pub fn num(v: i64) -> Expr { expr(Num(v)) }
+
+pub fn ident(name: str) -> Expr { expr(Ident(name)) }
+
+# One match arm as `pattern => body`.
+pub fn show_arm(self: MatchArm) -> str { `{self.pattern.show_pat()} => {self.body.show_expr()}` }
+
+fn show_arms(self: MatchArm[]) -> str { self.map(show_arm).join(sep=", ") }
+
+# A call, in the spelling its `method_style` flag says was written: the receiver
+# is `args[0]` for a method call and an ordinary argument for a free one.
+fn show_call(name: str, args: Expr[], method_style: bool) -> str {
+    if (!method_style) {
+        return `{name}({show_exprs(args)})`;
+    };
+    match (args.first()) {
+        some(recv) => `{recv.show_expr()}.{name}({show_exprs(args[1..])})`,
+        none => `{name}({show_exprs(args)})`,
+    }
+}
+
+pub fn show_exprs(self: Expr[]) -> str { self.map(show_expr).join(sep=", ") }
+
+fn show_opt_expr(self: Expr?) -> str {
+    match (self) {
+        some(e) => e.show_expr(),
+        none => "",
+    }
+}
+
+# `: T` when a binding or a lambda parameter was annotated, and nothing when it
+# was not — so the dump reads like the source did.
+fn show_ann(self: Ty?) -> str {
+    match (self) {
+        some(t) => `: {t.show_ty()}`,
+        none => "",
+    }
+}
+
+fn show_lambda_param(self: LambdaParam) -> str { `{self.name}{show_ann(self.ty)}` }
+
+fn show_field_init(self: FieldInit) -> str {
+    if (self.name.is_empty()) {
+        return self.value.show_expr();
+    };
+    `{self.name}: {self.value.show_expr()}`
+}
+
+fn show_field_inits(self: FieldInit[]) -> str { self.map(show_field_init).join(sep=", ") }
+
+fn show_dict_entry(self: (Expr, Expr)) -> str { `{self.0.show_expr()}: {self.1.show_expr()}` }
+
+fn show_binds(self: (str, str)[]) -> str { self.map(show_bind).join(sep=", ") }
+
+fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
+--- performance ---
+allocations: 216
+deallocations: 216
+reallocations: 13
+bytes allocated: 15750
+instructions executed: 9136
+binary size: 72944
+  code: 45096
+  data: 2394
+  metadata: 25454
+functions:
+  __arr_drop_Expr:
+    calls: 8
+    bytes: 116
+  __arr_drop_LambdaParam:
+    calls: 2
+    bytes: 172
+  __arr_drop_MatchArm:
+    calls: 1
+    bytes: 116
+  __arr_drop___tuple$Expr$Expr:
+    calls: 1
+    bytes: 116
+  __arr_drop___tuple$str$str:
+    calls: 1
+    bytes: 140
+  __arr_retain_Expr:
+    calls: 2
+    bytes: 116
+  __arr_retain_LambdaParam:
+    calls: 0
+    bytes: 172
+  __arr_retain_MatchArm:
+    calls: 0
+    bytes: 116
+  __arr_retain___tuple$Expr$Expr:
+    calls: 0
+    bytes: 116
+  __arr_retain___tuple$str$str:
+    calls: 0
+    bytes: 140
+  __m3__show_ty:
+    calls: 2
+    bytes: 4656
+  __m3__show_tys:
+    calls: 0
+    bytes: 460
+  __rec_drop_Expr:
+    calls: 37
+    bytes: 36
+  __rec_drop_ExprKind:
+    calls: 37
+    bytes: 1260
+  __rec_drop_MatchArm:
+    calls: 1
+    bytes: 72
+  __rec_drop___m1__Pat:
+    calls: 1
+    bytes: 136
+  __rec_drop___m3__Ty:
+    calls: 1
+    bytes: 408
+  __rec_drop___tuple$Expr$Expr:
+    calls: 1
+    bytes: 72
+  __test$show_expr:
+    calls: 1
+    bytes: 14296
+  __to_str_i64:
+    calls: 18
+    bytes: 204
+  aipl_arr_inc:
+    calls: 12
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 37
+    bytes: (external)
+  aipl_array_new:
+    calls: 12
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 13
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 11
+    bytes: (external)
+  aipl_assert:
+    calls: 25
+    bytes: (external)
+  aipl_i64_len:
+    calls: 36
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 78
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 183
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 57
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 105
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 57
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 18
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 108
+  show_ann:
+    calls: 4
+    bytes: 416
+  show_arm:
+    calls: 1
+    bytes: 2028
+  show_call:
+    calls: 3
+    bytes: 1560
+  show_expr:
+    calls: 54
+    bytes: 16984
+  show_exprs:
+    calls: 6
+    bytes: 460
+  show_field_init:
+    calls: 0
+    bytes: 620

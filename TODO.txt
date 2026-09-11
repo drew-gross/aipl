@@ -77,7 +77,6 @@ highlighter:
 misc cleanup:
   section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
-  Remove the C prefix from the CST types, the Ty prefix from the Ty variant, Pat from Pat, Suf from Suffix, B from BraceEntry, Bound from Bound, A from Ast, W from Work, P from Piece, J from Json,
   In group_styles, rs.map(group_styles) is refused
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
   DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
@@ -89,7 +88,6 @@ misc cleanup:
   BinOp should be lowered to a call much earlier in the pipeline, it's currently too easy to inspect a binop and assume it corresponds to a call other than the one it actually does
   unify operators with regular functions even more
   field_size and elem_size_of are apparently near duplicates that can be DRYed
-  remove single-letter prefixes such as JInt and CTree, the caller can import as if they need to disambiguate.
   token_value in lexer.aipl should leverage more having multiple arms to same value
   shift_all can be a map
   use val.method() syntax a _lot_ more. Any time a function could be interpreted as a verb.

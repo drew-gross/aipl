@@ -1,13 +1,13 @@
 // The tree the parser driver (`parse.aipl`) builds: a *concrete* syntax tree,
 // lossless by construction. Every byte of the parsed source is covered by
-// exactly one leaf — `CLeaf` for a token the grammar matched, `CTrivia` for a
+// exactly one leaf — `Leaf` for a token the grammar matched, `Trivia` for a
 // comment or a run of whitespace the lexer set aside — so concatenating a
 // tree's leaf spans in order reproduces the source byte for byte
 // (`text`). That is what a formatter generator needs and what an AST
 // cannot give it: an AST has already thrown away the text that carries no
 // meaning, and a formatter's whole job is to put it back.
 //
-// An interior node is `CTree(prod, kids)`, where `prod` is a production's
+// An interior node is `Tree(prod, kids)`, where `prod` is a production's
 // index in the grammar's `prods` array — not its name. The index is what
 // `link` (see `grammar.aipl`) rewrites rule references into, so the driver
 // never compares strings while parsing; `show` takes the name table when a
@@ -32,7 +32,7 @@ import {
     wrapping_decrement as --,
 } from builtins;
 
-# An interior node is `CTree(prod, kids)`; a `CGroup` is the bracket pair a
+# An interior node is `Tree(prod, kids)`; a `Group` is the bracket pair a
 # bracketed repetition matched, holding its opening kids, the kids between the
 # and its closing kids as three runs.
 #
@@ -41,7 +41,7 @@ import {
 # `Then([Lit("("), x, Lit(")")])` into a `nested_in` leaves every `build` function
 # reading exactly the children it read before. The only pass that sees a group is
 # the formatter, which is the pass that needs to know where the brackets are.
-variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[]) | CGroup(u64, Cst[], Cst[], Cst[])
+variant Cst = Leaf(Span) | Trivia(Span) | Tree(u64, Cst[]) | Group(u64, Cst[], Cst[], Cst[])
 
 # Every leaf span under `self`, in source order — token leaves and trivia
 # alike. The whole losslessness property is stated in terms of this list: the
@@ -49,9 +49,9 @@ variant Cst = CLeaf(Span) | CTrivia(Span) | CTree(u64, Cst[]) | CGroup(u64, Cst[
 # "slice each one and join".
 pub fn leaves(self: Cst) -> Span[] {
     match (self) {
-        CLeaf(sp) | CTrivia(sp) => [sp],
-        CTree(_, kids) => kids.map(leaves).join(),
-        CGroup(_, open, body, close) => [
+        Leaf(sp) | Trivia(sp) => [sp],
+        Tree(_, kids) => kids.map(leaves).join(),
+        Group(_, open, body, close) => [
             ..open.map(leaves).join(),
             ..body.map(leaves).join(),
             ..close.map(leaves).join(),
@@ -72,10 +72,10 @@ pub fn text(self: Cst, src: str) -> str { self.leaves().map(|sp| src[sp]).join()
 # want the blank line in front of it.
 pub fn token_leaves(self: Cst) -> Span[] {
     match (self) {
-        CLeaf(sp) => [sp],
-        CTrivia(..) => [],
-        CTree(_, kids) => kids.map(token_leaves).join(),
-        CGroup(_, open, body, close) => [
+        Leaf(sp) => [sp],
+        Trivia(..) => [],
+        Tree(_, kids) => kids.map(token_leaves).join(),
+        Group(_, open, body, close) => [
             ..open.map(token_leaves).join(),
             ..body.map(token_leaves).join(),
             ..close.map(token_leaves).join(),
@@ -110,10 +110,10 @@ pub fn token_span(self: Cst) -> Span? {
 # The leftmost token span under `self`, or `none` if it holds none.
 fn first_token(self: Cst) -> Span? {
     match (self) {
-        CLeaf(sp) => some(sp),
-        CTrivia(..) => none,
-        CTree(_, kids) => first_token_of(kids),
-        CGroup(_, open, body, close) => match (first_token_of(open)) {
+        Leaf(sp) => some(sp),
+        Trivia(..) => none,
+        Tree(_, kids) => first_token_of(kids),
+        Group(_, open, body, close) => match (first_token_of(open)) {
             some(sp) => some(sp),
             none => match (first_token_of(body)) {
                 some(sp) => some(sp),
@@ -126,10 +126,10 @@ fn first_token(self: Cst) -> Span? {
 # The rightmost token span under `self`, or `none` if it holds none.
 fn last_token(self: Cst) -> Span? {
     match (self) {
-        CLeaf(sp) => some(sp),
-        CTrivia(..) => none,
-        CTree(_, kids) => last_token_of(kids),
-        CGroup(_, open, body, close) => match (last_token_of(close)) {
+        Leaf(sp) => some(sp),
+        Trivia(..) => none,
+        Tree(_, kids) => last_token_of(kids),
+        Group(_, open, body, close) => match (last_token_of(close)) {
             some(sp) => some(sp),
             none => match (last_token_of(body)) {
                 some(sp) => some(sp),
@@ -198,9 +198,9 @@ pub fn span(self: Cst) -> Span {
 # The leftmost leaf span under `self` — a token or trivia — or `none`.
 fn first_leaf(self: Cst) -> Span? {
     match (self) {
-        CLeaf(sp) | CTrivia(sp) => some(sp),
-        CTree(_, kids) => first_leaf_of(kids),
-        CGroup(_, open, body, close) => match (first_leaf_of(open)) {
+        Leaf(sp) | Trivia(sp) => some(sp),
+        Tree(_, kids) => first_leaf_of(kids),
+        Group(_, open, body, close) => match (first_leaf_of(open)) {
             some(sp) => some(sp),
             none => match (first_leaf_of(body)) {
                 some(sp) => some(sp),
@@ -212,9 +212,9 @@ fn first_leaf(self: Cst) -> Span? {
 
 fn last_leaf(self: Cst) -> Span? {
     match (self) {
-        CLeaf(sp) | CTrivia(sp) => some(sp),
-        CTree(_, kids) => last_leaf_of(kids),
-        CGroup(_, open, body, close) => match (last_leaf_of(close)) {
+        Leaf(sp) | Trivia(sp) => some(sp),
+        Tree(_, kids) => last_leaf_of(kids),
+        Group(_, open, body, close) => match (last_leaf_of(close)) {
             some(sp) => some(sp),
             none => match (last_leaf_of(body)) {
                 some(sp) => some(sp),
@@ -259,9 +259,9 @@ fn last_leaf_of(ks: Cst[]) -> Span? {
 #
 # A leaf is dropped because the lowering pass has nothing to hand `build` for one
 # — it has no lowered value, and its text is reachable from the node's own span.
-# A `CGroup` never reaches the test: `flat_kids` splices it away first, which is
+# A `Group` never reaches the test: `flat_kids` splices it away first, which is
 # what makes a group transparent.
-pub fn nodes(self: Cst) -> Cst[] { self.flat_kids().filter(|k| k.case_of() == CTree) }
+pub fn nodes(self: Cst) -> Cst[] { self.flat_kids().filter(|k| k.case_of() == Tree) }
 
 # The direct kids of `self` with every group spliced in place — the one function
 # that makes a group transparent, and what `nodes` and `own_tokens` are both
@@ -269,9 +269,9 @@ pub fn nodes(self: Cst) -> Cst[] { self.flat_kids().filter(|k| k.case_of() == CT
 # nested directly inside another flattens with it.
 fn flat_kids(self: Cst) -> Cst[] {
     match (self) {
-        CLeaf(..) | CTrivia(..) => [],
-        CTree(_, kids) => kids.map(splice).join(),
-        CGroup(_, open, body, close) => [
+        Leaf(..) | Trivia(..) => [],
+        Tree(_, kids) => kids.map(splice).join(),
+        Group(_, open, body, close) => [
             ..open.map(splice).join(),
             ..body.map(splice).join(),
             ..close.map(splice).join(),
@@ -283,8 +283,8 @@ fn flat_kids(self: Cst) -> Cst[] {
 # itself.
 fn splice(self: Cst) -> Cst[] {
     match (self) {
-        CGroup(..) => self.flat_kids(),
-        CLeaf(..) | CTrivia(..) | CTree(..) => [self],
+        Group(..) => self.flat_kids(),
+        Leaf(..) | Trivia(..) | Tree(..) => [self],
     }
 }
 
@@ -306,8 +306,8 @@ pub fn own_token_text(self: Cst, src: str) -> str { self.own_tokens().map(|sp| s
 # Whether `self` is a token leaf: not an interior node, and not trivia.
 fn is_leaf(self: Cst) -> bool {
     match (self) {
-        CLeaf(..) => true,
-        CTree(..) | CTrivia(..) | CGroup(..) => false,
+        Leaf(..) => true,
+        Tree(..) | Trivia(..) | Group(..) => false,
     }
 }
 
@@ -315,8 +315,8 @@ fn is_leaf(self: Cst) -> bool {
 # it (the filter runs first), and reports the empty span rather than failing.
 fn leaf_span(self: Cst) -> Span {
     match (self) {
-        CLeaf(sp) => sp,
-        CTrivia(..) | CTree(..) | CGroup(..) => 0..0,
+        Leaf(sp) => sp,
+        Trivia(..) | Tree(..) | Group(..) => 0..0,
     }
 }
 
@@ -327,16 +327,16 @@ fn leaf_span(self: Cst) -> Span {
 # `?` rather than failing — this is a debug rendering, not a checked one.
 pub fn show(self: Cst, src: str, names: str[]) -> str {
     match (self) {
-        CLeaf(sp) => src[sp],
-        CTrivia(sp) => `~{src[sp]}`,
-        CTree(i, kids) => {
+        Leaf(sp) => src[sp],
+        Trivia(sp) => `~{src[sp]}`,
+        Tree(i, kids) => {
             let parts = kids.map(|k| k.show(src, names));
             let name = names[i].value_or("?");
             if (parts.is_empty()) { `({name})` } else { `({name} {parts.join(sep=" ")})` }
         },
         // A group has no name to print, so it renders as its own brackets: what
         // it holds, between `[` and `]`, whatever the source spelled them.
-        CGroup(_, open, body, close) => {
+        Group(_, open, body, close) => {
             let parts = [..open, ..body, ..close].map(|k| k.show(src, names));
             `[{parts.join(sep=" ")}]`
         },
@@ -346,11 +346,11 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // the grammar skipped over. Built by hand: the driver's own output is
     // exercised in `parse.aipl`, and this file's job is the tree, not the parse.
     let src = "1 + 2";
-    let t = CTree(1, [CLeaf(0..1), CTrivia(1..2), CLeaf(2..3), CTrivia(3..4), CLeaf(4..5)]);
+    let t = Tree(1, [Leaf(0..1), Trivia(1..2), Leaf(2..3), Trivia(3..4), Leaf(4..5)]);
 
-    // What counts as an interior child: a `CTree` does, a `CLeaf` and a
-    // `CTrivia` do not.
-    assert(CTree(0, [CLeaf(0..1), t, CTrivia(1..2)]).nodes() == [t]);
+    // What counts as an interior child: a `Tree` does, a `Leaf` and a
+    // `Trivia` do not.
+    assert(Tree(0, [Leaf(0..1), t, Trivia(1..2)]).nodes() == [t]);
 
     // `token_span` is `span` with the trivia at either edge left out. They agree
     // here because `t` opens and closes on a token...
@@ -359,13 +359,13 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
 
     // ...and disagree the moment one edge is trivia, which is the whole reason
     // the tight one exists: another parser's spans start at the token.
-    let padded = CTree(1, [CTrivia(0..1), CLeaf(1..2), CTrivia(2..3)]);
+    let padded = Tree(1, [Trivia(0..1), Leaf(1..2), Trivia(2..3)]);
     assert(padded.span() == 0..3);
     assert(padded.token_span() == some(1..2));
 
     // A node holding no token has no token span — an interior node for a
     // production that matched empty input.
-    let blank = CTree(1, [CTrivia(0..1)]);
+    let blank = Tree(1, [Trivia(0..1)]);
     assert(blank.token_span() == none);
 
     // Losslessness: the leaves tile the source, so the text comes back whole.
@@ -374,24 +374,24 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(t.span() == 0..5);
 
     // A leaf is its own text and its own span.
-    assert(CLeaf(2..3).text(src) == "+");
-    assert(CTrivia(1..2).span() == 1..2);
+    assert(Leaf(2..3).text(src) == "+");
+    assert(Trivia(1..2).span() == 1..2);
 
     // `token_text` is `text` with the trivia dropped — the spelling a lowering
     // function reads, rather than the bytes a formatter reproduces.
     assert(t.token_leaves() == [0..1, 2..3, 4..5]);
     assert(t.token_text(src) == "1+2");
-    assert(CTrivia(1..2).token_text(src) == "");
-    assert(CTree(1, [CTrivia(1..2), CLeaf(2..3)]).token_text(src) == "+");
+    assert(Trivia(1..2).token_text(src) == "");
+    assert(Tree(1, [Trivia(1..2), Leaf(2..3)]).token_text(src) == "+");
 
     // Nesting: an interior child contributes its own leaves to the parent, in
     // place, so the parent still reconstructs the whole source.
-    let nested = CTree(0, [CLeaf(0..1), CTrivia(1..2), CTree(1, [CLeaf(2..3), CLeaf(3..5)])]);
+    let nested = Tree(0, [Leaf(0..1), Trivia(1..2), Tree(1, [Leaf(2..3), Leaf(3..5)])]);
     assert(nested.text(src) == src);
     assert(nested.span() == 0..5);
     assert(nested.nodes().len() == 1);
     // `nodes` is one level deep and drops leaves: three kids, one interior.
-    assert(nested.nodes() == [CTree(1, [CLeaf(2..3), CLeaf(3..5)])]);
+    assert(nested.nodes() == [Tree(1, [Leaf(2..3), Leaf(3..5)])]);
 
     // `own_tokens` is the mirror — one level deep, leaves only — so between them
     // they are everything `nested` matched directly. The interior child's own
@@ -402,14 +402,14 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // (the last leaf spans `" 2"`, hence the space this one keeps)
     assert(nested.token_text(src) == "1+ 2");
     assert(t.own_tokens() == [0..1, 2..3, 4..5]);
-    assert(CLeaf(0..1).own_tokens() == []);
-    assert(CTree(0, []).own_token_text(src) == "");
+    assert(Leaf(0..1).own_tokens() == []);
+    assert(Tree(0, []).own_token_text(src) == "");
     assert(t.nodes() == []);
-    assert(CLeaf(0..1).nodes() == []);
+    assert(Leaf(0..1).nodes() == []);
 
     // A node that matched nothing has no extent rather than a bogus one.
-    assert(CTree(0, []).span() == 0..0);
-    assert(CTree(0, []).text(src) == "");
+    assert(Tree(0, []).span() == 0..0);
+    assert(Tree(0, []).text(src) == "");
 
     let names = ["expr", "term"];
     assert(t.show(src, names) == "(term 1 ~  + ~  2)");
@@ -417,26 +417,26 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // Trivia renders as `~` followed by its verbatim text — here a space, which
     // is why the whitespace doubles up next to the joining space.
     assert(nested.show(src, names) == "(expr 1 ~  (term +  2))");
-    assert(CTree(0, []).show(src, names) == "(expr)");
+    assert(Tree(0, []).show(src, names) == "(expr)");
     // An index past the end of the name table still renders.
     let far: u64 = 9;
-    assert(CTree(far, []).show(src, names) == "(?)");
+    assert(Tree(far, []).show(src, names) == "(?)");
 
     // ---------- groups ----------
     //
     //                1
     //      0123456789012
     let gs = "(1 + 2) * (3)";
-    let inner = CTree(1, [CLeaf(1..2), CTrivia(2..3), CLeaf(3..4), CTrivia(4..5), CLeaf(5..6)]);
-    let grp = CGroup(0, [CLeaf(0..1)], [inner], [CLeaf(6..7)]);
-    let outer = CTree(
+    let inner = Tree(1, [Leaf(1..2), Trivia(2..3), Leaf(3..4), Trivia(4..5), Leaf(5..6)]);
+    let grp = Group(0, [Leaf(0..1)], [inner], [Leaf(6..7)]);
+    let outer = Tree(
         0,
         [
             grp,
-            CTrivia(7..8),
-            CLeaf(8..9),
-            CTrivia(9..10),
-            CGroup(0, [CLeaf(10..11)], [CTree(1, [CLeaf(11..12)])], [CLeaf(12..13)]),
+            Trivia(7..8),
+            Leaf(8..9),
+            Trivia(9..10),
+            Group(0, [Leaf(10..11)], [Tree(1, [Leaf(11..12)])], [Leaf(12..13)]),
         ],
     );
 
@@ -450,12 +450,12 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // `*` between the two groups is a direct leaf of the parent, and the two
     // bracketed expressions are its two interior children — exactly what the
     // same tree written with `Then` and no group would have handed a `build`.
-    assert(outer.nodes() == [inner, CTree(1, [CLeaf(11..12)])]);
+    assert(outer.nodes() == [inner, Tree(1, [Leaf(11..12)])]);
     assert(outer.own_token_text(gs) == "()*()");
 
     // A group directly inside a group flattens with it, so nesting the brackets
     // does not nest the child list.
-    let doubled = CTree(0, [CGroup(0, [CLeaf(0..1)], [grp], [CLeaf(6..7)])]);
+    let doubled = Tree(0, [Group(0, [Leaf(0..1)], [grp], [Leaf(6..7)])]);
     assert(doubled.nodes() == [inner]);
 
     // A group renders as its own brackets, having no production name to print.
@@ -467,9 +467,9 @@ deallocations: 550
 reallocations: 39
 bytes allocated: 27526
 instructions executed: 30613
-binary size: 62384
+binary size: 62352
   code: 37524
-  data: 2549
+  data: 2517
   metadata: 22311
 functions:
   __arr_drop_Cst:

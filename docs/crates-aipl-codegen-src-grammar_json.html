@@ -52,24 +52,24 @@
           </h3>
           <pre class="signature"><code>variant Json</code></pre>
 
-          <div class="doc"><p>The AST. <code>JNumber</code> keeps the source spelling (see the header); <code>JMember</code> is a key/value pair and is meaningful only inside a <code>JObject</code>.</p></div>
+          <div class="doc"><p>The AST. <code>Number</code> keeps the source spelling (see the header); <code>Member</code> is a key/value pair and is meaningful only inside a <code>Object</code>.</p></div>
 
 
           <ul class="cases">
 
-            <li id="item-JNull"><code>JNull</code></li>
+            <li id="item-Null"><code>Null</code></li>
 
-            <li id="item-JBool"><code>JBool(bool)</code></li>
+            <li id="item-Bool"><code>Bool(bool)</code></li>
 
-            <li id="item-JNumber"><code>JNumber(str)</code></li>
+            <li id="item-Number"><code>Number(str)</code></li>
 
-            <li id="item-JString"><code>JString(str)</code></li>
+            <li id="item-String"><code>String(str)</code></li>
 
-            <li id="item-JArray"><code>JArray(Json[])</code></li>
+            <li id="item-Array"><code>Array(Json[])</code></li>
 
-            <li id="item-JObject"><code>JObject(Json[])</code></li>
+            <li id="item-Object"><code>Object(Json[])</code></li>
 
-            <li id="item-JMember"><code>JMember(str, Json)</code></li>
+            <li id="item-Member"><code>Member(str, Json)</code></li>
 
           </ul>
 
@@ -112,7 +112,7 @@
           </h3>
           <pre class="signature"><code>pub fn parse_json(src: str) -&#62; Json!ParseError</code></pre>
 
-          <div class="doc"><p>The <code>Json</code> <code>src</code> denotes: lex, parse to a concrete tree, lower it through the grammar's <code>build</code> functions.</p><p>Numbers arrive as their source spelling (<code>JNumber(&quot;1e9&quot;)</code>), since JSON's number syntax is wider than any one AIPL type — parsing one is the consumer's policy.</p></div>
+          <div class="doc"><p>The <code>Json</code> <code>src</code> denotes: lex, parse to a concrete tree, lower it through the grammar's <code>build</code> functions.</p><p>Numbers arrive as their source spelling (<code>Number(&quot;1e9&quot;)</code>), since JSON's number syntax is wider than any one AIPL type — parsing one is the consumer's policy.</p></div>
 
 
         </section>
@@ -126,7 +126,7 @@
           </h3>
           <pre class="signature"><code>pub fn render_json(self: Json) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>self</code> printed back as JSON source, in one canonical compact spelling: no spaces, no trailing separators, strings escaped.</p><p>Round-trips with <code>parse_json</code> — <code>parse_json(render_json(v)) == v</code> for every <code>v</code> a parse produced — which is what makes the pair a usable end-to-end check of the library.</p><p>A bare <code>JMember</code> renders as the <code>&quot;key&quot;:value</code> it is; it is only meaningful inside a <code>JObject</code>, which is where a parse ever puts one.</p></div>
+          <div class="doc"><p><code>self</code> printed back as JSON source, in one canonical compact spelling: no spaces, no trailing separators, strings escaped.</p><p>Round-trips with <code>parse_json</code> — <code>parse_json(render_json(v)) == v</code> for every <code>v</code> a parse produced — which is what makes the pair a usable end-to-end check of the library.</p><p>A bare <code>Member</code> renders as the <code>&quot;key&quot;:value</code> it is; it is only meaningful inside a <code>Object</code>, which is where a parse ever puts one.</p></div>
 
 
         </section>
@@ -343,7 +343,7 @@
           </h3>
           <pre class="signature"><code>fn shown(src: str) -&#62; str!ParseError</code></pre>
 
-          <div class="doc"><p>The concrete tree, rendered against the production names — the debug view a tree assertion reads better as than a nested <code>CTree</code> literal.</p></div>
+          <div class="doc"><p>The concrete tree, rendered against the production names — the debug view a tree assertion reads better as than a nested <code>Tree</code> literal.</p></div>
 
 
         </section>

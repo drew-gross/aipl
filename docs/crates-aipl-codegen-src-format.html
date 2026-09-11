@@ -31,11 +31,11 @@
 
           <ul class="cases">
 
-            <li id="item-PTok"><code>PTok(str)</code></li>
+            <li id="item-Tok"><code>Tok(str)</code></li>
 
-            <li id="item-PNode"><code>PNode(Doc, str, str)</code></li>
+            <li id="item-Node"><code>Node(Doc, str, str)</code></li>
 
-            <li id="item-PNote"><code>PNote(str, bool)</code></li>
+            <li id="item-Note"><code>Note(str, bool)</code></li>
 
           </ul>
 
@@ -83,7 +83,7 @@
 
           <ul class="cases">
 
-            <li id="item-FWord"><code>FWord</code></li>
+            <li id="item-Word"><code>Word</code></li>
 
           </ul>
 
@@ -245,7 +245,7 @@
           </h3>
           <pre class="signature"><code>fn group_doc&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, gi: u64, open: Cst[], body: Cst[], close: Cst[], space: (str, str) -&#62; bool) -&#62; Doc!ParseError</code></pre>
 
-          <div class="doc"><p>A <code>CGroup</code> laid out: its brackets around its contents, on one line while they fit and otherwise one item per indented line.</p><p>The brackets are read off the node, not inferred from it. That is the whole difference a group makes here: it says which of its kids opened it and which closed it, so <code>#{a}</code> (a two-token bracket), <code>|a, b|</code> (the same token both ends) and <code>match (e) { .. }</code> (two pairs in one production) are all just groups, with nothing to guess and nothing to be wrong about.</p></div>
+          <div class="doc"><p>A <code>Group</code> laid out: its brackets around its contents, on one line while they fit and otherwise one item per indented line.</p><p>The brackets are read off the node, not inferred from it. That is the whole difference a group makes here: it says which of its kids opened it and which closed it, so <code>#{a}</code> (a two-token bracket), <code>|a, b|</code> (the same token both ends) and <code>match (e) { .. }</code> (two pairs in one production) are all just groups, with nothing to guess and nothing to be wrong about.</p></div>
 
 
         </section>
@@ -271,7 +271,7 @@
             <a class="anchor" href="#item-list_items">list_items</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$21244: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
+          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$21107: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
 
           <div class="doc"><p>The items between a pair of brackets, each laid out inline.</p><p>A token spelled like the style's separator ends the item it follows and is dropped; the style writes the separators back, which is what lets a list that breaks gain a trailing one it never had in the source. With an empty separator every token or child starts a new item instead, which is the juxtaposed list. A comment never starts one — it belongs to the item it was written against.</p></div>
 
@@ -287,7 +287,7 @@
           </h3>
           <pre class="signature"><code>fn grammar_of(layouts: Layout[], groups: ListStyle[]) -&#62; Grammar&#60;FKind, str&#62;</code></pre>
 
-          <div class="doc"><p>A grammar of one production per layout, in order, so a hand-built <code>CTree(i, ..)</code> picks a layout by its index — followed by one throwaway production per group style, so a hand-built <code>CGroup(i, ..)</code> picks a style by its index too.</p><p>The styles cannot simply be handed over: <code>groups</code> is <code>link</code>'s output, rebuilt from the rules every time, so the only way to put a style in the table is to write a rule that has one. The carrier productions are never matched against anything; they exist to be linked.</p></div>
+          <div class="doc"><p>A grammar of one production per layout, in order, so a hand-built <code>Tree(i, ..)</code> picks a layout by its index — followed by one throwaway production per group style, so a hand-built <code>Group(i, ..)</code> picks a style by its index too.</p><p>The styles cannot simply be handed over: <code>groups</code> is <code>link</code>'s output, rebuilt from the rules every time, so the only way to put a style in the table is to write a rule that has one. The carrier productions are never matched against anything; they exist to be linked.</p></div>
 
 
         </section>

@@ -1,0 +1,147 @@
+// `aipl_syntax::ast::Type` as AIPL declares it. One of the files the AST is
+// declared across; see `ast.aipl`.
+import { equal as ==, join, map } from builtins;
+import { I64, Prim, Str, prim_name } from "./prim.aipl";
+
+# `aipl_syntax::ast::Type`, less the four checker sentinels (see the header).
+#
+# `TypeVar` is here for completeness rather than for the parser: a type
+# parameter is written as an ordinary identifier and reaches the AST as
+# `Named`, and `promote_type_vars` is what turns the ones a signature declared
+# into type variables afterwards.
+variant Ty =
+    | Unit
+    | Primitive(Prim)
+    | Named(str)
+    | Case(Ty)
+    | TypeVar(str)
+    | Optional(Ty)
+    | Array(Ty)
+    | Set(Ty)
+    | Dict(Ty, Ty)
+    | Result(Ty, Ty)
+    | Fn(Ty[], Ty)
+    | Tuple(Ty[])
+    | Generic(str, Ty[])
+    | Any
+
+# A type as a one-line structural dump: constructors named, leaves bare. It is
+# the oracle the lowering's tests assert against, so it is deliberately *not*
+# the source spelling — `Array(Optional(i64))` says which way `i64?[]` nested,
+# where re-rendering the source could not.
+pub fn show_ty(self: Ty) -> str {
+    match (self) {
+        Unit => "()",
+        Primitive(p) => p.prim_name(),
+        Named(n) => n,
+        Any => "any",
+        TypeVar(n) => `TypeVar({n})`,
+        Case(t) => `Case({t.show_ty()})`,
+        Optional(t) => `Optional({t.show_ty()})`,
+        Array(t) => `Array({t.show_ty()})`,
+        Set(t) => `Set({t.show_ty()})`,
+        Dict(k, v) => `Dict({k.show_ty()}, {v.show_ty()})`,
+        Result(o, e) => `Result({o.show_ty()}, {e.show_ty()})`,
+        Fn(ps, r) => `Fn([{show_tys(ps)}], {r.show_ty()})`,
+        Tuple(ts) => `Tuple({show_tys(ts)})`,
+        Generic(n, args) => `Generic({n}, {show_tys(args)})`,
+    }
+}.test({
+    let i64_ty: Ty = Primitive(I64);
+    assert(i64_ty.show_ty() == "i64");
+    assert(Array(Optional(i64_ty)).show_ty() == "Array(Optional(i64))");
+    assert(Dict(Primitive(Str), i64_ty).show_ty() == "Dict(str, i64)");
+    assert(Result(Unit, Named("Error")).show_ty() == "Result((), Error)");
+    assert(Fn([i64_ty, Primitive(Str)], Unit).show_ty() == "Fn([i64, str], ())");
+    assert(Tuple([i64_ty, Any]).show_ty() == "Tuple(i64, any)");
+    assert(Generic("Box", [Named("T")]).show_ty() == "Generic(Box, T)");
+    assert(Case(Named("V")).show_ty() == "Case(V)");
+    assert(Set(i64_ty).show_ty() == "Set(i64)");
+    assert(TypeVar("T").show_ty() == "TypeVar(T)");
+})
+
+# The elements of a type list, comma-separated. An empty list renders empty,
+# which is what `() -> R` and `Foo<>` would need if either could be written.
+pub fn show_tys(self: Ty[]) -> str { self.map(show_ty).join(sep=", ") }.test({
+    let empty: Ty[] = [];
+    assert(empty.show_tys() == "");
+    assert([Unit].show_tys() == "()");
+    assert([Primitive(I64), Named("P")].show_tys() == "i64, P");
+})
+--- performance ---
+allocations: 68
+deallocations: 68
+reallocations: 8
+bytes allocated: 4794
+instructions executed: 2884
+binary size: 17792
+  code: 9956
+  data: 966
+  metadata: 6870
+functions:
+  __arr_drop_Ty:
+    calls: 5
+    bytes: 116
+  __arr_retain_Ty:
+    calls: 0
+    bytes: 116
+  __rec_drop_Ty:
+    calls: 22
+    bytes: 408
+  __test$show_ty:
+    calls: 1
+    bytes: 3228
+  __test$show_tys:
+    calls: 1
+    bytes: 796
+  aipl_arr_inc:
+    calls: 3
+    bytes: (external)
+  aipl_array_dec:
+    calls: 15
+    bytes: (external)
+  aipl_array_new:
+    calls: 6
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 8
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 6
+    bytes: (external)
+  aipl_assert:
+    calls: 13
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 22
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 41
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 9
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 19
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 9
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 176
+  show_ty:
+    calls: 27
+    bytes: 4656
+  show_tys:
+    calls: 6
+    bytes: 460

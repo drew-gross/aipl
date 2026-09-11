@@ -65,18 +65,7 @@ import {
     wrapping_add as +,
     wrapping_increment as ++,
 } from builtins;
-import {
-    CGroup,
-    CLeaf,
-    CTree,
-    CTrivia,
-    Cst,
-    nodes,
-    show,
-    span,
-    text,
-    token_leaves,
-} from "./cst.aipl";
+import { Cst, Group, Leaf, Tree, Trivia, nodes, show, span, text, token_leaves } from "./cst.aipl";
 import { First, can_start, first_sets } from "./ebnf.aipl";
 import {
     Climb,
@@ -252,15 +241,15 @@ fn attach_trivia<K: variant>(toks: Token<K>[], trivia: Token<K>[]) -> (Cst[][], 
     for (let t : toks) {
         mut run: Cst[] = [];
         while (trivia_starts_before(trivia, j, t.text.span.start)) {
-            set run.push(CTrivia(trivia_span(trivia, j)));
+            set run.push(Trivia(trivia_span(trivia, j)));
             set j++;
         }
-        set run.push(CLeaf(t.text.span));
+        set run.push(Leaf(t.text.span));
         set attached.push(run);
     }
     mut trailing: Cst[] = [];
     while (j < trivia.len()) {
-        set trailing.push(CTrivia(trivia_span(trivia, j)));
+        set trailing.push(Trivia(trivia_span(trivia, j)));
         set j++;
     }
     (attached, trailing)
@@ -271,13 +260,13 @@ fn attach_trivia<K: variant>(toks: Token<K>[], trivia: Token<K>[]) -> (Cst[][], 
     let toks = [tok_at(2..3), tok_at(6..7)];
     let trivia = [tok_at(0..2), tok_at(3..6), tok_at(7..8)];
     let (attached, trailing) = attach_trivia(toks, trivia);
-    assert(attached == [[CTrivia(0..2), CLeaf(2..3)], [CTrivia(3..6), CLeaf(6..7)]]);
-    assert(trailing == [CTrivia(7..8)]);
+    assert(attached == [[Trivia(0..2), Leaf(2..3)], [Trivia(3..6), Leaf(6..7)]]);
+    assert(trailing == [Trivia(7..8)]);
 
     // No trivia at all: a leaf per token and nothing trailing.
     let bare: Token<Tok>[] = [];
     let (only_leaves, nothing) = attach_trivia([tok_at(0..1)], bare);
-    assert(only_leaves == [[CLeaf(0..1)]]);
+    assert(only_leaves == [[Leaf(0..1)]]);
     let no_trailing: Cst[] = [];
     assert(nothing == no_trailing);
 })
@@ -301,12 +290,12 @@ fn trivia_span<K: variant>(trivia: Token<K>[], j: u64) -> Span {
 # covers the source to its last byte.
 fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
     match (root) {
-        CTree(i, kids) => CTree(i, [..kids, ..p.trailing]),
-        CLeaf(sp) => CLeaf(sp),
-        CTrivia(sp) => CTrivia(sp),
+        Tree(i, kids) => Tree(i, [..kids, ..p.trailing]),
+        Leaf(sp) => Leaf(sp),
+        Trivia(sp) => Trivia(sp),
         // The root is a production's node, never a group — `match_prod` is what
         // `parse_cst` starts with — so there is nothing to append to here.
-        CGroup(gi, open, body, close) => CGroup(gi, open, body, close),
+        Group(gi, open, body, close) => Group(gi, open, body, close),
     }
 }
 
@@ -461,7 +450,7 @@ fn match_many<K: variant, A: any>(
 }
 
 # A bracketed repetition: `open`, then the items, then `close`, kept as one
-# `CGroup` naming style `gi`. It parses exactly as `Then` of the three would;
+# `Group` naming style `gi`. It parses exactly as `Then` of the three would;
 # what it adds is on either side of that.
 #
 # On the way in, the three runs stay separate in the tree, so the formatter knows
@@ -504,7 +493,7 @@ fn match_group<K: variant, A: any>(
         };
         return ok(no(sc.far, pos));
     };
-    ok(Step { hit: true, pos: sc.pos, kids: [CGroup(gi, so.kids, sb.kids, sc.kids)], far: sc.far })
+    ok(Step { hit: true, pos: sc.pos, kids: [Group(gi, so.kids, sb.kids, sc.kids)], far: sc.far })
 }
 
 # The repetition itself, without brackets.
@@ -635,7 +624,7 @@ fn match_maybe<K: variant, A: any>(
 }
 
 # A reference to production `i` — and the only rule that builds a node. The
-# production's own rule matches, and its children go into one `CTree(i, ..)`.
+# production's own rule matches, and its children go into one `Tree(i, ..)`.
 #
 # A labelled production that fails *without getting anywhere* reports as its
 # label instead of as the expectations from inside it — the collapse
@@ -671,7 +660,7 @@ fn match_prod<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, far: Far) -
     };
     let st = match_rule(p, rule, pos, i, far)?;
     if (st.hit) {
-        return ok(Step { hit: true, pos: st.pos, kids: [CTree(i, st.kids)], far: st.far });
+        return ok(Step { hit: true, pos: st.pos, kids: [Tree(i, st.kids)], far: st.far });
     };
     if (pos < st.far.pos || expect_as.is_empty()) {
         return ok(no(st.far, pos));
@@ -897,7 +886,7 @@ fn climb<K: variant, A: any>(
                 let rhs = climb(p, atom, precs, cp + 1, next_min, cur, f)?;
                 set f = rhs.far;
                 if (rhs.hit) {
-                    set kids = [CTree(cur, kids), ..op_kids, CTree(cur, rhs.kids)];
+                    set kids = [Tree(cur, kids), ..op_kids, Tree(cur, rhs.kids)];
                     set cp = rhs.pos;
                 } else {
                     // An operator with nothing after it: leave it unconsumed for
@@ -1082,7 +1071,7 @@ pub fn lower<K: variant, A: any>(src: str, node: Cst, g: Grammar<K, A>) -> A!Par
 
 fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]) -> A!ParseError {
     match (node) {
-        CTree(i, kids) => {
+        Tree(i, kids) => {
             // `nodes` splices groups away, so a production that wraps a bracket
             // pair hands its `build` the same children it would without one.
             let vals = node.nodes().try_map(|k| lower_node(src, k, prods))?;
@@ -1094,14 +1083,11 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
                 Mk(f) => f(src, node, vals),
             }
         },
-        CLeaf(span) => err(ParseError { message: "a token leaf has no lowered value", span }),
-        CTrivia(span) => err(ParseError { message: "trivia has no lowered value", span }),
+        Leaf(span) => err(ParseError { message: "a token leaf has no lowered value", span }),
+        Trivia(span) => err(ParseError { message: "trivia has no lowered value", span }),
         // Unreachable from a tree `parse_cst` built: `nodes` splices every group
         // away before this recurses, so lowering never lands on one.
-        CGroup(..) => err(ParseError {
-            message: "a group has no lowered value",
-            span: node.span(),
-        }),
+        Group(..) => err(ParseError { message: "a group has no lowered value", span: node.span() }),
     }
 }
 
@@ -1316,12 +1302,12 @@ pub fn parse<K: variant, A: any>(
     // children only, so `build_node` distinguishes a leaf from a branch by
     // whether it got any. `Node` is boxed and recursive, and `build` reaches it
     // through a function *value* — the shape this library was waiting on.
-    assert(parsed("(a b)", g_sexp, "list")? == NNode([NLeaf("a"), NLeaf("b")]));
+    assert(parsed("(a b)", g_sexp, "list")? == List([Atom("a"), Atom("b")]));
     assert(
-        parsed("(a (b) c)", g_sexp, "list")? == NNode([
-            NLeaf("a"),
-            NNode([NNode([NLeaf("b")])]),
-            NLeaf("c"),
+        parsed("(a (b) c)", g_sexp, "list")? == List([
+            Atom("a"),
+            List([List([Atom("b")])]),
+            Atom("c"),
         ]),
     );
     // A `build` that refuses fails the parse with its own error, unchanged.
@@ -1352,13 +1338,13 @@ pub fn parse<K: variant, A: any>(
     // The tree shows the brackets as a group — `[..]` in `show` — with the items
     // between them, and the source still comes back whole.
     assert(shown("(a, b)", g_grp, "list")? == "(list [( (item a) , (item b) )])");
-    assert(parsed("(a, b)", g_grp, "list")? == NNode([NLeaf("a"), NLeaf("b")]));
+    assert(parsed("(a, b)", g_grp, "list")? == List([Atom("a"), Atom("b")]));
 
     // Nested groups nest, and lowering still sees one child per item.
-    assert(parsed("(a, (b))", g_grp, "list")? == NNode([NLeaf("a"), NNode([NNode([NLeaf("b")])])]));
+    assert(parsed("(a, (b))", g_grp, "list")? == List([Atom("a"), List([List([Atom("b")])])]));
 
     // The style rode into the grammar's `groups` table, keyed by the index the
-    // `CGroup` carries.
+    // `Group` carries.
     assert(link(g_grp)?.groups == [ListStyle { spaced: true }]);
 
     // Losslessness holds through a group: trivia inside the brackets attaches to
@@ -1474,15 +1460,15 @@ fn lex_toks(src: str, rules: TokenRule<Tok>[]) -> LexResult<Tok>!ParseError {
     src.lex(rules).map_err(|e| ParseError { message: e.message, span: e.span })
 }
 
-variant Node = NLeaf(str) | NNode(Node[])
+variant Node = Atom(str) | List(Node[])
 
 # The lowering every fixture production uses: a node with no interior children
 # is a leaf carrying its text, anything else a branch carrying its children.
 fn build_node(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
     if (kids.is_nonempty()) {
-        return ok(NNode(kids));
+        return ok(List(kids));
     };
-    ok(NLeaf(node.text(src)))
+    ok(Atom(node.text(src)))
 }
 
 # A `build` that always refuses, for the error-propagation assertion.
@@ -1508,7 +1494,7 @@ fn labelled_prod(name: str, rule: Rule<Tok>, expect_as: str) -> Production<Tok, 
 fn g_of(ps: Production<Tok, Node>[]) -> Grammar<Tok, Node> { prods: ps }
 
 # Parse and render, so an assertion is one readable string rather than a nested
-# `CTree` literal.
+# `Tree` literal.
 fn shown(src: str, g: Grammar<Tok, Node>, start: str) -> str!ParseError {
     let lexed = lex_toks(src, tok_rules())?;
     let tree = parse_cst(src, lexed, g, start)?;
@@ -1543,9 +1529,9 @@ deallocations: 8858
 reallocations: 1737
 bytes allocated: 621987
 instructions executed: 1247352
-binary size: 640072
+binary size: 640048
   code: 389392
-  data: 9876
+  data: 9852
   metadata: 240804
 functions:
   __arr_drop_Node:

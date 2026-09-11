@@ -64,14 +64,14 @@
           </h3>
           <pre class="signature"><code>variant Sym&#60;K: variant&#62;</code></pre>
 
-          <div class="doc"><p>A terminal a match can begin with: a token *kind*, as <code>Term</code> matches it, or an exact *spelling*, as <code>Literal</code> does. Kept apart because the two tests are different — a kind ignores the token's text, a spelling ignores its kind — so a set holding <code>SKind(Num)</code> and one holding <code>SText(&quot;1&quot;)</code> are not the same set even where they accept the same token.</p></div>
+          <div class="doc"><p>A terminal a match can begin with: a token *kind*, as <code>Term</code> matches it, or an exact *spelling*, as <code>Literal</code> does. Kept apart because the two tests are different — a kind ignores the token's text, a spelling ignores its kind — so a set holding <code>Kind(Num)</code> and one holding <code>Text(&quot;1&quot;)</code> are not the same set even where they accept the same token.</p></div>
 
 
           <ul class="cases">
 
-            <li id="item-SKind"><code>SKind(Case&#60;K&#62;)</code></li>
+            <li id="item-Kind"><code>Kind(Case&#60;K&#62;)</code></li>
 
-            <li id="item-SText"><code>SText(str)</code></li>
+            <li id="item-Text"><code>Text(str)</code></li>
 
           </ul>
 
@@ -427,7 +427,7 @@
             <a class="anchor" href="#item-one">one</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn one(name: str, rule: Rule&#60;Kind&#62;) -&#62; Production&#60;Kind, Node&#62;</code></pre>
+          <pre class="signature"><code>fn one(name: str, rule: Rule&#60;Tok&#62;) -&#62; Production&#60;Tok, Node&#62;</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -441,7 +441,7 @@
             <a class="anchor" href="#item-g_of">g_of</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn g_of(ps: Production&#60;Kind, Node&#62;[]) -&#62; Grammar&#60;Kind, Node&#62;</code></pre>
+          <pre class="signature"><code>fn g_of(ps: Production&#60;Tok, Node&#62;[]) -&#62; Grammar&#60;Tok, Node&#62;</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -455,7 +455,7 @@
             <a class="anchor" href="#item-first_msg">first_msg</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn first_msg(r: Rule&#60;Kind&#62;, sets: First&#60;Kind&#62;[]) -&#62; str</code></pre>
+          <pre class="signature"><code>fn first_msg(r: Rule&#60;Tok&#62;, sets: First&#60;Tok&#62;[]) -&#62; str</code></pre>
 
           <div class="doc"><p>The message a <code>rule_first</code> failure reports — and a distinguishable string when it unexpectedly succeeded, so a broken assertion says which way it broke. <code>grammar.aipl</code>'s <code>failure_message</code> is the same idea over a <code>str!ParseError</code>.</p></div>
 
@@ -469,7 +469,7 @@
             <a class="anchor" href="#item-fixture">fixture</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn fixture() -&#62; Grammar&#60;Kind, Node&#62;</code></pre>
+          <pre class="signature"><code>fn fixture() -&#62; Grammar&#60;Tok, Node&#62;</code></pre>
 
           <div class="doc"><p>A grammar with one production per shape worth rendering: a separated list, a sequence, a precedence climb over two levels, an ordered choice with a nested sequence in it, and an optional prefix in front of a one-or-more.</p></div>
 

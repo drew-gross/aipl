@@ -1,0 +1,184 @@
+// One entry of a `#{ .. }` literal and the decision that turns a list of them
+// into a set or a dict. One of the files the AST is declared across; see
+// `ast.aipl`.
+import { Span, equal as ==, is_err_and, is_nonempty, logical_and as &&, push } from builtins;
+import { DictLit, Expr, SetLit, at, num, show_expr } from "./expr.aipl";
+import { ParseError } from "./grammar.aipl";
+
+# One entry of a `#{ .. }` literal, before it is known whether the literal is a
+# set or a dict. Every entry has to be one or the other consistently, and the
+# entries are not all in scope until the whole body is lowered — so the decision
+# belongs to `atom`, and this is what `brace_body` hands it.
+variant BraceEntry = Key(Expr) | Pair(Expr, Expr)
+
+# `#{ .. }` — a set, a dict, or an empty of either, which is both until its use
+# site says. Mixing the two spellings is refused here, where the whole body is
+# in scope for the first time.
+pub fn brace_literal(entries: BraceEntry[], span: Span) -> Expr!ParseError {
+    mut keys: Expr[] = [];
+    mut pairs: (Expr, Expr)[] = [];
+    for (let e : entries) {
+        match (e) {
+            Key(k) => {
+                set keys.push(k);
+            },
+            Pair(k, v) => {
+                set pairs.push((k, v));
+            },
+        };
+    }
+    if (keys.is_nonempty() && pairs.is_nonempty()) {
+        return err(ParseError { message: brace_mix_message(), span });
+    };
+    if (pairs.is_nonempty()) {
+        return ok(at(DictLit(pairs), span));
+    };
+    ok(at(SetLit(keys), span))
+}.test({
+    assert(brace_literal([Key(num(1)), Key(num(2))], 0..0)?.show_expr() == "Set([1, 2])");
+    assert(brace_literal([Pair(num(1), num(2))], 0..0)?.show_expr() == "Dict([1: 2])");
+    // Empty is a set: nothing said "key: value".
+    assert(brace_literal([], 0..0)?.show_expr() == "Set([])");
+    assert(
+        brace_literal([Key(num(1)), Pair(num(1), num(2))], 0..0).is_err_and(
+            |e| e.message == brace_mix_message(),
+        ),
+    );
+})
+
+fn brace_mix_message() -> str {
+    """
+        a "#{ .. }" literal can't mix set elements and "key: value" pairs — use either all bare elements (a set) or all pairs (a dict)
+    """
+}
+--- performance ---
+allocations: 56
+deallocations: 56
+reallocations: 3
+bytes allocated: 3409
+instructions executed: 2408
+binary size: 57344
+  code: 35888
+  data: 852
+  metadata: 20604
+functions:
+  __arr_drop_BraceEntry:
+    calls: 3
+    bytes: 184
+  __arr_drop___m1__Expr:
+    calls: 3
+    bytes: 116
+  __arr_drop___tuple$__m1__Expr$__m1__Expr:
+    calls: 2
+    bytes: 116
+  __arr_retain_BraceEntry:
+    calls: 0
+    bytes: 184
+  __arr_retain___m1__Expr:
+    calls: 4
+    bytes: 116
+  __arr_retain___tuple$__m1__Expr$__m1__Expr:
+    calls: 2
+    bytes: 116
+  __m1__show_ann:
+    calls: 0
+    bytes: 416
+  __m1__show_arm:
+    calls: 0
+    bytes: 2028
+  __m1__show_call:
+    calls: 0
+    bytes: 1560
+  __m1__show_expr:
+    calls: 7
+    bytes: 16984
+  __m1__show_exprs:
+    calls: 2
+    bytes: 460
+  __m1__show_field_init:
+    calls: 0
+    bytes: 620
+  __m4__show_ty:
+    calls: 0
+    bytes: 4656
+  __m4__show_tys:
+    calls: 0
+    bytes: 460
+  __rec_drop___m1__Expr:
+    calls: 10
+    bytes: 36
+  __rec_drop___m1__ExprKind:
+    calls: 10
+    bytes: 1260
+  __rec_drop___tuple$__m1__Expr$__m1__Expr:
+    calls: 2
+    bytes: 72
+  __test$brace_literal:
+    calls: 1
+    bytes: 3376
+  __test_try_fail___m5__ParseError:
+    calls: 0
+    bytes: 84
+  __to_str___m5__ParseError:
+    calls: 0
+    bytes: 824
+  __to_str_i64:
+    calls: 4
+    bytes: 204
+  aipl_arr_inc:
+    calls: 19
+    bytes: (external)
+  aipl_array_dec:
+    calls: 39
+    bytes: (external)
+  aipl_array_new:
+    calls: 12
+    bytes: (external)
+  aipl_array_push:
+    calls: 5
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 3
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 3
+    bytes: (external)
+  aipl_assert:
+    calls: 4
+    bytes: (external)
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 22
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 57
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 14
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 35
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 14
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  brace_literal:
+    calls: 4
+    bytes: 1900
+  main:
+    calls: 1
+    bytes: 116

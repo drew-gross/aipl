@@ -125,24 +125,24 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     // Parentheses are decided by where a rule sits rather than by how it was
     // written: a choice needs them inside a sequence, a sequence only under a
     // postfix, and neither needs them as a whole right-hand side.
-    let r_alt: Rule<Kind> = OneOf([Term(Num), Term(Name)]);
-    let r_seq: Rule<Kind> = Then([Term(Num), OneOf([Term(Name), Literal("+")])]);
-    let r_star: Rule<Kind> = Many(OneOf([Term(Num), Term(Name)]));
-    let r_plus: Rule<Kind> = Many(Then([Term(Num), Term(Name)]), min=1);
+    let r_alt: Rule<Tok> = OneOf([Term(Num), Term(Name)]);
+    let r_seq: Rule<Tok> = Then([Term(Num), OneOf([Term(Name), Literal("+")])]);
+    let r_star: Rule<Tok> = Many(OneOf([Term(Num), Term(Name)]));
+    let r_plus: Rule<Tok> = Many(Then([Term(Num), Term(Name)]), min=1);
     let two: u64 = 2;
-    let r_min2: Rule<Kind> = Many(Term(Num), min=two);
-    let r_opt: Rule<Kind> = Maybe(Named("alt"));
-    let no_rules: Rule<Kind>[] = [];
-    let r_empty: Rule<Kind> = Then(no_rules);
-    let r_never: Rule<Kind> = OneOf(no_rules);
-    let r_list: Rule<Kind> = Many(Term(Num), sep=Literal(","), trailing_sep=false);
+    let r_min2: Rule<Tok> = Many(Term(Num), min=two);
+    let r_opt: Rule<Tok> = Maybe(Named("alt"));
+    let no_rules: Rule<Tok>[] = [];
+    let r_empty: Rule<Tok> = Then(no_rules);
+    let r_never: Rule<Tok> = OneOf(no_rules);
+    let r_list: Rule<Tok> = Many(Term(Num), sep=Literal(","), trailing_sep=false);
 
     // Bounds. One-at-most is `?` and exactly-one is the body written alone,
     // because those are what those bounds mean; anything else is the `{n,m}`
     // longhand EBNF has no operator for.
-    let r_upto: Rule<Kind> = Many(Term(Num), max=1);
-    let r_exactly: Rule<Kind> = Many(Term(Num), min=1, max=1);
-    let r_range: Rule<Kind> = Many(Term(Num), min=two, max=4);
+    let r_upto: Rule<Tok> = Many(Term(Num), max=1);
+    let r_exactly: Rule<Tok> = Many(Term(Num), min=1, max=1);
+    let r_range: Rule<Tok> = Many(Term(Num), min=two, max=4);
     let g = g_of([
         one("alt", r_alt),
         one("seq", r_seq),
@@ -176,7 +176,7 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
 
     // A right-associative level is marked, because the flat rendering is the
     // one thing that cannot show which way it nests.
-    let r_pow: Rule<Kind> = Climb(Term(Num), [Prec { power: 3, right: true, ops: ["^"] }]);
+    let r_pow: Rule<Tok> = Climb(Term(Num), [Prec { power: 3, right: true, ops: ["^"] }]);
     assert(
         ebnf(g_of([one("pow", r_pow)])) == """
             pow = Num ("^" Num)* ; (* precedence: "^" (right) *)
@@ -186,8 +186,8 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     // Total, and indifferent to linking: an unresolved reference renders as the
     // name it names, and an index resolving to nothing as `?`.
     let nine: u64 = 9;
-    let r_far: Rule<Kind> = NamedIdx(nine);
-    let r_miss: Rule<Kind> = Named("nope");
+    let r_far: Rule<Tok> = NamedIdx(nine);
+    let r_miss: Rule<Tok> = Named("nope");
     assert(
         ebnf(g_of([one("a", r_far), one("b", r_miss)])) == """
             a = ? ;
@@ -444,9 +444,9 @@ fn level_text(precs: Prec[], power: u64) -> str {
 # A terminal a match can begin with: a token *kind*, as `Term` matches it, or an
 # exact *spelling*, as `Literal` does. Kept apart because the two tests are
 # different — a kind ignores the token's text, a spelling ignores its kind — so
-# a set holding `SKind(Num)` and one holding `SText("1")` are not the same set
+# a set holding `Kind(Num)` and one holding `Text("1")` are not the same set
 # even where they accept the same token.
-variant Sym<K: variant> = SKind(Case<K>) | SText(str)
+variant Sym<K: variant> = Kind(Case<K>) | Text(str)
 
 # What one production (or one rule) can begin with: the terminal set, and
 # whether it can match nothing at all. `nullable` is not a property of the set —
@@ -471,9 +471,9 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
     // Nullability reaching through a reference is what makes this a fixed point
     // rather than one pass: `a` cannot know it continues past `b` until `b` is
     // known nullable, and `b` is computed after it.
-    let r_a: Rule<Kind> = Then([Named("b"), Named("c")]);
-    let r_b: Rule<Kind> = Maybe(Literal("x"));
-    let r_c: Rule<Kind> = Term(Num);
+    let r_a: Rule<Tok> = Then([Named("b"), Named("c")]);
+    let r_b: Rule<Tok> = Maybe(Literal("x"));
+    let r_c: Rule<Tok> = Term(Num);
     let fp = g_of([one("a", r_a), one("b", r_b), one("c", r_c)]);
     assert(
         show_first_sets(fp)? == """
@@ -485,11 +485,11 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
 
     // Left recursion: the parse would not terminate, and this does — the sets
     // only grow, so the round that adds nothing ends it.
-    let r_e: Rule<Kind> = OneOf([Then([Named("e"), Literal("+"), Term(Num)]), Term(Num)]);
+    let r_e: Rule<Tok> = OneOf([Then([Named("e"), Literal("+"), Term(Num)]), Term(Num)]);
     assert(show_first_sets(g_of([one("e", r_e)]))? == "e = Num");
 
     // It fails only the way `link` fails.
-    let r_bad: Rule<Kind> = Named("nope");
+    let r_bad: Rule<Tok> = Named("nope");
     let bad = g_of([one("a", r_bad)]);
     assert(first_sets(bad) == err(ParseError { message: "no rule named \"nope\"", span: 0..0 }));
 })
@@ -532,12 +532,12 @@ fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseEr
 # is safe here.
 pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseError {
     match (r) {
-        Term(k) => ok(First { syms: [SKind(k)], nullable: false }),
+        Term(k) => ok(First { syms: [Kind(k)], nullable: false }),
         Literal(s) => {
-            // `SText` mentions no `K`, so nothing in the constructor pins the
+            // `Text` mentions no `K`, so nothing in the constructor pins the
             // type parameter — the annotated binding is what does, the same
             // idiom `grammar.aipl` writes its rules with.
-            let sym: Sym<K> = SText(s);
+            let sym: Sym<K> = Text(s);
             ok(First { syms: [sym], nullable: false })
         },
         // A sequence begins with its first element — and also with its second,
@@ -606,7 +606,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     // one alternative with. The optional `!` contributes its spelling without
     // making the sequence nullable, since `atom` after it is not.
     let three: u64 = 3;
-    let r: Rule<Kind> = Then([Maybe(Literal("!")), NamedIdx(three)]);
+    let r: Rule<Tok> = Then([Maybe(Literal("!")), NamedIdx(three)]);
     assert(
         rule_first(r, sets)?.show_first() == """
             "!" Num Name "("
@@ -614,7 +614,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     );
 
     // A whole-sequence nullability: every element optional, so the rule is too.
-    let r_all_opt: Rule<Kind> = Then([Maybe(Literal("!")), Maybe(Term(Num))]);
+    let r_all_opt: Rule<Tok> = Then([Maybe(Literal("!")), Maybe(Term(Num))]);
     assert(
         rule_first(r_all_opt, sets)?.show_first() == """
             "!" Num <empty>
@@ -622,10 +622,10 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     );
 
     // A reference that cannot be followed, and one that points nowhere.
-    let r_named: Rule<Kind> = Named("atom");
+    let r_named: Rule<Tok> = Named("atom");
     assert(first_msg(r_named, sets) == "unlinked rule reference \"atom\"");
     let nine: u64 = 9;
-    let r_far: Rule<Kind> = NamedIdx(nine);
+    let r_far: Rule<Tok> = NamedIdx(nine);
     assert(first_msg(r_far, sets) == "no production at index 9");
 })
 
@@ -655,19 +655,19 @@ pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
         return true;
     };
 
-    // One pass, comparing in place. The obvious spelling — `syms.contains(SKind(kind))
-    // || syms.contains(SText(text))` — reads better but *builds* a `Sym` per call
+    // One pass, comparing in place. The obvious spelling — `syms.contains(Kind(kind))
+    // || syms.contains(Text(text))` — reads better but *builds* a `Sym` per call
     // and walks the set twice, and this is asked once per production reference in
     // a parse. Constructing the needle turned out to cost about what the whole
     // test saves.
     for (let s : self.syms) {
         match (s) {
-            SKind(k) => {
+            Kind(k) => {
                 if (k == kind) {
                     return true;
                 };
             },
-            SText(t) => {
+            Text(t) => {
                 if (t == text) {
                     return true;
                 };
@@ -676,15 +676,15 @@ pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
     }
     false
 }.test({
-    let syms: Sym<Kind>[] = [SKind(Num), SText("(")];
-    let f: First<Kind> = First { syms, nullable: false };
+    let syms: Sym<Tok>[] = [Kind(Num), Text("(")];
+    let f: First<Tok> = First { syms, nullable: false };
 
     // A kind names itself only where the expected type says `Case<K>`, which a
     // constructor argument gives and a plain argument does not — hence the
     // annotated bindings, the same idiom a `Rule` is written with.
-    let num: Case<Kind> = Num;
-    let name: Case<Kind> = Name;
-    let punct: Case<Kind> = Punct;
+    let num: Case<Tok> = Num;
+    let name: Case<Tok> = Name;
+    let punct: Case<Tok> = Punct;
 
     // By kind, ignoring the token's text; by spelling, ignoring its kind.
     assert(f.can_start(num, "3"));
@@ -693,12 +693,12 @@ pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
     assert(!f.can_start(name, "x"));
 
     // A nullable rule accepts anything: it need not consume the token at all.
-    let no_syms: Sym<Kind>[] = [];
-    let nullable: First<Kind> = First { syms: no_syms, nullable: true };
+    let no_syms: Sym<Tok>[] = [];
+    let nullable: First<Tok> = First { syms: no_syms, nullable: true };
     assert(nullable.can_start(name, "x"));
 
     // A rule that begins with nothing and matches nothing accepts nothing.
-    let dead: First<Kind> = First { syms: no_syms, nullable: false };
+    let dead: First<Tok> = First { syms: no_syms, nullable: false };
     assert(!dead.can_start(name, "x"));
 })
 
@@ -717,8 +717,8 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
     };
     `{syms} <empty>`
 }.test({
-    let syms: Sym<Kind>[] = [SKind(Num), SText("(")];
-    let f: First<Kind> = First { syms, nullable: false };
+    let syms: Sym<Tok>[] = [Kind(Num), Text("(")];
+    let f: First<Tok> = First { syms, nullable: false };
     assert(
         f.show_first() == """
             Num "("
@@ -726,7 +726,7 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
     );
 
     // Nullability is not a member of the set, so it renders after it.
-    let nullable: First<Kind> = First { syms: f.syms, nullable: true };
+    let nullable: First<Tok> = First { syms: f.syms, nullable: true };
     assert(
         nullable.show_first() == """
             Num "(" <empty>
@@ -735,17 +735,17 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
 
     // The two degenerate sets are distinguishable: matching only emptiness is
     // not the same as matching nothing at all.
-    let no_syms: Sym<Kind>[] = [];
-    let only_empty: First<Kind> = First { syms: no_syms, nullable: true };
+    let no_syms: Sym<Tok>[] = [];
+    let only_empty: First<Tok> = First { syms: no_syms, nullable: true };
     assert(only_empty.show_first() == "<empty>");
-    let dead: First<Kind> = First { syms: no_syms, nullable: false };
+    let dead: First<Tok> = First { syms: no_syms, nullable: false };
     assert(dead.show_first() == "");
 })
 
 fn show_sym<K: variant>(self: Sym<K>) -> str {
     match (self) {
-        SKind(k) => k.case_name(),
-        SText(s) => dq(s),
+        Kind(k) => k.case_name(),
+        Text(s) => dq(s),
     }
 }
 
@@ -800,27 +800,27 @@ pub fn show_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> str!ParseError {
 // without both, and one grammar over them exercising every `Rule` arm. A real
 // consumer brings its own pair; `grammar_json.aipl` is the worked example.
 
-variant Kind = Num(str) | Name(str) | Punct
+variant Tok = Num(str) | Name(str) | Punct
 
-variant Node = NLeaf(str) | NList(Node[])
+variant Node = Leaf(str) | List(Node[])
 
 # The trivial lowering every fixture production passes: `Build` has no
 # payload-free arm to mean "nothing to lower".
-fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(NList(kids)) }
+fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(List(kids)) }
 
-fn one(name: str, rule: Rule<Kind>) -> Production<Kind, Node> {
+fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> {
     name,
     rule,
     build: Mk(keep),
     layout: Inline,
 }
 
-fn g_of(ps: Production<Kind, Node>[]) -> Grammar<Kind, Node> { prods: ps }
+fn g_of(ps: Production<Tok, Node>[]) -> Grammar<Tok, Node> { prods: ps }
 
 # The message a `rule_first` failure reports — and a distinguishable string when
 # it unexpectedly succeeded, so a broken assertion says which way it broke.
 # `grammar.aipl`'s `failure_message` is the same idea over a `str!ParseError`.
-fn first_msg(r: Rule<Kind>, sets: First<Kind>[]) -> str {
+fn first_msg(r: Rule<Tok>, sets: First<Tok>[]) -> str {
     match (rule_first(r, sets)) {
         ok(f) => `unexpectedly computed: {f.show_first()}`,
         err(e) => e.message,
@@ -830,19 +830,19 @@ fn first_msg(r: Rule<Kind>, sets: First<Kind>[]) -> str {
 # A grammar with one production per shape worth rendering: a separated list, a
 # sequence, a precedence climb over two levels, an ordered choice with a nested
 # sequence in it, and an optional prefix in front of a one-or-more.
-fn fixture() -> Grammar<Kind, Node> {
-    let r_prog: Rule<Kind> = Many(Named("stmt"), sep=Literal(";"));
-    let r_stmt: Rule<Kind> = Then([Term(Name), Literal("="), Named("expr")]);
-    let r_expr: Rule<Kind> = Climb(
+fn fixture() -> Grammar<Tok, Node> {
+    let r_prog: Rule<Tok> = Many(Named("stmt"), sep=Literal(";"));
+    let r_stmt: Rule<Tok> = Then([Term(Name), Literal("="), Named("expr")]);
+    let r_expr: Rule<Tok> = Climb(
         Named("atom"),
         [Prec { power: 1, right: false, ops: ["+"] }, Prec { power: 2, right: false, ops: ["*"] }],
     );
-    let r_atom: Rule<Kind> = OneOf([
+    let r_atom: Rule<Tok> = OneOf([
         Term(Num),
         Term(Name),
         Then([Literal("("), Named("expr"), Literal(")")]),
     ]);
-    let r_opt: Rule<Kind> = Then([Maybe(Literal("!")), Many(Term(Name), min=1)]);
+    let r_opt: Rule<Tok> = Then([Maybe(Literal("!")), Many(Term(Name), min=1)]);
     Grammar {
         prods: [
             one("prog", r_prog),
@@ -859,15 +859,15 @@ deallocations: 1849
 reallocations: 420
 bytes allocated: 173354
 instructions executed: 204402
-binary size: 154304
+binary size: 154264
   code: 100320
   data: 3996
-  metadata: 49988
+  metadata: 49948
 functions:
-  __arr_drop_First$Kind:
+  __arr_drop_First$Tok:
     calls: 23
     bytes: 116
-  __arr_drop_Sym$Kind:
+  __arr_drop_Sym$Tok:
     calls: 182
     bytes: 140
   __arr_drop___m2__ListStyle:
@@ -876,16 +876,16 @@ functions:
   __arr_drop___m2__Prec:
     calls: 3
     bytes: 120
-  __arr_drop___m2__Production$Kind$Node:
+  __arr_drop___m2__Production$Tok$Node:
     calls: 16
     bytes: 188
-  __arr_drop___m2__Rule$Kind:
+  __arr_drop___m2__Rule$Tok:
     calls: 89
     bytes: 116
-  __arr_retain_First$Kind:
+  __arr_retain_First$Tok:
     calls: 95
     bytes: 116
-  __arr_retain_Sym$Kind:
+  __arr_retain_Sym$Tok:
     calls: 139
     bytes: 140
   __arr_retain___m2__ListStyle:
@@ -894,10 +894,10 @@ functions:
   __arr_retain___m2__Prec:
     calls: 0
     bytes: 120
-  __arr_retain___m2__Production$Kind$Node:
+  __arr_retain___m2__Production$Tok$Node:
     calls: 34
     bytes: 188
-  __arr_retain___m2__Rule$Kind:
+  __arr_retain___m2__Rule$Tok:
     calls: 189
     bytes: 116
   __builtin_find_index$str$lam20:
@@ -906,22 +906,22 @@ functions:
   __builtin_find_index$str$lam7:
     calls: 35
     bytes: 400
-  __builtin_try_map$__m2__Production$Kind$Node$First<Kind>$__m2__ParseError$lam15:
+  __builtin_try_map$__m2__Production$Tok$Node$First<Tok>$__m2__ParseError$lam15:
     calls: 17
     bytes: 828
-  __builtin_try_map$__m2__Rule$Kind$__m2__Rule<Kind>$__m2__ParseError$lam38:
+  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam38:
     calls: 46
     bytes: 632
-  __eq_First$Kind:
+  __eq_First$Tok:
     calls: 36
     bytes: 128
-  __eq_First$Kind$arr:
+  __eq_First$Tok$arr:
     calls: 17
     bytes: 284
-  __eq_Sym$Kind:
+  __eq_Sym$Tok:
     calls: 103
     bytes: 144
-  __eq_Sym$Kind$arr:
+  __eq_Sym$Tok$arr:
     calls: 36
     bytes: 284
   __eq___builtin_Span:
@@ -930,31 +930,31 @@ functions:
   __eq___m2__ParseError:
     calls: 1
     bytes: 128
-  __m2__desugar_opt$Kind:
+  __m2__desugar_opt$Tok:
     calls: 25
     bytes: 700
-  __m2__desugar_rule$Kind:
+  __m2__desugar_rule$Tok:
     calls: 237
     bytes: 11936
-  __m2__group_styles$Kind:
+  __m2__group_styles$Tok:
     calls: 0
     bytes: 32
-  __m2__group_styles$Kind$tail:
+  __m2__group_styles$Tok$tail:
     calls: 262
     bytes: 4724
-  __m2__link$Kind$Node:
+  __m2__link$Tok$Node:
     calls: 9
     bytes: 2604
-  __m2__link_opt$Kind:
+  __m2__link_opt$Tok:
     calls: 12
     bytes: 716
-  __m2__link_rule$Kind:
+  __m2__link_rule$Tok:
     calls: 139
     bytes: 8236
-  __m2__link_rules$Kind:
+  __m2__link_rules$Tok:
     calls: 27
     bytes: 732
-  __m2__prod_names$Kind$Node:
+  __m2__prod_names$Tok$Node:
     calls: 20
     bytes: 492
   __map33:
@@ -963,10 +963,10 @@ functions:
   __rec_drop_Node:
     calls: 0
     bytes: 72
-  __rec_drop___m2__Rule$Kind:
+  __rec_drop___m2__Rule$Tok:
     calls: 476
     bytes: 340
-  __rec_drop___tuple$__m2__Rule_Kind$__m2__Rule_Kind:
+  __rec_drop___tuple$__m2__Rule_Tok$__m2__Rule_Tok:
     calls: 0
     bytes: 72
   __test$can_start:
@@ -1065,31 +1065,31 @@ functions:
   aipl_write_u64:
     calls: 4
     bytes: (external)
-  can_start$Kind:
+  can_start$Tok:
     calls: 5
     bytes: 600
-  climb_precs$Kind:
+  climb_precs$Tok:
     calls: 0
     bytes: 32
-  climb_precs$Kind$tail:
+  climb_precs$Tok$tail:
     calls: 90
     bytes: 1644
   dq:
     calls: 47
     bytes: 456
-  ebnf$Kind$Node:
+  ebnf$Tok$Node:
     calls: 6
     bytes: 2416
   first_msg:
     calls: 2
     bytes: 556
-  first_precs$Kind:
+  first_precs$Tok:
     calls: 0
     bytes: 32
-  first_precs$Kind$tail:
+  first_precs$Tok$tail:
     calls: 19
     bytes: 420
-  first_sets$Kind$Node:
+  first_sets$Tok$Node:
     calls: 7
     bytes: 356
   fixture:
@@ -1098,7 +1098,7 @@ functions:
   keep:
     calls: 0
     bytes: 268
-  linked_first_sets$Kind$Node:
+  linked_first_sets$Tok$Node:
     calls: 6
     bytes: 1084
   main:
@@ -1107,21 +1107,21 @@ functions:
   prec_note:
     calls: 30
     bytes: 3468
-  render_rule$Kind:
+  render_rule$Tok:
     calls: 98
     bytes: 9440
   rep_suffix:
     calls: 13
     bytes: 1440
-  rule_first$Kind:
+  rule_first$Tok:
     calls: 228
     bytes: 6188
-  show_first$Kind:
+  show_first$Tok:
     calls: 25
     bytes: 1344
-  show_first_sets$Kind$Node:
+  show_first_sets$Tok$Node:
     calls: 5
     bytes: 2608
-  union_syms$Kind:
+  union_syms$Tok:
     calls: 99
     bytes: 736

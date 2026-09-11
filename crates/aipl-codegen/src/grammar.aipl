@@ -192,7 +192,7 @@ variant Rule<K: variant> =
     // these to a `NamedIdx`, so the driver never compares strings.
     | Named(str)
     // A reference to production `i`, and the *only* rule that builds a CST node
-    // — one `CTree(i, ..)` per reference matched.
+    // — one `Tree(i, ..)` per reference matched.
     | NamedIdx(u64)
     // Precedence climbing — an `atom`, then binary operators drawn from `precs`,
     // nested by binding power. Each application nests under the *enclosing*
@@ -254,7 +254,7 @@ struct ListStyle { sep: str = ",", spaced: bool = false, trailing: bool = true, 
 # Wrapping is not here, and that is the point of `nested_in`. Where a list breaks
 # is a property of the bracket pair holding it, not of the production the pair
 # happens to sit in, so it is written at the brackets and read back off the
-# `CGroup` node they build. A production may hold several groups, each with its
+# `Group` node they build. A production may hold several groups, each with its
 # own style — `match (e) { .. }` is two — which is exactly what a single field on
 # the production could not say.
 variant Layout =
@@ -298,12 +298,12 @@ struct Production<K: variant, A: any> {
 }
 
 # A whole language: its productions, in order. Position is identity — a
-# `NamedIdx` and a `CTree` both name a production by its index here — so the
+# `NamedIdx` and a `Tree` both name a production by its index here — so the
 # order of this array is part of a linked grammar's meaning.
 #
 # `groups` is the same idea for bracket pairs: `link` collects every bracketed
 # `ListStyle` into it, in the order the rules mention them, and stamps the rule
-# with the entry's index. A `CGroup` node then carries that index rather
+# with the entry's index. A `Group` node then carries that index rather
 # than a style, which keeps the CST as free of layout as it is of production
 # names. It is empty on an unlinked grammar and written only by `link`, so no
 # grammar file ever spells it out.
@@ -316,7 +316,7 @@ pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods.map(|
 # Every group style in `r`, in the order the rules mention them: a group's own
 # style first, then the styles inside its brackets. That order is the contract
 # with `link_rule`, which hands out indices by walking the same tree the same
-# way — get the two out of step and a `CGroup` names another group's style.
+# way — get the two out of step and a `Group` names another group's style.
 #
 # Both spellings answer, so an already-linked rule reports the same list as the
 # rule it was linked from, which is what makes `link` idempotent.
@@ -832,11 +832,11 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 # see the naming note in `PARSER_LIBRARY.md`.)
 variant Kind = Atom(str) | Open | Close
 
-variant Node = NAtom(str) | NList(Node[])
+variant Node = Leaf(str) | List(Node[])
 
 # The trivial lowering a production with nothing to lower passes, and all these
 # fixtures need: `Build` has no payload-free arm to mean "don't".
-fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(NList(kids)) }
+fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(List(kids)) }
 
 # The rule of production `i` of `g`, for the assertions above — a grammar value
 # can't be compared with `==` (it holds function values), but the rule inside one

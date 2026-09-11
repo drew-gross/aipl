@@ -189,9 +189,9 @@ Two consequences, one for the language and one for the code written in it:
 - **A definition takes the plain name for what it is.** A type is not
   prefixed to say which family it belongs to, and a function is not suffixed
   to say which type it works on. `doc.aipl` exports `print`, not `print_doc`;
-  `ast.aipl` should export `Str`, not `EStr`. The file the definition lives in
+  `expr.aipl` exports `Str`, not `EStr`. The file the definition lives in
   is its namespace, and a caller who imports two `Str`s writes
-  `import { Str as ExprStr }` for the one it has to tell apart — paying the
+  `import { Str as PatStr }` for the one it has to tell apart — paying the
   prefix only where the ambiguity is real, and choosing a name that says what
   the ambiguity *was*.
 
@@ -209,25 +209,39 @@ site spell the path. `as` puts the cost where the clash is and nowhere else.
 | operators | yes | no operator is ambient; `import { equal as == }` is the *only* way to get one, and where a semantics must be chosen the alias records it: `wrapping_add as +` |
 | `Literal as Lit` in the grammar files | yes | a shortening, not a disambiguation — `as` is also how a file picks the name that reads best in *its* code |
 | `doc.aipl`'s `print` | yes | a caller that also uses the builtin `print` imports it as `print_doc`; the definition stays plain |
-| the AST case families (`EStr`/`PatStr`/`TyNamed`, `SLet`, `A..`) | **no** | prefixed at the definition, so every importer carries the prefix |
+| the AST case families | yes | `Str` is a primitive in `prim.aipl`, an expression in `expr.aipl` and a pattern in `pat.aipl`; `grammar_aipl.aipl`, which holds all three, imports `Str as StrPrim` and `Str as PatStr` and keeps the expression bare |
+| `Ast`, the lowering's seam | yes | its cases wrap the node types by name — `Ty(Ty)`, `Expr(Expr)` — so `ast.aipl` imports the *types* as `TyNode`, `ExprNode`, and the grammar imports the *cases* as `ATy`, `AExpr` |
 | `FmtError`/`ParseError`/`LexError` | **no** | each lives in its own file, so `Error` with an `as` at the one site that holds two would do |
 
-The two **no** rows are inherited, not chosen, and the move is in the same
-direction as §2's: an edit that touches one of these should leave the plain name
-behind it, not add another prefix beside it.
+The **no** row is inherited, not chosen, and the move is in the same direction
+as §2's: an edit that touches it should leave the plain name behind it, not add
+another prefix beside it.
 
-### One definition-side rule falls out of it
+### A clash inside one file is resolved by making two files
 
 `as` renames at the file boundary, so it cannot separate two names that are
-declared in the *same* file. `ast.aipl` holds `Ty`, `ExprKind`, `Pat` and
-`Stmt` together, and each has a string case, so within that file *something*
-has to tell `Str` from `Str` — and today that something is the prefix. That is
-the actual constraint the prefixes were answering, and the answer to it is
-**one variant family per file**, not a naming convention: split the declarations
-so each file exports the plain names, and let the file that needs several of
-them rename on import. The same goes for any pair of definitions that would
-want a prefix to coexist — a shared file is the wrong unit, not a reason to
-prefix.
+declared in the *same* file — and a constructor that collides with another
+top-level name in its own file is not even an error, it is silently shadowed.
+So when two definitions in one file want the same name, the answer is not a
+prefix and not a compromise name: **move one of them to a new file**, and let
+whichever file needs both rename on import. `ast.aipl` was one file holding
+`Ty`, `ExprKind`, `Pat` and `Stmt`, each with a string case, and is now nine;
+`Sexp` left `grammar_sexp.aipl` because its `Atom` and the token kind's `Atom`
+are the same word at two levels.
+
+This is the right direction on its own. A file that holds one idea is one a
+reader can hold whole, and its import list is a complete statement of what the
+idea depends on — where a file holding six has imports that serve any of them
+and a reader who has to work out which. The prefix was doing that work at every
+use site; the file does it once, at the top. So a split that a name clash
+forces is a split that was worth making anyway, and the rule is worth applying
+even where it feels like a lot of files: it is the *file count* that is the
+readable unit, not the line count of any one of them.
+
+The one thing the rule does not reach is a name that must serve as both a type
+and a constructor in the same file — `Ast`'s `Ty(Ty)`. There the type is what
+gets the alias (`import { Ty as TyNode }`), because the case is the file's own
+and the type is a visitor.
 
 ### What it does not mean
 
@@ -238,7 +252,7 @@ is about not encoding *which module* into the name — the module already says
 that.
 
 It does not mean a rename is free for the reader. A file that imports `Str as
-ExprStr` has made `ExprStr` a name a reader must look up, exactly as they would
+PatStr` has made `PatStr` a name a reader must look up, exactly as they would
 have had to look up `EStr`. The difference is that this lookup is in the import
 list at the top of the file they are already reading, and only in the files
 that needed it.

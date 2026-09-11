@@ -157,9 +157,9 @@
 
           <ul class="cases">
 
-            <li id="item-NLeaf"><code>NLeaf(str)</code></li>
+            <li id="item-Atom"><code>Atom(str)</code></li>
 
-            <li id="item-NNode"><code>NNode(Node[])</code></li>
+            <li id="item-List"><code>List(Node[])</code></li>
 
           </ul>
 
@@ -447,7 +447,7 @@
           </h3>
           <pre class="signature"><code>fn match_group&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, gi: u64, brackets: (Rule&#60;K&#62;, Rule&#60;K&#62;), sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-          <div class="doc"><p>A bracketed repetition: <code>open</code>, then the items, then <code>close</code>, kept as one <code>CGroup</code> naming style <code>gi</code>. It parses exactly as <code>Then</code> of the three would; what it adds is on either side of that.</p><p>On the way in, the three runs stay separate in the tree, so the formatter knows which tokens are brackets without inferring it from where they sit. On the way out, a <code>close</code> that fails after <code>open</code> matched records the opening bracket's span on the furthest failure — the parse still backtracks like any non-match, but if nothing else works the message can say which bracket was left open.</p></div>
+          <div class="doc"><p>A bracketed repetition: <code>open</code>, then the items, then <code>close</code>, kept as one <code>Group</code> naming style <code>gi</code>. It parses exactly as <code>Then</code> of the three would; what it adds is on either side of that.</p><p>On the way in, the three runs stay separate in the tree, so the formatter knows which tokens are brackets without inferring it from where they sit. On the way out, a <code>close</code> that fails after <code>open</code> matched records the opening bracket's span on the furthest failure — the parse still backtracks like any non-match, but if nothing else works the message can say which bracket was left open.</p></div>
 
 
         </section>
@@ -517,7 +517,7 @@
           </h3>
           <pre class="signature"><code>fn match_prod&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64, pos: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
-          <div class="doc"><p>A reference to production <code>i</code> — and the only rule that builds a node. The production's own rule matches, and its children go into one <code>CTree(i, ..)</code>.</p><p>A labelled production that fails *without getting anywhere* reports as its label instead of as the expectations from inside it — the collapse <code>SYMBOL_DISPLAY_NAMES</code> performs for the LR parser, where <code>expr</code>/<code>term</code>/<code>atom</code> all render as &quot;expression&quot;. It matters more here than there: under ordered choice every alternative of a failed <code>OneOf</code> leaves its own expectation behind, so an uncollapsed message lists the grammar's internals.</p><p>&quot;Without getting anywhere&quot; is the operative test. When the production failed *deeper* than it started, that deeper expectation is the useful one and the label is not applied; when it failed at its own first token, the label replaces what it expected there — but only what *this* production contributed, since the incoming <code>far</code> (a sibling alternative's expectations at the same position) is what the label is merged into. A transparent production (empty <code>expect_as</code>) never collapses anything: its insides are the message.</p></div>
+          <div class="doc"><p>A reference to production <code>i</code> — and the only rule that builds a node. The production's own rule matches, and its children go into one <code>Tree(i, ..)</code>.</p><p>A labelled production that fails *without getting anywhere* reports as its label instead of as the expectations from inside it — the collapse <code>SYMBOL_DISPLAY_NAMES</code> performs for the LR parser, where <code>expr</code>/<code>term</code>/<code>atom</code> all render as &quot;expression&quot;. It matters more here than there: under ordered choice every alternative of a failed <code>OneOf</code> leaves its own expectation behind, so an uncollapsed message lists the grammar's internals.</p><p>&quot;Without getting anywhere&quot; is the operative test. When the production failed *deeper* than it started, that deeper expectation is the useful one and the label is not applied; when it failed at its own first token, the label replaces what it expected there — but only what *this* production contributed, since the incoming <code>far</code> (a sibling alternative's expectations at the same position) is what the label is merged into. A transparent production (empty <code>expect_as</code>) never collapses anything: its insides are the message.</p></div>
 
 
         </section>
@@ -811,7 +811,7 @@
           </h3>
           <pre class="signature"><code>fn shown(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str!ParseError</code></pre>
 
-          <div class="doc"><p>Parse and render, so an assertion is one readable string rather than a nested <code>CTree</code> literal.</p></div>
+          <div class="doc"><p>Parse and render, so an assertion is one readable string rather than a nested <code>Tree</code> literal.</p></div>
 
 
         </section>
