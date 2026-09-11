@@ -20,7 +20,16 @@
 // so every production lowers to it whatever it is about. It grows a case per
 // node kind as the lowering does; `Ignored` is what a production that has not
 // been given a lowering yet still returns.
-import { equal as ==, is_empty, join, map } from builtins;
+import {
+    Span,
+    equal as ==,
+    filter_map,
+    first,
+    is_empty,
+    join,
+    logical_not as !,
+    map,
+} from builtins;
 
 # The primitive types, `aipl_syntax::ast::Primitive` case for case.
 variant Prim = I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64 | Bool | Char | Str
@@ -144,6 +153,234 @@ pub fn show_tys(self: Ty[]) -> str { self.map(show_ty).join(sep=", ") }.test({
     assert([TyPrimitive(I64), TyNamed("P")].show_tys() == "i64, P");
 })
 
+# `aipl_syntax::ast::Expr` — a kind and the span it was written at.
+#
+# The span is this node's *token* span, which is not byte-for-byte what gazelle
+# records: gazelle's spans are kept for diagnostics rather than as a record of
+# extent, so a bracketed form's stops before its closing bracket and a unary
+# leaves its own operator out (see 5c in `PARSER_LIBRARY.md`). Reconciling the
+# two is 5e's problem, not this declaration's. The `ty` and `value_span` fields
+# `Expr` carries in Rust are absent: nothing the parser produces sets either.
+struct Expr { kind: ExprKind, span: Span }
+
+# One field of a struct literal. A `..base` spread rides as an init with an
+# empty name whose *value* is the `ESpread` — the value is what identifies it,
+# exactly as an array-literal spread is identified by being a spread element.
+struct FieldInit { name: str, value: Expr }
+
+# One parameter of a lambda. `ty` is the annotation from `|x: i64| ..`, absent
+# for the bare `|x| ..` form.
+struct LambdaParam { name: str, ty: Ty?, span: Span }
+
+# One arm of a `match`, and the `then` half of an `if let`. Its span is the
+# *pattern's*, so a diagnostic points at what selected the arm rather than at
+# everything it does.
+struct MatchArm { pattern: Pat, body: Expr, span: Span }
+
+# `aipl_syntax::ast::ExprKind`, all 32 cases.
+#
+# Several surface forms are gone by the time they get here, because the AST is
+# where the language stops having them: an operator is an `ECall` on its
+# spelling, a range is an `EConstruct` of the builtin `Span`, a template is a
+# chain of concat calls, and a block is a right-nested `ESeq`. That is the same
+# set of desugarings gazelle's build actions do, in the same places.
+#
+# `ECall`'s `method_style` is the one bit that says which spelling was written:
+# `recv.f(a)` is stored as the free call `f(recv, a)` with the flag set, so the
+# receiver is `args[0]` either way.
+variant ExprKind =
+    | ENum(i64)
+    | EBool(bool)
+    | EStr(str)
+    | EChar(char)
+    | EIdent(str)
+    | ECall(name: str, args: Expr[], method_style: bool)
+    | ENeg(Expr)
+    | EIf(Expr, Expr, Expr)
+    | EConstruct(str, FieldInit[])
+    | EField(Expr, str)
+    | ELet(name: str, ty: Ty?, value: Expr, body: Expr)
+    | ELetMut(name: str, ty: Ty?, value: Expr, body: Expr)
+    | EAssign(lhs: Expr, value: Expr, body: Expr)
+    | EFor(name: str, iterable: Expr, body: Expr)
+    | EWhile(cond: Expr, body: Expr)
+    | EShim(effect: str, bindings: (str, str)[], body: Expr)
+    | ENone
+    | EMatch(Expr, MatchArm[])
+    | EIfLet(MatchArm, Expr, Expr)
+    | EArrayLit(Expr[])
+    | ESpread(Expr)
+    | ESetLit(Expr[])
+    | EDictLit((Expr, Expr)[])
+    | EIndex(Expr, Expr)
+    | ESlice(Expr, Expr, Expr?)
+    | ETry(Expr)
+    | EUnit
+    | ESeq(Expr, Expr)
+    | EReturn(Expr)
+    | ELambda(LambdaParam[], Expr)
+    | ETupleLit(Expr[])
+    | EKwArg(name: str, value: Expr, forwarded: bool)
+
+# An expression as a one-line structural dump. Spans are left out: they are what
+# 5e has to settle and what would make every assertion unreadable in the
+# meantime, and none of them is what a lowering test is asking about.
+#
+# A free call renders `f(a, b)` and a method call `a.f(b)`, so the `method_style`
+# flag is visible without a tag of its own — the two spellings are the two
+# things it distinguishes.
+pub fn show_expr(self: Expr) -> str {
+    match (self.kind) {
+        ENum(n) => `{n}`,
+        EBool(b) => if (b) { "true" } else { "false" },
+        EStr(s) => `Str({s})`,
+        EChar(c) => `Char({c})`,
+        EIdent(n) => n,
+        ECall(name, args, method_style) => show_call(name, args, method_style),
+        ENeg(e) => `Neg({e.show_expr()})`,
+        EIf(c, t, f) => `If({c.show_expr()}, {t.show_expr()}, {f.show_expr()})`,
+        EConstruct(name, fields) => `Construct({name}, [{show_field_inits(fields)}])`,
+        EField(e, name) => `{e.show_expr()}.{name}`,
+        ELet(name, ty, value, body) => `Let({name}{show_ann(ty)}, {value.show_expr()}, {body.show_expr()})`,
+        ELetMut(name, ty, value, body) => `Mut({name}{show_ann(ty)}, {value.show_expr()}, {body.show_expr()})`,
+        EAssign(lhs, value, body) => `Assign({lhs.show_expr()}, {value.show_expr()}, {body.show_expr()})`,
+        EFor(name, iterable, body) => `For({name}, {iterable.show_expr()}, {body.show_expr()})`,
+        EWhile(cond, body) => `While({cond.show_expr()}, {body.show_expr()})`,
+        EShim(effect, bindings, body) => `Shim({effect}, [{show_binds(bindings)}], {body.show_expr()})`,
+        ENone => "none",
+        EMatch(e, arms) => `Match({e.show_expr()}, [{show_arms(arms)}])`,
+        EIfLet(arm, e, f) => `IfLet({arm.show_arm()}, {e.show_expr()}, {f.show_expr()})`,
+        EArrayLit(es) => `[{show_exprs(es)}]`,
+        ESpread(e) => `..{e.show_expr()}`,
+        ESetLit(es) => `Set([{show_exprs(es)}])`,
+        EDictLit(ps) => `Dict([{ps.map(show_dict_entry).join(sep=", ")}])`,
+        EIndex(a, i) => `Index({a.show_expr()}, {i.show_expr()})`,
+        ESlice(a, lo, hi) => `Slice({a.show_expr()}, {lo.show_expr()}, {show_opt_expr(hi)})`,
+        ETry(e) => `Try({e.show_expr()})`,
+        EUnit => "()",
+        ESeq(a, b) => `Seq({a.show_expr()}, {b.show_expr()})`,
+        EReturn(e) => `Return({e.show_expr()})`,
+        ELambda(ps, body) => `Lambda([{ps.map(show_lambda_param).join(sep=", ")}], {body.show_expr()})`,
+        ETupleLit(es) => `Tuple({show_exprs(es)})`,
+        EKwArg(name, value, forwarded) => if (forwarded) {
+            `KwFwd({name}, {value.show_expr()})`
+        } else {
+            `Kw({name}, {value.show_expr()})`
+        },
+    }
+}.test({
+    let three = num(3);
+    assert(three.show_expr() == "3");
+    assert(ident("x").show_expr() == "x");
+    assert(expr(EStr("hi")).show_expr() == "Str(hi)");
+    assert(expr(EChar('c')).show_expr() == "Char(c)");
+    assert(expr(EBool(true)).show_expr() == "true");
+    assert(expr(ENone).show_expr() == "none");
+    assert(expr(EUnit).show_expr() == "()");
+    assert(expr(ENeg(three)).show_expr() == "Neg(3)");
+    // The two call spellings, which is what `method_style` is for.
+    assert(expr(ECall("+", [three, three], false)).show_expr() == "+(3, 3)");
+    assert(expr(ECall("f", [ident("xs"), three], true)).show_expr() == "xs.f(3)");
+    assert(expr(ECall("f", [ident("xs")], true)).show_expr() == "xs.f()");
+    assert(expr(EField(ident("p"), "x")).show_expr() == "p.x");
+    assert(expr(ESpread(ident("xs"))).show_expr() == "..xs");
+    assert(expr(EArrayLit([three, three])).show_expr() == "[3, 3]");
+    assert(expr(ETupleLit([three, ident("x")])).show_expr() == "Tuple(3, x)");
+    assert(expr(ESetLit([three])).show_expr() == "Set([3])");
+    assert(expr(EDictLit([(three, ident("v"))])).show_expr() == "Dict([3: v])");
+    assert(expr(ESlice(ident("s"), three, none)).show_expr() == "Slice(s, 3, )");
+    assert(expr(ESlice(ident("s"), three, some(three))).show_expr() == "Slice(s, 3, 3)");
+
+    // The annotation is written where the source writes it, and vanishes when
+    // there is none.
+    let i64_ty: Ty = TyPrimitive(I64);
+    assert(expr(ELet("x", none, three, ident("x"))).show_expr() == "Let(x, 3, x)");
+    assert(expr(ELetMut("x", some(i64_ty), three, ident("x"))).show_expr() == "Mut(x: i64, 3, x)");
+    assert(
+        expr(EShim(
+            "prints",
+            [("print", "p")],
+            three,
+        )).show_expr() == "Shim(prints, [print = p], 3)",
+    );
+    let arm = MatchArm { pattern: PatCtor("some", ["v"], false), body: ident("v"), span: 0..0 };
+    assert(expr(EMatch(ident("o"), [arm])).show_expr() == "Match(o, [some(v) => v])");
+    assert(
+        expr(ELambda(
+            [LambdaParam { name: "x", ty: none, span: 0..0 }],
+            three,
+        )).show_expr() == "Lambda([x], 3)",
+    );
+    assert(
+        expr(ELambda(
+            [LambdaParam { name: "x", ty: some(i64_ty), span: 0..0 }],
+            three,
+        )).show_expr() == "Lambda([x: i64], 3)",
+    );
+})
+
+# An `Expr` at an empty span — the shorthand this file's own tests are written
+# with, and the one every synthesized node uses (a template's `Str` segments,
+# an else-less `if`'s unit branch, an open slice's `0`).
+pub fn expr(kind: ExprKind) -> Expr { kind, span: 0..0 }
+
+# The two synthesized leaves that come up most.
+pub fn num(v: i64) -> Expr { expr(ENum(v)) }
+
+pub fn ident(name: str) -> Expr { expr(EIdent(name)) }
+
+# One match arm as `pattern => body`.
+pub fn show_arm(self: MatchArm) -> str { `{self.pattern.show_pat()} => {self.body.show_expr()}` }
+
+fn show_arms(self: MatchArm[]) -> str { self.map(show_arm).join(sep=", ") }
+
+# A call, in the spelling its `method_style` flag says was written: the receiver
+# is `args[0]` for a method call and an ordinary argument for a free one.
+fn show_call(name: str, args: Expr[], method_style: bool) -> str {
+    if (!method_style) {
+        return `{name}({show_exprs(args)})`;
+    };
+    match (args.first()) {
+        some(recv) => `{recv.show_expr()}.{name}({show_exprs(args[1..])})`,
+        none => `{name}({show_exprs(args)})`,
+    }
+}
+
+pub fn show_exprs(self: Expr[]) -> str { self.map(show_expr).join(sep=", ") }
+
+fn show_opt_expr(self: Expr?) -> str {
+    match (self) {
+        some(e) => e.show_expr(),
+        none => "",
+    }
+}
+
+# `: T` when a binding or a lambda parameter was annotated, and nothing when it
+# was not — so the dump reads like the source did.
+fn show_ann(self: Ty?) -> str {
+    match (self) {
+        some(t) => `: {t.show_ty()}`,
+        none => "",
+    }
+}
+
+fn show_lambda_param(self: LambdaParam) -> str { `{self.name}{show_ann(self.ty)}` }
+
+fn show_field_init(self: FieldInit) -> str {
+    if (self.name.is_empty()) {
+        return self.value.show_expr();
+    };
+    `{self.name}: {self.value.show_expr()}`
+}
+
+fn show_field_inits(self: FieldInit[]) -> str { self.map(show_field_init).join(sep=", ") }
+
+fn show_dict_entry(self: (Expr, Expr)) -> str { `{self.0.show_expr()}: {self.1.show_expr()}` }
+
+fn show_binds(self: (str, str)[]) -> str { self.map(show_bind).join(sep=", ") }
+
+fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
+
 # The one type every `build` in `grammar_aipl.aipl` returns, whatever the
 # production is about — `Build<A>` pins a single `A` for a whole grammar, so a
 # grammar describing a language rather than one expression type carries the seam
@@ -161,14 +398,14 @@ pub fn show_tys(self: Ty[]) -> str { self.map(show_ty).join(sep=", ") }.test({
 # named payload here, which is as close as the two declarations get: the slot
 # names are the same three, in the same order.
 #
-# `PatArray` — the destructuring `[a, b] => ..` arm — is absent for now. It holds
-# a list of *expressions*, so it arrives with the expression lowering rather than
-# with this one; nothing under the `pattern` production can produce it, which is
-# why the pattern slice closes without it.
+# `PatArray` — the destructuring `[a, b] => ..` arm — holds a list of
+# *expressions*, which is why nothing under the `pattern` production produces
+# one: it hangs off `match_arm`, where the elements are an ordinary `args` list.
 variant Pat =
     | PatCtor(name: str, bindings: str[], ignore_payload: bool)
     | PatStr(str)
     | PatChar(char)
+    | PatArray(Expr[])
     | PatWildcard
 
 # A pattern as a one-line dump, in the spelling that produced it: `Ctor(a, b)`,
@@ -180,6 +417,7 @@ pub fn show_pat(self: Pat) -> str {
         PatWildcard => "_",
         PatStr(s) => `Str({s})`,
         PatChar(c) => `Char({c})`,
+        PatArray(elems) => `[{show_exprs(elems)}]`,
         PatCtor(name, bindings, ignore_payload) => if (ignore_payload) {
             `{name}(..)`
         } else {
@@ -195,103 +433,350 @@ pub fn show_pat(self: Pat) -> str {
     assert(PatCtor("Circle", no_bindings, true).show_pat() == "Circle(..)");
     assert(PatStr("hi").show_pat() == "Str(hi)");
     assert(PatChar('x').show_pat() == "Char(x)");
+    assert(PatArray([num(1), ident("x")]).show_pat() == "[1, x]");
 })
 
-variant Ast = Ignored | ATy(Ty) | ATys(Ty[]) | APat(Pat) | APayload(str[], bool)
+# The names a pattern binds, in order — `Pattern::bindings` in Rust. It is what
+# an arm's alternatives must agree on, so that a shared body means the same
+# thing whichever alternative matched.
+#
+# An array pattern binds its `EIdent` elements and nothing else: a literal
+# element is a value to match, not a name to bind.
+pub fn pat_bindings(self: Pat) -> str[] {
+    match (self) {
+        PatCtor(_, bindings, _) => bindings,
+        PatArray(elems) => elems.filter_map(is_ident, ident_name),
+        PatStr(..) | PatChar(..) | PatWildcard => no_names(),
+    }
+}.test({
+    let none_bound: str[] = [];
+    assert(PatCtor("Pair", ["a", "b"], false).pat_bindings() == ["a", "b"]);
+    assert(PatCtor("Circle", none_bound, true).pat_bindings() == none_bound);
+    assert(PatWildcard.pat_bindings() == none_bound);
+    assert(PatStr("s").pat_bindings() == none_bound);
+    // A literal element of an array pattern is matched, not bound.
+    assert(PatArray([ident("a"), num(1), ident("b")]).pat_bindings() == ["a", "b"]);
+})
+
+# The empty binding list, which `#{}`'s sibling problem makes worth naming: an
+# empty array literal does not flex through a generic parameter, so a `[]`
+# written in argument or return position needs somewhere to be annotated.
+fn no_names() -> str[] { [] }
+
+fn is_ident(self: Expr) -> bool {
+    if (let EIdent(..) = self.kind) {
+        return true;
+    };
+    false
+}
+
+fn ident_name(self: Expr) -> str {
+    if (let EIdent(name) = self.kind) {
+        return name;
+    };
+    ""
+}
+
+# How a pattern is named in the "alternatives must bind the same names"
+# diagnostic: the constructor for a constructor pattern, and a description for
+# the literal forms, which bind nothing and so only ever appear on the side that
+# binds nothing.
+pub fn pat_label(self: Pat) -> str {
+    match (self) {
+        PatCtor(name, _, _) => `"{name}"`,
+        PatStr(..) => "a string pattern",
+        PatChar(..) => "a char pattern",
+        PatArray(..) => "an array pattern",
+        PatWildcard => "\"_\"",
+    }
+}.test({
+    let none_bound: str[] = [];
+    assert(PatCtor("some", ["v"], false).pat_label() == "\"some\"");
+    assert(PatWildcard.pat_label() == "\"_\"");
+    assert(PatStr("s").pat_label() == "a string pattern");
+    assert(PatArray([ident("a")]).pat_label() == "an array pattern");
+    assert(PatChar('c').pat_label() == "a char pattern");
+    assert(PatCtor("none", none_bound, false).pat_label() == "\"none\"");
+})
+
+# The binder list as the same diagnostic writes it: each name quoted, or the
+# word "nothing" when there are none.
+pub fn binder_list(self: str[]) -> str {
+    if (self.is_empty()) {
+        return "nothing";
+    };
+    self.map(quoted).join(sep=", ")
+}.test({
+    let none_bound: str[] = [];
+    assert(none_bound.binder_list() == "nothing");
+    assert(["v"].binder_list() == "\"v\"");
+    assert(["a", "b"].binder_list() == "\"a\", \"b\"");
+})
+
+fn quoted(self: str) -> str { `"{self}"` }
+
+# One postfix step, before it has a receiver to apply to. `postfix` is an atom
+# followed by a run of these, and a `suffix` on its own is not an expression —
+# which is why it needs a shape of its own rather than an `Expr`.
+#
+# A tuple index is a `SufField`: `p.0` is the field named `_0`, which is how the
+# AST spells it and why nothing downstream has to know tuples have a second
+# syntax for their fields.
+variant Suffix =
+    | SufField(str)
+    | SufMethod(name: str, args: Expr[])
+    | SufIndex(Expr)
+    | SufSliceFrom(Expr)
+    | SufSliceTo(Expr)
+    | SufTry
+
+# One entry of a `#{ .. }` literal, before it is known whether the literal is a
+# set or a dict. Every entry has to be one or the other consistently, and the
+# entries are not all in scope until the whole body is lowered — so the decision
+# belongs to `atom`, and this is what `brace_body` hands it.
+variant BraceEntry = BKey(Expr) | BPair(Expr, Expr)
+
+variant Ast =
+    | Ignored
+    | ATy(Ty)
+    | ATys(Ty[])
+    | APat(Pat)
+    | APayload(str[], bool)
+    | AExpr(Expr)
+    | AExprs(Expr[])
+    | ASuffix(Suffix)
+    | AFieldInit(FieldInit)
+    | ALambdaParam(LambdaParam)
+    | AEntry(BraceEntry)
+    | AEntries(BraceEntry[])
+    | AArms(MatchArm[])
+    | AShimBind(str, str)
+
+# What a child lowered to, as a noun a refusal can name. Every mismatch here is
+# a lowering bug rather than a bad program — the grammar guarantees the shape —
+# so the message says which two shapes disagreed and leaves it at that.
+pub fn ast_case_name(self: Ast) -> str {
+    match (self) {
+        Ignored => "an unlowered node",
+        ATy(..) => "a type",
+        ATys(..) => "a list of types",
+        APat(..) => "a pattern",
+        APayload(..) => "a constructor payload",
+        AExpr(..) => "an expression",
+        AExprs(..) => "a list of expressions",
+        ASuffix(..) => "a postfix suffix",
+        AFieldInit(..) => "a field initializer",
+        ALambdaParam(..) => "a lambda parameter",
+        AEntry(..) => "a brace-literal entry",
+        AEntries(..) => "a list of brace-literal entries",
+        AArms(..) => "a list of match arms",
+        AShimBind(..) => "a shim binding",
+    }
+}.test({
+    assert(Ignored.ast_case_name() == "an unlowered node");
+    assert(ATy(TyUnit).ast_case_name() == "a type");
+    assert(AExpr(num(1)).ast_case_name() == "an expression");
+    assert(ASuffix(SufTry).ast_case_name() == "a postfix suffix");
+})
 --- performance ---
-allocations: 84
-deallocations: 84
-reallocations: 8
-bytes allocated: 6008
-instructions executed: 4898
-binary size: 34632
-  code: 21244
-  data: 2184
-  metadata: 11204
+allocations: 368
+deallocations: 368
+reallocations: 27
+bytes allocated: 25940
+instructions executed: 16501
+binary size: 142688
+  code: 88856
+  data: 6201
+  metadata: 47631
 functions:
+  __arr_drop_Expr:
+    calls: 11
+    bytes: 116
+  __arr_drop_LambdaParam:
+    calls: 2
+    bytes: 172
+  __arr_drop_MatchArm:
+    calls: 1
+    bytes: 116
   __arr_drop_Ty:
     calls: 5
+    bytes: 116
+  __arr_drop___tuple$Expr$Expr:
+    calls: 1
+    bytes: 116
+  __arr_drop___tuple$str$str:
+    calls: 1
+    bytes: 140
+  __arr_retain_Expr:
+    calls: 2
+    bytes: 116
+  __arr_retain_LambdaParam:
+    calls: 0
+    bytes: 172
+  __arr_retain_MatchArm:
+    calls: 0
     bytes: 116
   __arr_retain_Ty:
     calls: 0
     bytes: 116
+  __arr_retain___tuple$Expr$Expr:
+    calls: 0
+    bytes: 116
+  __arr_retain___tuple$str$str:
+    calls: 0
+    bytes: 140
   __eq_Prim:
     calls: 0
     bytes: 64
   __eq_Prim$opt:
     calls: 3
     bytes: 92
+  __eq_str$arr:
+    calls: 5
+    bytes: 364
+  __rec_drop_Expr:
+    calls: 44
+    bytes: 36
+  __rec_drop_ExprKind:
+    calls: 44
+    bytes: 1260
+  __rec_drop_MatchArm:
+    calls: 1
+    bytes: 72
+  __rec_drop_Pat:
+    calls: 20
+    bytes: 136
   __rec_drop_Ty:
-    calls: 22
+    calls: 24
     bytes: 408
+  __rec_drop___tuple$Expr$Expr:
+    calls: 1
+    bytes: 72
+  __test$ast_case_name:
+    calls: 1
+    bytes: 13016
+  __test$binder_list:
+    calls: 1
+    bytes: 832
+  __test$pat_bindings:
+    calls: 1
+    bytes: 2288
+  __test$pat_label:
+    calls: 1
+    bytes: 6104
   __test$prim_from_name:
     calls: 1
     bytes: 2740
   __test$prim_name:
     calls: 1
     bytes: 3232
+  __test$show_expr:
+    calls: 1
+    bytes: 13108
   __test$show_pat:
     calls: 1
-    bytes: 2344
+    bytes: 2744
   __test$show_ty:
     calls: 1
     bytes: 3228
   __test$show_tys:
     calls: 1
     bytes: 796
+  __to_str_i64:
+    calls: 19
+    bytes: 204
   aipl_arr_inc:
-    calls: 9
+    calls: 35
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 24
+    calls: 93
     bytes: (external)
   aipl_array_new:
-    calls: 9
+    calls: 35
     bytes: (external)
   aipl_array_push_mut:
-    calls: 8
+    calls: 28
     bytes: (external)
   aipl_array_with_cap:
-    calls: 6
+    calls: 21
     bytes: (external)
   aipl_assert:
-    calls: 30
+    calls: 74
+    bytes: (external)
+  aipl_i64_len:
+    calls: 38
     bytes: (external)
   aipl_rec_alloc:
-    calls: 22
+    calls: 134
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 41
+    calls: 272
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 9
+    calls: 73
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 19
+    calls: 138
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 9
+    calls: 73
     bytes: (external)
   aipl_test_begin:
-    calls: 5
+    calls: 10
     bytes: (external)
   aipl_test_end:
-    calls: 5
+    calls: 10
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  aipl_write_i64:
+    calls: 19
+    bytes: (external)
+  binder_list:
+    calls: 3
+    bytes: 740
+  ident_name:
+    calls: 2
+    bytes: 2928
+  is_ident:
+    calls: 3
+    bytes: 2804
   main:
     calls: 1
-    bytes: 388
+    bytes: 744
+  pat_bindings:
+    calls: 5
+    bytes: 792
   prim_from_name:
     calls: 7
     bytes: 1228
-  show_pat:
+  show_ann:
+    calls: 4
+    bytes: 416
+  show_arm:
+    calls: 1
+    bytes: 476
+  show_call:
+    calls: 3
+    bytes: 1560
+  show_expr:
+    calls: 56
+    bytes: 16984
+  show_exprs:
     calls: 7
-    bytes: 1376
+    bytes: 460
+  show_field_init:
+    calls: 0
+    bytes: 620
+  show_pat:
+    calls: 9
+    bytes: 1640
   show_ty:
-    calls: 27
+    calls: 29
     bytes: 4656
   show_tys:
     calls: 6

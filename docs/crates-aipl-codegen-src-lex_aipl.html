@@ -267,6 +267,20 @@
 
 
 
+        <section class="item" id="item-template_segments">
+          <h3>
+            <a class="anchor" href="#item-template_segments">template_segments</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn template_segments(texts: str[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The decoded text segments of a template literal, given each segment token's source text in order — the head, any middles, then the tail, with their delimiters and interpolation braces still attached.</p><p>The whole literal at once rather than a segment at a time, because a raw template is de-dented across *all* its segments (<code>dedent_segments</code>, the raw rule's <code>finalize</code>): the common indent is a property of the literal, not of any one piece of it. The interpolation-free case never reaches here — it lexes to a plain <code>StrLit</code>, which is <code>str_lit_value</code>'s job.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-aipl_rules">
           <h3>
             <a class="anchor" href="#item-aipl_rules">aipl_rules</a>

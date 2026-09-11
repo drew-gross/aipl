@@ -75,6 +75,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  Remove the C prefix from the CST types. the caller can import as if necessary.
   fix all the join with empty sep
   make nested_in a 2-item tuple
   In group_styles, rs.map(group_styles) is refused
@@ -241,6 +242,7 @@ sets:
   support other types
 
 parser:
+  remove with_build
   remove expr_unary, it's silly
   a bracketed list's separator must be a literal, so the printer can write it back <--- lift this restriction
   trailing separater = Allowed | Disallowed | Required
@@ -332,6 +334,7 @@ design:
   it's safe to call an untrusted function that doesn't declare any effects
   the most readable implementation is also the fastest
   apis should express intent
+  import as is super powerful. Leverage it. Don't add prefixes to types to distinguish what they are, the caller can import as if they need to distinguish. Don't add a namespaces-like feature to the language, import as can handle it.
 
 optimizations:
   loop invariant/match invariant/branch invariant code motion

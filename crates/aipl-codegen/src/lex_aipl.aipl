@@ -4,10 +4,13 @@
 import {
     Span,
     equal as ==,
+    first,
     int_parse,
     join,
     len,
     logical_or as ||,
+    map,
+    push,
     split,
     starts_with,
     value_or,
@@ -340,6 +343,56 @@ pub fn char_lit_value(text: str) -> char? {
     // The shapes the lexer refuses, which is why this returns an optional.
     assert(char_lit_value("''") == none);
     assert(char_lit_value("'ab'") == none);
+})
+
+# The decoded text segments of a template literal, given each segment token's
+# source text in order — the head, any middles, then the tail, with their
+# delimiters and interpolation braces still attached.
+#
+# The whole literal at once rather than a segment at a time, because a raw
+# template is de-dented across *all* its segments (`dedent_segments`, the raw
+# rule's `finalize`): the common indent is a property of the literal, not of any
+# one piece of it. The interpolation-free case never reaches here — it lexes to
+# a plain `StrLit`, which is `str_lit_value`'s job.
+pub fn template_segments(texts: str[]) -> str[] {
+    let raw = texts.first().value_or("").starts_with("```");
+    let delim: u64 = if (raw) { 3 } else { 1 };
+    let last = texts.len() - 1;
+    mut inners: str[] = [];
+    for (let i, t : texts) {
+        let lead: u64 = if (i == 0) { delim } else { 1 };
+        let trail: u64 = if (i == last) { delim } else { 1 };
+        set inners.push(t[lead..t.len() - trail]);
+    }
+    if (raw) {
+        return process_raw_string(inners.join(sep="{")).split("{");
+    };
+    inners.map(unescape)
+}.test({
+    // The head runs through its `{`, a middle from `}` to `{`, the tail from
+    // its `}`.
+    assert(template_segments(["`a{", "}b`"]) == ["a", "b"]);
+    assert(template_segments(["`a{", "}b{", "}c`"]) == ["a", "b", "c"]);
+
+    // Escapes are decoded in the cooked form and left alone in the raw one,
+    // exactly as the two rules' emits do.
+    assert(template_segments(["`a\\nb{", "}c`"]) == ["a\nb", "c"]);
+    assert(template_segments(["```a\\nb{", "}c```"]) == ["a\\nb", "c"]);
+
+    // And the answer is the one the lexer itself gives for the same source,
+    // which is what makes this a claim rather than a second opinion.
+    let src = "`a{x}b`";
+    let segs = template_segments(["`a{", "}b`"]);
+    assert(
+        lex_aipl(src)? == LexResult {
+            tokens: [
+                atok(src, TemplateHead(segs[0].value_or("")), 0..3),
+                atok(src, Name("x"), 3..4),
+                atok(src, TemplateTail(segs[1].value_or("")), 4..7),
+            ],
+            trivia: [],
+        },
+    );
 })
 
 # The AIPL rule set. Order is priority (the first matching rule wins): skipped
@@ -839,88 +892,91 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4307
-deallocations: 4307
-reallocations: 39
-bytes allocated: 465734
-instructions executed: 1159762
-binary size: 487136
-  code: 332452
-  data: 8228
-  metadata: 146456
+allocations: 4490
+deallocations: 4490
+reallocations: 48
+bytes allocated: 487028
+instructions executed: 1204749
+binary size: 500024
+  code: 341048
+  data: 8868
+  metadata: 150108
 functions:
   __arr_drop___m1__StepResult$AiplTok:
-    calls: 1
+    calls: 2
     bytes: 140
   __arr_drop___m1__Token$AiplTok:
-    calls: 140
+    calls: 151
     bytes: 388
   __arr_drop___m1__TokenRule$AiplTok:
-    calls: 25
+    calls: 26
     bytes: 832
   __arr_retain___m1__StepResult$AiplTok:
-    calls: 1
+    calls: 2
     bytes: 140
   __arr_retain___m1__Token$AiplTok:
-    calls: 72
+    calls: 80
     bytes: 388
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
     bytes: 832
-  __builtin_all$char$s0$lam50:
-    calls: 16
+  __builtin_all$char$s0$lam51:
+    calls: 18
     bytes: 212
-  __builtin_count_while$char$lam15:
-    calls: 49
+  __builtin_count_while$char$lam16:
+    calls: 50
     bytes: 220
-  __builtin_count_while$char$s0$lam23:
-    calls: 33
+  __builtin_count_while$char$s0$lam24:
+    calls: 34
     bytes: 184
-  __builtin_count_while$char$s0$lam26:
+  __builtin_count_while$char$s0$lam27:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam43:
+  __builtin_count_while$char$s0$lam44:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam43$tail:
+  __builtin_count_while$char$s0$lam44$tail:
     calls: 3
     bytes: 256
-  __builtin_count_while$char$s0$lam49:
-    calls: 8
+  __builtin_count_while$char$s0$lam50:
+    calls: 9
     bytes: 172
-  __builtin_count_while$char$s0$lam51:
+  __builtin_count_while$char$s0$lam52:
     calls: 4
     bytes: 172
   __builtin_int_parse:
     calls: 4
     bytes: 1028
   __eq_AiplTok:
-    calls: 56
+    calls: 59
     bytes: 600
   __eq_StrStyle:
     calls: 8
     bytes: 64
   __eq___builtin_Span:
-    calls: 61
+    calls: 64
     bytes: 104
   __eq___m1__LexError:
     calls: 5
     bytes: 128
   __eq___m1__LexResult$AiplTok:
-    calls: 19
+    calls: 20
     bytes: 120
   __eq___m1__SpanStr:
-    calls: 56
+    calls: 59
     bytes: 128
   __eq___m1__Token$AiplTok:
-    calls: 56
+    calls: 59
     bytes: 120
   __eq___m1__Token$AiplTok$arr:
-    calls: 39
+    calls: 41
     bytes: 284
   __eq_char$opt:
     calls: 2
     bytes: 100
+  __eq_str$arr:
+    calls: 4
+    bytes: 364
   __eq_str$opt:
     calls: 3
     bytes: 100
@@ -928,7 +984,7 @@ functions:
     calls: 0
     bytes: 136
   __lambda_1:
-    calls: 16
+    calls: 17
     bytes: 104
   __lambda_2:
     calls: 0
@@ -936,7 +992,7 @@ functions:
   __lambda_3:
     calls: 2
     bytes: 164
-  __lambda_34:
+  __lambda_35:
     calls: 5
     bytes: 140
   __lambda_4:
@@ -949,61 +1005,61 @@ functions:
     calls: 0
     bytes: 48
   __lambda_7:
-    calls: 3
+    calls: 4
     bytes: 64
   __m10__parse_test_section_header:
     calls: 3
     bytes: 744
   __m1__between_len:
-    calls: 29
+    calls: 30
     bytes: 752
   __m1__delimited_len:
-    calls: 52
+    calls: 54
     bytes: 1592
   __m1__finalize_template$AiplTok:
-    calls: 5
+    calls: 6
     bytes: 8904
   __m1__float_len:
     calls: 0
     bytes: 816
   __m1__interp_scan$AiplTok:
-    calls: 1
+    calls: 2
     bytes: 2252
   __m1__lex$AiplTok:
-    calls: 25
+    calls: 26
     bytes: 1520
   __m1__lex_step$AiplTok:
-    calls: 96
+    calls: 98
     bytes: 29192
   __m1__nested_len:
-    calls: 61
+    calls: 63
     bytes: 940
   __m1__step_result$AiplTok:
-    calls: 1987
+    calls: 2045
     bytes: 15088
   __m1__template_scan$AiplTok:
-    calls: 5
+    calls: 6
     bytes: 2728
   __m1__template_step$AiplTok:
-    calls: 38
+    calls: 40
     bytes: 476
   __m1__to_eol_len:
     calls: 0
     bytes: 52
   __m1__to_eol_len$tail:
-    calls: 121
+    calls: 125
     bytes: 252
   __m1__to_eol_unless_len:
-    calls: 58
+    calls: 60
     bytes: 368
   __m2__unescape:
-    calls: 22
+    calls: 33
     bytes: 1176
   __m3__process_raw_string:
-    calls: 8
+    calls: 9
     bytes: 1712
   __m7__trim_prefix:
-    calls: 16
+    calls: 18
     bytes: 260
   __m8__trim_suffix:
     calls: 0
@@ -1026,6 +1082,9 @@ functions:
   __test$str_lit_value:
     calls: 1
     bytes: 7932
+  __test$template_segments:
+    calls: 1
+    bytes: 6496
   __test_try_fail___m1__LexError:
     calls: 0
     bytes: 84
@@ -1033,40 +1092,40 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 194
+    calls: 202
     bytes: (external)
   aipl_arr_inc:
-    calls: 8878
+    calls: 9196
     bytes: (external)
   aipl_arr_reserve:
-    calls: 194
+    calls: 202
     bytes: (external)
   aipl_array_dec:
-    calls: 13167
+    calls: 13664
     bytes: (external)
   aipl_array_new:
-    calls: 4197
+    calls: 4345
     bytes: (external)
   aipl_array_push:
-    calls: 19
+    calls: 37
     bytes: (external)
   aipl_array_push_mut:
-    calls: 16
+    calls: 27
     bytes: (external)
   aipl_array_with_cap:
-    calls: 16
+    calls: 22
     bytes: (external)
   aipl_assert:
-    calls: 35
+    calls: 40
     bytes: (external)
   aipl_rules:
-    calls: 25
+    calls: 26
     bytes: 90364
   aipl_test_begin:
-    calls: 5
+    calls: 6
     bytes: (external)
   aipl_test_end:
-    calls: 5
+    calls: 6
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -1094,13 +1153,16 @@ functions:
     bytes: 488
   main:
     calls: 1
-    bytes: 424
+    bytes: 508
   raw_tpl_kind:
     calls: 2
     bytes: 2592
   str_lit_value:
     calls: 9
     bytes: 400
+  template_segments:
+    calls: 5
+    bytes: 1652
   tpl_kind:
-    calls: 4
+    calls: 6
     bytes: 2608

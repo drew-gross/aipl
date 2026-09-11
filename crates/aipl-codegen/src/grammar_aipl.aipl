@@ -36,12 +36,13 @@
 //     which is why it is a separate rule and not `block` with a flag.
 //
 // The lowering is being written a slice at a time (stage 5d in
-// `PARSER_LIBRARY.md`). Types and patterns lower to the AST declared in
-// `ast.aipl`; every other production still shares one `build` that returns a
-// placeholder. What this file has to be right about either way is *what parses*
-// and *the shape of the tree*, which is what the `.test` blocks and the corpus
-// differential test check — and, for the slices that are done, *what it means*,
-// which is what `lower_aipl_ty` and `lower_aipl_pattern` assert.
+// `PARSER_LIBRARY.md`). Types, patterns and expressions lower to the AST
+// declared in `ast.aipl`; the statement and item productions still share one
+// `build` that returns a placeholder. What this file has to be right about
+// either way is *what parses* and *the shape of the tree*, which is what the
+// `.test` blocks and the corpus differential test check — and, for the slices
+// that are done, *what it means*, which is what `lower_aipl_ty`,
+// `lower_aipl_pattern` and `lower_aipl_expr` assert.
 //
 // The rules are written in the library's own vocabulary — `Then`, `OneOf`,
 // `Many`, `Maybe`, `Term`, `Named`, and `Literal` under the
@@ -57,11 +58,15 @@ import {
     extend,
     filter,
     first,
+    greater_than as >,
+    int_parse,
     is_empty,
     is_nonempty,
+    last,
     len,
     less_than as <,
     less_than_or_equal as <=,
+    logical_and as &&,
     logical_not as !,
     logical_or as ||,
     map,
@@ -74,20 +79,72 @@ import {
     value_or_err,
     wrapping_add as +,
     wrapping_add_assign as +=,
+    wrapping_decrement as --,
     wrapping_sub as -,
 } from builtins;
 import {
+    AArms,
+    AEntries,
+    AEntry,
+    AExpr,
+    AExprs,
+    AFieldInit,
+    ALambdaParam,
     APat,
     APayload,
+    AShimBind,
+    ASuffix,
     ATy,
     ATys,
     Ast,
+    BKey,
+    BPair,
+    BraceEntry,
+    EArrayLit,
+    EBool,
+    ECall,
+    EChar,
+    EConstruct,
+    EDictLit,
+    EField,
+    EIdent,
+    EIf,
+    EIfLet,
+    EIndex,
+    EKwArg,
+    ELambda,
+    EMatch,
+    ENeg,
+    ENone,
+    ENum,
+    ESeq,
+    ESetLit,
+    EShim,
+    ESlice,
+    ESpread,
+    EStr,
+    ETry,
+    ETupleLit,
+    EUnit,
+    Expr,
+    ExprKind,
+    FieldInit,
     Ignored,
+    LambdaParam,
+    MatchArm,
     Pat,
+    PatArray,
     PatChar,
     PatCtor,
     PatStr,
     PatWildcard,
+    SufField,
+    SufIndex,
+    SufMethod,
+    SufSliceFrom,
+    SufSliceTo,
+    SufTry,
+    Suffix,
     Ty,
     TyAny,
     TyArray,
@@ -102,7 +159,13 @@ import {
     TySet,
     TyTuple,
     TyUnit,
+    ast_case_name,
+    binder_list,
+    num,
+    pat_bindings,
+    pat_label,
     prim_from_name,
+    show_expr,
     show_pat,
     show_ty,
 } from "./ast.aipl";
@@ -144,6 +207,7 @@ import {
     aipl_rules,
     char_lit_value,
     str_lit_value,
+    template_segments,
 } from "./lex_aipl.aipl";
 import { LexResult, keep_skipped, lex } from "./lexer.aipl";
 import { parse, parse_cst, parse_prepared, prepare } from "./parse.aipl";
@@ -565,9 +629,9 @@ fn statements() -> Production<AiplTok, Ast>[] {
     let return_stmt: Rule<AiplTok> = Then([Lit("return"), Named("expr"), Lit(";")]);
 
     [
-        p("block", block),
-        p("block_body", block_body),
-        p("block_tail", block_tail),
+        p("block", block).with_build(Mk(lower_block)),
+        p("block_body", block_body).with_build(Mk(lower_block_body)),
+        p("block_tail", block_tail).with_build(Mk(lower_block_tail)),
         p("loop_body", loop_body),
         p("loop_inner", loop_inner),
         pl("kw_stmt", kw_stmt, "a statement"),
@@ -775,22 +839,22 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     ]);
 
     [
-        pl("expr", expr, "an expression"),
-        p("unary", expr_unary(unary)),
-        p("postfix", postfix),
-        p("suffix", suffix),
-        p("atom", atom),
-        p("else_branch", else_branch),
-        p("template", template),
-        p("shim_binding", shim_binding),
-        p("args", args),
-        p("arg", arg),
-        p("op_value", op_value),
-        p("lambda", lambda),
-        p("lambda_param", lambda_param),
-        p("field_init", field_init),
-        p("brace_body", brace_body),
-        p("entry", entry),
+        pl("expr", expr, "an expression").with_build(Mk(lower_expr)),
+        p("unary", expr_unary(unary)).with_build(Mk(lower_unary)),
+        p("postfix", postfix).with_build(Mk(lower_postfix)),
+        p("suffix", suffix).with_build(Mk(lower_suffix)),
+        p("atom", atom).with_build(Mk(lower_atom)),
+        p("else_branch", else_branch).with_build(Mk(lower_else_branch)),
+        p("template", template).with_build(Mk(lower_template)),
+        p("shim_binding", shim_binding).with_build(Mk(lower_shim_binding)),
+        p("args", args).with_build(Mk(lower_args)),
+        p("arg", arg).with_build(Mk(lower_arg)),
+        p("op_value", op_value).with_build(Mk(lower_op_value)),
+        p("lambda", lambda).with_build(Mk(lower_lambda)),
+        p("lambda_param", lambda_param).with_build(Mk(lower_lambda_param)),
+        p("field_init", field_init).with_build(Mk(lower_field_init)),
+        p("brace_body", brace_body).with_build(Mk(lower_brace_body)),
+        p("entry", entry).with_build(Mk(lower_entry)),
     ]
 }
 
@@ -832,11 +896,759 @@ fn patterns() -> Production<AiplTok, Ast>[] {
     ]);
 
     [
-        p("match_arm", match_arm),
-        p("arm_body", arm_body),
+        p("match_arm", match_arm).with_build(Mk(lower_match_arm)),
+        p("arm_body", arm_body).with_build(Mk(lower_arm_body)),
         pl("pattern", pattern, "a pattern").with_build(Mk(lower_pattern)),
         p("ctor_payload", ctor_payload).with_build(Mk(lower_ctor_payload)),
     ]
+}
+
+// ---------- lowering: expressions ----------
+//
+// The third slice, and the one the rest of the grammar waits on: statements
+// lower to expressions too, and every item that carries a default holds one.
+//
+// Three things here are *desugarings* rather than translations — the AST has no
+// node for them, because the language stops having them at this point. They are
+// gazelle's, moved verbatim:
+//
+//   - **An operator is a call on its spelling.** `a + b` is `+(a, b)`, `!x` is
+//     `!(x)`, and an operator passed as a value is a two-parameter lambda whose
+//     body is that call. Nothing downstream can tell an operator was written.
+//   - **A range is a construct.** `a..b` builds the builtin `Span`. No name is
+//     written, so no import is needed — which is why the desugar has to happen
+//     here rather than in the loader.
+//   - **A template is a concat chain.** Each interpolation goes through
+//     `__template_interp` and the pieces through `__aipl_concat`, folded from
+//     the tail backwards so the tree matches the one gazelle's right-recursive
+//     `template_rest` produces.
+//
+// A `suffix` and a `#{ .. }` entry get `Ast` cases of their own (`ASuffix`,
+// `AEntry`) because neither is an expression on its own: a suffix has no
+// receiver yet, and an entry is not known to be a set element or a dict pair
+// until the whole body is in scope.
+
+# An expression node at a span.
+fn at(kind: ExprKind, span: Span) -> Expr { kind, span }
+
+# The span a lowered node takes: this node's *tokens*, with the trivia in front
+# of the first one left out. `span` reaches back over that trivia, which is what
+# losslessness needs and the opposite of what a diagnostic wants.
+fn tok_span(self: Cst) -> Span { self.token_span().value_or(self.span()) }
+
+# The token span of interior child `i`, for the nodes whose parts want their own
+# spans — a match arm's pattern, one step of a postfix chain.
+fn sub_span(subs: Cst[], i: u64, fallback: Span) -> Span {
+    match (subs[i]) {
+        some(c) => c.tok_span(),
+        none => fallback,
+    }
+}
+
+# The text of own token `i`, or the empty string when there is none — so a
+# "which token is second?" test reads as one comparison.
+fn tok_text(src: str, toks: Span[], i: u64) -> str {
+    match (toks[i]) {
+        some(sp) => src[sp],
+        none => "",
+    }
+}
+
+fn as_expr(v: Ast, span: Span) -> Expr!ParseError {
+    if (let AExpr(e) = v) {
+        return ok(e);
+    };
+    err(wrong_kind("an expression", v, span))
+}
+
+fn as_exprs(v: Ast, span: Span) -> Expr[]!ParseError {
+    if (let AExprs(es) = v) {
+        return ok(es);
+    };
+    err(wrong_kind("a list of expressions", v, span))
+}
+
+fn as_suffix(v: Ast, span: Span) -> Suffix!ParseError {
+    if (let ASuffix(suf) = v) {
+        return ok(suf);
+    };
+    err(wrong_kind("a postfix suffix", v, span))
+}
+
+fn as_field_init(v: Ast, span: Span) -> FieldInit!ParseError {
+    if (let AFieldInit(fi) = v) {
+        return ok(fi);
+    };
+    err(wrong_kind("a field initializer", v, span))
+}
+
+fn as_lambda_param(v: Ast, span: Span) -> LambdaParam!ParseError {
+    if (let ALambdaParam(lp) = v) {
+        return ok(lp);
+    };
+    err(wrong_kind("a lambda parameter", v, span))
+}
+
+fn as_entry(v: Ast, span: Span) -> BraceEntry!ParseError {
+    if (let AEntry(e) = v) {
+        return ok(e);
+    };
+    err(wrong_kind("a brace-literal entry", v, span))
+}
+
+fn as_entries(v: Ast, span: Span) -> BraceEntry[]!ParseError {
+    if (let AEntries(es) = v) {
+        return ok(es);
+    };
+    err(wrong_kind("a list of brace-literal entries", v, span))
+}
+
+fn as_arms(v: Ast, span: Span) -> MatchArm[]!ParseError {
+    if (let AArms(arms) = v) {
+        return ok(arms);
+    };
+    err(wrong_kind("a list of match arms", v, span))
+}
+
+fn as_bind(v: Ast, span: Span) -> (str, str)!ParseError {
+    if (let AShimBind(op, f) = v) {
+        return ok((op, f));
+    };
+    err(wrong_kind("a shim binding", v, span))
+}
+
+# Child `i` as an expression, which most of this file wants.
+fn kid_expr(kids: Ast[], i: u64, span: Span) -> Expr!ParseError {
+    as_expr(kid(kids, i, span)?, span)
+}
+
+# `expr` — the `Climb` node. A bare operand climbed to itself has one interior
+# child and no token of its own; an application has two children with its
+# operator as a direct leaf between them.
+fn lower_expr(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let lhs = kid_expr(kids, 0, sp)?;
+    if (kids.len() != 2) {
+        return ok(AExpr(lhs));
+    };
+    let rhs = kid_expr(kids, 1, sp)?;
+    let tsp = node.tok_span();
+    let op = node.own_token_text(src);
+    if (op == "..") {
+        return ok(AExpr(at(
+            EConstruct(
+                "__builtin_Span",
+                [FieldInit { name: "start", value: lhs }, FieldInit { name: "end", value: rhs }],
+            ),
+            tsp,
+        )));
+    };
+    ok(AExpr(at(ECall(op, [lhs, rhs], false), tsp)))
+}
+
+# `unary` — `-x`, `!x`, or the postfix it wraps. Unary `-` is the one operator
+# with no named builtin to resolve to, so it stays a node of its own; `!` is an
+# ordinary call like every other operator.
+fn lower_unary(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let inner = kid_expr(kids, 0, sp)?;
+    let tsp = node.tok_span();
+    let op = node.own_token_text(src);
+    if (op == "-") {
+        return ok(AExpr(at(ENeg(inner), tsp)));
+    };
+    if (op == "!") {
+        return ok(AExpr(at(ECall("!", [inner], false), tsp)));
+    };
+    ok(AExpr(inner))
+}
+
+# `postfix` — an atom and the run of suffixes applied to it, left to right, each
+# step spanning from the atom's start to that suffix's end.
+fn lower_postfix(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let subs = node.nodes();
+    mut e = kid_expr(kids, 0, sp)?;
+    for (let i, k : kids[1..]) {
+        let suf = as_suffix(k, sp)?;
+        let end = sub_span(subs, i + 1, e.span).end;
+        set e = apply_suffix(e, suf, e.span.start..end);
+    }
+    ok(AExpr(e))
+}
+
+# One postfix step, given the receiver it applies to. A method call folds the
+# receiver in as `args[0]` and flags the method form, so `recv.f(a)` is stored
+# exactly as the free call `f(recv, a)`.
+fn apply_suffix(recv: Expr, suf: Suffix, span: Span) -> Expr {
+    match (suf) {
+        SufField(name) => at(EField(recv, name), span),
+        SufMethod(name, args) => at(ECall(name, [recv, ..args], true), span),
+        SufIndex(index) => index_or_slice(recv, index, span),
+        SufSliceFrom(lo) => at(ESlice(recv, lo, none), span),
+        // `recv[..end]` is `recv[0..end]`: the start clamps to `[0, len]`
+        // regardless, so a synthetic `0` is the whole difference.
+        SufSliceTo(hi) => at(ESlice(recv, num(0), some(hi)), span),
+        SufTry => at(ETry(recv), span),
+    }
+}
+
+# `recv[a..b]` — a range literal written *as* an index is the closed slice form,
+# folded straight into a `Slice` rather than constructing a `Span` only to
+# unpack it at runtime. A range that arrives as a *value* (`recv[s]`, a call
+# result) stays an index and takes the `Span`-index sugar path instead.
+fn index_or_slice(recv: Expr, index: Expr, span: Span) -> Expr {
+    match (index.range_bounds()) {
+        some(b) => at(ESlice(recv, b.0, some(b.1)), span),
+        none => at(EIndex(recv, index), span),
+    }
+}
+
+# The two ends of `self`, if it is the `Span` construct a range desugars to.
+fn range_bounds(self: Expr) -> (Expr, Expr)? {
+    if (let EConstruct(name, inits) = self.kind) {
+        if (name == "__builtin_Span") {
+            return two_values(inits);
+        };
+    };
+    none
+}
+
+fn two_values(self: FieldInit[]) -> (Expr, Expr)? {
+    if (self.len() != 2) {
+        return none;
+    };
+    match (self.first()) {
+        some(a) => match (self.last()) {
+            some(b) => some((a.value, b.value)),
+            none => none,
+        },
+        none => none,
+    }
+}
+
+# `suffix` — the seven postfix steps. `.` opens the three member forms, `[` the
+# three bracket forms, and `?` is the whole of the seventh.
+fn lower_suffix(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let toks = node.own_tokens();
+    let head = tok_text(src, toks, 0);
+    if (head == "?") {
+        return ok(ASuffix(SufTry));
+    };
+    if (head == ".") {
+        let name = tok_text(src, toks, 1);
+        if (kids.is_empty()) {
+            return ok(ASuffix(SufField(field_name(name, sp)?)));
+        };
+        let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a method call")?;
+        return ok(ASuffix(SufMethod(name, args)));
+    };
+
+    // Two own tokens — `[` and `]` — is a plain index. A third is the `..` of a
+    // slice, and which side of the operand it sits on says which end is open.
+    let inner = kid_expr(kids, 0, sp)?;
+    if (toks.len() == 2) {
+        return ok(ASuffix(SufIndex(inner)));
+    };
+    let Span { start } = toks[1].value_or_err(ParseError {
+        message: "a slice has no range",
+        span: sp,
+    })?;
+    if (start < sub_span(node.nodes(), 0, sp).start) {
+        return ok(ASuffix(SufSliceTo(inner)));
+    };
+    ok(ASuffix(SufSliceFrom(inner)))
+}
+
+# `.name` names a field and `.0` a tuple slot, which the AST spells as the field
+# `_0` — so the two syntaxes become one here and nothing downstream knows tuples
+# have a second way to name their fields. A negative index is refused, as it is
+# by gazelle: the `Int` matcher claims the sign, so `p.-1` does lex.
+fn field_name(name: str, span: Span) -> str!ParseError {
+    if (name.starts_with("-")) {
+        return err(ParseError { message: "tuple index must be a non-negative integer", span });
+    };
+    match (name.int_parse()) {
+        some(..) => ok(`_{name}`),
+        none => ok(name),
+    }
+}
+
+# `atom` — the twenty alternatives, dispatched on the first token each matched.
+# The template is the one alternative that matches no token of its own, which is
+# what identifies it without a comparison.
+fn lower_atom(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let toks = node.own_tokens();
+    if (toks.is_empty()) {
+        return ok(AExpr(kid_expr(kids, 0, sp)?));
+    };
+    let tsp = node.tok_span();
+    let head = tok_text(src, toks, 0);
+    if (head == "if") {
+        return ok(AExpr(lower_if(src, node, kids)?));
+    };
+    if (head == "match") {
+        return ok(AExpr(match_expr(kids, tsp, sp)?));
+    };
+    if (head == "shim") {
+        return ok(AExpr(shim_expr(src, node, kids, sp)?));
+    };
+    if (head == "true") {
+        return ok(AExpr(at(EBool(true), tsp)));
+    };
+    if (head == "false") {
+        return ok(AExpr(at(EBool(false), tsp)));
+    };
+    if (head == "none") {
+        return ok(AExpr(at(ENone, tsp)));
+    };
+
+    // A grouping paren holds one expression; a tuple holds two or more, which
+    // is what the comma after the first bought.
+    if (head == "(") {
+        if (kids.len() == 1) {
+            return ok(AExpr(kid_expr(kids, 0, sp)?));
+        };
+        return ok(AExpr(at(ETupleLit(kids.try_map(|k| as_expr(k, sp))?), tsp)));
+    };
+    // The array literal is the one place a `..` spread survives.
+    if (head == "[") {
+        return ok(AExpr(at(EArrayLit(as_exprs(kid(kids, 0, sp)?, sp)?), tsp)));
+    };
+    if (head == "#") {
+        return ok(AExpr(brace_literal(as_entries(kid(kids, 0, sp)?, sp)?, tsp)?));
+    };
+    if (head == "|") {
+        return ok(AExpr(lambda_of(kids, tsp, sp)?));
+    };
+    if (head.starts_with("\"") || head.starts_with("`")) {
+        return ok(AExpr(at(EStr(str_lit_value(head)), tsp)));
+    };
+    if (head.starts_with("'")) {
+        let c = char_lit_value(head).value_or_err(ParseError {
+            message: "a char literal holds exactly one character",
+            span: sp,
+        })?;
+        return ok(AExpr(at(EChar(c), tsp)));
+    };
+    if (let some(n) = head.int_parse()) {
+        return ok(AExpr(at(ENum(n), tsp)));
+    };
+
+    // What is left opens with an identifier, and the token after it says which
+    // of the three name forms was written.
+    let second = tok_text(src, toks, 1);
+    if (second == "(") {
+        let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a call argument list")?;
+        return ok(AExpr(at(ECall(head, args, false), tsp)));
+    };
+    if (second == "{") {
+        return ok(AExpr(at(EConstruct(head, kids.try_map(|k| as_field_init(k, sp))?), tsp)));
+    };
+    ok(AExpr(at(EIdent(head), tsp)))
+}
+
+# `match (e) { .. }` — every arm child is already a *list* of arms, since an
+# alternation expands to one arm per pattern, so they concatenate.
+fn match_expr(kids: Ast[], tsp: Span, sp: Span) -> Expr!ParseError {
+    let scrutinee = kid_expr(kids, 0, sp)?;
+    mut arms: MatchArm[] = [];
+    for (let k : kids[1..]) {
+        set arms.extend(as_arms(k, sp)?);
+    }
+    ok(at(EMatch(scrutinee, arms), tsp))
+}
+
+# `shim <effect> { op = f, .. } { body }`. Spanned over `shim <effect>` rather
+# than over the whole form: the body's span is empty when it ends in a `;`.
+fn shim_expr(src: str, node: Cst, kids: Ast[], sp: Span) -> Expr!ParseError {
+    let toks = node.own_tokens();
+    let last = kids.len() - 1;
+    let body = kid_expr(kids, last, sp)?;
+    let binds = kids[..last].try_map(|k| as_bind(k, sp))?;
+    let Span { start } = toks
+        .first()
+        .value_or_err(ParseError { message: "a shim matched no token", span: sp })?;
+    ok(at(EShim(tok_text(src, toks, 1), binds, body), start..tok_end(toks, 1, start)))
+}
+
+# Where own token `i` ends, for the nodes whose span stops partway through them.
+fn tok_end(toks: Span[], i: u64, fallback: u64) -> u64 {
+    match (toks[i]) {
+        some(sp) => sp.end,
+        none => fallback,
+    }
+}
+
+# `if (..) { .. }` and `if (let p = e) { .. }`, with or without an `else`. Both
+# are written in two places — an atom, and the tail of an `else` — and gazelle
+# builds them identically wherever they appear, so this does too.
+fn lower_if(src: str, node: Cst, kids: Ast[]) -> Expr!ParseError {
+    let sp = node.span();
+    let tsp = node.tok_span();
+    let subs = node.nodes();
+    if (node.own_tokens().map(|t| src[t]).contains("let")) {
+        let arm = MatchArm {
+            pattern: as_pat(kid(kids, 0, sp)?, sp)?,
+            body: kid_expr(kids, 2, sp)?,
+            span: sub_span(subs, 0, tsp),
+        };
+        return ok(at(EIfLet(arm, kid_expr(kids, 1, sp)?, else_or_unit(kids, 3, tsp, sp)?), tsp));
+    };
+    let cond = kid_expr(kids, 0, sp)?;
+    let then_branch = kid_expr(kids, 1, sp)?;
+    ok(at(EIf(cond, then_branch, else_or_unit(kids, 2, tsp, sp)?), tsp))
+}
+
+# The `else` branch, or the synthetic unit an else-less `if` gets — so it is
+# typed and lowered exactly like `if (..) { .. } else {}`.
+fn else_or_unit(kids: Ast[], i: u64, tsp: Span, sp: Span) -> Expr!ParseError {
+    match (kids[i]) {
+        some(k) => as_expr(k, sp),
+        none => ok(at(EUnit, tsp)),
+    }
+}
+
+# `else_branch` — a block, or another `if` in the else position. The block form
+# is the one with no token of its own.
+fn lower_else_branch(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    if (node.own_tokens().is_empty()) {
+        return ok(AExpr(kid_expr(kids, 0, sp)?));
+    };
+    ok(AExpr(lower_if(src, node, kids)?))
+}
+
+# `#{ .. }` — a set, a dict, or an empty of either, which is both until its use
+# site says. Mixing the two spellings is refused here, where the whole body is
+# in scope for the first time.
+fn brace_literal(entries: BraceEntry[], span: Span) -> Expr!ParseError {
+    mut keys: Expr[] = [];
+    mut pairs: (Expr, Expr)[] = [];
+    for (let e : entries) {
+        match (e) {
+            BKey(k) => {
+                set keys.push(k);
+            },
+            BPair(k, v) => {
+                set pairs.push((k, v));
+            },
+        };
+    }
+    if (keys.is_nonempty() && pairs.is_nonempty()) {
+        return err(ParseError { message: brace_mix_message(), span });
+    };
+    if (pairs.is_nonempty()) {
+        return ok(at(EDictLit(pairs), span));
+    };
+    ok(at(ESetLit(keys), span))
+}
+
+fn brace_mix_message() -> str {
+    """
+        a "#{ .. }" literal can't mix set elements and "key: value" pairs — use either all bare elements (a set) or all pairs (a dict)
+    """
+}
+
+# `template` — the head, the interpolations, the tail. The segments are decoded
+# together (`template_segments`), because a raw template is de-dented as one
+# block and a segment cannot be read on its own.
+fn lower_template(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let segs = template_segments(node.own_tokens().map(|t| src[t]));
+    let exprs = kids.try_map(|k| as_expr(k, sp))?;
+    ok(AExpr(at(template_chain(segs, exprs, sp).kind, node.tok_span())))
+}
+
+# The concat chain, folded from the tail backwards: each interpolation is
+# `__template_interp` of its expression, and each segment is joined on with
+# `__aipl_concat`. Built right to left because that is the shape gazelle's
+# right-recursive `template_rest` produces, and the two trees have to agree.
+fn template_chain(segs: str[], exprs: Expr[], sp: Span) -> Expr {
+    mut acc = at(EStr(seg_at(segs, exprs.len())), sp);
+    mut i = exprs.len();
+    while (i > 0) {
+        set i--;
+        let text = at(EStr(seg_at(segs, i)), sp);
+        set acc = concat_call(concat_call(text, interp_call(expr_at(exprs, i, sp))), acc);
+    }
+    acc
+}
+
+fn seg_at(self: str[], i: u64) -> str { self[i].value_or("") }
+
+fn expr_at(self: Expr[], i: u64, sp: Span) -> Expr { self[i].value_or(at(EUnit, sp)) }
+
+# `__template_interp` passes a `str` through unchanged and widens a `char` to
+# its one-character `str`, so neither picks up the quotes `to_str` renders
+# around a text scalar; anything else it converts.
+fn interp_call(e: Expr) -> Expr {
+    let span = e.span;
+    at(ECall("__template_interp", [e], false), span)
+}
+
+fn concat_call(a: Expr, b: Expr) -> Expr {
+    let span = a.span.start..b.span.end;
+    at(ECall("__aipl_concat", [a, b], false), span)
+}
+
+# `args` — the comma-separated list every call, array literal and array pattern
+# is built on.
+fn lower_args(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    ok(AExprs(kids.try_map(|k| as_expr(k, sp))?))
+}
+
+# A `..` spread that is not a direct element of an array literal. `args` is
+# shared by calls, the mutating writeback and array patterns, so the grammar
+# admits one everywhere and only the array literal leaves it in place.
+fn no_spread(args: Expr[], context: str) -> Expr[]!ParseError {
+    for (let a : args) {
+        if (let ESpread(..) = a.kind) {
+            return err(ParseError {
+                message: `\`..\` spread is only allowed in an array literal, not in {context}`,
+                span: a.span,
+            });
+        };
+    }
+    ok(args)
+}
+
+# `arg` — a spread, a keyword argument, or an ordinary expression. The three
+# pass-through alternatives (an expression, a lambda, a bare operator) match no
+# token of their own.
+fn lower_arg(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let toks = node.own_tokens();
+    if (toks.is_empty()) {
+        return ok(AExpr(kid_expr(kids, 0, sp)?));
+    };
+    let value = kid_expr(kids, 0, sp)?;
+    let head = tok_text(src, toks, 0);
+
+    // `..xs`. The `..` carries no meaning of its own, so the node takes the
+    // operand's span and an error points at what is being spread.
+    if (head == "..") {
+        let span = value.span;
+        return ok(AExpr(at(ESpread(value), span)));
+    };
+    // `k = v`, or `k?= v` forwarding an optional into a `k?: T` parameter.
+    let Span { start } = toks
+        .first()
+        .value_or_err(ParseError { message: "a keyword argument has no name", span: sp })?;
+    let span = start..value.span.end;
+    ok(AExpr(at(EKwArg(head, value, tok_text(src, toks, 1) == "?"), span)))
+}
+
+# `op_value` — an operator passed as a value (`apply(2, 3, +)`) is a binary
+# lambda whose body is that operator's call, which reuses every lambda mechanism
+# and leaves the operator gated like any other use.
+fn lower_op_value(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let tsp = node.tok_span();
+    let body = at(
+        ECall(node.own_token_text(src), [at(EIdent("lhs"), tsp), at(EIdent("rhs"), tsp)], false),
+        tsp,
+    );
+    let params = [
+        LambdaParam { name: "lhs", ty: none, span: tsp },
+        LambdaParam { name: "rhs", ty: none, span: tsp },
+    ];
+    ok(AExpr(at(ELambda(params, body), tsp)))
+}
+
+# `lambda` — `|a, b| body`, or the no-parameter `|| body`. The `||` is one
+# token, so its presence is what says the parameter list is empty.
+fn lower_lambda(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+
+    // The *first* token, not the run of them: `|x|` matches two `|` tokens, and
+    // their texts run together are indistinguishable from the one `||` token
+    // the no-parameter form is.
+    if (tok_text(src, node.own_tokens(), 0) == "||") {
+        let body = kid_expr(kids, 0, sp)?;
+        let span = body.span;
+        let no_params: LambdaParam[] = [];
+        return ok(AExpr(at(ELambda(no_params, body), span)));
+    };
+    ok(AExpr(lambda_of(kids, node.tok_span(), sp)?))
+}
+
+# `|a, b| body` — the parameters are every child but the last, which is the
+# body. Shared with the value-position lambda in `atom`, which is the same shape
+# with a block for a body.
+fn lambda_of(kids: Ast[], span: Span, sp: Span) -> Expr!ParseError {
+    let last = kids.len() - 1;
+    let body = kid_expr(kids, last, sp)?;
+    ok(at(ELambda(kids[..last].try_map(|k| as_lambda_param(k, sp))?, body), span))
+}
+
+fn lower_lambda_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let toks = node.own_tokens();
+    let name_span = toks.first().value_or(node.tok_span());
+    let name = tok_text(src, toks, 0);
+    if (kids.is_empty()) {
+        return ok(ALambdaParam(LambdaParam { name, ty: none, span: name_span }));
+    };
+    let ty = as_ty(kid(kids, 0, sp)?, sp)?;
+    ok(ALambdaParam(LambdaParam { name, ty: some(ty), span: name_span }))
+}
+
+# `field_init` — `name: value`, the shorthand `name`, or a `..base` spread. A
+# spread names no field, so it rides as an init with an empty name whose *value*
+# is the spread; the value is what identifies it.
+fn lower_field_init(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let toks = node.own_tokens();
+    let head = tok_text(src, toks, 0);
+    if (head == "..") {
+        let base = kid_expr(kids, 0, sp)?;
+        let span = base.span;
+        return ok(AFieldInit(FieldInit { name: "", value: at(ESpread(base), span) }));
+    };
+    if (kids.is_empty()) {
+        // `x` is `x: x`, spanned at the field name.
+        let span = toks.first().value_or(node.tok_span());
+        return ok(AFieldInit(FieldInit { name: head, value: at(EIdent(head), span) }));
+    };
+    ok(AFieldInit(FieldInit { name: head, value: kid_expr(kids, 0, sp)? }))
+}
+
+fn lower_brace_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    ok(AEntries(kids.try_map(|k| as_entry(k, sp))?))
+}
+
+fn lower_entry(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let key = kid_expr(kids, 0, sp)?;
+    if (kids.len() == 1) {
+        return ok(AEntry(BKey(key)));
+    };
+    ok(AEntry(BPair(key, kid_expr(kids, 1, sp)?)))
+}
+
+fn lower_shim_binding(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let toks = node.own_tokens();
+    ok(AShimBind(tok_text(src, toks, 0), tok_text(src, toks, 2)))
+}
+
+// ---------- lowering: blocks ----------
+//
+// A block is not a node in the AST: it is the right-nested `ESeq` its
+// statements fold to, which is why `block` and its two body productions lower
+// to an ordinary `Expr` like everything else here.
+//
+// The statement half is the next slice. Until it lands, a block holding a
+// keyword statement refuses rather than dropping it.
+
+fn lower_block(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    ok(AExpr(kid_expr(kids, 0, sp)?))
+}
+
+# `block_body` — a statement and the rest of the block, an expression and
+# whatever the `;` after it decided, or nothing at all.
+fn lower_block_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+
+    // Empty: the block's value is unit. Its span is empty too — gazelle repairs
+    // that from the block's own `{`, which is a side-channel this does not have
+    // yet (5f).
+    if (kids.is_empty()) {
+        return ok(AExpr(at(EUnit, 0..0)));
+    };
+    if (let Ignored = kid(kids, 0, sp)?) {
+        return err(ParseError { message: "a statement in a block is not lowered yet", span: sp });
+    };
+    let value = kid_expr(kids, 0, sp)?;
+
+    // `block_tail` hands back what followed the `;`: nothing when the
+    // expression was the block's value, and the rest of the block when it was a
+    // statement.
+    match (as_exprs(kid(kids, 1, sp)?, sp)?.first()) {
+        some(rest) => {
+            let span = value.span.start..rest.span.end;
+            ok(AExpr(at(ESeq(value, rest), span)))
+        },
+        none => ok(AExpr(value)),
+    }
+}
+
+# `block_tail` — the `; rest` that turns the expression before it into a
+# statement, as a list so that "nothing followed" and "this followed" are the
+# empty and one-element cases of one shape.
+fn lower_block_tail(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    ok(AExprs(kids.try_map(|k| as_expr(k, sp))?))
+}
+
+// ---------- lowering: match arms ----------
+
+fn lower_arm_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    ok(AExpr(kid_expr(kids, 0, sp)?))
+}
+
+# `match_arm` — one written arm becomes one *or more* arms: an alternation
+# `A | B => body` expands here into one arm per pattern, so no later stage ever
+# sees an or-pattern. The body is shared, which is what makes the
+# same-bindings check below necessary.
+fn lower_match_arm(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+    let sp = node.span();
+    let tsp = node.tok_span();
+    let last = kids.len() - 1;
+    let body = kid_expr(kids, last, sp)?;
+
+    // `[e0, e1] => body` — an array-literal pattern, whose one non-body child
+    // is an `args` list rather than a pattern.
+    if (let AExprs(elems) = kid(kids, 0, sp)?) {
+        let checked = no_spread(elems, "an array pattern")?;
+        return ok(AArms([MatchArm { pattern: PatArray(checked), body, span: tsp }]));
+    };
+    let subs = node.nodes();
+    let heads = same_bindings(kids[..last].try_map(|k| as_pat(k, sp))?, subs, tsp)?;
+    mut arms: MatchArm[] = [];
+    for (let i, pat : heads) {
+        let span = arm_span(pat, subs, i, tsp, heads.len() == 1);
+        set arms.push(MatchArm { pattern: pat, body, span });
+    }
+    ok(AArms(arms))
+}
+
+# An arm's span is its *pattern's*, so a diagnostic points at what selected the
+# arm rather than at everything it does. The one exception is a char pattern,
+# whose span is a single quoted byte — too narrow to read — so it takes the
+# whole arm.
+fn arm_span(pat: Pat, subs: Cst[], i: u64, tsp: Span, alone: bool) -> Span {
+    if (let PatChar(..) = pat) {
+        if (alone) {
+            return tsp;
+        };
+    };
+    sub_span(subs, i, tsp)
+}
+
+# Every alternative of one arm must bind the same names in the same order, so
+# the shared body means the same thing whichever matched. Two cases whose
+# payloads line up may therefore group by naming them alike; alternatives that
+# disagree are refused here rather than left to fail as an unbound name
+# somewhere in the body.
+fn same_bindings(heads: Pat[], subs: Cst[], tsp: Span) -> Pat[]!ParseError {
+    let first_pat = heads.first().value_or(PatWildcard);
+    let want = first_pat.pat_bindings();
+    for (let i, pat : heads) {
+        let got = pat.pat_bindings();
+        if (got != want) {
+            return err(ParseError {
+                message: `alternatives of one arm must bind the same names: {first_pat.pat_label()} binds {want.binder_list()}, but {pat.pat_label()} binds {got.binder_list()}`,
+                span: sub_span(subs, 0, tsp).start..sub_span(subs, i, tsp).end,
+            });
+        };
+    }
+    ok(heads)
 }
 
 // ---------- lowering: patterns ----------
@@ -846,15 +1658,11 @@ fn patterns() -> Production<AiplTok, Ast>[] {
 // that decode the same bytes on the way in, because a `build` is handed the
 // source and a span and has to strip the delimiters for itself.
 
-# The `Pat` a child lowered to.
 fn as_pat(v: Ast, span: Span) -> Pat!ParseError {
-    match (v) {
-        APat(pat) => ok(pat),
-        ATy(..) | ATys(..) | APayload(..) | Ignored => err(ParseError {
-            message: "expected a pattern",
-            span,
-        }),
-    }
+    if (let APat(pat) = v) {
+        return ok(pat);
+    };
+    err(wrong_kind("a pattern", v, span))
 }
 
 # `V.A` is one name with a dot in it, exactly as gazelle spells it — the
@@ -923,13 +1731,11 @@ fn lower_pattern(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         };
         return ok(APat(PatCtor(name, no_bindings, false)));
     };
-    match (kid(kids, 0, sp)?) {
-        APayload(bindings, ignore_payload) => ok(APat(PatCtor(name, bindings, ignore_payload))),
-        ATy(..) | ATys(..) | APat(..) | Ignored => err(ParseError {
-            message: "a constructor pattern has no payload",
-            span: sp,
-        }),
-    }
+    let payload = kid(kids, 0, sp)?;
+    if (let APayload(bindings, ignore_payload) = payload) {
+        return ok(APat(PatCtor(name, bindings, ignore_payload)));
+    };
+    err(wrong_kind("a constructor payload", payload, sp))
 }
 
 // ---------- entry points ----------
@@ -1139,6 +1945,169 @@ pub fn lower_aipl_pattern(src: str) -> Pat!ParseError {
     // here too.
     assert(pat_dump("`t`") == "Str(t)");
 })
+
+# One AIPL **expression**, lowered to the AST.
+#
+# This is most of the language: statements lower to expressions too, and the
+# `atom` production reaches blocks, match arms and patterns, so what parses here
+# is nearly everything but a declaration. The one thing it cannot do yet is a
+# block holding a keyword statement — that slice is next, and a block that holds
+# one refuses rather than dropping it.
+pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
+    as_expr(parse(src, lex_lossless(src)?, aipl_grammar(), "expr")?, 0..src.len())
+}.test({
+    // Literals, and the identifier that is not one.
+    assert(expr_dump("1") == "1");
+    assert(expr_dump("true") == "true");
+    assert(expr_dump("false") == "false");
+    assert(expr_dump("none") == "none");
+    assert(expr_dump("\"s\"") == "Str(s)");
+    assert(expr_dump("'c'") == "Char(c)");
+    assert(expr_dump("x") == "x");
+
+    // `-1` is one token: the lexer claims the sign when a digit follows it, so
+    // only a *spaced* minus is the unary operator.
+    assert(expr_dump("-1") == "-1");
+    assert(expr_dump("- 1") == "Neg(1)");
+    assert(expr_dump("-x") == "Neg(x)");
+
+    // Every operator is a call on its spelling — there is no operator node, and
+    // nothing downstream can tell one was written.
+    assert(expr_dump("a + b") == "+(a, b)");
+    assert(expr_dump("!x") == "!(x)");
+    // Precedence and associativity, which is what the `Climb` table encodes.
+    assert(expr_dump("1 + 2 * 3") == "+(1, *(2, 3))");
+    assert(expr_dump("1 * 2 + 3") == "+(*(1, 2), 3)");
+    assert(expr_dump("a - b - c") == "-(-(a, b), c)");
+    assert(expr_dump("a == b && c") == "&&(==(a, b), c)");
+    assert(expr_dump("a || b && c") == "||(a, &&(b, c))");
+
+    // A range is sugar for constructing the builtin `Span`, which is why it
+    // needs no import.
+    assert(expr_dump("a..b") == "Construct(__builtin_Span, [start: a, end: b])");
+    // ...except written *as* an index, where it folds straight into a slice.
+    assert(expr_dump("s[1..2]") == "Slice(s, 1, 2)");
+    assert(expr_dump("s[1..]") == "Slice(s, 1, )");
+    assert(expr_dump("s[..2]") == "Slice(s, 0, 2)");
+    assert(expr_dump("s[i]") == "Index(s, i)");
+
+    // Postfix chains, left to right. A tuple slot is the field `_0`.
+    assert(expr_dump("p.x") == "p.x");
+    assert(expr_dump("p.0") == "p._0");
+    assert(expr_dump("p.-1") == "error: tuple index must be a non-negative integer");
+    assert(expr_dump("x?") == "Try(x)");
+    assert(expr_dump("a.b.c") == "a.b.c");
+
+    // A method call folds its receiver in as the first argument, so `xs.f(1)`
+    // and `f(xs, 1)` are the same call with one bit between them.
+    assert(expr_dump("xs.push(1)") == "xs.push(1)");
+    assert(expr_dump("xs.len()") == "xs.len()");
+    assert(
+        expr_dump(
+            "xs.f(..ys)",
+        ) == "error: `..` spread is only allowed in an array literal, not in a method call",
+    );
+    assert(expr_dump("push(xs, 1)") == "push(xs, 1)");
+    assert(expr_dump("f()") == "f()");
+    assert(expr_dump("a.b(1).c[2]?") == "Try(Index(a.b(1).c, 2))");
+
+    // Struct literals, including the shorthand and the spread.
+    assert(expr_dump("P { x: 1, y }") == "Construct(P, [x: 1, y: y])");
+    assert(expr_dump("P { ..base, x: 1 }") == "Construct(P, [..base, x: 1])");
+    assert(expr_dump("P {}") == "Construct(P, [])");
+
+    // Array, tuple and paren. A tuple needs the comma; one expression in
+    // parentheses is just that expression.
+    assert(expr_dump("[1, 2]") == "[1, 2]");
+    assert(expr_dump("[1, ..rest]") == "[1, ..rest]");
+    assert(expr_dump("(1, 2)") == "Tuple(1, 2)");
+    assert(expr_dump("(1, 2,)") == "Tuple(1, 2)");
+    assert(expr_dump("(1)") == "1");
+    assert(expr_dump("(1 + 2) * 3") == "*(+(1, 2), 3)");
+    // A spread survives only in an array literal.
+    assert(
+        expr_dump(
+            "f(..xs)",
+        ) == "error: `..` spread is only allowed in an array literal, not in a call argument list",
+    );
+
+    // `#{ .. }` is a set, a dict, or an empty of either — and never a mix.
+    assert(expr_dump("#{1, 2}") == "Set([1, 2])");
+    assert(expr_dump("#{1: 2}") == "Dict([1: 2])");
+    assert(expr_dump("#{}") == "Set([])");
+    assert(expr_dump("#{1, 2: 3}").starts_with("error: a \"#{ .. }\" literal can't mix"));
+
+    // A template is a concat chain over `__template_interp` of each
+    // interpolation, folded from the tail backwards.
+    assert(
+        expr_dump(
+            "`a{x}b`",
+        ) == "__aipl_concat(__aipl_concat(Str(a), __template_interp(x)), Str(b))",
+    );
+
+    // Arguments: lambdas, bare operators, keyword arguments.
+    assert(expr_dump("f(|x| x)") == "f(Lambda([x], x))");
+    assert(expr_dump("f(|x: i64| x)") == "f(Lambda([x: i64], x))");
+    assert(expr_dump("f(|| 1)") == "f(Lambda([], 1))");
+    assert(expr_dump("f(+)") == "f(Lambda([lhs, rhs], +(lhs, rhs)))");
+    assert(expr_dump("f(k = 1)") == "f(Kw(k, 1))");
+    assert(expr_dump("f(k?= o)") == "f(KwFwd(k, o))");
+    // A lambda in value position takes a block body; it builds the same node.
+    assert(expr_dump("|x| { x }") == "Lambda([x], x)");
+
+    // `if`, with and without an `else`, and the ladder. An else-less `if` gets
+    // a synthetic unit, so it is typed exactly like `if (..) { .. } else {}`.
+    assert(expr_dump("if (a) { 1 } else { 2 }") == "If(a, 1, 2)");
+    assert(expr_dump("if (a) { 1 }") == "If(a, 1, ())");
+    assert(expr_dump("if (a) { }") == "If(a, (), ())");
+    assert(expr_dump("if (a) { 1 } else if (b) { 2 } else { 3 }") == "If(a, 1, If(b, 2, 3))");
+    assert(expr_dump("if (let some(v) = o) { v } else { 0 }") == "IfLet(some(v) => v, o, 0)");
+    assert(expr_dump("if (let some(v) = o) { v }") == "IfLet(some(v) => v, o, ())");
+
+    // A block is a right-nested `Seq`, and an `expr;` is what puts one there.
+    assert(expr_dump("if (a) { f(); 1 }") == "If(a, Seq(f(), 1), ())");
+    assert(expr_dump("if (a) { f(); }") == "If(a, Seq(f(), ()), ())");
+
+    // `match`, and the alternation that expands to one arm per pattern.
+    assert(expr_dump("match (v) { A(x) => x, _ => 0 }") == "Match(v, [A(x) => x, _ => 0])");
+    assert(
+        expr_dump(
+            "match (v) { A(x) | B(x) => x, _ => 0 }",
+        ) == "Match(v, [A(x) => x, B(x) => x, _ => 0])",
+    );
+    assert(expr_dump("match (v) { A(..) => 1, _ => 0 }") == "Match(v, [A(..) => 1, _ => 0])");
+    assert(expr_dump("match (xs) { [a, b] => a, _ => 0 }") == "Match(xs, [[a, b] => a, _ => 0])");
+    assert(expr_dump("match (s) { \"a\" => 1, _ => 0 }") == "Match(s, [Str(a) => 1, _ => 0])");
+
+    // Alternatives that disagree about what they bind are refused here rather
+    // than left to fail as an unbound name somewhere in the shared body.
+    assert(
+        expr_dump("match (v) { A(x) | B(y) => x, _ => 0 }") == """
+            error: alternatives of one arm must bind the same names: "A" binds "x", but "B" binds "y"
+        """,
+    );
+    assert(
+        expr_dump("match (v) { A(x) | B => x, _ => 0 }") == """
+            error: alternatives of one arm must bind the same names: "A" binds "x", but "B" binds nothing
+        """,
+    );
+
+    // `shim`, whose bindings are a list and whose body is a block.
+    assert(expr_dump("shim prints { print = p } { g() }") == "Shim(prints, [print = p], g())");
+
+    // The one thing left: a block holding a keyword statement.
+    assert(
+        expr_dump("if (a) { let x = 1; x }") == "error: a statement in a block is not lowered yet",
+    );
+})
+
+# A lowered expression as text, or the refusal that stopped it.
+fn expr_dump(src: str) -> str {
+    match (lower_aipl_expr(src)) {
+        ok(e) => e.show_expr(),
+        err(e) => `error: {e.message}`,
+    }
+}
 
 # A lowered pattern as text, or the refusal that stopped it.
 fn pat_dump(src: str) -> str {
@@ -1583,15 +2552,22 @@ fn with_build(self: Production<AiplTok, Ast>, build: Build<Ast>) -> Production<A
 //     `ty`, and the suffix run for `base_ty`. A production that matched none is
 //     the pass-through alternative.
 
-# The `Ty` a child lowered to, or a refusal naming what arrived instead. Every
-# type production lowers to `ATy`; anything else here is a lowering bug rather
-# than a bad program, which is why the message says so plainly.
+# What a production lowered, where something else was wanted. Every one of these
+# is a lowering bug rather than a bad program — the grammar guarantees the shape
+# — so the message names both sides and leaves it there.
+fn wrong_kind(want: str, got: Ast, span: Span) -> ParseError {
+    message: `a production lowered {got.ast_case_name()} where {want} was expected`,
+    span,
+}
+
+# The projections out of `Ast`, one per case a `build` reads. Each is an `if let`
+# rather than a `match`: a `match` on a fourteen-case variant has to spell every
+# other case out, once per projection, and what they all do is the same refusal.
 fn as_ty(v: Ast, span: Span) -> Ty!ParseError {
-    match (v) {
-        ATy(t) => ok(t),
-        ATys(..) => err(ParseError { message: "expected a type, got a list of types", span }),
-        APat(..) | APayload(..) | Ignored => err(ParseError { message: "expected a type", span }),
-    }
+    if (let ATy(t) = v) {
+        return ok(t);
+    };
+    err(wrong_kind("a type", v, span))
 }
 
 # Child `i`, or a refusal. A `build` reads its children positionally, and a
@@ -1637,34 +2613,29 @@ fn lower_ty(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let head = kid(kids, 0, sp)?;
     if (kids.len() == 2) {
         let rhs = as_ty(kid(kids, 1, sp)?, sp)?;
-        return match (head) {
-            // `(A, B) -> R` and `(A, B)!E`: a list on the left, and the token
-            // between says which.
-            ATys(ts) => if (ops == "->") {
-                ok(ATy(TyFn(ts, rhs)))
-            } else {
-                ok(ATy(TyResult(tuple_ty(ts, "!Error", sp)?, rhs)))
-            },
-            // `A!E`.
-            ATy(lhs) => ok(ATy(TyResult(lhs, rhs))),
-            APat(..) | APayload(..) | Ignored => err(ParseError {
-                message: "a type has an operand that is not a type",
-                span: sp,
-            }),
+
+        // `(A, B) -> R` and `(A, B)!E`: a list on the left, and the token
+        // between says which. Anything else on the left is `A!E`.
+        if (let ATys(ts) = head) {
+            if (ops == "->") {
+                return ok(ATy(TyFn(ts, rhs)));
+            };
+            return ok(ATy(TyResult(tuple_ty(ts, "!Error", sp)?, rhs)));
         };
+        return ok(ATy(TyResult(as_ty(head, sp)?, rhs)));
     };
-    match (head) {
-        ATys(ts) => match (ops) {
+    if (let ATys(ts) = head) {
+        return match (ops) {
             "[]" => ok(ATy(TyArray(tuple_ty(ts, "[]", sp)?))),
             "?" => ok(ATy(TyOptional(tuple_ty(ts, "?", sp)?))),
             _ => ok(ATy(tuple_ty(ts, "", sp)?)),
-        },
-        ATy(t) => if (ops == "!") { ok(ATy(TyResult(TyUnit, t))) } else { ok(ATy(t)) },
-        APat(..) | APayload(..) | Ignored => err(ParseError {
-            message: "a type has an operand that is not a type",
-            span: sp,
-        }),
-    }
+        };
+    };
+    let t = as_ty(head, sp)?;
+    if (ops == "!") {
+        return ok(ATy(TyResult(TyUnit, t)));
+    };
+    ok(ATy(t))
 }
 
 # `ty_parens` — the parenthesized list every `(`-led type form opens with. It is
@@ -1762,40 +2733,58 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1983325
-deallocations: 1983325
-reallocations: 10380
-bytes allocated: 208299743
-instructions executed: 243503232
-binary size: 895272
-  code: 597156
-  data: 19532
-  metadata: 278584
+allocations: 2724966
+deallocations: 2724966
+reallocations: 14592
+bytes allocated: 286603482
+instructions executed: 326327906
+binary size: 1508680
+  code: 994756
+  data: 28148
+  metadata: 485776
 functions:
   __arr_drop___m10__ListStyle:
-    calls: 92720
+    calls: 127856
     bytes: 120
   __arr_drop___m10__Prec:
-    calls: 322
+    calls: 466
     bytes: 120
   __arr_drop___m10__Production$__m11__AiplTok$__m1__Ast:
-    calls: 11709
+    calls: 16245
     bytes: 188
   __arr_drop___m10__Rule$__m11__AiplTok:
-    calls: 260315
+    calls: 361475
     bytes: 116
   __arr_drop___m12__StepResult$__m11__AiplTok:
-    calls: 5
+    calls: 6
     bytes: 140
   __arr_drop___m12__Token$__m11__AiplTok:
-    calls: 2718
+    calls: 3554
     bytes: 388
   __arr_drop___m12__TokenRule$__m11__AiplTok:
-    calls: 322
+    calls: 466
     bytes: 832
   __arr_drop___m1__Ast:
-    calls: 190
-    bytes: 312
+    calls: 1161
+    bytes: 820
+  __arr_drop___m1__BraceEntry:
+    calls: 5
+    bytes: 184
+  __arr_drop___m1__Expr:
+    calls: 52
+    bytes: 116
+  __arr_drop___m1__FieldInit:
+    calls: 6
+    bytes: 116
+  __arr_drop___m1__LambdaParam:
+    calls: 4
+    bytes: 172
+  __arr_drop___m1__MatchArm:
+    calls: 16
+    bytes: 116
+  __arr_drop___m1__Pat:
+    calls: 14
+    bytes: 116
   __arr_drop___m1__Ty:
     calls: 27
     bytes: 116
@@ -1806,7 +2795,7 @@ functions:
     calls: 37350
     bytes: 140
   __arr_drop___m2__Cst:
-    calls: 16447
+    calls: 24864
     bytes: 116
   __arr_drop___m3__Piece:
     calls: 247
@@ -1814,30 +2803,54 @@ functions:
   __arr_drop___m4__Doc:
     calls: 314
     bytes: 116
+  __arr_drop___tuple$__m1__Expr$__m1__Expr:
+    calls: 2
+    bytes: 116
+  __arr_drop___tuple$str$str:
+    calls: 1
+    bytes: 140
   __arr_retain___m10__ListStyle:
-    calls: 67830
+    calls: 93534
     bytes: 120
   __arr_retain___m10__Prec:
     calls: 0
     bytes: 120
   __arr_retain___m10__Production$__m11__AiplTok$__m1__Ast:
-    calls: 20974
+    calls: 28966
     bytes: 188
   __arr_retain___m10__Rule$__m11__AiplTok:
-    calls: 371640
+    calls: 512472
     bytes: 116
   __arr_retain___m12__StepResult$__m11__AiplTok:
-    calls: 7
+    calls: 8
     bytes: 140
   __arr_retain___m12__Token$__m11__AiplTok:
-    calls: 2396
+    calls: 3088
     bytes: 388
   __arr_retain___m12__TokenRule$__m11__AiplTok:
-    calls: 11431
+    calls: 16543
     bytes: 832
   __arr_retain___m1__Ast:
-    calls: 210
-    bytes: 312
+    calls: 1283
+    bytes: 820
+  __arr_retain___m1__BraceEntry:
+    calls: 7
+    bytes: 184
+  __arr_retain___m1__Expr:
+    calls: 40
+    bytes: 116
+  __arr_retain___m1__FieldInit:
+    calls: 6
+    bytes: 116
+  __arr_retain___m1__LambdaParam:
+    calls: 3
+    bytes: 172
+  __arr_retain___m1__MatchArm:
+    calls: 21
+    bytes: 116
+  __arr_retain___m1__Pat:
+    calls: 17
+    bytes: 116
   __arr_retain___m1__Ty:
     calls: 35
     bytes: 116
@@ -1848,7 +2861,7 @@ functions:
     calls: 43137
     bytes: 140
   __arr_retain___m2__Cst:
-    calls: 14582
+    calls: 19712
     bytes: 116
   __arr_retain___m3__Piece:
     calls: 304
@@ -1856,84 +2869,120 @@ functions:
   __arr_retain___m4__Doc:
     calls: 397
     bytes: 116
-  __builtin_all$__m10__Rule$__m11__AiplTok$lam177:
+  __arr_retain___tuple$__m1__Expr$__m1__Expr:
+    calls: 2
+    bytes: 116
+  __arr_retain___tuple$str$str:
+    calls: 1
+    bytes: 140
+  __builtin_all$__m10__Rule$__m11__AiplTok$lam230:
     calls: 0
     bytes: 36
-  __builtin_all$__m10__Rule$__m11__AiplTok$lam177$tail:
+  __builtin_all$__m10__Rule$__m11__AiplTok$lam230$tail:
     calls: 0
     bytes: 384
-  __builtin_all$char$s0$lam161:
+  __builtin_all$char$s0$lam212:
     calls: 79
     bytes: 212
-  __builtin_any$__m10__Rule$__m11__AiplTok$lam180:
+  __builtin_any$__m10__Rule$__m11__AiplTok$lam233:
     calls: 0
     bytes: 36
-  __builtin_any$__m10__Rule$__m11__AiplTok$lam180$tail:
+  __builtin_any$__m10__Rule$__m11__AiplTok$lam233$tail:
     calls: 108
     bytes: 380
-  __builtin_any$__m4__Doc$lam192:
+  __builtin_any$__m4__Doc$lam245:
     calls: 0
     bytes: 32
-  __builtin_any$__m4__Doc$lam192$tail:
+  __builtin_any$__m4__Doc$lam245$tail:
     calls: 145
     bytes: 324
-  __builtin_count_while$char$lam57:
-    calls: 1215
+  __builtin_count_while$char$lam63:
+    calls: 1543
     bytes: 220
-  __builtin_count_while$char$s0$lam125:
+  __builtin_count_while$char$s0$lam164:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam138:
+  __builtin_count_while$char$s0$lam177:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam138$tail:
-    calls: 28
+  __builtin_count_while$char$s0$lam177$tail:
+    calls: 32
     bytes: 256
-  __builtin_count_while$char$s0$lam158:
-    calls: 67
+  __builtin_count_while$char$s0$lam209:
+    calls: 268
     bytes: 172
-  __builtin_count_while$char$s0$lam160:
+  __builtin_count_while$char$s0$lam211:
     calls: 1
     bytes: 172
-  __builtin_count_while$char$s0$lam65:
-    calls: 997
+  __builtin_count_while$char$s0$lam71:
+    calls: 1327
     bytes: 184
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m10__Prec$lam196:
-    calls: 148
+  __builtin_find_if$__m10__Prec$lam249:
+    calls: 266
     bytes: 688
-  __builtin_find_index$str$lam15:
-    calls: 161
+  __builtin_find_index$str$lam124:
+    calls: 44275
     bytes: 400
-  __builtin_find_index$str$lam28:
-    calls: 10260
+  __builtin_find_index$str$lam20:
+    calls: 233
     bytes: 400
-  __builtin_find_index$str$lam85:
-    calls: 31675
+  __builtin_find_index$str$lam33:
+    calls: 14148
     bytes: 400
   __builtin_int_parse:
-    calls: 67
+    calls: 268
     bytes: 1028
   __builtin_intersperse$__m4__Doc:
     calls: 26
     bytes: 408
-  __builtin_try_map$__m10__Production$__m11__AiplTok$__m1__Ast$__m20__First<__m11__AiplTok>$__m10__ParseError$lam109:
+  __builtin_try_map$__m10__Production$__m11__AiplTok$__m1__Ast$__m20__First<__m11__AiplTok>$__m10__ParseError$lam148:
     calls: 72
     bytes: 920
-  __builtin_try_map$__m10__Rule$__m11__AiplTok$__m10__Rule<__m11__AiplTok>$__m10__ParseError$lam148:
-    calls: 29640
+  __builtin_try_map$__m10__Rule$__m11__AiplTok$__m10__Rule<__m11__AiplTok>$__m10__ParseError$lam199:
+    calls: 40872
     bytes: 720
-  __builtin_try_map$__m1__Ast$__m1__Ty$__m10__ParseError$lam68:
+  __builtin_try_map$__m1__Ast$__m1__BraceEntry$__m10__ParseError$lam109:
+    calls: 4
+    bytes: 2632
+  __builtin_try_map$__m1__Ast$__m1__Expr$__m10__ParseError$lam102:
+    calls: 19
+    bytes: 2524
+  __builtin_try_map$__m1__Ast$__m1__Expr$__m10__ParseError$lam82:
+    calls: 15
+    bytes: 2524
+  __builtin_try_map$__m1__Ast$__m1__Expr$__m10__ParseError$lam87:
+    calls: 2
+    bytes: 2524
+  __builtin_try_map$__m1__Ast$__m1__Expr$__m10__ParseError$lam94:
+    calls: 1
+    bytes: 2524
+  __builtin_try_map$__m1__Ast$__m1__FieldInit$__m10__ParseError$lam90:
+    calls: 3
+    bytes: 2524
+  __builtin_try_map$__m1__Ast$__m1__LambdaParam$__m10__ParseError$lam196:
+    calls: 3
+    bytes: 2616
+  __builtin_try_map$__m1__Ast$__m1__Pat$__m10__ParseError$lam112:
+    calls: 11
+    bytes: 2524
+  __builtin_try_map$__m1__Ast$__m1__Ty$__m10__ParseError$lam74:
     calls: 14
-    bytes: 1192
-  __builtin_try_map$__m1__Ast$__m1__Ty$__m10__ParseError$lam73:
+    bytes: 2524
+  __builtin_try_map$__m1__Ast$__m1__Ty$__m10__ParseError$lam79:
     calls: 6
-    bytes: 1192
-  __builtin_try_map$__m2__Cst$__m1__Ast$__m10__ParseError$lam157:
-    calls: 243
-    bytes: 1076
+    bytes: 2524
+  __builtin_try_map$__m1__Ast$__tuple$str$str$__m10__ParseError$lam193:
+    calls: 1
+    bytes: 2556
+  __builtin_try_map$__m2__Cst$__m1__Ast$__m10__ParseError$lam208:
+    calls: 1127
+    bytes: 2028
+  __builtin_value_or$__builtin_Span:
+    calls: 0
+    bytes: 96
   __eq___m20__First$__m11__AiplTok:
     calls: 1494
     bytes: 128
@@ -1952,72 +3001,78 @@ functions:
   __eq_set$str$arr:
     calls: 54
     bytes: 300
+  __eq_str$arr:
+    calls: 14
+    bytes: 364
   __eq_str$opt:
     calls: 175
     bytes: 100
-  __filter39$own0:
-    calls: 270
-    bytes: 332
-  __filter80$own0:
-    calls: 6
+  __filter119$own0:
+    calls: 15
     bytes: 428
-  __lambda_121:
-    calls: 61
+  __filter45$own0:
+    calls: 1333
+    bytes: 332
+  __lambda_160:
+    calls: 246
     bytes: 140
-  __lambda_16:
+  __lambda_21:
     calls: 0
     bytes: 136
-  __lambda_17:
-    calls: 429
-    bytes: 104
-  __lambda_18:
-    calls: 0
-    bytes: 144
-  __lambda_19:
-    calls: 0
-    bytes: 164
-  __lambda_20:
-    calls: 0
-    bytes: 144
-  __lambda_21:
-    calls: 5
-    bytes: 164
   __lambda_22:
+    calls: 557
+    bytes: 104
+  __lambda_23:
+    calls: 0
+    bytes: 144
+  __lambda_24:
+    calls: 0
+    bytes: 164
+  __lambda_25:
+    calls: 0
+    bytes: 144
+  __lambda_26:
+    calls: 7
+    bytes: 164
+  __lambda_27:
     calls: 0
     bytes: 48
-  __lambda_23:
-    calls: 3
+  __lambda_28:
+    calls: 4
     bytes: 64
   __m10__desugar_opt$__m11__AiplTok:
-    calls: 11780
+    calls: 16244
     bytes: 700
   __m10__desugar_rule$__m11__AiplTok:
-    calls: 154470
+    calls: 213006
     bytes: 11936
   __m10__group_styles$__m11__AiplTok:
     calls: 0
     bytes: 32
   __m10__group_styles$__m11__AiplTok$tail:
-    calls: 532190
+    calls: 733862
     bytes: 4724
   __m10__link$__m11__AiplTok$__m1__Ast:
-    calls: 190
+    calls: 262
     bytes: 2796
   __m10__link_opt$__m11__AiplTok:
-    calls: 11780
+    calls: 16244
     bytes: 716
   __m10__link_rule$__m11__AiplTok:
-    calls: 154470
+    calls: 213006
     bytes: 8236
   __m10__link_rules$__m11__AiplTok:
-    calls: 29640
+    calls: 40872
     bytes: 832
   __m10__prod_names$__m11__AiplTok$__m1__Ast:
-    calls: 351
+    calls: 495
     bytes: 492
   __m11__char_lit_emit:
-    calls: 2
+    calls: 3
     bytes: 1772
+  __m11__char_lit_value:
+    calls: 3
+    bytes: 300
   __m11__dedent_segments:
     calls: 1
     bytes: 272
@@ -2025,61 +3080,64 @@ functions:
     calls: 8
     bytes: 196
   __m11__int_lit:
-    calls: 67
+    calls: 126
     bytes: 1364
   __m11__raw_tpl_kind:
     calls: 2
     bytes: 2592
   __m11__str_lit_value:
-    calls: 3
+    calls: 5
     bytes: 400
+  __m11__template_segments:
+    calls: 1
+    bytes: 1652
   __m11__tpl_kind:
-    calls: 7
+    calls: 9
     bytes: 2608
   __m12__between_len:
-    calls: 930
+    calls: 1201
     bytes: 752
   __m12__delimited_len:
-    calls: 1855
+    calls: 2395
     bytes: 1592
   __m12__finalize_template$__m11__AiplTok:
-    calls: 4
+    calls: 5
     bytes: 8904
   __m12__float_len:
     calls: 0
     bytes: 816
   __m12__interp_scan$__m11__AiplTok:
-    calls: 5
+    calls: 6
     bytes: 2252
   __m12__lex$__m11__AiplTok:
-    calls: 161
+    calls: 233
     bytes: 1520
   __m12__lex_step$__m11__AiplTok:
-    calls: 2368
+    calls: 3054
     bytes: 29192
   __m12__nested_len:
-    calls: 1578
+    calls: 2064
     bytes: 940
   __m12__step_result$__m11__AiplTok:
-    calls: 72409
+    calls: 94470
     bytes: 15088
   __m12__template_scan$__m11__AiplTok:
-    calls: 4
+    calls: 5
     bytes: 2728
   __m12__template_step$__m11__AiplTok:
-    calls: 1845
+    calls: 2381
     bytes: 476
   __m12__to_eol_len:
     calls: 0
     bytes: 52
   __m12__to_eol_len$tail:
-    calls: 3159
+    calls: 4131
     bytes: 252
   __m12__to_eol_unless_len:
-    calls: 1577
+    calls: 2063
     bytes: 368
   __m13__unescape:
-    calls: 19
+    calls: 29
     bytes: 1176
   __m14__process_raw_string:
     calls: 1
@@ -2097,70 +3155,70 @@ functions:
     calls: 175
     bytes: 744
   __m19__climb$__m11__AiplTok$__m1__Ast:
-    calls: 199
+    calls: 393
     bytes: 3160
   __m19__error_at$__m11__AiplTok$__m1__Ast:
     calls: 34
     bytes: 4108
   __m19__far_miss:
-    calls: 15902
+    calls: 20175
     bytes: 1084
   __m19__far_unclosed:
     calls: 9
     bytes: 320
   __m19__find_prec:
-    calls: 151
+    calls: 351
     bytes: 228
   __m19__leaf_at$__m11__AiplTok$__m1__Ast:
-    calls: 4095
+    calls: 4873
     bytes: 3100
   __m19__lower_node$__m11__AiplTok$__m1__Ast:
-    calls: 243
-    bytes: 4932
+    calls: 1127
+    bytes: 7828
   __m19__match_group$__m11__AiplTok$__m1__Ast:
-    calls: 6187
+    calls: 7139
     bytes: 6196
   __m19__match_many$__m11__AiplTok$__m1__Ast:
-    calls: 7621
+    calls: 8807
     bytes: 1436
   __m19__match_maybe$__m11__AiplTok$__m1__Ast:
-    calls: 460
+    calls: 507
     bytes: 1076
   __m19__match_one_of$__m11__AiplTok$__m1__Ast:
-    calls: 4086
+    calls: 4944
     bytes: 1692
   __m19__match_prod$__m11__AiplTok$__m1__Ast:
-    calls: 7795
+    calls: 9129
     bytes: 8972
   __m19__match_reps$__m11__AiplTok$__m1__Ast:
-    calls: 1932
+    calls: 2272
     bytes: 5120
   __m19__match_rule$__m11__AiplTok$__m1__Ast:
-    calls: 53439
+    calls: 65427
     bytes: 14428
   __m19__match_then$__m11__AiplTok$__m1__Ast:
-    calls: 13894
+    calls: 17348
     bytes: 2128
   __m19__parse$__m11__AiplTok$__m1__Ast:
-    calls: 51
-    bytes: 592
+    calls: 123
+    bytes: 1084
   __m19__parse_cst$__m11__AiplTok$__m1__Ast:
-    calls: 152
+    calls: 224
     bytes: 624
   __m19__parse_prepared$__m11__AiplTok$__m1__Ast:
-    calls: 161
+    calls: 233
     bytes: 5288
   __m19__prepare$__m11__AiplTok$__m1__Ast:
     calls: 9
     bytes: 2068
   __m19__prev_end$__m11__AiplTok$__m1__Ast:
-    calls: 4349
+    calls: 5271
     bytes: 1580
   __m19__pruned$__m11__AiplTok$__m1__Ast:
     calls: 70
     bytes: 1344
   __m19__quoted:
-    calls: 19538
+    calls: 23308
     bytes: 456
   __m19__rule_labels$__m11__AiplTok$__m1__Ast:
     calls: 0
@@ -2181,13 +3239,46 @@ functions:
     calls: 5346
     bytes: 908
   __m19__tok_text$__m11__AiplTok$__m1__Ast:
-    calls: 15937
+    calls: 20229
     bytes: 1712
   __m19__trailing_trivia$__m11__AiplTok$__m1__Ast:
-    calls: 254
+    calls: 398
     bytes: 1160
+  __m1__binder_list:
+    calls: 4
+    bytes: 740
+  __m1__ident_name:
+    calls: 0
+    bytes: 2928
+  __m1__is_ident:
+    calls: 0
+    bytes: 2804
+  __m1__pat_bindings:
+    calls: 25
+    bytes: 792
+  __m1__show_ann:
+    calls: 5
+    bytes: 416
+  __m1__show_arm:
+    calls: 13
+    bytes: 476
+  __m1__show_call:
+    calls: 32
+    bytes: 1560
+  __m1__show_expr:
+    calls: 210
+    bytes: 16984
+  __m1__show_exprs:
+    calls: 39
+    bytes: 460
+  __m1__show_field_init:
+    calls: 6
+    bytes: 620
+  __m1__show_pat:
+    calls: 28
+    bytes: 1640
   __m1__show_ty:
-    calls: 89
+    calls: 90
     bytes: 4656
   __m1__show_tys:
     calls: 14
@@ -2211,34 +3302,37 @@ functions:
     calls: 9
     bytes: 532
   __m2__first_token:
-    calls: 103
+    calls: 1507
     bytes: 660
   __m2__first_token_of:
-    calls: 63
+    calls: 909
     bytes: 320
   __m2__flat_kids:
     calls: 0
     bytes: 32
   __m2__flat_kids$tail:
-    calls: 549
+    calls: 2219
     bytes: 3832
   __m2__last_token:
-    calls: 101
+    calls: 1541
     bytes: 660
   __m2__last_token_of:
-    calls: 78
+    calls: 1111
     bytes: 396
   __m2__leaves:
-    calls: 2307
+    calls: 15043
     bytes: 3684
+  __m2__own_token_text:
+    calls: 259
+    bytes: 1316
   __m2__span:
-    calls: 235
+    calls: 1089
     bytes: 524
   __m2__splice:
     calls: 0
     bytes: 32
   __m2__splice$tail:
-    calls: 1028
+    calls: 4340
     bytes: 612
   __m2__text:
     calls: 10
@@ -2246,31 +3340,34 @@ functions:
   __m2__token_leaves:
     calls: 1334
     bytes: 3648
+  __m2__token_span:
+    calls: 434
+    bytes: 288
   __m3__breaks_after:
     calls: 1
     bytes: 444
-  __m3__fmt_node$__m11__AiplTok$__m1__Ast$s1$lam29:
+  __m3__fmt_node$__m11__AiplTok$__m1__Ast$s1$lam34:
     calls: 144
     bytes: 4800
   __m3__format_cst$__m11__AiplTok$__m1__Ast$s1$lam12:
     calls: 20
     bytes: 384
-  __m3__gap_wanted$lam149:
+  __m3__gap_wanted$lam200:
     calls: 160
     bytes: 304
-  __m3__group_doc$__m11__AiplTok$__m1__Ast$s1$lam93:
+  __m3__group_doc$__m11__AiplTok$__m1__Ast$s1$lam132:
     calls: 13
     bytes: 2420
-  __m3__inline_doc$lam92:
+  __m3__inline_doc$lam131:
     calls: 137
     bytes: 2668
-  __m3__pieces$__m11__AiplTok$__m1__Ast$s1$lam90:
+  __m3__pieces$__m11__AiplTok$__m1__Ast$s1$lam129:
     calls: 170
     bytes: 3612
   __m3__render_cst$__m11__AiplTok$__m1__Ast$s1$lam3:
     calls: 20
     bytes: 5268
-  __m3__wrapped$lam150:
+  __m3__wrapped$lam201:
     calls: 13
     bytes: 4272
   __m4__col_after:
@@ -2301,13 +3398,28 @@ functions:
     calls: 1
     bytes: 1276
   __rec_drop___m10__Rule$__m11__AiplTok:
-    calls: 534759
+    calls: 752271
     bytes: 340
+  __rec_drop___m1__Expr:
+    calls: 227
+    bytes: 36
+  __rec_drop___m1__ExprKind:
+    calls: 226
+    bytes: 1260
+  __rec_drop___m1__FieldInit:
+    calls: 8
+    bytes: 72
+  __rec_drop___m1__MatchArm:
+    calls: 13
+    bytes: 72
+  __rec_drop___m1__Pat:
+    calls: 32
+    bytes: 136
   __rec_drop___m1__Ty:
-    calls: 96
+    calls: 97
     bytes: 408
   __rec_drop___m2__Cst:
-    calls: 10398
+    calls: 12635
     bytes: 132
   __rec_drop___m4__Doc:
     calls: 382
@@ -2316,7 +3428,10 @@ functions:
     calls: 657
     bytes: 84
   __rec_drop___tuple$__m10__Rule___m11__AiplTok$__m10__Rule___m11__AiplTok:
-    calls: 30302
+    calls: 42686
+    bytes: 72
+  __rec_drop___tuple$__m1__Expr$__m1__Expr:
+    calls: 3
     bytes: 72
   __test$aipl_node_spans:
     calls: 1
@@ -2333,6 +3448,9 @@ functions:
   __test$format_aipl_ty:
     calls: 1
     bytes: 8840
+  __test$lower_aipl_expr:
+    calls: 1
+    bytes: 12416
   __test$lower_aipl_pattern:
     calls: 1
     bytes: 2460
@@ -2345,57 +3463,66 @@ functions:
   __to_str___m10__ParseError:
     calls: 0
     bytes: 824
+  __to_str_i64:
+    calls: 52
+    bytes: 204
   __to_str_u64:
     calls: 10
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 67799
+    calls: 102666
     bytes: (external)
   aipl_arr_elem_ptr:
-    calls: 78
+    calls: 1111
     bytes: (external)
   aipl_arr_extend:
-    calls: 121962
+    calls: 167396
     bytes: (external)
   aipl_arr_inc:
-    calls: 4187449
+    calls: 5488344
     bytes: (external)
   aipl_arr_join:
-    calls: 65959
+    calls: 101194
     bytes: (external)
   aipl_arr_reserve:
-    calls: 88592
+    calls: 110401
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 229466
+    calls: 325300
     bytes: (external)
   aipl_arr_reverse:
-    calls: 78
+    calls: 1111
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 187
     bytes: (external)
   aipl_arr_sort:
     calls: 34
     bytes: (external)
   aipl_array_dec:
-    calls: 5554606
+    calls: 7356266
     bytes: (external)
   aipl_array_new:
-    calls: 907704
+    calls: 1244405
     bytes: (external)
   aipl_array_push:
-    calls: 230417
+    calls: 316816
     bytes: (external)
   aipl_array_push_mut:
-    calls: 349884
+    calls: 462684
     bytes: (external)
   aipl_array_with_cap:
-    calls: 122269
+    calls: 159344
     bytes: (external)
   aipl_assert:
-    calls: 164
+    calls: 236
     bytes: (external)
   aipl_grammar:
-    calls: 161
+    calls: 233
     bytes: 932
+  aipl_i64_len:
+    calls: 104
+    bytes: (external)
   aipl_node_spans:
     calls: 3
     bytes: 408
@@ -2406,19 +3533,19 @@ functions:
     calls: 8
     bytes: 748
   aipl_rec_alloc:
-    calls: 576594
+    calls: 809237
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 3788506
+    calls: 5224316
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 158381
+    calls: 223085
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 3211912
+    calls: 4415079
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 158381
+    calls: 223085
     bytes: (external)
   aipl_set_contains:
     calls: 58509
@@ -2430,10 +3557,10 @@ functions:
     calls: 14418
     bytes: (external)
   aipl_test_begin:
-    calls: 7
+    calls: 8
     bytes: (external)
   aipl_test_end:
-    calls: 7
+    calls: 8
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -2441,105 +3568,255 @@ functions:
   aipl_u64_len:
     calls: 20
     bytes: (external)
+  aipl_write_i64:
+    calls: 52
+    bytes: (external)
   aipl_write_u64:
     calls: 10
     bytes: (external)
   angles:
-    calls: 483
+    calls: 699
     bytes: 376
+  arm_span:
+    calls: 10
+    bytes: 748
+  as_arms:
+    calls: 10
+    bytes: 1624
+  as_bind:
+    calls: 1
+    bytes: 1872
+  as_entries:
+    calls: 4
+    bytes: 1572
+  as_entry:
+    calls: 5
+    bytes: 1732
+  as_expr:
+    calls: 739
+    bytes: 1600
+  as_exprs:
+    calls: 33
+    bytes: 1628
+  as_field_init:
+    calls: 4
+    bytes: 1624
+  as_lambda_param:
+    calls: 3
+    bytes: 1780
+  as_pat:
+    calls: 31
+    bytes: 1592
+  as_suffix:
+    calls: 15
+    bytes: 1860
   as_ty:
-    calls: 141
-    bytes: 1784
+    calls: 205
+    bytes: 1588
+  at:
+    calls: 226
+    bytes: 112
+  brace_literal:
+    calls: 4
+    bytes: 1712
   braces:
-    calls: 2093
+    calls: 3029
     bytes: 376
+  concat_call:
+    calls: 2
+    bytes: 332
+  else_or_unit:
+    calls: 9
+    bytes: 3376
+  expr_dump:
+    calls: 72
+    bytes: 552
   expressions:
-    calls: 322
-    bytes: 32856
+    calls: 466
+    bytes: 34764
+  field_name:
+    calls: 6
+    bytes: 888
   format_aipl_ty:
     calls: 20
     bytes: 808
   items:
-    calls: 161
+    calls: 233
     bytes: 32060
   keep:
-    calls: 0
-    bytes: 608
+    calls: 2
+    bytes: 1556
   kid:
-    calls: 164
-    bytes: 2260
+    calls: 888
+    bytes: 5632
+  kid_expr:
+    calls: 645
+    bytes: 1680
+  lambda_of:
+    calls: 3
+    bytes: 804
   lex_lossless:
-    calls: 161
+    calls: 233
     bytes: 96796
+  lower_aipl_expr:
+    calls: 72
+    bytes: 2076
   lower_aipl_pattern:
     calls: 15
-    bytes: 3248
+    bytes: 2084
   lower_aipl_ty:
     calls: 36
-    bytes: 1120
+    bytes: 2072
+  lower_arg:
+    calls: 18
+    bytes: 9940
+  lower_args:
+    calls: 19
+    bytes: 2492
+  lower_arm_body:
+    calls: 12
+    bytes: 2500
+  lower_atom:
+    calls: 168
+    bytes: 55876
   lower_base_ty:
-    calls: 65
-    bytes: 3500
-  lower_ctor_payload:
-    calls: 6
-    bytes: 3892
-  lower_pattern:
-    calls: 15
-    bytes: 10584
-  lower_ty:
-    calls: 75
-    bytes: 19252
-  lower_ty_core:
     calls: 66
-    bytes: 13156
+    bytes: 6828
+  lower_block:
+    calls: 14
+    bytes: 2500
+  lower_block_body:
+    calls: 18
+    bytes: 19096
+  lower_block_tail:
+    calls: 15
+    bytes: 2492
+  lower_brace_body:
+    calls: 4
+    bytes: 2492
+  lower_ctor_payload:
+    calls: 15
+    bytes: 6256
+  lower_else_branch:
+    calls: 4
+    bytes: 5912
+  lower_entry:
+    calls: 5
+    bytes: 5132
+  lower_expr:
+    calls: 179
+    bytes: 7456
+  lower_field_init:
+    calls: 4
+    bytes: 8732
+  lower_if:
+    calls: 9
+    bytes: 9036
+  lower_lambda:
+    calls: 3
+    bytes: 6540
+  lower_lambda_param:
+    calls: 3
+    bytes: 8884
+  lower_match_arm:
+    calls: 12
+    bytes: 14040
+  lower_op_value:
+    calls: 1
+    bytes: 2712
+  lower_pattern:
+    calls: 31
+    bytes: 17588
+  lower_postfix:
+    calls: 164
+    bytes: 8804
+  lower_shim_binding:
+    calls: 1
+    bytes: 3048
+  lower_suffix:
+    calls: 17
+    bytes: 21116
+  lower_template:
+    calls: 1
+    bytes: 5544
+  lower_ty:
+    calls: 76
+    bytes: 42744
+  lower_ty_core:
+    calls: 67
+    bytes: 27544
   lower_ty_parens:
     calls: 14
-    bytes: 1056
+    bytes: 2492
+  lower_unary:
+    calls: 167
+    bytes: 6164
   main:
     calls: 1
-    bytes: 588
+    bytes: 668
+  match_expr:
+    calls: 5
+    bytes: 3028
   nest:
-    calls: 2898
+    calls: 4194
     bytes: 844
   nest2:
-    calls: 966
+    calls: 1398
     bytes: 1016
+  no_spread:
+    calls: 17
+    bytes: 3328
   node_spans:
     calls: 27
-    bytes: 756
+    bytes: 560
   only:
-    calls: 4830
+    calls: 6990
     bytes: 792
   p:
-    calls: 12397
+    calls: 17941
     bytes: 448
   parens:
-    calls: 1288
+    calls: 1864
     bytes: 376
   pat_dump:
     calls: 15
-    bytes: 2016
+    bytes: 552
   patterns:
-    calls: 322
-    bytes: 6644
+    calls: 466
+    bytes: 6844
   pipes:
-    calls: 644
+    calls: 932
     bytes: 376
+  range_bounds:
+    calls: 3
+    bytes: 2960
+  same_bindings:
+    calls: 11
+    bytes: 3864
+  shim_expr:
+    calls: 1
+    bytes: 3052
   statements:
-    calls: 322
-    bytes: 24688
+    calls: 466
+    bytes: 25024
   tuple_ty:
     calls: 9
     bytes: 556
+  two_values:
+    calls: 1
+    bytes: 1124
   ty_dump:
     calls: 36
     bytes: 552
   types:
-    calls: 322
+    calls: 466
     bytes: 8600
   why_prepared:
     calls: 9
     bytes: 1760
   with_build:
-    calls: 1932
+    calls: 12582
     bytes: 336
+  wrong_kind:
+    calls: 0
+    bytes: 2960
