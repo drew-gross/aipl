@@ -243,23 +243,29 @@ fn sanity_check(artifact: &str) {
         .unwrap();
     assert_eq!(whole, FfiValue::Str("fn main() {}\n".to_string())); // no marker → keep all
 
-    // Returns `Span?`: `some(span)` (the first trailing-ws run's byte range)
-    // or `none` when clean. Exercises an optional-of-struct return marshaled
-    // back through the dogfood `from_artifact` path.
-    let dirty = comp
+    // The parser: a whole file to an AST, with its `#[allow]` spans. Rebuilt
+    // through the same bridge the compiler uses, so this proves the artifact's
+    // parser and the Rust-side reconstruction agree, not merely that a call
+    // returns.
+    let parsed = comp
         .call_values(
-            "find_trailing_whitespace",
-            &[FfiValue::Str("bad \nok".to_string())],
+            "aipl_parse_file",
+            &[FfiValue::Str(
+                "fn f(x: i64) -> i64 { x } #[allow]\n".to_string(),
+            )],
         )
         .unwrap();
-    assert_eq!(dirty, FfiValue::Opt(Some(Box::new(span(3, 4)))));
-    let clean = comp
-        .call_values(
-            "find_trailing_whitespace",
-            &[FfiValue::Str("a\nb\nc".to_string())],
-        )
+    let (program, allows) = aipl::ffi_ast::parse_file_from_ffi(&parsed)
+        .unwrap_or_else(|e| panic!("dogfooded aipl_parse_file did not rebuild: {e}"));
+    assert_eq!(program.items.len(), 1);
+    assert_eq!(allows, vec![26..34]);
+    let refused = comp
+        .call_values("aipl_parse_file", &[FfiValue::Str("fn f( {".to_string())])
         .unwrap();
-    assert_eq!(clean, FfiValue::Opt(None));
+    assert!(
+        aipl::ffi_ast::parse_file_from_ffi(&refused).is_err(),
+        "a syntax error must come back as one"
+    );
 
     // Formats `input:LINE: TEXT` (1-based line, trimmed condition text).
     let loc = comp

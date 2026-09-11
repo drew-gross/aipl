@@ -20,6 +20,10 @@ aipl-parser = { workspace = true }
 # `count_while` module import) the embedded `dedent.aipl` the compiler dogfoods
 # via the FFI to de-dent raw strings.
 aipl-loader = { workspace = true }
+# The parser hook runs the dogfooded parser on a grown stack segment when the
+# caller's is small: a recursive-descent parse of a large source needs several
+# megabytes, and a test thread has two. See `parse_file`.
+stacker = { workspace = true }
 # Used to install the dogfooded `reindent_block` into the formatter's hook (the
 # formatter's raw-block re-layout, dogfooded via the FFI); `install_parser_hooks`.
 cranelift = { workspace = true }

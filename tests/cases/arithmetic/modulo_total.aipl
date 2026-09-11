@@ -68,10 +68,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 382
-binary size: 3864
+binary size: 3888
   code: 1328
-  data: 688
-  metadata: 1848
+  data: 705
+  metadata: 1855
 functions:
   __test$identity:
     calls: 1

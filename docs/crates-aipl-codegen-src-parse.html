@@ -258,20 +258,6 @@
 
 
 
-        <section class="item" id="item-prev_end">
-          <h3>
-            <a class="anchor" href="#item-prev_end">prev_end</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn prev_end&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; u64</code></pre>
-
-          <div class="doc"><p>Where token <code>i - 1</code> ended — the start of the run of trivia that belongs in front of token <code>i</code>. Derived from the token positions rather than remembered, so backtracking can't leave it stale: re-consuming a token re-attaches exactly the same trivia.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-leaf_at">
           <h3>
             <a class="anchor" href="#item-leaf_at">leaf_at</a>
@@ -279,21 +265,63 @@
           </h3>
           <pre class="signature"><code>fn leaf_at&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, i: u64) -&#62; Cst[]</code></pre>
 
-          <div class="doc"><p>The CST children consuming token <code>i</code> contributes: every trivia record between the previous token and this one, then the token's own leaf. Attaching trivia *before* its following token is what makes the leaf spans tile the source with no gaps, which is the whole losslessness property.</p></div>
+          <div class="doc"><p>The CST children consuming token <code>i</code> contributes: every trivia record between the previous token and this one, then the token's own leaf. Attaching trivia *before* its following token is what makes the leaf spans tile the source with no gaps, which is the whole losslessness property.</p><p>Looked up, not computed: a PEG asks this once per token *per attempt*, and it attempts a token many times. Filtering the whole trivia list on each ask was quadratic in the file — the largest compiler sources took a minute to parse, and this one call was most of it. <code>attach_trivia</code> does the same pairing once, by one merge over the two sorted lists.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-trailing_trivia">
+        <section class="item" id="item-attach_trivia">
           <h3>
-            <a class="anchor" href="#item-trailing_trivia">trailing_trivia</a>
+            <a class="anchor" href="#item-attach_trivia">attach_trivia</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn trailing_trivia&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;) -&#62; Cst[]</code></pre>
+          <pre class="signature"><code>fn attach_trivia&#60;K: variant&#62;(toks: Token&#60;K&#62;[], trivia: Token&#60;K&#62;[]) -&#62; (Cst[][], Cst[])</code></pre>
 
-          <div class="doc"><p>The trivia after the last token — a trailing comment or newline, which no token consumption can pick up. Appended to the root node so the tree still covers the source to its last byte.</p></div>
+          <div class="doc"><p>Every token's <code>leaf_at</code> children, in token order, and the trivia left after the last token. Both lists arrive sorted by position and never overlap, so one pass that advances through the trivia as it walks the tokens pairs them off exactly as the per-token filter did — each trivia record lands in front of the first token that starts after it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-tok_at">
+          <h3>
+            <a class="anchor" href="#item-tok_at">tok_at</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn tok_at(span: Span) -&#62; Token&#60;Tok&#62;</code></pre>
+
+          <div class="doc"><p>A token at a span, for the attachment test — only the position matters to it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-trivia_starts_before">
+          <h3>
+            <a class="anchor" href="#item-trivia_starts_before">trivia_starts_before</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn trivia_starts_before&#60;K: variant&#62;(trivia: Token&#60;K&#62;[], j: u64, at: u64) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether trivia record <code>j</code> exists and starts before <code>at</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-trivia_span">
+          <h3>
+            <a class="anchor" href="#item-trivia_span">trivia_span</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn trivia_span&#60;K: variant&#62;(trivia: Token&#60;K&#62;[], j: u64) -&#62; Span</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -307,7 +335,7 @@
           </h3>
           <pre class="signature"><code>fn with_trailing&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, root: Cst) -&#62; Cst</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>The trivia after the last token, appended to the root node so the tree still covers the source to its last byte.</p></div>
 
 
         </section>

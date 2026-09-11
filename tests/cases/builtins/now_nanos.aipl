@@ -33,8 +33,8 @@ bytes allocated: 0
 instructions executed: 69
 binary size: 1440
   code: 356
-  data: 91
-  metadata: 993
+  data: 93
+  metadata: 991
 functions:
   __test$now_is_plausible:
     calls: 1

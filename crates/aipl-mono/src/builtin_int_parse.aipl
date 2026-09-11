@@ -113,9 +113,9 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 12506
-binary size: 9920
+binary size: 9936
   code: 4512
-  data: 1816
+  data: 1832
   metadata: 3592
 functions:
   __builtin_count_while$char$s0$lam4:

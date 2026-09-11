@@ -52,10 +52,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 176
 instructions executed: 175
-binary size: 3064
+binary size: 3088
   code: 888
-  data: 582
-  metadata: 1594
+  data: 607
+  metadata: 1593
 functions:
   __test$arithmetic:
     calls: 1

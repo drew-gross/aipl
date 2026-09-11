@@ -38,7 +38,6 @@ import {
     contains,
     equal as ==,
     extend,
-    filter,
     find_if,
     find_index,
     first,
@@ -56,6 +55,7 @@ import {
     map,
     map_err,
     not_equal as !=,
+    push,
     sort,
     try_map,
     union,
@@ -64,7 +64,6 @@ import {
     value_or_err,
     wrapping_add as +,
     wrapping_increment as ++,
-    wrapping_sub as -,
 } from builtins;
 import {
     CGroup,
@@ -101,7 +100,18 @@ import {
     link,
     prod_names,
 } from "./grammar.aipl";
-import { Bare, CharRun, LexResult, Of, OneChar, ToEol, Token, TokenRule, lex } from "./lexer.aipl";
+import {
+    Bare,
+    CharRun,
+    LexResult,
+    Of,
+    OneChar,
+    SpanStr,
+    ToEol,
+    Token,
+    TokenRule,
+    lex,
+} from "./lexer.aipl";
 import { line_at } from "./line_at.aipl";
 
 # The furthest failure seen so far: the token position nothing could be matched
@@ -132,7 +142,11 @@ struct Step { hit: bool, pos: u64, kids: Cst[], far: Far }
 # there is no token to point at.
 struct Parser<K: variant, A: any> {
     toks: Token<K>[],
-    trivia: Token<K>[],
+    // The CST children consuming each token contributes — the trivia in front of
+    // it, then its own leaf — computed once by `attach_trivia`. See `leaf_at`.
+    attached: Cst[][],
+    // The trivia after the last token, which no token consumption can pick up.
+    trailing: Cst[],
     prods: Production<K, A>[],
     end: u64,
     // The FIRST set of each production, in `prods` order — what `match_prod`
@@ -215,54 +229,79 @@ fn tok_text<K: variant, A: any>(p: Parser<K, A>, i: u64) -> str {
     }
 }
 
-# Where token `i - 1` ended — the start of the run of trivia that belongs in
-# front of token `i`. Derived from the token positions rather than remembered,
-# so backtracking can't leave it stale: re-consuming a token re-attaches exactly
-# the same trivia.
-fn prev_end<K: variant, A: any>(p: Parser<K, A>, i: u64) -> u64 {
-    if (i == 0) {
-        return 0;
-    };
-    match (p.toks[i - 1]) {
-        some(t) => t.text.span.end,
-        none => 0,
-    }
-}
-
 # The CST children consuming token `i` contributes: every trivia record between
 # the previous token and this one, then the token's own leaf. Attaching trivia
 # *before* its following token is what makes the leaf spans tile the source with
 # no gaps, which is the whole losslessness property.
-fn leaf_at<K: variant, A: any>(p: Parser<K, A>, i: u64) -> Cst[] {
-    match (p.toks[i]) {
-        some(t) => {
-            let start = prev_end(p, i);
-            [
-                ..p.trivia
-                    .filter(
-                        |tr| {
-                            start <= tr.text.span.start && tr.text.span.start < t.text.span.start
-                        },
-                    )
-                    .map(|tr| CTrivia(tr.text.span)),
-                CLeaf(t.text.span),
-            ]
-        },
-        none => [],
+#
+# Looked up, not computed: a PEG asks this once per token *per attempt*, and it
+# attempts a token many times. Filtering the whole trivia list on each ask was
+# quadratic in the file — the largest compiler sources took a minute to parse,
+# and this one call was most of it. `attach_trivia` does the same pairing once,
+# by one merge over the two sorted lists.
+fn leaf_at<K: variant, A: any>(p: Parser<K, A>, i: u64) -> Cst[] { p.attached[i].value_or([]) }
+
+# Every token's `leaf_at` children, in token order, and the trivia left after the
+# last token. Both lists arrive sorted by position and never overlap, so one
+# pass that advances through the trivia as it walks the tokens pairs them off
+# exactly as the per-token filter did — each trivia record lands in front of the
+# first token that starts after it.
+fn attach_trivia<K: variant>(toks: Token<K>[], trivia: Token<K>[]) -> (Cst[][], Cst[]) {
+    mut attached: Cst[][] = [];
+    mut j: u64 = 0;
+    for (let t : toks) {
+        mut run: Cst[] = [];
+        while (trivia_starts_before(trivia, j, t.text.span.start)) {
+            set run.push(CTrivia(trivia_span(trivia, j)));
+            set j++;
+        }
+        set run.push(CLeaf(t.text.span));
+        set attached.push(run);
+    }
+    mut trailing: Cst[] = [];
+    while (j < trivia.len()) {
+        set trailing.push(CTrivia(trivia_span(trivia, j)));
+        set j++;
+    }
+    (attached, trailing)
+}.test({
+    // Two tokens with trivia before each and one trailing record: each record
+    // lands in front of the first token that starts after it, and what is left
+    // is the tail.
+    let toks = [tok_at(2..3), tok_at(6..7)];
+    let trivia = [tok_at(0..2), tok_at(3..6), tok_at(7..8)];
+    let (attached, trailing) = attach_trivia(toks, trivia);
+    assert(attached == [[CTrivia(0..2), CLeaf(2..3)], [CTrivia(3..6), CLeaf(6..7)]]);
+    assert(trailing == [CTrivia(7..8)]);
+
+    // No trivia at all: a leaf per token and nothing trailing.
+    let bare: Token<Tok>[] = [];
+    let (only_leaves, nothing) = attach_trivia([tok_at(0..1)], bare);
+    assert(only_leaves == [[CLeaf(0..1)]]);
+    let no_trailing: Cst[] = [];
+    assert(nothing == no_trailing);
+})
+
+# A token at a span, for the attachment test — only the position matters to it.
+fn tok_at(span: Span) -> Token<Tok> { kind: Punct, text: SpanStr { text: "", span } }
+
+# Whether trivia record `j` exists and starts before `at`.
+fn trivia_starts_before<K: variant>(trivia: Token<K>[], j: u64, at: u64) -> bool {
+    trivia[j].is_some_and(|tr| tr.text.span.start < at)
+}
+
+fn trivia_span<K: variant>(trivia: Token<K>[], j: u64) -> Span {
+    match (trivia[j]) {
+        some(tr) => tr.text.span,
+        none => 0..0,
     }
 }
 
-# The trivia after the last token — a trailing comment or newline, which no
-# token consumption can pick up. Appended to the root node so the tree still
+# The trivia after the last token, appended to the root node so the tree still
 # covers the source to its last byte.
-fn trailing_trivia<K: variant, A: any>(p: Parser<K, A>) -> Cst[] {
-    let start = prev_end(p, p.toks.len());
-    p.trivia.filter(|tr| start <= tr.text.span.start).map(|tr| CTrivia(tr.text.span))
-}
-
 fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
     match (root) {
-        CTree(i, kids) => CTree(i, [..kids, ..trailing_trivia(p)]),
+        CTree(i, kids) => CTree(i, [..kids, ..p.trailing]),
         CLeaf(sp) => CLeaf(sp),
         CTrivia(sp) => CTrivia(sp),
         // The root is a production's node, never a group — `match_prod` is what
@@ -1008,9 +1047,11 @@ pub fn parse_prepared<K: variant, A: any>(
     let i = prod_names(grammar)
         .find_index(|n| n == start)
         .value_or_err(ParseError { message: `no rule named "{start}"`, span: 0..0 })?;
+    let (attached, trailing) = attach_trivia(lexed.tokens, lexed.trivia);
     let p = Parser {
         toks: lexed.tokens,
-        trivia: lexed.trivia,
+        attached,
+        trailing,
         prods: grammar.prods,
         end: src.len(),
         firsts,
@@ -1497,24 +1538,24 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 9702
-deallocations: 9702
-reallocations: 688
-bytes allocated: 691387
-instructions executed: 1279002
-binary size: 633576
-  code: 384196
-  data: 9564
-  metadata: 239816
+allocations: 8846
+deallocations: 8846
+reallocations: 1737
+bytes allocated: 621603
+instructions executed: 1247520
+binary size: 640048
+  code: 389396
+  data: 9876
+  metadata: 240776
 functions:
   __arr_drop_Node:
-    calls: 21
+    calls: 16
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 616
+    calls: 573
     bytes: 116
   __arr_drop___m2__First$Tok:
-    calls: 68
+    calls: 44
     bytes: 116
   __arr_drop___m2__Sym$Tok:
     calls: 146
@@ -1526,28 +1567,28 @@ functions:
     calls: 2
     bytes: 120
   __arr_drop___m3__Production$Tok$Node:
-    calls: 162
+    calls: 118
     bytes: 188
   __arr_drop___m3__Rule$Tok:
-    calls: 463
+    calls: 211
     bytes: 116
   __arr_drop___m4__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_drop___m4__Token$Tok:
-    calls: 401
+    calls: 404
     bytes: 188
   __arr_drop___m4__TokenRule$Tok:
     calls: 81
     bytes: 632
   __arr_retain_Node:
-    calls: 18
+    calls: 13
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 556
+    calls: 551
     bytes: 116
   __arr_retain___m2__First$Tok:
-    calls: 100
+    calls: 76
     bytes: 116
   __arr_retain___m2__Sym$Tok:
     calls: 115
@@ -1559,10 +1600,10 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain___m3__Production$Tok$Node:
-    calls: 183
+    calls: 139
     bytes: 188
   __arr_retain___m3__Rule$Tok:
-    calls: 692
+    calls: 440
     bytes: 116
   __arr_retain___m4__StepResult$Tok:
     calls: 0
@@ -1573,54 +1614,54 @@ functions:
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
     bytes: 632
-  __builtin_all$__m3__Rule$Tok$lam127:
+  __builtin_all$__m3__Rule$Tok$lam121:
     calls: 0
     bytes: 36
-  __builtin_all$__m3__Rule$Tok$lam127$tail:
+  __builtin_all$__m3__Rule$Tok$lam121$tail:
     calls: 0
     bytes: 384
-  __builtin_any$__m3__Prec$lam118:
+  __builtin_any$__m3__Prec$lam112:
     calls: 13
     bytes: 276
-  __builtin_any$__m3__Rule$Tok$lam130:
+  __builtin_any$__m3__Rule$Tok$lam124:
     calls: 0
     bytes: 36
-  __builtin_any$__m3__Rule$Tok$lam130$tail:
+  __builtin_any$__m3__Rule$Tok$lam124$tail:
     calls: 0
     bytes: 380
-  __builtin_count_while$char$lam49:
+  __builtin_count_while$char$lam52:
     calls: 192
     bytes: 220
-  __builtin_count_while$char$s0$lam57:
+  __builtin_count_while$char$s0$lam60:
     calls: 0
     bytes: 184
-  __builtin_count_while$char$s0$lam75:
+  __builtin_count_while$char$s0$lam78:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam75$tail:
+  __builtin_count_while$char$s0$lam78$tail:
     calls: 3
     bytes: 256
-  __builtin_find_if$__m3__Prec$lam145:
+  __builtin_find_if$__m3__Prec$lam139:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam21:
     calls: 139
     bytes: 400
-  __builtin_find_index$str$lam28:
+  __builtin_find_index$str$lam31:
     calls: 81
     bytes: 400
-  __builtin_find_index$str$lam39:
+  __builtin_find_index$str$lam42:
     calls: 47
     bytes: 400
-  __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam87:
+  __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam86:
     calls: 18
-    bytes: 748
-  __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam93:
+    bytes: 668
+  __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam92:
     calls: 32
-    bytes: 920
-  __builtin_try_map$__m3__Rule$Tok$__m3__Rule<Tok>$__m3__ParseError$lam59:
+    bytes: 828
+  __builtin_try_map$__m3__Rule$Tok$__m3__Rule<Tok>$__m3__ParseError$lam62:
     calls: 94
-    bytes: 720
+    bytes: 632
   __eq_Node:
     calls: 13
     bytes: 136
@@ -1628,8 +1669,17 @@ functions:
     calls: 8
     bytes: 300
   __eq___builtin_Span:
-    calls: 1
+    calls: 7
     bytes: 104
+  __eq___m1__Cst:
+    calls: 6
+    bytes: 360
+  __eq___m1__Cst$arr:
+    calls: 5
+    bytes: 300
+  __eq___m1__Cst$arr$arr:
+    calls: 2
+    bytes: 300
   __eq___m2__First$Tok:
     calls: 48
     bytes: 128
@@ -1657,7 +1707,7 @@ functions:
   __eq_set$str$arr:
     calls: 30
     bytes: 300
-  __filter106$own0:
+  __filter105$own0:
     calls: 18
     bytes: 332
   __lambda_0:
@@ -1669,36 +1719,48 @@ functions:
   __lambda_2:
     calls: 0
     bytes: 128
-  __lambda_22:
+  __lambda_25:
     calls: 0
     bytes: 128
-  __lambda_23:
+  __lambda_26:
     calls: 75
     bytes: 96
-  __lambda_24:
+  __lambda_27:
     calls: 0
     bytes: 128
-  __lambda_25:
+  __lambda_28:
     calls: 38
     bytes: 96
   __lambda_3:
     calls: 0
     bytes: 96
+  __m1__first_leaf:
+    calls: 2
+    bytes: 696
+  __m1__first_leaf_of:
+    calls: 1
+    bytes: 320
   __m1__flat_kids:
     calls: 0
     bytes: 32
   __m1__flat_kids$tail:
     calls: 21
     bytes: 3832
+  __m1__last_leaf:
+    calls: 2
+    bytes: 696
+  __m1__last_leaf_of:
+    calls: 1
+    bytes: 524
   __m1__leaves:
-    calls: 66
+    calls: 64
     bytes: 3684
   __m1__show:
     calls: 208
     bytes: 2968
   __m1__span:
     calls: 1
-    bytes: 524
+    bytes: 236
   __m1__splice:
     calls: 0
     bytes: 32
@@ -1743,7 +1805,7 @@ functions:
     bytes: 4724
   __m3__link$Tok$Node:
     calls: 95
-    bytes: 2796
+    bytes: 2604
   __m3__link_opt$Tok:
     calls: 54
     bytes: 716
@@ -1752,7 +1814,7 @@ functions:
     bytes: 8236
   __m3__link_rules$Tok:
     calls: 94
-    bytes: 832
+    bytes: 732
   __m3__prod_names$Tok$Node:
     calls: 211
     bytes: 492
@@ -1764,16 +1826,16 @@ functions:
     bytes: 1592
   __m4__finalize_template$Tok:
     calls: 0
-    bytes: 5260
+    bytes: 5068
   __m4__float_len:
     calls: 0
     bytes: 816
   __m4__interp_scan$Tok:
     calls: 0
-    bytes: 2252
+    bytes: 2028
   __m4__lex$Tok:
     calls: 81
-    bytes: 1520
+    bytes: 1328
   __m4__lex_step$Tok:
     calls: 310
     bytes: 24988
@@ -1805,7 +1867,7 @@ functions:
     calls: 30
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 392
+    calls: 428
     bytes: 132
   __rec_drop___m3__Rule$Tok:
     calls: 1060
@@ -1813,6 +1875,9 @@ functions:
   __rec_drop___tuple$__m3__Rule_Tok$__m3__Rule_Tok:
     calls: 37
     bytes: 72
+  __test$attach_trivia:
+    calls: 1
+    bytes: 3360
   __test$parse:
     calls: 1
     bytes: 186072
@@ -1826,55 +1891,55 @@ functions:
     calls: 5
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 225
+    calls: 304
     bytes: (external)
   aipl_arr_extend:
     calls: 1209
     bytes: (external)
   aipl_arr_inc:
-    calls: 31288
+    calls: 29032
     bytes: (external)
   aipl_arr_join:
-    calls: 157
+    calls: 156
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1498
+    calls: 1295
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 456
+    calls: 690
     bytes: (external)
   aipl_arr_sort:
     calls: 37
     bytes: (external)
   aipl_array_dec:
-    calls: 38673
+    calls: 35525
     bytes: (external)
   aipl_array_new:
-    calls: 4586
+    calls: 4994
     bytes: (external)
   aipl_array_push:
-    calls: 648
+    calls: 246
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1524
+    calls: 2190
     bytes: (external)
   aipl_array_with_cap:
-    calls: 1156
+    calls: 868
     bytes: (external)
   aipl_assert:
-    calls: 73
+    calls: 77
     bytes: (external)
   aipl_rec_alloc:
-    calls: 1519
+    calls: 1555
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 11092
+    calls: 10732
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 315
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 9573
+    calls: 9177
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 315
@@ -1889,10 +1954,10 @@ functions:
     calls: 69
     bytes: (external)
   aipl_test_begin:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_end:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -1903,6 +1968,9 @@ functions:
   aipl_write_u64:
     calls: 5
     bytes: (external)
+  attach_trivia$Tok:
+    calls: 82
+    bytes: 1876
   build_node:
     calls: 17
     bytes: 440
@@ -1923,7 +1991,7 @@ functions:
     bytes: 228
   leaf_at$Tok$Node:
     calls: 203
-    bytes: 1888
+    bytes: 404
   lex_toks:
     calls: 81
     bytes: 776
@@ -1932,7 +2000,7 @@ functions:
     bytes: 3844
   main:
     calls: 1
-    bytes: 104
+    bytes: 180
   match_group$Tok$Node:
     calls: 15
     bytes: 6196
@@ -1950,13 +2018,13 @@ functions:
     bytes: 7068
   match_reps$Tok$Node:
     calls: 50
-    bytes: 5120
+    bytes: 4928
   match_rule$Tok$Node:
     calls: 578
     bytes: 6272
   match_then$Tok$Node:
     calls: 49
-    bytes: 2128
+    bytes: 2036
   parse$Tok$Node:
     calls: 5
     bytes: 380
@@ -1965,16 +2033,13 @@ functions:
     bytes: 624
   parse_prepared$Tok$Node:
     calls: 81
-    bytes: 5288
+    bytes: 5968
   parsed:
     calls: 5
     bytes: 452
   prepare$Tok$Node:
     calls: 12
     bytes: 2068
-  prev_end$Tok$Node:
-    calls: 287
-    bytes: 772
   pruned$Tok$Node:
     calls: 11
     bytes: 1344
@@ -2014,9 +2079,9 @@ functions:
   tok_text$Tok$Node:
     calls: 183
     bytes: 904
-  trailing_trivia$Tok$Node:
-    calls: 84
-    bytes: 760
   trivia_rules:
     calls: 3
     bytes: 3368
+  trivia_span$Tok:
+    calls: 17
+    bytes: 760

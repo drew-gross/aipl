@@ -1,9 +1,9 @@
 //! AIPL — facade crate.
 //!
 //! The compiler is split across several workspace crates so `cargo build
-//! --timings` can attribute build time to each piece (notably the
-//! gazelle-macro parser and the cranelift codegen, the two heavy
-//! dependencies). This crate re-exports them under the original `aipl::*`
+//! --timings` can attribute build time to each piece (notably the cranelift
+//! codegen, the one heavy dependency now that the parser is dogfooded AIPL
+//! rather than a parser-generator macro). This crate re-exports them under the original `aipl::*`
 //! paths so downstream code — the CLI and the integration tests — sees a
 //! single unified API.
 

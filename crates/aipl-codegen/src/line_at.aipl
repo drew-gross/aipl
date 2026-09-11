@@ -50,10 +50,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 2209
-binary size: 4056
+binary size: 4072
   code: 1924
-  data: 576
-  metadata: 1556
+  data: 586
+  metadata: 1562
 functions:
   __eq_LineAt:
     calls: 7

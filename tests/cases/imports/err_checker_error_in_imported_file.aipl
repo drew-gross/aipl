@@ -23,4 +23,4 @@ error: call to undefined fn "nosuchfn"
  --> util.aipl:5:32
   |
 5 | pub fn helper(n: i64) -> i64 { nosuchfn(n) + 1 }
-  |                                ^^^^^^^^^^
+  |                                ^^^^^^^^^^^

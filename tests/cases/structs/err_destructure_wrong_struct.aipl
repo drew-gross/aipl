@@ -17,4 +17,4 @@ error: cannot destructure P as Q — the pattern names the struct it takes apart
   --> ./tests/cases/structs/err_destructure_wrong_struct.aipl:12:19
    |
 12 |     let Q { x } = make();
-   |                   ^^^^
+   |                   ^^^^^^

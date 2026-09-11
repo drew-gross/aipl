@@ -18,10 +18,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 376
-binary size: 2576
+binary size: 2592
   code: 960
-  data: 340
-  metadata: 1276
+  data: 357
+  metadata: 1275
 functions:
   __eq_Shape:
     calls: 7

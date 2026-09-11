@@ -27,8 +27,8 @@ bytes allocated: 296
 instructions executed: 946
 binary size: 3504
   code: 1516
-  data: 263
-  metadata: 1725
+  data: 264
+  metadata: 1724
 functions:
   __eq_bool$arr:
     calls: 4

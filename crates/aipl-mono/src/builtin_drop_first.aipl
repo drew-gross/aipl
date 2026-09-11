@@ -18,8 +18,8 @@ bytes allocated: 528
 instructions executed: 347
 binary size: 4008
   code: 1800
-  data: 325
-  metadata: 1883
+  data: 326
+  metadata: 1882
 functions:
   __test$drop_first:
     calls: 1

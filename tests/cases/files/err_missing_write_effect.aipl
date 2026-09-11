@@ -11,4 +11,4 @@ error: fn "write_string_to_file" has effect "!write_files" but the calling funct
  --> ./tests/cases/files/err_missing_write_effect.aipl:7:5
   |
 7 |     write_string_to_file("x.txt", "data");
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

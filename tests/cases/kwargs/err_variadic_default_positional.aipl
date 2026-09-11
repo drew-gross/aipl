@@ -14,4 +14,4 @@ error: fn "count" expects 1 positional arg(s), got 2 (its keyword parameter must
   --> ./tests/cases/kwargs/err_variadic_default_positional.aipl:10:18
    |
 10 |     print(to_str(count([1, 2], 5)));
-   |                  ^^^^^^^^^^^^^^^
+   |                  ^^^^^^^^^^^^^^^^

@@ -72,10 +72,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 952
-binary size: 11032
+binary size: 11088
   code: 4884
-  data: 1894
-  metadata: 4254
+  data: 1952
+  metadata: 4252
 functions:
   __test$is_dotfile:
     calls: 1

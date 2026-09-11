@@ -10,4 +10,4 @@ error: a "#{ .. }" literal can't mix set elements and "key: value" pairs — use
  --> ./tests/cases/dicts/err_mixed_literal.aipl:5:13
   |
 5 |     let d = #{1, 2: "a"};
-  |             ^
+  |             ^^^^^^^^^^^^

@@ -9045,7 +9045,18 @@ pub fn binding_is_exclusive(name: &str, body: &Expr, allow_tail_move: bool) -> b
 
 /// True if `name` is used in `e` in a way that makes in-place mutation unsafe.
 /// `iterating` is set inside a `for` over `name`; `tail` means `e` is in tail
-/// position, where a bare `Ident(name)` is a move-out, not an alias.
+/// position, where a use of `name` is a move-out, not an alias.
+///
+/// What "tail" buys is exactly this: an alias is only dangerous if a mutation
+/// of `name` can *follow* it in this function, and nothing follows the tail
+/// expression. So a bare `name`, a `return name`, and — the case that matters
+/// in practice — `name` handed to a composite or a call that *is* the tail
+/// (`(xs, n)`, `Step { kids: xs }`, `Wrap(xs)`, `ok(xs)`) are all last uses.
+/// Before the composite and call arms knew this, a `mut` array that ended its
+/// function inside one lost the in-place path for its whole scope, and every
+/// `push` copied: building a 30,000-element list that way took seventeen
+/// seconds. The forms that *do* run code afterwards — `Let`, `Seq`, `Assign`,
+/// a loop body — pass `tail` only to what comes last.
 fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool {
     let is_n = |x: &Expr| matches!(&x.kind, ExprKind::Ident(n) if n == name);
     let rec = |x: &Expr| aliases_or_unsafe(name, x, iterating, false);
@@ -9108,12 +9119,15 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                         | "__builtin_is_nonempty"
                         | "__builtin_to_str"
                         | "__builtin_trim" => false,
-                        _ => true,
+                        _ => !tail,
                     }
                 } else {
-                    rec(recv)
+                    rec_tail(recv)
                 };
-                recv_bad || args[1..].iter().any(|a| is_n(a) || rec(a))
+                recv_bad
+                    || args[1..]
+                        .iter()
+                        .any(|a| if is_n(a) { !tail } else { rec_tail(a) })
             } else {
                 let consuming = matches!(
                     fname.as_str(),
@@ -9130,17 +9144,33 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                         | "__filter_truncate"
                         | "__map_set"
                 );
-                args.iter()
-                    .any(|a| if is_n(a) { !consuming } else { rec(a) })
+                args.iter().any(|a| {
+                    if is_n(a) {
+                        !consuming && !tail
+                    } else {
+                        rec_tail(a)
+                    }
+                })
             }
         }
-        ExprKind::ArrayLit(elems) | ExprKind::SetLit(elems) | ExprKind::TupleLit(elems) => {
-            elems.iter().any(|x| is_n(x) || rec(x))
-        }
-        ExprKind::DictLit(pairs) => pairs
+        // A composite that is the tail is built from its elements and then
+        // returned, so every element is a last use — including `name` nested
+        // inside one (`(f(xs), 1)`): the call runs, the tuple is built, and
+        // nothing in this function touches `xs` again.
+        ExprKind::ArrayLit(elems) | ExprKind::SetLit(elems) | ExprKind::TupleLit(elems) => elems
             .iter()
-            .any(|(k, v)| is_n(k) || rec(k) || is_n(v) || rec(v)),
-        ExprKind::Construct(_, inits) => inits.iter().any(|i| is_n(&i.value) || rec(&i.value)),
+            .any(|x| if is_n(x) { !tail } else { rec_tail(x) }),
+        ExprKind::DictLit(pairs) => pairs.iter().any(|(k, v)| {
+            (if is_n(k) { !tail } else { rec_tail(k) })
+                || (if is_n(v) { !tail } else { rec_tail(v) })
+        }),
+        ExprKind::Construct(_, inits) => inits.iter().any(|i| {
+            if is_n(&i.value) {
+                !tail
+            } else {
+                rec_tail(&i.value)
+            }
+        }),
         // A capture of `name` inside a lambda body counts as a use (conservative).
         ExprKind::Lambda(_, body) => rec(body),
         ExprKind::Let(_, _, val, b) | ExprKind::LetMut(_, _, val, b) => {

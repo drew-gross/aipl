@@ -45,8 +45,8 @@ bytes allocated: 1112
 instructions executed: 1009
 binary size: 7544
   code: 4268
-  data: 233
-  metadata: 3043
+  data: 235
+  metadata: 3041
 functions:
   __eq_set$i64:
     calls: 2

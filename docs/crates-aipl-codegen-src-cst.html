@@ -122,7 +122,7 @@
           </h3>
           <pre class="signature"><code>pub fn span(self: Cst) -&#62; Span</code></pre>
 
-          <div class="doc"><p>The span <code>self</code> covers: its first leaf's start through its last leaf's end. A node with no leaves at all — an interior node for a production that matched empty input, which <code>Maybe</code> and a zero-minimum <code>Many</code> can both produce — has no extent, and reports the empty <code>0..0</code>.</p></div>
+          <div class="doc"><p>The span <code>self</code> covers: its first leaf's start through its last leaf's end. A node with no leaves at all — an interior node for a production that matched empty input, which <code>Maybe</code> and a zero-minimum <code>Many</code> can both produce — has no extent, and reports the empty <code>0..0</code>.</p><p>By descent, like <code>token_span</code>, and for the same reason: this is asked at every node a lowering visits, and collecting every leaf beneath each of them is quadratic in the tree. A block is a right-recursive chain one node deep per statement, so on the largest compiler sources that was most of the lowering's time.</p></div>
 
 
         </section>
@@ -241,7 +241,63 @@
           </h3>
           <pre class="signature"><code>fn last_token_of(ks: Cst[]) -&#62; Span?</code></pre>
 
-          <div class="doc"><p><code>first_token_of</code> from the other end.</p></div>
+          <div class="doc"><p><code>first_token_of</code> from the other end — by index, for the reason <code>last_leaf_of</code> gives.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-first_leaf">
+          <h3>
+            <a class="anchor" href="#item-first_leaf">first_leaf</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn first_leaf(self: Cst) -&#62; Span?</code></pre>
+
+          <div class="doc"><p>The leftmost leaf span under <code>self</code> — a token or trivia — or <code>none</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-last_leaf">
+          <h3>
+            <a class="anchor" href="#item-last_leaf">last_leaf</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn last_leaf(self: Cst) -&#62; Span?</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-first_leaf_of">
+          <h3>
+            <a class="anchor" href="#item-first_leaf_of">first_leaf_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn first_leaf_of(ks: Cst[]) -&#62; Span?</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-last_leaf_of">
+          <h3>
+            <a class="anchor" href="#item-last_leaf_of">last_leaf_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn last_leaf_of(ks: Cst[]) -&#62; Span?</code></pre>
+
+          <div class="doc"><p>From the other end, by index rather than by reversing the list: this runs once per level of a descent, and a reversed copy per level is a copy of every sibling list on the way down.</p></div>
 
 
         </section>

@@ -32,10 +32,10 @@ deallocations: 8
 reallocations: 0
 bytes allocated: 386
 instructions executed: 976
-binary size: 5888
+binary size: 5896
   code: 2956
-  data: 427
-  metadata: 2505
+  data: 438
+  metadata: 2502
 functions:
   __builtin_any$char$lam8:
     calls: 1

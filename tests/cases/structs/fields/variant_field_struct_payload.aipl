@@ -29,8 +29,8 @@ bytes allocated: 0
 instructions executed: 242
 binary size: 2232
   code: 976
-  data: 190
-  metadata: 1066
+  data: 192
+  metadata: 1064
 functions:
   __eq_Cell:
     calls: 1

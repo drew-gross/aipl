@@ -47,8 +47,8 @@ bytes allocated: 928
 instructions executed: 2485
 binary size: 8120
   code: 4504
-  data: 606
-  metadata: 3010
+  data: 607
+  metadata: 3009
 functions:
   __test$intersperse:
     calls: 1

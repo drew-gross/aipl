@@ -2739,6 +2739,20 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./find_files.aipl",
     "./companion_files.aipl",
     "./parse_spec.aipl",
+    // The parser: AIPL's grammar as data, the PEG driver that runs it, the
+    // concrete tree it builds, the AST it lowers to, and the two the driver's
+    // analysis and the grammar's own tests pull in (`ebnf.aipl` for FIRST sets,
+    // `format.aipl`/`doc.aipl` for the type-layout assertions). `aipl_parse_file`
+    // is what every compile calls, so this belongs in the parser-hook artifact
+    // beside `lex_aipl` rather than in a third.
+    "./grammar_aipl.aipl",
+    "./ast.aipl",
+    "./cst.aipl",
+    "./grammar.aipl",
+    "./parse.aipl",
+    "./ebnf.aipl",
+    "./format.aipl",
+    "./doc.aipl",
 ];
 
 /// Every `.aipl` the *formatter* engine needs: the walker and its `Doc` printer,
@@ -2821,7 +2835,6 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "parse_test_section_header",
     "strip_test_sections",
     "split_test_sections",
-    "find_trailing_whitespace",
     "assert_loc",
     "caret_block",
     "fill_or_add_section_file",
@@ -2833,6 +2846,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "find_files",
     "companion_files",
     "parse_spec",
+    "aipl_parse_file",
 ];
 
 /// The formatter engine's single FFI entry.
@@ -3190,27 +3204,30 @@ pub struct SpecFields {
 /// (`str -> Span?`), marshaled back as an [`FfiValue::Opt`] of a struct via the
 /// FFI. `none` maps to `None`, `some(span.clone())` to `Some(span.clone())` — no sentinel. No
 /// native fallback; panics if it can't be built or called.
-fn find_trailing_whitespace(src: &str) -> Option<Span> {
-    // A `Span` struct value (its `start`/`end` fields) as a Rust `Span`.
-    fn span_of(fields: &[(String, FfiValue)]) -> Span {
-        let field = |k: &str| match fields.iter().find(|(n, _)| n == k) {
-            Some((_, FfiValue::Int(v))) => *v as usize,
-            other => panic!("dogfooded find_trailing_whitespace() Span.{k}: {other:?}"),
-        };
-        field("start")..field("end")
-    }
-    DOGFOOD_ENGINE.with(|comp| {
-        match comp.call_values(
-            "find_trailing_whitespace",
-            &[FfiValue::Str(src.to_string())],
-        ) {
-            Ok(FfiValue::Opt(None)) => None,
-            Ok(FfiValue::Opt(Some(inner))) => match *inner {
-                FfiValue::Struct(fields) => Some(span_of(&fields)),
-                other => panic!("dogfooded find_trailing_whitespace() some(_): {other:?}"),
-            },
-            other => panic!("dogfooded find_trailing_whitespace() call: {other:?}"),
-        }
+/// The parser hook (see [`install_parser_hooks`]): a whole source file to its
+/// `Program` and `#[allow]` spans, through the dogfooded `aipl_parse_file`
+/// (`grammar_aipl.aipl`) and the bridge in [`ffi_ast`] that rebuilds the
+/// marshalled AST on this side. A parse failure comes back as the error it was;
+/// a value that does not have the declared shape is a panic, since that is the
+/// two AST declarations disagreeing rather than anything in the source.
+fn parse_file(src: &str) -> Result<(Program, Vec<Span>), aipl_syntax::Error> {
+    // A recursive-descent parse recurses once per production per level of
+    // source nesting, and the lowering once per node — several megabytes of
+    // native stack on the largest compiler sources. The CLI runs on a 256 MB
+    // thread and never notices; a test thread has 2 MB and overflows on a
+    // 600-line file. So when less than the red zone remains, the call moves to
+    // a fresh segment on the *same* thread — which is what keeps the
+    // thread-local engine in reach, where a helper thread would have to build
+    // its own.
+    const RED_ZONE: usize = 8 * 1024 * 1024;
+    const SEGMENT: usize = 64 * 1024 * 1024;
+    stacker::maybe_grow(RED_ZONE, SEGMENT, || {
+        DOGFOOD_ENGINE.with(|comp| {
+            match comp.call_values("aipl_parse_file", &[FfiValue::Str(src.to_string())]) {
+                Ok(value) => ffi_ast::parse_file_from_ffi(&value),
+                Err(e) => panic!("dogfooded aipl_parse_file() call: {e:?}"),
+            }
+        })
     })
 }
 
@@ -3715,7 +3732,7 @@ pub fn install_parser_hooks() {
     aipl_parser::set_strip_test_sections_hook(strip_test_sections);
     aipl_parser::set_split_test_sections_hook(split_test_sections);
     aipl_parser::set_companion_files_hook(companion_files);
-    aipl_parser::set_find_trailing_whitespace_hook(find_trailing_whitespace);
+    aipl_parser::set_parse_hook(parse_file);
     aipl_parser::set_assert_loc_hook(assert_loc);
     aipl_parser::set_lex_hook(lex_aipl);
     aipl_parser::set_lex_stripped_hook(lex_aipl_stripped);
@@ -4383,6 +4400,21 @@ fn ffi_type_tag(t: &ConcreteType) -> Result<String, Error> {
 /// check doubles as the visited set, so a (hypothetical) type cycle can't
 /// recurse forever. Used to gather the layouts a set of dogfood entries needs
 /// serialized.
+/// The ` boxed` token a recursive type's manifest line carries after its size.
+///
+/// A boxed value is a *pointer* to its payload, and a reader that does not know
+/// that reads the pointer word as the payload's first field — a variant tag out
+/// of range, a struct of garbage. The flag used to be unnecessary because
+/// nothing recursive could cross the FFI; the parser's AST is recursive
+/// throughout, so now it can, and the manifest has to say so.
+fn boxed_flag(boxed: bool) -> &'static str {
+    if boxed {
+        " boxed"
+    } else {
+        ""
+    }
+}
+
 fn collect_named_types(
     t: &ConcreteType,
     structs: &HashMap<String, TypeDef>,
@@ -4678,7 +4710,11 @@ pub fn generate_dogfood_artifact(
                         ffi_type_tag(&f.ty)?
                     ));
                 }
-                out.push_str(&format!("; struct {sname} {}{fields}\n", layout.size));
+                out.push_str(&format!(
+                    "; struct {sname} {}{}{fields}\n",
+                    layout.size,
+                    boxed_flag(layout.boxed)
+                ));
             }
             // `; variant <name> <size> <Case> <Case>(<off>:<tag>,...) ...` —
             // one whitespace-free token per case (payload fields are
@@ -4699,7 +4735,11 @@ pub fn generate_dogfood_artifact(
                         .join(",");
                     cases.push_str(&format!(" {}({fields})", case.name));
                 }
-                out.push_str(&format!("; variant {sname} {}{cases}\n", layout.size));
+                out.push_str(&format!(
+                    "; variant {sname} {}{}{cases}\n",
+                    layout.size,
+                    boxed_flag(layout.boxed)
+                ));
             }
             None => {
                 return Err(
@@ -4777,9 +4817,9 @@ fn manifest_structs(manifest: &aipl_artifact::Manifest) -> Result<HashMap<String
             // `<name> <size> <field>@<offset>:<tag> ...`
             aipl_artifact::TypeLine::Struct(body) => {
                 let toks: Vec<&str> = body.split_whitespace().collect();
-                let (name, size) = manifest_type_head(&toks, "struct")?;
+                let (name, size, boxed, first) = manifest_type_head(&toks, "struct")?;
                 let mut fields = Vec::new();
-                for ft in &toks[2..] {
+                for ft in &toks[first..] {
                     let (fname, rest) = ft
                         .split_once('@')
                         .ok_or_else(|| Error::msg(format!("malformed `; struct` field {ft:?}")))?;
@@ -4796,12 +4836,12 @@ fn manifest_structs(manifest: &aipl_artifact::Manifest) -> Result<HashMap<String
                 }
                 (
                     name,
-                    // FFI-marshalable types are never recursive (`check_ffi_return`
-                    // rejects boxed types), so the manifest carries no flags.
+                    // `scc` matters to codegen's retain/release decisions, not to
+                    // reading a value out; the FFI reader asks only `boxed`.
                     TypeDef::Struct(StructLayout {
                         fields,
                         size,
-                        boxed: false,
+                        boxed,
                         scc: 0,
                     }),
                 )
@@ -4810,9 +4850,9 @@ fn manifest_structs(manifest: &aipl_artifact::Manifest) -> Result<HashMap<String
             // (payload fields are positional: offset + type tag, no name).
             aipl_artifact::TypeLine::Variant(body) => {
                 let toks: Vec<&str> = body.split_whitespace().collect();
-                let (name, size) = manifest_type_head(&toks, "variant")?;
+                let (name, size, boxed, first) = manifest_type_head(&toks, "variant")?;
                 let mut cases = Vec::new();
-                for ct in &toks[2..] {
+                for ct in &toks[first..] {
                     let (cname, fields) = match ct.split_once('(') {
                         None => (ct.to_string(), Vec::new()),
                         Some((cname, rest)) => {
@@ -4845,7 +4885,7 @@ fn manifest_structs(manifest: &aipl_artifact::Manifest) -> Result<HashMap<String
                     TypeDef::Variant(VariantLayout {
                         cases,
                         size,
-                        boxed: false,
+                        boxed,
                         scc: 0,
                     }),
                 )
@@ -4856,8 +4896,9 @@ fn manifest_structs(manifest: &aipl_artifact::Manifest) -> Result<HashMap<String
     Ok(out)
 }
 
-/// The leading `<name> <size>` both type-manifest lines start with.
-fn manifest_type_head(toks: &[&str], kind: &str) -> Result<(String, u32), Error> {
+/// The leading `<name> <size> [boxed]` both type-manifest lines start with, and
+/// the index of the first token after it.
+fn manifest_type_head(toks: &[&str], kind: &str) -> Result<(String, u32, bool, usize), Error> {
     let name = toks
         .first()
         .ok_or_else(|| Error::msg(format!("`; {kind}` line missing name")))?;
@@ -4865,7 +4906,8 @@ fn manifest_type_head(toks: &[&str], kind: &str) -> Result<(String, u32), Error>
         .get(1)
         .and_then(|s| s.parse().ok())
         .ok_or_else(|| Error::msg(format!("`; {kind}` line missing/invalid size")))?;
-    Ok((name.to_string(), size))
+    let boxed = toks.get(2) == Some(&"boxed");
+    Ok((name.to_string(), size, boxed, if boxed { 3 } else { 2 }))
 }
 impl Compilation {
     pub fn new(program: &Program, dbg: DebugOptions) -> Result<Self, Vec<Error>> {

@@ -15,4 +15,4 @@ error: integer literal 300 does not fit in u8
   --> ./tests/cases/generics/errors/err_int_literal_arg_out_of_range.aipl:10:17
    |
 10 |     let r: u8 = identity(300);
-   |                 ^^^^^^^^^^^^
+   |                 ^^^^^^^^^^^^^

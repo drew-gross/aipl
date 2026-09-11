@@ -47,10 +47,10 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 576
 instructions executed: 1148
-binary size: 10824
-  code: 6320
-  data: 702
-  metadata: 3802
+binary size: 10840
+  code: 6324
+  data: 710
+  metadata: 3806
 functions:
   __dict_drop_i64$str:
     calls: 4
@@ -81,7 +81,7 @@ functions:
     bytes: 2348
   __test$make_empty:
     calls: 1
-    bytes: 776
+    bytes: 780
   __test$strs:
     calls: 1
     bytes: 980

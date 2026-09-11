@@ -46,9 +46,9 @@ deallocations: 18
 reallocations: 0
 bytes allocated: 1296
 instructions executed: 1659
-binary size: 12976
+binary size: 12992
   code: 7784
-  data: 645
+  data: 661
   metadata: 4547
 functions:
   __dict_drop_bool$str:

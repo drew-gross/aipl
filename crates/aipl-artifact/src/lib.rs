@@ -345,6 +345,9 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_arr_extend" => sig(5, true),
         "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
         | "aipl_arr_slice" => sig(6, true),
+        // The parts, `join`'s three separators, and the element type's three
+        // descriptors; the joined array comes back in a register.
+        "aipl_arr_join" => sig(7, true),
         // The `str` entry points, mirroring `builtin_import_sig` in
         // `aipl-codegen`. A `str` argument is a `*const Str`, so it is one word
         // like any other; a `str` *result* is written through a leading out

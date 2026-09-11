@@ -16,8 +16,8 @@ bytes allocated: 0
 instructions executed: 87
 binary size: 1424
   code: 424
-  data: 90
-  metadata: 910
+  data: 93
+  metadata: 907
 functions:
   __test$past_end_is_some:
     calls: 1

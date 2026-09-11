@@ -25,11 +25,11 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 186
-instructions executed: 435
-binary size: 4024
-  code: 2212
-  data: 96
-  metadata: 1716
+instructions executed: 436
+binary size: 4096
+  code: 2180
+  data: 137
+  metadata: 1779
 functions:
   __eq_set$bool:
     calls: 1
@@ -39,10 +39,10 @@ functions:
     bytes: 256
   __test$bools:
     calls: 1
-    bytes: 696
+    bytes: 656
   __test$chars:
     calls: 1
-    bytes: 836
+    bytes: 844
   aipl_array_dec:
     calls: 4
     bytes: (external)

@@ -27,8 +27,8 @@ bytes allocated: 128
 instructions executed: 593
 binary size: 2288
   code: 1072
-  data: 61
-  metadata: 1155
+  data: 62
+  metadata: 1154
 functions:
   __eq_i64$arr:
     calls: 1

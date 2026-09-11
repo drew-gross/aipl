@@ -1406,7 +1406,7 @@
           </h3>
           <pre class="signature"><code>fn lower_loop_body(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p><code>loop_body</code> — deliberately *not* repaired the way <code>block</code> is. A loop body's value is discarded, so no diagnostic ever points at its synthetic <code>0</code>; and its empty span is load-bearing elsewhere: the loop lints recognize the body's tail by exactly that (<code>is_block_tail</code> in <code>aipl-syntax</code>'s lint driver), which is how they know a body holds one statement and nothing after it. Giving the <code>0</code> a location switched every one of them off.</p></div>
 
 
         </section>

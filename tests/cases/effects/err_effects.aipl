@@ -27,22 +27,22 @@ error: fn "print" has effect "!prints" but the calling function does not declare
   --> ./tests/cases/effects/err_effects.aipl:11:13
    |
 11 |     let _ = print("forbidden");
-   |             ^^^^^^^^^^^^^^^^^
+   |             ^^^^^^^^^^^^^^^^^^
 
 error: fn "now_nanos" has effect "!clock" but the calling function does not declare it
   --> ./tests/cases/effects/err_effects.aipl:15:34
    |
 15 | fn clock_without_shim() -> u64 { now_nanos() }
-   |                                  ^^^^^^^^^
+   |                                  ^^^^^^^^^^^
 
 error: fn "inner": body returns (), but the declared return type is i64
   --> ./tests/cases/effects/err_effects.aipl:18:29
    |
 18 | fn inner() !prints -> i64 { print("hi") }
-   |                             ^^^^^^^^^^
+   |                             ^^^^^^^^^^^
 
 error: fn "inner" has effect "!prints" but the calling function does not declare it
   --> ./tests/cases/effects/err_effects.aipl:20:21
    |
 20 | fn outer() -> i64 { inner() }
-   |                     ^^^^^
+   |                     ^^^^^^^

@@ -22,15 +22,14 @@ import {
     equal as ==,
     filter,
     filter_map,
-    first,
+    greater_than as >,
     is_empty,
     is_some,
     join,
-    last,
     len,
     map,
-    reverse,
     value_or,
+    wrapping_decrement as --,
 } from builtins;
 
 # An interior node is `CTree(prod, kids)`; a `CGroup` is the bracket pair a
@@ -152,10 +151,16 @@ fn first_token_of(ks: Cst[]) -> Span? {
     none
 }
 
-# `first_token_of` from the other end.
+# `first_token_of` from the other end — by index, for the reason `last_leaf_of`
+# gives.
 fn last_token_of(ks: Cst[]) -> Span? {
-    for (let k : ks.reverse()) {
-        let hit = k.last_token();
+    mut i = ks.len();
+    while (i > 0) {
+        set i--;
+        let hit = match (ks[i]) {
+            some(k) => k.last_token(),
+            none => none,
+        };
         if (hit.is_some()) {
             return hit;
         };
@@ -174,15 +179,77 @@ pub fn token_text(self: Cst, src: str) -> str { self.token_leaves().map(|sp| src
 # A node with no leaves at all — an interior node for a production that matched
 # empty input, which `Maybe` and a zero-minimum `Many` can both produce — has no
 # extent, and reports the empty `0..0`.
+#
+# By descent, like `token_span`, and for the same reason: this is asked at
+# every node a lowering visits, and collecting every leaf beneath each of them
+# is quadratic in the tree. A block is a right-recursive chain one node deep
+# per statement, so on the largest compiler sources that was most of the
+# lowering's time.
 pub fn span(self: Cst) -> Span {
-    let ls = self.leaves();
-    match (ls.first()) {
-        some(f) => match (ls.last()) {
+    match (self.first_leaf()) {
+        some(f) => match (self.last_leaf()) {
             some(l) => f.start..l.end,
             none => f,
         },
         none => 0..0,
     }
+}
+
+# The leftmost leaf span under `self` — a token or trivia — or `none`.
+fn first_leaf(self: Cst) -> Span? {
+    match (self) {
+        CLeaf(sp) | CTrivia(sp) => some(sp),
+        CTree(_, kids) => first_leaf_of(kids),
+        CGroup(_, open, body, close) => match (first_leaf_of(open)) {
+            some(sp) => some(sp),
+            none => match (first_leaf_of(body)) {
+                some(sp) => some(sp),
+                none => first_leaf_of(close),
+            },
+        },
+    }
+}
+
+fn last_leaf(self: Cst) -> Span? {
+    match (self) {
+        CLeaf(sp) | CTrivia(sp) => some(sp),
+        CTree(_, kids) => last_leaf_of(kids),
+        CGroup(_, open, body, close) => match (last_leaf_of(close)) {
+            some(sp) => some(sp),
+            none => match (last_leaf_of(body)) {
+                some(sp) => some(sp),
+                none => last_leaf_of(open),
+            },
+        },
+    }
+}
+
+fn first_leaf_of(ks: Cst[]) -> Span? {
+    for (let k : ks) {
+        let hit = k.first_leaf();
+        if (hit.is_some()) {
+            return hit;
+        };
+    }
+    none
+}
+
+# From the other end, by index rather than by reversing the list: this runs
+# once per level of a descent, and a reversed copy per level is a copy of every
+# sibling list on the way down.
+fn last_leaf_of(ks: Cst[]) -> Span? {
+    mut i = ks.len();
+    while (i > 0) {
+        set i--;
+        let hit = match (ks[i]) {
+            some(k) => k.last_leaf(),
+            none => none,
+        };
+        if (hit.is_some()) {
+            return hit;
+        };
+    }
+    none
 }
 
 # The interior children of `self` — its kids with the leaves dropped. This is
@@ -397,15 +464,15 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 609
-deallocations: 609
-reallocations: 40
-bytes allocated: 30894
-instructions executed: 32508
-binary size: 59760
-  code: 35504
-  data: 2525
-  metadata: 21731
+allocations: 537
+deallocations: 537
+reallocations: 39
+bytes allocated: 27110
+instructions executed: 30795
+binary size: 62344
+  code: 37580
+  data: 2549
+  metadata: 22215
 functions:
   __arr_drop_Cst:
     calls: 137
@@ -438,40 +505,34 @@ functions:
     calls: 1
     bytes: 13644
   aipl_arr_drop_arr:
-    calls: 88
-    bytes: (external)
-  aipl_arr_elem_ptr:
-    calls: 3
+    calls: 76
     bytes: (external)
   aipl_arr_extend:
-    calls: 24
+    calls: 22
     bytes: (external)
   aipl_arr_inc:
-    calls: 1305
+    calls: 1112
     bytes: (external)
   aipl_arr_join:
-    calls: 91
+    calls: 78
     bytes: (external)
   aipl_arr_reserve:
-    calls: 12
+    calls: 11
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 178
-    bytes: (external)
-  aipl_arr_reverse:
-    calls: 2
+    calls: 145
     bytes: (external)
   aipl_array_dec:
-    calls: 1808
+    calls: 1543
     bytes: (external)
   aipl_array_new:
-    calls: 292
+    calls: 248
     bytes: (external)
   aipl_array_push_mut:
-    calls: 247
+    calls: 214
     bytes: (external)
   aipl_array_with_cap:
-    calls: 117
+    calls: 104
     bytes: (external)
   aipl_assert:
     calls: 40
@@ -480,10 +541,10 @@ functions:
     calls: 61
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 580
+    calls: 567
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 519
+    calls: 506
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -494,6 +555,12 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  first_leaf:
+    calls: 12
+    bytes: 696
+  first_leaf_of:
+    calls: 6
+    bytes: 320
   first_token:
     calls: 7
     bytes: 660
@@ -506,14 +573,20 @@ functions:
   flat_kids$tail:
     calls: 20
     bytes: 3832
+  last_leaf:
+    calls: 12
+    bytes: 696
+  last_leaf_of:
+    calls: 6
+    bytes: 524
   last_token:
     calls: 5
     bytes: 660
   last_token_of:
     calls: 2
-    bytes: 396
+    bytes: 524
   leaves:
-    calls: 88
+    calls: 48
     bytes: 3684
   main:
     calls: 1
@@ -526,7 +599,7 @@ functions:
     bytes: 2968
   span:
     calls: 7
-    bytes: 524
+    bytes: 236
   splice:
     calls: 0
     bytes: 32

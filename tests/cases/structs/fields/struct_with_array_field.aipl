@@ -16,29 +16,29 @@ fn make() -> Tags {
     assert(id * 10 + n == 72);
 })
 --- performance ---
-allocations: 2
-deallocations: 2
-reallocations: 0
-bytes allocated: 136
-instructions executed: 284
-binary size: 3376
-  code: 1536
+allocations: 1
+deallocations: 1
+reallocations: 1
+bytes allocated: 56
+instructions executed: 280
+binary size: 3240
+  code: 1464
   data: 156
-  metadata: 1684
+  metadata: 1620
 functions:
   __test$make:
     calls: 1
-    bytes: 1436
+    bytes: 1364
   aipl_arr_inc:
-    calls: 4
+    calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 6
+    calls: 3
     bytes: (external)
   aipl_array_new:
     calls: 1
     bytes: (external)
-  aipl_array_push:
+  aipl_array_push_mut:
     calls: 1
     bytes: (external)
   aipl_assert:

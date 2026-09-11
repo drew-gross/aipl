@@ -62,22 +62,22 @@ error: "out" is seeded empty and unioned into by this loop and nothing else — 
   --> ./tests/cases/lints/err_union_loop_union_all.aipl:13:23
    |
 13 |     mut out: #{i64} = #{};
-   |                       ^
+   |                       ^^^
 
 error: "acc" is seeded empty and unioned into by this loop and nothing else — write "mut acc = ns.map(|n| ..).union_all();" and drop the loop, importing `map` and `union_all` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_union_loop_union_all.aipl:25:23
    |
 25 |     mut acc: #{i64} = #{};
-   |                       ^
+   |                       ^^^
 
 error: "acc" is seeded empty and unioned into by this loop and nothing else — write "mut acc = ns.map(|n| ..).union_all();" and drop the loop, importing `map` and `union_all` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_union_loop_union_all.aipl:35:23
    |
 35 |     mut acc: #{i64} = #{};
-   |                       ^
+   |                       ^^^
 
 error: "out" is seeded empty and unioned into by this loop and nothing else — write "mut out = <iterable>.union_all();" and drop the loop, importing `union_all` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_union_loop_union_all.aipl:47:23
    |
 47 |     mut out: #{i64} = #{};
-   |                       ^
+   |                       ^^^

@@ -77,7 +77,7 @@ error: fn "add" expects 2 arg(s), got 1
   --> ./tests/cases/functions/err_functions.aipl:18:30
    |
 18 | fn arity_mismatch() -> i64 { add(1) }
-   |                              ^^^^^
+   |                              ^^^^^^
 
 error: fn "use_point" arg 0: expected Point, got i64
   --> ./tests/cases/functions/err_functions.aipl:21:44
@@ -89,7 +89,7 @@ error: call to undefined fn "missing"
   --> ./tests/cases/functions/err_functions.aipl:24:30
    |
 24 | fn call_undefined() -> i64 { missing(1) }
-   |                              ^^^^^^^^^
+   |                              ^^^^^^^^^^
 
 error: fn "sum" arg 1: variadic parameter expects i64[], i64, or i64?, got bool
   --> ./tests/cases/functions/err_functions.aipl:28:19
@@ -137,7 +137,7 @@ error: a lambda used as a value cannot capture local "n" (function values are no
   --> ./tests/cases/functions/err_functions.aipl:56:13
    |
 56 |     let f = |x: i64| { x + n };
-   |             ^^^^^^^^^^^^^^^^
+   |             ^^^^^^^^^^^^^^^^^^
 
 error: lambda parameter "x" used as a value must be typed, e.g. `|x: i64| ...`
   --> ./tests/cases/functions/err_functions.aipl:61:14
@@ -149,13 +149,13 @@ error: cannot bind "_" to a value of type ()
   --> ./tests/cases/functions/err_functions.aipl:67:13
    |
 67 |     let _ = print("hi");
-   |             ^^^^^^^^^^
+   |             ^^^^^^^^^^^
 
 error: arithmetic operand: expected i64, got ()
   --> ./tests/cases/functions/err_functions.aipl:71:42
    |
 71 | fn unit_used_as_value() !prints -> i64 { print("hi") + 1 }
-   |                                          ^^^^^^^^^^
+   |                                          ^^^^^^^^^^^
 
 error: fn "main": body returns i64, but the declared return type is ()
   --> ./tests/cases/functions/err_functions.aipl:74:13

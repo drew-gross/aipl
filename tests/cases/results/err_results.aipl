@@ -37,19 +37,19 @@ error: this result is discarded, ignoring its possible error; handle it with `ma
   --> ./tests/cases/results/err_results.aipl:14:5
    |
 14 |     might_fail(5);
-   |     ^^^^^^^^^^^^
+   |     ^^^^^^^^^^^^^
 
 error: the result bound to "r" is never used, ignoring its possible error; inspect it with `match` or `?`
   --> ./tests/cases/results/err_results.aipl:18:13
    |
 18 |     let r = might_fail(5);
-   |             ^^^^^^^^^^^^
+   |             ^^^^^^^^^^^^^
 
 error: non-exhaustive match: missing err
-  --> ./tests/cases/results/err_results.aipl:23:12
+  --> ./tests/cases/results/err_results.aipl:23:5
    |
 23 |     match (r) {
-   |            ^^^^
+   |     ^^^^^^^^^^^
 
 error: fn "payload_invalid_type": a set element must be an integer (i8..i64, u8..u64), bool, char, or str, got i64[]
 
@@ -57,4 +57,4 @@ error: "err" expects 1 argument, got 0
   --> ./tests/cases/results/err_results.aipl:32:25
    |
 32 | fn void_err() -> !str { err() }
-   |                         ^^^
+   |                         ^^^^^

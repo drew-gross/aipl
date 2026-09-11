@@ -12,4 +12,4 @@ error: fn "clamp": keyword argument "hi" takes the value itself, not an optional
  --> ./tests/cases/kwargs/err_omittable_some.aipl:8:23
   |
 8 |     print(clamp(5, hi=some(3)));
-  |                       ^^^^^^
+  |                       ^^^^^^^

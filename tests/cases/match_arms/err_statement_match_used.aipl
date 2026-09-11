@@ -17,7 +17,7 @@ fn main() !prints {
 }
 --- errors ---
 error: this `match` produces no value, so it is a statement — end it with ";" (to use it as an expression, every arm must produce a value)
- --> ./tests/cases/match_arms/err_statement_match_used.aipl:9:12
+ --> ./tests/cases/match_arms/err_statement_match_used.aipl:9:5
   |
 9 |     match (e) {
-  |            ^^^^
+  |     ^^^^^^^^^^^

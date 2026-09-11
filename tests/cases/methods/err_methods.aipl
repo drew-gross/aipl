@@ -52,7 +52,7 @@ error: call to undefined fn "nope"
   --> ./tests/cases/methods/err_methods.aipl:16:37
    |
 16 | fn method_call_undefined() -> i64 { 5.nope() }
-   |                                     ^^^^^^
+   |                                     ^^^^^^^^
 
 error: fn "no_self" cannot be called as a method (its first parameter must be named "self")
   --> ./tests/cases/methods/err_methods.aipl:19:40
@@ -70,7 +70,7 @@ error: the result of mutating method "push" is discarded, losing the mutation; w
   --> ./tests/cases/methods/err_methods.aipl:27:5
    |
 27 |     xs.push(2);
-   |     ^^^^^^^^^
+   |     ^^^^^^^^^^
 
 error: set: cannot assign to immutable binding "n" (use "let mut")
   --> ./tests/cases/methods/err_methods.aipl:33:9

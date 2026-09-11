@@ -13,4 +13,4 @@ error: conflicting types for "T" in "value_or": i64 vs char
   --> ./tests/cases/generics/errors/err_type_param_conflict.aipl:10:20
    |
 10 | fn main() -> i64 { value_or(some(7), 'z') }
-   |                    ^^^^^^^^^^^^^^^^^^^^^
+   |                    ^^^^^^^^^^^^^^^^^^^^^^

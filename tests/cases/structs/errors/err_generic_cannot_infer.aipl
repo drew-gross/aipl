@@ -11,4 +11,4 @@ error: cannot infer type parameter "T" of generic struct "Phantom" — provide a
  --> ./tests/cases/structs/errors/err_generic_cannot_infer.aipl:6:13
   |
 6 |     let p = Phantom { tag: "x" };
-  |             ^^^^^^^^^^^^^^^^^^
+  |             ^^^^^^^^^^^^^^^^^^^^

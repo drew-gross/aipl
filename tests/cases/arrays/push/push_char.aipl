@@ -37,8 +37,8 @@ bytes allocated: 147
 instructions executed: 284
 binary size: 4072
   code: 1732
-  data: 244
-  metadata: 2096
+  data: 245
+  metadata: 2095
 functions:
   __test$appended:
     calls: 1

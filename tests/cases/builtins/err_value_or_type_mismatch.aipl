@@ -7,4 +7,4 @@ error: conflicting types for "T" in "value_or": i64 vs char
  --> ./tests/cases/builtins/err_value_or_type_mismatch.aipl:4:20
   |
 4 | fn main() -> i64 { some(1).value_or('z') }
-  |                    ^^^^^^^^^^^^^^^^^^^^
+  |                    ^^^^^^^^^^^^^^^^^^^^^

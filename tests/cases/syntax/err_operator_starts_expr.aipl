@@ -1,6 +1,6 @@
 fn main() -> i64 { + 1 }
 --- errors ---
-error: unexpected '+'; expected '}', expression, field, or statement
+error: expected `}`, a field, a statement, or an expression, found `+`
  --> ./tests/cases/syntax/err_operator_starts_expr.aipl:1:20
   |
 1 | fn main() -> i64 { + 1 }

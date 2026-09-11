@@ -37,14 +37,14 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 207
-binary size: 2648
-  code: 1020
-  data: 349
-  metadata: 1279
+binary size: 2672
+  code: 1024
+  data: 374
+  metadata: 1274
 functions:
   __test$is_nine:
     calls: 1
-    bytes: 180
+    bytes: 184
   __test$is_some_and:
     calls: 1
     bytes: 660

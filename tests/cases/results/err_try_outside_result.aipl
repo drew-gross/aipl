@@ -11,4 +11,4 @@ error: "?" can only be used in a function that returns a result, or in a test
  --> ./tests/cases/results/err_try_outside_result.aipl:4:29
   |
 4 | fn bad(x: i64!str) -> i64 { x? }
-  |                             ^
+  |                             ^^

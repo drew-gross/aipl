@@ -32,8 +32,8 @@ bytes allocated: 584
 instructions executed: 1478
 binary size: 5888
   code: 3524
-  data: 117
-  metadata: 2247
+  data: 118
+  metadata: 2246
 functions:
   __eq_str$arr:
     calls: 3

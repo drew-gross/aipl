@@ -56,13 +56,13 @@ error: "out" is seeded and then only appended to before being returned — write
   --> ./tests/cases/lints/err_push_array_literal.aipl:18:22
    |
 18 |     mut out: i64[] = [];
-   |                      ^
+   |                      ^^
 
 error: "out" is seeded and then only appended to before being returned — write "[..<array>, x]" and drop the mut (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_push_array_literal.aipl:29:15
    |
 29 |     mut out = evens(n);
-   |               ^^^^^^^
+   |               ^^^^^^^^
 
 error: "out" is seeded and then only appended to before being returned — write "[..xs, <element>]" and drop the mut (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_push_array_literal.aipl:37:15

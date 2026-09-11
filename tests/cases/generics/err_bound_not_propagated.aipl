@@ -19,16 +19,16 @@ error: fn "minimum": type parameter "T" requires "ord", but the enclosing "T" is
  --> ./tests/cases/generics/err_bound_not_propagated.aipl:9:39
   |
 9 | fn wrong_ord<T: any>(xs: T[]) -> T? { xs.minimum() }
-  |                                       ^^^^^^^^^^
+  |                                       ^^^^^^^^^^^^
 
 error: fn "same_case": type parameter "T" requires "variant", but the enclosing "T" is declared "any"
   --> ./tests/cases/generics/err_bound_not_propagated.aipl:11:48
    |
 11 | fn wrong_variant<T: any>(a: T, b: T) -> bool { a.same_case(b) }
-   |                                                ^^^^^^^^^^^^^
+   |                                                ^^^^^^^^^^^^^^
 
 error: fn "same_case": type parameter "T" requires "variant", but the enclosing "T" is declared "ord"
   --> ./tests/cases/generics/err_bound_not_propagated.aipl:14:53
    |
 14 | fn ord_is_not_variant<T: ord>(a: T, b: T) -> bool { a.same_case(b) }
-   |                                                     ^^^^^^^^^^^^^
+   |                                                     ^^^^^^^^^^^^^^

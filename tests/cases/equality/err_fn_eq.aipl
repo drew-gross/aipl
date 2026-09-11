@@ -17,4 +17,4 @@ error: fn "print" has effect "!prints" but the calling function does not declare
  --> ./tests/cases/equality/err_fn_eq.aipl:7:5
   |
 7 |     print("unreachable");
-  |     ^^^^^^^^^^^^^^^^^^^
+  |     ^^^^^^^^^^^^^^^^^^^^

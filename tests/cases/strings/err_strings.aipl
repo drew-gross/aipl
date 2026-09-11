@@ -92,7 +92,7 @@ error: "match" on a str expects string literals, `[..]` patterns, or `_`
   --> ./tests/cases/strings/err_strings.aipl:25:9
    |
 25 |         some(v) => v,
-   |         ^^^^
+   |         ^^^^^^^
 
 error: duplicate "a" arm
   --> ./tests/cases/strings/err_strings.aipl:33:9
@@ -101,10 +101,10 @@ error: duplicate "a" arm
    |         ^^^
 
 error: non-exhaustive match on a str: add a `_` arm
-  --> ./tests/cases/strings/err_strings.aipl:39:12
+  --> ./tests/cases/strings/err_strings.aipl:39:5
    |
 39 |     match (s) {
-   |            ^^^^
+   |     ^^^^^^^^^^^
 
 error: the `_` arm must be last (arms after it are unreachable)
   --> ./tests/cases/strings/err_strings.aipl:47:9

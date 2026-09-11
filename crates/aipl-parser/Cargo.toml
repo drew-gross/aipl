@@ -2,13 +2,11 @@
 name = "aipl-parser"
 version = "0.1.0"
 edition = "2021"
-description = "AIPL lexer and gazelle-based parser"
+description = "The AIPL parser's Rust-side entry points and post-parse rewrites"
 license = "MIT"
 
 [dependencies]
 aipl-syntax = { workspace = true }
-gazelle-parser = { workspace = true }
-gazelle-macros = { workspace = true }
 
 [lib]
 path = "src/lib.rs"

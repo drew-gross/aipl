@@ -917,21 +917,21 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4507
-deallocations: 4507
-reallocations: 48
-bytes allocated: 500388
-instructions executed: 1223816
-binary size: 504160
-  code: 343388
-  data: 9284
-  metadata: 151488
+allocations: 4433
+deallocations: 4433
+reallocations: 88
+bytes allocated: 490980
+instructions executed: 1223252
+binary size: 503232
+  code: 342780
+  data: 9572
+  metadata: 150880
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
     bytes: 140
   __arr_drop___m1__Token$AiplTok:
-    calls: 155
+    calls: 145
     bytes: 388
   __arr_drop___m1__TokenRule$AiplTok:
     calls: 27
@@ -940,7 +940,7 @@ functions:
     calls: 2
     bytes: 140
   __arr_retain___m1__Token$AiplTok:
-    calls: 81
+    calls: 71
     bytes: 388
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
@@ -1043,16 +1043,16 @@ functions:
     bytes: 1592
   __m1__finalize_template$AiplTok:
     calls: 6
-    bytes: 8904
+    bytes: 8712
   __m1__float_len:
     calls: 0
     bytes: 816
   __m1__interp_scan$AiplTok:
     calls: 2
-    bytes: 2252
+    bytes: 2028
   __m1__lex$AiplTok:
     calls: 27
-    bytes: 1520
+    bytes: 1328
   __m1__lex_step$AiplTok:
     calls: 99
     bytes: 29192
@@ -1123,22 +1123,22 @@ functions:
     calls: 204
     bytes: (external)
   aipl_arr_inc:
-    calls: 9228
+    calls: 8946
     bytes: (external)
   aipl_arr_reserve:
     calls: 204
     bytes: (external)
   aipl_array_dec:
-    calls: 13713
+    calls: 13357
     bytes: (external)
   aipl_array_new:
     calls: 4360
     bytes: (external)
   aipl_array_push:
-    calls: 37
+    calls: 29
     bytes: (external)
   aipl_array_push_mut:
-    calls: 27
+    calls: 35
     bytes: (external)
   aipl_array_with_cap:
     calls: 22

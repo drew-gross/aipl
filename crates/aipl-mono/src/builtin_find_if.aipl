@@ -60,10 +60,10 @@ deallocations: 9
 reallocations: 0
 bytes allocated: 483
 instructions executed: 1475
-binary size: 10064
-  code: 5884
-  data: 774
-  metadata: 3406
+binary size: 10080
+  code: 5888
+  data: 790
+  metadata: 3402
 functions:
   __eq_char$opt:
     calls: 1
@@ -79,7 +79,7 @@ functions:
     bytes: 2064
   __test$is_nine:
     calls: 1
-    bytes: 180
+    bytes: 184
   aipl_arr_inc:
     calls: 1
     bytes: (external)

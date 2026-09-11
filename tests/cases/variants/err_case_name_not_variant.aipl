@@ -11,4 +11,4 @@ error: fn "case_name": type parameter "T" requires "variant", but was inferred a
  --> ./tests/cases/variants/err_case_name_not_variant.aipl:7:11
   |
 7 |     print(case_name(1));
-  |           ^^^^^^^^^^^
+  |           ^^^^^^^^^^^^

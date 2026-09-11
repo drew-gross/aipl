@@ -35,16 +35,16 @@ error: only the fields of "p" are read — destructure the binding instead: "let
   --> ./tests/cases/lints/err_destructure_binding.aipl:11:13
    |
 11 |     let p = make();
-   |             ^^^^
+   |             ^^^^^^
 
 error: only the fields of "step" are read — destructure the binding instead: "let <Type> { line, col } = ..." (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_destructure_binding.aipl:21:16
    |
 21 |     let step = shift(head.line);
-   |                ^^^^^^^^^^^^^^^
+   |                ^^^^^^^^^^^^^^^^
 
 error: only the fields of "col" are read — destructure the binding instead: "let <Type> { col, line } = ..." (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_destructure_binding.aipl:28:15
    |
 28 |     let col = make();
-   |               ^^^^
+   |               ^^^^^^

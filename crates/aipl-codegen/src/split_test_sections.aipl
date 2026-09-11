@@ -55,10 +55,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 6098
-binary size: 10088
+binary size: 10112
   code: 5288
-  data: 987
-  metadata: 3813
+  data: 1012
+  metadata: 3812
 functions:
   __eq___tuple$str$str:
     calls: 9

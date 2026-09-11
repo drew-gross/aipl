@@ -35,10 +35,10 @@ deallocations: 9
 reallocations: 0
 bytes allocated: 450
 instructions executed: 1215
-binary size: 7752
+binary size: 7784
   code: 4408
-  data: 591
-  metadata: 2753
+  data: 618
+  metadata: 2758
 functions:
   __builtin_find_if$char$lam10:
     calls: 1

@@ -520,7 +520,9 @@ than silently substituting a Rust version. The parser reaches the dogfooded
 no fallback, so any in-process parse must `install_parser_hooks()` first — tests
 that parse directly do this (e.g. via a `parse` wrapper or in `setup_cases`).
 Keeping one implementation avoids the two drifting apart and keeps the AIPL
-genuinely exercised.
+genuinely exercised. The parser itself is the largest of these: `parse` in
+`aipl-parser` is a hook onto the dogfooded `aipl_parse_file`
+(`grammar_aipl.aipl`), and the crate holds no grammar of its own.
 
 ## Multiple runtime representations: classify + `match`, don't `is_*`
 A single source type can have several runtime representations chosen by context
@@ -579,33 +581,46 @@ compiler runs on.
 > a handoff is how you stage IR from unformatted source and then validate an
 > artifact that is stale before you finish.
 
-**The one case handoff genuinely cannot bootstrap: a change to the formatter's
-own grammar.** `crates/aipl-codegen/src/walker.aipl` compiles into `fmt.clif`,
-and handoff formats the corpus (step 1) *before* regenerating IR (step 5) — so
-the live formatter, which doesn't know the new syntax yet, is what formats
-sources written in it, and the run stops at `aipl fmt`. Adding a syntax form
-means teaching two parsers: the gazelle grammar in `aipl-parser` *and* the
-formatter's own token walker.
+**The one case handoff genuinely cannot bootstrap: a change to the language's
+own syntax.** Both of the compiler's syntax descriptions are dogfooded AIPL
+compiled into a checked-in artifact — the **parser** (`grammar_aipl.aipl`, the
+grammar as data, run by `parse.aipl`; in `dogfood.clif`) and the **formatter**
+(`walker.aipl`, a hand-written token walker; in `fmt.clif`) — and the compiler
+that regenerates an artifact is running the *checked-in* one. So a source
+written in a syntax form the checked-in parser does not know cannot be parsed
+to regenerate anything, and a source the checked-in formatter does not know is
+what `aipl fmt` (handoff's step 1, before any regeneration) chokes on or,
+worse, silently rewrites into something that means something else — a struct
+spread `T { ..base, x: 1 }` became `T { .., base, x: 1 }` before the walker
+knew the form. Adding a syntax form means teaching both.
 
-Expect this on **any** change to `walker.aipl`'s grammar — it is routine, not
-exotic (two separate features hit it in a single session). Two symptoms to
-recognize: the run stops at `aipl fmt` with a parse error on a file using the new
-syntax; or, more insidiously, the live formatter *silently rewrites* the new form
-into something that means something else — a struct spread `T { ..base, x: 1 }`
-became `T { .., base, x: 1 }` before the walker knew the form. Always confirm the
-new syntax round-trips through `aipl fmt` before trusting a formatted corpus.
+**The procedure, in the only order that works** (the parser is one level worse
+than the formatter, since nothing at all can be regenerated until it parses):
 
-To get out of the loop:
+1. Add the form to `grammar_aipl.aipl` — the rule *and* its lowering — writing
+   the grammar file itself in syntax the checked-in parser already knows. Its
+   own `.test` blocks can use the new form: they run in-engine, not through
+   the artifact.
+2. Hand off. The staged flow regenerates `dogfood.clif` with the new parser in
+   it, and the corpus (which does not use the form yet) validates it.
+3. Teach `walker.aipl` the form, still written in old syntax; hand off again
+   for `fmt.clif`. Confirm the new form round-trips through `aipl fmt` before
+   trusting a formatted corpus.
+4. Only now write the form anywhere else — including in those two files.
 
-1. `fill_staged_ir` — builds a `fmt.clif.staged` that understands the new form.
-2. Format the corpus with the staged formatter:
-   `AIPL_FMT_IR=<abs>/fmt.clif.staged AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged cargo test --test compiler -- --ignored fmt::format_corpus`
-3. `fill_staged_ir` **again** — step 2 rewrote the very sources the IR is
-   generated from, so the artifact from step 1 no longer matches them.
-4. Validate + promote as below, then run handoff normally for the refills.
+Skip step 2 and the symptom is a parse error, from the checked-in parser, on
+`grammar_aipl.aipl` itself. Skip step 3 and it is the `aipl fmt` failure or the
+silent rewrite above. If you find the formatter half already stranded — the
+corpus is written in a form only the staged `fmt.clif` knows — the escape is:
+`fill_staged_ir`; format the corpus with the staged formatter
+(`AIPL_FMT_IR=<abs>/fmt.clif.staged AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged
+cargo test --test compiler -- --ignored fmt::format_corpus`); `fill_staged_ir`
+**again**, since formatting rewrote the sources the artifact is generated
+from; validate + promote as below; then hand off normally for the refills.
 
 This is not a licence to hand-drive generally: it announces itself as a hard
-`aipl fmt` failure, and it's the only ordering the gate can't express.
+failure in the parser or in `aipl fmt`, and it's the only ordering the gate
+can't express.
 
 The steps, for those cases:
 

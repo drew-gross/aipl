@@ -13,4 +13,4 @@ error: call to undefined fn "A" — "A" is a variant constructor that isn't in s
  --> ./tests/cases/imports/err_constructor_not_imported.aipl:8:25
   |
 8 | fn main() -> i64 { take(A(5)) }
-  |                         ^^^
+  |                         ^^^^

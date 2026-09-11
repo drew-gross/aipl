@@ -23,10 +23,10 @@ error: constructor "Circle" expects 1 argument(s), got 2
  --> ./tests/cases/variants/err_variants.aipl:9:18
   |
 9 |     print(to_str(Circle(1, 2)));
-  |                  ^^^^^^^^^^^
+  |                  ^^^^^^^^^^^^
 
 error: non-exhaustive match: missing Rect
-  --> ./tests/cases/variants/err_variants.aipl:14:12
+  --> ./tests/cases/variants/err_variants.aipl:14:5
    |
 14 |     match (s) {
-   |            ^^^^
+   |     ^^^^^^^^^^^

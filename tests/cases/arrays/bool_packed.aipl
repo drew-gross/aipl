@@ -26,9 +26,9 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 68
 instructions executed: 1304
-binary size: 3488
+binary size: 3496
   code: 1916
-  data: 224
+  data: 232
   metadata: 1348
 functions:
   __eq_bool$arr:

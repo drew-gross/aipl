@@ -131,7 +131,7 @@ error: slice covers the whole receiver — use "s" itself (or append #[allow] to
    --> ./tests/cases/lints/err_lints.aipl:100:15
     |
 100 |     print(s[..s.len()]);
-    |               ^^^^^
+    |               ^^^^^^^
 
 error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
    --> ./tests/cases/lints/err_lints.aipl:101:13
@@ -143,13 +143,13 @@ error: slice end is the receiver's whole length — use the open-ended "s[3..]" 
   --> ./tests/cases/lints/err_lints.aipl:93:16
    |
 93 |     print(s[3..s.len()]);
-   |                ^^^^^
+   |                ^^^^^^^
 
 error: slice end is the receiver's whole length — use the open-ended "s[4..]" (or append #[allow] to this line to keep it)
    --> ./tests/cases/lints/err_lints.aipl:110:16
     |
 110 |     print(s[4..s.len()]);
-    |                ^^^^^
+    |                ^^^^^^^
 
 error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
    --> ./tests/cases/lints/err_lints.aipl:105:13
@@ -161,7 +161,7 @@ error: lambda only forwards its argument(s) to "to_str" — pass "to_str" direct
   --> ./tests/cases/lints/err_lints.aipl:60:43
    |
 60 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
-   |                                           ^^^^^^^^^^^^
+   |                                           ^^^^^^^^^^^^^
 
 error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_lints.aipl:44:47
@@ -191,7 +191,7 @@ error: a length compared against 0 — use "xs.is_nonempty()", importing `is_non
   --> ./tests/cases/lints/err_lints.aipl:82:35
    |
 82 | fn any_items(xs: i64[]) -> bool { 0 < xs.len() }
-   |                                   ^^^^^^^^^^
+   |                                   ^^^^^^^^^^^^
 
 error: a length compared against 0 — use "is_nonempty" on the receiver, importing `is_nonempty` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_lints.aipl:86:34
@@ -203,16 +203,16 @@ error: fn "make" returns "Point" and its body is a "Point" literal, naming the t
   --> ./tests/cases/lints/err_lints.aipl:44:36
    |
 44 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
-   |                                    ^^^^^^^^^^^^^^^^^^
+   |                                    ^^^^^^^^^^^^^^^^^^^^
 
 error: fn "tag" returns "Tag" and its body is a "Tag" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_lints.aipl:50:26
    |
 50 | fn tag(id: i64) -> Tag { Tag { id: id + 0 } }
-   |                          ^^^^^^^^^^^^^^^^
+   |                          ^^^^^^^^^^^^^^^^^^
 
 error: fn "tag_short" returns "Tag" and its body is a "Tag" literal, naming the type twice — write the field directly as the body, "{ id, }" — the trailing comma is what keeps it a struct literal rather than a block (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_lints.aipl:55:32
    |
 55 | fn tag_short(id: i64) -> Tag { Tag { id } }
-   |                                ^^^^^^^^
+   |                                ^^^^^^^^^^

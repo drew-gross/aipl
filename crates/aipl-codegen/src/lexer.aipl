@@ -1465,21 +1465,21 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1604
-deallocations: 1604
-reallocations: 54
-bytes allocated: 108824
-instructions executed: 346230
-binary size: 2314944
-  code: 1548320
-  data: 10524
-  metadata: 756100
+allocations: 1418
+deallocations: 1418
+reallocations: 153
+bytes allocated: 84584
+instructions executed: 345114
+binary size: 2314112
+  code: 1547708
+  data: 10908
+  metadata: 755496
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
     bytes: 140
   __arr_drop_Token$Kind:
-    calls: 340
+    calls: 312
     bytes: 472
   __arr_drop_TokenRule$Kind:
     calls: 35
@@ -1488,7 +1488,7 @@ functions:
     calls: 9
     bytes: 140
   __arr_retain_Token$Kind:
-    calls: 176
+    calls: 148
     bytes: 472
   __arr_retain_TokenRule$Kind:
     calls: 6
@@ -1635,22 +1635,22 @@ functions:
     calls: 350
     bytes: (external)
   aipl_arr_inc:
-    calls: 3735
+    calls: 3177
     bytes: (external)
   aipl_arr_reserve:
     calls: 350
     bytes: (external)
   aipl_array_dec:
-    calls: 5331
+    calls: 4587
     bytes: (external)
   aipl_array_new:
     calls: 1355
     bytes: (external)
   aipl_array_push:
-    calls: 72
+    calls: 52
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6
+    calls: 26
     bytes: (external)
   aipl_array_with_cap:
     calls: 3
@@ -1681,7 +1681,7 @@ functions:
     bytes: 140
   finalize_template$Kind:
     calls: 13
-    bytes: 10376
+    bytes: 10180
   float_len:
     calls: 14
     bytes: 816
@@ -1690,13 +1690,13 @@ functions:
     bytes: 1580
   interp_scan$Kind:
     calls: 9
-    bytes: 2252
+    bytes: 2028
   keep_skipped$Kind:
     calls: 3
     bytes: 5956
   lex$Kind:
     calls: 72
-    bytes: 1520
+    bytes: 1328
   lex_step$Kind:
     calls: 171
     bytes: 30956

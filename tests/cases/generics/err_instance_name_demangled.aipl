@@ -12,4 +12,4 @@ error: fn "f": body returns Box<i64>[], but the declared return type is i64
  --> ./tests/cases/generics/err_instance_name_demangled.aipl:7:17
   |
 7 | fn f() -> i64 { [Box { value: 5 }] }
-  |                 ^^^^^^^^^^^^^^^
+  |                 ^^^^^^^^^^^^^^^^^^

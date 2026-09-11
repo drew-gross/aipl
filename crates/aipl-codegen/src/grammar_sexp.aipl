@@ -353,18 +353,18 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 47990
-deallocations: 47990
-reallocations: 2393
-bytes allocated: 2458974
-instructions executed: 6742209
-binary size: 402928
-  code: 259308
-  data: 5284
-  metadata: 138336
+allocations: 45545
+deallocations: 45545
+reallocations: 4627
+bytes allocated: 2318942
+instructions executed: 6551330
+binary size: 402488
+  code: 259788
+  data: 5332
+  metadata: 137368
 functions:
   __arr_drop_Sexp:
-    calls: 876
+    calls: 851
     bytes: 116
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -376,10 +376,10 @@ functions:
     calls: 38
     bytes: 604
   __arr_drop___m1__Cst:
-    calls: 9136
+    calls: 8653
     bytes: 116
   __arr_drop___m2__First$SexpKind:
-    calls: 7
+    calls: 4
     bytes: 116
   __arr_drop___m2__Sym$SexpKind:
     calls: 14
@@ -388,19 +388,19 @@ functions:
     calls: 150
     bytes: 120
   __arr_drop___m3__Production$SexpKind$Sexp:
-    calls: 156
+    calls: 106
     bytes: 188
   __arr_drop___m3__Rule$SexpKind:
-    calls: 262
+    calls: 161
     bytes: 116
   __arr_drop___m4__Piece:
-    calls: 195
+    calls: 165
     bytes: 228
   __arr_drop___m5__Doc:
-    calls: 280
+    calls: 268
     bytes: 116
   __arr_retain_Sexp:
-    calls: 893
+    calls: 868
     bytes: 116
   __arr_retain___m11__StepResult$SexpKind:
     calls: 0
@@ -412,10 +412,10 @@ functions:
     calls: 0
     bytes: 604
   __arr_retain___m1__Cst:
-    calls: 5613
+    calls: 5573
     bytes: 116
   __arr_retain___m2__First$SexpKind:
-    calls: 11
+    calls: 8
     bytes: 116
   __arr_retain___m2__Sym$SexpKind:
     calls: 10
@@ -424,27 +424,27 @@ functions:
     calls: 100
     bytes: 120
   __arr_retain___m3__Production$SexpKind$Sexp:
-    calls: 150
+    calls: 100
     bytes: 188
   __arr_retain___m3__Rule$SexpKind:
-    calls: 303
+    calls: 202
     bytes: 116
   __arr_retain___m4__Piece:
-    calls: 225
+    calls: 195
     bytes: 228
   __arr_retain___m5__Doc:
-    calls: 428
+    calls: 416
     bytes: 116
-  __builtin_all$char$s0$lam155:
+  __builtin_all$char$s0$lam154:
     calls: 51
     bytes: 212
-  __builtin_any$__m3__Prec$lam170:
+  __builtin_any$__m3__Prec$lam164:
     calls: 0
     bytes: 276
-  __builtin_any$__m5__Doc$lam171:
+  __builtin_any$__m5__Doc$lam165:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam171$tail:
+  __builtin_any$__m5__Doc$lam165$tail:
     calls: 111
     bytes: 324
   __builtin_count_while$char$lam91:
@@ -456,10 +456,10 @@ functions:
   __builtin_count_while$char$s0$lam119$tail:
     calls: 13
     bytes: 256
-  __builtin_count_while$char$s0$lam134:
+  __builtin_count_while$char$s0$lam133:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam158:
+  __builtin_count_while$char$s0$lam157:
     calls: 0
     bytes: 172
   __builtin_count_while$char$s0$lam99:
@@ -468,7 +468,7 @@ functions:
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m3__Prec$lam178:
+  __builtin_find_if$__m3__Prec$lam172:
     calls: 0
     bytes: 688
   __builtin_find_index$str$lam51:
@@ -485,13 +485,13 @@ functions:
     bytes: 408
   __builtin_try_map$__m1__Cst$Sexp$__m3__ParseError$lam103:
     calls: 883
-    bytes: 748
+    bytes: 668
   __builtin_try_map$__m3__Production$SexpKind$Sexp$__m2__First<SexpKind>$__m3__ParseError$lam57:
     calls: 3
-    bytes: 920
+    bytes: 828
   __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam76:
     calls: 51
-    bytes: 720
+    bytes: 632
   __eq_Sexp:
     calls: 234
     bytes: 136
@@ -510,7 +510,7 @@ functions:
   __eq___m2__Sym$SexpKind$arr:
     calls: 5
     bytes: 284
-  __filter129$own0:
+  __filter128$own0:
     calls: 883
     bytes: 332
   __lambda_21:
@@ -527,16 +527,16 @@ functions:
     bytes: 1592
   __m11__finalize_template$SexpKind:
     calls: 0
-    bytes: 4784
+    bytes: 4592
   __m11__float_len:
     calls: 0
     bytes: 816
   __m11__interp_scan$SexpKind:
     calls: 0
-    bytes: 2252
+    bytes: 2028
   __m11__lex$SexpKind:
     calls: 38
-    bytes: 1520
+    bytes: 1328
   __m11__lex_step$SexpKind:
     calls: 1089
     bytes: 24400
@@ -578,7 +578,7 @@ functions:
     bytes: 228
   __m13__leaf_at$SexpKind$Sexp:
     calls: 977
-    bytes: 1720
+    bytes: 404
   __m13__lower_node$SexpKind$Sexp:
     calls: 883
     bytes: 3844
@@ -599,13 +599,13 @@ functions:
     bytes: 6760
   __m13__match_reps$SexpKind$Sexp:
     calls: 448
-    bytes: 5120
+    bytes: 4928
   __m13__match_rule$SexpKind$Sexp:
     calls: 6045
     bytes: 6012
   __m13__match_then$SexpKind$Sexp:
     calls: 0
-    bytes: 2128
+    bytes: 2036
   __m13__parse$SexpKind$Sexp:
     calls: 19
     bytes: 380
@@ -614,10 +614,7 @@ functions:
     bytes: 624
   __m13__parse_prepared$SexpKind$Sexp:
     calls: 37
-    bytes: 5288
-  __m13__prev_end$SexpKind$Sexp:
-    calls: 1043
-    bytes: 648
+    bytes: 7736
   __m13__pruned$SexpKind$Sexp:
     calls: 0
     bytes: 1344
@@ -627,18 +624,30 @@ functions:
   __m13__tok_text$SexpKind$Sexp:
     calls: 1348
     bytes: 792
-  __m13__trailing_trivia$SexpKind$Sexp:
-    calls: 66
-    bytes: 704
+  __m13__trivia_span$SexpKind:
+    calls: 106
+    bytes: 648
   __m14__line_at:
     calls: 1
     bytes: 532
+  __m1__first_leaf:
+    calls: 0
+    bytes: 696
+  __m1__first_leaf_of:
+    calls: 0
+    bytes: 320
   __m1__flat_kids:
     calls: 0
     bytes: 32
   __m1__flat_kids$tail:
     calls: 1306
     bytes: 3832
+  __m1__last_leaf:
+    calls: 0
+    bytes: 696
+  __m1__last_leaf_of:
+    calls: 0
+    bytes: 524
   __m1__leaves:
     calls: 23
     bytes: 3684
@@ -647,7 +656,7 @@ functions:
     bytes: 2968
   __m1__span:
     calls: 0
-    bytes: 524
+    bytes: 236
   __m1__splice:
     calls: 0
     bytes: 32
@@ -719,7 +728,7 @@ functions:
     bytes: 4724
   __m3__link$SexpKind$Sexp:
     calls: 50
-    bytes: 2796
+    bytes: 2604
   __m3__link_opt$SexpKind:
     calls: 50
     bytes: 716
@@ -728,7 +737,7 @@ functions:
     bytes: 8236
   __m3__link_rules$SexpKind:
     calls: 50
-    bytes: 832
+    bytes: 732
   __m3__prod_names$SexpKind$Sexp:
     calls: 94
     bytes: 492
@@ -741,7 +750,7 @@ functions:
   __m4__format_cst$SexpKind$Sexp$s1$lam31:
     calls: 12
     bytes: 384
-  __m4__gap_wanted$lam130:
+  __m4__gap_wanted$lam129:
     calls: 148
     bytes: 144
   __m4__group_doc$SexpKind$Sexp$s1$lam107:
@@ -749,14 +758,14 @@ functions:
     bytes: 2420
   __m4__inline_doc$lam106:
     calls: 148
-    bytes: 2668
+    bytes: 2428
   __m4__pieces$SexpKind$Sexp$s1$lam104:
     calls: 125
-    bytes: 3612
+    bytes: 3400
   __m4__render_cst$SexpKind$Sexp$s1$lam8:
     calls: 12
     bytes: 5268
-  __m4__wrapped$lam131:
+  __m4__wrapped$lam130:
     calls: 18
     bytes: 4272
   __m5__col_after:
@@ -790,7 +799,7 @@ functions:
     calls: 476
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 2545
+    calls: 2541
     bytes: 132
   __rec_drop___m3__Rule$SexpKind:
     calls: 1102
@@ -829,55 +838,55 @@ functions:
     calls: 1
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 3840
+    calls: 3876
     bytes: (external)
   aipl_arr_extend:
     calls: 4516
     bytes: (external)
   aipl_arr_inc:
-    calls: 197210
+    calls: 189717
     bytes: (external)
   aipl_arr_join:
     calls: 3850
     bytes: (external)
   aipl_arr_reserve:
-    calls: 5339
+    calls: 4362
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 4475
+    calls: 5454
     bytes: (external)
   aipl_arr_sort:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 237583
+    calls: 227649
     bytes: (external)
   aipl_array_new:
-    calls: 26784
+    calls: 27837
     bytes: (external)
   aipl_array_push:
-    calls: 1688
+    calls: 1276
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6980
+    calls: 8367
     bytes: (external)
   aipl_array_with_cap:
-    calls: 5474
+    calls: 4431
     bytes: (external)
   aipl_assert:
     calls: 38
     bytes: (external)
   aipl_rec_alloc:
-    calls: 5200
+    calls: 5196
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 61967
+    calls: 61678
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 1236
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 56767
+    calls: 56482
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 1236

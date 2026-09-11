@@ -79,7 +79,7 @@ error: "x" is not a function and cannot be called
   --> ./tests/cases/lambdas/err_lambdas.aipl:31:5
    |
 31 |     x(3)
-   |     ^^^
+   |     ^^^^
 
 error: fn "twice" returns i64, but bool is expected here
   --> ./tests/cases/lambdas/err_lambdas.aipl:36:35

@@ -23,8 +23,8 @@ bytes allocated: 288
 instructions executed: 569
 binary size: 2944
   code: 1456
-  data: 113
-  metadata: 1375
+  data: 115
+  metadata: 1373
 functions:
   __eq_V:
     calls: 3

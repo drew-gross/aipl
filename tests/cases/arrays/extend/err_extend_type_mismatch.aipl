@@ -13,4 +13,4 @@ error: extend source: expected i64[], got str[]
  --> ./tests/cases/arrays/extend/err_extend_type_mismatch.aipl:9:19
   |
 9 |     set xs.extend(["a"]);
-  |                   ^^^^
+  |                   ^^^^^

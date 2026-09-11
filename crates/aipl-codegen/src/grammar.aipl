@@ -855,15 +855,15 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     }
 }
 --- performance ---
-allocations: 653
-deallocations: 653
-reallocations: 35
-bytes allocated: 65666
-instructions executed: 59575
-binary size: 137224
-  code: 86644
-  data: 3396
-  metadata: 47184
+allocations: 607
+deallocations: 607
+reallocations: 77
+bytes allocated: 60418
+instructions executed: 59399
+binary size: 136544
+  code: 86264
+  data: 3484
+  metadata: 46796
 functions:
   __arr_drop_ListStyle:
     calls: 41
@@ -872,10 +872,10 @@ functions:
     calls: 2
     bytes: 120
   __arr_drop_Production$Kind$Node:
-    calls: 28
+    calls: 20
     bytes: 188
   __arr_drop_Rule$Kind:
-    calls: 25
+    calls: 13
     bytes: 116
   __arr_retain_ListStyle:
     calls: 16
@@ -884,10 +884,10 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain_Production$Kind$Node:
-    calls: 25
+    calls: 17
     bytes: 188
   __arr_retain_Rule$Kind:
-    calls: 32
+    calls: 20
     bytes: 116
   __builtin_find_index$str$lam1:
     calls: 1
@@ -903,7 +903,7 @@ functions:
     bytes: 400
   __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam19:
     calls: 4
-    bytes: 720
+    bytes: 632
   __eq_ListStyle:
     calls: 14
     bytes: 200
@@ -977,7 +977,7 @@ functions:
     calls: 95
     bytes: (external)
   aipl_arr_inc:
-    calls: 713
+    calls: 625
     bytes: (external)
   aipl_arr_join:
     calls: 4
@@ -989,16 +989,13 @@ functions:
     calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 1092
+    calls: 958
     bytes: (external)
   aipl_array_new:
     calls: 307
     bytes: (external)
-  aipl_array_push:
-    calls: 37
-    bytes: (external)
   aipl_array_push_mut:
-    calls: 41
+    calls: 78
     bytes: (external)
   aipl_array_with_cap:
     calls: 22
@@ -1010,13 +1007,13 @@ functions:
     calls: 262
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1294
+    calls: 1267
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 166
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1032
+    calls: 1005
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 166
@@ -1056,7 +1053,7 @@ functions:
     bytes: 268
   link$Kind$Node:
     calls: 14
-    bytes: 2796
+    bytes: 2604
   link_opt$Kind:
     calls: 16
     bytes: 716
@@ -1065,7 +1062,7 @@ functions:
     bytes: 8236
   link_rules$Kind:
     calls: 4
-    bytes: 832
+    bytes: 732
   main:
     calls: 1
     bytes: 180

@@ -77,7 +77,7 @@ error: duplicate match arm
   --> ./tests/cases/arrays/err_arrays.aipl:26:9
    |
 26 |         [1, 2] => 2,
-   |         ^
+   |         ^^^^^^^^^^^
 
 error: array-pattern element: expected i64, got str
   --> ./tests/cases/arrays/err_arrays.aipl:33:10
@@ -92,10 +92,10 @@ error: array-pattern elements must be a binding name or a literal
    |             ^^^^^
 
 error: non-exhaustive match on an array: add a `_` arm
-  --> ./tests/cases/arrays/err_arrays.aipl:47:12
+  --> ./tests/cases/arrays/err_arrays.aipl:47:5
    |
 47 |     match (xs) {
-   |            ^^^^^
+   |     ^^^^^^^^^^^^
 
 error: the `_` arm must be last (arms after it are unreachable)
   --> ./tests/cases/arrays/err_arrays.aipl:56:9

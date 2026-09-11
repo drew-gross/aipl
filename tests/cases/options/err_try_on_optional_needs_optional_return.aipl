@@ -10,4 +10,4 @@ error: "?" on an optional can only be used in a function that returns an optiona
  --> ./tests/cases/options/err_try_on_optional_needs_optional_return.aipl:5:26
   |
 5 | fn bad(o: i64?) -> i64 { o? + 1 }
-  |                          ^
+  |                          ^^

@@ -8,4 +8,4 @@ error: dict keys must be an integer (i8..i64, u8..u64), bool, char, or str, got 
  --> ./tests/cases/dicts/err_key_type.aipl:3:13
   |
 3 |     let d = #{[1]: "a"};
-  |             ^^^^^^^^^^
+  |             ^^^^^^^^^^^

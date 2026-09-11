@@ -44,8 +44,8 @@ bytes allocated: 488
 instructions executed: 2221
 binary size: 7640
   code: 4332
-  data: 751
-  metadata: 2557
+  data: 752
+  metadata: 2556
 functions:
   __eq_i64$opt:
     calls: 3

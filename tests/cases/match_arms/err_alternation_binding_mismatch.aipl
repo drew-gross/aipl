@@ -18,4 +18,4 @@ error: alternatives of one arm must bind the same names: "A" binds "x", but "B" 
   --> ./tests/cases/match_arms/err_alternation_binding_mismatch.aipl:11:9
    |
 11 |         A(x) | B(x, y) => x,
-   |         ^^^^^^^^
+   |         ^^^^^^^^^^^^^^

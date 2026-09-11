@@ -19,9 +19,7 @@
 //! The AST is the source of names, kinds, signatures and docs. It is *not* the
 //! source of positions: no item in `aipl_syntax::ast` carries a span — only
 //! `ImportName` does — because the compiler never needed one. Rather than widen
-//! the AST (which the gazelle grammar is due to stop producing anyway, see
-//! `PARSER_LIBRARY.md`), positions are read from the token stream, which has
-//! them exactly.
+//! the AST, positions are read from the token stream, which has them exactly.
 //!
 //! That works because a declaration's shape is unmistakable *in tokens*: an item
 //! is introduced by the keyword `fn`, `struct` or `variant`, and the identifier

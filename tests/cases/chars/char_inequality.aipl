@@ -17,8 +17,8 @@ bytes allocated: 0
 instructions executed: 95
 binary size: 1464
   code: 472
-  data: 95
-  metadata: 897
+  data: 96
+  metadata: 896
 functions:
   __test$first_not_z:
     calls: 1

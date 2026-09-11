@@ -1,6 +1,6 @@
 fn f() { 1
 --- errors ---
-error: unexpected end of input; expected '.', '..', ';', '?', '[', '}', or operator
+error: expected `.`, `;`, `?`, `[`, `}`, or an operator, found end of input (`{` at line 1 is never closed)
  --> ./tests/cases/syntax/err_missing_brace_before.aipl:1:11
   |
 1 | fn f() { 1

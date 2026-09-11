@@ -68,10 +68,10 @@ deallocations: 12
 reallocations: 0
 bytes allocated: 834
 instructions executed: 2004
-binary size: 8336
-  code: 4760
+binary size: 8344
+  code: 4764
   data: 654
-  metadata: 2922
+  metadata: 2926
 functions:
   __filter4$own0:
     calls: 1
@@ -102,7 +102,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 376
+    bytes: 380
   right_fold$i64$i64$lam5:
     calls: 2
     bytes: 264

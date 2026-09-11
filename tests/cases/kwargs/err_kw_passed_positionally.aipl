@@ -8,4 +8,4 @@ error: fn "f" expects 1 positional arg(s), got 2 (its keyword parameter must be 
  --> ./tests/cases/kwargs/err_kw_passed_positionally.aipl:5:20
   |
 5 | fn main() -> i64 { f(1, 2) }
-  |                    ^^^^^^
+  |                    ^^^^^^^

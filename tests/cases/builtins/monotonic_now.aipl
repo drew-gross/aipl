@@ -58,10 +58,10 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 88
 instructions executed: 290
-binary size: 4392
+binary size: 4424
   code: 1656
-  data: 550
-  metadata: 2186
+  data: 577
+  metadata: 2191
 functions:
   __test$elapsed_over_a_one_second_sleep:
     calls: 1

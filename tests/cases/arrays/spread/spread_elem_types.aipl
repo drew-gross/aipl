@@ -24,10 +24,10 @@ deallocations: 18
 reallocations: 3
 bytes allocated: 642
 instructions executed: 1008
-binary size: 8096
+binary size: 8112
   code: 4060
-  data: 415
-  metadata: 3621
+  data: 425
+  metadata: 3627
 functions:
   __eq_P:
     calls: 2

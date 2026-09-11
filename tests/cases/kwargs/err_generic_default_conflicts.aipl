@@ -14,4 +14,4 @@ error: conflicting types for "T" in "padded": str vs i64
   --> ./tests/cases/kwargs/err_generic_default_conflicts.aipl:10:18
    |
 10 |     print(to_str(padded(["a"])));
-   |                  ^^^^^^^^^^^
+   |                  ^^^^^^^^^^^^^

@@ -13,4 +13,4 @@ error: fn "execute_program" expects 1 positional arg(s), got 2 (its keyword para
  --> ./tests/cases/execute_program/err_args_positional.aipl:6:12
   |
 6 |     match (execute_program("echo", ["a"])) {
-  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

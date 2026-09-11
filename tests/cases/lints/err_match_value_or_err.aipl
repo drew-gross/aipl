@@ -83,28 +83,28 @@ error: this `match` turns an optional into a result — write "o.value_or_err("m
   --> ./tests/cases/lints/err_match_value_or_err.aipl:13:17
    |
 13 |         none => err("missing"),
-   |                 ^^^^^^^^^^^^^
+   |                 ^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write "o.value_or_err("missing")" instead (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or_err.aipl:19:17
    |
 19 |         none => err("missing"),
-   |                 ^^^^^^^^^^^^^
+   |                 ^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write "o.value_or_err("integer literal overflows i64")?" and use the payload directly — `?` does the early return this arm is doing by hand (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or_err.aipl:33:17
    |
 33 |         none => err("integer literal overflows i64"),
-   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or_err.aipl:49:17
    |
 49 |         none => err(describe(tag)),
-   |                 ^^^^^^^^^^^^^^^^
+   |                 ^^^^^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_value_or_err.aipl:59:17
    |
 59 |         none => err(Fault { code: 7 }),
-   |                 ^^^^^^^^^^^^^^^^^^^
+   |                 ^^^^^^^^^^^^^^^^^^^^^^

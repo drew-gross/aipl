@@ -61,9 +61,9 @@ deallocations: 13
 reallocations: 0
 bytes allocated: 722
 instructions executed: 2246
-binary size: 12240
+binary size: 12256
   code: 7368
-  data: 997
+  data: 1013
   metadata: 3875
 functions:
   __builtin_find_index$char$lam10:

@@ -29,8 +29,8 @@ bytes allocated: 632
 instructions executed: 483
 binary size: 4832
   code: 2208
-  data: 401
-  metadata: 2223
+  data: 402
+  metadata: 2222
 functions:
   __test$drop_last_n:
     calls: 1

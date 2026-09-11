@@ -38,20 +38,44 @@ pub fn program_from_ffi(v: &FfiValue) -> R<ast::Program> {
 
 /// The `Program` and the `#[allow]` spans behind a `Res(Ok(..))` returned by
 /// `aipl_parse_file` — the whole of what `aipl_parser::parse_with_allows`
-/// returns, and what stage 5g's entry point reads.
+/// returns, which is what the parser hook hands back.
 ///
 /// The markers are the parser's one side-channel: they are trivia, so no
-/// production sees one, and the loader's lint pass still needs them. Gazelle
-/// carries them out through a thread-local sink; here they ride the return
-/// value.
-pub fn parse_file_from_ffi(v: &FfiValue) -> R<(ast::Program, Vec<Span>)> {
+/// production sees one, and the loader's lint pass still needs them. They ride
+/// the return value rather than a thread-local sink.
+///
+/// A parse failure comes back as the `ParseError` it was, message and span, as
+/// an [`aipl_syntax::Error`] the caller renders like any other; a value that
+/// does not have the declared shape is a spanless error naming the mismatch,
+/// since that is a bug in the two declarations rather than in the source.
+pub fn parse_file_from_ffi(v: &FfiValue) -> Result<(ast::Program, Vec<Span>), aipl_syntax::Error> {
     match v {
-        FfiValue::Res(Ok(inner)) => Ok((
-            program(field(inner, "program")?)?,
-            each(field(inner, "allows")?, span)?,
-        )),
-        FfiValue::Res(Err(e)) => Err(parse_error_message(e)),
-        other => Err(format!("expected a result, got {}", shape(other))),
+        FfiValue::Res(Ok(inner)) => parsed_file(inner).map_err(aipl_syntax::Error::msg),
+        FfiValue::Res(Err(e)) => Err(parse_error(e)),
+        other => Err(aipl_syntax::Error::msg(format!(
+            "expected a result, got {}",
+            shape(other)
+        ))),
+    }
+}
+
+fn parsed_file(v: &FfiValue) -> R<(ast::Program, Vec<Span>)> {
+    Ok((
+        program(field(v, "program")?)?,
+        each(field(v, "allows")?, span)?,
+    ))
+}
+
+/// A `ParseError` struct as the error the compiler reports: its message at its
+/// span.
+fn parse_error(v: &FfiValue) -> aipl_syntax::Error {
+    match (
+        field(v, "message").and_then(text),
+        field(v, "span").and_then(span),
+    ) {
+        (Ok(message), Ok(at)) => aipl_syntax::Error::at(message, at),
+        (Ok(message), Err(_)) => aipl_syntax::Error::msg(message),
+        (Err(e), _) => aipl_syntax::Error::msg(e),
     }
 }
 

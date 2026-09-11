@@ -96,8 +96,8 @@ bytes allocated: 4784
 instructions executed: 8304
 binary size: 24248
   code: 15228
-  data: 745
-  metadata: 8275
+  data: 746
+  metadata: 8274
 functions:
   __arr_drop_E:
     calls: 10

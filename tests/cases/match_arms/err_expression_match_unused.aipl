@@ -14,7 +14,7 @@ fn main() !prints {
 }
 --- errors ---
 error: this `match` produces i64, but its value is unused — bind it with "let", return it, or make every arm a statement so the `match` is a statement too
- --> ./tests/cases/match_arms/err_expression_match_unused.aipl:9:12
+ --> ./tests/cases/match_arms/err_expression_match_unused.aipl:9:5
   |
 9 |     match (Tick) {
-  |            ^^^^^^^
+  |     ^^^^^^^^^^^^^^

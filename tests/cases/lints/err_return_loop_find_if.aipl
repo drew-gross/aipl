@@ -50,16 +50,16 @@ error: this loop returns the first element passing a test, and "none" otherwise 
   --> ./tests/cases/lints/err_return_loop_find_if.aipl:13:20
    |
 13 |             return some(x);
-   |                    ^^^^^^
+   |                    ^^^^^^^
 
 error: this loop returns the first element passing a test, and "none" otherwise — write "return names.find_if(|n| ..);" and drop the loop, importing `find_if` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_return_loop_find_if.aipl:24:20
    |
 24 |             return some(n);
-   |                    ^^^^^^
+   |                    ^^^^^^^
 
 error: this loop returns the first element passing a test, and "none" otherwise — write "return <iterable>.find_if(|x| ..);" and drop the loop, importing `find_if` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_return_loop_find_if.aipl:37:20
    |
 37 |             return some(x);
-   |                    ^^^^^^
+   |                    ^^^^^^^

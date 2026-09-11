@@ -854,18 +854,18 @@ fn fixture() -> Grammar<Kind, Node> {
     }
 }
 --- performance ---
-allocations: 2151
-deallocations: 2151
-reallocations: 144
-bytes allocated: 199522
-instructions executed: 205274
-binary size: 155200
-  code: 100792
-  data: 3988
-  metadata: 50420
+allocations: 1849
+deallocations: 1849
+reallocations: 420
+bytes allocated: 173354
+instructions executed: 204402
+binary size: 154304
+  code: 100320
+  data: 3996
+  metadata: 49988
 functions:
   __arr_drop_First$Kind:
-    calls: 77
+    calls: 23
     bytes: 116
   __arr_drop_Sym$Kind:
     calls: 182
@@ -877,13 +877,13 @@ functions:
     calls: 3
     bytes: 120
   __arr_drop___m2__Production$Kind$Node:
-    calls: 42
+    calls: 16
     bytes: 188
   __arr_drop___m2__Rule$Kind:
-    calls: 207
+    calls: 89
     bytes: 116
   __arr_retain_First$Kind:
-    calls: 149
+    calls: 95
     bytes: 116
   __arr_retain_Sym$Kind:
     calls: 139
@@ -895,10 +895,10 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain___m2__Production$Kind$Node:
-    calls: 60
+    calls: 34
     bytes: 188
   __arr_retain___m2__Rule$Kind:
-    calls: 307
+    calls: 189
     bytes: 116
   __builtin_find_index$str$lam20:
     calls: 24
@@ -908,10 +908,10 @@ functions:
     bytes: 400
   __builtin_try_map$__m2__Production$Kind$Node$First<Kind>$__m2__ParseError$lam15:
     calls: 17
-    bytes: 920
+    bytes: 828
   __builtin_try_map$__m2__Rule$Kind$__m2__Rule<Kind>$__m2__ParseError$lam38:
     calls: 46
-    bytes: 720
+    bytes: 632
   __eq_First$Kind:
     calls: 36
     bytes: 128
@@ -944,7 +944,7 @@ functions:
     bytes: 4724
   __m2__link$Kind$Node:
     calls: 9
-    bytes: 2796
+    bytes: 2604
   __m2__link_opt$Kind:
     calls: 12
     bytes: 716
@@ -953,7 +953,7 @@ functions:
     bytes: 8236
   __m2__link_rules$Kind:
     calls: 27
-    bytes: 832
+    bytes: 732
   __m2__prod_names$Kind$Node:
     calls: 20
     bytes: 492
@@ -1003,7 +1003,7 @@ functions:
     calls: 66
     bytes: (external)
   aipl_arr_inc:
-    calls: 4115
+    calls: 3550
     bytes: (external)
   aipl_arr_join:
     calls: 34
@@ -1018,16 +1018,16 @@ functions:
     calls: 21
     bytes: (external)
   aipl_array_dec:
-    calls: 5381
+    calls: 4514
     bytes: (external)
   aipl_array_new:
     calls: 643
     bytes: (external)
   aipl_array_push:
-    calls: 301
+    calls: 7
     bytes: (external)
   aipl_array_push_mut:
-    calls: 470
+    calls: 764
     bytes: (external)
   aipl_array_with_cap:
     calls: 122
@@ -1039,13 +1039,13 @@ functions:
     calls: 476
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 3446
+    calls: 3218
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 111
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2970
+    calls: 2742
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 111

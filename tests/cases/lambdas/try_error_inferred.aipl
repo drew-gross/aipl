@@ -51,31 +51,31 @@ err
 err
 three
 --- performance ---
-allocations: 11
-deallocations: 11
-reallocations: 0
-bytes allocated: 534
-instructions executed: 1494
-binary size: 12232
-  code: 7764
+allocations: 8
+deallocations: 8
+reallocations: 3
+bytes allocated: 310
+instructions executed: 1482
+binary size: 11704
+  code: 7512
   data: 67
-  metadata: 4401
+  metadata: 4125
 functions:
   __arr_drop_Wrapped:
-    calls: 3
+    calls: 2
     bytes: 120
   __arr_retain_Wrapped:
-    calls: 4
+    calls: 3
     bytes: 120
   __builtin_try_map$i64$Wrapped$str$lam13:
     calls: 1
-    bytes: 636
+    bytes: 544
   __builtin_try_map$i64$Wrapped$str$lam9:
     calls: 1
-    bytes: 636
+    bytes: 544
   __builtin_try_map$i64$i64$str$lam17:
     calls: 1
-    bytes: 576
+    bytes: 508
   __lambda_0:
     calls: 1
     bytes: 564
@@ -95,19 +95,16 @@ functions:
     calls: 1
     bytes: 708
   aipl_arr_inc:
-    calls: 8
+    calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 18
+    calls: 9
     bytes: (external)
   aipl_array_new:
     calls: 6
     bytes: (external)
-  aipl_array_push:
-    calls: 3
-    bytes: (external)
   aipl_array_push_mut:
-    calls: 2
+    calls: 5
     bytes: (external)
   aipl_array_with_cap:
     calls: 1

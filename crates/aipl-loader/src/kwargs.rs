@@ -233,9 +233,8 @@ impl FnKwInfo {
         // default would be a value of `T?` no call site can spell — supplying
         // the parameter passes a bare `T`, and `?=` passes an optional the
         // caller already holds. Checked here rather than in the parser because
-        // it is a rule about the declaration, not about its shape: the AIPL
-        // grammar accepts the same syntax and the two must agree on what parses
-        // (`aipl_grammar_matches_gazelle_on_corpus`).
+        // it is a rule about the declaration, not about its shape — the grammar
+        // accepts the syntax and says nothing about which default is legal.
         for p in sig_params {
             if !p.implicit_some {
                 continue;

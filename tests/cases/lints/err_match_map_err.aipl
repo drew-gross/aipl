@@ -65,22 +65,22 @@ error: this `match` rewrites the result's error side and passes its value throug
   --> ./tests/cases/lints/err_match_map_err.aipl:17:18
    |
 17 |         ok(v) => ok(v),
-   |                  ^^^^
+   |                  ^^^^^
 
 error: this `match` rewrites the result's error side and passes its value through — write "r.map_err(|e| ..)" instead (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_map_err.aipl:25:18
    |
 25 |         ok(v) => ok(v),
-   |                  ^^^^
+   |                  ^^^^^
 
 error: this `match` rewrites the result's error side and passes its value through — write "r.map_err(|e| ..)" instead (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_map_err.aipl:36:18
    |
 36 |         ok(v) => ok(v),
-   |                  ^^^^
+   |                  ^^^^^
 
 error: this `match` rewrites the result's error side and passes its value through — write ".map_err(|e| ..)" instead (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_match_map_err.aipl:45:18
    |
 45 |         ok(v) => ok(v),
-   |                  ^^^^
+   |                  ^^^^^

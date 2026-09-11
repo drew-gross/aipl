@@ -154,21 +154,21 @@ fn companion_path(header: str) -> str!str {
     assert(companion_path("file: a\\b.txt").is_err_and(|e| e.starts_with(`use "/"`)));
 })
 --- performance ---
-allocations: 71
-deallocations: 71
-reallocations: 0
-bytes allocated: 5386
-instructions executed: 12244
-binary size: 25312
-  code: 13448
-  data: 2565
-  metadata: 9299
+allocations: 65
+deallocations: 65
+reallocations: 6
+bytes allocated: 4858
+instructions executed: 12208
+binary size: 25136
+  code: 13316
+  data: 2629
+  metadata: 9191
 functions:
   __arr_drop_Companion:
-    calls: 11
+    calls: 10
     bytes: 140
   __arr_retain_Companion:
-    calls: 7
+    calls: 6
     bytes: 140
   __eq_Companion:
     calls: 6
@@ -192,15 +192,15 @@ functions:
     calls: 0
     bytes: 276
   aipl_arr_inc:
-    calls: 27
+    calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 66
+    calls: 42
     bytes: (external)
   aipl_array_new:
     calls: 33
     bytes: (external)
-  aipl_array_push:
+  aipl_array_push_mut:
     calls: 6
     bytes: (external)
   aipl_assert:
@@ -217,7 +217,7 @@ functions:
     bytes: (external)
   companion_files:
     calls: 12
-    bytes: 2644
+    bytes: 2512
   companion_path:
     calls: 15
     bytes: 956

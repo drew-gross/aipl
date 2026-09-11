@@ -17,4 +17,4 @@ error: constructor "B@V" carries no payload, so ".." ignores nothing — write "
   --> ./tests/cases/match_arms/err_ignore_payload_nullary.aipl:10:9
    |
 10 |         B(..) => 2,
-   |         ^
+   |         ^^^^^

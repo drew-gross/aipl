@@ -1,6 +1,6 @@
 f() { 1 }
 --- errors ---
-error: unexpected 'f'; expected definition or end of input
+error: expected an item or end of input, found `f`
  --> ./tests/cases/functions/err_missing_fn_keyword.aipl:1:1
   |
 1 | f() { 1 }

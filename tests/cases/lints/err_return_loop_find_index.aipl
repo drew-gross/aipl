@@ -54,16 +54,16 @@ error: this loop returns the position of the first element passing a test, and "
   --> ./tests/cases/lints/err_return_loop_find_index.aipl:17:20
    |
 17 |             return some(i);
-   |                    ^^^^^^
+   |                    ^^^^^^^
 
 error: this loop returns the position of the first element passing a test, and "none" otherwise — write "return names.find_index(|n| ..);" and drop the loop, importing `find_index` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_return_loop_find_index.aipl:28:20
    |
 28 |             return some(i);
-   |                    ^^^^^^
+   |                    ^^^^^^^
 
 error: this loop returns the position of the first element passing a test, and "none" otherwise — write "return <iterable>.find_index(|x| ..);" and drop the loop, importing `find_index` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_return_loop_find_index.aipl:41:20
    |
 41 |             return some(i);
-   |                    ^^^^^^
+   |                    ^^^^^^^

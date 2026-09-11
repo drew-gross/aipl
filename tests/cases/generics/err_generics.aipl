@@ -28,4 +28,4 @@ error: fn "generic_body_unreachable": body returns u64, but the declared return 
   --> ./tests/cases/generics/err_generics.aipl:17:49
    |
 17 | fn generic_body_unreachable(v: any[]) -> bool { len(v) }
-   |                                                 ^^^^^
+   |                                                 ^^^^^^

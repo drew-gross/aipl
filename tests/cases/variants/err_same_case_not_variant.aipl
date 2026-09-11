@@ -9,4 +9,4 @@ error: fn "same_case": type parameter "T" requires "variant", but was inferred a
  --> ./tests/cases/variants/err_same_case_not_variant.aipl:6:24
   |
 6 | fn main() -> i64 { if (same_case(1, 2)) { 1 } else { 0 } }
-  |                        ^^^^^^^^^^^^^^
+  |                        ^^^^^^^^^^^^^^^

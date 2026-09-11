@@ -45,10 +45,10 @@ fn char_arm_on_str(s: str) -> i64 {
 fn main() {}
 --- errors ---
 error: non-exhaustive match on a char: add a `_` arm
- --> ./tests/cases/chars/err_match_char_literals.aipl:7:12
+ --> ./tests/cases/chars/err_match_char_literals.aipl:7:5
   |
 7 |     match (c) {
-  |            ^^^^
+  |     ^^^^^^^^^^^
 
 error: the `_` arm must be last (arms after it are unreachable)
   --> ./tests/cases/chars/err_match_char_literals.aipl:15:9

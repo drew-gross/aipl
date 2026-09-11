@@ -87,10 +87,10 @@ deallocations: 10
 reallocations: 0
 bytes allocated: 640
 instructions executed: 2474
-binary size: 9448
-  code: 5960
-  data: 774
-  metadata: 2714
+binary size: 9464
+  code: 5964
+  data: 783
+  metadata: 2717
 functions:
   __eq_i64$opt:
     calls: 2
@@ -127,7 +127,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 324
+    bytes: 328
   opt_right_fold$i64$i64$lam4:
     calls: 2
     bytes: 468

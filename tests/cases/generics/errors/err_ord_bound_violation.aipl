@@ -13,4 +13,4 @@ error: fn "identity": type parameter "T" requires "ord", but was inferred as Poi
  --> ./tests/cases/generics/errors/err_ord_bound_violation.aipl:8:5
   |
 8 |     identity(Point { x: 1, y: 2 });
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

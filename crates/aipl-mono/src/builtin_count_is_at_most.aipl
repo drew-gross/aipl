@@ -46,8 +46,8 @@ bytes allocated: 656
 instructions executed: 1800
 binary size: 4808
   code: 2448
-  data: 535
-  metadata: 1825
+  data: 536
+  metadata: 1824
 functions:
   __builtin_count_is_at_most$i64:
     calls: 5

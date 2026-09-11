@@ -78,10 +78,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 1919
-binary size: 10976
+binary size: 11000
   code: 5820
-  data: 1314
-  metadata: 3842
+  data: 1339
+  metadata: 3841
 functions:
   __test$check_len:
     calls: 1

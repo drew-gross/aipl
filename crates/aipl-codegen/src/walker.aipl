@@ -2954,15 +2954,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
 --- performance ---
-allocations: 115345
-deallocations: 115345
-reallocations: 1910
-bytes allocated: 6237037
-instructions executed: 22267341
-binary size: 8725680
-  code: 5508772
-  data: 27364
-  metadata: 3189544
+allocations: 115034
+deallocations: 115034
+reallocations: 2070
+bytes allocated: 6202021
+instructions executed: 22258808
+binary size: 8724064
+  code: 5507884
+  data: 27444
+  metadata: 3188736
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -2977,13 +2977,13 @@ functions:
     calls: 20
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1516
+    calls: 1512
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
     calls: 1
     bytes: 140
   __arr_drop___m9__Token$__m8__AiplTok:
-    calls: 1386
+    calls: 1383
     bytes: 388
   __arr_drop___m9__TokenRule$__m8__AiplTok:
     calls: 152
@@ -3001,13 +3001,13 @@ functions:
     calls: 27
     bytes: 140
   __arr_retain___m1__Doc:
-    calls: 1593
+    calls: 1589
     bytes: 116
   __arr_retain___m9__StepResult$__m8__AiplTok:
     calls: 1
     bytes: 140
   __arr_retain___m9__Token$__m8__AiplTok:
-    calls: 1088
+    calls: 1085
     bytes: 388
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
@@ -3170,16 +3170,16 @@ functions:
     bytes: 1592
   __m9__finalize_template$__m8__AiplTok:
     calls: 1
-    bytes: 8904
+    bytes: 8712
   __m9__float_len:
     calls: 0
     bytes: 816
   __m9__interp_scan$__m8__AiplTok:
     calls: 1
-    bytes: 2252
+    bytes: 2028
   __m9__lex$__m8__AiplTok:
     calls: 152
-    bytes: 1520
+    bytes: 1328
   __m9__lex_step$__m8__AiplTok:
     calls: 1972
     bytes: 29192
@@ -3215,7 +3215,7 @@ functions:
     bytes: 7868
   __test$new_walker:
     calls: 1
-    bytes: 12132
+    bytes: 12108
   __test$struct_pattern:
     calls: 1
     bytes: 2188
@@ -3232,7 +3232,7 @@ functions:
     calls: 4190
     bytes: (external)
   aipl_arr_inc:
-    calls: 256969
+    calls: 252702
     bytes: (external)
   aipl_arr_reserve:
     calls: 4268
@@ -3241,16 +3241,16 @@ functions:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 364262
+    calls: 359684
     bytes: (external)
   aipl_array_new:
     calls: 104603
     bytes: (external)
   aipl_array_push:
-    calls: 1715
+    calls: 1707
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1985
+    calls: 1993
     bytes: (external)
   aipl_array_with_cap:
     calls: 511
@@ -3262,13 +3262,13 @@ functions:
     calls: 7318
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 50322
+    calls: 50315
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 4437
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 43004
+    calls: 42997
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 4437
@@ -3431,7 +3431,7 @@ functions:
     bytes: 8432
   match_expr:
     calls: 2
-    bytes: 12032
+    bytes: 11936
   more_before:
     calls: 200
     bytes: 200
@@ -3464,7 +3464,7 @@ functions:
     bytes: 8508
   pattern_alts:
     calls: 3
-    bytes: 3252
+    bytes: 3092
   peek_is:
     calls: 936
     bytes: 288

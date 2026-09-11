@@ -21,13 +21,13 @@ reallocations: 0
 bytes allocated: 0
 instructions executed: 27
 binary size: 896
-  code: 192
+  code: 196
   data: 1
-  metadata: 703
+  metadata: 699
 functions:
   __test$sat:
     calls: 1
-    bytes: 92
+    bytes: 96
   aipl_assert:
     calls: 1
     bytes: (external)

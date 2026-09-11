@@ -6,4 +6,4 @@ error: unknown struct "Span" — "Span" is a builtin type; import it with `impor
  --> ./tests/cases/builtins/err_span_without_import.aipl:2:13
   |
 2 |     let s = Span { start: 1, end: 2 };
-  |             ^^^^^^^^^^^^^^^^^^^^^^^
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^

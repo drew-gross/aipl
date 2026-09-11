@@ -17,8 +17,8 @@ bytes allocated: 0
 instructions executed: 91
 binary size: 1464
   code: 464
-  data: 97
-  metadata: 903
+  data: 98
+  metadata: 902
 functions:
   __test$second_is_e:
     calls: 1

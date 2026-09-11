@@ -677,53 +677,53 @@ fn node_of(t: str) -> Piece { PNode(Text(t), t, t) }
 
 fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
 --- performance ---
-allocations: 2607
-deallocations: 2607
-reallocations: 195
-bytes allocated: 194427
-instructions executed: 225944
-binary size: 239744
-  code: 152608
-  data: 5020
-  metadata: 82116
+allocations: 2381
+deallocations: 2381
+reallocations: 395
+bytes allocated: 171667
+instructions executed: 225192
+binary size: 232384
+  code: 148836
+  data: 5028
+  metadata: 78520
 functions:
   __arr_drop_Piece:
-    calls: 118
+    calls: 95
     bytes: 228
   __arr_drop___m1__Cst:
     calls: 8
     bytes: 116
   __arr_drop___m2__Doc:
-    calls: 273
+    calls: 218
     bytes: 116
   __arr_drop___m8__ListStyle:
     calls: 15
     bytes: 120
   __arr_drop___m8__Production$FKind$str:
-    calls: 31
+    calls: 10
     bytes: 188
   __arr_drop___m8__Rule$FKind:
     calls: 0
     bytes: 116
   __arr_retain_Piece:
-    calls: 123
+    calls: 100
     bytes: 228
   __arr_retain___m1__Cst:
     calls: 0
     bytes: 116
   __arr_retain___m2__Doc:
-    calls: 415
+    calls: 360
     bytes: 116
   __arr_retain___m8__ListStyle:
     calls: 6
     bytes: 120
   __arr_retain___m8__Production$FKind$str:
-    calls: 52
+    calls: 31
     bytes: 188
   __arr_retain___m8__Rule$FKind:
     calls: 0
     bytes: 116
-  __builtin_all$char$s0$lam87:
+  __builtin_all$char$s0$lam81:
     calls: 17
     bytes: 212
   __builtin_any$__m2__Doc$lam33:
@@ -735,7 +735,7 @@ functions:
   __builtin_count_while$char$s0$lam68:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam96:
+  __builtin_count_while$char$s0$lam90:
     calls: 0
     bytes: 172
   __builtin_drop_last$str:
@@ -752,16 +752,25 @@ functions:
     bytes: 408
   __builtin_try_map$__m8__Rule$FKind$__m8__Rule<FKind>$__m8__ParseError$lam80:
     calls: 0
-    bytes: 720
+    bytes: 632
   __eq_str$arr:
     calls: 4
     bytes: 364
-  __m1__leaves:
+  __m1__first_leaf:
     calls: 1
-    bytes: 3684
+    bytes: 696
+  __m1__first_leaf_of:
+    calls: 1
+    bytes: 320
+  __m1__last_leaf:
+    calls: 0
+    bytes: 696
+  __m1__last_leaf_of:
+    calls: 0
+    bytes: 524
   __m1__span:
     calls: 1
-    bytes: 524
+    bytes: 236
   __m1__token_leaves:
     calls: 99
     bytes: 3648
@@ -809,7 +818,7 @@ functions:
     bytes: 4724
   __m8__link$FKind$str:
     calls: 8
-    bytes: 3192
+    bytes: 3048
   __m8__link_opt$FKind:
     calls: 6
     bytes: 716
@@ -818,7 +827,7 @@ functions:
     bytes: 8236
   __m8__link_rules$FKind:
     calls: 0
-    bytes: 832
+    bytes: 732
   __rec_drop___m1__Cst:
     calls: 27
     bytes: 132
@@ -874,10 +883,10 @@ functions:
     calls: 72
     bytes: (external)
   aipl_arr_inc:
-    calls: 2244
+    calls: 1873
     bytes: (external)
   aipl_arr_join:
-    calls: 32
+    calls: 31
     bytes: (external)
   aipl_arr_reserve:
     calls: 50
@@ -886,19 +895,19 @@ functions:
     calls: 88
     bytes: (external)
   aipl_array_dec:
-    calls: 3597
+    calls: 3000
     bytes: (external)
   aipl_array_new:
-    calls: 739
+    calls: 738
     bytes: (external)
   aipl_array_push:
-    calls: 482
+    calls: 267
     bytes: (external)
   aipl_array_push_mut:
-    calls: 308
+    calls: 523
     bytes: (external)
   aipl_array_with_cap:
-    calls: 90
+    calls: 89
     bytes: (external)
   aipl_assert:
     calls: 45
@@ -907,13 +916,13 @@ functions:
     calls: 1133
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 8369
+    calls: 8197
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 703
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 7236
+    calls: 7064
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 703
@@ -974,7 +983,7 @@ functions:
     bytes: 468
   grammar_of:
     calls: 2
-    bytes: 2264
+    bytes: 2168
   group_doc$FKind$str$s1$lam41:
     calls: 0
     bytes: 2420
@@ -986,16 +995,16 @@ functions:
     bytes: 2420
   inline_doc$lam21:
     calls: 58
-    bytes: 2668
+    bytes: 2428
   inline_doc$lam40:
     calls: 1
-    bytes: 2668
+    bytes: 2428
   inline_doc$lam51:
     calls: 20
-    bytes: 2668
+    bytes: 2428
   inline_doc$lam6:
     calls: 6
-    bytes: 2668
+    bytes: 2428
   kv:
     calls: 2
     bytes: 288
@@ -1013,13 +1022,13 @@ functions:
     bytes: 820
   pieces$FKind$str$s1$lam38:
     calls: 1
-    bytes: 3196
+    bytes: 2980
   pieces$FKind$str$s1$lam46:
     calls: 1
-    bytes: 3196
+    bytes: 2980
   pieces$FKind$str$s1$lam49:
     calls: 20
-    bytes: 3196
+    bytes: 2980
   render_cst$FKind$str$s1$lam0:
     calls: 1
     bytes: 404

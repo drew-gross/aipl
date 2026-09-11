@@ -199,7 +199,7 @@ fn a_file_that_does_not_parse_gets_no_formatting_complaint() {
     // on top of a source the formatter couldn't read is noise.
     let (_stdout, stderr, code) = check("unparseable", "this is not valid aipl at all\n");
     assert!(
-        stderr.contains("expected definition or end of input"),
+        stderr.contains("expected an item or end of input"),
         "expected the parse error, got:\n{stderr}"
     );
     assert!(

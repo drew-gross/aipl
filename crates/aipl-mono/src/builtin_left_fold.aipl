@@ -49,9 +49,9 @@ reallocations: 0
 bytes allocated: 610
 instructions executed: 1300
 binary size: 6560
-  code: 3316
+  code: 3320
   data: 637
-  metadata: 2607
+  metadata: 2603
 functions:
   __filter11$own0:
     calls: 1
@@ -85,4 +85,4 @@ functions:
     bytes: 180
   main:
     calls: 1
-    bytes: 376
+    bytes: 380

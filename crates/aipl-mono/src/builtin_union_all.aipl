@@ -47,8 +47,8 @@ bytes allocated: 3117
 instructions executed: 2858
 binary size: 13752
   code: 7848
-  data: 683
-  metadata: 5221
+  data: 684
+  metadata: 5220
 functions:
   __eq_set$bool:
     calls: 1

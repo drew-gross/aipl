@@ -8,7 +8,7 @@ fn f(n: i64) -> i64 {
     n + 1
 }
 --- errors ---
-error: unexpected '# not documentation'; expected '}', expression, field, or statement
+error: expected `}`, a field, a statement, or an expression, found `# not documentation`
  --> ./tests/cases/docs/err_doc_in_body.aipl:7:5
   |
 7 |     # not documentation
