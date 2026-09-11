@@ -77,8 +77,6 @@ highlighter:
 misc cleanup:
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
   Remove the C prefix from the CST types. the caller can import as if necessary.
-  fix all the join with empty sep
-  make nested_in a 2-item tuple
   In group_styles, rs.map(group_styles) is refused
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
   DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
@@ -202,6 +200,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  self.syms.map(|s| show_sym(s)) -> self.syms.map(show_sym) should work
   (Rule<K>, Rule<K>)?!ParseError doesn't parse
   pass expected-type context into tuples -> fix five bracket helpers for nested_in
   Make the language features powerful enough that we don't need builtin_return
@@ -378,6 +377,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    map/join should fuse to map_join
     filter/find.
     depth in grammar_sexp can be xs.map(depth).maximum() + 1 and fuse to map_max
     fusions should work if there are unrelated operations in between (use a dep graph?)

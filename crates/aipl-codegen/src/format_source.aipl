@@ -68,15 +68,15 @@ pub fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
     assert(fmt_layout("fn  main( )  {  }", 100) == ok("fn main() {}\n"));
 })
 --- performance ---
-allocations: 2103
-deallocations: 2103
+allocations: 2107
+deallocations: 2107
 reallocations: 33
-bytes allocated: 125530
-instructions executed: 418007
-binary size: 1031552
-  code: 669032
+bytes allocated: 125658
+instructions executed: 417951
+binary size: 1031560
+  code: 669008
   data: 2235
-  metadata: 360285
+  metadata: 360317
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -374,7 +374,7 @@ functions:
     bytes: 13176
   __m6__format_program:
     calls: 4
-    bytes: 138704
+    bytes: 138680
   __m6__hug_close:
     calls: 0
     bytes: 732
@@ -634,10 +634,10 @@ functions:
     calls: 64
     bytes: (external)
   aipl_array_dec:
-    calls: 6693
+    calls: 6697
     bytes: (external)
   aipl_array_new:
-    calls: 1930
+    calls: 1934
     bytes: (external)
   aipl_array_push:
     calls: 24

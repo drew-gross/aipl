@@ -665,7 +665,7 @@ fn show_fn(self: Function) -> str {
         some(t) => ` -> {t.show_ty()}`,
         none => "",
     };
-    let effects = sig.effects.map(effect_marker).join(sep="");
+    let effects = sig.effects.map(effect_marker).join();
     let test = match (self.test_body) {
         some(b) => ` .test({b.show_expr()})`,
         none => "",

@@ -677,15 +677,15 @@ fn node_of(t: str) -> Piece { PNode(Text(t), t, t) }
 
 fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
 --- performance ---
-allocations: 2381
-deallocations: 2381
+allocations: 2420
+deallocations: 2420
 reallocations: 395
-bytes allocated: 171667
-instructions executed: 225192
+bytes allocated: 172915
+instructions executed: 224646
 binary size: 232384
-  code: 148836
+  code: 148808
   data: 5028
-  metadata: 78520
+  metadata: 78548
 functions:
   __arr_drop_Piece:
     calls: 95
@@ -797,7 +797,7 @@ functions:
     bytes: 688
   __m2__print_doc:
     calls: 39
-    bytes: 4968
+    bytes: 4940
   __m3__reindent_block:
     calls: 0
     bytes: 4084
@@ -895,10 +895,10 @@ functions:
     calls: 88
     bytes: (external)
   aipl_array_dec:
-    calls: 3000
+    calls: 3039
     bytes: (external)
   aipl_array_new:
-    calls: 738
+    calls: 777
     bytes: (external)
   aipl_array_push:
     calls: 267

@@ -1538,15 +1538,15 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 8846
-deallocations: 8846
+allocations: 8858
+deallocations: 8858
 reallocations: 1737
-bytes allocated: 621603
-instructions executed: 1247520
-binary size: 640048
-  code: 389396
+bytes allocated: 621987
+instructions executed: 1247352
+binary size: 640072
+  code: 389392
   data: 9876
-  metadata: 240776
+  metadata: 240804
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1769,7 +1769,7 @@ functions:
     bytes: 612
   __m1__text:
     calls: 12
-    bytes: 476
+    bytes: 472
   __m1__token_leaves:
     calls: 5
     bytes: 3648
@@ -1912,10 +1912,10 @@ functions:
     calls: 37
     bytes: (external)
   aipl_array_dec:
-    calls: 35525
+    calls: 35537
     bytes: (external)
   aipl_array_new:
-    calls: 4994
+    calls: 5006
     bytes: (external)
   aipl_array_push:
     calls: 246

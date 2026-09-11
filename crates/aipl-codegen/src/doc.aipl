@@ -102,7 +102,7 @@ fn has_hard(self: Doc) -> bool {
 # preserved when present (the Rust `print`'s belt-and-braces cleanup).
 pub fn print_doc(doc: Doc, width: u64) -> str {
     let pieces = go(width, 0, WCons(0, false, doc, WNil), []);
-    cleanup(pieces.join(sep=""))
+    cleanup(pieces.join())
 }
 
 # The main layout loop: pop a frame, emit for its `Doc`, push any children, and
@@ -320,15 +320,15 @@ fn cleanup(out: str) -> str {
     assert(print_doc(raw, 100) == `x = """\n    hi\n"""`);
 })
 --- performance ---
-allocations: 288
-deallocations: 288
+allocations: 297
+deallocations: 297
 reallocations: 16
-bytes allocated: 19609
-instructions executed: 22280
-binary size: 33136
-  code: 20112
+bytes allocated: 19897
+instructions executed: 22154
+binary size: 33144
+  code: 20084
   data: 689
-  metadata: 12335
+  metadata: 12371
 functions:
   __arr_drop_Doc:
     calls: 8
@@ -373,10 +373,10 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 185
+    calls: 194
     bytes: (external)
   aipl_array_new:
-    calls: 54
+    calls: 63
     bytes: (external)
   aipl_array_push:
     calls: 34
@@ -440,4 +440,4 @@ functions:
     bytes: 108
   print_doc:
     calls: 9
-    bytes: 4968
+    bytes: 4940
