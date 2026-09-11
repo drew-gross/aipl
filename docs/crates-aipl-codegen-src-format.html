@@ -64,7 +64,7 @@
           </h3>
           <pre class="signature"><code>pub fn render_cst&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, src: str, node: Cst, space: (str, str) -&#62; bool, width: u64) -&#62; str!ParseError</code></pre>
 
-          <div class="doc"><p><code>src</code> laid out at <code>width</code> — <code>format_cst</code> and <code>print_doc</code>, which is what every caller wants and neither half should assume.</p></div>
+          <div class="doc"><p><code>src</code> laid out at <code>width</code> — <code>format_cst</code> and <code>print</code>, which is what every caller wants and neither half should assume.</p></div>
 
 
         </section>
@@ -271,7 +271,7 @@
             <a class="anchor" href="#item-list_items">list_items</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$21220: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
+          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$21244: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
 
           <div class="doc"><p>The items between a pair of brackets, each laid out inline.</p><p>A token spelled like the style's separator ends the item it follows and is dropped; the style writes the separators back, which is what lets a list that breaks gain a trailing one it never had in the source. With an empty separator every token or child starts a new item instead, which is the juxtaposed list. A comment never starts one — it belongs to the item it was written against.</p></div>
 

@@ -1,9 +1,9 @@
 // A Wadler/Prettier-style pretty-printing document algebra, dogfooded in AIPL:
-// the formatter builds a `Doc` tree describing *possible* layouts and `print_doc`
+// the formatter builds a `Doc` tree describing *possible* layouts and `print`
 // picks one — each `Group` renders on one line ("flat") when it fits within the
 // width limit, and breaks at its `Line`/`SoftLine` points otherwise. This is the
 // port of the Rust `aipl-fmt` `doc.rs`; `format_source` (the formatter proper)
-// builds the tree and calls `print_doc` here.
+// builds the tree and calls `print` here.
 //
 // The printer walks a `Work` cons-list (the explicit work-stack the Rust version
 // keeps in a `Vec`) with a `while` loop, so the native stack stays flat however
@@ -17,8 +17,6 @@ import {
     any,
     concat as +++,
     contains,
-    drop_last,
-    ends_with,
     equal as ==,
     greater_than as >,
     is_space,
@@ -97,11 +95,11 @@ fn has_hard(self: Doc) -> bool {
 
 // ---------- printing ----------
 
-# Render `doc` at the given width limit. Lines are indented with spaces;
-# trailing whitespace is stripped from every line and a final newline is
-# preserved when present (the Rust `print`'s belt-and-braces cleanup).
-pub fn print_doc(doc: Doc, width: u64) -> str {
-    let pieces = go(width, 0, WCons(0, false, doc, WNil), []);
+# Render the document at the given width limit. Lines are indented with
+# spaces; trailing whitespace is stripped from every line, and the result ends
+# in a newline whenever it spans more than one line.
+pub fn print(self: Doc, width: u64) -> str {
+    let pieces = go(width, 0, WCons(0, false, self, WNil), []);
     cleanup(pieces.join())
 }
 
@@ -268,21 +266,18 @@ fn newline_str(sp: u64) -> str { "\n" +++ " ".repeat(sp) }
 # blank line's own trailing spaces are removed by `cleanup`).
 fn blank_str(sp: u64) -> str { "\n\n" +++ " ".repeat(sp) }
 
-# Strip trailing whitespace from every line and preserve a final newline when
-# the rendered text had one (mirrors `str::lines().map(trim_end).join(sep="\n")`).
+# Strip trailing whitespace from every line, and end a multi-line result with a
+# newline — a single line is a fragment, anything longer is a block. The whole
+# text is trimmed first so a break the layout left dangling at the end (a
+# newline plus its indentation) does not become a trailing blank line.
 fn cleanup(out: str) -> str {
-    let ended = out.ends_with("\n");
-    let raw = out.split("\n");
-
-    // `lines()` drops exactly one trailing empty when the text ends in a newline;
-    // `split` keeps it, so drop it here to match.
-    let lines = if (ended) { raw.drop_last() } else { raw };
-    let body = lines.map(|line| line.trim_end_while(is_space)).join(sep="\n");
-    body +++ if (ended) { "\n" } else { "" }
+    let lines = out.trim_end_while(is_space).split("\n").map(|line| line.trim_end_while(is_space));
+    let body = lines.join(sep="\n");
+    if (lines.len() > 1) { body +++ "\n" } else { body }
 }.test({
     // Plain text is emitted verbatim.
-    assert(print_doc(Text("hello"), 100) == "hello");
-    assert(print_doc(Concat([Text("a"), Text("b")]), 100) == "ab");
+    assert(Text("hello").print(100) == "hello");
+    assert(Concat([Text("a"), Text("b")]).print(100) == "ab");
 
     // A group that fits stays flat: `Line` becomes a space, `SoftLine` nothing.
     let list = group(Concat([
@@ -291,14 +286,14 @@ fn cleanup(out: str) -> str {
         SoftLine,
         Text(")"),
     ]));
-    assert(print_doc(list, 100) == "(a, b)");
+    assert(list.print(100) == "(a, b)");
 
     // The same group, too wide to fit, breaks at every `Line`/`SoftLine`, one
-    // element per indented line.
-    assert(print_doc(list, 5) == "(\n    a,\n    b\n)");
+    // element per indented line — and, now multi-line, ends in a newline.
+    assert(list.print(5) == "(\n    a,\n    b\n)\n");
 
     // A `HardLine` forces the break even with width to spare.
-    assert(print_doc(group(Concat([Text("a"), HardLine, Text("b")])), 100) == "a\nb");
+    assert(group(Concat([Text("a"), HardLine, Text("b")])).print(100) == "a\nb\n");
 
     // `IfBroken` text appears only when the group breaks.
     let arr = group(Concat([
@@ -307,31 +302,36 @@ fn cleanup(out: str) -> str {
         SoftLine,
         Text("]"),
     ]));
-    assert(print_doc(arr, 100) == "[x]");
-    assert(print_doc(arr, 2) == "[\n    x,\n]");
+    assert(arr.print(100) == "[x]");
+    assert(arr.print(2) == "[\n    x,\n]\n");
 
     // `BlankLine` separates with a truly-empty line (its trailing spaces are
     // cleaned away).
-    assert(print_doc(Concat([Text("a"), BlankLine, Text("b")]), 100) == "a\n\nb");
+    assert(Concat([Text("a"), BlankLine, Text("b")]).print(100) == "a\n\nb\n");
+
+    // A break left dangling at the end is not a trailing blank line, and a
+    // single line — however it ends — takes no newline.
+    assert(Concat([Text("a"), HardLine]).print(100) == "a");
+    assert(Concat([Text("a"), BlankLine, Text("b"), HardLine]).print(100) == "a\n\nb\n");
 
     // A multi-line `RawBlock` is re-aligned around its column: a bare-opening
     // `"""` block's content is re-indented one level deeper than the delimiters.
     let raw = Concat([Text("x = "), RawBlock(`"""\n  hi\n"""`)]);
-    assert(print_doc(raw, 100) == `x = """\n    hi\n"""`);
+    assert(raw.print(100) == `x = """\n    hi\n"""\n`);
 })
 --- performance ---
-allocations: 297
-deallocations: 297
-reallocations: 16
-bytes allocated: 19897
-instructions executed: 22154
-binary size: 33144
-  code: 20084
-  data: 689
-  metadata: 12371
+allocations: 336
+deallocations: 336
+reallocations: 2
+bytes allocated: 22562
+instructions executed: 28053
+binary size: 34824
+  code: 21084
+  data: 846
+  metadata: 12894
 functions:
   __arr_drop_Doc:
-    calls: 8
+    calls: 10
     bytes: 116
   __arr_retain_Doc:
     calls: 0
@@ -351,59 +351,62 @@ functions:
   __builtin_count_while$char$s0$lam24:
     calls: 1
     bytes: 172
-  __builtin_drop_last$str:
-    calls: 1
-    bytes: 208
   __m1__reindent_block:
     calls: 1
-    bytes: 4084
+    bytes: 4268
+  __m5__trim_end_while$lam4:
+    calls: 34
+    bytes: 300
+  __map6$own0:
+    calls: 11
+    bytes: 428
   __rec_drop_Doc:
-    calls: 38
+    calls: 46
     bytes: 184
   __rec_drop_Work:
-    calls: 109
+    calls: 119
     bytes: 84
   __test$cleanup:
     calls: 1
-    bytes: 4932
+    bytes: 5900
   aipl_arr_inc:
-    calls: 83
+    calls: 95
     bytes: (external)
   aipl_arr_slice:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 194
+    calls: 214
     bytes: (external)
   aipl_array_new:
-    calls: 63
+    calls: 74
     bytes: (external)
   aipl_array_push:
-    calls: 34
+    calls: 40
     bytes: (external)
   aipl_array_push_mut:
-    calls: 22
+    calls: 3
     bytes: (external)
   aipl_array_with_cap:
-    calls: 12
+    calls: 3
     bytes: (external)
   aipl_assert:
-    calls: 9
+    calls: 11
     bytes: (external)
   aipl_rec_alloc:
-    calls: 147
+    calls: 165
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 938
+    calls: 1016
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 105
+    calls: 113
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 791
+    calls: 851
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 105
+    calls: 113
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -415,7 +418,7 @@ functions:
     calls: 1
     bytes: (external)
   col_after:
-    calls: 25
+    calls: 28
     bytes: 596
   fits:
     calls: 0
@@ -438,6 +441,6 @@ functions:
   main:
     calls: 1
     bytes: 108
-  print_doc:
-    calls: 9
-    bytes: 4940
+  print:
+    calls: 11
+    bytes: 4268

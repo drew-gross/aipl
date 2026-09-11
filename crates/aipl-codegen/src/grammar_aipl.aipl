@@ -2910,7 +2910,7 @@ pub fn format_aipl_ty(src: str, width: u64) -> str!ParseError {
     assert(format_aipl_ty("Box < i64 >", 100)? == "Box<i64>");
     assert(format_aipl_ty("Map < str , i64 >", 100)? == "Map<str, i64>");
     // No trailing comma in type position, even broken.
-    assert(format_aipl_ty("Map < str , i64 >", 1)? == "Map<\n    str,\n    i64\n>");
+    assert(format_aipl_ty("Map < str , i64 >", 1)? == "Map<\n    str,\n    i64\n>\n");
 
     // Results: `T!E`, and the void-ok `!E`.
     assert(format_aipl_ty("i64 ! str", 100)? == "i64!str");
@@ -4158,15 +4158,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2955877
-deallocations: 2955877
-reallocations: 322553
-bytes allocated: 279143319
-instructions executed: 398719729
-binary size: 4837048
-  code: 3157696
+allocations: 2955858
+deallocations: 2955858
+reallocations: 322532
+bytes allocated: 279142583
+instructions executed: 398729471
+binary size: 4837024
+  code: 3157720
   data: 42684
-  metadata: 1636668
+  metadata: 1636620
 functions:
   __arr_drop___m11__ListStyle:
     calls: 158600
@@ -4393,9 +4393,6 @@ functions:
   __builtin_count_while$char$s0$lam82:
     calls: 1801
     bytes: 184
-  __builtin_drop_last$str:
-    calls: 0
-    bytes: 208
   __builtin_find_if$__m11__Prec$lam326:
     calls: 346
     bytes: 688
@@ -4570,6 +4567,9 @@ functions:
   __lambda_37:
     calls: 4
     bytes: 64
+  __m10__trim_end_while$lam48:
+    calls: 43
+    bytes: 300
   __m11__desugar_opt$__m12__AiplTok:
     calls: 20150
     bytes: 700
@@ -4926,7 +4926,7 @@ functions:
     bytes: 3400
   __m4__render_cst$__m12__AiplTok$__m1__Ast$s1$lam3:
     calls: 20
-    bytes: 5240
+    bytes: 4580
   __m4__wrapped$lam284:
     calls: 13
     bytes: 4272
@@ -4953,10 +4953,13 @@ functions:
     bytes: 688
   __m6__reindent_block:
     calls: 0
-    bytes: 2928
+    bytes: 3092
   __m7__dedent:
     calls: 1
     bytes: 1276
+  __map50$own0:
+    calls: 20
+    bytes: 428
   __rec_drop___m11__Rule$__m12__AiplTok:
     calls: 942594
     bytes: 340
@@ -5075,7 +5078,7 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 7914266
+    calls: 7914246
     bytes: (external)
   aipl_array_new:
     calls: 1561273
@@ -5084,10 +5087,10 @@ functions:
     calls: 4494
     bytes: (external)
   aipl_array_push_mut:
-    calls: 927734
+    calls: 927711
     bytes: (external)
   aipl_array_with_cap:
-    calls: 168296
+    calls: 168276
     bytes: (external)
   aipl_assert:
     calls: 301

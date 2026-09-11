@@ -95,14 +95,14 @@
 
 
 
-        <section class="item" id="item-print_doc">
+        <section class="item" id="item-print">
           <h3>
-            <a class="anchor" href="#item-print_doc">print_doc</a>
+            <a class="anchor" href="#item-print">print</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn print_doc(doc: Doc, width: u64) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn print(self: Doc, width: u64) -&#62; str</code></pre>
 
-          <div class="doc"><p>Render <code>doc</code> at the given width limit. Lines are indented with spaces; trailing whitespace is stripped from every line and a final newline is preserved when present (the Rust <code>print</code>'s belt-and-braces cleanup).</p></div>
+          <div class="doc"><p>Render the document at the given width limit. Lines are indented with spaces; trailing whitespace is stripped from every line, and the result ends in a newline whenever it spans more than one line.</p></div>
 
 
         </section>
@@ -263,7 +263,7 @@
           </h3>
           <pre class="signature"><code>fn cleanup(out: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>Strip trailing whitespace from every line and preserve a final newline when the rendered text had one (mirrors <code>str::lines().map(trim_end).join(sep=&quot;\n&quot;)</code>).</p></div>
+          <div class="doc"><p>Strip trailing whitespace from every line, and end a multi-line result with a newline — a single line is a fragment, anything longer is a block. The whole text is trimmed first so a break the layout left dangling at the end (a newline plus its indentation) does not become a trailing blank line.</p></div>
 
 
         </section>

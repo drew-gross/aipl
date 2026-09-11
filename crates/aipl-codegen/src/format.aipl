@@ -52,7 +52,7 @@ import {
     SoftLine,
     Text,
     group,
-    print_doc,
+    print,
 } from "./doc.aipl";
 import {
     Grammar,
@@ -175,7 +175,7 @@ fn fmt_node<K: variant, A: any>(
 
     // The same tree at a width it cannot fit: one item per indented line, plus
     // the trailing separator the style asks for.
-    assert(rendered(g, src, tree, 12)? == "{\n    a: 1,\n    b: -2,\n}");
+    assert(rendered(g, src, tree, 12)? == "{\n    a: 1,\n    b: -2,\n}\n");
 
     // A group handed in on its own lays out the same as one reached through its
     // parent — the layout belongs to the brackets, not to what encloses them.
@@ -199,7 +199,7 @@ fn fmt_node<K: variant, A: any>(
     );
 })
 
-# `src` laid out at `width` — `format_cst` and `print_doc`, which is what every
+# `src` laid out at `width` — `format_cst` and `print`, which is what every
 # caller wants and neither half should assume.
 pub fn render_cst<K: variant, A: any>(
     g: Grammar<K, A>,
@@ -207,7 +207,7 @@ pub fn render_cst<K: variant, A: any>(
     node: Cst,
     space: (str, str) -> bool,
     width: u64,
-) -> str!ParseError { ok(print_doc(format_cst(g, src, node, space)?, width)) }.test({
+) -> str!ParseError { ok(format_cst(g, src, node, space)?.print(width)) }.test({
     let g = grammar_of([Inline], []);
     let src = "a b";
     let tree = CTree(0, [CLeaf(0..1), CTrivia(1..2), CLeaf(2..3)]);
@@ -316,7 +316,7 @@ fn tight(ps: Piece[]) -> Doc { Concat(ps.map(piece_doc)) }.test({
     assert(tight([PTok("-"), PTok("2")]).at(80) == "-2");
     assert(tight(nothing).at(80) == "");
     assert(tight([PTok("a"), PNote("/* c */", false), PTok("b")]).at(80) == "a/* c */b");
-    assert(tight([PTok("a"), PNote("// c", true), PTok("b")]).at(80) == "a// c\nb");
+    assert(tight([PTok("a"), PNote("// c", true), PTok("b")]).at(80) == "a// c\nb\n");
 })
 
 # One piece as a `Doc`, with nothing added around it.
@@ -385,7 +385,9 @@ fn inline_doc(ps: Piece[], space: (str, str) -> bool) -> Doc {
 
     // A comment ending a source line ends the formatted line too.
     assert(
-        inline_doc([PTok("a"), PNote("// c", true), PTok("b")], colon_space).at(80) == "a // c\nb",
+        inline_doc([PTok("a"), PNote("// c", true), PTok("b")], colon_space).at(
+            80,
+        ) == "a // c\nb\n",
     );
     assert(
         inline_doc([PTok("a"), PNote("/*c*/", false), PTok("b")], colon_space).at(
@@ -477,7 +479,7 @@ fn wrapped(
     let three = [node_of("a"), PTok(","), node_of("b"), PTok(","), node_of("c")];
 
     assert(wrapped(lp, three, rp, parens, never_space).at(80) == "(a, b, c)");
-    assert(wrapped(lp, three, rp, parens, never_space).at(5) == "(\n    a,\n    b,\n    c,\n)");
+    assert(wrapped(lp, three, rp, parens, never_space).at(5) == "(\n    a,\n    b,\n    c,\n)\n");
 
     // An empty list is its brackets and nothing else — no space to break at.
     let nothing: Piece[] = [];
@@ -507,13 +509,13 @@ fn wrapped(
     let lb = [PTok("{")];
     let rb = [PTok("}")];
     assert(wrapped(lb, pair, rb, braces, never_space).at(80) == "{ a, b }");
-    assert(wrapped(lb, pair, rb, braces, never_space).at(5) == "{\n    a,\n    b,\n}");
+    assert(wrapped(lb, pair, rb, braces, never_space).at(5) == "{\n    a,\n    b,\n}\n");
 
     // `trailing: false` is the dialect where `[1, 2,]` is an error.
     assert(
         wrapped(lb, pair, rb, ListStyle { trailing: false }, never_space).at(
             5,
-        ) == "{\n    a,\n    b\n}",
+        ) == "{\n    a,\n    b\n}\n",
     );
 
     // An empty separator is the juxtaposed list — a break between items and
@@ -521,7 +523,7 @@ fn wrapped(
     let words = ListStyle { sep: "", trailing: false };
     let sexp = [node_of("a"), node_of("b")];
     assert(wrapped(lp, sexp, rp, words, never_space).at(80) == "(a b)");
-    assert(wrapped(lp, sexp, rp, words, never_space).at(3) == "(\n    a\n    b\n)");
+    assert(wrapped(lp, sexp, rp, words, never_space).at(3) == "(\n    a\n    b\n)\n");
 
     // A group holding one thing is a list of one item: flat it is just the
     // brackets around it, and there is no separator to reach.
@@ -666,7 +668,7 @@ fn rendered(g: Grammar<FKind, str>, src: str, node: Cst, width: u64) -> str!Pars
 }
 
 # A `Doc` at a width, for the assertions above.
-fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
+fn at(self: Doc, width: u64) -> str { self.print(width) }
 
 # A two-leaf node at `at`, standing in for a production that matched a key and
 # its colon — enough shape for the driver's tests without a parse.
@@ -677,15 +679,15 @@ fn node_of(t: str) -> Piece { PNode(Text(t), t, t) }
 
 fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
 --- performance ---
-allocations: 2420
-deallocations: 2420
-reallocations: 395
-bytes allocated: 172915
-instructions executed: 224646
+allocations: 2388
+deallocations: 2388
+reallocations: 349
+bytes allocated: 171827
+instructions executed: 237224
 binary size: 232384
-  code: 148808
-  data: 5028
-  metadata: 78548
+  code: 148848
+  data: 5076
+  metadata: 78460
 functions:
   __arr_drop_Piece:
     calls: 95
@@ -738,9 +740,6 @@ functions:
   __builtin_count_while$char$s0$lam90:
     calls: 0
     bytes: 172
-  __builtin_drop_last$str:
-    calls: 0
-    bytes: 208
   __builtin_find_index$str$lam37:
     calls: 26
     bytes: 400
@@ -795,12 +794,15 @@ functions:
   __m2__has_hard$tail:
     calls: 259
     bytes: 688
-  __m2__print_doc:
+  __m2__print:
     calls: 39
-    bytes: 4940
+    bytes: 4268
   __m3__reindent_block:
     calls: 0
-    bytes: 4084
+    bytes: 4268
+  __m7__trim_end_while$lam28:
+    calls: 96
+    bytes: 300
   __m8__desugar_opt$FKind:
     calls: 6
     bytes: 700
@@ -828,6 +830,9 @@ functions:
   __m8__link_rules$FKind:
     calls: 0
     bytes: 732
+  __map30$own0:
+    calls: 39
+    bytes: 428
   __rec_drop___m1__Cst:
     calls: 27
     bytes: 132
@@ -866,7 +871,7 @@ functions:
     bytes: 4364
   __test$wrapped:
     calls: 1
-    bytes: 10488
+    bytes: 10496
   __test_try_fail___m8__ParseError:
     calls: 0
     bytes: 84
@@ -895,7 +900,7 @@ functions:
     calls: 88
     bytes: (external)
   aipl_array_dec:
-    calls: 3039
+    calls: 3000
     bytes: (external)
   aipl_array_new:
     calls: 777
@@ -904,10 +909,10 @@ functions:
     calls: 267
     bytes: (external)
   aipl_array_push_mut:
-    calls: 523
+    calls: 466
     bytes: (external)
   aipl_array_with_cap:
-    calls: 89
+    calls: 50
     bytes: (external)
   aipl_assert:
     calls: 45

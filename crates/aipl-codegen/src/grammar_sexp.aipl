@@ -325,15 +325,17 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 
     // Too wide to fit: one element per indented line, and no trailing separator
     // to add, this list having none to begin with.
-    assert(format_sexp("(alpha beta gamma)", 10)? == "(\n    alpha\n    beta\n    gamma\n)");
+    assert(format_sexp("(alpha beta gamma)", 10)? == "(\n    alpha\n    beta\n    gamma\n)\n");
 
     // Only the list that does not fit breaks: the outer one is too wide, the
     // inner one still fits on its indented line and stays flat.
-    assert(format_sexp("(a (bb  cc) ddddddddd)", 20)? == "(\n    a\n    (bb cc)\n    ddddddddd\n)");
+    assert(
+        format_sexp("(a (bb  cc) ddddddddd)", 20)? == "(\n    a\n    (bb cc)\n    ddddddddd\n)\n",
+    );
 
     // A comment is not layout, so it survives — and, having ended a source
     // line, it still ends a line, which forces the list it sits in to break.
-    assert(format_sexp("(a ; note\n b)", 80)? == "(\n    a\n    ; note\n    b\n)");
+    assert(format_sexp("(a ; note\n b)", 80)? == "(\n    a\n    ; note\n    b\n)\n");
 
     // ---- the two properties a formatter has to have ----
     //
@@ -353,15 +355,15 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 45595
-deallocations: 45595
-reallocations: 4627
-bytes allocated: 2320542
-instructions executed: 6550630
-binary size: 402520
-  code: 259712
-  data: 5332
-  metadata: 137476
+allocations: 45604
+deallocations: 45604
+reallocations: 4613
+bytes allocated: 2321321
+instructions executed: 6565901
+binary size: 402488
+  code: 259756
+  data: 5340
+  metadata: 137392
 functions:
   __arr_drop_Sexp:
     calls: 851
@@ -370,13 +372,13 @@ functions:
     calls: 0
     bytes: 140
   __arr_drop___m11__Token$SexpKind:
-    calls: 1162
+    calls: 1165
     bytes: 160
   __arr_drop___m11__TokenRule$SexpKind:
     calls: 38
     bytes: 604
   __arr_drop___m1__Cst:
-    calls: 8653
+    calls: 8657
     bytes: 116
   __arr_drop___m2__First$SexpKind:
     calls: 4
@@ -406,13 +408,13 @@ functions:
     calls: 0
     bytes: 140
   __arr_retain___m11__Token$SexpKind:
-    calls: 1088
+    calls: 1091
     bytes: 160
   __arr_retain___m11__TokenRule$SexpKind:
     calls: 0
     bytes: 604
   __arr_retain___m1__Cst:
-    calls: 5573
+    calls: 5579
     bytes: 116
   __arr_retain___m2__First$SexpKind:
     calls: 8
@@ -436,7 +438,7 @@ functions:
     calls: 416
     bytes: 116
   __builtin_all$char$s0$lam154:
-    calls: 51
+    calls: 53
     bytes: 212
   __builtin_any$__m3__Prec$lam164:
     calls: 0
@@ -448,7 +450,7 @@ functions:
     calls: 111
     bytes: 324
   __builtin_count_while$char$lam91:
-    calls: 178
+    calls: 181
     bytes: 220
   __builtin_count_while$char$s0$lam119:
     calls: 0
@@ -465,9 +467,6 @@ functions:
   __builtin_count_while$char$s0$lam99:
     calls: 0
     bytes: 184
-  __builtin_drop_last$str:
-    calls: 0
-    bytes: 208
   __builtin_find_if$__m3__Prec$lam172:
     calls: 0
     bytes: 688
@@ -519,6 +518,9 @@ functions:
   __lambda_22:
     calls: 84
     bytes: 96
+  __m10__trim_end_while$lam66:
+    calls: 61
+    bytes: 300
   __m11__between_len:
     calls: 0
     bytes: 752
@@ -538,13 +540,13 @@ functions:
     calls: 38
     bytes: 1328
   __m11__lex_step$SexpKind:
-    calls: 1089
+    calls: 1092
     bytes: 24400
   __m11__nested_len:
     calls: 0
     bytes: 940
   __m11__step_result$SexpKind:
-    calls: 3964
+    calls: 3967
     bytes: 8332
   __m11__template_scan$SexpKind:
     calls: 0
@@ -625,7 +627,7 @@ functions:
     calls: 1348
     bytes: 792
   __m13__trivia_span$SexpKind:
-    calls: 106
+    calls: 109
     bytes: 648
   __m14__line_at:
     calls: 1
@@ -661,7 +663,7 @@ functions:
     calls: 0
     bytes: 32
   __m1__splice$tail:
-    calls: 3090
+    calls: 3091
     bytes: 612
   __m1__token_leaves:
     calls: 1377
@@ -764,7 +766,7 @@ functions:
     bytes: 3400
   __m4__render_cst$SexpKind$Sexp$s1$lam8:
     calls: 12
-    bytes: 5240
+    bytes: 4580
   __m4__wrapped$lam130:
     calls: 18
     bytes: 4272
@@ -791,15 +793,18 @@ functions:
     bytes: 688
   __m6__reindent_block:
     calls: 0
-    bytes: 4084
+    bytes: 4268
   __map45:
     calls: 0
     bytes: 380
+  __map68$own0:
+    calls: 12
+    bytes: 428
   __rec_drop_Sexp:
     calls: 476
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 2541
+    calls: 2544
     bytes: 132
   __rec_drop___m3__Rule$SexpKind:
     calls: 1102
@@ -841,52 +846,52 @@ functions:
     calls: 3876
     bytes: (external)
   aipl_arr_extend:
-    calls: 4516
+    calls: 4522
     bytes: (external)
   aipl_arr_inc:
-    calls: 189717
+    calls: 189745
     bytes: (external)
   aipl_arr_join:
     calls: 3850
     bytes: (external)
   aipl_arr_reserve:
-    calls: 4362
+    calls: 4368
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 5454
+    calls: 5455
     bytes: (external)
   aipl_arr_sort:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 227699
+    calls: 227722
     bytes: (external)
   aipl_array_new:
-    calls: 27887
+    calls: 27894
     bytes: (external)
   aipl_array_push:
     calls: 1276
     bytes: (external)
   aipl_array_push_mut:
-    calls: 8367
+    calls: 8322
     bytes: (external)
   aipl_array_with_cap:
-    calls: 4431
+    calls: 4419
     bytes: (external)
   aipl_assert:
     calls: 38
     bytes: (external)
   aipl_rec_alloc:
-    calls: 5196
+    calls: 5199
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 61678
+    calls: 61694
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 1236
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 56482
+    calls: 56495
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 1236

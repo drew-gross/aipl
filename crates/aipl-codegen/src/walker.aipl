@@ -2,7 +2,7 @@
 // `aipl-fmt` `Walker` (`crates/aipl-fmt/src/lib.rs`). It walks the token stream
 // `lex_aipl` produces — not the AST, since the parser desugars as it builds
 // (template literals, `set n++`, destructuring), so an AST can't be printed back
-// faithfully — and builds a `Doc` layout tree for `print_doc` to lay out.
+// faithfully — and builds a `Doc` layout tree for `print` to lay out.
 //
 // The Rust walker is a `&mut self` cursor over `(toks, pos, comments, last_end)`.
 // AIPL values have no references, so the cursor travels as a `W` *value* that
@@ -58,7 +58,7 @@ import {
     SoftLine,
     Text,
     group,
-    print_doc,
+    print,
 } from "./doc.aipl";
 import { is_operator_name } from "./is_operator_name.aipl";
 import { AiplTok, lex_aipl } from "./lex_aipl.aipl";
@@ -473,7 +473,7 @@ pub fn format_program(src: str, width: u64) -> str!FmtError {
     // Every comment must have been carried into the output; one left behind
     // would silently vanish from the formatted source.
     match (d.w.comments[d.w.cpos]) {
-        none => ok(print_doc(d.doc, width)),
+        none => ok(d.doc.print(width)),
         some(c) => err(FmtError {
             message: "formatter: comment was not carried into the output (formatter bug)",
             span: c,
@@ -2449,7 +2449,7 @@ fn walker_of(src: str) -> W!FmtError {
     assert(walker_of("Box < i64 >")?.ty().rendered(100)? == "Box<i64>");
     assert(walker_of("Map < str , i64 >")?.ty().rendered(100)? == "Map<str, i64>");
     // An `Angles` list takes no trailing comma even when broken.
-    assert(walker_of("Map < str , i64 >")?.ty().rendered(1)? == "Map<\n    str,\n    i64\n>");
+    assert(walker_of("Map < str , i64 >")?.ty().rendered(1)? == "Map<\n    str,\n    i64\n>\n");
 
     // Results: `T!E`, and the void-ok `!E`.
     assert(walker_of("i64 ! str")?.ty().rendered(100)? == "i64!str");
@@ -2471,18 +2471,16 @@ fn walker_of(src: str) -> W!FmtError {
 
     // --- comma lists --------------------------------------------------------
     // Empty renders as just the brackets; no indent machinery.
-    assert(print_doc(comma_list_docs([], Parens), 100) == "()");
-    assert(print_doc(comma_list_docs([], SpacedBraces), 100) == "{}");
+    assert(comma_list_docs([], Parens).print(100) == "()");
+    assert(comma_list_docs([], SpacedBraces).print(100) == "{}");
     // Flat: `SpacedBraces` pads, the rest hug.
-    assert(print_doc(comma_list_docs([Text("a"), Text("b")], Parens), 100) == "(a, b)");
-    assert(print_doc(comma_list_docs([Text("a"), Text("b")], SpacedBraces), 100) == "{ a, b }");
-    assert(print_doc(comma_list_docs([Text("a")], Brackets), 100) == "[a]");
-    assert(print_doc(comma_list_docs([Text("a")], HashBraces), 100) == "#{a}");
+    assert(comma_list_docs([Text("a"), Text("b")], Parens).print(100) == "(a, b)");
+    assert(comma_list_docs([Text("a"), Text("b")], SpacedBraces).print(100) == "{ a, b }");
+    assert(comma_list_docs([Text("a")], Brackets).print(100) == "[a]");
+    assert(comma_list_docs([Text("a")], HashBraces).print(100) == "#{a}");
     // Broken: one per line, trailing comma only where the grammar allows it.
-    assert(print_doc(comma_list_docs([Text("a"), Text("b")], Parens), 1) == "(\n    a,\n    b,\n)");
-    assert(
-        print_doc(comma_list_docs([Text("a"), Text("b")], TyParens), 1) == "(\n    a,\n    b\n)",
-    );
+    assert(comma_list_docs([Text("a"), Text("b")], Parens).print(1) == "(\n    a,\n    b,\n)\n");
+    assert(comma_list_docs([Text("a"), Text("b")], TyParens).print(1) == "(\n    a,\n    b\n)\n");
 
     // --- type parameters ----------------------------------------------------
     // Absent is an empty doc, so a caller can concatenate it unconditionally.
@@ -2507,16 +2505,16 @@ fn walker_of(src: str) -> W!FmtError {
             100,
         )? == "fn f(a: i64, b: str) -> bool { c }",
     );
-    assert(format_program("fn f() {\n\n\n    g();\n}", 100)? == "fn f() {\n    g();\n}");
+    assert(format_program("fn f() {\n\n\n    g();\n}", 100)? == "fn f() {\n    g();\n}\n");
     // Imports hoist above items, builtins first, names sorted.
     assert(
         format_program(
             "fn f() {}\nimport { b, a } from builtins;",
             100,
-        )? == "import { a, b } from builtins;\n\nfn f() {}",
+        )? == "import { a, b } from builtins;\n\nfn f() {}\n",
     );
     // A comment is carried, not dropped.
-    assert(format_program("// hi\nfn f() {}", 100)? == "// hi\nfn f() {}");
+    assert(format_program("// hi\nfn f() {}", 100)? == "// hi\nfn f() {}\n");
     // A string literal keeps its bytes verbatim, spacing inside untouched.
     assert(format_program(`fn f() -> str \{ "a  b" }`, 100)? == `fn f() -> str \{ "a  b" }`);
     // A lex error surfaces as a formatter error rather than a panic.
@@ -2538,7 +2536,7 @@ fn walker_of(src: str) -> W!FmtError {
 
     // A `"""` block is a `RawBlock`, so its closing delimiter re-aligns under
     // the opening one rather than staying where the author left it.
-    assert(walker_of("\"\"\"\n    a\n\"\"\"")?.expr().rendered(100)? == "\"\"\"\n    a\n\"\"\"");
+    assert(walker_of("\"\"\"\n    a\n\"\"\"")?.expr().rendered(100)? == "\"\"\"\n    a\n\"\"\"\n");
 
     // A template literal is copied verbatim, interpolations and all — three
     // token positions (head, middle, tail) that only a kind tells apart.
@@ -2565,7 +2563,7 @@ fn walker_of(src: str) -> W!FmtError {
 
     // Two or more calls form a chain that breaks before each call when too wide.
     assert(walker_of("a . f ( ) . g ( )")?.expr().rendered(100)? == "a.f().g()");
-    assert(walker_of("a . f ( ) . g ( )")?.expr().rendered(5)? == "a\n    .f()\n    .g()");
+    assert(walker_of("a . f ( ) . g ( )")?.expr().rendered(5)? == "a\n    .f()\n    .g()\n");
 
     // Literals and containers.
     assert(walker_of("( a )")?.expr().rendered(100)? == "(a)");
@@ -2598,73 +2596,79 @@ fn walker_of(src: str) -> W!FmtError {
     assert(
         walker_of("if ( c ) { a } else { b }")?
             .expr()
-            .rendered(5)? == "if (c) {\n    a\n} else {\n    b\n}",
+            .rendered(5)? == "if (c) {\n    a\n} else {\n    b\n}\n",
     );
     // A match is always one arm per line, even when it would fit.
     assert(
         walker_of("match ( v ) { A => 1 , }")?
             .expr()
-            .rendered(100)? == "match (v) {\n    A => 1,\n}",
+            .rendered(100)? == "match (v) {\n    A => 1,\n}\n",
     );
     assert(
         walker_of("match ( v ) { A ( x ) => x , B => 2 , }")?
             .expr()
-            .rendered(100)? == "match (v) {\n    A(x) => x,\n    B => 2,\n}",
+            .rendered(100)? == "match (v) {\n    A(x) => x,\n    B => 2,\n}\n",
     );
 
     // --- statements & blocks --------------------------------------------------
     assert(walker_of("{ }")?.block().rendered(100)? == "{}");
     assert(walker_of("{ a }")?.block().rendered(100)? == "{ a }");
     // Any `;` forces one statement per line.
-    assert(walker_of("{ f ( ) ; }")?.block().rendered(100)? == "{\n    f();\n}");
-    assert(walker_of("{ let x = 1 ; x }")?.block().rendered(100)? == "{\n    let x = 1;\n    x\n}");
-    assert(walker_of("{ mut x = 1 ; x }")?.block().rendered(100)? == "{\n    mut x = 1;\n    x\n}");
-    assert(walker_of("{ set x = 1 ; }")?.block().rendered(100)? == "{\n    set x = 1;\n}");
-    assert(walker_of("{ set x ++ ; }")?.block().rendered(100)? == "{\n    set x++;\n}");
-    assert(walker_of("{ set x -- ; }")?.block().rendered(100)? == "{\n    set x--;\n}");
-    // The compound assignments are spaced like the `=` they stand in for.
-    assert(walker_of("{ set x += 1 ; }")?.block().rendered(100)? == "{\n    set x += 1;\n}");
-    assert(walker_of("{ set x -= n ; }")?.block().rendered(100)? == "{\n    set x -= n;\n}");
-    assert(walker_of("{ set x *= 2 ; }")?.block().rendered(100)? == "{\n    set x *= 2;\n}");
+    assert(walker_of("{ f ( ) ; }")?.block().rendered(100)? == "{\n    f();\n}\n");
     assert(
-        walker_of("{ set x /= f ( 2 ) ; }")?.block().rendered(100)? == "{\n    set x /= f(2);\n}",
+        walker_of("{ let x = 1 ; x }")?.block().rendered(100)? == "{\n    let x = 1;\n    x\n}\n",
     );
-    assert(walker_of("{ set a . b = 1 ; }")?.block().rendered(100)? == "{\n    set a.b = 1;\n}");
+    assert(
+        walker_of("{ mut x = 1 ; x }")?.block().rendered(100)? == "{\n    mut x = 1;\n    x\n}\n",
+    );
+    assert(walker_of("{ set x = 1 ; }")?.block().rendered(100)? == "{\n    set x = 1;\n}\n");
+    assert(walker_of("{ set x ++ ; }")?.block().rendered(100)? == "{\n    set x++;\n}\n");
+    assert(walker_of("{ set x -- ; }")?.block().rendered(100)? == "{\n    set x--;\n}\n");
+    // The compound assignments are spaced like the `=` they stand in for.
+    assert(walker_of("{ set x += 1 ; }")?.block().rendered(100)? == "{\n    set x += 1;\n}\n");
+    assert(walker_of("{ set x -= n ; }")?.block().rendered(100)? == "{\n    set x -= n;\n}\n");
+    assert(walker_of("{ set x *= 2 ; }")?.block().rendered(100)? == "{\n    set x *= 2;\n}\n");
+    assert(
+        walker_of("{ set x /= f ( 2 ) ; }")?.block().rendered(100)? == "{\n    set x /= f(2);\n}\n",
+    );
+    assert(walker_of("{ set a . b = 1 ; }")?.block().rendered(100)? == "{\n    set a.b = 1;\n}\n");
     assert(
         walker_of("{ set xs . push ( 1 ) ; }")?
             .block()
-            .rendered(100)? == "{\n    set xs.push(1);\n}",
+            .rendered(100)? == "{\n    set xs.push(1);\n}\n",
     );
-    assert(walker_of("{ return 1 ; }")?.block().rendered(100)? == "{\n    return 1;\n}");
+    assert(walker_of("{ return 1 ; }")?.block().rendered(100)? == "{\n    return 1;\n}\n");
     // Destructuring binders.
     assert(
-        walker_of("{ let ( a , b ) = p ; }")?.block().rendered(100)? == "{\n    let (a, b) = p;\n}",
+        walker_of("{ let ( a , b ) = p ; }")?
+            .block()
+            .rendered(100)? == "{\n    let (a, b) = p;\n}\n",
     );
     assert(
         walker_of("{ let S { a , b } = p ; }")?
             .block()
-            .rendered(100)? == "{\n    let S { a, b } = p;\n}",
+            .rendered(100)? == "{\n    let S { a, b } = p;\n}\n",
     );
     assert(
         walker_of("{ mut S { a , b } = p ; }")?
             .block()
-            .rendered(100)? == "{\n    mut S { a, b } = p;\n}",
+            .rendered(100)? == "{\n    mut S { a, b } = p;\n}\n",
     );
     // Loops.
     assert(
         walker_of("{ while ( c ) { f ( ) ; } }")?
             .block()
-            .rendered(100)? == "{\n    while (c) {\n        f();\n    }\n}",
+            .rendered(100)? == "{\n    while (c) {\n        f();\n    }\n}\n",
     );
     assert(
         walker_of("{ for ( let x : xs ) { f ( ) ; } }")?
             .block()
-            .rendered(100)? == "{\n    for (let x : xs) {\n        f();\n    }\n}",
+            .rendered(100)? == "{\n    for (let x : xs) {\n        f();\n    }\n}\n",
     );
     assert(
         walker_of("{ for ( let ( i , x ) : xs ) { f ( ) ; } }")?
             .block()
-            .rendered(100)? == "{\n    for (let (i, x) : xs) {\n        f();\n    }\n}",
+            .rendered(100)? == "{\n    for (let (i, x) : xs) {\n        f();\n    }\n}\n",
     );
 
     // --- items ------------------------------------------------------------------
@@ -2687,11 +2691,11 @@ fn walker_of(src: str) -> W!FmtError {
     // `# ..` doc comments are tokens, not trivia, so `item` emits them itself —
     // one per line, verbatim, above whatever they document. Another branch that
     // only a real kind reaches.
-    assert(walker_of("# Doc.\nfn f ( ) { }")?.item().rendered(100)? == "# Doc.\nfn f() {}");
+    assert(walker_of("# Doc.\nfn f ( ) { }")?.item().rendered(100)? == "# Doc.\nfn f() {}\n");
     assert(
         walker_of("# One.\n#\n# Two.\nstruct S { }")?
             .item()
-            .rendered(100)? == "# One.\n#\n# Two.\nstruct S {}",
+            .rendered(100)? == "# One.\n#\n# Two.\nstruct S {}\n",
     );
 
     // A `//` note above the docs is an ordinary comment, drained by `lead`, so
@@ -2699,7 +2703,7 @@ fn walker_of(src: str) -> W!FmtError {
     assert(
         walker_of("// note\n# Doc.\nfn f ( ) { }")?
             .program()
-            .rendered(100)? == "// note\n# Doc.\nfn f() {}",
+            .rendered(100)? == "// note\n# Doc.\nfn f() {}\n",
     );
 
     assert(walker_of("fn f ( ) { }")?.fn_item().rendered(100)? == "fn f() {}");
@@ -2734,7 +2738,7 @@ fn walker_of(src: str) -> W!FmtError {
     assert(
         walker_of("fn f ( ) ! prints { g ( ) ; }")?
             .fn_item()
-            .rendered(100)? == "fn f() !prints {\n    g();\n}",
+            .rendered(100)? == "fn f() !prints {\n    g();\n}\n",
     );
     assert(
         walker_of("fn f < T : any > ( x : T ) -> T { x }")?
@@ -2751,7 +2755,7 @@ fn walker_of(src: str) -> W!FmtError {
     assert(
         walker_of("fn f ( ) { } . test ( { g ( ) ; } )")?
             .fn_item()
-            .rendered(100)? == "fn f() {}.test({\n    g();\n})",
+            .rendered(100)? == "fn f() {}.test({\n    g();\n})\n",
     );
 
     // --- program ------------------------------------------------------------
@@ -2759,7 +2763,7 @@ fn walker_of(src: str) -> W!FmtError {
     assert(
         walker_of("fn a ( ) { } fn b ( ) { }")?
             .program()
-            .rendered(100)? == "fn a() {}\n\nfn b() {}",
+            .rendered(100)? == "fn a() {}\n\nfn b() {}\n",
     );
 
     // Imports hoist above the items, builtins before paths, each on its own line
@@ -2771,13 +2775,13 @@ fn walker_of(src: str) -> W!FmtError {
             .program()
             .rendered(
                 100,
-            )? == `import \{ a, b } from builtins;\nimport \{ x } from "./m.aipl";\n\nfn f() \{}`,
+            )? == `import \{ a, b } from builtins;\nimport \{ x } from "./m.aipl";\n\nfn f() \{}\n`,
     );
     // A struct and a variant are items too.
     assert(
         walker_of("struct S { a : i64 } variant V = A | B")?
             .program()
-            .rendered(100)? == "struct S { a: i64 }\n\nvariant V = A | B",
+            .rendered(100)? == "struct S { a: i64 }\n\nvariant V = A | B\n",
     );
     assert(walker_of("")?.program().rendered(100)? == "");
 
@@ -2813,7 +2817,7 @@ fn walker_of(src: str) -> W!FmtError {
     // }
 
     let cw = new_walker(csrc, ctoks, [0..6, 17..24]);
-    assert(cw.program().rendered(100)? == "// hdr\nfn a() {}\n\n// on b\nfn b() {}");
+    assert(cw.program().rendered(100)? == "// hdr\nfn a() {}\n\n// on b\nfn b() {}\n");
 
     // --- truncated input terminates -------------------------------------------
     // Every "scan until a closing token" loop goes through `more_before`, which
@@ -2882,7 +2886,7 @@ fn walker_of(src: str) -> W!FmtError {
     assert(
         walker_of("import { b , a } from builtins ;")?
             .import_item()?.doc
-            .at(5) == "import {\n    a,\n    b,\n} from builtins;",
+            .at(5) == "import {\n    a,\n    b,\n} from builtins;\n",
     );
     // The hoist key puts builtins ahead of every path.
     assert(walker_of("import { x } from builtins ;")?.import_item()?.source == "builtins");
@@ -2936,32 +2940,32 @@ fn walker_of(src: str) -> W!FmtError {
     assert(
         walker_of("variant V = A | B")?
             .variant_item()
-            .rendered(5)? == "variant V =\n    | A\n    | B",
+            .rendered(5)? == "variant V =\n    | A\n    | B\n",
     );
     // Same layout whether or not the source already had the leading `|`.
     assert(
         walker_of("variant V = | A | B")?
             .variant_item()
-            .rendered(5)? == "variant V =\n    | A\n    | B",
+            .rendered(5)? == "variant V =\n    | A\n    | B\n",
     );
 })
 
 # Render what a walker step produced at the given width — the round trip a
 # formatter test actually cares about.
-fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(print_doc(self?.doc, width)) }
+fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.print(width)) }
 
 # Render a `Doc` directly — the `WDoc`-free form, for steps that hand back
 # something other than a plain `WDoc`.
-fn at(self: Doc, width: u64) -> str { print_doc(self, width) }
+fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 115186
-deallocations: 115186
-reallocations: 2070
-bytes allocated: 6206885
-instructions executed: 22256680
-binary size: 8724064
-  code: 5507856
-  data: 27444
+allocations: 115076
+deallocations: 115076
+reallocations: 1876
+bytes allocated: 6203693
+instructions executed: 22366599
+binary size: 8724120
+  code: 5507760
+  data: 27596
   metadata: 3188764
 functions:
   __arr_drop_ImportEntry:
@@ -3045,9 +3049,6 @@ functions:
   __builtin_count_while$char$s0$lam97$tail:
     calls: 14
     bytes: 256
-  __builtin_drop_last$str:
-    calls: 1
-    bytes: 208
   __builtin_int_parse:
     calls: 22
     bytes: 1028
@@ -3132,15 +3133,18 @@ functions:
   __m1__has_hard$tail:
     calls: 1531
     bytes: 688
-  __m1__print_doc:
+  __m1__print:
     calls: 152
-    bytes: 4940
+    bytes: 4268
   __m2__reindent_block:
     calls: 2
-    bytes: 2928
+    bytes: 3092
   __m3__dedent:
     calls: 2
     bytes: 1276
+  __m6__trim_end_while$lam22:
+    calls: 405
+    bytes: 300
   __m8__aipl_rules:
     calls: 152
     bytes: 90364
@@ -3204,6 +3208,9 @@ functions:
   __m9__to_eol_unless_len:
     calls: 1081
     bytes: 368
+  __map24$own0:
+    calls: 152
+    bytes: 428
   __rec_drop___m1__Doc:
     calls: 2985
     bytes: 184
@@ -3221,7 +3228,7 @@ functions:
     bytes: 2188
   __test$walker_of:
     calls: 1
-    bytes: 4851476
+    bytes: 4851368
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
@@ -3241,7 +3248,7 @@ functions:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 359836
+    calls: 359684
     bytes: (external)
   aipl_array_new:
     calls: 104755
@@ -3250,10 +3257,10 @@ functions:
     calls: 1707
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1993
+    calls: 1740
     bytes: (external)
   aipl_array_with_cap:
-    calls: 511
+    calls: 359
     bytes: (external)
   aipl_assert:
     calls: 196

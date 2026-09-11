@@ -75,6 +75,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
   Remove the C prefix from the CST types. the caller can import as if necessary.
   In group_styles, rs.map(group_styles) is refused
@@ -227,6 +228,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
+  wrap comments
   formatter gets list separater directly off the Many
   aipl fmt breaks a long tuple literal across lines with a trailing comma, and the tuple grammar rejects one. Formatter should understand from the Many that it shouldn't emit trailing commas.
   Why the formatter isn't already a thin wrapper

@@ -466,15 +466,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 20153
-deallocations: 20153
-reallocations: 3346
-bytes allocated: 1343763
-instructions executed: 2446903
-binary size: 415800
-  code: 268048
+allocations: 20144
+deallocations: 20144
+reallocations: 3337
+bytes allocated: 1343403
+instructions executed: 2450353
+binary size: 415760
+  code: 268092
   data: 5948
-  metadata: 141804
+  metadata: 141720
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -587,9 +587,6 @@ functions:
   __builtin_count_while$char$s0$lam77:
     calls: 106
     bytes: 172
-  __builtin_drop_last$str:
-    calls: 0
-    bytes: 208
   __builtin_find_if$__m3__Prec$lam175:
     calls: 141
     bytes: 688
@@ -638,6 +635,9 @@ functions:
   __lambda_35:
     calls: 107
     bytes: 140
+  __m10__trim_end_while$lam68:
+    calls: 18
+    bytes: 300
   __m11__between_len:
     calls: 0
     bytes: 752
@@ -886,7 +886,7 @@ functions:
     bytes: 3400
   __m4__render_cst$CalcTok$Calc$s1$lam7:
     calls: 9
-    bytes: 5240
+    bytes: 4580
   __m4__wrapped$lam133:
     calls: 0
     bytes: 4272
@@ -913,10 +913,13 @@ functions:
     bytes: 688
   __m6__reindent_block:
     calls: 0
-    bytes: 4084
+    bytes: 4268
   __map47:
     calls: 0
     bytes: 380
+  __map70$own0:
+    calls: 9
+    bytes: 428
   __rec_drop_Calc:
     calls: 205
     bytes: 132
@@ -990,7 +993,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 74629
+    calls: 74620
     bytes: (external)
   aipl_array_new:
     calls: 10631
@@ -999,10 +1002,10 @@ functions:
     calls: 520
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6047
+    calls: 6038
     bytes: (external)
   aipl_array_with_cap:
-    calls: 2268
+    calls: 2259
     bytes: (external)
   aipl_assert:
     calls: 51
