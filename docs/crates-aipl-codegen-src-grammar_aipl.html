@@ -187,6 +187,20 @@
 
 
 
+        <section class="item" id="item-aipl_parse_error">
+          <h3>
+            <a class="anchor" href="#item-aipl_parse_error">aipl_parse_error</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn aipl_parse_error(src: str) -&#62; ParseError?</code></pre>
+
+          <div class="doc"><p>Why <code>src</code> does not parse, or <code>none</code> when it does — the FFI entry the error-message comparison reads. A refusal from a <code>build</code> (a mixed <code>#{ .. }</code>, a duplicate <code>.test</code>) comes back the same way a syntax error does, since both are reasons a source has no AST.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-aipl_parse_report">
           <h3>
             <a class="anchor" href="#item-aipl_parse_report">aipl_parse_report</a>
@@ -314,6 +328,20 @@
           <pre class="signature"><code>fn at(kind: ExprKind, span: Span) -&#62; Expr</code></pre>
 
           <div class="doc"><p>An expression node at a span.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-join_spans">
+          <h3>
+            <a class="anchor" href="#item-join_spans">join_spans</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn join_spans(a: Span, b: Span) -&#62; Span</code></pre>
+
+          <div class="doc"><p>Two spans as the one that covers both — <code>aipl_syntax::join_spans</code>, mirrored.</p><p>The rule that matters is the empty one: an *empty* span is the &quot;no location&quot; placeholder a construct with no text of its own carries (an empty block body, a synthesized node), and it must not take part in a join. Written naively as <code>a.start..b.end</code> it drags every enclosing construct's end back to offset 0, which is a span that ends before it starts — and a caret rendered from one is nonsense. Contributing nothing is the honest answer.</p></div>
 
 
         </section>
@@ -1000,6 +1028,20 @@
           <pre class="signature"><code>fn lower_block(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-repair_block_value">
+          <h3>
+            <a class="anchor" href="#item-repair_block_value">repair_block_value</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn repair_block_value(e: Expr, brace: Span) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>A block's *value* given the block's own <code>{</code>, when it has none of its own.</p><p>A block with no trailing expression — <code>{}</code>, or one ending in <code>f();</code> — has a unit value the parser cannot locate: the empty production it comes from matches no text. Left at the empty span, every diagnostic about that value reports at line 1 of the file. The block's <code>{</code> is the honest location, and this is the first place it is in scope.</p><p>The value can sit arbitrarily deep in the chain a block is, so this walks the four kinds that pass a value along and rebuilds the spine. Depth is one frame per statement in *this* block — nested blocks repair their own, so the total work is one pass over the program rather than one per nesting level.</p></div>
 
 
         </section>

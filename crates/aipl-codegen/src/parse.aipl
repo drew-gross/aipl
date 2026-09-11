@@ -867,6 +867,19 @@ fn climb<K: variant, A: any>(
                 };
             },
             none => {
+                // The climb ends here because the next token is not an operator
+                // this level would take — so an operator *was* one of the things
+                // that could have followed, and a failure at this position has
+                // to say so. Without this the expectation set after a complete
+                // expression lists only the punctuation that could close it, and
+                // a reader is told `a + b` is invalid where it is not.
+                //
+                // Only when some level is still in reach: at a `min_power` above
+                // every level, no operator would have been taken and claiming
+                // one was expected would be a lie.
+                if (precs.any(|pr| min_power <= pr.power)) {
+                    set f = far_miss(f, cp, "an operator");
+                };
                 set going = false;
             },
         };
@@ -1484,15 +1497,15 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 9690
-deallocations: 9690
+allocations: 9702
+deallocations: 9702
 reallocations: 688
-bytes allocated: 690859
-instructions executed: 1277103
-binary size: 632848
-  code: 383692
+bytes allocated: 691387
+instructions executed: 1279002
+binary size: 633576
+  code: 384196
   data: 9564
-  metadata: 239592
+  metadata: 239816
 functions:
   __arr_drop_Node:
     calls: 21
@@ -1560,16 +1573,19 @@ functions:
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
     bytes: 632
-  __builtin_all$__m3__Rule$Tok$lam124:
+  __builtin_all$__m3__Rule$Tok$lam127:
     calls: 0
     bytes: 36
-  __builtin_all$__m3__Rule$Tok$lam124$tail:
+  __builtin_all$__m3__Rule$Tok$lam127$tail:
     calls: 0
     bytes: 384
-  __builtin_any$__m3__Rule$Tok$lam127:
+  __builtin_any$__m3__Prec$lam118:
+    calls: 13
+    bytes: 276
+  __builtin_any$__m3__Rule$Tok$lam130:
     calls: 0
     bytes: 36
-  __builtin_any$__m3__Rule$Tok$lam127$tail:
+  __builtin_any$__m3__Rule$Tok$lam130$tail:
     calls: 0
     bytes: 380
   __builtin_count_while$char$lam49:
@@ -1584,7 +1600,7 @@ functions:
   __builtin_count_while$char$s0$lam75$tail:
     calls: 3
     bytes: 256
-  __builtin_find_if$__m3__Prec$lam142:
+  __builtin_find_if$__m3__Prec$lam145:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam21:
@@ -1816,7 +1832,7 @@ functions:
     calls: 1209
     bytes: (external)
   aipl_arr_inc:
-    calls: 31232
+    calls: 31288
     bytes: (external)
   aipl_arr_join:
     calls: 157
@@ -1831,10 +1847,10 @@ functions:
     calls: 37
     bytes: (external)
   aipl_array_dec:
-    calls: 38605
+    calls: 38673
     bytes: (external)
   aipl_array_new:
-    calls: 4574
+    calls: 4586
     bytes: (external)
   aipl_array_push:
     calls: 648
@@ -1892,12 +1908,12 @@ functions:
     bytes: 440
   climb$Tok$Node:
     calls: 15
-    bytes: 3160
+    bytes: 3388
   error_at$Tok$Node:
     calls: 37
     bytes: 3108
   far_miss:
-    calls: 122
+    calls: 133
     bytes: 1084
   far_unclosed:
     calls: 5

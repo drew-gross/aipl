@@ -704,3 +704,410 @@ fn aipl_grammar_builds_the_same_ast_on_small_corpus_files() {
         );
     });
 }
+
+/// Print every corpus file gazelle refuses, with both parsers' rendered
+/// diagnostics side by side — the survey stage 5e works from.
+///
+/// `#[ignore]`d: it is an author's report, not an assertion. Run it with
+/// `cargo test --test dogfood -- --ignored parser_dogfood::survey_parse_errors`.
+#[test]
+#[ignore]
+fn survey_parse_errors() {
+    on_big_stack(|| {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut files = Vec::new();
+        collect_aipl(&root.join("tests").join("cases"), &mut files);
+        files.sort();
+
+        let engine = compile_grammar();
+        let mut same = 0usize;
+        let mut differ: Vec<String> = Vec::new();
+        let mut accepted: Vec<String> = Vec::new();
+
+        for path in &files {
+            let Ok(source) = fs::read_to_string(path) else {
+                continue;
+            };
+            let label = path
+                .strip_prefix(root)
+                .unwrap_or(path)
+                .display()
+                .to_string();
+            let Err(want) = aipl::parse(&source) else {
+                continue;
+            };
+            let src = aipl_parser::strip_test_sections(&source);
+            let value =
+                match engine.call_values("aipl_parse_error", &[FfiValue::Str(source.clone())]) {
+                    Ok(v) => v,
+                    Err(e) => panic!("aipl_parse_error({label}): {e:?}"),
+                };
+            let got = match &value {
+                FfiValue::Opt(Some(inner)) => aipl_parse_error(inner),
+                FfiValue::Opt(None) => {
+                    accepted.push(label);
+                    continue;
+                }
+                other => panic!("aipl_parse_error({label}): {other:?}"),
+            };
+            let want = want.render(src, &label);
+            let got = got.render(src, &label);
+            if want == got {
+                same += 1;
+            } else {
+                differ.push(format!("=== {label}\n--- gazelle\n{want}\n--- aipl\n{got}"));
+            }
+        }
+
+        println!(
+            "{same} identical, {} differ, {} accepted by the AIPL grammar\n",
+            differ.len(),
+            accepted.len()
+        );
+        survey_spans(&engine, &files, root);
+        for label in &accepted {
+            println!("ACCEPTED: {label}");
+        }
+        println!();
+        for d in &differ {
+            println!("{d}\n");
+        }
+        panic!("survey only");
+    });
+}
+
+/// A `ParseError` struct from the FFI, as the `Error` the renderer takes.
+fn aipl_parse_error(v: &FfiValue) -> aipl_syntax::Error {
+    let FfiValue::Struct(fields) = v else {
+        panic!("a ParseError is a struct: {v:?}");
+    };
+    let get = |name: &str| {
+        fields
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, value)| value)
+            .unwrap_or_else(|| panic!("no field {name:?}"))
+    };
+    let FfiValue::Str(message) = get("message") else {
+        panic!("message is a string");
+    };
+    let FfiValue::Struct(span) = get("span") else {
+        panic!("span is a struct");
+    };
+    let num = |name: &str| match span.iter().find(|(n, _)| n == name) {
+        Some((_, FfiValue::Int(n))) => *n as usize,
+        other => panic!("span.{name}: {other:?}"),
+    };
+    aipl_syntax::Error::at(message.clone(), num("start")..num("end"))
+}
+
+/// The second half of the 5e survey: where the two parsers' *spans* differ, over
+/// every corpus file both accept.
+///
+/// This is the measurement that says how big the rest of 5e is. A checker or
+/// loader diagnostic points its caret with a span off the AST, so every span
+/// that moves is a `--- errors ---` fixture that will move with it at the
+/// switch — and the messages themselves are untouched. Grouped by node kind,
+/// with one example each, because the differences come in conventions rather
+/// than one at a time.
+fn survey_spans(engine: &Engine, files: &[PathBuf], root: &Path) {
+    use std::collections::BTreeMap;
+    let mut by_kind: BTreeMap<String, (usize, String)> = BTreeMap::new();
+    let mut nodes = 0usize;
+    let mut differing = 0usize;
+
+    for path in files {
+        let Ok(source) = fs::read_to_string(path) else {
+            continue;
+        };
+        if source.len() > 2_000 {
+            continue;
+        }
+        let label = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+        let src = aipl_parser::strip_test_sections(&source);
+        let Ok(mut want) = aipl::parse(&source) else {
+            continue;
+        };
+        let Ok(value) = engine.call_values("aipl_program", &[FfiValue::Str(source.clone())]) else {
+            continue;
+        };
+        let Ok(mut got) = aipl::ffi_ast::program_from_ffi(&value) else {
+            continue;
+        };
+        aipl_parser::post_parse(&mut got, src);
+        for (a, b) in paired_bodies(&mut want, &mut got) {
+            compare_spans(a, b, src, &label, &mut by_kind, &mut nodes, &mut differing);
+        }
+    }
+
+    println!("\n{differing} of {nodes} expression spans differ, by node kind:");
+    for (kind, (count, example)) in &by_kind {
+        println!("  {kind:<12} {count:>5}   e.g. {example}");
+    }
+}
+
+/// The `Expr`s of two structurally equal programs, paired — every body, default
+/// and test block, in declaration order.
+fn paired_bodies<'a>(
+    want: &'a mut aipl_syntax::ast::Program,
+    got: &'a mut aipl_syntax::ast::Program,
+) -> Vec<(&'a aipl_syntax::ast::Expr, &'a aipl_syntax::ast::Expr)> {
+    use aipl_syntax::ast::Item;
+    let mut out = Vec::new();
+    for (a, b) in want.items.iter().zip(got.items.iter()) {
+        match (a, b) {
+            (Item::Fn(x), Item::Fn(y)) => {
+                out.push((&x.body, &y.body));
+                if let (Some(x), Some(y)) = (&x.test_body, &y.test_body) {
+                    out.push((x, y));
+                }
+            }
+            (Item::Struct(x), Item::Struct(y)) => {
+                for (fx, fy) in x.fields.iter().zip(y.fields.iter()) {
+                    if let (Some(dx), Some(dy)) = (&fx.default, &fy.default) {
+                        out.push((dx, dy));
+                    }
+                }
+            }
+            (Item::Variant(x), Item::Variant(y)) => {
+                for (cx, cy) in x.cases.iter().zip(y.cases.iter()) {
+                    for (sx, sy) in cx.payload.iter().zip(cy.payload.iter()) {
+                        if let (Some(dx), Some(dy)) = (&sx.default, &sy.default) {
+                            out.push((dx, dy));
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+fn compare_spans(
+    a: &aipl_syntax::ast::Expr,
+    b: &aipl_syntax::ast::Expr,
+    src: &str,
+    label: &str,
+    by_kind: &mut std::collections::BTreeMap<String, (usize, String)>,
+    nodes: &mut usize,
+    differing: &mut usize,
+) {
+    *nodes += 1;
+    if a.span != b.span {
+        *differing += 1;
+        let kind = kind_name(&a.kind);
+        let entry = by_kind.entry(kind).or_insert_with(|| {
+            (
+                0,
+                format!(
+                    "{label}: gazelle {:?} = {:?}, aipl {:?} = {:?}",
+                    a.span,
+                    src.get(a.span.clone()).unwrap_or(""),
+                    b.span,
+                    src.get(b.span.clone()).unwrap_or(""),
+                ),
+            )
+        });
+        entry.0 += 1;
+    }
+    let (mut ax, mut bx) = (a.clone(), b.clone());
+    let (ac, bc) = (
+        aipl_syntax::each_subexpr_mut(&mut ax),
+        aipl_syntax::each_subexpr_mut(&mut bx),
+    );
+    for (ca, cb) in ac.into_iter().zip(bc.into_iter()) {
+        compare_spans(ca, cb, src, label, by_kind, nodes, differing);
+    }
+}
+
+/// A node's kind as its constructor name, taken off the derived `Debug` rather
+/// than written out a second time.
+fn kind_name(k: &aipl_syntax::ast::ExprKind) -> String {
+    let rendered = format!("{k:?}");
+    rendered
+        .split(['(', ' ', '{'])
+        .next()
+        .unwrap_or("?")
+        .to_string()
+}
+
+/// Every span gazelle records is *inside* the one the AIPL parser records for
+/// the same node.
+///
+/// The two disagree about spans on roughly 40% of nodes, and 5e's question is
+/// whether that is a problem. It is not, and this says why in the one form that
+/// can be checked: gazelle's spans are kept for diagnostics rather than as a
+/// record of extent, so they stop before a closing bracket (`[1, 2, 3` for
+/// `[1, 2, 3]`) and omit a leading keyword (`x` for `-x`, the condition for the
+/// whole `if`). The AIPL parser's are token-tight extents. Containment is
+/// exactly the statement "never narrower, never elsewhere" — so no caret moves
+/// off the construct it points at, and several stop being cut in half.
+///
+/// It is a *checked* invariant rather than a note because it is the thing that
+/// would break silently: a lowering that joined the wrong two spans, or dropped
+/// a node's own tokens, shows up here and nowhere else.
+#[test]
+fn aipl_spans_contain_gazelles() {
+    on_big_stack(|| {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut files = Vec::new();
+        collect_aipl(&root.join("tests").join("cases"), &mut files);
+        files.sort();
+
+        let engine = compile_grammar();
+        let mut escapes: Vec<String> = Vec::new();
+        let mut compared = 0usize;
+
+        for path in &files {
+            let Ok(source) = fs::read_to_string(path) else {
+                continue;
+            };
+            if source.len() > 2_000 {
+                continue;
+            }
+            let label = path
+                .strip_prefix(root)
+                .unwrap_or(path)
+                .display()
+                .to_string();
+            let src = aipl_parser::strip_test_sections(&source);
+            let Ok(mut want) = aipl::parse(&source) else {
+                continue;
+            };
+            let Ok(value) = engine.call_values("aipl_program", &[FfiValue::Str(source.clone())])
+            else {
+                continue;
+            };
+            let Ok(mut got) = aipl::ffi_ast::program_from_ffi(&value) else {
+                continue;
+            };
+            aipl_parser::post_parse(&mut got, src);
+            for (a, b) in paired_bodies(&mut want, &mut got) {
+                check_contained(a, b, src, &label, &mut escapes, &mut compared);
+            }
+        }
+
+        assert!(
+            escapes.is_empty(),
+            "{} of {compared} span(s) are not covered by the AIPL parser's:\n{}",
+            escapes.len(),
+            escapes
+                .iter()
+                .take(20)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        assert!(
+            compared >= 10_000,
+            "expected a good many spans under the size cap; only {compared} were compared"
+        );
+    });
+}
+
+fn check_contained(
+    a: &aipl_syntax::ast::Expr,
+    b: &aipl_syntax::ast::Expr,
+    src: &str,
+    label: &str,
+    escapes: &mut Vec<String>,
+    compared: &mut usize,
+) {
+    *compared += 1;
+    // An empty gazelle span is its "no location" placeholder, which contains
+    // nothing and is contained by nothing — `join_spans` ignores it and so does
+    // this.
+    let covered =
+        a.span.start >= a.span.end || (b.span.start <= a.span.start && a.span.end <= b.span.end);
+    if !covered {
+        escapes.push(format!(
+            "{label}: {} at {:?} = {:?}, but the AIPL parser spans {:?} = {:?}",
+            kind_name(&a.kind),
+            a.span,
+            src.get(a.span.clone()).unwrap_or(""),
+            b.span,
+            src.get(b.span.clone()).unwrap_or(""),
+        ));
+    }
+    let (mut ax, mut bx) = (a.clone(), b.clone());
+    let (ac, bc) = (
+        aipl_syntax::each_subexpr_mut(&mut ax),
+        aipl_syntax::each_subexpr_mut(&mut bx),
+    );
+    for (ca, cb) in ac.into_iter().zip(bc.into_iter()) {
+        check_contained(ca, cb, src, label, escapes, compared);
+    }
+}
+
+/// Every corpus file gazelle refuses, the AIPL parser refuses too — with a
+/// message and a span that points somewhere inside the source.
+///
+/// Not a parity check: the two word their diagnostics differently, and
+/// `survey_parse_errors` is where that is read and iterated on. This is the
+/// floor underneath it — a source with no AST must say so, and say it
+/// somewhere a caret can be drawn.
+#[test]
+fn aipl_grammar_refuses_what_gazelle_refuses() {
+    on_big_stack(|| {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut files = Vec::new();
+        collect_aipl(&root.join("tests").join("cases"), &mut files);
+        files.sort();
+
+        let engine = compile_grammar();
+        let mut bad: Vec<String> = Vec::new();
+        let mut compared = 0usize;
+
+        for path in &files {
+            let Ok(source) = fs::read_to_string(path) else {
+                continue;
+            };
+            let label = path
+                .strip_prefix(root)
+                .unwrap_or(path)
+                .display()
+                .to_string();
+            if aipl::parse(&source).is_ok() {
+                continue;
+            }
+            let src = aipl_parser::strip_test_sections(&source);
+            let value =
+                match engine.call_values("aipl_parse_error", &[FfiValue::Str(source.clone())]) {
+                    Ok(v) => v,
+                    Err(e) => panic!("aipl_parse_error({label}): {e:?}"),
+                };
+            compared += 1;
+            let e = match &value {
+                FfiValue::Opt(Some(inner)) => aipl_parse_error(inner),
+                FfiValue::Opt(None) => {
+                    bad.push(format!(
+                        "{label}: gazelle refuses it, the AIPL parser does not"
+                    ));
+                    continue;
+                }
+                other => panic!("aipl_parse_error({label}): {other:?}"),
+            };
+            if e.message.is_empty() {
+                bad.push(format!("{label}: refused with an empty message"));
+            }
+            match e.span.as_ref() {
+                Some(span) if span.start <= span.end && span.end <= src.len() => {}
+                other => bad.push(format!(
+                    "{label}: refused at {other:?}, which is no place in a {} byte source",
+                    src.len()
+                )),
+            }
+        }
+
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+        assert!(
+            compared >= 30,
+            "expected the corpus's syntax-error fixtures; only {compared} were found"
+        );
+    });
+}

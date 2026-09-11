@@ -358,10 +358,10 @@ deallocations: 47990
 reallocations: 2393
 bytes allocated: 2458974
 instructions executed: 6742209
-binary size: 402200
-  code: 258804
+binary size: 402928
+  code: 259308
   data: 5284
-  metadata: 138112
+  metadata: 138336
 functions:
   __arr_drop_Sexp:
     calls: 876
@@ -438,10 +438,13 @@ functions:
   __builtin_all$char$s0$lam155:
     calls: 51
     bytes: 212
-  __builtin_any$__m5__Doc$lam168:
+  __builtin_any$__m3__Prec$lam170:
+    calls: 0
+    bytes: 276
+  __builtin_any$__m5__Doc$lam171:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam168$tail:
+  __builtin_any$__m5__Doc$lam171$tail:
     calls: 111
     bytes: 324
   __builtin_count_while$char$lam91:
@@ -465,7 +468,7 @@ functions:
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m3__Prec$lam175:
+  __builtin_find_if$__m3__Prec$lam178:
     calls: 0
     bytes: 688
   __builtin_find_index$str$lam51:
@@ -560,7 +563,7 @@ functions:
     bytes: 368
   __m13__climb$SexpKind$Sexp:
     calls: 0
-    bytes: 3160
+    bytes: 3388
   __m13__error_at$SexpKind$Sexp:
     calls: 4
     bytes: 2968

@@ -294,8 +294,13 @@ pub fn parse_calc(src: str) -> Calc!ParseError {
     // ---- errors ----
     assert(msg_of("") == "expected an expression, found end of input");
     assert(msg_of("1 +") == "expected an expression, found end of input");
-    assert(msg_of("(1") == "expected `)`, found end of input");
-    assert(msg_of("1 2") == "expected end of input, found `2`");
+
+    // A `Climb` that stops because the next token is no operator of its says so:
+    // after `1` an operator is one of the things that could have come next, and
+    // a message that listed only the bracket would be telling a reader `1 + 2`
+    // is invalid.
+    assert(msg_of("(1") == "expected `)` or an operator, found end of input");
+    assert(msg_of("1 2") == "expected an operator or end of input, found `2`");
     assert(msg_of("@") == "unexpected character");
 })
 
@@ -461,15 +466,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 21742
-deallocations: 21742
+allocations: 21908
+deallocations: 21908
 reallocations: 1022
-bytes allocated: 1486847
-instructions executed: 2538804
-binary size: 415360
-  code: 267084
-  data: 5852
-  metadata: 142424
+bytes allocated: 1494275
+instructions executed: 2566098
+binary size: 416152
+  code: 267588
+  data: 5916
+  metadata: 142648
 functions:
   __arr_drop_Calc:
     calls: 404
@@ -552,10 +557,13 @@ functions:
   __builtin_all$char$s0$lam152:
     calls: 12
     bytes: 212
-  __builtin_any$__m5__Doc$lam171:
+  __builtin_any$__m3__Prec$lam173:
+    calls: 156
+    bytes: 276
+  __builtin_any$__m5__Doc$lam174:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam171$tail:
+  __builtin_any$__m5__Doc$lam174$tail:
     calls: 0
     bytes: 324
   __builtin_count_while$char$lam94:
@@ -582,7 +590,7 @@ functions:
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m3__Prec$lam178:
+  __builtin_find_if$__m3__Prec$lam181:
     calls: 141
     bytes: 688
   __builtin_find_index$str$lam53:
@@ -674,12 +682,12 @@ functions:
     bytes: 368
   __m13__climb$CalcTok$Calc:
     calls: 160
-    bytes: 3160
+    bytes: 3388
   __m13__error_at$CalcTok$Calc:
     calls: 4
     bytes: 2780
   __m13__far_miss:
-    calls: 193
+    calls: 349
     bytes: 1084
   __m13__far_unclosed:
     calls: 0
@@ -955,13 +963,13 @@ functions:
     calls: 1323
     bytes: (external)
   aipl_arr_inc:
-    calls: 63636
+    calls: 64465
     bytes: (external)
   aipl_arr_join:
     calls: 1472
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1721
+    calls: 1723
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 2700
@@ -973,16 +981,16 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 80293
+    calls: 81288
     bytes: (external)
   aipl_array_new:
-    calls: 9761
+    calls: 9925
     bytes: (external)
   aipl_array_push:
     calls: 2096
     bytes: (external)
   aipl_array_push_mut:
-    calls: 4185
+    calls: 4187
     bytes: (external)
   aipl_array_with_cap:
     calls: 2654

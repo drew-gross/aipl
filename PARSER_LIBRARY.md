@@ -24,7 +24,7 @@ their own:
 - [x] 5b Wire FIRST-set pruning into the driver, and re-measure
 - [x] 5c Extend the differential test from acceptance to shape (operator grouping)
 - [x] 5d Lower AIPL's grammar to the AST
-- [ ] 5e Error-message parity against the corpus fixtures
+- [x] 5e Error messages: nothing worse, nothing broken (parity deliberately not the bar)
 - [ ] 5f Side-channels: `#[allow]` spans, trailing whitespace, doc attachment
 - [ ] 5g The bootstrap procedure, and the `DOGFOOD_SOURCE_FILES` switch
 
@@ -545,8 +545,10 @@ both places where it does had to be normalized too:
   its first element where the AIPL parser spans it from its `(`. Only the digits
   differ, so only the digits go.
 
-Both are span renderings. Neither is a disagreement about the tree, and both
-close when 5e settles the span convention.
+Both are span renderings. Neither is a disagreement about the tree, and 5e
+settled what to do about them: the AIPL parser's spans are a *superset* of
+gazelle's rather than a match, so these two stay normalized and the fixtures
+they feed get refilled at the switch.
 
 **`post_parse` is now a named function** in `aipl-parser`, not two statements
 inside `parse`: `bake_asserts` and `promote_type_vars` follow a parse but are no
@@ -554,14 +556,16 @@ part of one, and both sides of the differential have to run them to be compared
 at the same stage. It is also what 5g's entry point will call once the AIPL
 parser takes over.
 
-**Two gaps this stage leaves**, both named above and both belonging to the
-stages that own them:
+**Two gaps this stage leaves:**
 
-- **`Expr` declares no `value_span`**, and `lower_block` does neither half of
-  `with_block_span`'s job — 5f.
+- **`Expr` declares no `value_span`** — 5f. (`lower_block`'s other half, the
+  repair of an unlocated block value, landed in 5e.)
 - **Two error messages embed a rendered type** (`fn f`'s shorthand-body
   refusals), rendered with `show_ty`'s structural dump where gazelle uses
-  `aipl_syntax::type_name`'s source spelling — 5e.
+  `aipl_syntax::type_name`'s source spelling. Left as is: 5e's bar is "not
+  worse", and a structural dump of a type is not worse than a source spelling of
+  one — a `ty_source` mirroring `type_name` is worth writing when someone is
+  iterating on these messages, not before.
 
 **While deciding which productions earn a node, collapse the wrapper lists.**
 `Many`'s `style?` argument exists for one shape: a group whose list lives one
@@ -596,16 +600,80 @@ that node is what writing the 54 lowering functions decides; the ones that do no
 can fold into their group as part of the same pass. Doing it earlier means
 guessing at the AST shape this stage settles.
 
-### 5e — Error-message parity
+### 5e — Error messages — **done, at a deliberately lower bar than parity**
 
-**170 corpus files carry `--- errors ---` blocks**, rendered byte-exact from
-gazelle's `friendly_syntax_error`. Every one must match or be refilled and
-individually reviewed — and a refill that silently degrades a hundred messages is
-exactly what the handoff review guard exists to catch, so this is the step to
-diff by hand.
+The bar was byte-exact parity. It is not, by decision: the messages are going to
+be iterated on either way, so what matters is that the AIPL parser's are not
+*worse* and not *broken*. Parity would have meant adopting gazelle's quirks into
+the parser replacing it.
 
-See *Errors* above for why PEG makes this harder than LR rather than easier: the
-`expect_as` labels exist but have never been measured against these fixtures.
+**Of the 170 `--- errors ---` fixtures, 37 are parse errors.** The rest are
+loader and checker diagnostics — untouched by which parser ran, except through
+the spans their carets are drawn from, which is the second half below.
+
+**The 37, measured.** 19 render byte-identical; 18 differ; **0** are accepted by
+the AIPL grammar where gazelle refuses them. The 18 are wording
+(`unexpected 'X'; expected Y` against `expected Y, found `X``) plus two where the
+AIPL caret is *wider and right* — gazelle's `^` on the `#` of a mixed
+`#{ .. }`, against the whole literal; gazelle's `A(x) | B` on an alternation
+mismatch, against `A(x) | B(x, y)`.
+
+**Three real gaps, found by reading the 18 and fixed:**
+
+- **An operator was never in the expected set.** `climb` ends its loop when the
+  next token is not an operator, and said nothing about it — so after a complete
+  expression the message listed only the punctuation that could close it, and
+  told a reader `a + b` was invalid where it is not. It now records
+  `an operator` at that position, and only when a level at or above the current
+  `min_power` exists, so the claim is true wherever it is made.
+- **`construct_fields` was unlabelled**, so a failure at a block's opening leaked
+  `Name` and `` `..` `` — the raw alternatives of the struct-literal body
+  shorthand — where gazelle says `field`. Now `expect_as: "a field"`.
+- **`effect` was unlabelled**, leaking `` `!` `` where gazelle says `effect`.
+  Now `expect_as: "an effect"`.
+
+`survey_parse_errors` (`#[ignore]`d, in `tests/suites/parser_dogfood.rs`) prints
+every one of the 37 with both renderings side by side. That is the tool for
+iterating on wording; it is a report, not an assertion.
+
+**The other half of 5e is spans, and it is much the larger half.** A checker
+diagnostic points its caret with a span off the AST, so every span that moves is
+a fixture that moves at the switch. Measured over the 490 corpus files both
+parsers accept: **6357 of 15086 expression spans differ**. Every one is gazelle
+truncating or omitting — a bracketed form stopping before its closer
+(`[true, false` for `[true, false]`), a construct omitting its own keyword (`x`
+for `-x`, the condition for the whole `if`). The AIPL parser's are token-tight
+extents.
+
+That is a claim worth checking rather than asserting, so it is checked:
+`aipl_spans_contain_gazelles` walks both trees in lockstep and requires **every
+gazelle span to be inside the AIPL parser's** for the same node. Containment is
+exactly "never narrower, never elsewhere" — no caret moves off the construct it
+points at, and several stop being cut in half.
+
+**Writing that test found three span bugs, all now fixed:**
+
+- **Naive joins produced inverted spans.** `aipl_syntax::join_spans` treats an
+  *empty* span as "no location" and contributes nothing; the lowering was
+  writing `a.start..b.end`, so a block ending in a statement — whose value is a
+  unit with no location — gave every enclosing `Let`, `LetMut`, `Seq` and
+  `Assign` an end of 0. 1500 nodes carried a span ending before it started, and
+  a caret drawn from one is nonsense. `join_spans` is now mirrored in
+  `grammar_aipl.aipl` and used at every join.
+- **The same bug again in loop bodies**, which have their own `loop_inner` chain
+  and their own synthetic value. Found only because the containment test does
+  not stop at the first failure.
+- **A block's value had no location at all.** `repair_block_value` gives it the
+  block's own `{`, which is what `with_block_span` does on the gazelle side —
+  closing half of what 5f had recorded. Blocks and loop bodies both.
+
+`aipl_grammar_refuses_what_gazelle_refuses` is the floor underneath the survey:
+every corpus file gazelle refuses is refused by the AIPL parser too, with a
+non-empty message and a span inside the source. It asserts nothing about wording.
+
+**What this leaves for 5g:** the corpus fixtures whose caret comes from a span
+will change at the switch, and the change is a widening. That is a refill to
+review, not a regression to chase — and the containment test is what says so.
 
 ### 5f — Side-channels
 
@@ -616,12 +684,12 @@ Small individually, each a silent behavior loss if missed:
   the markers trivia and `grammar_aipl.aipl` drops them.
 - `reject_trailing_whitespace`.
 - Doc-comment attachment.
-- **A block's value span** (`with_block_span` in `aipl-parser`). Two jobs: it
-  records the block's tail position in `Expr::value_span`, so a return-type error
-  underlines the value rather than the first `let`; and it repairs the empty span
-  of the synthetic `Unit` a block with no trailing expression gets, from the
-  block's own `{`. The AIPL `Expr` declares neither field, and `lower_block` does
-  neither repair.
+- **A block's recorded value span** (`Expr::value_span`, set by
+  `with_block_span` in `aipl-parser`), so a return-type error underlines the
+  value rather than the first `let`. The AIPL `Expr` does not declare the field.
+  The *other* half of `with_block_span` — repairing the unlocated span of the
+  synthetic value a block with no trailing expression gets — is done, in 5e's
+  `repair_block_value`.
 
 ### 5g — The bootstrap, and the switch
 

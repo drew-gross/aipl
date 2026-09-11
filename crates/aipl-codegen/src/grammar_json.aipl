@@ -497,10 +497,10 @@ deallocations: 36190
 reallocations: 1226
 bytes allocated: 3042273
 instructions executed: 4509329
-binary size: 443336
-  code: 285676
+binary size: 444064
+  code: 286180
   data: 7828
-  metadata: 149832
+  metadata: 150056
 functions:
   __arr_drop_Json:
     calls: 147
@@ -577,10 +577,13 @@ functions:
   __builtin_all$char$s0$lam156:
     calls: 44
     bytes: 212
-  __builtin_any$__m5__Doc$lam169:
+  __builtin_any$__m3__Prec$lam171:
+    calls: 0
+    bytes: 276
+  __builtin_any$__m5__Doc$lam172:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam169$tail:
+  __builtin_any$__m5__Doc$lam172$tail:
     calls: 207
     bytes: 324
   __builtin_count_while$char$lam92:
@@ -604,7 +607,7 @@ functions:
   __builtin_drop_last$str:
     calls: 0
     bytes: 208
-  __builtin_find_if$__m3__Prec$lam176:
+  __builtin_find_if$__m3__Prec$lam179:
     calls: 0
     bytes: 688
   __builtin_find_index$str$lam58:
@@ -702,7 +705,7 @@ functions:
     bytes: 1176
   __m13__climb$JsonTok$Json:
     calls: 0
-    bytes: 3160
+    bytes: 3388
   __m13__error_at$JsonTok$Json:
     calls: 7
     bytes: 2968
