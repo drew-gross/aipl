@@ -390,7 +390,7 @@
           </h3>
           <pre class="signature"><code>variant Pat</code></pre>
 
-          <div class="doc"><p>The one type every <code>build</code> in <code>grammar_aipl.aipl</code> returns, whatever the production is about — <code>Build&lt;A&gt;</code> pins a single <code>A</code> for a whole grammar, so a grammar describing a language rather than one expression type carries the seam here. Each case is a node kind the lowering produces; <code>Ignored</code> is what a production with no lowering yet returns.</p><p>Two cases are not node kinds but the intermediate a production hands its parent. <code>ATys</code> is the *list* a production whose whole content is a comma-separated run of types lowers to, and the case it lands in is what tells <code>ty</code>'s alternatives apart — <code>(A, B)</code> and <code>A</code> reach <code>ty</code> as different <code>Ast</code> cases, so nothing has to count tokens to know which matched. <code>APayload</code> is a constructor pattern's slot list and whether it was written <code>..</code>, which is the pair <code>Pat</code>'s <code>PatCtor</code> needs and no node of its own. <code>aipl_syntax::ast::Pattern</code>. Its <code>Ctor</code> case is a struct variant there and a named payload here, which is as close as the two declarations get: the slot names are the same three, in the same order.</p><p><code>PatArray</code> — the destructuring <code>[a, b] =&gt; ..</code> arm — holds a list of *expressions*, which is why nothing under the <code>pattern</code> production produces one: it hangs off <code>match_arm</code>, where the elements are an ordinary <code>args</code> list.</p></div>
+          <div class="doc"><p>The one type every <code>build</code> in <code>grammar_aipl.aipl</code> returns, whatever the production is about — <code>Build&lt;A&gt;</code> pins a single <code>A</code> for a whole grammar, so a grammar describing a language rather than one expression type carries the seam here. Each case is a node kind the lowering produces.</p><p>Two cases are not node kinds but the intermediate a production hands its parent. <code>ATys</code> is the *list* a production whose whole content is a comma-separated run of types lowers to, and the case it lands in is what tells <code>ty</code>'s alternatives apart — <code>(A, B)</code> and <code>A</code> reach <code>ty</code> as different <code>Ast</code> cases, so nothing has to count tokens to know which matched. <code>APayload</code> is a constructor pattern's slot list and whether it was written <code>..</code>, which is the pair <code>Pat</code>'s <code>PatCtor</code> needs and no node of its own. <code>aipl_syntax::ast::Pattern</code>. Its <code>Ctor</code> case is a struct variant there and a named payload here, which is as close as the two declarations get: the slot names are the same three, in the same order.</p><p><code>PatArray</code> — the destructuring <code>[a, b] =&gt; ..</code> arm — holds a list of *expressions*, which is why nothing under the <code>pattern</code> production produces one: it hangs off <code>match_arm</code>, where the elements are an ordinary <code>args</code> list.</p></div>
 
 
           <ul class="cases">
@@ -912,8 +912,6 @@
 
 
           <ul class="cases">
-
-            <li id="item-Ignored"><code>Ignored</code></li>
 
             <li id="item-ATy"><code>ATy(Ty)</code></li>
 

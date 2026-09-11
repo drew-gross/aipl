@@ -17,9 +17,8 @@
 //     one would be a bug.
 //
 // `Ast` at the bottom is the single type `Build<A>` pins for the whole grammar,
-// so every production lowers to it whatever it is about. It grows a case per
-// node kind as the lowering does; `Ignored` is what a production that has not
-// been given a lowering yet still returns.
+// so every production lowers to it whatever it is about, with a case per node
+// kind the lowering produces.
 import {
     Span,
     equal as ==,
@@ -398,8 +397,7 @@ fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
 # The one type every `build` in `grammar_aipl.aipl` returns, whatever the
 # production is about — `Build<A>` pins a single `A` for a whole grammar, so a
 # grammar describing a language rather than one expression type carries the seam
-# here. Each case is a node kind the lowering produces; `Ignored` is what a
-# production with no lowering yet returns.
+# here. Each case is a node kind the lowering produces.
 #
 # Two cases are not node kinds but the intermediate a production hands its
 # parent. `ATys` is the *list* a production whose whole content is a
@@ -766,7 +764,6 @@ variant Stmt =
     | SReturn(value: Expr, span: Span)
 
 variant Ast =
-    | Ignored
     | ATy(Ty)
     | ATys(Ty[])
     | APat(Pat)
@@ -804,7 +801,6 @@ variant Ast =
 # so the message says which two shapes disagreed and leaves it at that.
 pub fn ast_case_name(self: Ast) -> str {
     match (self) {
-        Ignored => "an unlowered node",
         ATy(..) => "a type",
         ATys(..) => "a list of types",
         APat(..) => "a pattern",
@@ -838,7 +834,6 @@ pub fn ast_case_name(self: Ast) -> str {
         ACaseParam(..) => "a case parameter",
     }
 }.test({
-    assert(Ignored.ast_case_name() == "an unlowered node");
     assert(ATy(TyUnit).ast_case_name() == "a type");
     assert(AExpr(num(1)).ast_case_name() == "an expression");
     assert(ASuffix(SufTry).ast_case_name() == "a postfix suffix");
@@ -848,11 +843,11 @@ allocations: 368
 deallocations: 368
 reallocations: 27
 bytes allocated: 26644
-instructions executed: 17389
-binary size: 196872
-  code: 125276
-  data: 6505
-  metadata: 65091
+instructions executed: 17243
+binary size: 179120
+  code: 113232
+  data: 6425
+  metadata: 59463
 functions:
   __arr_drop_Expr:
     calls: 11
@@ -925,7 +920,7 @@ functions:
     bytes: 72
   __test$ast_case_name:
     calls: 1
-    bytes: 46420
+    bytes: 34376
   __test$binder_list:
     calls: 1
     bytes: 832
@@ -978,7 +973,7 @@ functions:
     calls: 21
     bytes: (external)
   aipl_assert:
-    calls: 78
+    calls: 77
     bytes: (external)
   aipl_i64_len:
     calls: 38
