@@ -134,7 +134,7 @@ block0(v0: i64, v1: i64):
 
 ; source variables:
 ;   v1 = src
-;   v1 = $inl235_self
+;   v1 = $inl2364_self
 ; __m3__dedent
 function u0:37(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -574,25 +574,25 @@ block27:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl236_self
+;   v1 = $inl2365_self
 ;   v6 = ls
-;   v6 = $inl69_$arr
+;   v6 = $inl2636_$arr
 ;   ss1 = $out
 ;   v42 = $e
-;   v42 = $inl66_l
-;   v42 = $inl214_self
-;   v42 = $inl68_l
-;   v72 = $inl70_self
+;   v42 = $inl2633_l
+;   v42 = $inl2981_self
+;   v42 = $inl2635_l
+;   v72 = $inl2637_self
 ;   v137 = v
-;   v138 = $inl71_default
+;   v138 = $inl2638_default
 ;   v135 = n
-;   v6 = $inl74_$arr
-;   v135 = $inl75_$cap10
+;   v6 = $inl2641_$arr
+;   v135 = $inl2642_$cap10
 ;   ss11 = $out
 ;   v174 = $e
-;   v174 = $inl72_line
-;   v174 = $inl215_self
-;   v135 = $inl73_n
+;   v174 = $inl2639_line
+;   v174 = $inl2982_self
+;   v135 = $inl2640_n
 ; __m17__group
 function u0:38(i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -1648,10 +1648,10 @@ block44(v356: i64):
 ;   v1 = self
 ;   v2 = width
 ;   v6 = __kwarg$2
-;   v2 = $inl1_width
-;   v9 = $inl2_col0
-;   v18 = $inl3_work0
-;   v31 = $inl4_acc0
+;   v2 = $inl2568_width
+;   v9 = $inl2569_col0
+;   v18 = $inl2570_work0
+;   v31 = $inl2571_acc0
 ;   ss0 = col
 ;   ss1 = work
 ;   ss2 = acc
@@ -1664,25 +1664,25 @@ block44(v356: i64):
 ;   v95 = s
 ;   v96 = rendered
 ;   v113 = ds
-;   v113 = $inl23_ds
-;   v50 = $inl24_sp
-;   v51 = $inl25_flat
-;   v53 = $inl26_rest
-;   v50 = $inl31_sp
-;   v50 = $inl32_sp
-;   v50 = $inl33_sp
-;   v50 = $inl34_sp
+;   v113 = $inl2152_ds
+;   v50 = $inl2153_sp
+;   v51 = $inl2154_flat
+;   v53 = $inl2155_rest
+;   v50 = $inl2160_sp
+;   v50 = $inl2161_sp
+;   v50 = $inl2162_sp
+;   v50 = $inl2163_sp
 ;   v238 = inner
 ;   v257 = forced
 ;   v258 = inner
-;   v257 = $inl8_forced
-;   v2 = $inl9_width
-;   v264 = $inl10_col
-;   v50 = $inl11_sp
-;   v258 = $inl12_inner
-;   v53 = $inl13_rest
+;   v257 = $inl2137_forced
+;   v2 = $inl2138_width
+;   v264 = $inl2139_col
+;   v50 = $inl2140_sp
+;   v258 = $inl2141_inner
+;   v53 = $inl2142_rest
 ;   v298 = s
-;   v329 = $inl5_out
+;   v329 = $inl2572_out
 ;   v336 = lines
 ;   v349 = body
 ; __m17__go
@@ -2395,23 +2395,23 @@ block3:
 ;   v65 = s
 ;   v66 = rendered
 ;   v83 = ds
-;   v83 = $inl23_ds
-;   v20 = $inl24_sp
-;   v21 = $inl25_flat
-;   v23 = $inl26_rest
-;   v20 = $inl31_sp
-;   v20 = $inl32_sp
-;   v20 = $inl33_sp
-;   v20 = $inl34_sp
+;   v83 = $inl2152_ds
+;   v20 = $inl2153_sp
+;   v21 = $inl2154_flat
+;   v23 = $inl2155_rest
+;   v20 = $inl2160_sp
+;   v20 = $inl2161_sp
+;   v20 = $inl2162_sp
+;   v20 = $inl2163_sp
 ;   v208 = inner
 ;   v227 = forced
 ;   v228 = inner
-;   v227 = $inl8_forced
-;   v0 = $inl9_width
-;   v234 = $inl10_col
-;   v20 = $inl11_sp
-;   v228 = $inl12_inner
-;   v23 = $inl13_rest
+;   v227 = $inl2137_forced
+;   v0 = $inl2138_width
+;   v234 = $inl2139_col
+;   v20 = $inl2140_sp
+;   v228 = $inl2141_inner
+;   v23 = $inl2142_rest
 ;   v268 = s
 ; __m17__group_flat$tail
 function u0:44(i64, i64, i64, i64, i64, i64) -> i64 tail {
@@ -3072,31 +3072,31 @@ block1(v2: i64):
 ;   v34 = s
 ;   v40 = s
 ;   v45 = ds
-;   v45 = $inl27_ds
-;   v7 = $inl28_sp
-;   v8 = $inl29_flat
-;   v10 = $inl30_rest
-;   v45 = $inl84_self
-;   v10 = $inl85_init
-;   v7 = $inl86_$cap18
-;   v8 = $inl87_$cap19
+;   v45 = $inl2156_ds
+;   v7 = $inl2157_sp
+;   v8 = $inl2158_flat
+;   v10 = $inl2159_rest
+;   v45 = $inl2651_self
+;   v10 = $inl2652_init
+;   v7 = $inl2653_$cap18
+;   v8 = $inl2654_$cap19
 ;   ss0 = acc
 ;   ss1 = i
 ;   v103 = x
-;   v103 = $inl80_d
-;   v105 = $inl81_work
-;   v7 = $inl82_$inl28_sp
-;   v8 = $inl83_$inl29_flat
-;   v0 = $inl14_budget
-;   v135 = $inl15_n
-;   v10 = $inl16_rest
+;   v103 = $inl2647_d
+;   v105 = $inl2648_work
+;   v7 = $inl2649_$inl2157_sp
+;   v8 = $inl2650_$inl2158_flat
+;   v0 = $inl2143_budget
+;   v135 = $inl2144_n
+;   v10 = $inl2145_rest
 ;   v151 = inner
 ;   v165 = forced
 ;   v166 = inner
 ;   v184 = s
-;   v0 = $inl17_budget
-;   v187 = $inl18_n
-;   v10 = $inl19_rest
+;   v0 = $inl2146_budget
+;   v187 = $inl2147_n
+;   v10 = $inl2148_rest
 ; __m17__fits
 function u0:45(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64, i64) -> i64 tail
@@ -3232,9 +3232,9 @@ block3(v12: i64):
 ;   v6 = s
 ;   v4 = flat
 ;   v5 = rest
-;   v0 = $inl20_budget
-;   v15 = $inl21_n
-;   v5 = $inl22_rest
+;   v0 = $inl2149_budget
+;   v15 = $inl2150_n
+;   v5 = $inl2151_rest
 ; __m17__fits_atom
 function u0:49(i64, i64, i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64, i64, i64, i64, i64, i64) -> i64 tail
@@ -3437,17 +3437,17 @@ block3:
 ;   v1 = sp
 ;   v2 = flat
 ;   v3 = rest
-;   v0 = $inl92_self
-;   v3 = $inl93_init
-;   v1 = $inl94_$cap22
-;   v2 = $inl95_$cap23
+;   v0 = $inl2659_self
+;   v3 = $inl2660_init
+;   v1 = $inl2661_$cap22
+;   v2 = $inl2662_$cap23
 ;   ss0 = acc
 ;   ss1 = i
 ;   v61 = x
-;   v61 = $inl88_d
-;   v63 = $inl89_work
-;   v1 = $inl90_sp
-;   v2 = $inl91_flat
+;   v61 = $inl2655_d
+;   v63 = $inl2656_work
+;   v1 = $inl2657_sp
+;   v2 = $inl2658_flat
 ; __m17__col_after
 function u0:52(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -3636,9 +3636,9 @@ block3(v13: i64):
 ;   v1 = text
 ;   v6 = parts
 ;   v9 = n
-;   v28 = $inl222_self
+;   v28 = $inl2989_self
 ;   v66 = v
-;   v71 = $inl223_default
+;   v71 = $inl2990_default
 ; __m17__newline_str
 function u0:53(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -3941,8 +3941,8 @@ block0(v0: i64, v1: i64):
 ; source variables:
 ;   v1 = src
 ;   v2 = __tpat$1691
-;   v4 = $inl0_src
-;   v4 = $inl235_self
+;   v4 = $inl2567_src
+;   v4 = $inl2364_self
 ; __m2__fmt_layout
 function u0:57(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 48, align = 8
@@ -4158,11 +4158,11 @@ block18:
 ;   v1 = cleaned
 ;   v2 = width
 ;   v34 = laid_out
-;   v34 = $inl98_self
+;   v34 = $inl2665_self
 ;   ss1 = k
 ;   ss2 = __idx$410
 ;   v44 = c
-;   v44 = $inl97_c
+;   v44 = $inl2664_c
 ;   v54 = i
 ; __m16__indent
 function u0:58(i64, i64, i64) apple_aarch64 {
@@ -4244,7 +4244,7 @@ block0(v0: i64, v1: i64, v2: i64):
 ;   v1 = self
 ;   v2 = target
 ;   v7 = pad
-;   v1 = $inl237_self
+;   v1 = $inl2366_self
 ; __m11__is_operator_name
 function u0:59(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -4646,7 +4646,7 @@ block0(v0: i64, v1: i64):
 
 ; source variables:
 ;   v1 = line
-;   v1 = $inl37_line
+;   v1 = $inl2166_line
 ; __m13__doc_line_value
 function u0:61(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -7847,9 +7847,9 @@ block58:
 
 ; source variables:
 ;   v1 = text
-;   v2 = $inl230_self
+;   v2 = $inl2997_self
 ;   v5 = v
-;   v13 = $inl231_e
+;   v13 = $inl2998_e
 ; __m13__char_lit_emit
 function u0:70(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -9217,10 +9217,10 @@ block40:
 
 ; source variables:
 ;   v0 = texts
-;   v0 = $inl234_self
-;   v9 = $inl224_self
+;   v0 = $inl3001_self
+;   v9 = $inl2991_self
 ;   v47 = v
-;   v52 = $inl225_default
+;   v52 = $inl2992_default
 ;   v64 = raw
 ;   v65 = delim
 ;   v72 = last
@@ -9230,7 +9230,7 @@ block40:
 ;   v112 = i
 ;   v116 = lead
 ;   v120 = trail
-;   v177 = $inl101_$arr
+;   v177 = $inl2668_$arr
 ;   ss19 = $out
 ;   v213 = $e
 ; __m13__s_keyword
@@ -34441,183 +34441,183 @@ block2224:
 ; source variables:
 ;   v0 = three_quotes
 ;   v8 = cont
-;   v404 = $inl38_spelling
-;   v408 = $inl39_kind
-;   v410 = $inl40_scope
-;   v526 = $inl41_spelling
-;   v530 = $inl42_kind
-;   v532 = $inl43_scope
-;   v648 = $inl44_spelling
-;   v652 = $inl45_kind
-;   v654 = $inl46_scope
-;   v770 = $inl47_spelling
-;   v774 = $inl48_kind
-;   v776 = $inl49_scope
-;   v892 = $inl50_spelling
-;   v896 = $inl51_kind
-;   v898 = $inl52_scope
-;   v1014 = $inl53_spelling
-;   v1018 = $inl54_kind
-;   v1020 = $inl55_scope
-;   v1137 = $inl56_spelling
-;   v1141 = $inl57_kind
-;   v1143 = $inl58_scope
-;   v1260 = $inl59_spelling
-;   v1264 = $inl60_kind
-;   v1266 = $inl61_scope
-;   v1383 = $inl62_spelling
-;   v1387 = $inl63_kind
-;   v1389 = $inl64_scope
-;   v1505 = $inl65_spelling
-;   v1509 = $inl66_kind
-;   v1511 = $inl67_scope
-;   v1627 = $inl68_spelling
-;   v1631 = $inl69_kind
-;   v1633 = $inl70_scope
-;   v1749 = $inl71_spelling
-;   v1753 = $inl72_kind
-;   v1755 = $inl73_scope
-;   v1871 = $inl74_spelling
-;   v1875 = $inl75_kind
-;   v1877 = $inl76_scope
-;   v1993 = $inl77_spelling
-;   v1997 = $inl78_kind
-;   v1999 = $inl79_scope
-;   v2115 = $inl80_spelling
-;   v2119 = $inl81_kind
-;   v2121 = $inl82_scope
-;   v2237 = $inl83_spelling
-;   v2241 = $inl84_kind
-;   v2243 = $inl85_scope
-;   v2359 = $inl86_spelling
-;   v2363 = $inl87_kind
-;   v2365 = $inl88_scope
-;   v2481 = $inl89_spelling
-;   v2485 = $inl90_kind
-;   v2487 = $inl91_scope
-;   v2603 = $inl92_spelling
-;   v2607 = $inl93_kind
-;   v2609 = $inl94_scope
-;   v2725 = $inl95_spelling
-;   v2729 = $inl96_kind
-;   v2731 = $inl97_scope
-;   v2847 = $inl98_spelling
-;   v2851 = $inl99_kind
-;   v2853 = $inl100_scope
-;   v3507 = $inl101_spelling
-;   v3511 = $inl102_kind
-;   v3513 = $inl103_scope
-;   v3619 = $inl104_spelling
-;   v3623 = $inl105_kind
-;   v3625 = $inl106_scope
-;   v3731 = $inl107_spelling
-;   v3735 = $inl108_kind
-;   v3737 = $inl109_scope
-;   v3843 = $inl110_spelling
-;   v3847 = $inl111_kind
-;   v3849 = $inl112_scope
-;   v3955 = $inl113_spelling
-;   v3959 = $inl114_kind
-;   v3961 = $inl115_scope
-;   v4067 = $inl116_spelling
-;   v4071 = $inl117_kind
-;   v4073 = $inl118_scope
-;   v4179 = $inl119_spelling
-;   v4183 = $inl120_kind
-;   v4185 = $inl121_scope
-;   v4291 = $inl122_spelling
-;   v4295 = $inl123_kind
-;   v4297 = $inl124_scope
-;   v4403 = $inl125_spelling
-;   v4407 = $inl126_kind
-;   v4409 = $inl127_scope
-;   v4515 = $inl128_spelling
-;   v4519 = $inl129_kind
-;   v4521 = $inl130_scope
-;   v4627 = $inl131_spelling
-;   v4631 = $inl132_kind
-;   v4633 = $inl133_scope
-;   v4739 = $inl134_spelling
-;   v4743 = $inl135_kind
-;   v4745 = $inl136_scope
-;   v4851 = $inl137_spelling
-;   v4855 = $inl138_kind
-;   v4857 = $inl139_scope
-;   v4963 = $inl140_spelling
-;   v4967 = $inl141_kind
-;   v4969 = $inl142_scope
-;   v5075 = $inl143_spelling
-;   v5079 = $inl144_kind
-;   v5081 = $inl145_scope
-;   v5187 = $inl146_spelling
-;   v5191 = $inl147_kind
-;   v5193 = $inl148_scope
-;   v5299 = $inl149_spelling
-;   v5303 = $inl150_kind
-;   v5305 = $inl151_scope
-;   v5411 = $inl152_spelling
-;   v5415 = $inl153_kind
-;   v5417 = $inl154_scope
-;   v5523 = $inl155_spelling
-;   v5527 = $inl156_kind
-;   v5529 = $inl157_scope
-;   v5635 = $inl158_spelling
-;   v5639 = $inl159_kind
-;   v5641 = $inl160_scope
-;   v5747 = $inl161_spelling
-;   v5751 = $inl162_kind
-;   v5753 = $inl163_scope
-;   v5859 = $inl164_spelling
-;   v5863 = $inl165_kind
-;   v5865 = $inl166_scope
-;   v5971 = $inl167_spelling
-;   v5975 = $inl168_kind
-;   v5977 = $inl169_scope
-;   v6083 = $inl170_spelling
-;   v6087 = $inl171_kind
-;   v6089 = $inl172_scope
-;   v6195 = $inl173_spelling
-;   v6199 = $inl174_kind
-;   v6201 = $inl175_scope
-;   v6307 = $inl176_spelling
-;   v6311 = $inl177_kind
-;   v6313 = $inl178_scope
-;   v6419 = $inl179_spelling
-;   v6423 = $inl180_kind
-;   v6425 = $inl181_scope
-;   v6531 = $inl182_spelling
-;   v6535 = $inl183_kind
-;   v6537 = $inl184_scope
-;   v6643 = $inl185_spelling
-;   v6647 = $inl186_kind
-;   v6649 = $inl187_scope
-;   v6755 = $inl188_spelling
-;   v6759 = $inl189_kind
-;   v6761 = $inl190_scope
-;   v6867 = $inl191_spelling
-;   v6871 = $inl192_kind
-;   v6873 = $inl193_scope
-;   v6979 = $inl194_spelling
-;   v6983 = $inl195_kind
-;   v6985 = $inl196_scope
-;   v7091 = $inl197_spelling
-;   v7095 = $inl198_kind
-;   v7097 = $inl199_scope
-;   v7203 = $inl200_spelling
-;   v7207 = $inl201_kind
-;   v7209 = $inl202_scope
-;   v7315 = $inl203_spelling
-;   v7319 = $inl204_kind
-;   v7321 = $inl205_scope
-;   v7427 = $inl206_spelling
-;   v7431 = $inl207_kind
-;   v7433 = $inl208_scope
-;   v7539 = $inl209_spelling
-;   v7543 = $inl210_kind
-;   v7545 = $inl211_scope
-;   v7651 = $inl212_spelling
-;   v7655 = $inl213_kind
-;   v7657 = $inl214_scope
+;   v404 = $inl2167_spelling
+;   v408 = $inl2168_kind
+;   v410 = $inl2169_scope
+;   v526 = $inl2170_spelling
+;   v530 = $inl2171_kind
+;   v532 = $inl2172_scope
+;   v648 = $inl2173_spelling
+;   v652 = $inl2174_kind
+;   v654 = $inl2175_scope
+;   v770 = $inl2176_spelling
+;   v774 = $inl2177_kind
+;   v776 = $inl2178_scope
+;   v892 = $inl2179_spelling
+;   v896 = $inl2180_kind
+;   v898 = $inl2181_scope
+;   v1014 = $inl2182_spelling
+;   v1018 = $inl2183_kind
+;   v1020 = $inl2184_scope
+;   v1137 = $inl2185_spelling
+;   v1141 = $inl2186_kind
+;   v1143 = $inl2187_scope
+;   v1260 = $inl2188_spelling
+;   v1264 = $inl2189_kind
+;   v1266 = $inl2190_scope
+;   v1383 = $inl2191_spelling
+;   v1387 = $inl2192_kind
+;   v1389 = $inl2193_scope
+;   v1505 = $inl2194_spelling
+;   v1509 = $inl2195_kind
+;   v1511 = $inl2196_scope
+;   v1627 = $inl2197_spelling
+;   v1631 = $inl2198_kind
+;   v1633 = $inl2199_scope
+;   v1749 = $inl2200_spelling
+;   v1753 = $inl2201_kind
+;   v1755 = $inl2202_scope
+;   v1871 = $inl2203_spelling
+;   v1875 = $inl2204_kind
+;   v1877 = $inl2205_scope
+;   v1993 = $inl2206_spelling
+;   v1997 = $inl2207_kind
+;   v1999 = $inl2208_scope
+;   v2115 = $inl2209_spelling
+;   v2119 = $inl2210_kind
+;   v2121 = $inl2211_scope
+;   v2237 = $inl2212_spelling
+;   v2241 = $inl2213_kind
+;   v2243 = $inl2214_scope
+;   v2359 = $inl2215_spelling
+;   v2363 = $inl2216_kind
+;   v2365 = $inl2217_scope
+;   v2481 = $inl2218_spelling
+;   v2485 = $inl2219_kind
+;   v2487 = $inl2220_scope
+;   v2603 = $inl2221_spelling
+;   v2607 = $inl2222_kind
+;   v2609 = $inl2223_scope
+;   v2725 = $inl2224_spelling
+;   v2729 = $inl2225_kind
+;   v2731 = $inl2226_scope
+;   v2847 = $inl2227_spelling
+;   v2851 = $inl2228_kind
+;   v2853 = $inl2229_scope
+;   v3507 = $inl2230_spelling
+;   v3511 = $inl2231_kind
+;   v3513 = $inl2232_scope
+;   v3619 = $inl2233_spelling
+;   v3623 = $inl2234_kind
+;   v3625 = $inl2235_scope
+;   v3731 = $inl2236_spelling
+;   v3735 = $inl2237_kind
+;   v3737 = $inl2238_scope
+;   v3843 = $inl2239_spelling
+;   v3847 = $inl2240_kind
+;   v3849 = $inl2241_scope
+;   v3955 = $inl2242_spelling
+;   v3959 = $inl2243_kind
+;   v3961 = $inl2244_scope
+;   v4067 = $inl2245_spelling
+;   v4071 = $inl2246_kind
+;   v4073 = $inl2247_scope
+;   v4179 = $inl2248_spelling
+;   v4183 = $inl2249_kind
+;   v4185 = $inl2250_scope
+;   v4291 = $inl2251_spelling
+;   v4295 = $inl2252_kind
+;   v4297 = $inl2253_scope
+;   v4403 = $inl2254_spelling
+;   v4407 = $inl2255_kind
+;   v4409 = $inl2256_scope
+;   v4515 = $inl2257_spelling
+;   v4519 = $inl2258_kind
+;   v4521 = $inl2259_scope
+;   v4627 = $inl2260_spelling
+;   v4631 = $inl2261_kind
+;   v4633 = $inl2262_scope
+;   v4739 = $inl2263_spelling
+;   v4743 = $inl2264_kind
+;   v4745 = $inl2265_scope
+;   v4851 = $inl2266_spelling
+;   v4855 = $inl2267_kind
+;   v4857 = $inl2268_scope
+;   v4963 = $inl2269_spelling
+;   v4967 = $inl2270_kind
+;   v4969 = $inl2271_scope
+;   v5075 = $inl2272_spelling
+;   v5079 = $inl2273_kind
+;   v5081 = $inl2274_scope
+;   v5187 = $inl2275_spelling
+;   v5191 = $inl2276_kind
+;   v5193 = $inl2277_scope
+;   v5299 = $inl2278_spelling
+;   v5303 = $inl2279_kind
+;   v5305 = $inl2280_scope
+;   v5411 = $inl2281_spelling
+;   v5415 = $inl2282_kind
+;   v5417 = $inl2283_scope
+;   v5523 = $inl2284_spelling
+;   v5527 = $inl2285_kind
+;   v5529 = $inl2286_scope
+;   v5635 = $inl2287_spelling
+;   v5639 = $inl2288_kind
+;   v5641 = $inl2289_scope
+;   v5747 = $inl2290_spelling
+;   v5751 = $inl2291_kind
+;   v5753 = $inl2292_scope
+;   v5859 = $inl2293_spelling
+;   v5863 = $inl2294_kind
+;   v5865 = $inl2295_scope
+;   v5971 = $inl2296_spelling
+;   v5975 = $inl2297_kind
+;   v5977 = $inl2298_scope
+;   v6083 = $inl2299_spelling
+;   v6087 = $inl2300_kind
+;   v6089 = $inl2301_scope
+;   v6195 = $inl2302_spelling
+;   v6199 = $inl2303_kind
+;   v6201 = $inl2304_scope
+;   v6307 = $inl2305_spelling
+;   v6311 = $inl2306_kind
+;   v6313 = $inl2307_scope
+;   v6419 = $inl2308_spelling
+;   v6423 = $inl2309_kind
+;   v6425 = $inl2310_scope
+;   v6531 = $inl2311_spelling
+;   v6535 = $inl2312_kind
+;   v6537 = $inl2313_scope
+;   v6643 = $inl2314_spelling
+;   v6647 = $inl2315_kind
+;   v6649 = $inl2316_scope
+;   v6755 = $inl2317_spelling
+;   v6759 = $inl2318_kind
+;   v6761 = $inl2319_scope
+;   v6867 = $inl2320_spelling
+;   v6871 = $inl2321_kind
+;   v6873 = $inl2322_scope
+;   v6979 = $inl2323_spelling
+;   v6983 = $inl2324_kind
+;   v6985 = $inl2325_scope
+;   v7091 = $inl2326_spelling
+;   v7095 = $inl2327_kind
+;   v7097 = $inl2328_scope
+;   v7203 = $inl2329_spelling
+;   v7207 = $inl2330_kind
+;   v7209 = $inl2331_scope
+;   v7315 = $inl2332_spelling
+;   v7319 = $inl2333_kind
+;   v7321 = $inl2334_scope
+;   v7427 = $inl2335_spelling
+;   v7431 = $inl2336_kind
+;   v7433 = $inl2337_scope
+;   v7539 = $inl2338_spelling
+;   v7543 = $inl2339_kind
+;   v7545 = $inl2340_scope
+;   v7651 = $inl2341_spelling
+;   v7655 = $inl2342_kind
+;   v7657 = $inl2343_scope
 ; __m13__atok
 function u0:85(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -34810,8 +34810,8 @@ block1:
 ;   v1 = src
 ;   v2 = kind
 ;   v3 = span
-;   v1 = $inl219_src
-;   v3 = $inl220_at
+;   v1 = $inl2348_src
+;   v3 = $inl2349_at
 ; __m13__lex_aipl
 function u0:86(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 48, align = 8
@@ -34981,7 +34981,7 @@ block12:
 
 ; source variables:
 ;   v1 = src
-;   v1 = $inl215_src
+;   v1 = $inl2344_src
 ; __m13__lex_aipl_stripped
 function u0:88(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -35022,7 +35022,7 @@ block0(v0: i64, v1: i64):
 
 ; source variables:
 ;   v1 = src
-;   v2 = $inl216_src
+;   v2 = $inl2345_src
 ; __m12__span_str
 function u0:89(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -35178,15 +35178,15 @@ block6(v17: i64):
 ;   v0 = self
 ;   v1 = head
 ;   v2 = cont
-;   v0 = $inl236_self
-;   v10 = $inl246_self
+;   v0 = $inl3003_self
+;   v10 = $inl3013_self
 ;   v13 = x
-;   v1 = $inl247_$cap43
-;   v13 = $inl102_c
-;   v1 = $inl103_head
-;   v0 = $inl250_self
-;   v0 = $inl179_self
-;   v19 = $inl180_n
+;   v1 = $inl3014_$cap43
+;   v13 = $inl2669_c
+;   v1 = $inl2670_head
+;   v0 = $inl3017_self
+;   v0 = $inl2746_self
+;   v19 = $inl2747_n
 ; __m12__one_char_len
 function u0:92(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
@@ -35241,12 +35241,12 @@ block6(v16: i64):
 ; source variables:
 ;   v0 = self
 ;   v1 = chars
-;   v0 = $inl237_self
-;   v9 = $inl254_self
+;   v0 = $inl3004_self
+;   v9 = $inl3021_self
 ;   v12 = x
-;   v1 = $inl255_$cap49
-;   v12 = $inl106_c
-;   v1 = $inl107_chars
+;   v1 = $inl3022_$cap49
+;   v12 = $inl2673_c
+;   v1 = $inl2674_chars
 ; __m12__exact_len
 function u0:93(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) -> i64 apple_aarch64
@@ -35346,11 +35346,11 @@ block6(v26: i64):
 ;   v0 = self
 ;   v1 = spelling
 ;   v2 = boundary
-;   v14 = $inl258_self
+;   v14 = $inl3025_self
 ;   v17 = x
-;   v2 = $inl259_$cap52
-;   v17 = $inl108_c
-;   v2 = $inl109_boundary
+;   v2 = $inl3026_$cap52
+;   v17 = $inl2675_c
+;   v2 = $inl2676_boundary
 ; __m12__delimited_len
 function u0:95(i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
@@ -35877,29 +35877,29 @@ block44:
 ;   v3 = delims
 ;   v4 = escapes
 ;   v5 = msg
-;   v1 = $inl238_self
-;   v13 = $inl112_self
+;   v1 = $inl3005_self
+;   v13 = $inl2679_self
 ;   v16 = x
-;   v3 = $inl113_$cap55
-;   v16 = $inl110_c
-;   v3 = $inl111_delims
-;   v1 = $inl239_self
-;   v47 = $inl262_self
+;   v3 = $inl2680_$cap55
+;   v16 = $inl2677_c
+;   v3 = $inl2678_delims
+;   v1 = $inl3006_self
+;   v47 = $inl3029_self
 ;   v50 = v
-;   v51 = $inl263_default
+;   v51 = $inl3030_default
 ;   v48 = d
 ;   ss4 = i
 ;   ss5 = closed
-;   v74 = $inl264_self
+;   v74 = $inl3031_self
 ;   v77 = v
-;   v78 = $inl265_default
+;   v78 = $inl3032_default
 ;   v75 = c
-;   v112 = $inl116_self
+;   v112 = $inl2683_self
 ;   v115 = x
-;   v4 = $inl117_$cap58
-;   v115 = $inl114_e
-;   v4 = $inl115_escapes
-;   v5 = $inl227_msg
+;   v4 = $inl2684_$cap58
+;   v115 = $inl2681_e
+;   v4 = $inl2682_escapes
+;   v5 = $inl2356_msg
 ; __m12__unterminated_msg
 function u0:96(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -36180,7 +36180,7 @@ block20:
 ;   v4 = close
 ;   v5 = msg
 ;   ss1 = i
-;   v5 = $inl228_msg
+;   v5 = $inl2357_msg
 ; __m12__nested_len
 function u0:98(i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
@@ -36483,7 +36483,7 @@ block26:
 ;   v5 = msg
 ;   ss1 = depth
 ;   ss2 = i
-;   v5 = $inl229_msg
+;   v5 = $inl2358_msg
 ; __m12__to_eol_len$tail
 function u0:100(i64, i64, i64, i64, i64, i64) -> i64 tail {
     ss0 = explicit_slot 24, align = 8
@@ -36654,7 +36654,7 @@ block5(v29: i64):
 ;   v1 = marker
 ;   v2 = blocked
 ;   v9 = len
-;   v20 = $inl240_self
+;   v20 = $inl3007_self
 ;   v31 = c
 ; __m12__number_end
 function u0:102(i64, i64) -> i64 apple_aarch64 {
@@ -36881,11 +36881,11 @@ block12(v67: i64):
 ;   v1 = int_end
 ;   ss0 = end
 ;   v14 = __ceqv1
-;   v29 = $inl268_self
+;   v29 = $inl3035_self
 ;   v32 = x
 ;   v79 = has_sign
 ;   v80 = digits
-;   v95 = $inl269_self
+;   v95 = $inl3036_self
 ;   v98 = x
 ; __m12__float_len
 function u0:103(i64) -> i64 apple_aarch64 {
@@ -37144,15 +37144,15 @@ block28(v128: i64):
 ; source variables:
 ;   v0 = self
 ;   v1 = int_end
-;   v0 = $inl18_self
-;   v1 = $inl19_int_end
+;   v0 = $inl2585_self
+;   v1 = $inl2586_int_end
 ;   ss0 = end
 ;   v22 = __ceqv1
-;   v37 = $inl270_self
+;   v37 = $inl3037_self
 ;   v40 = x
 ;   v87 = has_sign
 ;   v88 = digits
-;   v103 = $inl271_self
+;   v103 = $inl3038_self
 ;   v106 = x
 ;   v125 = end
 ; __m12__int_len
@@ -37261,9 +37261,9 @@ block12(v44: i64):
 
 ; source variables:
 ;   v0 = self
-;   v0 = $inl241_self
+;   v0 = $inl3008_self
 ;   v11 = __ceqv2
-;   v23 = $inl272_self
+;   v23 = $inl3039_self
 ;   v26 = x
 ;   v35 = start
 ;   v40 = digits
@@ -40032,9 +40032,9 @@ block70:
 
 ; source variables:
 ;   v1 = text
-;   v2 = $inl232_self
+;   v2 = $inl2999_self
 ;   v5 = v
-;   v13 = $inl233_e
+;   v13 = $inl3000_e
 ; __m12__nonempty_str
 function u0:111(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -42650,8 +42650,8 @@ block3(v8: i64):
 ; source variables:
 ;   v1 = text
 ;   v2 = seg
-;   v1 = $inl23_text
-;   v2 = $inl24_seg
+;   v1 = $inl2590_text
+;   v2 = $inl2591_seg
 ;   v36 = t
 ; __m12__rawtpl_kind
 function u0:113(i64, i64, i64) apple_aarch64 {
@@ -44106,8 +44106,8 @@ block1:
 ;   v1 = src
 ;   v2 = kind
 ;   v3 = span
-;   v1 = $inl225_src
-;   v3 = $inl226_at
+;   v1 = $inl2354_src
+;   v3 = $inl2355_at
 ; __m12__toks
 function u0:115(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
@@ -44536,11 +44536,11 @@ block9(v53: i64):
 ; source variables:
 ;   v1 = s
 ;   v5 = opened
-;   v5 = $inl122_self
+;   v5 = $inl2689_self
 ;   ss2 = k
 ;   ss3 = __idx$410
 ;   v15 = c
-;   v15 = $inl121_c
+;   v15 = $inl2688_c
 ;   v29 = i
 ;   v49 = tail
 ; __m15__reindent_block
@@ -45192,29 +45192,29 @@ block42:
 ; source variables:
 ;   v1 = self
 ;   v2 = base
-;   v1 = $inl238_self
+;   v1 = $inl2367_self
 ;   v7 = ls
 ;   v10 = n
-;   v7 = $inl123_self
-;   v33 = $inl226_self
+;   v7 = $inl2690_self
+;   v33 = $inl2993_self
 ;   v71 = v
-;   v76 = $inl227_default
+;   v76 = $inl2994_default
 ;   v84 = closing
-;   v7 = $inl235_self
-;   v120 = $inl228_self
+;   v7 = $inl3002_self
+;   v120 = $inl2995_self
 ;   v158 = v
-;   v163 = $inl229_default
+;   v163 = $inl2996_default
 ;   v155 = opening
 ;   ss16 = out
-;   v7 = $inl124_self
-;   v7 = $inl288_self
-;   v179 = $inl289_n
-;   v184 = $inl125_self
+;   v7 = $inl2691_self
+;   v7 = $inl3055_self
+;   v179 = $inl3056_n
+;   v184 = $inl2692_self
 ;   v199 = content
-;   v223 = $inl6_self
-;   v225 = $inl7_target
+;   v223 = $inl2573_self
+;   v225 = $inl2574_target
 ;   v230 = pad
-;   v223 = $inl237_self
+;   v223 = $inl2366_self
 ; __m10__split_test_sections
 function u0:120(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -45830,11 +45830,11 @@ block6(v17: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = c
-;   v1 = $inl242_self
+;   v1 = $inl3009_self
 ;   v13 = __ceqv4
-;   v1 = $inl251_self
-;   v1 = $inl179_self
-;   v18 = $inl180_n
+;   v1 = $inl3018_self
+;   v1 = $inl2746_self
+;   v18 = $inl2747_n
 ; __m7__trim_suffix
 function u0:123(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
@@ -45902,9 +45902,9 @@ block6(v19: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = c
-;   v1 = $inl126_self
+;   v1 = $inl2693_self
 ;   v15 = __ceqv5
-;   v1 = $inl127_self
+;   v1 = $inl2694_self
 ; __m14__escape_text
 function u0:124(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -46349,7 +46349,7 @@ block3:
 ;   ss2 = run_start
 ;   ss3 = i
 ;   v30 = __ceqv6
-;   v64 = $inl239_self
+;   v64 = $inl2368_self
 ; __m18__new_walker
 function u0:126(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 64, align = 8
@@ -46541,8 +46541,8 @@ block0(v0: i64, v1: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl254_self
-;   v2 = $inl255_n
+;   v1 = $inl2383_self
+;   v2 = $inl2384_n
 ; __m18__at_end
 function u0:130(i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -46607,10 +46607,10 @@ block0(v0: i64, v1: i64):
 ; source variables:
 ;   v0 = self
 ;   v1 = end
-;   v0 = $inl386_self
-;   v0 = $inl288_self
-;   v0 = $inl0_self
-;   v11 = $inl1_n
+;   v0 = $inl2515_self
+;   v0 = $inl2417_self
+;   v0 = $inl2767_self
+;   v11 = $inl2768_n
 ; __m18__bump
 function u0:132(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -46958,7 +46958,7 @@ block7(v37: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl246_self
+;   v1 = $inl2375_self
 ;   v40 = t
 ;   v1 = __spread_base$1
 ; __m18__expect
@@ -47261,12 +47261,12 @@ block3(v8: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = want
-;   v1 = $inl289_self
-;   v1 = $inl2_self
-;   v3 = $inl3_n
-;   v1 = $inl290_self
-;   v1 = $inl4_self
-;   v81 = $inl5_n
+;   v1 = $inl2418_self
+;   v1 = $inl2769_self
+;   v3 = $inl2770_n
+;   v1 = $inl2419_self
+;   v1 = $inl2771_self
+;   v81 = $inl2772_n
 ; __m18__err_here
 function u0:134(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -47491,7 +47491,7 @@ block7(v38: i64):
 ; source variables:
 ;   v1 = self
 ;   v2 = msg
-;   v1 = $inl247_self
+;   v1 = $inl2376_self
 ;   v41 = t
 ; __m18__next_start
 function u0:135(i64) -> i64 apple_aarch64 {
@@ -47675,7 +47675,7 @@ block16(v80: i64):
 
 ; source variables:
 ;   v0 = self
-;   v0 = $inl248_self
+;   v0 = $inl2377_self
 ;   v39 = t
 ;   v36 = tok
 ;   v83 = c
@@ -48163,17 +48163,17 @@ block12:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl26_w0
-;   v1 = $inl249_self
+;   v1 = $inl2593_w0
+;   v1 = $inl2378_self
 ;   v40 = t
-;   v37 = $inl27_limit
-;   v52 = $inl28_acc0
+;   v37 = $inl2594_limit
+;   v52 = $inl2595_acc0
 ;   ss2 = w
 ;   ss3 = acc
 ;   v66 = c
 ;   v69 = stepped
-;   v69 = $inl391_self
-;   v105 = $inl392_span
+;   v69 = $inl2520_self
+;   v105 = $inl2521_span
 ; __m18__lead_loop
 function u0:139(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -48496,8 +48496,8 @@ block3:
 ;   ss1 = acc
 ;   v15 = c
 ;   v18 = stepped
-;   v18 = $inl391_self
-;   v54 = $inl392_span
+;   v18 = $inl2520_self
+;   v54 = $inl2521_span
 ; __m18__trailing_comment
 function u0:140(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -49097,10 +49097,10 @@ block7(v36: i64):
 ; source variables:
 ;   v1 = self
 ;   v97 = c
-;   v1 = $inl250_self
+;   v1 = $inl2379_self
 ;   v137 = t
-;   v1 = $inl397_self
-;   v152 = $inl398_span
+;   v1 = $inl2526_self
+;   v152 = $inl2527_span
 ; __m18__take_comment
 function u0:141(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 64, align = 8
@@ -50887,7 +50887,7 @@ block24(v493: i64):
 ; source variables:
 ;   v0 = items
 ;   v1 = style
-;   v1 = $inl29_self
+;   v1 = $inl2596_self
 ;   v2 = __spat$16554
 ;   v311 = open
 ;   v313 = close
@@ -50895,7 +50895,7 @@ block24(v493: i64):
 ;   ss36 = __spread$0
 ;   v459 = inner
 ;   ss38 = parts
-;   v552 = $inl0_self
+;   v552 = $inl2129_self
 ; __m18__format_program
 function u0:144(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 48, align = 8
@@ -53790,18 +53790,18 @@ block346:
 ; source variables:
 ;   v1 = src
 ;   v2 = width
-;   v1 = $inl217_src
-;   v4 = $inl129_self
+;   v1 = $inl2346_src
+;   v4 = $inl2696_self
 ;   v10 = v
 ;   v47 = e
-;   v47 = $inl128_e
+;   v47 = $inl2695_e
 ;   v151 = __spat$17634
-;   v1 = $inl240_src
-;   v152 = $inl131_$arr
+;   v1 = $inl2369_src
+;   v152 = $inl2698_$arr
 ;   ss6 = $out
 ;   v184 = $e
-;   v184 = $inl130_t
-;   v231 = $inl399_k
+;   v184 = $inl2697_t
+;   v231 = $inl2528_k
 ;   v418 = _
 ;   v424 = _
 ;   v430 = _
@@ -53814,12 +53814,12 @@ block346:
 ;   v559 = _
 ;   v561 = _
 ;   v566 = _
-;   v846 = $inl241_toks
-;   v847 = $inl133_$arr
+;   v846 = $inl2370_toks
+;   v847 = $inl2700_$arr
 ;   ss159 = $out
 ;   v879 = $e
-;   v879 = $inl132_t
-;   v988 = $inl242_comments
+;   v879 = $inl2699_t
+;   v988 = $inl2371_comments
 ;   v1065 = d
 ;   v1144 = c
 ; __m18__fmt_kind
@@ -55202,7 +55202,7 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = n
-;   v0 = $inl30_self
+;   v0 = $inl2597_self
 ; __m18__is_int_type_name
 function u0:147(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -55549,11 +55549,11 @@ block7(v39: i64):
 ;   v0 = self
 ;   v1 = n
 ;   v2 = k
-;   v13 = $inl136_self
+;   v13 = $inl2703_self
 ;   v42 = x
-;   v2 = $inl137_$cap77
-;   v42 = $inl134_t
-;   v2 = $inl135_k
+;   v2 = $inl2704_$cap77
+;   v42 = $inl2701_t
+;   v2 = $inl2702_k
 ; __m18__comment_before_cursor
 function u0:151(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -56456,10 +56456,10 @@ block42:
 ; source variables:
 ;   v0 = self
 ;   v3 = n
-;   v23 = $inl274_self
+;   v23 = $inl3041_self
 ;   v54 = v
-;   v63 = $inl275_default
-;   v52 = $inl434_self
+;   v63 = $inl3042_default
+;   v52 = $inl2563_self
 ;   v91 = _
 ;   v94 = _
 ;   v97 = _
@@ -58918,23 +58918,23 @@ block71:
 
 ; source variables:
 ;   v1 = self
-;   v141 = $inl35_self
-;   v149 = $inl36_acc0
+;   v141 = $inl2602_self
+;   v149 = $inl2603_acc0
 ;   ss4 = w
 ;   ss5 = acc
 ;   v167 = first
-;   v169 = $inl291_self
-;   v169 = $inl6_self
-;   v174 = $inl7_n
+;   v169 = $inl2420_self
+;   v169 = $inl2773_self
+;   v174 = $inl2774_n
 ;   v183 = r
-;   v286 = $inl292_self
-;   v286 = $inl8_self
-;   v291 = $inl9_n
+;   v286 = $inl2421_self
+;   v286 = $inl2775_self
+;   v291 = $inl2776_n
 ;   v539 = names
 ;   v790 = __spat$23988
 ;   v792 = text
 ;   v946 = done
-;   v964 = $inl39_names
+;   v964 = $inl2606_names
 ; __m18__import_names
 function u0:162(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -59534,13 +59534,13 @@ block11:
 ;   ss0 = w
 ;   ss1 = acc
 ;   v18 = first
-;   v20 = $inl291_self
-;   v20 = $inl10_self
-;   v25 = $inl11_n
+;   v20 = $inl2420_self
+;   v20 = $inl2777_self
+;   v25 = $inl2778_n
 ;   v34 = r
-;   v137 = $inl292_self
-;   v137 = $inl12_self
-;   v142 = $inl13_n
+;   v137 = $inl2421_self
+;   v137 = $inl2779_self
+;   v142 = $inl2780_n
 ; __m18__import_alias
 function u0:163(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 88, align = 8
@@ -60446,9 +60446,9 @@ block91(v262: i64):
 ; source variables:
 ;   v0 = a
 ;   v1 = b
-;   v0 = $inl35_self
+;   v0 = $inl2164_self
 ;   v2 = a_op
-;   v1 = $inl36_self
+;   v1 = $inl2165_self
 ; __m18__sorted_import_names$tail
 function u0:166(i64) -> i64 tail {
     sig0 = (i64) -> i64 apple_aarch64
@@ -61709,17 +61709,17 @@ block48:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl293_self
-;   v1 = $inl14_self
-;   v2 = $inl15_n
+;   v1 = $inl2422_self
+;   v1 = $inl2781_self
+;   v2 = $inl2782_n
 ;   v80 = inner
-;   v1 = $inl294_self
-;   v1 = $inl16_self
-;   v225 = $inl17_n
+;   v1 = $inl2423_self
+;   v1 = $inl2783_self
+;   v225 = $inl2784_n
 ;   v298 = base
-;   v300 = $inl295_self
-;   v300 = $inl18_self
-;   v305 = $inl19_n
+;   v300 = $inl2424_self
+;   v300 = $inl2785_self
+;   v305 = $inl2786_n
 ;   v404 = e
 ; __m18__paren_ty
 function u0:169(i64, i64) apple_aarch64 {
@@ -63963,26 +63963,26 @@ block63:
 ;   v80 = args
 ;   v166 = closed
 ;   v174 = list
-;   v166 = $inl296_self
-;   v166 = $inl20_self
-;   v175 = $inl21_n
+;   v166 = $inl2425_self
+;   v166 = $inl2787_self
+;   v175 = $inl2788_n
 ;   v288 = r
-;   v166 = $inl297_self
-;   v166 = $inl22_self
-;   v470 = $inl23_n
+;   v166 = $inl2426_self
+;   v166 = $inl2789_self
+;   v470 = $inl2790_n
 ;   v583 = e
-;   v166 = $inl298_self
-;   v166 = $inl24_self
-;   v765 = $inl25_n
-;   v166 = $inl44_self
-;   v935 = $inl45_acc0
+;   v166 = $inl2427_self
+;   v166 = $inl2791_self
+;   v765 = $inl2792_n
+;   v166 = $inl2611_self
+;   v935 = $inl2612_acc0
 ;   ss26 = w
 ;   ss27 = acc
-;   v945 = $inl305_self
-;   v945 = $inl26_self
-;   v946 = $inl27_n
-;   v956 = $inl258_self
-;   v957 = $inl259_n
+;   v945 = $inl2434_self
+;   v945 = $inl2793_self
+;   v946 = $inl2794_n
+;   v956 = $inl2387_self
+;   v957 = $inl2388_n
 ;   v1077 = arrs
 ;   ss38 = __spread$1
 ; __m18__ty_list
@@ -64492,9 +64492,9 @@ block18:
 ;   ss0 = w
 ;   ss1 = acc
 ;   v72 = t
-;   v85 = $inl299_self
-;   v85 = $inl28_self
-;   v90 = $inl29_n
+;   v85 = $inl2428_self
+;   v85 = $inl2795_self
+;   v90 = $inl2796_n
 ; __m18__base_ty
 function u0:171(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -65469,23 +65469,23 @@ block34:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl300_self
-;   v1 = $inl30_self
-;   v2 = $inl31_n
+;   v1 = $inl2429_self
+;   v1 = $inl2797_self
+;   v2 = $inl2798_n
 ;   v11 = head
-;   v141 = $inl42_self
-;   v149 = $inl43_acc0
+;   v141 = $inl2609_self
+;   v149 = $inl2610_acc0
 ;   ss4 = w
 ;   ss5 = acc
 ;   ss6 = more
-;   v163 = $inl303_self
-;   v163 = $inl32_self
-;   v164 = $inl33_n
-;   v240 = $inl304_self
-;   v240 = $inl34_self
-;   v241 = $inl35_n
-;   v251 = $inl256_self
-;   v252 = $inl257_n
+;   v163 = $inl2432_self
+;   v163 = $inl2799_self
+;   v164 = $inl2800_n
+;   v240 = $inl2433_self
+;   v240 = $inl2801_self
+;   v241 = $inl2802_n
+;   v251 = $inl2385_self
+;   v252 = $inl2386_n
 ;   v378 = __spat$28706
 ;   v379 = docs
 ;   ss23 = __spread$2
@@ -66682,9 +66682,9 @@ block45:
 ; source variables:
 ;   v1 = self
 ;   v155 = k
-;   v157 = $inl301_self
-;   v157 = $inl36_self
-;   v162 = $inl37_n
+;   v157 = $inl2430_self
+;   v157 = $inl2803_self
+;   v162 = $inl2804_n
 ;   v171 = __spat$28971
 ;   v329 = docs
 ;   v438 = closed
@@ -67904,9 +67904,9 @@ block28:
 ; source variables:
 ;   v1 = self
 ;   v2 = n
-;   v4 = $inl302_self
-;   v4 = $inl38_self
-;   v9 = $inl39_n
+;   v4 = $inl2431_self
+;   v4 = $inl2805_self
+;   v9 = $inl2806_n
 ;   v220 = args
 ;   v322 = closed
 ; __m18__type_suffixes
@@ -68389,14 +68389,14 @@ block3:
 ;   ss0 = w
 ;   ss1 = acc
 ;   ss2 = more
-;   v14 = $inl303_self
-;   v14 = $inl40_self
-;   v15 = $inl41_n
-;   v91 = $inl304_self
-;   v91 = $inl42_self
-;   v92 = $inl43_n
-;   v102 = $inl256_self
-;   v103 = $inl257_n
+;   v14 = $inl2432_self
+;   v14 = $inl2807_self
+;   v15 = $inl2808_n
+;   v91 = $inl2433_self
+;   v91 = $inl2809_self
+;   v92 = $inl2810_n
+;   v102 = $inl2385_self
+;   v103 = $inl2386_n
 ; __m18__array_suffixes
 function u0:176(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -68710,11 +68710,11 @@ block3:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v10 = $inl305_self
-;   v10 = $inl44_self
-;   v11 = $inl45_n
-;   v21 = $inl258_self
-;   v22 = $inl259_n
+;   v10 = $inl2434_self
+;   v10 = $inl2811_self
+;   v11 = $inl2812_n
+;   v21 = $inl2387_self
+;   v22 = $inl2388_n
 ; __m18__type_params
 function u0:177(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -69782,21 +69782,21 @@ block27:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl306_self
-;   v1 = $inl46_self
-;   v2 = $inl47_n
-;   v103 = $inl46_self
-;   v111 = $inl47_acc0
+;   v1 = $inl2435_self
+;   v1 = $inl2813_self
+;   v2 = $inl2814_n
+;   v103 = $inl2613_self
+;   v111 = $inl2614_acc0
 ;   ss6 = w
 ;   ss7 = acc
 ;   v129 = n
-;   v131 = $inl307_self
-;   v131 = $inl48_self
-;   v136 = $inl49_n
+;   v131 = $inl2436_self
+;   v131 = $inl2815_self
+;   v136 = $inl2816_n
 ;   v145 = p
-;   v234 = $inl308_self
-;   v234 = $inl50_self
-;   v239 = $inl51_n
+;   v234 = $inl2437_self
+;   v234 = $inl2817_self
+;   v239 = $inl2818_n
 ;   v370 = __spat$31294
 ;   v464 = closed
 ; __m18__type_param_list
@@ -70323,13 +70323,13 @@ block3:
 ;   ss0 = w
 ;   ss1 = acc
 ;   v18 = n
-;   v20 = $inl307_self
-;   v20 = $inl52_self
-;   v25 = $inl53_n
+;   v20 = $inl2436_self
+;   v20 = $inl2819_self
+;   v25 = $inl2820_n
 ;   v34 = p
-;   v123 = $inl308_self
-;   v123 = $inl54_self
-;   v128 = $inl55_n
+;   v123 = $inl2437_self
+;   v123 = $inl2821_self
+;   v128 = $inl2822_n
 ; __m18__param_bound
 function u0:179(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 88, align = 8
@@ -71941,16 +71941,16 @@ block57:
 ;   v63 = n
 ;   v143 = tps
 ;   v241 = eq
-;   v241 = $inl309_self
-;   v241 = $inl56_self
-;   v246 = $inl57_n
+;   v241 = $inl2438_self
+;   v241 = $inl2823_self
+;   v246 = $inl2824_n
 ;   v389 = cs
-;   v435 = $inl48_cases
+;   v435 = $inl2615_cases
 ;   ss15 = out
 ;   ss16 = __idx$36496
 ;   v469 = c
 ;   v473 = i
-;   v627 = $inl1_self
+;   v627 = $inl2130_self
 ; __m18__variant_cases
 function u0:181(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -72828,14 +72828,14 @@ block21:
 ;   ss2 = more
 ;   v15 = l
 ;   v22 = n
-;   v24 = $inl310_self
-;   v24 = $inl58_self
-;   v29 = $inl59_n
+;   v24 = $inl2439_self
+;   v24 = $inl2825_self
+;   v29 = $inl2826_n
 ;   v38 = payload
 ;   v205 = tc
-;   v250 = $inl311_self
-;   v250 = $inl60_self
-;   v255 = $inl61_n
+;   v250 = $inl2440_self
+;   v250 = $inl2827_self
+;   v255 = $inl2828_n
 ; __m18__variant_payload
 function u0:182(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 88, align = 8
@@ -75410,25 +75410,25 @@ block77:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v17 = $inl260_self
-;   v18 = $inl261_n
+;   v17 = $inl2389_self
+;   v18 = $inl2390_n
 ;   v30 = n
 ;   v199 = t
-;   v307 = $inl262_self
-;   v308 = $inl263_n
-;   v318 = $inl264_self
-;   v319 = $inl265_n
+;   v307 = $inl2391_self
+;   v308 = $inl2392_n
+;   v318 = $inl2393_self
+;   v319 = $inl2394_n
 ;   v332 = n
 ;   v532 = t
 ;   v720 = t
 ;   v27 = head
-;   v790 = $inl312_self
-;   v790 = $inl62_self
-;   v795 = $inl63_n
+;   v790 = $inl2441_self
+;   v790 = $inl2829_self
+;   v795 = $inl2830_n
 ;   v804 = d
-;   v928 = $inl313_self
-;   v928 = $inl64_self
-;   v933 = $inl65_n
+;   v928 = $inl2442_self
+;   v928 = $inl2831_self
+;   v933 = $inl2832_n
 ; __m18__variant_body
 function u0:184(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -77293,12 +77293,12 @@ block31:
 ;   ss0 = w
 ;   ss1 = imports
 ;   ss2 = items
-;   v12 = $inl387_self
+;   v12 = $inl2516_self
 ;   v24 = l
-;   v52 = $inl388_self
-;   v74 = $inl314_self
-;   v74 = $inl66_self
-;   v75 = $inl67_n
+;   v52 = $inl2517_self
+;   v74 = $inl2443_self
+;   v74 = $inl2833_self
+;   v75 = $inl2834_n
 ;   v161 = im
 ;   v168 = tc
 ;   v336 = it
@@ -77843,23 +77843,23 @@ block31:
 
 ; source variables:
 ;   v0 = entries
-;   v0 = $inl145_self
+;   v0 = $inl2712_self
 ;   ss0 = out
 ;   v32 = x
 ;   ss3 = k
 ;   ss4 = placed
 ;   v103 = y
-;   v32 = $inl143_a
-;   v103 = $inl144_b
-;   v108 = $inl40_a
-;   v110 = $inl41_b
+;   v32 = $inl2710_a
+;   v103 = $inl2711_b
+;   v108 = $inl2607_a
+;   v110 = $inl2608_b
 ;   v115 = a_builtins
 ;   v100 = step
 ;   ss9 = __spread$0
-;   v225 = $inl147_$arr
+;   v225 = $inl2714_$arr
 ;   ss10 = $out
 ;   v257 = $e
-;   v257 = $inl146_e
+;   v257 = $inl2713_e
 ; __m18__item
 function u0:188(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -78535,13 +78535,13 @@ block30:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl401_self
-;   v2 = $inl402_k
+;   v1 = $inl2530_self
+;   v2 = $inl2531_k
 ;   v7 = __spat$39407
 ;   v75 = rest
-;   v1 = $inl315_self
-;   v1 = $inl68_self
-;   v224 = $inl69_n
+;   v1 = $inl2444_self
+;   v1 = $inl2835_self
+;   v224 = $inl2836_n
 ;   v227 = t
 ; __m18__fn_item
 function u0:189(i64, i64) apple_aarch64 {
@@ -81675,9 +81675,9 @@ block91:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl316_self
-;   v1 = $inl70_self
-;   v2 = $inl71_n
+;   v1 = $inl2445_self
+;   v1 = $inl2837_self
+;   v2 = $inl2838_n
 ;   v11 = head
 ;   v200 = n
 ;   v291 = tps
@@ -81685,18 +81685,18 @@ block91:
 ;   v654 = closed
 ;   ss16 = __spread$5
 ;   v740 = sig
-;   v654 = $inl49_self
-;   v740 = $inl50_acc0
+;   v654 = $inl2616_self
+;   v740 = $inl2617_acc0
 ;   ss23 = w
 ;   ss24 = acc
-;   v748 = $inl319_self
-;   v748 = $inl72_self
-;   v749 = $inl73_n
+;   v748 = $inl2448_self
+;   v748 = $inl2839_self
+;   v749 = $inl2840_n
 ;   v767 = e
 ;   v876 = effs
-;   v878 = $inl317_self
-;   v878 = $inl74_self
-;   v883 = $inl75_n
+;   v878 = $inl2446_self
+;   v878 = $inl2841_self
+;   v883 = $inl2842_n
 ;   v892 = ret
 ;   v1281 = body
 ;   ss41 = __spread$6
@@ -82041,13 +82041,13 @@ block11(v98: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl318_self
-;   v1 = $inl76_self
-;   v2 = $inl77_n
-;   v1 = $inl266_self
-;   v28 = $inl267_n
-;   v1 = $inl268_self
-;   v83 = $inl269_n
+;   v1 = $inl2447_self
+;   v1 = $inl2843_self
+;   v2 = $inl2844_n
+;   v1 = $inl2395_self
+;   v28 = $inl2396_n
+;   v1 = $inl2397_self
+;   v83 = $inl2398_n
 ;   v86 = after
 ; __m18__construct_body
 function u0:191(i64, i64) apple_aarch64 {
@@ -82824,10 +82824,10 @@ block28:
 ;   v57 = __spat$43045
 ;   v58 = docs
 ;   v132 = closed
-;   v1 = $inl270_self
-;   v137 = $inl271_n
-;   v1 = $inl272_self
-;   v146 = $inl273_n
+;   v1 = $inl2399_self
+;   v137 = $inl2400_n
+;   v1 = $inl2401_self
+;   v146 = $inl2402_n
 ;   ss7 = __spread$7
 ;   v191 = item
 ; __m18__fn_effects
@@ -83144,9 +83144,9 @@ block3:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v10 = $inl319_self
-;   v10 = $inl78_self
-;   v11 = $inl79_n
+;   v10 = $inl2448_self
+;   v10 = $inl2845_self
+;   v11 = $inl2846_n
 ;   v29 = e
 ; __m18__fn_return
 function u0:193(i64, i64, i64) apple_aarch64 {
@@ -84718,14 +84718,14 @@ block38:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v10 = $inl320_self
-;   v10 = $inl80_self
-;   v11 = $inl81_n
+;   v10 = $inl2449_self
+;   v10 = $inl2847_self
+;   v11 = $inl2848_n
 ;   v29 = a
 ;   v124 = opened
-;   v124 = $inl321_self
-;   v124 = $inl82_self
-;   v129 = $inl83_n
+;   v124 = $inl2450_self
+;   v124 = $inl2849_self
+;   v129 = $inl2850_n
 ;   v138 = arg
 ; __m18__params_until
 function u0:195(i64, i64, i64, i64) apple_aarch64 {
@@ -85234,9 +85234,9 @@ block18:
 ;   ss0 = w
 ;   ss1 = acc
 ;   v72 = p
-;   v85 = $inl322_self
-;   v85 = $inl84_self
-;   v90 = $inl85_n
+;   v85 = $inl2451_self
+;   v85 = $inl2851_self
+;   v90 = $inl2852_n
 ; __m18__one_param
 function u0:196(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 72, align = 8
@@ -87907,32 +87907,32 @@ block63:
 ; source variables:
 ;   v1 = self
 ;   v2 = l
-;   v4 = $inl323_self
-;   v4 = $inl86_self
-;   v9 = $inl87_n
+;   v4 = $inl2452_self
+;   v4 = $inl2853_self
+;   v9 = $inl2854_n
 ;   v18 = m
 ;   v153 = n
-;   v155 = $inl324_self
-;   v155 = $inl88_self
-;   v160 = $inl89_n
+;   v155 = $inl2453_self
+;   v155 = $inl2855_self
+;   v160 = $inl2856_n
 ;   v193 = ids
 ;   v317 = closed
 ;   ss15 = __spread$9
-;   v580 = $inl325_self
-;   v580 = $inl90_self
-;   v585 = $inl91_n
+;   v580 = $inl2454_self
+;   v580 = $inl2857_self
+;   v585 = $inl2858_n
 ;   v593 = opt
 ;   v848 = t
 ;   ss36 = __spread$10
 ;   v937 = typed
-;   v939 = $inl326_self
-;   v939 = $inl92_self
-;   v944 = $inl93_n
+;   v939 = $inl2455_self
+;   v939 = $inl2859_self
+;   v944 = $inl2860_n
 ;   ss48 = __mut_copy$92
 ;   v953 = v
-;   v1078 = $inl327_self
-;   v1078 = $inl94_self
-;   v1083 = $inl95_n
+;   v1078 = $inl2456_self
+;   v1078 = $inl2861_self
+;   v1083 = $inl2862_n
 ;   v1092 = d
 ; __m18__spaced_default
 function u0:197(i64, i64, i64) apple_aarch64 {
@@ -90839,13 +90839,13 @@ block41:
 ;   v25 = f
 ;   v216 = t
 ;   v246 = base
-;   v258 = $inl328_self
-;   v258 = $inl96_self
-;   v263 = $inl97_n
+;   v258 = $inl2457_self
+;   v258 = $inl2863_self
+;   v263 = $inl2864_n
 ;   v272 = d
-;   v461 = $inl329_self
-;   v461 = $inl98_self
-;   v466 = $inl99_n
+;   v461 = $inl2458_self
+;   v461 = $inl2865_self
+;   v466 = $inl2866_n
 ; __m18__block
 function u0:200(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 80, align = 8
@@ -91122,7 +91122,7 @@ block12:
 ; source variables:
 ;   v1 = self
 ;   v51 = __spat$48905
-;   v58 = $inl2_self
+;   v58 = $inl2131_self
 ; __m18__block_layout
 function u0:201(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -93105,7 +93105,7 @@ block49:
 ;   ss2 = prev_end
 ;   ss3 = open
 ;   v17 = l
-;   v18 = $inl431_self
+;   v18 = $inl2560_self
 ;   v41 = ds
 ;   v49 = _
 ;   v52 = _
@@ -93114,16 +93114,16 @@ block49:
 ;   v59 = _
 ;   v60 = _
 ;   v68 = had_lead
-;   v97 = $inl393_self
-;   v109 = $inl394_span
+;   v97 = $inl2522_self
+;   v109 = $inl2523_span
 ;   v117 = blank
-;   v155 = $inl330_self
-;   v155 = $inl100_self
-;   v156 = $inl101_n
+;   v155 = $inl2459_self
+;   v155 = $inl2867_self
+;   v156 = $inl2868_n
 ;   v180 = start
 ;   v252 = stmt
-;   v259 = $inl395_self
-;   v264 = $inl396_span
+;   v259 = $inl2524_self
+;   v264 = $inl2525_span
 ;   v298 = tc
 ; __m18__trim_last_break$tail
 function u0:204(i64) -> i64 tail {
@@ -93449,10 +93449,10 @@ block42:
 ; source variables:
 ;   v0 = self
 ;   v3 = n
-;   v23 = $inl276_self
+;   v23 = $inl3043_self
 ;   v54 = v
-;   v63 = $inl277_default
-;   v52 = $inl433_self
+;   v63 = $inl3044_default
+;   v52 = $inl2562_self
 ;   v89 = ds
 ;   v98 = _
 ;   v100 = _
@@ -94927,16 +94927,16 @@ block64:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl331_self
-;   v1 = $inl102_self
-;   v2 = $inl103_n
+;   v1 = $inl2460_self
+;   v1 = $inl2869_self
+;   v2 = $inl2870_n
 ;   v5 = t
 ;   v140 = v
 ;   v226 = done
 ;   v509 = e
-;   v511 = $inl332_self
-;   v511 = $inl104_self
-;   v516 = $inl105_n
+;   v511 = $inl2461_self
+;   v511 = $inl2871_self
+;   v516 = $inl2872_n
 ; __m18__let_stmt
 function u0:207(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 88, align = 8
@@ -97659,16 +97659,16 @@ block92:
 ; source variables:
 ;   v1 = self
 ;   v4 = kw
-;   v4 = $inl333_self
-;   v4 = $inl106_self
-;   v9 = $inl107_n
+;   v4 = $inl2462_self
+;   v4 = $inl2873_self
+;   v9 = $inl2874_n
 ;   v36 = ids
 ;   v355 = v
 ;   v488 = done
 ;   v784 = n
-;   v786 = $inl334_self
-;   v786 = $inl108_self
-;   v791 = $inl109_n
+;   v786 = $inl2463_self
+;   v786 = $inl2875_self
+;   v791 = $inl2876_n
 ;   v942 = a
 ;   v1149 = v
 ;   v1274 = done
@@ -98996,9 +98996,9 @@ block46:
 ; source variables:
 ;   v1 = self
 ;   v9 = n
-;   v11 = $inl335_self
-;   v11 = $inl110_self
-;   v16 = $inl111_n
+;   v11 = $inl2464_self
+;   v11 = $inl2877_self
+;   v16 = $inl2878_n
 ;   v167 = a
 ;   v374 = v
 ;   v499 = done
@@ -100748,9 +100748,9 @@ block18:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl336_self
-;   v1 = $inl112_self
-;   v2 = $inl113_n
+;   v1 = $inl2465_self
+;   v1 = $inl2879_self
+;   v2 = $inl2880_n
 ;   v169 = __spat$55982
 ; __m18__is_compound_assign
 function u0:211(i64) -> i64 apple_aarch64 {
@@ -103564,22 +103564,22 @@ block94:
 ; source variables:
 ;   v1 = self
 ;   v9 = n
-;   v11 = $inl337_self
-;   v11 = $inl114_self
-;   v16 = $inl115_n
+;   v11 = $inl2466_self
+;   v11 = $inl2881_self
+;   v16 = $inl2882_n
 ;   v19 = step
-;   v19 = $inl436_self
+;   v19 = $inl2565_self
 ;   v144 = done
-;   v331 = $inl338_self
-;   v331 = $inl116_self
-;   v336 = $inl117_n
+;   v331 = $inl2467_self
+;   v331 = $inl2883_self
+;   v336 = $inl2884_n
 ;   v339 = compound
-;   v339 = $inl435_self
+;   v339 = $inl2564_self
 ;   v473 = v
 ;   v591 = done
-;   v836 = $inl339_self
-;   v836 = $inl118_self
-;   v841 = $inl119_n
+;   v836 = $inl2468_self
+;   v836 = $inl2885_self
+;   v841 = $inl2886_n
 ;   v1113 = v
 ;   v1235 = done
 ; __m18__set_member
@@ -105796,18 +105796,18 @@ block71:
 ; source variables:
 ;   v1 = self
 ;   v2 = name
-;   v1 = $inl51_self
-;   v2 = $inl52_acc0
+;   v1 = $inl2618_self
+;   v2 = $inl2619_acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v13 = $inl341_self
-;   v13 = $inl120_self
-;   v14 = $inl121_n
+;   v13 = $inl2470_self
+;   v13 = $inl2887_self
+;   v14 = $inl2888_n
 ;   v32 = m
 ;   v146 = p
-;   v148 = $inl340_self
-;   v148 = $inl122_self
-;   v153 = $inl123_n
+;   v148 = $inl2469_self
+;   v148 = $inl2889_self
+;   v153 = $inl2890_n
 ;   v260 = v
 ;   v369 = done
 ;   v683 = opened
@@ -106146,9 +106146,9 @@ block3:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v13 = $inl341_self
-;   v13 = $inl124_self
-;   v14 = $inl125_n
+;   v13 = $inl2470_self
+;   v13 = $inl2891_self
+;   v14 = $inl2892_n
 ;   v32 = m
 ; __m18__for_stmt
 function u0:216(i64, i64) apple_aarch64 {
@@ -108618,17 +108618,17 @@ block76:
 ; source variables:
 ;   v1 = self
 ;   v162 = opened
-;   v162 = $inl342_self
-;   v162 = $inl126_self
-;   v167 = $inl127_n
-;   v162 = $inl53_self
+;   v162 = $inl2471_self
+;   v162 = $inl2893_self
+;   v167 = $inl2894_n
+;   v162 = $inl2620_self
 ;   v194 = ids
 ;   v211 = s
 ;   v310 = _
 ;   v454 = b
-;   v456 = $inl343_self
-;   v456 = $inl128_self
-;   v461 = $inl129_n
+;   v456 = $inl2472_self
+;   v456 = $inl2895_self
+;   v461 = $inl2896_n
 ;   v484 = item
 ;   v176 = binder
 ;   v873 = it
@@ -110478,14 +110478,14 @@ block3:
 ;   v3 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v11 = $inl344_self
-;   v11 = $inl130_self
-;   v12 = $inl131_n
-;   v18 = $inl389_self
+;   v11 = $inl2473_self
+;   v11 = $inl2897_self
+;   v12 = $inl2898_n
+;   v18 = $inl2518_self
 ;   v31 = n
-;   v43 = $inl345_self
-;   v43 = $inl132_self
-;   v48 = $inl133_n
+;   v43 = $inl2474_self
+;   v43 = $inl2899_self
+;   v48 = $inl2900_n
 ; __m18__expr
 function u0:220(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 80, align = 8
@@ -111190,11 +111190,11 @@ block15:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v10 = $inl346_self
-;   v10 = $inl134_self
-;   v11 = $inl135_n
-;   v21 = $inl274_self
-;   v22 = $inl275_n
+;   v10 = $inl2475_self
+;   v10 = $inl2901_self
+;   v11 = $inl2902_n
+;   v21 = $inl2403_self
+;   v22 = $inl2404_n
 ;   v112 = rhs
 ; __m18__binop_expr
 function u0:222(i64, i64) apple_aarch64 {
@@ -111824,7 +111824,7 @@ block25:
 ;   v69 = first
 ;   v153 = tail
 ;   ss3 = __spread$13
-;   v197 = $inl3_self
+;   v197 = $inl2132_self
 ;   v161 = d
 ; __m18__binop_tail
 function u0:223(i64, i64, i64) apple_aarch64 {
@@ -112800,14 +112800,14 @@ block40:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v10 = $inl347_self
-;   v10 = $inl136_self
-;   v11 = $inl137_n
-;   v14 = $inl54_t
+;   v10 = $inl2476_self
+;   v10 = $inl2903_self
+;   v11 = $inl2904_n
+;   v14 = $inl2621_t
 ;   v100 = op
 ;   v107 = lead_rhs
 ;   v194 = rhs
-;   v197 = $inl432_self
+;   v197 = $inl2561_self
 ;   v220 = ds
 ;   v228 = _
 ;   v231 = _
@@ -113439,12 +113439,12 @@ block3(v21: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl348_self
-;   v1 = $inl138_self
-;   v2 = $inl139_n
-;   v1 = $inl349_self
-;   v1 = $inl140_self
-;   v11 = $inl141_n
+;   v1 = $inl2477_self
+;   v1 = $inl2905_self
+;   v2 = $inl2906_n
+;   v1 = $inl2478_self
+;   v1 = $inl2907_self
+;   v11 = $inl2908_n
 ;   v22 = op
 ;   v90 = __spat$64049
 ; __m18__postfix
@@ -114790,23 +114790,23 @@ block64:
 ;   v124 = __spat$64255
 ;   v126 = w
 ;   v131 = segs
-;   v131 = $inl149_self
+;   v131 = $inl2716_self
 ;   ss4 = n
 ;   v262 = x
-;   v262 = $inl148_s
-;   v131 = $inl151_$arr
+;   v262 = $inl2715_s
+;   v131 = $inl2718_$arr
 ;   ss7 = $out
 ;   v329 = $e
-;   v329 = $inl150_s
+;   v329 = $inl2717_s
 ;   ss11 = __spread$14
-;   v131 = $inl153_$arr
+;   v131 = $inl2720_$arr
 ;   ss12 = $out
 ;   v394 = $e
-;   v394 = $inl152_s
-;   v131 = $inl55_segs
+;   v394 = $inl2719_s
+;   v131 = $inl2622_segs
 ;   ss18 = out
 ;   v565 = s
-;   v628 = $inl4_self
+;   v628 = $inl2133_self
 ; __m18__postfix_segs
 function u0:227(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -115608,9 +115608,9 @@ block34:
 ;   ss0 = w
 ;   ss1 = acc
 ;   ss2 = more
-;   v14 = $inl350_self
-;   v14 = $inl142_self
-;   v15 = $inl143_n
+;   v14 = $inl2479_self
+;   v14 = $inl2909_self
+;   v15 = $inl2910_n
 ;   v18 = t
 ;   v86 = d
 ;   v206 = d
@@ -116726,9 +116726,9 @@ block28:
 ; source variables:
 ;   v1 = self
 ;   v9 = m
-;   v11 = $inl351_self
-;   v11 = $inl144_self
-;   v16 = $inl145_n
+;   v11 = $inl2480_self
+;   v11 = $inl2911_self
+;   v16 = $inl2912_n
 ;   v279 = args
 ;   v396 = closed
 ; __m18__index_seg
@@ -117605,9 +117605,9 @@ block35:
 ; source variables:
 ;   v1 = self
 ;   v4 = opened
-;   v4 = $inl352_self
-;   v4 = $inl146_self
-;   v9 = $inl147_n
+;   v4 = $inl2481_self
+;   v4 = $inl2913_self
+;   v9 = $inl2914_n
 ;   v18 = __spat$66442
 ;   v177 = docs
 ;   v266 = closed
@@ -118921,13 +118921,13 @@ block34:
 ; source variables:
 ;   v1 = self
 ;   v51 = a
-;   v53 = $inl353_self
-;   v53 = $inl148_self
-;   v58 = $inl149_n
+;   v53 = $inl2482_self
+;   v53 = $inl2915_self
+;   v58 = $inl2916_n
 ;   v174 = dots
-;   v174 = $inl354_self
-;   v174 = $inl150_self
-;   v179 = $inl151_n
+;   v174 = $inl2483_self
+;   v174 = $inl2917_self
+;   v179 = $inl2918_n
 ;   v390 = b
 ; __m18__chain_docs
 function u0:232(i64) -> i64 apple_aarch64 {
@@ -119901,20 +119901,20 @@ block43(v344: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl403_self
-;   v2 = $inl404_k
-;   v1 = $inl405_self
-;   v21 = $inl406_k
-;   v1 = $inl407_self
-;   v96 = $inl408_k
-;   v1 = $inl409_self
-;   v100 = $inl410_k
-;   v1 = $inl411_self
-;   v105 = $inl412_k
+;   v1 = $inl2532_self
+;   v2 = $inl2533_k
+;   v1 = $inl2534_self
+;   v21 = $inl2535_k
+;   v1 = $inl2536_self
+;   v96 = $inl2537_k
+;   v1 = $inl2538_self
+;   v100 = $inl2539_k
+;   v1 = $inl2540_self
+;   v105 = $inl2541_k
 ;   v111 = __spat$68116
-;   v1 = $inl355_self
-;   v1 = $inl152_self
-;   v215 = $inl153_n
+;   v1 = $inl2484_self
+;   v1 = $inl2919_self
+;   v215 = $inl2920_n
 ;   v218 = t
 ; __m18__str_atom
 function u0:234(i64, i64) apple_aarch64 {
@@ -121299,9 +121299,9 @@ block48:
 ; source variables:
 ;   v1 = self
 ;   v70 = first
-;   v72 = $inl356_self
-;   v72 = $inl154_self
-;   v77 = $inl155_n
+;   v72 = $inl2485_self
+;   v72 = $inl2921_self
+;   v77 = $inl2922_n
 ;   v178 = closed
 ;   v448 = rest
 ;   v549 = closed
@@ -121957,13 +121957,13 @@ block21:
 ;   v2 = acc0
 ;   ss0 = w
 ;   ss1 = acc
-;   v10 = $inl357_self
-;   v10 = $inl156_self
-;   v11 = $inl157_n
+;   v10 = $inl2486_self
+;   v10 = $inl2923_self
+;   v11 = $inl2924_n
 ;   v24 = stepped
-;   v24 = $inl358_self
-;   v24 = $inl158_self
-;   v29 = $inl159_n
+;   v24 = $inl2487_self
+;   v24 = $inl2925_self
+;   v29 = $inl2926_n
 ;   v204 = e
 ; __m18__array_atom
 function u0:237(i64, i64) apple_aarch64 {
@@ -124117,13 +124117,13 @@ block31:
 ;   ss1 = acc
 ;   v18 = l
 ;   v93 = k
-;   v95 = $inl359_self
-;   v95 = $inl160_self
-;   v100 = $inl161_n
+;   v95 = $inl2488_self
+;   v95 = $inl2927_self
+;   v100 = $inl2928_n
 ;   v109 = e
-;   v288 = $inl360_self
-;   v288 = $inl162_self
-;   v293 = $inl163_n
+;   v288 = $inl2489_self
+;   v288 = $inl2929_self
+;   v293 = $inl2930_n
 ; __m18__dict_value
 function u0:240(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 88, align = 8
@@ -125814,24 +125814,24 @@ block38:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl413_self
-;   v2 = $inl414_k
-;   v1 = $inl415_self
-;   v6 = $inl416_k
-;   v1 = $inl417_self
-;   v11 = $inl418_k
-;   v1 = $inl361_self
-;   v1 = $inl164_self
-;   v24 = $inl165_n
+;   v1 = $inl2542_self
+;   v2 = $inl2543_k
+;   v1 = $inl2544_self
+;   v6 = $inl2545_k
+;   v1 = $inl2546_self
+;   v11 = $inl2547_k
+;   v1 = $inl2490_self
+;   v1 = $inl2931_self
+;   v24 = $inl2932_n
 ;   v64 = n
-;   v66 = $inl362_self
-;   v66 = $inl166_self
-;   v71 = $inl167_n
+;   v66 = $inl2491_self
+;   v66 = $inl2933_self
+;   v71 = $inl2934_n
 ;   v181 = args
 ;   v283 = closed
-;   v528 = $inl363_self
-;   v528 = $inl168_self
-;   v533 = $inl169_n
+;   v528 = $inl2492_self
+;   v528 = $inl2935_self
+;   v533 = $inl2936_n
 ; __m18__struct_atom
 function u0:242(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 80, align = 8
@@ -127785,18 +127785,18 @@ block34:
 ;   ss0 = w
 ;   ss1 = acc
 ;   v18 = l
-;   v20 = $inl364_self
-;   v20 = $inl170_self
-;   v25 = $inl171_n
+;   v20 = $inl2493_self
+;   v20 = $inl2937_self
+;   v25 = $inl2938_n
 ;   v132 = v
 ;   v233 = f
-;   v235 = $inl365_self
-;   v235 = $inl172_self
-;   v240 = $inl173_n
+;   v235 = $inl2494_self
+;   v235 = $inl2939_self
+;   v240 = $inl2940_n
 ;   v34 = e
-;   v474 = $inl366_self
-;   v474 = $inl174_self
-;   v479 = $inl175_n
+;   v474 = $inl2495_self
+;   v474 = $inl2941_self
+;   v479 = $inl2942_n
 ; __m18__struct_field_value
 function u0:244(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 88, align = 8
@@ -130669,26 +130669,26 @@ block94:
 ; source variables:
 ;   v1 = self
 ;   v131 = opened
-;   v131 = $inl367_self
-;   v131 = $inl176_self
-;   v136 = $inl177_n
+;   v131 = $inl2496_self
+;   v131 = $inl2943_self
+;   v136 = $inl2944_n
 ;   v238 = clause
 ;   v414 = cond
 ;   v512 = closed
 ;   v145 = lead
 ;   v711 = then_b
 ;   v717 = head
-;   v725 = $inl368_self
-;   v725 = $inl178_self
-;   v730 = $inl179_n
-;   v750 = $inl5_self
+;   v725 = $inl2497_self
+;   v725 = $inl2945_self
+;   v730 = $inl2946_n
+;   v750 = $inl2134_self
 ;   v887 = stepped
-;   v887 = $inl369_self
-;   v887 = $inl180_self
-;   v892 = $inl181_n
+;   v887 = $inl2498_self
+;   v887 = $inl2947_self
+;   v892 = $inl2948_n
 ;   v901 = tail
 ;   ss27 = __spread$16
-;   v1206 = $inl6_self
+;   v1206 = $inl2135_self
 ; __m18__if_let_clause
 function u0:246(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 80, align = 8
@@ -134940,7 +134940,7 @@ block52:
 ;   v246 = binds
 ;   v356 = closed
 ;   v469 = body
-;   v531 = $inl7_self
+;   v531 = $inl2136_self
 ; __m18__shim_bindings
 function u0:249(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -135619,9 +135619,9 @@ block18:
 ;   ss1 = acc
 ;   v18 = op
 ;   v106 = f
-;   v147 = $inl370_self
-;   v147 = $inl182_self
-;   v152 = $inl183_n
+;   v147 = $inl2499_self
+;   v147 = $inl2949_self
+;   v152 = $inl2950_n
 ; __m18__match_arms
 function u0:250(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -137190,13 +137190,13 @@ block61:
 ;   v93 = pat
 ;   v180 = alts
 ;   v284 = after
-;   v284 = $inl371_self
-;   v284 = $inl184_self
-;   v289 = $inl185_n
+;   v284 = $inl2500_self
+;   v284 = $inl2951_self
+;   v289 = $inl2952_n
 ;   v298 = body
-;   v534 = $inl372_self
-;   v534 = $inl186_self
-;   v539 = $inl187_n
+;   v534 = $inl2501_self
+;   v534 = $inl2953_self
+;   v539 = $inl2954_n
 ;   v596 = tc
 ; __m18__pattern_alts
 function u0:251(i64, i64, i64) apple_aarch64 {
@@ -137924,9 +137924,9 @@ block21:
 ;   v2 = first
 ;   ss0 = w
 ;   ss1 = parts
-;   v18 = $inl373_self
-;   v18 = $inl188_self
-;   v19 = $inl189_n
+;   v18 = $inl2502_self
+;   v18 = $inl2955_self
+;   v19 = $inl2956_n
 ;   v106 = next
 ; __m18__pattern
 function u0:252(i64, i64) apple_aarch64 {
@@ -139800,27 +139800,27 @@ block53:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl419_self
-;   v2 = $inl420_k
-;   v1 = $inl421_self
-;   v6 = $inl422_k
+;   v1 = $inl2548_self
+;   v2 = $inl2549_k
+;   v1 = $inl2550_self
+;   v6 = $inl2551_k
 ;   v12 = b
-;   v1 = $inl374_self
-;   v1 = $inl190_self
-;   v116 = $inl191_n
+;   v1 = $inl2503_self
+;   v1 = $inl2957_self
+;   v116 = $inl2958_n
 ;   v204 = elems
 ;   v290 = closed
 ;   v443 = n
-;   v445 = $inl375_self
-;   v445 = $inl192_self
-;   v450 = $inl193_n
-;   v461 = $inl56_self
-;   v467 = $inl57_name
+;   v445 = $inl2504_self
+;   v445 = $inl2959_self
+;   v450 = $inl2960_n
+;   v461 = $inl2623_self
+;   v467 = $inl2624_name
 ;   v475 = __spat$81033
 ;   v459 = q
-;   v572 = $inl376_self
-;   v572 = $inl194_self
-;   v577 = $inl195_n
+;   v572 = $inl2505_self
+;   v572 = $inl2961_self
+;   v577 = $inl2962_n
 ;   v723 = ids
 ;   v837 = closed
 ; __m18__qualified_case
@@ -140597,9 +140597,9 @@ block18:
 ;   ss1 = acc
 ;   v15 = l
 ;   v90 = a
-;   v120 = $inl377_self
-;   v120 = $inl196_self
-;   v125 = $inl197_n
+;   v120 = $inl2506_self
+;   v120 = $inl2963_self
+;   v125 = $inl2964_n
 ; __m18__call_arg
 function u0:255(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -142505,35 +142505,35 @@ block55(v896: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl378_self
-;   v1 = $inl198_self
-;   v2 = $inl199_n
+;   v1 = $inl2507_self
+;   v1 = $inl2965_self
+;   v2 = $inl2966_n
 ;   v80 = v
-;   v1 = $inl423_self
-;   v225 = $inl424_k
-;   v1 = $inl276_self
-;   v229 = $inl277_n
-;   v1 = $inl278_self
-;   v239 = $inl279_n
+;   v1 = $inl2552_self
+;   v225 = $inl2553_k
+;   v1 = $inl2405_self
+;   v229 = $inl2406_n
+;   v1 = $inl2407_self
+;   v239 = $inl2408_n
 ;   v250 = n
 ;   v356 = v
-;   v1 = $inl425_self
-;   v557 = $inl426_k
-;   v1 = $inl280_self
-;   v561 = $inl281_n
+;   v1 = $inl2554_self
+;   v557 = $inl2555_k
+;   v1 = $inl2409_self
+;   v561 = $inl2410_n
 ;   v572 = n
 ;   v659 = v
-;   v1 = $inl379_self
-;   v1 = $inl200_self
-;   v836 = $inl201_n
-;   v1 = $inl380_self
-;   v1 = $inl202_self
-;   v845 = $inl203_n
-;   v1 = $inl427_self
-;   v870 = $inl428_k
-;   v1 = $inl282_self
-;   v874 = $inl283_n
-;   v877 = $inl58_t
+;   v1 = $inl2508_self
+;   v1 = $inl2967_self
+;   v836 = $inl2968_n
+;   v1 = $inl2509_self
+;   v1 = $inl2969_self
+;   v845 = $inl2970_n
+;   v1 = $inl2556_self
+;   v870 = $inl2557_k
+;   v1 = $inl2411_self
+;   v874 = $inl2412_n
+;   v877 = $inl2625_t
 ;   v897 = b
 ; __m18__is_arg_end
 function u0:256(i64) -> i64 apple_aarch64 {
@@ -143982,15 +143982,15 @@ block58:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl381_self
-;   v1 = $inl204_self
-;   v2 = $inl205_n
+;   v1 = $inl2510_self
+;   v1 = $inl2971_self
+;   v2 = $inl2972_n
 ;   v121 = opened
 ;   v193 = ps
 ;   v11 = params
-;   v349 = $inl382_self
-;   v349 = $inl206_self
-;   v354 = $inl207_n
+;   v349 = $inl2511_self
+;   v349 = $inl2973_self
+;   v354 = $inl2974_n
 ;   v363 = body
 ;   ss16 = __spread$17
 ;   ss18 = d
@@ -144717,13 +144717,13 @@ block21:
 ;   ss0 = w
 ;   ss1 = acc
 ;   v18 = n
-;   v20 = $inl383_self
-;   v20 = $inl208_self
-;   v25 = $inl209_n
+;   v20 = $inl2512_self
+;   v20 = $inl2975_self
+;   v25 = $inl2976_n
 ;   v34 = p
-;   v196 = $inl384_self
-;   v196 = $inl210_self
-;   v201 = $inl211_n
+;   v196 = $inl2513_self
+;   v196 = $inl2977_self
+;   v201 = $inl2978_n
 ; __m18__lambda_param_ty
 function u0:259(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 88, align = 8
@@ -145417,10 +145417,10 @@ block16:
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl252_self
-;   v11 = $inl154_self
+;   v1 = $inl2381_self
+;   v11 = $inl2721_self
 ;   v40 = v
-;   v58 = $inl155_e
+;   v58 = $inl2722_e
 ;   v135 = __spat$84772
 ; __m18__template_scan
 function u0:261(i64, i64, i64, i64) apple_aarch64 {
@@ -146138,23 +146138,23 @@ block29:
 ;   v3 = depth0
 ;   ss0 = w
 ;   ss1 = depth
-;   v11 = $inl390_self
-;   v22 = $inl437_self
-;   v22 = $inl25_self
-;   v32 = $inl280_self
+;   v11 = $inl2519_self
+;   v22 = $inl2566_self
+;   v22 = $inl2592_self
+;   v32 = $inl3047_self
 ;   v61 = v
-;   v79 = $inl281_default
+;   v79 = $inl3048_default
 ;   v58 = __spat$85107
 ;   v85 = span
 ;   v87 = kind
-;   v89 = $inl32_self
-;   v90 = $inl33_end
+;   v89 = $inl2599_self
+;   v90 = $inl2600_end
 ;   v89 = __spread_base$3
 ;   v110 = stepped
-;   v110 = $inl59_self
-;   v133 = $inl60_end
+;   v110 = $inl2626_self
+;   v133 = $inl2627_end
 ;   ss10 = w
-;   v143 = $inl34_self
+;   v143 = $inl2601_self
 ;   v143 = __spread_base$4
 ; __m18__drop_comments_before
 function u0:262(i64, i64, i64) apple_aarch64 {
@@ -146313,7 +146313,7 @@ block3:
 ;   v1 = self
 ;   v2 = end
 ;   ss0 = w
-;   v12 = $inl34_self
+;   v12 = $inl2601_self
 ;   v12 = __spread_base$4
 ; __m18__cur_comment
 function u0:263(i64, i64) apple_aarch64 {
@@ -146428,9 +146428,9 @@ block7(v36: i64):
 
 ; source variables:
 ;   v1 = self
-;   v11 = $inl284_self
+;   v11 = $inl3051_self
 ;   v39 = v
-;   v47 = $inl285_default
+;   v47 = $inl3052_default
 ; __m18__cur_tok
 function u0:264(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -146567,10 +146567,10 @@ block7(v37: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl253_self
-;   v11 = $inl282_self
+;   v1 = $inl2382_self
+;   v11 = $inl3049_self
 ;   v40 = v
-;   v58 = $inl283_default
+;   v58 = $inl3050_default
 ; __m18__comment_starts_before
 function u0:265(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -146665,11 +146665,11 @@ block7(v36: i64):
 ; source variables:
 ;   v0 = self
 ;   v1 = end
-;   v11 = $inl158_self
+;   v11 = $inl2725_self
 ;   v39 = x
-;   v1 = $inl159_$cap100
-;   v39 = $inl156_c
-;   v1 = $inl157_end
+;   v1 = $inl2726_$cap100
+;   v39 = $inl2723_c
+;   v1 = $inl2724_end
 ; __m18__hugs_sole_arg
 function u0:266(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -146950,29 +146950,29 @@ block18(v96: i64):
 
 ; source variables:
 ;   v0 = self
-;   v0 = $inl31_self
-;   v0 = $inl385_self
-;   v0 = $inl212_self
-;   v41 = $inl213_n
+;   v0 = $inl2598_self
+;   v0 = $inl2514_self
+;   v0 = $inl2979_self
+;   v41 = $inl2980_n
 ;   v44 = t
 ;   v55 = direct
-;   v0 = $inl429_self
-;   v58 = $inl430_k
-;   v0 = $inl284_self
-;   v62 = $inl285_n
-;   v0 = $inl286_self
-;   v71 = $inl287_n
+;   v0 = $inl2558_self
+;   v58 = $inl2559_k
+;   v0 = $inl2413_self
+;   v62 = $inl2414_n
+;   v0 = $inl2415_self
+;   v71 = $inl2416_n
 ;   v90 = open_at
-;   v95 = $inl163_self
+;   v95 = $inl2730_self
 ;   v98 = x
-;   v0 = $inl164_$cap103
-;   v90 = $inl165_$cap104
-;   v98 = $inl160_close
-;   v0 = $inl161_self
-;   v90 = $inl162_open_at
-;   v0 = $inl61_self
-;   v90 = $inl62_open_at
-;   v98 = $inl63_close
+;   v0 = $inl2731_$cap103
+;   v90 = $inl2732_$cap104
+;   v98 = $inl2727_close
+;   v0 = $inl2728_self
+;   v90 = $inl2729_open_at
+;   v0 = $inl2628_self
+;   v90 = $inl2629_open_at
+;   v98 = $inl2630_close
 ; __m18__hug_close
 function u0:267(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -147498,10 +147498,10 @@ block3(v9: i64):
 ; source variables:
 ;   v0 = args
 ;   v1 = hug
-;   v0 = $inl166_self
-;   v31 = $inl278_self
+;   v0 = $inl2733_self
+;   v31 = $inl3045_self
 ;   v62 = v
-;   v71 = $inl279_default
+;   v71 = $inl3046_default
 ; __m18__walker_of
 function u0:270(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 48, align = 8
@@ -150028,18 +150028,18 @@ block313:
 
 ; source variables:
 ;   v1 = src
-;   v1 = $inl218_src
-;   v3 = $inl168_self
+;   v1 = $inl2347_src
+;   v3 = $inl2735_self
 ;   v9 = v
 ;   v46 = e
-;   v46 = $inl167_e
+;   v46 = $inl2734_e
 ;   v157 = __spat$90507
-;   v1 = $inl243_src
-;   v158 = $inl170_$arr
+;   v1 = $inl2372_src
+;   v158 = $inl2737_$arr
 ;   ss6 = $out
 ;   v190 = $e
-;   v190 = $inl169_t
-;   v237 = $inl400_k
+;   v190 = $inl2736_t
+;   v237 = $inl2529_k
 ;   v424 = _
 ;   v430 = _
 ;   v436 = _
@@ -150052,12 +150052,12 @@ block313:
 ;   v565 = _
 ;   v567 = _
 ;   v572 = _
-;   v852 = $inl244_toks
-;   v853 = $inl172_$arr
+;   v852 = $inl2373_toks
+;   v853 = $inl2739_$arr
 ;   ss159 = $out
 ;   v885 = $e
-;   v885 = $inl171_t
-;   v994 = $inl245_comments
+;   v885 = $inl2738_t
+;   v994 = $inl2374_comments
 ; __m18__rendered
 function u0:271(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -150327,7 +150327,7 @@ block3:
 ;   ss0 = k
 ;   ss1 = __idx$410
 ;   v11 = c
-;   v11 = $inl64_c
+;   v11 = $inl2631_c
 ;   v25 = i
 ; __lambda_2
 function u0:275(i64, i64) apple_aarch64 {
@@ -150472,7 +150472,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v36 = $e
-;   v36 = $inl65_l
+;   v36 = $inl2632_l
 ; __lambda_4
 function u0:277(i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -150493,7 +150493,7 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = l
-;   v0 = $inl216_self
+;   v0 = $inl2983_self
 ; __lambda_5
 function u0:278(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -150581,7 +150581,7 @@ block3:
 ;   v0 = self
 ;   ss0 = n
 ;   v8 = x
-;   v8 = $inl67_c
+;   v8 = $inl2634_c
 ; __lambda_7$tail
 function u0:281(i64, i64, i64) -> i64 tail {
     ss0 = explicit_slot 24, align = 8
@@ -150766,9 +150766,9 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v36 = $e
-;   v36 = $inl66_l
-;   v36 = $inl217_self
-;   v36 = $inl68_l
+;   v36 = $inl2633_l
+;   v36 = $inl2984_self
+;   v36 = $inl2635_l
 ; __builtin_value_or$u64
 function u0:283(i64, i64) -> i64 apple_aarch64 {
 block0(v0: i64, v1: i64):
@@ -150886,7 +150886,7 @@ block3(v9: i64):
 ; source variables:
 ;   v1 = line
 ;   v2 = n
-;   v1 = $inl218_self
+;   v1 = $inl2985_self
 ; __map11
 function u0:287(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -151041,9 +151041,9 @@ block3:
 ;   v1 = $cap10
 ;   ss0 = $out
 ;   v37 = $e
-;   v37 = $inl72_line
-;   v37 = $inl219_self
-;   v1 = $inl73_n
+;   v37 = $inl2639_line
+;   v37 = $inl2986_self
+;   v1 = $inl2640_n
 ; __builtin_any$__m17__Doc$lam12$tail
 function u0:289(i64) -> i64 tail {
     ss0 = explicit_slot 8, align = 8
@@ -151191,8 +151191,8 @@ block0(v0: i64, v1: i64, v2: i64, v3: i64):
 ; source variables:
 ;   v0 = d
 ;   v1 = work
-;   v2 = $inl24_sp
-;   v3 = $inl25_flat
+;   v2 = $inl2153_sp
+;   v3 = $inl2154_flat
 ; __builtin_right_fold$__m17__Doc$__m17__Work$lam16
 function u0:291(i64, i64, i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -151385,10 +151385,10 @@ block3:
 ;   ss0 = acc
 ;   ss1 = i
 ;   v61 = x
-;   v61 = $inl76_d
-;   v63 = $inl77_work
-;   v2 = $inl78_$inl24_sp
-;   v3 = $inl79_$inl25_flat
+;   v61 = $inl2643_d
+;   v63 = $inl2644_work
+;   v2 = $inl2645_$inl2153_sp
+;   v3 = $inl2646_$inl2154_flat
 ; __lambda_17
 function u0:292(i64, i64, i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -151426,8 +151426,8 @@ block0(v0: i64, v1: i64, v2: i64, v3: i64):
 ; source variables:
 ;   v0 = d
 ;   v1 = work
-;   v2 = $inl28_sp
-;   v3 = $inl29_flat
+;   v2 = $inl2157_sp
+;   v3 = $inl2158_flat
 ; __builtin_right_fold$__m17__Doc$__m17__Work$lam20
 function u0:293(i64, i64, i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -151620,10 +151620,10 @@ block3:
 ;   ss0 = acc
 ;   ss1 = i
 ;   v61 = x
-;   v61 = $inl80_d
-;   v63 = $inl81_work
-;   v2 = $inl82_$inl28_sp
-;   v3 = $inl83_$inl29_flat
+;   v61 = $inl2647_d
+;   v63 = $inl2648_work
+;   v2 = $inl2649_$inl2157_sp
+;   v3 = $inl2650_$inl2158_flat
 ; __lambda_21
 function u0:294(i64, i64, i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -151855,10 +151855,10 @@ block3:
 ;   ss0 = acc
 ;   ss1 = i
 ;   v61 = x
-;   v61 = $inl88_d
-;   v63 = $inl89_work
-;   v2 = $inl90_sp
-;   v3 = $inl91_flat
+;   v61 = $inl2655_d
+;   v63 = $inl2656_work
+;   v2 = $inl2657_sp
+;   v3 = $inl2658_flat
 ; __builtin_value_or$str
 function u0:296(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -152169,7 +152169,7 @@ block3:
 ;   ss0 = $a
 ;   ss1 = $i
 ;   v34 = $e
-;   v34 = $inl96_line
+;   v34 = $inl2663_line
 ; __lambda_28
 function u0:300(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -152275,7 +152275,7 @@ block3:
 ;   ss0 = k
 ;   ss1 = __idx$410
 ;   v11 = c
-;   v11 = $inl97_c
+;   v11 = $inl2664_c
 ;   v21 = i
 ; __lambda_30
 function u0:302(i64, i64, i64) apple_aarch64 {
@@ -152327,7 +152327,7 @@ block3(v7: i64):
 ; source variables:
 ;   v1 = line
 ;   v2 = pad
-;   v1 = $inl220_self
+;   v1 = $inl2987_self
 ; __map32
 function u0:303(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -152477,9 +152477,9 @@ block3:
 ;   v1 = $cap31
 ;   ss0 = $out
 ;   v37 = $e
-;   v37 = $inl99_line
-;   v37 = $inl221_self
-;   v1 = $inl100_pad
+;   v37 = $inl2666_line
+;   v37 = $inl2988_self
+;   v1 = $inl2667_pad
 ; __builtin_int_parse
 function u0:304(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -152787,21 +152787,21 @@ block32(v104: i64):
 ; source variables:
 ;   v1 = self
 ;   v6 = neg
-;   v1 = $inl252_self
-;   v1 = $inl179_self
-;   v8 = $inl180_n
+;   v1 = $inl3019_self
+;   v1 = $inl2746_self
+;   v8 = $inl2747_n
 ;   v7 = body
-;   v7 = $inl176_self
+;   v7 = $inl2743_self
 ;   v26 = digits
-;   v26 = $inl177_self
-;   v40 = $inl178_init
+;   v26 = $inl2744_self
+;   v40 = $inl2745_init
 ;   ss5 = acc
 ;   ss6 = ok
 ;   v49 = x
 ;   v54 = step
-;   v54 = $inl292_self
+;   v54 = $inl3059_self
 ;   v68 = v
-;   v70 = $inl293_default
+;   v70 = $inl3060_default
 ;   v91 = v
 ;   v109 = min
 ; __builtin_value_or_err$i64$str
@@ -153859,8 +153859,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap43
 ;   v4 = x
-;   v4 = $inl102_c
-;   v1 = $inl103_head
+;   v4 = $inl2669_c
+;   v1 = $inl2670_head
 ; __builtin_drop_first$char$s0
 function u0:320(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -153885,8 +153885,8 @@ block0(v0: i64, v1: i64):
 
 ; source variables:
 ;   v1 = self
-;   v1 = $inl179_self
-;   v2 = $inl180_n
+;   v1 = $inl2746_self
+;   v2 = $inl2747_n
 ; __lambda_45
 function u0:321(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -153987,8 +153987,8 @@ block3:
 ;   v1 = $cap46
 ;   ss0 = n
 ;   v9 = x
-;   v9 = $inl104_c
-;   v1 = $inl105_cont
+;   v9 = $inl2671_c
+;   v1 = $inl2672_cont
 ; __lambda_48
 function u0:323(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -154038,8 +154038,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap49
 ;   v4 = x
-;   v4 = $inl106_c
-;   v1 = $inl107_chars
+;   v4 = $inl2673_c
+;   v1 = $inl2674_chars
 ; __lambda_51
 function u0:325(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -154089,8 +154089,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap52
 ;   v4 = x
-;   v4 = $inl108_c
-;   v1 = $inl109_boundary
+;   v4 = $inl2675_c
+;   v1 = $inl2676_boundary
 ; __lambda_54
 function u0:327(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -154140,8 +154140,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap55
 ;   v4 = x
-;   v4 = $inl110_c
-;   v1 = $inl111_delims
+;   v4 = $inl2677_c
+;   v1 = $inl2678_delims
 ; __builtin_value_or$char
 function u0:329(i64, i64) -> i64 apple_aarch64 {
 block0(v0: i64, v1: i64):
@@ -154212,8 +154212,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap58
 ;   v4 = x
-;   v4 = $inl114_e
-;   v1 = $inl115_escapes
+;   v4 = $inl2681_e
+;   v1 = $inl2682_escapes
 ; __lambda_60
 function u0:332(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -154314,7 +154314,7 @@ block3:
 ;   v3 = self
 ;   ss1 = n
 ;   v11 = x
-;   v11 = $inl118_x
+;   v11 = $inl2685_x
 ; __builtin_count_while$char$s0$lam61
 function u0:333(i64) -> i64 apple_aarch64 {
     sig0 = (i64, i64, i64) -> i64 tail
@@ -154477,7 +154477,7 @@ block1(v1: i64):
 ; source variables:
 ;   v0 = self
 ;   v3 = x
-;   v3 = $inl119_e
+;   v3 = $inl2686_e
 ; __lambda_66
 function u0:339(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -154521,7 +154521,7 @@ block1(v1: i64):
 ; source variables:
 ;   v0 = self
 ;   v3 = x
-;   v3 = $inl120_sign
+;   v3 = $inl2687_sign
 ; __lambda_68
 function u0:341(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -154635,7 +154635,7 @@ block3:
 ;   ss0 = k
 ;   ss1 = __idx$410
 ;   v11 = c
-;   v11 = $inl121_c
+;   v11 = $inl2688_c
 ;   v25 = i
 ; __builtin_last$str
 function u0:343(i64, i64) apple_aarch64 {
@@ -154764,8 +154764,8 @@ block0(v0: i64):
 
 ; source variables:
 ;   v0 = self
-;   v0 = $inl290_self
-;   v1 = $inl291_n
+;   v0 = $inl3057_self
+;   v1 = $inl3058_n
 ; __builtin_drop_last$str$tail
 function u0:346(i64) -> i64 tail {
     sig0 = (i64) apple_aarch64
@@ -155387,7 +155387,7 @@ block1(v2: i64):
 ;   v1 = self
 ;   v7 = v
 ;   v44 = e
-;   v44 = $inl128_e
+;   v44 = $inl2695_e
 ; __lambda_72
 function u0:353(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -156859,7 +156859,7 @@ block171:
 
 ; source variables:
 ;   v1 = t
-;   v3 = $inl399_k
+;   v3 = $inl2528_k
 ;   v190 = _
 ;   v196 = _
 ;   v202 = _
@@ -158647,8 +158647,8 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl130_t
-;   v79 = $inl399_k
+;   v32 = $inl2697_t
+;   v79 = $inl2528_k
 ;   v266 = _
 ;   v272 = _
 ;   v278 = _
@@ -159021,7 +159021,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl132_t
+;   v32 = $inl2699_t
 ; __lambda_76
 function u0:357(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64, i64) -> i64 apple_aarch64
@@ -159066,8 +159066,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap77
 ;   v5 = x
-;   v5 = $inl134_t
-;   v1 = $inl135_k
+;   v5 = $inl2701_t
+;   v1 = $inl2702_k
 ; __lambda_79
 function u0:359(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -159151,7 +159151,7 @@ block3:
 ; source variables:
 ;   v0 = c
 ;   v1 = self
-;   v1 = $inl251_self
+;   v1 = $inl2380_self
 ; __builtin_is_some_and$__builtin_Span$lam81
 function u0:360(i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -159249,9 +159249,9 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap80
 ;   v5 = x
-;   v5 = $inl138_c
-;   v1 = $inl139_self
-;   v1 = $inl251_self
+;   v5 = $inl2705_c
+;   v1 = $inl2706_self
+;   v1 = $inl2380_self
 ; __builtin_value_or$__m17__Doc
 function u0:361(i64, i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -160013,11 +160013,11 @@ block91(v266: i64):
 ; source variables:
 ;   v0 = a
 ;   v1 = b
-;   v3 = $inl37_a
-;   v5 = $inl38_b
-;   v3 = $inl35_self
+;   v3 = $inl2604_a
+;   v5 = $inl2605_b
+;   v3 = $inl2164_self
 ;   v6 = a_op
-;   v5 = $inl36_self
+;   v5 = $inl2165_self
 ; __builtin_sort_by$__m18__ImportName$lam85
 function u0:363(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -161139,13 +161139,13 @@ block3:
 ;   ss3 = k
 ;   ss4 = placed
 ;   v107 = y
-;   v32 = $inl140_a
-;   v107 = $inl141_b
-;   v113 = $inl37_a
-;   v115 = $inl38_b
-;   v113 = $inl35_self
+;   v32 = $inl2707_a
+;   v107 = $inl2708_b
+;   v113 = $inl2604_a
+;   v115 = $inl2605_b
+;   v113 = $inl2164_self
 ;   v116 = a_op
-;   v115 = $inl36_self
+;   v115 = $inl2165_self
 ;   v104 = step
 ;   ss49 = __spread$0
 ; __lambda_86
@@ -161326,7 +161326,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl142_n
+;   v32 = $inl2709_n
 ; __map87
 function u0:365(i64) -> i64 apple_aarch64 {
     sig0 = (i64) -> i64 tail
@@ -161398,8 +161398,8 @@ block3(v20: i64):
 ; source variables:
 ;   v0 = a
 ;   v1 = b
-;   v3 = $inl40_a
-;   v5 = $inl41_b
+;   v3 = $inl2607_a
+;   v5 = $inl2608_b
 ;   v10 = a_builtins
 ; __builtin_sort_by$__m18__ImportEntry$lam89
 function u0:368(i64) -> i64 apple_aarch64 {
@@ -161846,10 +161846,10 @@ block3:
 ;   ss3 = k
 ;   ss4 = placed
 ;   v103 = y
-;   v32 = $inl143_a
-;   v103 = $inl144_b
-;   v108 = $inl40_a
-;   v110 = $inl41_b
+;   v32 = $inl2710_a
+;   v103 = $inl2711_b
+;   v108 = $inl2607_a
+;   v110 = $inl2608_b
 ;   v115 = a_builtins
 ;   v100 = step
 ;   ss9 = __spread$0
@@ -161994,7 +161994,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl146_e
+;   v32 = $inl2713_e
 ; __lambda_93
 function u0:371(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -162103,7 +162103,7 @@ block3:
 ;   v0 = self
 ;   ss0 = n
 ;   v27 = x
-;   v27 = $inl148_s
+;   v27 = $inl2715_s
 ; __lambda_95
 function u0:373(i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -162235,7 +162235,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl150_s
+;   v32 = $inl2717_s
 ; __lambda_97
 function u0:375(i64) -> i64 apple_aarch64 {
     sig0 = (i64) apple_aarch64
@@ -162367,7 +162367,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl152_s
+;   v32 = $inl2719_s
 ; __builtin_value_or_err$__m18__FmtTok$__m18__FmtError
 function u0:377(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 32, align = 8
@@ -162623,8 +162623,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap100
 ;   v5 = x
-;   v5 = $inl156_c
-;   v1 = $inl157_end
+;   v5 = $inl2723_c
+;   v1 = $inl2724_end
 ; __lambda_102
 function u0:382(i64, i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -162690,9 +162690,9 @@ block3(v15: i64):
 ;   v0 = close
 ;   v1 = self
 ;   v2 = open_at
-;   v1 = $inl61_self
-;   v2 = $inl62_open_at
-;   v0 = $inl63_close
+;   v1 = $inl2628_self
+;   v2 = $inl2629_open_at
+;   v0 = $inl2630_close
 ; __builtin_is_some_and$u64$lam105
 function u0:383(i64, i64, i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -162771,12 +162771,12 @@ block1(v3: i64):
 ;   v1 = $cap103
 ;   v2 = $cap104
 ;   v5 = x
-;   v5 = $inl160_close
-;   v1 = $inl161_self
-;   v2 = $inl162_open_at
-;   v1 = $inl61_self
-;   v2 = $inl62_open_at
-;   v5 = $inl63_close
+;   v5 = $inl2727_close
+;   v1 = $inl2728_self
+;   v2 = $inl2729_open_at
+;   v1 = $inl2628_self
+;   v2 = $inl2629_open_at
+;   v5 = $inl2630_close
 ; __builtin_first$__m17__Doc
 function u0:384(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 16, align = 8
@@ -163130,7 +163130,7 @@ block1(v2: i64):
 ;   v1 = self
 ;   v7 = v
 ;   v44 = e
-;   v44 = $inl167_e
+;   v44 = $inl2734_e
 ; __lambda_108
 function u0:387(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -164602,7 +164602,7 @@ block171:
 
 ; source variables:
 ;   v1 = t
-;   v3 = $inl400_k
+;   v3 = $inl2529_k
 ;   v190 = _
 ;   v196 = _
 ;   v202 = _
@@ -166390,8 +166390,8 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl169_t
-;   v79 = $inl400_k
+;   v32 = $inl2736_t
+;   v79 = $inl2529_k
 ;   v266 = _
 ;   v272 = _
 ;   v278 = _
@@ -166764,7 +166764,7 @@ block3:
 ;   v0 = $arr
 ;   ss0 = $out
 ;   v32 = $e
-;   v32 = $inl171_t
+;   v32 = $inl2738_t
 ; __lambda_112
 function u0:391(i64) -> i64 apple_aarch64 {
 block0(v0: i64):
@@ -166878,7 +166878,7 @@ block3:
 ;   ss0 = k
 ;   ss1 = __idx$410
 ;   v11 = c
-;   v11 = $inl173_c
+;   v11 = $inl2740_c
 ;   v25 = i
 ; __lambda_114
 function u0:393(i64) -> i64 apple_aarch64 {
@@ -166976,7 +166976,7 @@ block3:
 ;   v3 = self
 ;   ss1 = n
 ;   v11 = x
-;   v11 = $inl174_c
+;   v11 = $inl2741_c
 ; __builtin_count_while$char$s0$lam115
 function u0:394(i64) -> i64 apple_aarch64 {
     sig0 = (i64, i64, i64) -> i64 tail
@@ -167298,9 +167298,9 @@ block12(v41: i64):
 ;   ss1 = ok
 ;   v11 = x
 ;   v16 = step
-;   v16 = $inl294_self
+;   v16 = $inl3061_self
 ;   v30 = v
-;   v32 = $inl295_default
+;   v32 = $inl3062_default
 ; __m12__lex_step$__m13__AiplTok
 function u0:402(i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -176924,40 +176924,40 @@ block1433:
 ;   v28 = r
 ;   v216 = cont
 ;   v218 = first
-;   v220 = $inl8_self
-;   v218 = $inl9_head
-;   v220 = $inl243_self
-;   v228 = $inl248_self
+;   v220 = $inl2575_self
+;   v218 = $inl2576_head
+;   v220 = $inl3010_self
+;   v228 = $inl3015_self
 ;   v231 = x
-;   v218 = $inl249_$cap43
-;   v231 = $inl102_c
-;   v218 = $inl103_head
-;   v216 = $inl10_cont
-;   v220 = $inl253_self
-;   v220 = $inl179_self
-;   v237 = $inl180_n
+;   v218 = $inl3016_$cap43
+;   v231 = $inl2669_c
+;   v218 = $inl2670_head
+;   v216 = $inl2577_cont
+;   v220 = $inl3020_self
+;   v220 = $inl2746_self
+;   v237 = $inl2747_n
 ;   v448 = chars
-;   v450 = $inl11_self
-;   v448 = $inl12_chars
-;   v450 = $inl244_self
-;   v458 = $inl256_self
+;   v450 = $inl2578_self
+;   v448 = $inl2579_chars
+;   v450 = $inl3011_self
+;   v458 = $inl3023_self
 ;   v461 = x
-;   v448 = $inl257_$cap49
-;   v461 = $inl106_c
-;   v448 = $inl107_chars
+;   v448 = $inl3024_$cap49
+;   v461 = $inl2673_c
+;   v448 = $inl2674_chars
 ;   v673 = spelling
-;   v675 = $inl13_self
-;   v673 = $inl14_spelling
+;   v675 = $inl2580_self
+;   v673 = $inl2581_spelling
 ;   v890 = spelling
 ;   v892 = boundary
-;   v894 = $inl15_self
-;   v890 = $inl16_spelling
-;   v892 = $inl17_boundary
-;   v906 = $inl260_self
+;   v894 = $inl2582_self
+;   v890 = $inl2583_spelling
+;   v892 = $inl2584_boundary
+;   v906 = $inl3027_self
 ;   v909 = x
-;   v892 = $inl261_$cap52
-;   v909 = $inl108_c
-;   v892 = $inl109_boundary
+;   v892 = $inl3028_$cap52
+;   v909 = $inl2675_c
+;   v892 = $inl2676_boundary
 ;   v1126 = delims
 ;   v1128 = escapes
 ;   v1527 = open
@@ -176970,10 +176970,10 @@ block1433:
 ;   v2668 = marker
 ;   v2883 = marker
 ;   v2885 = blocked
-;   v3301 = $inl20_self
-;   v3301 = $inl245_self
+;   v3301 = $inl2587_self
+;   v3301 = $inl3012_self
 ;   v3312 = __ceqv2
-;   v3324 = $inl273_self
+;   v3324 = $inl3040_self
 ;   v3327 = x
 ;   v3336 = start
 ;   v3341 = digits
@@ -177182,8 +177182,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap122
 ;   v5 = x
-;   v5 = $inl181_t
-;   v1 = $inl182_c
+;   v5 = $inl2748_t
+;   v1 = $inl2749_c
 ; __builtin_count_while$char$s0$lam124
 function u0:410(i64) -> i64 apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -177260,7 +177260,7 @@ block3:
 ;   v0 = self
 ;   ss0 = n
 ;   v8 = x
-;   v8 = $inl175_c
+;   v8 = $inl2742_c
 ; __builtin_value_or$i64
 function u0:411(i64, i64) -> i64 apple_aarch64 {
 block0(v0: i64, v1: i64):
@@ -182132,13 +182132,13 @@ block713:
 ;   v2 = src
 ;   v3 = at
 ;   v4 = n
-;   v2 = $inl221_src
-;   v56 = $inl222_at
+;   v2 = $inl2350_src
+;   v56 = $inl2351_at
 ;   v70 = text
-;   v72 = $inl183_e
-;   v70 = $inl184___spat$31078
-;   v116 = $inl21_m
-;   v173 = $inl22_text
+;   v72 = $inl2750_e
+;   v70 = $inl2751___spat$31078
+;   v116 = $inl2588_m
+;   v173 = $inl2589_text
 ;   v199 = _
 ;   v201 = _
 ;   v230 = open
@@ -182157,7 +182157,7 @@ block713:
 ;   v394 = _
 ;   v413 = _
 ;   v415 = _
-;   v174 = $inl185_value
+;   v174 = $inl2752_value
 ;   v468 = span
 ;   v474 = s
 ;   v469 = content
@@ -182165,9 +182165,9 @@ block713:
 ;   v713 = f
 ;   v894 = f
 ;   v1046 = _
-;   v468 = $inl230_span
+;   v468 = $inl2359_span
 ;   v1102 = _
-;   v468 = $inl231_span
+;   v468 = $inl2360_span
 ;   v1331 = kind
 ;   v1391 = t
 ; __m12__template_step$__m13__AiplTok
@@ -184078,9 +184078,9 @@ block5(v22: i64):
 ;   v250 = f
 ;   v431 = f
 ;   v583 = _
-;   v5 = $inl230_span
+;   v5 = $inl2359_span
 ;   v639 = _
-;   v5 = $inl231_span
+;   v5 = $inl2360_span
 ; __m12__template_scan$__m13__AiplTok
 function u0:415(i64, i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -184817,16 +184817,16 @@ block40:
 ;   ss4 = seg_start
 ;   ss5 = text_start
 ;   v49 = end
-;   v106 = $inl266_self
+;   v106 = $inl3033_self
 ;   v109 = v
-;   v110 = $inl267_default
+;   v110 = $inl3034_default
 ;   v107 = c
 ;   v192 = interp
-;   v241 = $inl190_self
+;   v241 = $inl2757_self
 ;   v244 = x
-;   v4 = $inl191_$cap129
-;   v244 = $inl188_e
-;   v4 = $inl189_escapes
+;   v4 = $inl2758_$cap129
+;   v244 = $inl2755_e
+;   v4 = $inl2756_escapes
 ; __lambda_125
 function u0:416(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 40, align = 8
@@ -185587,8 +185587,8 @@ block1(v3: i64):
 ;   v2 = $cap126
 ;   v8 = v
 ;   v226 = e
-;   v226 = $inl186_message
-;   v2 = $inl187_span
+;   v226 = $inl2753_message
+;   v2 = $inl2754_span
 ; __m12__finalize_template$__m13__AiplTok
 function u0:418(i64, i64, i64, i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 8, align = 8
@@ -188145,28 +188145,28 @@ block342:
 ;   ss2 = __idx$42287
 ;   v56 = txt
 ;   v58 = k
-;   v66 = $inl286_self
+;   v66 = $inl3053_self
 ;   v94 = v
-;   v102 = $inl287_default
+;   v102 = $inl3054_default
 ;   v91 = sp
-;   v3 = $inl192_e
-;   v56 = $inl193_text
-;   v109 = $inl194_seg
-;   v91 = $inl195_span
+;   v3 = $inl2759_e
+;   v56 = $inl2760_text
+;   v109 = $inl2761_seg
+;   v91 = $inl2762_span
 ;   v137 = f
 ;   v318 = f
 ;   v471 = _
-;   v91 = $inl232_span
+;   v91 = $inl2361_span
 ;   v601 = _
-;   v91 = $inl233_span
+;   v91 = $inl2362_span
 ;   v657 = _
-;   v91 = $inl234_span
+;   v91 = $inl2363_span
 ;   v786 = kind
-;   v1 = $inl223_src
-;   v91 = $inl224_at
-;   v874 = $inl196_self
+;   v1 = $inl2352_src
+;   v91 = $inl2353_at
+;   v874 = $inl2763_self
 ;   v910 = v
-;   v937 = $inl197_default
+;   v937 = $inl2764_default
 ;   v907 = run
 ; __m12__interp_scan$__m13__AiplTok
 function u0:419(i64, i64, i64, i64, i64) apple_aarch64 {
@@ -188833,8 +188833,8 @@ block1(v2: i64):
 ;   v0 = self
 ;   v1 = $cap129
 ;   v4 = x
-;   v4 = $inl188_e
-;   v1 = $inl189_escapes
+;   v4 = $inl2755_e
+;   v1 = $inl2756_escapes
 ; __m12__seg_emit$__m13__AiplTok
 function u0:422(i64, i64, i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 40, align = 8
@@ -190309,11 +190309,11 @@ block1(v5: i64):
 ;   v15 = f
 ;   v196 = f
 ;   v349 = _
-;   v4 = $inl232_span
+;   v4 = $inl2361_span
 ;   v479 = _
-;   v4 = $inl233_span
+;   v4 = $inl2362_span
 ;   v535 = _
-;   v4 = $inl234_span
+;   v4 = $inl2363_span
 ; __builtin_value_or$__m12__StepResult$__m13__AiplTok
 function u0:423(i64, i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
@@ -191139,8 +191139,8 @@ block1(v3: i64):
 ;   v2 = $cap132
 ;   v8 = v
 ;   v226 = e
-;   v226 = $inl198_message
-;   v2 = $inl199_span
+;   v226 = $inl2765_message
+;   v2 = $inl2766_span
 ; __rec_drop___m17__Doc
 function u0:426(i64) apple_aarch64 {
     sig0 = (i64) apple_aarch64

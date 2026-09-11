@@ -299,9 +299,15 @@ fn splice(self: Cst) -> Cst[] {
 # together. Trivia is dropped here as it is there.
 pub fn own_tokens(self: Cst) -> Span[] { self.flat_kids().filter_map(is_leaf, leaf_span) }
 
+# This node's own tokens as their text, one string per token. A `str` is a view
+# into `src`, so this costs no more than the spans do, and a lowering that asks
+# "which token is second?" gets a string to compare rather than a span to look
+# up.
+pub fn own_texts(self: Cst, src: str) -> str[] { self.own_tokens().map(|t| src[t]) }
+
 # The source text of `self`'s direct token leaves, run together with nothing
 # between them — the operator of a binary node, the keyword that opened a form.
-pub fn own_token_text(self: Cst, src: str) -> str { self.own_tokens().map(|sp| src[sp]).join() }
+pub fn own_token_text(self: Cst, src: str) -> str { self.own_texts(src).join() }
 
 # Whether `self` is a token leaf: not an interior node, and not trivia.
 fn is_leaf(self: Cst) -> bool {

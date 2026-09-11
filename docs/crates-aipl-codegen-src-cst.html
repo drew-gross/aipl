@@ -157,6 +157,20 @@
 
 
 
+        <section class="item" id="item-own_texts">
+          <h3>
+            <a class="anchor" href="#item-own_texts">own_texts</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn own_texts(self: Cst, src: str) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>This node's own tokens as their text, one string per token. A <code>str</code> is a view into <code>src</code>, so this costs no more than the spans do, and a lowering that asks &quot;which token is second?&quot; gets a string to compare rather than a span to look up.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-own_token_text">
           <h3>
             <a class="anchor" href="#item-own_token_text">own_token_text</a>

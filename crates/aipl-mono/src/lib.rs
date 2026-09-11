@@ -7706,7 +7706,6 @@ pub fn inline_single_use(program: &Program) -> Program {
     }
 
     let mut program = program.clone();
-    let mut counter = 0usize;
     // Functions that are used once but only as a *value* (an `Ident`, never a
     // direct call) — nothing to substitute, so don't re-select them forever.
     let mut skip: HashSet<String> = HashSet::new();
@@ -7740,7 +7739,6 @@ pub fn inline_single_use(program: &Program) -> Program {
                     &f.name,
                     &fparam_names,
                     &f.body,
-                    &mut counter,
                     &mut replaced,
                     InlineSites::First,
                 );
@@ -7784,7 +7782,6 @@ pub fn inline_single_use_post_mono(
         .iter()
         .any(|f| f.name == "main" || f.name == "__test_main");
     let mut program = program.clone();
-    let mut counter = 0usize;
     let mut skip: HashSet<String> = HashSet::new();
 
     loop {
@@ -7815,7 +7812,6 @@ pub fn inline_single_use_post_mono(
                 &f.name,
                 &fparam_names,
                 &f.body,
-                &mut counter,
                 &mut replaced,
                 InlineSites::First,
             );
@@ -7945,7 +7941,6 @@ fn body_size(e: &Expr) -> usize {
 /// anywhere, so a call site always means the function it appears to.
 pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
     let mut program = program.clone();
-    let mut counter = 0usize;
     let binders = collect_binders(&program);
     // Selected once, from the original program: a function that qualifies now
     // stays eligible, and inlining only ever *grows* callers, so re-selecting
@@ -8001,7 +7996,6 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
                     &f.name,
                     &fparams,
                     &f.body,
-                    &mut counter,
                     &mut replaced,
                     InlineSites::All,
                 );
@@ -8014,7 +8008,6 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
                         &f.name,
                         &fparams,
                         &f.body,
-                        &mut counter,
                         &mut replaced,
                         InlineSites::All,
                     )
@@ -8052,7 +8045,6 @@ pub fn inline_small_post_mono(
     externally_called: &HashSet<String>,
 ) -> MonoProgram {
     let mut program = program.clone();
-    let mut counter = 0usize;
     let binders = collect_binders_mono(&program);
     // See `inline_single_use_post_mono`: with no single entry, any function may
     // be called by name from Rust, so none may be elided.
@@ -8112,7 +8104,6 @@ pub fn inline_small_post_mono(
                 &f.name,
                 &fparams,
                 &f.body,
-                &mut counter,
                 &mut replaced,
                 InlineSites::All,
             );
@@ -8459,7 +8450,6 @@ fn replace_call(
     fname: &str,
     fparams: &[InlineParam],
     fbody: &Expr,
-    counter: &mut usize,
     replaced: &mut bool,
     sites: InlineSites,
 ) -> Expr {
@@ -8477,13 +8467,12 @@ fn replace_call(
             // argument is what gives the constant folder something to work with.
             if name == fname && args.len() == fparams.len() {
                 *replaced = true;
-                return build_inlined(fparams, fbody, args, e.span.clone(), counter);
+                return build_inlined(fparams, fbody, args, e.span.clone());
             }
         }
     }
-    let rc = |x: &Expr, counter: &mut usize, replaced: &mut bool| {
-        replace_call(x, fname, fparams, fbody, counter, replaced, sites)
-    };
+    let rc =
+        |x: &Expr, replaced: &mut bool| replace_call(x, fname, fparams, fbody, replaced, sites);
     let kind = match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),
@@ -8492,7 +8481,7 @@ fn replace_call(
         ExprKind::Shim(effect, bindings, body) => ExprKind::Shim(
             effect.clone(),
             bindings.clone(),
-            Box::new(rc(body, counter, replaced)),
+            Box::new(rc(body, replaced)),
         ),
         ExprKind::Num(_)
         | ExprKind::Bool(_)
@@ -8503,71 +8492,60 @@ fn replace_call(
         | ExprKind::Unit => e.kind.clone(),
         ExprKind::Call(name, args, m) => ExprKind::Call(
             name.clone(),
-            args.iter().map(|a| rc(a, counter, replaced)).collect(),
+            args.iter().map(|a| rc(a, replaced)).collect(),
             *m,
         ),
-        ExprKind::Neg(x) => ExprKind::Neg(Box::new(rc(x, counter, replaced))),
-        ExprKind::Try(x) => ExprKind::Try(Box::new(rc(x, counter, replaced))),
-        ExprKind::Return(x) => ExprKind::Return(Box::new(rc(x, counter, replaced))),
-        ExprKind::Field(x, fld) => ExprKind::Field(Box::new(rc(x, counter, replaced)), fld.clone()),
-        ExprKind::Seq(a, b) => ExprKind::Seq(
-            Box::new(rc(a, counter, replaced)),
-            Box::new(rc(b, counter, replaced)),
-        ),
-        ExprKind::Index(a, b) => ExprKind::Index(
-            Box::new(rc(a, counter, replaced)),
-            Box::new(rc(b, counter, replaced)),
-        ),
-        ExprKind::While(a, b) => ExprKind::While(
-            Box::new(rc(a, counter, replaced)),
-            Box::new(rc(b, counter, replaced)),
-        ),
+        ExprKind::Neg(x) => ExprKind::Neg(Box::new(rc(x, replaced))),
+        ExprKind::Try(x) => ExprKind::Try(Box::new(rc(x, replaced))),
+        ExprKind::Return(x) => ExprKind::Return(Box::new(rc(x, replaced))),
+        ExprKind::Field(x, fld) => ExprKind::Field(Box::new(rc(x, replaced)), fld.clone()),
+        ExprKind::Seq(a, b) => ExprKind::Seq(Box::new(rc(a, replaced)), Box::new(rc(b, replaced))),
+        ExprKind::Index(a, b) => {
+            ExprKind::Index(Box::new(rc(a, replaced)), Box::new(rc(b, replaced)))
+        }
+        ExprKind::While(a, b) => {
+            ExprKind::While(Box::new(rc(a, replaced)), Box::new(rc(b, replaced)))
+        }
         ExprKind::Let(n, ty, a, b) => ExprKind::Let(
             n.clone(),
             ty.clone(),
-            Box::new(rc(a, counter, replaced)),
-            Box::new(rc(b, counter, replaced)),
+            Box::new(rc(a, replaced)),
+            Box::new(rc(b, replaced)),
         ),
         ExprKind::LetMut(n, ty, a, b) => ExprKind::LetMut(
             n.clone(),
             ty.clone(),
-            Box::new(rc(a, counter, replaced)),
-            Box::new(rc(b, counter, replaced)),
+            Box::new(rc(a, replaced)),
+            Box::new(rc(b, replaced)),
         ),
         // The LHS is a place (idents/fields only) — no calls to replace.
         ExprKind::Assign(lhs, a, b) => ExprKind::Assign(
             lhs.clone(),
-            Box::new(rc(a, counter, replaced)),
-            Box::new(rc(b, counter, replaced)),
+            Box::new(rc(a, replaced)),
+            Box::new(rc(b, replaced)),
         ),
         ExprKind::For(v, a, b) => ExprKind::For(
             v.clone(),
-            Box::new(rc(a, counter, replaced)),
-            Box::new(rc(b, counter, replaced)),
+            Box::new(rc(a, replaced)),
+            Box::new(rc(b, replaced)),
         ),
         ExprKind::If(a, b, c) => ExprKind::If(
-            Box::new(rc(a, counter, replaced)),
-            Box::new(rc(b, counter, replaced)),
-            Box::new(rc(c, counter, replaced)),
+            Box::new(rc(a, replaced)),
+            Box::new(rc(b, replaced)),
+            Box::new(rc(c, replaced)),
         ),
         ExprKind::Slice(a, b, c) => ExprKind::Slice(
-            Box::new(rc(a, counter, replaced)),
-            Box::new(rc(b, counter, replaced)),
-            c.as_ref().map(|c| Box::new(rc(c, counter, replaced))),
+            Box::new(rc(a, replaced)),
+            Box::new(rc(b, replaced)),
+            c.as_ref().map(|c| Box::new(rc(c, replaced))),
         ),
-        ExprKind::ArrayLit(xs) => {
-            ExprKind::ArrayLit(xs.iter().map(|x| rc(x, counter, replaced)).collect())
-        }
-        ExprKind::SetLit(xs) => {
-            ExprKind::SetLit(xs.iter().map(|x| rc(x, counter, replaced)).collect())
-        }
-        ExprKind::TupleLit(xs) => {
-            ExprKind::TupleLit(xs.iter().map(|x| rc(x, counter, replaced)).collect())
-        }
+        ExprKind::ArrayLit(xs) => ExprKind::ArrayLit(xs.iter().map(|x| rc(x, replaced)).collect()),
+        ExprKind::SetLit(xs) => ExprKind::SetLit(xs.iter().map(|x| rc(x, replaced)).collect()),
+        ExprKind::TupleLit(xs) => ExprKind::TupleLit(xs.iter().map(|x| rc(x, replaced)).collect()),
         ExprKind::DictLit(pairs) => ExprKind::DictLit(
             pairs
                 .iter()
-                .map(|(k, v)| (rc(k, counter, replaced), rc(v, counter, replaced)))
+                .map(|(k, v)| (rc(k, replaced), rc(v, replaced)))
                 .collect(),
         ),
         ExprKind::Construct(name, inits) => ExprKind::Construct(
@@ -8576,16 +8554,16 @@ fn replace_call(
                 .iter()
                 .map(|i| FieldInit {
                     name: i.name.clone(),
-                    value: rc(&i.value, counter, replaced),
+                    value: rc(&i.value, replaced),
                 })
                 .collect(),
         ),
         ExprKind::Match(s, arms) => ExprKind::Match(
-            Box::new(rc(s, counter, replaced)),
+            Box::new(rc(s, replaced)),
             arms.iter()
                 .map(|a| MatchArm {
                     pattern: a.pattern.clone(),
-                    body: rc(&a.body, counter, replaced),
+                    body: rc(&a.body, replaced),
                     span: a.span.clone(),
                 })
                 .collect(),
@@ -8593,13 +8571,13 @@ fn replace_call(
         ExprKind::IfLet(arm, s, else_b) => ExprKind::IfLet(
             Box::new(MatchArm {
                 pattern: arm.pattern.clone(),
-                body: rc(&arm.body, counter, replaced),
+                body: rc(&arm.body, replaced),
                 span: arm.span.clone(),
             }),
-            Box::new(rc(s, counter, replaced)),
-            Box::new(rc(else_b, counter, replaced)),
+            Box::new(rc(s, replaced)),
+            Box::new(rc(else_b, replaced)),
         ),
-        ExprKind::Lambda(ps, b) => ExprKind::Lambda(ps.clone(), Box::new(rc(b, counter, replaced))),
+        ExprKind::Lambda(ps, b) => ExprKind::Lambda(ps.clone(), Box::new(rc(b, replaced))),
     };
     Expr::rebuilt(kind, e)
 }
@@ -8619,25 +8597,31 @@ struct InlineParam {
     mutable: bool,
 }
 
+/// The next id for a binding an inlined body introduces. Process-wide rather
+/// than per pass: four passes inline (single-use and small, before and after
+/// monomorphization), and a body one pass inlined is inlined again by a later
+/// one, so two counters that each start at zero can hand out the same
+/// `$inl<n>_self` twice in one function — the inner binding then shadows the
+/// outer, and a `self.span()` that meant the outer receiver reads the inner
+/// one. Ids only ever have to be unique within one program, so sharing the
+/// counter between concurrent compiles costs nothing but a few skipped numbers.
+fn next_inline_id() -> usize {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
 /// Build the inlined expression for `Call(f, args)`: bind each (freshly renamed)
 /// parameter to its argument via a `let`, in order, wrapping `f`'s body. Renaming
 /// the parameters to `$inl<N>_<name>` is required for correctness — an argument
 /// is evaluated in the parameter-binding scope, so a later argument referencing a
 /// caller name that collides with a parameter would otherwise be captured. (`$`
 /// can't appear in user identifiers, so the fresh names can never collide.)
-fn build_inlined(
-    fparams: &[InlineParam],
-    fbody: &Expr,
-    args: &[Expr],
-    span: Span,
-    counter: &mut usize,
-) -> Expr {
+fn build_inlined(fparams: &[InlineParam], fbody: &Expr, args: &[Expr], span: Span) -> Expr {
     let mut map: HashMap<String, String> = HashMap::new();
     let fresh: Vec<String> = fparams
         .iter()
         .map(|p| {
-            let nm = format!("$inl{}_{}", *counter, p.name);
-            *counter += 1;
+            let nm = format!("$inl{}_{}", next_inline_id(), p.name);
             map.insert(p.name.clone(), nm.clone());
             nm
         })

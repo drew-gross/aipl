@@ -390,20 +390,6 @@
 
 
 
-        <section class="item" id="item-tok_text">
-          <h3>
-            <a class="anchor" href="#item-tok_text">tok_text</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn tok_text(src: str, toks: Span[], i: u64) -&#62; str</code></pre>
-
-          <div class="doc"><p>The text of own token <code>i</code>, or the empty string when there is none — so a &quot;which token is second?&quot; test reads as one comparison.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-as_expr">
           <h3>
             <a class="anchor" href="#item-as_expr">as_expr</a>
@@ -650,20 +636,6 @@
           <pre class="signature"><code>fn shim_expr(src: str, node: Cst, kids: Ast[], sp: Span) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p><code>shim &lt;effect&gt; { op = f, .. } { body }</code>. Spanned over <code>shim &lt;effect&gt;</code> rather than over the whole form: the body's span is empty when it ends in a <code>;</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-tok_end">
-          <h3>
-            <a class="anchor" href="#item-tok_end">tok_end</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn tok_end(toks: Span[], i: u64, fallback: u64) -&#62; u64</code></pre>
-
-          <div class="doc"><p>Where own token <code>i</code> ends, for the nodes whose span stops partway through them.</p></div>
 
 
         </section>
@@ -1011,7 +983,7 @@
             <a class="anchor" href="#item-binder_names">binder_names</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn binder_names(src: str, toks: Span[]) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn binder_names(toks: str[]) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The identifier tokens of a binder-led statement: everything this production matched directly, less the fixed spellings around them. A <code>let</code> statement's type is a child node rather than a token, so what is left is exactly the names — one for <code>let x</code>, two or more for <code>let (a, b)</code>, and the struct name followed by its fields for <code>let T { x, y }</code>.</p></div>
 
@@ -1404,7 +1376,7 @@
             <a class="anchor" href="#item-qualified_name">qualified_name</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn qualified_name(src: str, toks: Span[], head: str) -&#62; str</code></pre>
+          <pre class="signature"><code>fn qualified_name(toks: str[], head: str) -&#62; str</code></pre>
 
           <div class="doc"><p><code>V.A</code> is one name with a dot in it, exactly as gazelle spells it — the qualification is not a separate field on the AST, so a qualified case and a bare one are the same shape from here on. Anything but a <code>.</code> in second position means this pattern was not qualified.</p></div>
 
@@ -1600,7 +1572,7 @@
             <a class="anchor" href="#item-doc_block">doc_block</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_block(src: str, toks: Span[]) -&#62; str?</code></pre>
+          <pre class="signature"><code>fn doc_block(lines: str[]) -&#62; str?</code></pre>
 
           <div class="doc"><p>A run of <code># text</code> lines, joined by newline and nothing else — so a blank <code>#</code> line contributes an empty line, which is what lets a doc block have paragraphs. <code>doc_line_value</code> strips the marker, beside the lexer rule that strips it on the way in.</p></div>
 
