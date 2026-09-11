@@ -36,6 +36,25 @@ pub fn program_from_ffi(v: &FfiValue) -> R<ast::Program> {
     }
 }
 
+/// The `Program` and the `#[allow]` spans behind a `Res(Ok(..))` returned by
+/// `aipl_parse_file` — the whole of what `aipl_parser::parse_with_allows`
+/// returns, and what stage 5g's entry point reads.
+///
+/// The markers are the parser's one side-channel: they are trivia, so no
+/// production sees one, and the loader's lint pass still needs them. Gazelle
+/// carries them out through a thread-local sink; here they ride the return
+/// value.
+pub fn parse_file_from_ffi(v: &FfiValue) -> R<(ast::Program, Vec<Span>)> {
+    match v {
+        FfiValue::Res(Ok(inner)) => Ok((
+            program(field(inner, "program")?)?,
+            each(field(inner, "allows")?, span)?,
+        )),
+        FfiValue::Res(Err(e)) => Err(parse_error_message(e)),
+        other => Err(format!("expected a result, got {}", shape(other))),
+    }
+}
+
 /// A `ParseError` struct as its message, with the span left out — a caller that
 /// wants the span has the value.
 fn parse_error_message(v: &FfiValue) -> String {
@@ -269,10 +288,17 @@ fn field_init(v: &FfiValue) -> R<ast::FieldInit> {
 }
 
 fn expr(v: &FfiValue) -> R<ast::Expr> {
-    Ok(ast::Expr::new(
-        expr_kind(field(v, "kind")?)?,
-        span(field(v, "span")?)?,
-    ))
+    let built = ast::Expr::new(expr_kind(field(v, "kind")?)?, span(field(v, "span")?)?);
+    // The AIPL side spells `Option<Span>` as a plain `Span` whose *empty* value
+    // means "none" — the convention `join_spans` already uses for a location
+    // that does not exist, and the only one a struct field can hold. A recorded
+    // value span is never empty, so the two spellings say the same thing.
+    let value_span = span(field(v, "value_span")?)?;
+    Ok(if value_span.is_empty() {
+        built
+    } else {
+        built.with_value_span(value_span)
+    })
 }
 
 fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {

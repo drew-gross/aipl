@@ -25,13 +25,14 @@ their own:
 - [x] 5c Extend the differential test from acceptance to shape (operator grouping)
 - [x] 5d Lower AIPL's grammar to the AST
 - [x] 5e Error messages: nothing worse, nothing broken (parity deliberately not the bar)
-- [ ] 5f Side-channels: `#[allow]` spans, trailing whitespace, doc attachment
+- [x] 5f Side-channels: `#[allow]` spans, trailing whitespace, doc attachment
 - [ ] 5g The bootstrap procedure, and the `DOGFOOD_SOURCE_FILES` switch
 
 **5a is decided: lower in AIPL and marshal the result**, 5b is measured, 5c — the
-oracle 5d needs — is in place, and 5d is done: the AIPL parser builds the same
-`ast::Program` gazelle does, asserted over 490 corpus files. What is left is
-error-message parity, the side-channels, and the switch.
+oracle 5d needs — is in place, 5d is done (the AIPL parser builds the same
+`ast::Program` gazelle does, asserted over 490 corpus files), 5e found the
+messages are better rather than merely equal, and 5f closed the side-channels.
+**What is left is 5g: the bootstrap, and the switch.**
 
 ## Context
 
@@ -675,21 +676,43 @@ non-empty message and a span inside the source. It asserts nothing about wording
 will change at the switch, and the change is a widening. That is a refill to
 review, not a regression to chase — and the containment test is what says so.
 
-### 5f — Side-channels
+### 5f — Side-channels — **done**
 
-Small individually, each a silent behavior loss if missed:
+Small individually, each a silent behavior loss if missed. All four now cross,
+and `aipl_parse_file` is the single entry that carries them — the whole of
+`aipl_parser::parse_with_allows` on this side: strip the expected-output
+sections, refuse trailing whitespace, lex losslessly, keep the `#[allow]` spans,
+parse and lower. It deliberately stops short of `post_parse`, which follows a
+parse and is no part of one.
 
-- `parse_with_allows` collects `#[allow]` spans through a thread-local
-  `ALLOW_SINK` for the loader. The AIPL side has no equivalent — the lexer makes
-  the markers trivia and `grammar_aipl.aipl` drops them.
-- `reject_trailing_whitespace`.
-- Doc-comment attachment.
-- **A block's recorded value span** (`Expr::value_span`, set by
-  `with_block_span` in `aipl-parser`), so a return-type error underlines the
-  value rather than the first `let`. The AIPL `Expr` does not declare the field.
-  The *other* half of `with_block_span` — repairing the unlocated span of the
-  synthetic value a block with no trailing expression gets — is done, in 5e's
-  `repair_block_value`.
+- **`#[allow]` spans.** The markers are trivia, so no production ever sees one,
+  and the loader's lint pass needs them anyway to drop a hit squelched on the
+  same line. Gazelle carries them out through a thread-local sink armed by
+  `parse_with_allows`; here they ride the return value — same information,
+  without the arming. `ParsedFile` is the pair, and `parse_file_from_ffi` reads
+  it back.
+- **`reject_trailing_whitespace`.** The two parsers do not merely agree here,
+  they run the same code: `find_trailing_whitespace.aipl` is already the
+  implementation `aipl_parser` reaches through the FFI.
+- **Doc-comment attachment** landed with 5d — the `# ..` lines are `item`'s own
+  tokens, which is what makes documentation attach there and what makes an
+  import's refusal of it land in the same place. The corpus carries only two
+  documented files under the differential's size cap, so `DECL_FIXTURES` now
+  covers the shapes directly: a blank `#` making a paragraph, an unspaced
+  `#text`, and two documented declarations in a row.
+- **A block's recorded value span** (`Expr::value_span`). The AIPL `Expr`
+  declares it as a plain `Span` whose *empty* value means "none" — the
+  convention already in force for a location that does not exist, and the only
+  shape a struct field can hold (see the constraint list). `repair_block_value`
+  now does both halves of `with_block_span`'s job in one walk: locating the
+  value, and handing back where it is.
+
+**The tests.** `aipl_parser_carries_the_same_side_channels` compares the
+`#[allow]` spans against `parse_with_allows` file by file and requires the
+trailing-whitespace refusal to fall on the same side, with floors under both so
+the comparison cannot quietly empty out (70 corpus files carry a marker under
+the size cap). Mutation-verified. The value span joins 5e's containment test,
+which now checks it under the same rule as every other span.
 
 ### 5g — The bootstrap, and the switch
 

@@ -187,6 +187,34 @@
 
 
 
+        <section class="item" id="item-ParsedFile">
+          <h3>
+            <a class="anchor" href="#item-ParsedFile">ParsedFile</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ParsedFile</code></pre>
+
+          <div class="doc"><p>What a source file parses to: its program, and the spans of every <code>#[allow]</code> lint-squelch marker in it.</p><p>The markers are the parser's one *side-channel* — they are trivia, so no production ever sees one, and the loader's lint pass still needs them to drop a hit squelched on the same line. Gazelle carries them out through a thread-local sink armed by <code>parse_with_allows</code>; here they ride the return value, which is the same information without the arming.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-aipl_parse_file">
+          <h3>
+            <a class="anchor" href="#item-aipl_parse_file">aipl_parse_file</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn aipl_parse_file(src: str) -&#62; ParsedFile!ParseError</code></pre>
+
+          <div class="doc"><p>The whole of <code>aipl_parser::parse_with_allows</code>, on this side: strip the expected-output sections, refuse trailing whitespace, lex losslessly, keep the <code>#[allow]</code> spans, parse and lower.</p><p>What it deliberately does *not* do is <code>post_parse</code> — <code>bake_asserts</code> and <code>promote_type_vars</code> follow a parse but are no part of one, and they stay on the Rust side where they already live.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-aipl_parse_error">
           <h3>
             <a class="anchor" href="#item-aipl_parse_error">aipl_parse_error</a>
@@ -1039,9 +1067,9 @@
             <a class="anchor" href="#item-repair_block_value">repair_block_value</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn repair_block_value(e: Expr, brace: Span) -&#62; Expr</code></pre>
+          <pre class="signature"><code>fn repair_block_value(e: Expr, brace: Span) -&#62; (Expr, Span)</code></pre>
 
-          <div class="doc"><p>A block's *value* given the block's own <code>{</code>, when it has none of its own.</p><p>A block with no trailing expression — <code>{}</code>, or one ending in <code>f();</code> — has a unit value the parser cannot locate: the empty production it comes from matches no text. Left at the empty span, every diagnostic about that value reports at line 1 of the file. The block's <code>{</code> is the honest location, and this is the first place it is in scope.</p><p>The value can sit arbitrarily deep in the chain a block is, so this walks the four kinds that pass a value along and rebuilds the spine. Depth is one frame per statement in *this* block — nested blocks repair their own, so the total work is one pass over the program rather than one per nesting level.</p></div>
+          <div class="doc"><p>A block's chain with its *value* located, and that location — the two halves of <code>with_block_span</code> in <code>aipl-parser</code>, which does both in one walk for the same reason.</p><p>**Repairing it.** A block with no trailing expression — <code>{}</code>, or one ending in <code>f();</code> — has a unit value the parser cannot locate: the empty production it comes from matches no text. Left at the empty span, every diagnostic about that value reports at line 1 of the file. The block's <code>{</code> is the honest location, and this is the first place it is in scope.</p><p>**Recording it.** <code>fn f() -&gt; str { let a = 1; a }</code> returns the <code>a</code>, but the body's span starts at the <code>let</code>, so a return-type error would underline the binding. The tail is in hand here, so it is stored once rather than re-walked at every diagnostic.</p><p>The value can sit arbitrarily deep in the chain a block is, so this walks the four kinds that pass a value along and rebuilds the spine. Depth is one frame per statement in *this* block — nested blocks repair their own, so the total work is one pass over the program rather than one per nesting level.</p></div>
 
 
         </section>
@@ -2121,6 +2149,34 @@
           <pre class="signature"><code>fn ty_space(l: str, r: str) -&#62; bool</code></pre>
 
           <div class="doc"><p>The spacing rule for the productions annotated so far: spaces around <code>-&gt;</code>, a space after the <code>:</code> of a dict type, and nothing anywhere else.</p><p>Everything else a reader would call spacing in a type is a list separating its items, which the <code>Wrap</code> layouts do, or a suffix written against its core, which <code>Tight</code> does. That is the shape the rule takes in a real language: a handful of tokens that want air, and silence for the rest.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-reject_trailing_whitespace">
+          <h3>
+            <a class="anchor" href="#item-reject_trailing_whitespace">reject_trailing_whitespace</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn reject_trailing_whitespace(src: str) -&#62; str!ParseError</code></pre>
+
+          <div class="doc"><p><code>src</code> unchanged, or a refusal locating its first run of trailing whitespace. The locator is <code>find_trailing_whitespace.aipl</code>, which is the same function <code>aipl_parser::reject_trailing_whitespace</code> reaches through the FFI — so the two parsers do not merely agree here, they run the same code.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-allow_spans">
+          <h3>
+            <a class="anchor" href="#item-allow_spans">allow_spans</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn allow_spans(lexed: LexResult&#60;AiplTok&#62;) -&#62; Span[]</code></pre>
+
+          <div class="doc"><p>Every <code>#[allow]</code> marker's span, in source order. The lexer records them as trivia under a kind of their own, so this is a filter rather than a re-scan.</p></div>
 
 
         </section>

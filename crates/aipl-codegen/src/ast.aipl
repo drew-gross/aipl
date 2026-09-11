@@ -153,15 +153,29 @@ pub fn show_tys(self: Ty[]) -> str { self.map(show_ty).join(sep=", ") }.test({
     assert([TyPrimitive(I64), TyNamed("P")].show_tys() == "i64, P");
 })
 
-# `aipl_syntax::ast::Expr` — a kind and the span it was written at.
+# `aipl_syntax::ast::Expr` — a kind, the span it was written at, and (for a
+# block) where its *value* is.
 #
-# The span is this node's *token* span, which is not byte-for-byte what gazelle
-# records: gazelle's spans are kept for diagnostics rather than as a record of
-# extent, so a bracketed form's stops before its closing bracket and a unary
-# leaves its own operator out (see 5c in `PARSER_LIBRARY.md`). Reconciling the
-# two is 5e's problem, not this declaration's. The `ty` and `value_span` fields
-# `Expr` carries in Rust are absent: nothing the parser produces sets either.
-struct Expr { kind: ExprKind, span: Span }
+# The span is this node's *token* span, which is a superset of gazelle's:
+# gazelle's are kept for diagnostics rather than as a record of extent, so a
+# bracketed form's stops before its closing bracket and a unary leaves its own
+# operator out. `aipl_spans_contain_gazelles` is where that is stated and
+# checked; 5e in `PARSER_LIBRARY.md` is where it is argued.
+#
+# `value_span` is a block's tail position: `fn f() -> str { let a = 1; a }`
+# returns the `a`, but the body's span starts at the `let`, so a return-type
+# error would underline the binding. It is recorded while the block is being
+# built, where the tail is in hand, rather than re-walked at every diagnostic.
+#
+# Rust spells it `Option<Box<Span>>`; here it is a plain `Span` with the *empty*
+# one meaning "none", which is the convention already in force for a location
+# that does not exist (see `join_spans`). A struct field cannot be an optional
+# struct anyway — see the constraint list in `PARSER_LIBRARY.md` — and the two
+# spellings mean the same thing, since a recorded value span is never empty: the
+# repair that fills it in runs first.
+#
+# The `ty` field `Expr` carries in Rust is absent — nothing the parser sets it.
+struct Expr { kind: ExprKind, span: Span, value_span: Span }
 
 # One field of a struct literal. A `..base` spread rides as an init with an
 # empty name whose *value* is the `ESpread` — the value is what identifies it,
@@ -322,7 +336,7 @@ pub fn show_expr(self: Expr) -> str {
 # An `Expr` at an empty span — the shorthand this file's own tests are written
 # with, and the one every synthesized node uses (a template's `Str` segments,
 # an else-less `if`'s unit branch, an open slice's `0`).
-pub fn expr(kind: ExprKind) -> Expr { kind, span: 0..0 }
+pub fn expr(kind: ExprKind) -> Expr { kind, span: 0..0, value_span: 0..0 }
 
 # The two synthesized leaves that come up most.
 pub fn num(v: i64) -> Expr { expr(ENum(v)) }
@@ -833,12 +847,12 @@ pub fn ast_case_name(self: Ast) -> str {
 allocations: 368
 deallocations: 368
 reallocations: 27
-bytes allocated: 25940
-instructions executed: 16817
-binary size: 195440
-  code: 123848
+bytes allocated: 26644
+instructions executed: 17389
+binary size: 196872
+  code: 125276
   data: 6505
-  metadata: 65087
+  metadata: 65091
 functions:
   __arr_drop_Expr:
     calls: 11
@@ -911,7 +925,7 @@ functions:
     bytes: 72
   __test$ast_case_name:
     calls: 1
-    bytes: 46388
+    bytes: 46420
   __test$binder_list:
     calls: 1
     bytes: 832
@@ -920,10 +934,10 @@ functions:
     bytes: 1384
   __test$pat_bindings:
     calls: 1
-    bytes: 2288
+    bytes: 2384
   __test$pat_label:
     calls: 1
-    bytes: 6104
+    bytes: 6136
   __test$prim_from_name:
     calls: 1
     bytes: 2740
@@ -932,10 +946,10 @@ functions:
     bytes: 3232
   __test$show_expr:
     calls: 1
-    bytes: 13108
+    bytes: 14296
   __test$show_pat:
     calls: 1
-    bytes: 2744
+    bytes: 2824
   __test$show_ty:
     calls: 1
     bytes: 3228

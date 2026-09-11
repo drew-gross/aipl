@@ -437,6 +437,11 @@ fn aipl_grammar_groups_expressions_like_gazelle() {
 const DECL_FIXTURES: &[&str] = &[
     "import { equal as ==, len, - } from builtins;\nimport { P } from \"./p.aipl\";",
     "# A point.\n# Two lines of it.\nstruct P { x: i64, y: i64 = 0 }",
+    // Doc attachment: a blank `#` makes a paragraph, `#text` needs no space,
+    // and the lines attach to whichever declaration follows.
+    "# One.\n#\n# Two, after a blank line.\n#three, unspaced\nfn f() { }",
+    "# Documented.\nvariant V = A | B(i64)",
+    "# First.\nfn f() { }\n\n# Second.\nfn g() { }",
     "struct B<T: any, U: variant> { v: T, w: U }",
     "variant V = A | B(i64) | C(x: i64, y: i64 = 1)",
     "variant W<T: any> = | Some(T) | Nothing",
@@ -586,7 +591,12 @@ fn zero_expr(e: &mut aipl_syntax::ast::Expr) {
     use aipl_syntax::ast::ExprKind as K;
     e.span = 0..0;
     e.ty = None;
-    e.value_span = None;
+    // `value_span` is *not* cleared: both parsers record a block's tail
+    // position now (5f), so it is part of what the two have to agree about.
+    // Zeroed like every other span, since it is one.
+    if e.value_span.is_some() {
+        e.value_span = Some(Box::new(0..0));
+    }
     match &mut e.kind {
         // `bake_asserts` writes the *text* a condition's span covers into the
         // baked location string, so a span difference surfaces here as a value
@@ -1034,6 +1044,19 @@ fn check_contained(
             src.get(b.span.clone()).unwrap_or(""),
         ));
     }
+    // A block's recorded value span is a span like any other, and holds the same
+    // relation: gazelle's points at the tail expression, the AIPL parser's at
+    // the same expression with its own extent.
+    if let (Some(wa), Some(wb)) = (&a.value_span, &b.value_span) {
+        if !(wa.start >= wa.end || (wb.start <= wa.start && wa.end <= wb.end)) {
+            escapes.push(format!(
+                "{label}: {}'s value span {wa:?} = {:?} is not covered by {wb:?} = {:?}",
+                kind_name(&a.kind),
+                src.get(wa.as_ref().clone()).unwrap_or(""),
+                src.get(wb.as_ref().clone()).unwrap_or(""),
+            ));
+        }
+    }
     let (mut ax, mut bx) = (a.clone(), b.clone());
     let (ac, bc) = (
         aipl_syntax::each_subexpr_mut(&mut ax),
@@ -1108,6 +1131,81 @@ fn aipl_grammar_refuses_what_gazelle_refuses() {
         assert!(
             compared >= 30,
             "expected the corpus's syntax-error fixtures; only {compared} were found"
+        );
+    });
+}
+
+/// The AIPL parser carries the same side-channels out of a file that
+/// `aipl_parser::parse_with_allows` does: the `#[allow]` marker spans, and the
+/// refusal of trailing whitespace.
+///
+/// Both are things the *grammar* never sees. `#[allow]` is trivia, so no
+/// production matches one and the loader's lint pass would silently stop
+/// squelching anything; trailing whitespace is a property of the source text
+/// rather than of its syntax, and is checked before the parse on both sides.
+/// Neither would be caught by comparing ASTs, which is why they have a test of
+/// their own.
+#[test]
+fn aipl_parser_carries_the_same_side_channels() {
+    on_big_stack(|| {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut files = Vec::new();
+        collect_aipl(&root.join("tests").join("cases"), &mut files);
+        files.sort();
+
+        let engine = compile_grammar();
+        let mut bad: Vec<String> = Vec::new();
+        let mut with_markers = 0usize;
+        let mut refused = 0usize;
+
+        for path in &files {
+            let Ok(source) = fs::read_to_string(path) else {
+                continue;
+            };
+            if source.len() > 2_000 {
+                continue;
+            }
+            let label = path
+                .strip_prefix(root)
+                .unwrap_or(path)
+                .display()
+                .to_string();
+            let value =
+                match engine.call_values("aipl_parse_file", &[FfiValue::Str(source.clone())]) {
+                    Ok(v) => v,
+                    Err(e) => panic!("aipl_parse_file({label}): {e:?}"),
+                };
+            let got = aipl::ffi_ast::parse_file_from_ffi(&value);
+            match (aipl_parser::parse_with_allows(&source), got) {
+                (Ok((_, want)), Ok((_, got))) => {
+                    if want != got {
+                        bad.push(format!("{label}: allow spans {want:?} against {got:?}"));
+                    }
+                    if !want.is_empty() {
+                        with_markers += 1;
+                    }
+                }
+                // Both refuse. The messages are 5e's business, not this test's;
+                // what matters here is that trailing whitespace is refused on
+                // both sides rather than parsed on one.
+                (Err(_), Err(_)) => refused += 1,
+                (Ok(_), Err(e)) => bad.push(format!(
+                    "{label}: gazelle accepts it, the AIPL parser says {e}"
+                )),
+                (Err(e), Ok(_)) => bad.push(format!(
+                    "{label}: gazelle says {e}, the AIPL parser accepts it"
+                )),
+            }
+        }
+
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+        assert!(
+            with_markers >= 50,
+            "expected the corpus's `#[allow]` fixtures; only {with_markers} carried a marker"
+        );
+        assert!(
+            refused >= 30,
+            "expected the corpus's refusals; only {refused} were refused"
         );
     });
 }
