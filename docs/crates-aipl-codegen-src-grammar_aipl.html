@@ -173,14 +173,14 @@
 
 
 
-        <section class="item" id="item-aipl_lower_program">
+        <section class="item" id="item-aipl_program">
           <h3>
-            <a class="anchor" href="#item-aipl_lower_program">aipl_lower_program</a>
+            <a class="anchor" href="#item-aipl_program">aipl_program</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn aipl_lower_program(src: str) -&#62; str!ParseError</code></pre>
+          <pre class="signature"><code>pub fn aipl_program(src: str) -&#62; Program!ParseError</code></pre>
 
-          <div class="doc"><p><code>src</code> lowered to the AST and rendered — the FFI entry a Rust-side test reads, since a <code>Program</code> value cannot cross the boundary until the bridge in 5d's last step is built. A refusal comes back as the <code>err</code> side, so a caller can tell &quot;did not lower&quot; from &quot;lowered to something unexpected&quot;.</p></div>
+          <div class="doc"><p><code>src</code> lowered to the AST, as the AST — the FFI entry the Rust side rebuilds an <code>aipl_syntax::ast::Program</code> from. This is the bridge stage 5a chose: lower in AIPL, marshal the result, reconstruct on the other side.</p></div>
 
 
         </section>

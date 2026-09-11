@@ -15,6 +15,7 @@ use std::{
 // TEMPORARY: 24-byte-`str` ABI spike (STR_REPR.md). Delete with the file.
 #[cfg(test)]
 mod abi_spike;
+pub mod ffi_ast;
 
 // STAGED: the 24-byte `str` layout (STR_REPR.md stage 1), proven on its own
 // before the switch wires it up. `str24` is **shared verbatim** with the AOT

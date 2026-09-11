@@ -4396,15 +4396,32 @@ pub fn parse(input: &str) -> Result<Program, Error> {
         gazelle::ParseError::Action(e) => e,
     })?;
 
+    post_parse(&mut program, input);
+    Ok(program)
+}
+
+/// The two rewrites that follow a parse but are no part of one — named as a
+/// function rather than inlined so the AIPL parser can run the same pair.
+///
+/// Neither belongs to a grammar. `bake_asserts` needs the source text, and
+/// `promote_type_vars` needs a declaration's own signature, so both are things
+/// done *to* a `Program` once it exists. When the AIPL grammar takes over
+/// (stage 5g in `PARSER_LIBRARY.md`) this is what its entry point calls, and
+/// until then it is what the AST differential calls so the two sides are
+/// compared at the same stage.
+///
+/// `src` must be the string the program's spans are relative to — the
+/// section-stripped source, not the whole file.
+pub fn post_parse(program: &mut Program, src: &str) {
     // Bake `assert(cond)` calls inside `.test({ .. })` bodies into
     // `__assert(cond, "input:LINE: TEXT")`, capturing each assertion's source
-    // location now (while the source is in hand) for the `check` failure report.
+    // location while the source is in hand, for the `check` failure report.
     // Only test bodies are rewritten, so a bare `assert(..)` elsewhere stays an
     // unknown call — `assert` is effectively test-only.
     for item in &mut program.items {
         if let Item::Fn(f) = item {
             if let Some(test_body) = &mut f.test_body {
-                bake_asserts(test_body, input);
+                bake_asserts(test_body, src);
             }
         }
     }
@@ -4412,9 +4429,7 @@ pub fn parse(input: &str) -> Result<Program, Error> {
     // A declaration's own type parameters stop being ordinary names here, at the
     // one point every path shares: source files reach the checker through the
     // loader, but the builtin signatures are parsed directly.
-    aipl_syntax::promote_type_vars(&mut program);
-
-    Ok(program)
+    aipl_syntax::promote_type_vars(program);
 }
 
 /// Rewrite each `assert(cond)` within `e` into `__assert(cond, "input:LINE:

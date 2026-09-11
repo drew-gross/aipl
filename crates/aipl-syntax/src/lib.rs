@@ -2903,7 +2903,7 @@ fn promote_in_expr(e: &mut ast::Expr, vars: &[String]) {
 
 /// The direct sub-expressions of `e`, mutably — the shape [`each_subexpr`]
 /// walks, for passes that rewrite rather than inspect.
-fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
+pub fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
     use ast::ExprKind as K;
     match &mut e.kind {
         K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {

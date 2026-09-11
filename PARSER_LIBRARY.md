@@ -23,14 +23,15 @@ their own:
 - [x] 5a Decide the bridge: how an AIPL parse becomes a Rust `Program`
 - [x] 5b Wire FIRST-set pruning into the driver, and re-measure
 - [x] 5c Extend the differential test from acceptance to shape (operator grouping)
-- [ ] 5d Lower AIPL's grammar to the AST *(54/54 productions; the Rust bridge is left)*
+- [x] 5d Lower AIPL's grammar to the AST
 - [ ] 5e Error-message parity against the corpus fixtures
 - [ ] 5f Side-channels: `#[allow]` spans, trailing whitespace, doc attachment
 - [ ] 5g The bootstrap procedure, and the `DOGFOOD_SOURCE_FILES` switch
 
-**5a is decided: lower in AIPL and marshal the result**, 5b is measured, and 5c
-— the oracle 5d needs — is in place. 5d is under way; its table of finished
-slices is below.
+**5a is decided: lower in AIPL and marshal the result**, 5b is measured, 5c — the
+oracle 5d needs — is in place, and 5d is done: the AIPL parser builds the same
+`ast::Program` gazelle does, asserted over 490 corpus files. What is left is
+error-message parity, the side-channels, and the switch.
 
 ## Context
 
@@ -43,7 +44,7 @@ project exists to remove:
 | gazelle LR(1) grammar | `crates/aipl-parser/src/lib.rs:18-504` | ~254 non-comment lines, 81 rules, 238 alternatives | the compiler's AST | by hand |
 | formatter token walker | `crates/aipl-codegen/src/walker.aipl` | 2920 code lines, 144 functions | a `Doc` layout tree | by hand |
 | TextMate grammar | `editors/vscode/syntaxes/aipl.tmLanguage.json` | 176 lines | editor scopes | **generated** (stage 2) |
-| the grammar as data | `crates/aipl-codegen/src/grammar_aipl.aipl` | 1144 code lines, 54 productions | a `Cst` and a full AST | the replacement |
+| the grammar as data | `crates/aipl-codegen/src/grammar_aipl.aipl` | 1144 code lines, 54 productions | a `Cst` and an `ast::Program` | the replacement |
 
 CLAUDE.md still names the cost of the first two: *"Adding a syntax form means
 teaching two parsers: the gazelle grammar in `aipl-parser` **and** the
@@ -309,7 +310,7 @@ It only becomes worth revisiting if the tree can be got across the FFI once and
 cheaply — the same "no way to hold prepared state across calls" problem 5g has
 to answer.
 
-### 5d — Lower AIPL's grammar to the AST — **all 54 productions; the bridge is left**
+### 5d — Lower AIPL's grammar to the AST — **done**
 
 The bulk of the work. Declare `aipl_syntax`'s AST as AIPL types, replace
 `variant Ast = Ignored` with it, and write the 54 `build` functions against the
@@ -501,15 +502,66 @@ them gazelle's, moved rather than reinvented:
   where an import is refused it, since it brings a name in rather than declaring
   one.
 
-**What is left: the Rust side.** `FfiValue` → `ast::Program`, plus the
-two-declaration shape test. Two known gaps to close with it:
+**The bridge, and the differential it makes possible.**
+`crates/aipl-codegen/src/ffi_ast.rs` rebuilds an `ast::Program` from the
+`FfiValue` the AIPL parser returns. It is a mapping rather than a translation:
+every name in it is the one the AIPL declaration uses, and those are the Rust
+names behind a per-type tag — so a case the bridge does not know is a case the
+two declarations have *drifted* on, and it says exactly that. That is the
+"walk both and compare shape" test the plan asked for, in the form that costs
+nothing extra: the mapping is the comparison.
+
+What crosses, by shape: a struct as `Struct` with its field names, a variant as
+`Variant` with its constructor name and positional payload, an optional as
+`Opt`, an array as `Array`, a `bool` as `Int` 0/1, a `char` as its codepoint,
+and a tuple as a `Struct` whose fields are `_0`, `_1`, … . No mangling reaches
+the host; the names are the declared ones.
+
+**Two tests compare whole `Program`s**, in `tests/suites/parser_dogfood.rs`:
+
+| test | over | cost |
+|---|---|---|
+| `aipl_grammar_builds_the_same_ast_as_gazelle` | 59 fixtures (`SHAPE_FIXTURES` + the new `DECL_FIXTURES`) | ~15s |
+| `aipl_grammar_builds_the_same_ast_on_small_corpus_files` | every `tests/cases/**` file under 2 KB that gazelle accepts — **490 of them** | ~24s |
+
+The corpus one is capped by size because each file costs a whole AST across the
+FFI, and the compiler sources at the large end cross as six-figure value graphs.
+`tests/cases/` is where the small files are, and they are also the ones written
+to exercise one language feature each — so the cap costs breadth of *size*, not
+breadth of syntax. Mutation-verified: swapping a binary operator's operands
+breaks 28 of the 59 fixtures.
+
+**Three things are normalized before comparing, and all three are one thing.**
+Gazelle's spans are a diagnostic convention rather than a record of extent, so
+they are zeroed on both sides (with `Expr::ty` and `Expr::value_span`, which the
+parser sets on neither side). But a span can reach the AST as a *value*, and
+both places where it does had to be normalized too:
+
+- **The baked assert location.** `bake_asserts` writes the text a condition's
+  span covers into a string literal, so gazelle's `[true, false` meets the AIPL
+  parser's `[true, false]` — the closing-bracket convention, as a value.
+- **The synthetic binding names.** `__tpat$N` and its three siblings are
+  numbered from the span they came from, and gazelle spans a tuple literal from
+  its first element where the AIPL parser spans it from its `(`. Only the digits
+  differ, so only the digits go.
+
+Both are span renderings. Neither is a disagreement about the tree, and both
+close when 5e settles the span convention.
+
+**`post_parse` is now a named function** in `aipl-parser`, not two statements
+inside `parse`: `bake_asserts` and `promote_type_vars` follow a parse but are no
+part of one, and both sides of the differential have to run them to be compared
+at the same stage. It is also what 5g's entry point will call once the AIPL
+parser takes over.
+
+**Two gaps this stage leaves**, both named above and both belonging to the
+stages that own them:
 
 - **`Expr` declares no `value_span`**, and `lower_block` does neither half of
-  `with_block_span`'s job — see 5f.
+  `with_block_span`'s job — 5f.
 - **Two error messages embed a rendered type** (`fn f`'s shorthand-body
-  refusals) and render it with `show_ty`'s structural dump where gazelle uses
-  `aipl_syntax::type_name`'s source spelling. A `ty_source` mirroring
-  `type_name` is the fix, and it belongs with 5e's message parity.
+  refusals), rendered with `show_ty`'s structural dump where gazelle uses
+  `aipl_syntax::type_name`'s source spelling — 5e.
 
 **While deciding which productions earn a node, collapse the wrapper lists.**
 `Many`'s `style?` argument exists for one shape: a group whose list lives one
@@ -577,6 +629,14 @@ The circularity: the parser that parses `grammar_aipl.aipl` would be generated
 from `grammar_aipl.aipl`. This is the `walker.aipl` formatter deadlock already
 documented in CLAUDE.md, one level worse, and there is no procedure for it yet.
 Write the procedure before needing it.
+
+**Expect churn in the checked-in metrics at the switch.** The synthetic bindings
+a desugaring introduces are named after a span (`__tpat$220`), and the AIPL
+parser's spans are not gazelle's to the byte — so the symbols change even where
+nothing else does. The AST differential normalizes those digits away precisely
+because they are not a disagreement; the corpus's `binary size` and `.clif`
+artifacts will not be so forgiving. Settling the span convention in 5e is what
+keeps this from being a whole-corpus refill.
 
 ## Constraints still in force
 

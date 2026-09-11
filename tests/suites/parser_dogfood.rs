@@ -463,48 +463,244 @@ const DECL_FIXTURES: &[&str] = &[
     "fn f() -> #{str: i64} { #{\"a\": 1} }",
 ];
 
-/// Every fixture lowers to an AST — the claim stage 5d's AIPL half makes.
+/// The AIPL grammar builds the same `Program` gazelle does.
 ///
-/// Not a differential: a `Program` cannot cross the FFI yet (that is the
-/// bridge, 5d's last step), so what comes back is the rendered dump and what is
-/// asserted is that the lowering *reaches* one. That is weaker than comparing
-/// trees and still the check the per-production assertions cannot make: those
-/// name the shapes they were written against, and this asks the 54 `build`
-/// functions about whole files, where a production is reached in combinations
-/// nobody chose.
+/// This is the whole of stage 5 in one assertion: lex, parse, lower, marshal,
+/// rebuild — and the result has to equal what the parser being replaced
+/// produces, node for node. Acceptance agreement says the two admit the same
+/// language and shape agreement says they group expressions alike; this says
+/// they *mean* the same thing, which is the only claim that lets gazelle go.
 ///
-/// The gazelle parse is run first so a fixture that is simply bad AIPL fails as
-/// a bad fixture rather than as a lowering bug.
+/// **Spans are zeroed on both sides before comparing.** Gazelle's are kept for
+/// diagnostics rather than as a record of extent — a bracketed form's stops
+/// before its closing bracket, a unary leaves its own operator out — so they are
+/// a convention to match rather than a fact to agree about, and matching them is
+/// 5e's job. `Expr::ty` and `Expr::value_span` go with them: neither is set by
+/// the AIPL side, and `value_span` is one of 5f's side-channels.
 #[test]
-fn aipl_grammar_lowers_every_fixture() {
+fn aipl_grammar_builds_the_same_ast_as_gazelle() {
     on_big_stack(|| {
         let engine = compile_grammar();
-        let mut failures: Vec<String> = Vec::new();
+        let mut mismatches: Vec<String> = Vec::new();
 
         for src in SHAPE_FIXTURES.iter().chain(DECL_FIXTURES.iter()) {
-            if let Err(e) = aipl::parse(src) {
-                panic!("fixture does not parse with gazelle: {src:?}: {e}");
-            }
-            match engine.call_values("aipl_lower_program", &[FfiValue::Str(src.to_string())]) {
-                Ok(FfiValue::Res(Ok(boxed))) => match *boxed {
-                    FfiValue::Str(dump) => assert!(
-                        !dump.is_empty(),
-                        "aipl_lower_program({src:?}) lowered to nothing"
-                    ),
-                    other => panic!("aipl_lower_program({src:?}) is not a string: {other:?}"),
-                },
-                Ok(FfiValue::Res(Err(e))) => {
-                    failures.push(format!("{src:?}: {e:?}"));
+            let mut want = match aipl::parse(src) {
+                Ok(p) => p,
+                Err(e) => panic!("fixture does not parse with gazelle: {src:?}: {e}"),
+            };
+            let value = match engine.call_values("aipl_program", &[FfiValue::Str(src.to_string())])
+            {
+                Ok(v) => v,
+                Err(e) => panic!("aipl_program({src:?}): {e:?}"),
+            };
+            let mut got = match aipl::ffi_ast::program_from_ffi(&value) {
+                Ok(p) => p,
+                Err(e) => {
+                    mismatches.push(format!("{src:?}: did not rebuild: {e}"));
+                    continue;
                 }
-                other => panic!("aipl_lower_program({src:?}): {other:?}"),
+            };
+            // The two rewrites that follow a parse but are no part of one.
+            // `aipl::parse` runs them for gazelle; running them here is what
+            // compares the two sides at the same stage, and is what stage 5g's
+            // entry point will do for real.
+            aipl_parser::post_parse(&mut got, src);
+            zero_spans(&mut want);
+            zero_spans(&mut got);
+            if want != got {
+                mismatches.push(format!("{src:?}\n  gazelle: {want:?}\n  aipl:    {got:?}"));
             }
         }
 
         assert!(
-            failures.is_empty(),
-            "{} fixture(s) parsed but did not lower:\n{}",
-            failures.len(),
-            failures.join("\n")
+            mismatches.is_empty(),
+            "{} of {} fixture(s) disagree:\n{}",
+            mismatches.len(),
+            SHAPE_FIXTURES.len() + DECL_FIXTURES.len(),
+            mismatches.join("\n")
+        );
+    });
+}
+
+/// Every span in `p` set to `0..0`, and the two `Expr` fields the parser leaves
+/// to later passes cleared — so `==` compares structure and names only.
+fn zero_spans(p: &mut aipl_syntax::ast::Program) {
+    use aipl_syntax::ast::{ImportSource, Item};
+    for item in &mut p.items {
+        match item {
+            Item::Fn(f) => {
+                for param in &mut f.sig.params {
+                    strip_temp(&mut param.name);
+                    if let Some(d) = &mut param.default {
+                        zero_expr(d);
+                    }
+                }
+                zero_expr(&mut f.body);
+                if let Some(t) = &mut f.test_body {
+                    zero_expr(t);
+                }
+            }
+            Item::Struct(s) => {
+                for fd in &mut s.fields {
+                    if let Some(d) = &mut fd.default {
+                        zero_expr(d);
+                    }
+                }
+            }
+            Item::Variant(v) => {
+                for case in &mut v.cases {
+                    for slot in &mut case.payload {
+                        if let Some(d) = &mut slot.default {
+                            zero_expr(d);
+                        }
+                    }
+                }
+            }
+            Item::Import(d) => {
+                for n in &mut d.names {
+                    n.span = 0..0;
+                }
+                match &mut d.source {
+                    ImportSource::Path { span, .. } | ImportSource::Builtins { span } => {
+                        *span = 0..0
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A synthetic binding's name without the span it was numbered from. Leaves
+/// every name a user could have written alone: all four prefixes are reserved
+/// (`$` is not in the identifier set).
+fn strip_temp(name: &mut String) {
+    for prefix in ["__tpat$", "__spat$", "__fpat$", "__idx$"] {
+        if name.starts_with(prefix) {
+            *name = prefix.to_string();
+            return;
+        }
+    }
+}
+
+fn zero_expr(e: &mut aipl_syntax::ast::Expr) {
+    use aipl_syntax::ast::ExprKind as K;
+    e.span = 0..0;
+    e.ty = None;
+    e.value_span = None;
+    match &mut e.kind {
+        // `bake_asserts` writes the *text* a condition's span covers into the
+        // baked location string, so a span difference surfaces here as a value
+        // rather than as a diagnostic. It is the same difference: gazelle's
+        // span for a bracketed form stops before its closing bracket, so its
+        // string says `[true, false` where the AIPL parser's says
+        // `[true, false]`. Cleared with the spans, and for the same reason —
+        // matching gazelle's convention is 5e's job.
+        K::Call(name, args, _) if name == "__assert" && args.len() == 2 => {
+            args[1].kind = K::Str(String::new());
+        }
+        K::Match(_, arms) => {
+            for a in arms {
+                a.span = 0..0;
+            }
+        }
+        K::IfLet(arm, ..) => arm.span = 0..0,
+        K::Lambda(params, _) => {
+            for param in params {
+                param.span = 0..0;
+            }
+        }
+        // The synthetic bindings a desugaring introduces are named after the
+        // span they came from, so they are span renderings too — and the same
+        // convention gap shows: gazelle spans a tuple literal from its first
+        // element, the AIPL parser from its `(`, so one says `__tpat$220` where
+        // the other says `__tpat$219`. The names are unique either way and
+        // nothing reads them; only the digits differ, so only the digits go.
+        K::Let(name, ..) | K::LetMut(name, ..) | K::For(name, ..) | K::Ident(name) => {
+            strip_temp(name)
+        }
+        _ => {}
+    }
+    for child in aipl_syntax::each_subexpr_mut(e) {
+        zero_expr(child);
+    }
+}
+
+/// The same comparison as the fixtures, over real corpus files.
+///
+/// The fixtures are chosen; these are not, which is the point — a lowering can
+/// be right about every shape someone thought to write down and wrong about the
+/// combination a real file happens to contain. The differential is the strong
+/// one (whole `Program`s, node for node), so the only question is how much of
+/// the corpus it can afford.
+///
+/// **Capped by size, deliberately.** Each file costs a parse on both sides plus
+/// a whole AST across the FFI as a nested `FfiValue`; the compiler sources at
+/// the large end of the corpus are thousands of lines and their trees cross as
+/// six-figure value graphs. `tests/cases/` is where the small files are, and
+/// they are also the ones written to exercise one language feature each — so
+/// the cap costs breadth of *size*, not breadth of syntax. Files gazelle
+/// rejects are skipped: a syntax-error fixture has no AST to compare.
+#[test]
+fn aipl_grammar_builds_the_same_ast_on_small_corpus_files() {
+    on_big_stack(|| {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut files = Vec::new();
+        collect_aipl(&root.join("tests").join("cases"), &mut files);
+        files.sort();
+
+        let engine = compile_grammar();
+        let mut mismatches: Vec<String> = Vec::new();
+        let mut compared = 0usize;
+
+        for path in &files {
+            let Ok(source) = fs::read_to_string(path) else {
+                continue;
+            };
+            if source.len() > 2_000 {
+                continue;
+            }
+            // Spans are relative to the source with its expected-output
+            // sections stripped, which is what both parsers see.
+            let src = aipl_parser::strip_test_sections(&source);
+            let Ok(mut want) = aipl::parse(&source) else {
+                continue;
+            };
+            let value = match engine.call_values("aipl_program", &[FfiValue::Str(source.clone())]) {
+                Ok(v) => v,
+                Err(e) => panic!("aipl_program({}): {e:?}", path.display()),
+            };
+            let mut got = match aipl::ffi_ast::program_from_ffi(&value) {
+                Ok(p) => p,
+                Err(e) => {
+                    mismatches.push(format!("{}: did not rebuild: {e}", path.display()));
+                    continue;
+                }
+            };
+            aipl_parser::post_parse(&mut got, src);
+            zero_spans(&mut want);
+            zero_spans(&mut got);
+            compared += 1;
+            if want != got {
+                mismatches.push(format!("{}: the two ASTs differ", path.display()));
+            }
+        }
+
+        assert!(
+            mismatches.is_empty(),
+            "{} of {compared} corpus file(s) disagree:\n{}",
+            mismatches.len(),
+            mismatches
+                .iter()
+                .take(20)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        // A guard against the comparison quietly emptying out — a size cap that
+        // excluded everything, or a corpus directory that moved.
+        assert!(
+            compared >= 200,
+            "expected a good many corpus files under the cap; only {compared} were compared"
         );
     });
 }

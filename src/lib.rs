@@ -21,7 +21,7 @@ pub use aipl_parser::{
 // Compiler passes and backends, each re-exported as a module so existing
 // `aipl::codegen::…`, `aipl::mono::…`, etc. paths keep resolving.
 pub use aipl_codegen as codegen;
-pub use aipl_codegen::{parse_spec, FfiValue, SpecFields};
+pub use aipl_codegen::{ffi_ast, parse_spec, FfiValue, SpecFields};
 /// The documentation site generator behind `aipl docs`: static HTML and one
 /// stylesheet, written from an [`index`]. Exposed so a project can generate its
 /// own docs from a build script rather than the CLI.
