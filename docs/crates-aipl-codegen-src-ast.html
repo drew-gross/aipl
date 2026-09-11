@@ -519,6 +519,388 @@
 
 
 
+        <section class="item" id="item-Bound">
+          <h3>
+            <a class="anchor" href="#item-Bound">Bound</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Bound</code></pre>
+
+          <div class="doc"><p><code>aipl_syntax::ast::Bound</code> — a constraint on a declared type variable. <code>any</code> accepts anything, <code>ord</code> narrows to the primitives usable with <code>&lt;</code>/<code>&gt;</code>, and <code>variant</code> to the tagged types a <code>match</code> can inspect.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-BoundAny"><code>BoundAny</code></li>
+
+            <li id="item-BoundOrd"><code>BoundOrd</code></li>
+
+            <li id="item-BoundVariant"><code>BoundVariant</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-bound_from_name">
+          <h3>
+            <a class="anchor" href="#item-bound_from_name">bound_from_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn bound_from_name(name: str) -&#62; Bound?</code></pre>
+
+          <div class="doc"><p>The bound a keyword names, or <code>none</code> when it names none of them. The <code>variant</code> bound has a keyword of its own in the grammar and so never reaches here.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_bound">
+          <h3>
+            <a class="anchor" href="#item-show_bound">show_bound</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_bound(self: Bound) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-TypeParam">
+          <h3>
+            <a class="anchor" href="#item-TypeParam">TypeParam</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct TypeParam</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ImportSource">
+          <h3>
+            <a class="anchor" href="#item-ImportSource">ImportSource</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ImportSource</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+          <ul class="cases">
+
+            <li id="item-ImportPath"><code>ImportPath(path: str, span: Span)</code></li>
+
+            <li id="item-ImportBuiltins"><code>ImportBuiltins(span: Span)</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-ImportName">
+          <h3>
+            <a class="anchor" href="#item-ImportName">ImportName</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ImportName</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ImportDecl">
+          <h3>
+            <a class="anchor" href="#item-ImportDecl">ImportDecl</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ImportDecl</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Param">
+          <h3>
+            <a class="anchor" href="#item-Param">Param</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Param</code></pre>
+
+          <div class="doc"><p>One declared parameter. <code>ty</code> is the type the *body* sees, which is not always the one written: a variadic <code>x: T*</code> stores the sequence type, and a <code>k?: T</code> stores <code>T?</code> with <code>implicit_some</code> recording that the call site passes a bare <code>T</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Signature">
+          <h3>
+            <a class="anchor" href="#item-Signature">Signature</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Signature</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Function">
+          <h3>
+            <a class="anchor" href="#item-Function">Function</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Function</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-FieldDecl">
+          <h3>
+            <a class="anchor" href="#item-FieldDecl">FieldDecl</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct FieldDecl</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-StructDecl">
+          <h3>
+            <a class="anchor" href="#item-StructDecl">StructDecl</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct StructDecl</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-CaseParam">
+          <h3>
+            <a class="anchor" href="#item-CaseParam">CaseParam</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct CaseParam</code></pre>
+
+          <div class="doc"><p>One payload slot of a variant case. A positional slot has no name; the three named forms differ only in whether they carry a default and whether the <code>?</code> moved onto the name.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-VariantCase">
+          <h3>
+            <a class="anchor" href="#item-VariantCase">VariantCase</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct VariantCase</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-VariantDecl">
+          <h3>
+            <a class="anchor" href="#item-VariantDecl">VariantDecl</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct VariantDecl</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Item">
+          <h3>
+            <a class="anchor" href="#item-Item">Item</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Item</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+          <ul class="cases">
+
+            <li id="item-ItemFn"><code>ItemFn(Function)</code></li>
+
+            <li id="item-ItemStruct"><code>ItemStruct(StructDecl)</code></li>
+
+            <li id="item-ItemVariant"><code>ItemVariant(VariantDecl)</code></li>
+
+            <li id="item-ItemImport"><code>ItemImport(ImportDecl)</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-Program">
+          <h3>
+            <a class="anchor" href="#item-Program">Program</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Program</code></pre>
+
+          <div class="doc"><p><code>aipl_syntax::ast::Program</code>, less its <code>sources</code> map: a single parsed file has none, and the loader fills one in when it flattens several files together.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ParsedBody">
+          <h3>
+            <a class="anchor" href="#item-ParsedBody">ParsedBody</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant ParsedBody</code></pre>
+
+          <div class="doc"><p>A parsed function body, before the return type is in scope to name the struct the shorthand constructs. Gazelle's <code>ParsedBody</code>, and parser-local for the same reason: by the time a <code>Function</code> is built the sugar is gone.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-PBlock"><code>PBlock(Expr)</code></li>
+
+            <li id="item-PConstruct"><code>PConstruct(FieldInit[], Span)</code></li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-ParsedParam">
+          <h3>
+            <a class="anchor" href="#item-ParsedParam">ParsedParam</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ParsedParam</code></pre>
+
+          <div class="doc"><p>A parameter as written, before the destructuring form is taken apart. <code>fields</code> is empty for every ordinary parameter and holds the pattern's field names for <code>Point { x, y }</code>, whose <code>Param</code> is the synthetic scrutinee the function's own lowering then binds those fields off.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-FnAttr">
+          <h3>
+            <a class="anchor" href="#item-FnAttr">FnAttr</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct FnAttr</code></pre>
+
+          <div class="doc"><p>One <code>.test({ .. })</code> attribute: its block, and the span of the attribute name, which is where a duplicate is reported.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_program">
+          <h3>
+            <a class="anchor" href="#item-show_program">show_program</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_program(self: Program) -&#62; str</code></pre>
+
+          <div class="doc"><p>A whole program as text, one item per line — the oracle the item lowering's tests assert against. Near the source it came from rather than structural, because an item's shape is its declaration and a dump that hid that would be harder to read than the thing it describes.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_item">
+          <h3>
+            <a class="anchor" href="#item-show_item">show_item</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_item(self: Item) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Stmt">
+          <h3>
+            <a class="anchor" href="#item-Stmt">Stmt</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Stmt</code></pre>
+
+          <div class="doc"><p>One keyword statement, after its own production has read it and before the rest of the block is in scope. <code>wrap_stmt</code> is what folds it together with that rest, and several of these fold into *several* nodes — which is why a statement cannot simply lower to an <code>Expr</code> the way an expression does.</p><p>It mirrors gazelle's <code>StmtSpec</code>, which is a parser-local type there for the same reason it is one here: the AST has no statement node, so this shape exists only between the production and the fold.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-SLet"><code>SLet(name: str, name_span: Span, ty: Ty?, value: Expr)</code></li>
+
+            <li id="item-SMut"><code>SMut(name: str, name_span: Span, ty: Ty?, value: Expr)</code></li>
+
+            <li id="item-SLetTuple"><code>SLetTuple(names: str[], value: Expr, span: Span)</code></li>
+
+            <li id="item-SLetStruct"><code>SLetStruct(struct_name: str, fields: str[], value: Expr, span: Span)</code></li>
+
+            <li id="item-SMutStruct"><code>SMutStruct(struct_name: str, fields: str[], value: Expr, span: Span)</code></li>
+
+            <li id="item-SAssign"><code>SAssign(lhs: Expr, value: Expr, span: Span)</code></li>
+
+            <li id="item-SFor"><code>SFor(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, span: Span)</code></li>
+
+            <li id="item-SWhile"><code>SWhile(cond: Expr, body: Expr, span: Span)</code></li>
+
+            <li id="item-SReturn"><code>SReturn(value: Expr, span: Span)</code></li>
+
+          </ul>
+
+        </section>
+
+
+
         <section class="item" id="item-Ast">
           <h3>
             <a class="anchor" href="#item-Ast">Ast</a>
@@ -558,6 +940,42 @@
             <li id="item-AArms"><code>AArms(MatchArm[])</code></li>
 
             <li id="item-AShimBind"><code>AShimBind(str, str)</code></li>
+
+            <li id="item-AStmt"><code>AStmt(Stmt)</code></li>
+
+            <li id="item-AName"><code>AName(str)</code></li>
+
+            <li id="item-AProgram"><code>AProgram(Program)</code></li>
+
+            <li id="item-AItem"><code>AItem(Item)</code></li>
+
+            <li id="item-AImport"><code>AImport(ImportDecl)</code></li>
+
+            <li id="item-AImportName"><code>AImportName(ImportName)</code></li>
+
+            <li id="item-AFunction"><code>AFunction(Function)</code></li>
+
+            <li id="item-ATypeParams"><code>ATypeParams(TypeParam[])</code></li>
+
+            <li id="item-ATypeParam"><code>ATypeParam(TypeParam)</code></li>
+
+            <li id="item-AParam"><code>AParam(ParsedParam)</code></li>
+
+            <li id="item-ABody"><code>ABody(ParsedBody)</code></li>
+
+            <li id="item-AFieldInits"><code>AFieldInits(FieldInit[])</code></li>
+
+            <li id="item-AAttr"><code>AAttr(FnAttr)</code></li>
+
+            <li id="item-AStruct"><code>AStruct(StructDecl)</code></li>
+
+            <li id="item-AFieldDecl"><code>AFieldDecl(FieldDecl)</code></li>
+
+            <li id="item-AVariant"><code>AVariant(VariantDecl)</code></li>
+
+            <li id="item-AVariantCase"><code>AVariantCase(VariantCase)</code></li>
+
+            <li id="item-ACaseParam"><code>ACaseParam(CaseParam)</code></li>
 
           </ul>
 
@@ -774,6 +1192,188 @@
             <span class="kind kind-fn">fn</span>
           </h3>
           <pre class="signature"><code>fn quoted(self: str) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_fn">
+          <h3>
+            <a class="anchor" href="#item-show_fn">show_fn</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_fn(self: Function) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-effect_marker">
+          <h3>
+            <a class="anchor" href="#item-effect_marker">effect_marker</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn effect_marker(self: str) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_doc">
+          <h3>
+            <a class="anchor" href="#item-show_doc">show_doc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_doc(self: str?) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_type_params">
+          <h3>
+            <a class="anchor" href="#item-show_type_params">show_type_params</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_type_params(self: TypeParam[]) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_type_param">
+          <h3>
+            <a class="anchor" href="#item-show_type_param">show_type_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_type_param(self: TypeParam) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_param">
+          <h3>
+            <a class="anchor" href="#item-show_param">show_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_param(self: Param) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_default">
+          <h3>
+            <a class="anchor" href="#item-show_default">show_default</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_default(self: Expr?) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_field_decl">
+          <h3>
+            <a class="anchor" href="#item-show_field_decl">show_field_decl</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_field_decl(self: FieldDecl) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_case">
+          <h3>
+            <a class="anchor" href="#item-show_case">show_case</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_case(self: VariantCase) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_case_param">
+          <h3>
+            <a class="anchor" href="#item-show_case_param">show_case_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_case_param(self: CaseParam) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-opt_marker">
+          <h3>
+            <a class="anchor" href="#item-opt_marker">opt_marker</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn opt_marker(self: bool) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_import_name">
+          <h3>
+            <a class="anchor" href="#item-show_import_name">show_import_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_import_name(self: ImportName) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_import_source">
+          <h3>
+            <a class="anchor" href="#item-show_import_source">show_import_source</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_import_source(self: ImportSource) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

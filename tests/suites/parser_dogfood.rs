@@ -424,3 +424,87 @@ fn aipl_grammar_groups_expressions_like_gazelle() {
         );
     });
 }
+
+/// Sources that exercise the *declaration* half of the grammar, which
+/// `SHAPE_FIXTURES` leaves almost untouched: it is an expression list, chosen
+/// for precedence and grouping.
+///
+/// These are here for the lowering rather than for shape — every parameter
+/// form, both destructuring statements, the three `for` loops, the nine `set`
+/// spellings, the body shorthand, and a doc comment, so the 54 `build`
+/// functions are asked about the syntax a real file contains rather than only
+/// about the pieces their own assertions name.
+const DECL_FIXTURES: &[&str] = &[
+    "import { equal as ==, len, - } from builtins;\nimport { P } from \"./p.aipl\";",
+    "# A point.\n# Two lines of it.\nstruct P { x: i64, y: i64 = 0 }",
+    "struct B<T: any, U: variant> { v: T, w: U }",
+    "variant V = A | B(i64) | C(x: i64, y: i64 = 1)",
+    "variant W<T: any> = | Some(T) | Nothing",
+    "fn f(mut xs: i64[], y: str = \"z\", n: i64*, k?: u64 = none) { }",
+    "fn f(Point { x, y }) -> i64 { x }",
+    "pub fn f<T: ord>(a: T) -> T { a }",
+    "fn f() !prints !reads { g(); }",
+    "fn f(v: i64) -> P { v, next: none }",
+    "fn f(v: P) -> P { ..v, x: 1 }",
+    "fn f() -> i64 { 1 }.test({ assert(f() == 1); })",
+    "fn f(p: P) -> i64 { let (a, b) = p; a }",
+    "fn f(p: P) -> i64 { let P { x, y } = p; x }",
+    "fn f(p: P) -> i64 { mut P { x } = p; x }",
+    "fn f(xs: i64[]) { for (let x : xs) { g(x); } }",
+    "fn f(xs: i64[]) { for (let i, x : xs) { g(i); } }",
+    "fn f(ps: P[]) { for (let (a, b) : ps) { g(a); } }",
+    "fn f(mut n: i64) { set n++; set n--; set n += 1; set n -= 1; set n *= 2; set n /= 2; }",
+    "fn f(mut xs: i64[], mut p: P) { set xs.push(1); set p.x = 1; set p.a.b = 2; }",
+    "fn f(b: bool) -> i64 { while (b) { g(); } return 1; }",
+    "fn f(v: V) -> i64 { match (v) { A(x) | B(x) => x, C(..) => 1, _ => 0 } }",
+    "fn f(o: i64?) -> i64 { if (let some(v) = o) { v } else { 0 } }",
+    "fn f() { shim prints { print = p } { g(); } }",
+    "fn f(x: i64) -> str { `a{x}b` }",
+    "fn f() -> #{str: i64} { #{\"a\": 1} }",
+];
+
+/// Every fixture lowers to an AST — the claim stage 5d's AIPL half makes.
+///
+/// Not a differential: a `Program` cannot cross the FFI yet (that is the
+/// bridge, 5d's last step), so what comes back is the rendered dump and what is
+/// asserted is that the lowering *reaches* one. That is weaker than comparing
+/// trees and still the check the per-production assertions cannot make: those
+/// name the shapes they were written against, and this asks the 54 `build`
+/// functions about whole files, where a production is reached in combinations
+/// nobody chose.
+///
+/// The gazelle parse is run first so a fixture that is simply bad AIPL fails as
+/// a bad fixture rather than as a lowering bug.
+#[test]
+fn aipl_grammar_lowers_every_fixture() {
+    on_big_stack(|| {
+        let engine = compile_grammar();
+        let mut failures: Vec<String> = Vec::new();
+
+        for src in SHAPE_FIXTURES.iter().chain(DECL_FIXTURES.iter()) {
+            if let Err(e) = aipl::parse(src) {
+                panic!("fixture does not parse with gazelle: {src:?}: {e}");
+            }
+            match engine.call_values("aipl_lower_program", &[FfiValue::Str(src.to_string())]) {
+                Ok(FfiValue::Res(Ok(boxed))) => match *boxed {
+                    FfiValue::Str(dump) => assert!(
+                        !dump.is_empty(),
+                        "aipl_lower_program({src:?}) lowered to nothing"
+                    ),
+                    other => panic!("aipl_lower_program({src:?}) is not a string: {other:?}"),
+                },
+                Ok(FfiValue::Res(Err(e))) => {
+                    failures.push(format!("{src:?}: {e:?}"));
+                }
+                other => panic!("aipl_lower_program({src:?}): {other:?}"),
+            }
+        }
+
+        assert!(
+            failures.is_empty(),
+            "{} fixture(s) parsed but did not lower:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    });
+}

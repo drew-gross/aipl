@@ -536,6 +536,221 @@ variant Suffix =
 # belongs to `atom`, and this is what `brace_body` hands it.
 variant BraceEntry = BKey(Expr) | BPair(Expr, Expr)
 
+# `aipl_syntax::ast::Bound` — a constraint on a declared type variable. `any`
+# accepts anything, `ord` narrows to the primitives usable with `<`/`>`, and
+# `variant` to the tagged types a `match` can inspect.
+variant Bound = BoundAny | BoundOrd | BoundVariant
+
+# The bound a keyword names, or `none` when it names none of them. The
+# `variant` bound has a keyword of its own in the grammar and so never reaches
+# here.
+pub fn bound_from_name(name: str) -> Bound? {
+    match (name) {
+        "any" => some(BoundAny),
+        "ord" => some(BoundOrd),
+        _ => none,
+    }
+}.test({
+    assert(bound_from_name("any") == some(BoundAny));
+    assert(bound_from_name("ord") == some(BoundOrd));
+    assert(bound_from_name("eq") == none);
+
+    // `variant` is its own keyword in type-parameter position, so it is not a
+    // bound *name* — the grammar tells the two apart before this is asked.
+    assert(bound_from_name("variant") == none);
+})
+
+pub fn show_bound(self: Bound) -> str {
+    match (self) {
+        BoundAny => "any",
+        BoundOrd => "ord",
+        BoundVariant => "variant",
+    }
+}
+
+struct TypeParam { name: str, bound: Bound }
+
+variant ImportSource = ImportPath(path: str, span: Span) | ImportBuiltins(span: Span)
+
+struct ImportName { name: str, alias: str?, span: Span }
+
+struct ImportDecl { names: ImportName[], source: ImportSource }
+
+# One declared parameter. `ty` is the type the *body* sees, which is not always
+# the one written: a variadic `x: T*` stores the sequence type, and a `k?: T`
+# stores `T?` with `implicit_some` recording that the call site passes a bare
+# `T`.
+struct Param {
+    name: str,
+    ty: Ty,
+    mutable: bool,
+    variadic: bool,
+    default: Expr?,
+    implicit_some: bool,
+}
+
+struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], return_ty: Ty? }
+
+struct Function { name: str, is_pub: bool, sig: Signature, body: Expr, test_body: Expr?, doc: str? }
+
+struct FieldDecl { name: str, ty: Ty, default: Expr? }
+
+struct StructDecl { name: str, doc: str?, type_vars: TypeParam[], fields: FieldDecl[] }
+
+# One payload slot of a variant case. A positional slot has no name; the three
+# named forms differ only in whether they carry a default and whether the `?`
+# moved onto the name.
+struct CaseParam { name: str?, ty: Ty, default: Expr?, implicit_some: bool }
+
+struct VariantCase { name: str, doc: str?, payload: CaseParam[] }
+
+struct VariantDecl { name: str, doc: str?, type_vars: TypeParam[], cases: VariantCase[] }
+
+variant Item =
+    | ItemFn(Function)
+    | ItemStruct(StructDecl)
+    | ItemVariant(VariantDecl)
+    | ItemImport(ImportDecl)
+
+# `aipl_syntax::ast::Program`, less its `sources` map: a single parsed file has
+# none, and the loader fills one in when it flattens several files together.
+struct Program { items: Item[] }
+
+# A parsed function body, before the return type is in scope to name the struct
+# the shorthand constructs. Gazelle's `ParsedBody`, and parser-local for the
+# same reason: by the time a `Function` is built the sugar is gone.
+variant ParsedBody = PBlock(Expr) | PConstruct(FieldInit[], Span)
+
+# A parameter as written, before the destructuring form is taken apart.
+# `fields` is empty for every ordinary parameter and holds the pattern's field
+# names for `Point { x, y }`, whose `Param` is the synthetic scrutinee the
+# function's own lowering then binds those fields off.
+struct ParsedParam { param: Param, fields: str[], span: Span }
+
+# One `.test({ .. })` attribute: its block, and the span of the attribute name,
+# which is where a duplicate is reported.
+struct FnAttr { body: Expr, span: Span }
+
+# A whole program as text, one item per line — the oracle the item lowering's
+# tests assert against. Near the source it came from rather than structural,
+# because an item's shape is its declaration and a dump that hid that would be
+# harder to read than the thing it describes.
+pub fn show_program(self: Program) -> str { self.items.map(show_item).join(sep="\n") }
+
+pub fn show_item(self: Item) -> str {
+    match (self) {
+        ItemFn(f) => show_fn(f),
+        ItemStruct(s) => `{show_doc(s.doc)}struct {s.name}{show_type_params(s.type_vars)}({s.fields.map(show_field_decl).join(sep=", ")})`,
+        ItemVariant(v) => `{show_doc(v.doc)}variant {v.name}{show_type_params(v.type_vars)}({v.cases.map(show_case).join(sep=" | ")})`,
+        ItemImport(d) => `import [{d.names.map(show_import_name).join(sep=", ")}] from {show_import_source(d.source)}`,
+    }
+}
+
+fn show_fn(self: Function) -> str {
+    let vis = if (self.is_pub) { "pub " } else { "" };
+    let sig = self.sig;
+    let ret = match (sig.return_ty) {
+        some(t) => ` -> {t.show_ty()}`,
+        none => "",
+    };
+    let effects = sig.effects.map(effect_marker).join(sep="");
+    let test = match (self.test_body) {
+        some(b) => ` .test({b.show_expr()})`,
+        none => "",
+    };
+    `{show_doc(self.doc)}{vis}fn {self.name}{show_type_params(sig.type_vars)}({sig.params.map(show_param).join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}`
+}
+
+fn effect_marker(self: str) -> str { ` !{self}` }
+
+fn show_doc(self: str?) -> str {
+    match (self) {
+        some(d) => `doc({d}) `,
+        none => "",
+    }
+}
+
+fn show_type_params(self: TypeParam[]) -> str {
+    if (self.is_empty()) {
+        return "";
+    };
+    `<{self.map(show_type_param).join(sep=", ")}>`
+}
+
+fn show_type_param(self: TypeParam) -> str { `{self.name}: {self.bound.show_bound()}` }
+
+fn show_param(self: Param) -> str {
+    let prefix = if (self.mutable) { "mut " } else { "" };
+    let opt = if (self.implicit_some) { "?" } else { "" };
+    let star = if (self.variadic) { "*" } else { "" };
+    `{prefix}{self.name}{opt}: {self.ty.show_ty()}{star}{show_default(self.default)}`
+}
+
+fn show_default(self: Expr?) -> str {
+    match (self) {
+        some(e) => ` = {e.show_expr()}`,
+        none => "",
+    }
+}
+
+fn show_field_decl(self: FieldDecl) -> str {
+    `{self.name}: {self.ty.show_ty()}{show_default(self.default)}`
+}
+
+fn show_case(self: VariantCase) -> str {
+    if (self.payload.is_empty()) {
+        return self.name;
+    };
+    `{self.name}({self.payload.map(show_case_param).join(sep=", ")})`
+}
+
+fn show_case_param(self: CaseParam) -> str {
+    match (self.name) {
+        some(n) => `{n}{opt_marker(self.implicit_some)}: {self.ty.show_ty()}{show_default(self.default)}`,
+        none => self.ty.show_ty(),
+    }
+}
+
+fn opt_marker(self: bool) -> str {
+    if (self) {
+        return "?";
+    };
+    ""
+}
+
+fn show_import_name(self: ImportName) -> str {
+    match (self.alias) {
+        some(a) => `{self.name} as {a}`,
+        none => self.name,
+    }
+}
+
+fn show_import_source(self: ImportSource) -> str {
+    match (self) {
+        ImportPath(path, _) => `"{path}"`,
+        ImportBuiltins(..) => "builtins",
+    }
+}
+
+# One keyword statement, after its own production has read it and before the
+# rest of the block is in scope. `wrap_stmt` is what folds it together with that
+# rest, and several of these fold into *several* nodes — which is why a
+# statement cannot simply lower to an `Expr` the way an expression does.
+#
+# It mirrors gazelle's `StmtSpec`, which is a parser-local type there for the
+# same reason it is one here: the AST has no statement node, so this shape
+# exists only between the production and the fold.
+variant Stmt =
+    | SLet(name: str, name_span: Span, ty: Ty?, value: Expr)
+    | SMut(name: str, name_span: Span, ty: Ty?, value: Expr)
+    | SLetTuple(names: str[], value: Expr, span: Span)
+    | SLetStruct(struct_name: str, fields: str[], value: Expr, span: Span)
+    | SMutStruct(struct_name: str, fields: str[], value: Expr, span: Span)
+    | SAssign(lhs: Expr, value: Expr, span: Span)
+    | SFor(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, span: Span)
+    | SWhile(cond: Expr, body: Expr, span: Span)
+    | SReturn(value: Expr, span: Span)
+
 variant Ast =
     | Ignored
     | ATy(Ty)
@@ -551,6 +766,24 @@ variant Ast =
     | AEntries(BraceEntry[])
     | AArms(MatchArm[])
     | AShimBind(str, str)
+    | AStmt(Stmt)
+    | AName(str)
+    | AProgram(Program)
+    | AItem(Item)
+    | AImport(ImportDecl)
+    | AImportName(ImportName)
+    | AFunction(Function)
+    | ATypeParams(TypeParam[])
+    | ATypeParam(TypeParam)
+    | AParam(ParsedParam)
+    | ABody(ParsedBody)
+    | AFieldInits(FieldInit[])
+    | AAttr(FnAttr)
+    | AStruct(StructDecl)
+    | AFieldDecl(FieldDecl)
+    | AVariant(VariantDecl)
+    | AVariantCase(VariantCase)
+    | ACaseParam(CaseParam)
 
 # What a child lowered to, as a noun a refusal can name. Every mismatch here is
 # a lowering bug rather than a bad program — the grammar guarantees the shape —
@@ -571,6 +804,24 @@ pub fn ast_case_name(self: Ast) -> str {
         AEntries(..) => "a list of brace-literal entries",
         AArms(..) => "a list of match arms",
         AShimBind(..) => "a shim binding",
+        AStmt(..) => "a statement",
+        AName(..) => "a name",
+        AProgram(..) => "a program",
+        AItem(..) => "an item",
+        AImport(..) => "an import",
+        AImportName(..) => "an imported name",
+        AFunction(..) => "a function",
+        ATypeParams(..) => "a type parameter list",
+        ATypeParam(..) => "a type parameter",
+        AParam(..) => "a parameter",
+        ABody(..) => "a function body",
+        AFieldInits(..) => "a field initializer list",
+        AAttr(..) => "a function attribute",
+        AStruct(..) => "a struct declaration",
+        AFieldDecl(..) => "a field declaration",
+        AVariant(..) => "a variant declaration",
+        AVariantCase(..) => "a variant case",
+        ACaseParam(..) => "a case parameter",
     }
 }.test({
     assert(Ignored.ast_case_name() == "an unlowered node");
@@ -583,11 +834,11 @@ allocations: 368
 deallocations: 368
 reallocations: 27
 bytes allocated: 25940
-instructions executed: 16501
-binary size: 142688
-  code: 88856
-  data: 6201
-  metadata: 47631
+instructions executed: 16817
+binary size: 195440
+  code: 123848
+  data: 6505
+  metadata: 65087
 functions:
   __arr_drop_Expr:
     calls: 11
@@ -625,6 +876,12 @@ functions:
   __arr_retain___tuple$str$str:
     calls: 0
     bytes: 140
+  __eq_Bound:
+    calls: 0
+    bytes: 64
+  __eq_Bound$opt:
+    calls: 2
+    bytes: 92
   __eq_Prim:
     calls: 0
     bytes: 64
@@ -654,10 +911,13 @@ functions:
     bytes: 72
   __test$ast_case_name:
     calls: 1
-    bytes: 13016
+    bytes: 46388
   __test$binder_list:
     calls: 1
     bytes: 832
+  __test$bound_from_name:
+    calls: 1
+    bytes: 1384
   __test$pat_bindings:
     calls: 1
     bytes: 2288
@@ -704,7 +964,7 @@ functions:
     calls: 21
     bytes: (external)
   aipl_assert:
-    calls: 74
+    calls: 78
     bytes: (external)
   aipl_i64_len:
     calls: 38
@@ -725,10 +985,10 @@ functions:
     calls: 73
     bytes: (external)
   aipl_test_begin:
-    calls: 10
+    calls: 11
     bytes: (external)
   aipl_test_end:
-    calls: 10
+    calls: 11
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -747,7 +1007,7 @@ functions:
     bytes: 2804
   main:
     calls: 1
-    bytes: 744
+    bytes: 824
   pat_bindings:
     calls: 5
     bytes: 792

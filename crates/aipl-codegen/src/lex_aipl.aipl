@@ -157,7 +157,32 @@ variant AiplTok =
 # A doc comment's text: the line past its `#`, with one optional space of
 # separation removed. `# text` and `#text` carry the same `text`, and a bare
 # `#` an empty line — so a doc block's blank lines survive as blank lines.
-fn doc_text(line: str) -> AiplTok { DocComment(line.trim_prefix('#').trim_prefix(' ')) }
+fn doc_text(line: str) -> AiplTok { DocComment(doc_line_value(line)) }
+
+# The same, as a function a consumer can reach. A parser `build` is handed the
+# source and a span rather than the token, so it has to strip the marker for
+# itself — and it strips it here, beside the rule, so the two answers cannot
+# drift. Same arrangement as `str_lit_value`.
+pub fn doc_line_value(line: str) -> str { line.trim_prefix('#').trim_prefix(' ') }.test({
+    assert(doc_line_value("# text") == "text");
+    assert(doc_line_value("#text") == "text");
+
+    // A bare `#` is an empty line, which is what lets a doc block have
+    // paragraphs.
+    assert(doc_line_value("#") == "");
+
+    // Only *one* space of separation is removed, so an indented continuation
+    // keeps its indent.
+    assert(doc_line_value("#   indented") == "  indented");
+    // And it is the answer the lexer's own rule gives.
+    let src = "# hi";
+    assert(
+        lex_aipl(src)? == LexResult {
+            tokens: [atok(src, DocComment(doc_line_value(src)), 0..4)],
+            trivia: [],
+        },
+    );
+})
 
 pub fn ident_start() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_" }
 
@@ -892,35 +917,35 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4490
-deallocations: 4490
+allocations: 4507
+deallocations: 4507
 reallocations: 48
-bytes allocated: 487028
-instructions executed: 1204749
-binary size: 500024
-  code: 341048
-  data: 8868
-  metadata: 150108
+bytes allocated: 500388
+instructions executed: 1223816
+binary size: 504160
+  code: 343388
+  data: 9284
+  metadata: 151488
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
     bytes: 140
   __arr_drop___m1__Token$AiplTok:
-    calls: 151
+    calls: 155
     bytes: 388
   __arr_drop___m1__TokenRule$AiplTok:
-    calls: 26
+    calls: 27
     bytes: 832
   __arr_retain___m1__StepResult$AiplTok:
     calls: 2
     bytes: 140
   __arr_retain___m1__Token$AiplTok:
-    calls: 80
+    calls: 81
     bytes: 388
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
     bytes: 832
-  __builtin_all$char$s0$lam51:
+  __builtin_all$char$s0$lam52:
     calls: 18
     bytes: 212
   __builtin_count_while$char$lam16:
@@ -929,47 +954,47 @@ functions:
   __builtin_count_while$char$s0$lam24:
     calls: 34
     bytes: 184
-  __builtin_count_while$char$s0$lam27:
+  __builtin_count_while$char$s0$lam31:
     calls: 0
     bytes: 172
   __builtin_count_while$char$s0$lam44:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam44$tail:
-    calls: 3
-    bytes: 256
-  __builtin_count_while$char$s0$lam50:
-    calls: 9
-    bytes: 172
-  __builtin_count_while$char$s0$lam52:
     calls: 4
+    bytes: 256
+  __builtin_count_while$char$s0$lam49:
+    calls: 4
+    bytes: 172
+  __builtin_count_while$char$s0$lam51:
+    calls: 9
     bytes: 172
   __builtin_int_parse:
     calls: 4
     bytes: 1028
   __eq_AiplTok:
-    calls: 59
+    calls: 60
     bytes: 600
   __eq_StrStyle:
     calls: 8
     bytes: 64
   __eq___builtin_Span:
-    calls: 64
+    calls: 65
     bytes: 104
   __eq___m1__LexError:
     calls: 5
     bytes: 128
   __eq___m1__LexResult$AiplTok:
-    calls: 20
+    calls: 21
     bytes: 120
   __eq___m1__SpanStr:
-    calls: 59
+    calls: 60
     bytes: 128
   __eq___m1__Token$AiplTok:
-    calls: 59
+    calls: 60
     bytes: 120
   __eq___m1__Token$AiplTok$arr:
-    calls: 41
+    calls: 43
     bytes: 284
   __eq_char$opt:
     calls: 2
@@ -989,12 +1014,12 @@ functions:
   __lambda_2:
     calls: 0
     bytes: 144
+  __lambda_27:
+    calls: 5
+    bytes: 140
   __lambda_3:
     calls: 2
     bytes: 164
-  __lambda_35:
-    calls: 5
-    bytes: 140
   __lambda_4:
     calls: 0
     bytes: 144
@@ -1026,16 +1051,16 @@ functions:
     calls: 2
     bytes: 2252
   __m1__lex$AiplTok:
-    calls: 26
+    calls: 27
     bytes: 1520
   __m1__lex_step$AiplTok:
-    calls: 98
+    calls: 99
     bytes: 29192
   __m1__nested_len:
-    calls: 63
+    calls: 64
     bytes: 940
   __m1__step_result$AiplTok:
-    calls: 2045
+    calls: 2050
     bytes: 15088
   __m1__template_scan$AiplTok:
     calls: 6
@@ -1047,10 +1072,10 @@ functions:
     calls: 0
     bytes: 52
   __m1__to_eol_len$tail:
-    calls: 125
+    calls: 127
     bytes: 252
   __m1__to_eol_unless_len:
-    calls: 60
+    calls: 61
     bytes: 368
   __m2__unescape:
     calls: 33
@@ -1059,7 +1084,7 @@ functions:
     calls: 9
     bytes: 1712
   __m7__trim_prefix:
-    calls: 18
+    calls: 30
     bytes: 260
   __m8__trim_suffix:
     calls: 0
@@ -1070,6 +1095,9 @@ functions:
   __test$char_lit_value:
     calls: 1
     bytes: 1856
+  __test$doc_line_value:
+    calls: 1
+    bytes: 2264
   __test$lex_aipl:
     calls: 1
     bytes: 130732
@@ -1092,19 +1120,19 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 202
+    calls: 204
     bytes: (external)
   aipl_arr_inc:
-    calls: 9196
+    calls: 9228
     bytes: (external)
   aipl_arr_reserve:
-    calls: 202
+    calls: 204
     bytes: (external)
   aipl_array_dec:
-    calls: 13664
+    calls: 13713
     bytes: (external)
   aipl_array_new:
-    calls: 4345
+    calls: 4360
     bytes: (external)
   aipl_array_push:
     calls: 37
@@ -1116,16 +1144,16 @@ functions:
     calls: 22
     bytes: (external)
   aipl_assert:
-    calls: 40
+    calls: 45
     bytes: (external)
   aipl_rules:
-    calls: 26
+    calls: 27
     bytes: 90364
   aipl_test_begin:
-    calls: 6
+    calls: 7
     bytes: (external)
   aipl_test_end:
-    calls: 6
+    calls: 7
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -1140,7 +1168,7 @@ functions:
     calls: 2
     bytes: 272
   doc_text:
-    calls: 0
+    calls: 1
     bytes: 196
   int_lit:
     calls: 4
@@ -1153,7 +1181,7 @@ functions:
     bytes: 488
   main:
     calls: 1
-    bytes: 508
+    bytes: 584
   raw_tpl_kind:
     calls: 2
     bytes: 2592

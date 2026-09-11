@@ -23,7 +23,7 @@ their own:
 - [x] 5a Decide the bridge: how an AIPL parse becomes a Rust `Program`
 - [x] 5b Wire FIRST-set pruning into the driver, and re-measure
 - [x] 5c Extend the differential test from acceptance to shape (operator grouping)
-- [ ] 5d Lower AIPL's grammar to the AST *(26/54 productions — checklist in 5d)*
+- [ ] 5d Lower AIPL's grammar to the AST *(54/54 productions; the Rust bridge is left)*
 - [ ] 5e Error-message parity against the corpus fixtures
 - [ ] 5f Side-channels: `#[allow]` spans, trailing whitespace, doc attachment
 - [ ] 5g The bootstrap procedure, and the `DOGFOOD_SOURCE_FILES` switch
@@ -43,7 +43,7 @@ project exists to remove:
 | gazelle LR(1) grammar | `crates/aipl-parser/src/lib.rs:18-504` | ~254 non-comment lines, 81 rules, 238 alternatives | the compiler's AST | by hand |
 | formatter token walker | `crates/aipl-codegen/src/walker.aipl` | 2920 code lines, 144 functions | a `Doc` layout tree | by hand |
 | TextMate grammar | `editors/vscode/syntaxes/aipl.tmLanguage.json` | 176 lines | editor scopes | **generated** (stage 2) |
-| the grammar as data | `crates/aipl-codegen/src/grammar_aipl.aipl` | 1144 code lines, 54 productions | a `Cst`, and an AST for 26 of them | the replacement |
+| the grammar as data | `crates/aipl-codegen/src/grammar_aipl.aipl` | 1144 code lines, 54 productions | a `Cst` and a full AST | the replacement |
 
 CLAUDE.md still names the cost of the first two: *"Adding a syntax form means
 teaching two parsers: the gazelle grammar in `aipl-parser` **and** the
@@ -309,7 +309,7 @@ It only becomes worth revisiting if the tree can be got across the FFI once and
 cheaply — the same "no way to hold prepared state across calls" problem 5g has
 to answer.
 
-### 5d — Lower AIPL's grammar to the AST — **26 of 54 productions**
+### 5d — Lower AIPL's grammar to the AST — **all 54 productions; the bridge is left**
 
 The bulk of the work. Declare `aipl_syntax`'s AST as AIPL types, replace
 `variant Ast = Ignored` with it, and write the 54 `build` functions against the
@@ -327,26 +327,26 @@ functions whose lists concatenate into one flat `prods` array. Tick one when its
 `build` is written *and* asserted, not when it compiles — a production returning
 `Ignored` still compiles. The arrow names what it lowers to.
 
-**items** — `items()`, 18
+**items** — `items()`, 18 — **done**, entry point `lower_aipl_program`
 
-- [ ] `program` → `Program`
-- [ ] `item` → `Item`
-- [ ] `import_decl` → `ImportDecl`
-- [ ] `import_name` → `ImportName`
-- [ ] `operator` → a name
-- [ ] `function` → `Function`
-- [ ] `effect` → a name
-- [ ] `type_params` → `TypeParam[]`
-- [ ] `type_param` → `TypeParam`
-- [ ] `param` → `Param`
-- [ ] `fn_body` → `Expr`
-- [ ] `construct_fields` → `FieldInit[]`
-- [ ] `fn_attr` → the `.test`/`.doc` attribute
-- [ ] `struct_decl` → `StructDecl`
-- [ ] `field_decl` → `FieldDecl`
-- [ ] `variant_decl` → `VariantDecl`
-- [ ] `variant_case` → `VariantCase`
-- [ ] `case_param` → `CaseParam`
+- [x] `program` → `Program`
+- [x] `item` → `Item`
+- [x] `import_decl` → `ImportDecl`
+- [x] `import_name` → `ImportName`
+- [x] `operator` → a name
+- [x] `function` → `Function`
+- [x] `effect` → a name
+- [x] `type_params` → `TypeParam[]`
+- [x] `type_param` → `TypeParam`
+- [x] `param` → `Param`
+- [x] `fn_body` → `Expr`
+- [x] `construct_fields` → `FieldInit[]`
+- [x] `fn_attr` → the `.test`/`.doc` attribute
+- [x] `struct_decl` → `StructDecl`
+- [x] `field_decl` → `FieldDecl`
+- [x] `variant_decl` → `VariantDecl`
+- [x] `variant_case` → `VariantCase`
+- [x] `case_param` → `CaseParam`
 
 **types** — `types()`, 4 — **done**, entry point `lower_aipl_ty`
 
@@ -355,22 +355,22 @@ functions whose lists concatenate into one flat `prods` array. Tick one when its
 - [x] `base_ty` → `Ty`
 - [x] `ty_core` → `Ty`
 
-**statements** — `statements()`, 12. Every one of these lowers to an `Expr`:
-AIPL has no statement node, and a block is a right-nested `Seq`.
+**statements** — `statements()`, 12 — **done**, entry point `lower_aipl_block`.
+Every one of these lowers to an `Expr`: AIPL has no statement node, and a block
+is the right-nested chain its statements fold to.
 
 - [x] `block` → `Expr`
-- [ ] `block_body` → `Expr` — the expression half is written; the `kw_stmt` arm
-      refuses until the statement slice lands, rather than dropping it
+- [x] `block_body` → `Expr`
 - [x] `block_tail` → `Expr`
-- [ ] `loop_body` → `Expr`
-- [ ] `loop_inner` → `Expr`
-- [ ] `kw_stmt` → `Expr`
-- [ ] `let_stmt` → `Expr` (`Let`)
-- [ ] `mut_stmt` → `Expr` (`LetMut`)
-- [ ] `assign_stmt` → `Expr` (`Assign`)
-- [ ] `for_stmt` → `Expr` (`For`)
-- [ ] `while_stmt` → `Expr` (`While`)
-- [ ] `return_stmt` → `Expr` (`Return`)
+- [x] `loop_body` → `Expr`
+- [x] `loop_inner` → `Expr`
+- [x] `kw_stmt` → `Expr`
+- [x] `let_stmt` → `Expr` (`Let`)
+- [x] `mut_stmt` → `Expr` (`LetMut`)
+- [x] `assign_stmt` → `Expr` (`Assign`)
+- [x] `for_stmt` → `Expr` (`For`)
+- [x] `while_stmt` → `Expr` (`While`)
+- [x] `return_stmt` → `Expr` (`Return`)
 
 **expressions** — `expressions()`, 16 — **done**, entry point `lower_aipl_expr`
 
@@ -403,6 +403,18 @@ either reaches an expression, so each could be finished and judged on its own.
 The expression slice is the opposite — it reaches almost everything — so it
 landed with `block`/`block_tail`/`match_arm`/`arm_body`, which `atom` needs to be
 exercisable at all.
+
+**Whole files lower, not just the shapes the assertions name.**
+`aipl_grammar_lowers_every_fixture` (`tests/suites/parser_dogfood.rs`) runs the
+lowering over `SHAPE_FIXTURES` plus a new `DECL_FIXTURES` — every parameter
+form, both destructuring statements, the three `for` loops, the nine `set`
+spellings, the body shorthand, a doc comment — through the FFI entry
+`aipl_lower_program`. It is not a differential: a `Program` cannot cross the FFI
+until the bridge is built, so what is asserted is that the lowering *reaches* a
+result. That is weaker than comparing trees and is still the check the
+per-production assertions cannot make, since those name the shapes they were
+written against and this asks the 54 `build` functions about whole files.
+Verified to fail when a `build` is broken.
 
 **What the expression slice settled**, beyond the four points above:
 
@@ -463,20 +475,41 @@ is `TyOptional` and stripping the tag has to give the Rust name back exactly. A
 tag is needed at all because constructors share one namespace per file and
 `Named` is already a `Rule`.
 
-**What is left, in the order it unblocks things:**
+**What the statement and item slices added to the list of desugarings**, all of
+them gazelle's, moved rather than reinvented:
 
-1. **Statements** — `block_body`'s other arm, `loop_body`, `loop_inner`,
-   `kw_stmt` and the six statement productions. They lower to `Expr` too
-   (`ELet`, `ELetMut`, `EAssign`, `EFor`, `EWhile`), so they are expressions in a
-   trench coat. The work that is *not* mechanical is gazelle's `StmtSpec` /
-   `wrap_stmt` pair: the destructuring forms (`let (a, b) = e;`,
-   `let P { x } = e;`, `for (let i, x : xs)`) desugar into several nodes each,
-   and the nine `assign_stmt` alternatives fold `set n++;` and `set n += e;`
-   into ordinary calls.
-2. **Items** — the 18 in the first group. Several are closed today
-   (`type_param`, `effect`, `import_name`) but there is no reason to lower them
-   ahead of the `Expr` they sit beside.
-3. **The Rust side** — `FfiValue` → `ast::Program`, and the shape test above.
+- `let (a, b) = e;` binds a temporary and reads `._0`/`._1` off it;
+  `let T { x, y } = e;` does the same by field name, with the pattern's type as
+  the temporary's annotation (`__spat$`, `aipl_syntax::DESTRUCTURE_BASE_PREFIX`)
+  — which is what makes the type name mean something rather than decorate the
+  line. `mut T { x } = e;` rebinds the *fields* mutably and leaves the scrutinee
+  an immutable `let`.
+- `for (let (a, b) : ps)` is a plain loop over a temporary with the field reads
+  prepended to the body; `for (let i, x : xs)` is a plain loop over a counter
+  declared just *outside* it, so it resets when the loop is nested inside
+  another. The bump calls `__builtin_wrapping_add` rather than emitting a `+`:
+  operator usage is gated per file, and a loop should not oblige a file to
+  import an operator it never wrote.
+- `set n++;` and `set n += e;` are ordinary calls on the binding, each gated on
+  the operator that was actually written rather than on the one it collapses to.
+- `Point { x, y }` in parameter position is a scrutinee the caller never named,
+  with the fields bound off it at the top of the body.
+- The `{ field: value }` body shorthand resolves at `function`, the first place
+  the return type and the field list are both in scope, into exactly the
+  `EConstruct` the long form parses to.
+- Documentation attaches at `item`, not at the declaration — which is also
+  where an import is refused it, since it brings a name in rather than declaring
+  one.
+
+**What is left: the Rust side.** `FfiValue` → `ast::Program`, plus the
+two-declaration shape test. Two known gaps to close with it:
+
+- **`Expr` declares no `value_span`**, and `lower_block` does neither half of
+  `with_block_span`'s job — see 5f.
+- **Two error messages embed a rendered type** (`fn f`'s shorthand-body
+  refusals) and render it with `show_ty`'s structural dump where gazelle uses
+  `aipl_syntax::type_name`'s source spelling. A `ty_source` mirroring
+  `type_name` is the fix, and it belongs with 5e's message parity.
 
 **While deciding which productions earn a node, collapse the wrapper lists.**
 `Many`'s `style?` argument exists for one shape: a group whose list lives one
