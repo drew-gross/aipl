@@ -478,12 +478,6 @@ fn tuple_instance_arity(inst: &str) -> Option<usize> {
         .map(|rest| rest.split('$').count())
 }
 
-/// Whether `name` is the synthetic struct a tuple lowers to — what a renderer
-/// needs to know to print `(1, "a")` rather than the struct's mangled name.
-pub fn is_tuple_struct(name: &str) -> bool {
-    tuple_instance_arity(name).is_some()
-}
-
 /// Whether the synthetic struct `inst` could be an instance of the template
 /// `base`.
 ///
@@ -1663,6 +1657,9 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                         ty: settled(&f.ty, &format!("struct {:?} field {:?}", s.name, f.name)),
                     })
                     .collect(),
+                // Settled here, where the tuple naming scheme lives: past this
+                // boundary a tuple is told apart by this flag, not by its name.
+                is_tuple: tuple_instance_arity(&s.name).is_some(),
                 name: s.name,
             })
             .collect(),

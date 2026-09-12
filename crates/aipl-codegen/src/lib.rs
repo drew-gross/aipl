@@ -2376,6 +2376,9 @@ struct StructLayout {
     /// a reference between boxed values of the *same* group is an internal
     /// (weak-counted) reference; everything else is external (strong).
     scc: u32,
+    /// What a tuple lowered to (see `ConcreteStructDecl::is_tuple`): rendered
+    /// as `(a, b)`, never by its synthetic name.
+    is_tuple: bool,
 }
 
 #[derive(Clone)]
@@ -4845,13 +4848,15 @@ fn manifest_structs(manifest: &aipl_artifact::Manifest) -> Result<HashMap<String
                 }
                 (
                     name,
-                    // `scc` matters to codegen's retain/release decisions, not to
-                    // reading a value out; the FFI reader asks only `boxed`.
+                    // `scc` matters to codegen's retain/release decisions, and
+                    // `is_tuple` to rendering, not to reading a value out; the
+                    // FFI reader asks only `boxed`.
                     TypeDef::Struct(StructLayout {
                         fields,
                         size,
                         boxed,
                         scc: 0,
+                        is_tuple: false,
                     }),
                 )
             }
@@ -7301,6 +7306,7 @@ fn build_struct_layout(
         size: offset,
         boxed: rec.contains_key(&decl.name),
         scc: rec.get(&decl.name).copied().unwrap_or(0),
+        is_tuple: decl.is_tuple,
     })
 }
 
@@ -12427,7 +12433,7 @@ fn emit_render_struct<M: Module>(
         .iter()
         .map(|f| (f.name.clone(), f.offset, f.ty.clone()))
         .collect();
-    let tuple = aipl_mono::is_tuple_struct(sname);
+    let tuple = layout.is_tuple;
     let open = if tuple {
         "(".to_string()
     } else {

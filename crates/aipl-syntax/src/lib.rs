@@ -991,6 +991,10 @@ pub mod ast {
     pub struct ConcreteStructDecl {
         pub name: String,
         pub fields: Vec<ConcreteFieldDecl>,
+        /// Whether this struct is what a tuple lowered to. Its name and field
+        /// names are then the compiler's, not the user's — so a renderer prints
+        /// the value as it was written, `(1, "a")`, and never the struct.
+        pub is_tuple: bool,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
