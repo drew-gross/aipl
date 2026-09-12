@@ -1,0 +1,41 @@
+import { concat as +++, extend, print } from builtins;
+
+struct Log { text: str }
+
+// The shapes the append lint must leave alone. `extend` grows its receiver
+// from the end, so a receiver on the *right* is a prepend, not an append; a
+// concatenation stored into a different binding is not growing anything; and
+// a field store has no slot for `extend` to write back into.
+fn main() !prints {
+    mut s = "mid";
+    set s = "pre-" +++ s; // a prepend
+    mut t = "";
+    set t = s +++ "!"; // stored elsewhere
+    mut log = Log { text: "a" };
+    set log.text = log.text +++ "b"; // a field store
+    mut u = "u";
+    set u.extend("v"); // already the in-place form
+    print(s);
+    print(t);
+    print(log.text);
+    print(u);
+}
+--- stdout ---
+pre-mid
+pre-mid!
+ab
+uv
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 264
+instructions executed: 232
+binary size: 2144
+  code: 1088
+  data: 1
+  metadata: 1055
+functions:
+  main:
+    calls: 1
+    bytes: 1088

@@ -75,8 +75,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  powers_desc looks like an ad-hoc reimplementaiton of an ordered set. We should make that a language feature.
   lex doc comments as one big token, not one per line
-  improve unescape using the for (let i, c : v) syntax
   section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
   In group_styles, rs.map(group_styles) is refused
@@ -285,7 +285,6 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
-  lint require set out = out +++ expr; to be out.extend(expr)
   we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway
   err_lints being all one big file is kinda annoying, lets group by kind
   for (let sub : rs) { if (cond(sub)) return true } else return false => line require this to return any
@@ -345,6 +344,7 @@ design:
   apis should express intent
 
 optimizations:
+  extend should create a rope when the value doesn't fit in the existing capacity
   after fusion there should be more inlining opportunities. Make a pass manager that re-enqueues functions for optimization after they are optimized
   owned spread: { ..var, field: f } should edit var if it's uniquely owned
   loop invariant/match invariant/branch invariant code motion
@@ -387,6 +387,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    fuse sequential extends
     map(f).map(g) should fuse to map(f(g))
     map/join should fuse to map_join
     filter/find.

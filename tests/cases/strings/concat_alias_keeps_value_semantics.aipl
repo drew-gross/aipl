@@ -1,14 +1,14 @@
-import { concat as +++, equal as == } from builtins;
+import { equal as ==, extend } from builtins;
 
-// Aliasing disables the in-place concat: once `s` is captured by `t`, the
-// static analysis marks `s` non-exclusive, so further `set s = s + ..` build
+// Aliasing disables the in-place append: once `s` is captured by `t`, the
+// static analysis marks `s` non-exclusive, so further `set s.extend(..)` build
 // fresh strings (copy) and the snapshot `t` is never mutated underneath us.
 fn grown() -> str {
     mut s = "ab";
-    set s = s +++ "c";
+    set s.extend("c");
     let t = s; // snapshot "abc"
-    set s = s +++ "d";
-    set s = s +++ "e";
+    set s.extend("d");
+    set s.extend("e");
     s // abcde
 }.test({
     assert(grown() == "abcde");
@@ -16,10 +16,10 @@ fn grown() -> str {
 
 fn snapshot() -> str {
     mut s = "ab";
-    set s = s +++ "c";
+    set s.extend("c");
     let t = s; // snapshot "abc"
-    set s = s +++ "d";
-    set s = s +++ "e";
+    set s.extend("d");
+    set s.extend("e");
     t // abc — unchanged
 }.test({
     assert(snapshot() == "abc");
@@ -28,19 +28,19 @@ fn snapshot() -> str {
 allocations: 6
 deallocations: 6
 reallocations: 0
-bytes allocated: 528
-instructions executed: 282
-binary size: 2768
-  code: 1372
+bytes allocated: 120
+instructions executed: 324
+binary size: 4744
+  code: 2412
   data: 94
-  metadata: 1302
+  metadata: 2238
 functions:
   __test$grown:
     calls: 1
-    bytes: 608
+    bytes: 1144
   __test$snapshot:
     calls: 1
-    bytes: 592
+    bytes: 1096
   aipl_assert:
     calls: 2
     bytes: (external)
@@ -52,6 +52,9 @@ functions:
     bytes: (external)
   aipl_test_summary:
     calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 12
     bytes: (external)
   main:
     calls: 1

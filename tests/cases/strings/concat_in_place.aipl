@@ -1,47 +1,64 @@
-import { concat as +++, equal as == } from builtins;
+import { concat as +++, equal as ==, extend } from builtins;
 
-// Building a string by repeated `set s = s +++ ..` on a never-aliased binding:
+// Building a string by repeated `set s.extend(..)` on a never-aliased binding:
 // each append writes into `s`'s own storage. The result is four bytes, so it
 // never leaves the inline form and the whole function allocates *nothing* —
 // see `concat_in_place_grows.aipl` for the same loop past the 22-byte inline
 // capacity, where the buffer is grown under itself instead. Without the
-// optimization each of the four concats builds a fresh string.
+// optimization each of the four appends builds a fresh string.
 fn build() -> str {
     mut s = "";
-    set s = s +++ "a";
-    set s = s +++ "b";
-    set s = s +++ "c";
-    set s = s +++ "d";
+    set s.extend("a");
+    set s.extend("b");
+    set s.extend("c");
+    set s.extend("d");
     s
 }.test({
     assert(build() == "abcd");
+})
+
+// The rebuild spelling, `set s = s +++ ..`, reaches the same in-place append
+// when the binding is exclusive — it is what `extend` on a `str` is compiled
+// as. The `extend_longhand` lint steers to `extend` (which also appends when the
+// binding *is* aliased, where this form copies), so the shape is kept here under
+// `#[allow]` only to show the two still agree.
+fn rebuilt() -> str {
+    mut s = "";
+    set s = s +++ "a"; #[allow]
+    set s = s +++ "b"; #[allow]
+    s
+}.test({
+    assert(rebuilt() == "ab");
 })
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 96
-binary size: 1536
-  code: 504
-  data: 44
-  metadata: 988
+instructions executed: 184
+binary size: 2200
+  code: 896
+  data: 92
+  metadata: 1212
 functions:
   __test$build:
     calls: 1
-    bytes: 400
-  aipl_assert:
+    bytes: 416
+  __test$rebuilt:
     calls: 1
+    bytes: 308
+  aipl_assert:
+    calls: 2
     bytes: (external)
   aipl_test_begin:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_end:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 104
+    bytes: 172

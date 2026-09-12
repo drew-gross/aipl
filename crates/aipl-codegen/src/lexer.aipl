@@ -1469,9 +1469,9 @@ allocations: 1415
 deallocations: 1415
 reallocations: 153
 bytes allocated: 84320
-instructions executed: 344987
-binary size: 2313976
-  code: 1547592
+instructions executed: 345005
+binary size: 2313968
+  code: 1547584
   data: 10908
   metadata: 755476
 functions:
@@ -1615,7 +1615,7 @@ functions:
     bytes: 96
   __m1__unescape:
     calls: 21
-    bytes: 1060
+    bytes: 1052
   __test$keep_skipped:
     calls: 1
     bytes: 25276

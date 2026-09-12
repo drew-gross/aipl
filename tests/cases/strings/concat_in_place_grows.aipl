@@ -1,4 +1,4 @@
-import { concat as +++, equal as ==, len } from builtins;
+import { equal as ==, extend, len } from builtins;
 
 // The heap half of `concat_in_place.aipl`: a builder loop whose result outgrows
 // the 22-byte inline form. The binding is never aliased, so each append writes
@@ -11,7 +11,7 @@ import { concat as +++, equal as ==, len } from builtins;
 fn build(parts: str) -> str {
     mut s = "";
     for (let _ : parts) {
-        set s = s +++ "abcde";
+        set s.extend("abcde");
     }
     s
 }.test({
@@ -25,11 +25,11 @@ allocations: 2
 deallocations: 2
 reallocations: 1
 bytes allocated: 112
-instructions executed: 704
+instructions executed: 761
 binary size: 2776
-  code: 1068
+  code: 1072
   data: 234
-  metadata: 1474
+  metadata: 1470
 functions:
   __test$build:
     calls: 1
@@ -48,7 +48,7 @@ functions:
     bytes: (external)
   build:
     calls: 4
-    bytes: 320
+    bytes: 324
   main:
     calls: 1
     bytes: 104

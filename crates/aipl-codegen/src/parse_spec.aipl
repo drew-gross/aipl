@@ -3,10 +3,10 @@
 // the entry-point source is whatever precedes the first marker, and each marker
 // opens a section whose body runs to the next marker or EOF.
 import {
-    concat as +++,
     contains,
     drop_n,
     equal as ==,
+    extend,
     int_parse,
     is_empty,
     is_err_and,
@@ -67,7 +67,8 @@ pub fn parse_spec(src: str) -> Spec!str {
     for (let line : src.split_lines()) {
         let header = parse_test_section_header(line).value_or("");
         if (header == "") {
-            set buf = buf +++ line +++ "\n";
+            set buf.extend(line);
+            set buf.extend("\n");
         } else {
             set spec = finalize(spec, current, buf)?;
             set current = header;
@@ -180,15 +181,15 @@ fn companion_path(name: str, prefix: str) -> str!str {
     ok(path)
 }
 --- performance ---
-allocations: 127
-deallocations: 127
+allocations: 146
+deallocations: 146
 reallocations: 0
-bytes allocated: 8264
-instructions executed: 30736
-binary size: 91608
-  code: 61944
+bytes allocated: 5769
+instructions executed: 31876
+binary size: 92240
+  code: 62316
   data: 1862
-  metadata: 27802
+  metadata: 28062
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -247,6 +248,9 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  aipl_write_bytes:
+    calls: 152
+    bytes: (external)
   companion_path:
     calls: 4
     bytes: 1284
@@ -258,4 +262,4 @@ functions:
     bytes: 108
   parse_spec:
     calls: 13
-    bytes: 5044
+    bytes: 5416

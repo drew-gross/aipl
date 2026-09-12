@@ -175,8 +175,8 @@ deallocations: 7292
 reallocations: 288
 bytes allocated: 880489
 instructions executed: 708328
-binary size: 231288
-  code: 167004
+binary size: 231280
+  code: 166996
   data: 3376
   metadata: 60908
 functions:
@@ -305,7 +305,7 @@ functions:
     bytes: 724
   __m5__unescape:
     calls: 0
-    bytes: 1060
+    bytes: 1052
   __m6__char_lit_emit:
     calls: 0
     bytes: 1772

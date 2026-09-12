@@ -741,7 +741,7 @@ fn call_values_marshals_optional_array_return() {
 /// that reads every element, so a mis-sized stride or a wrong tag shows up as a
 /// wrong answer rather than passing unnoticed.
 const ARRAY_PARAM_SRC: &str = "\
-import { len, push, value_or, wrapping_add_assign as +=, wrapping_sub as -, wrapping_add as ++, concat as +++} from builtins;
+import { extend, len, push, value_or, wrapping_add_assign as +=, wrapping_sub as -, wrapping_add as ++ } from builtins;
 struct Span { start: i64, end: i64 }
 variant Token = Eof | Ident(str) | Count(i64)
 
@@ -756,7 +756,7 @@ pub fn count(xs: i64[]) -> u64 { len(xs) }
 pub fn concat_all(parts: str[]) -> str {
     mut out = \"\";
     for (let p : parts) {
-        set out = out +++ p;
+        set out.extend(p);
     }
     out
 }
@@ -802,7 +802,7 @@ pub fn describe_all(ts: Token[]) -> str {
             Ident(s) => s,
             Count(n) => \"<count>\",
         };
-        set out = out +++ piece;
+        set out.extend(piece);
     }
     out
 }

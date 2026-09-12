@@ -14,6 +14,7 @@ mod compound_assign;
 mod destructure_binding;
 mod destructure_param;
 mod eta_lambda;
+mod extend_longhand;
 mod field_init_shorthand;
 mod fn_body_type_stutter;
 mod is_empty_longhand;
@@ -43,6 +44,7 @@ use self::compound_assign::{compound_assign, matching_compound};
 use self::destructure_binding::destructure_binding;
 use self::destructure_param::destructure_param;
 use self::eta_lambda::eta_lambda;
+use self::extend_longhand::{extend_longhand, extend_names};
 use self::field_init_shorthand::field_init_shorthand;
 use self::fn_body_type_stutter::fn_body_type_stutter;
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
@@ -160,6 +162,13 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
         each_expr(program, &mut |e| {
             compound_assign(e, &compound, &steps, &mut hits)
         });
+    }
+    // The same accumulate shape for `+++`, whose in-place form is a method
+    // rather than a compound operator. Disjoint from the above by operator, and
+    // only where `+++` is the builtin `concat` — see `extend_names`.
+    let extends = extend_names(program);
+    if !extends.is_empty() {
+        each_expr(program, &mut |e| extend_longhand(e, &extends, &mut hits));
     }
     // Only for the comparisons this file's `<`/`>` really are — see
     // `len_zero_cmp`, which also says whether `is_nonempty` needs importing.

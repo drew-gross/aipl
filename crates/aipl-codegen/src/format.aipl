@@ -678,10 +678,10 @@ deallocations: 2388
 reallocations: 349
 bytes allocated: 172579
 instructions executed: 237282
-binary size: 232384
-  code: 148904
+binary size: 233008
+  code: 149272
   data: 5020
-  metadata: 78460
+  metadata: 78716
 functions:
   __arr_drop_Piece:
     calls: 95
@@ -793,7 +793,7 @@ functions:
     bytes: 4268
   __m3__reindent_block:
     calls: 0
-    bytes: 4268
+    bytes: 4636
   __m7__trim_end_while$lam28:
     calls: 96
     bytes: 300

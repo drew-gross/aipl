@@ -1,4 +1,4 @@
-import { concat as +++, equal as ==, wrapping_add_assign as += } from builtins;
+import { equal as ==, extend, wrapping_add_assign as += } from builtins;
 
 // A variadic ("zero or more") parameter is written `T*`. Inside the body it is
 // the *sequence* type — `i64[]` here — so it iterates like any array. At a call
@@ -25,7 +25,7 @@ fn sum(self: i64, others: i64*) -> i64 {
 fn joined(self: str, parts: str*) -> str {
     mut s = self;
     for (let p : parts) {
-        set s = s +++ p;
+        set s.extend(p);
     }
     s
 }.test({
@@ -38,16 +38,16 @@ fn joined(self: str, parts: str*) -> str {
 allocations: 14
 deallocations: 14
 reallocations: 0
-bytes allocated: 824
-instructions executed: 1180
-binary size: 7688
-  code: 4164
+bytes allocated: 545
+instructions executed: 1208
+binary size: 8728
+  code: 4660
   data: 499
-  metadata: 3025
+  metadata: 3569
 functions:
   __test$joined:
     calls: 1
-    bytes: 1820
+    bytes: 2140
   __test$sum:
     calls: 1
     bytes: 892
@@ -72,9 +72,12 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  aipl_write_bytes:
+    calls: 8
+    bytes: (external)
   joined$vo1:
     calls: 2
-    bytes: 748
+    bytes: 924
   main:
     calls: 1
     bytes: 164

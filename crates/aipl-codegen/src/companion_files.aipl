@@ -3,9 +3,9 @@
 // read). `aipl check` stages these into the scratch directory it runs a file's
 // tests in, and the corpus harness stages the same set for a case's build.
 import {
-    concat as +++,
     contains,
     equal as ==,
+    extend,
     is_err_and,
     len,
     not_equal as !=,
@@ -44,7 +44,8 @@ pub fn companion_files(src: str) -> Companion[]!str {
         // `parse_test_section_header` never yields an empty name.
         let header = parse_test_section_header(line).value_or("");
         if (header == "") {
-            set buf = buf +++ line +++ "\n";
+            set buf.extend(line);
+            set buf.extend("\n");
         } else {
             if (path != "") {
                 set out.push(Companion { path, contents: buf.trim_end_while(|c| c == '\n') });
@@ -154,15 +155,15 @@ fn companion_path(header: str) -> str!str {
     assert(companion_path("file: a\\b.txt").is_err_and(|e| e.starts_with(`use "/"`)));
 })
 --- performance ---
-allocations: 65
-deallocations: 65
+allocations: 81
+deallocations: 81
 reallocations: 6
-bytes allocated: 4858
-instructions executed: 12208
-binary size: 25136
-  code: 13316
+bytes allocated: 3626
+instructions executed: 12868
+binary size: 25784
+  code: 13708
   data: 2629
-  metadata: 9191
+  metadata: 9447
 functions:
   __arr_drop_Companion:
     calls: 10
@@ -215,9 +216,12 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  aipl_write_bytes:
+    calls: 88
+    bytes: (external)
   companion_files:
     calls: 12
-    bytes: 2512
+    bytes: 2904
   companion_path:
     calls: 15
     bytes: 956

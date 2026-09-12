@@ -331,12 +331,12 @@ fn cleanup(out: str) -> str {
 allocations: 336
 deallocations: 336
 reallocations: 2
-bytes allocated: 22562
-instructions executed: 28053
-binary size: 34824
-  code: 21084
+bytes allocated: 22432
+instructions executed: 28083
+binary size: 35616
+  code: 21452
   data: 846
-  metadata: 12894
+  metadata: 13318
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -361,7 +361,7 @@ functions:
     bytes: 172
   __m1__reindent_block:
     calls: 1
-    bytes: 4268
+    bytes: 4636
   __m5__trim_end_while$lam4:
     calls: 34
     bytes: 300
@@ -424,6 +424,9 @@ functions:
     bytes: (external)
   aipl_test_summary:
     calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 4
     bytes: (external)
   col_after:
     calls: 28

@@ -1,0 +1,24 @@
+import { concat as +++, print } from builtins;
+
+// `#[allow]` on the line squelches the append lint, like any other lint.
+fn main() !prints {
+    mut s = "a";
+    set s = s +++ "b"; #[allow]
+    print(s);
+}
+--- stdout ---
+ab
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 39
+binary size: 864
+  code: 208
+  data: 1
+  metadata: 655
+functions:
+  main:
+    calls: 1
+    bytes: 208

@@ -9420,6 +9420,24 @@ fn arr_base(builder: &mut FunctionBuilder, arr_ptr: Value) -> Value {
 /// the writeback form is storing the grown array back into that binding's slot,
 /// and there is no slot to write back to for anything else. Every other call
 /// position was already rewritten by mono into this one on a fresh local.
+/// The receiver of `extend` when it is a `mut` **`str`** variable: its slot,
+/// its live type cell, and whether it was proven unaliased — or `None` for
+/// anything else, which [`mut_array_receiver`] then judges (and names in its
+/// diagnostics). A `str` is the `char` sequence at runtime, so it needs no
+/// element type of its own: the caller supplies `char`.
+fn mut_str_receiver(
+    env: &Env,
+    receiver: &Expr,
+) -> Option<(StackSlot, Rc<RefCell<ConcreteType>>, bool)> {
+    let ExprKind::Ident(var) = &receiver.kind else {
+        return None;
+    };
+    let Some(EnvBinding::Mut(slot, cell, exclusive)) = env.get(var) else {
+        return None;
+    };
+    is_str_repr(&cell.borrow()).then(|| (*slot, cell.clone(), *exclusive))
+}
+
 fn mut_array_receiver(
     env: &Env,
     receiver: &Expr,
@@ -16656,7 +16674,21 @@ fn compile_call_expr<M: Module>(
             }
             let receiver = &args[0];
             let source = &args[1];
-            let (slot, ty_cell, exclusive, elem_ty) = mut_array_receiver(env, receiver, "extend")?;
+            // A `str` receiver is the `char` sequence too (see `is_char_array`),
+            // so `set s.extend(t)` takes the char path below — the same in-place
+            // `aipl_str_append` that `set s = s +++ t;` reaches, and the reason
+            // that spelling is linted toward this one. The binding stays a
+            // `str`: only an array receiver has an element type to refine.
+            let str_receiver = mut_str_receiver(env, receiver).is_some();
+            let (slot, ty_cell, exclusive, elem_ty) = match mut_str_receiver(env, receiver) {
+                Some((slot, cell, exclusive)) => (
+                    slot,
+                    cell,
+                    exclusive,
+                    ConcreteType::Primitive(Primitive::Char),
+                ),
+                None => mut_array_receiver(env, receiver, "extend")?,
+            };
             let arr_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
             let mark = scope_depth(scopes);
             let (src_ptr, src_ty) = compile_expr(module, builder, cx, scopes, source)?;
@@ -16692,6 +16724,12 @@ fn compile_call_expr<M: Module>(
                 elem_ty
             };
             let new_arr_ty = ConcreteType::Array(Box::new(result_elem.clone()));
+            // What the binding is typed after the append: a `str` stays one.
+            let binding_ty = if str_receiver {
+                ConcreteType::Primitive(Primitive::Str)
+            } else {
+                new_arr_ty.clone()
+            };
             if is_char_array(&new_arr_ty) {
                 // `char[]` is str-shaped, and `str` has no in-place growable
                 // form: build a fresh buffer of the combined length and copy
@@ -16719,7 +16757,7 @@ fn compile_call_expr<M: Module>(
                     // the runtime, which takes the copy path rather than reading
                     // bytes out of a block it is about to grow.
                     builtins.call_void(module, builder, "aipl_str_append", &[arr_ptr, src_ptr]);
-                    *ty_cell.borrow_mut() = new_arr_ty;
+                    *ty_cell.borrow_mut() = binding_ty;
                     return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
                 }
                 let old_len = builtins.call(module, builder, "aipl_str_len", &[arr_ptr]);
@@ -16747,7 +16785,7 @@ fn compile_call_expr<M: Module>(
                     RcOp::Drop,
                 );
                 store_binding_str(builder, cx, slot, buf, structs);
-                *ty_cell.borrow_mut() = new_arr_ty;
+                *ty_cell.borrow_mut() = binding_ty;
                 return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
             }
             let drop_fn = array_drop_fn_addr(builder, module, cx, &result_elem);

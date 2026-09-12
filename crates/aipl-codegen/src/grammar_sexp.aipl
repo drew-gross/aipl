@@ -281,10 +281,10 @@ deallocations: 11508
 reallocations: 1565
 bytes allocated: 741542
 instructions executed: 1369919
-binary size: 400680
-  code: 259200
+binary size: 401304
+  code: 259568
   data: 4796
-  metadata: 136684
+  metadata: 136940
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -723,7 +723,7 @@ functions:
     bytes: 688
   __m6__reindent_block:
     calls: 0
-    bytes: 4268
+    bytes: 4636
   __map45:
     calls: 0
     bytes: 380

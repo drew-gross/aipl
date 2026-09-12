@@ -471,10 +471,10 @@ deallocations: 20144
 reallocations: 3337
 bytes allocated: 1363371
 instructions executed: 2450353
-binary size: 420168
-  code: 270916
+binary size: 420792
+  code: 271284
   data: 5948
-  metadata: 143304
+  metadata: 143560
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -919,7 +919,7 @@ functions:
     bytes: 688
   __m6__reindent_block:
     calls: 0
-    bytes: 4268
+    bytes: 4636
   __map46:
     calls: 0
     bytes: 380

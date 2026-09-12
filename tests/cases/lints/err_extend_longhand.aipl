@@ -1,0 +1,40 @@
+import { concat, concat as +++, print } from builtins;
+
+// Every append-by-rebuild the lint flags, and what it advises for each. The
+// hits name the import to add (this file has no `extend`); the chain's hit says
+// to append each operand on its own, since `set s.extend(a +++ b);` would build
+// `a +++ b` first.
+fn main() !prints {
+    mut s = "start";
+    set s = s +++ "-a";
+    set s = s +++ "-b" +++ "-c"; // a left-leaning chain, so still an append
+    set s = concat(s, "-d"); // the bare call is the same call
+    mut xs = [1];
+    set xs = xs +++ [2, 3]; // an array appends the same way
+    print(s);
+    print(`{xs}`);
+}
+--- errors ---
+error: "s" is rebuilt to append to it — grow it in place with "set s.extend(...);", importing `extend` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_extend_longhand.aipl:9:9
+  |
+9 |     set s = s +++ "-a";
+  |         ^^^^^^^^^^^^^^
+
+error: "s" is rebuilt to append to it — grow it in place with "set s.extend(...);" (one per appended operand), importing `extend` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_extend_longhand.aipl:10:9
+   |
+10 |     set s = s +++ "-b" +++ "-c"; // a left-leaning chain, so still an append
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: "s" is rebuilt to append to it — grow it in place with "set s.extend(...);", importing `extend` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_extend_longhand.aipl:11:9
+   |
+11 |     set s = concat(s, "-d"); // the bare call is the same call
+   |         ^^^^^^^^^^^^^^^^^^^
+
+error: "xs" is rebuilt to append to it — grow it in place with "set xs.extend(...);", importing `extend` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_extend_longhand.aipl:13:9
+   |
+13 |     set xs = xs +++ [2, 3]; // an array appends the same way
+   |         ^^^^^^^^^^^^^^^^^^

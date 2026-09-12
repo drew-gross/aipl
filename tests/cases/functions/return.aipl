@@ -1,4 +1,4 @@
-import { concat as +++, equal as ==, less_than_or_equal as <=, print, to_str } from builtins;
+import { equal as ==, extend, less_than_or_equal as <=, print, to_str } from builtins;
 
 // `return value;` early-exits the enclosing function. It's a statement (like
 // `set`), so it appears followed by `;`; control never falls through it, and the
@@ -16,7 +16,7 @@ fn clamp_low(x: i64) -> i64 {
 fn first_index_reaching(xs: i64[], limit: i64) -> str {
     mut log = "";
     for (let i, x : xs) {
-        set log = log +++ "s";
+        set log.extend("s");
         if (limit <= x) {
             return to_str(i);
         };
@@ -45,11 +45,11 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 155
-instructions executed: 418
+instructions executed: 430
 binary size: 2920
-  code: 1344
+  code: 1348
   data: 1
-  metadata: 1575
+  metadata: 1571
 functions:
   __to_str_i64:
     calls: 2
@@ -80,7 +80,7 @@ functions:
     bytes: 20
   first_index_reaching:
     calls: 2
-    bytes: 484
+    bytes: 488
   main:
     calls: 1
     bytes: 432

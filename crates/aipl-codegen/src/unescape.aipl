@@ -1,5 +1,5 @@
 // AIPL's string-escape decoder.
-import { concat as +++, equal as ==, wrapping_add as + } from builtins;
+import { concat as +++, equal as ==, extend, wrapping_add as + } from builtins;
 
 # Map a `\X` escape's X to its meaning: `n`/`t`/`r` to the control chars, and
 # any other escaped char (`"`, `\`, `` ` ``, `{`) to itself. Validity was
@@ -36,11 +36,11 @@ pub fn unescape(self: str) -> str {
     mut escaped = false;
     for (let i, c : self) {
         if (escaped) {
-            set out = out +++ c.escape_text();
+            set out.extend(c.escape_text());
             set run_start = i + 1;
             set escaped = false;
         } else if (c == '\\') {
-            set out = out +++ self[run_start..i];
+            set out.extend(self[run_start..i]);
             set escaped = true;
         };
     }
@@ -75,9 +75,9 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 352
-instructions executed: 3773
-binary size: 13152
-  code: 7356
+instructions executed: 3857
+binary size: 13144
+  code: 7348
   data: 1141
   metadata: 4655
 functions:
@@ -104,4 +104,4 @@ functions:
     bytes: 180
   unescape:
     calls: 13
-    bytes: 1060
+    bytes: 1052

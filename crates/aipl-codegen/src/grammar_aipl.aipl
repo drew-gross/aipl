@@ -4130,11 +4130,11 @@ allocations: 3028475
 deallocations: 3028475
 reallocations: 331496
 bytes allocated: 293377529
-instructions executed: 407727849
-binary size: 4869304
-  code: 3178028
+instructions executed: 407727873
+binary size: 4869928
+  code: 3178400
   data: 44596
-  metadata: 1646680
+  metadata: 1646932
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4594,7 +4594,7 @@ functions:
     bytes: 688
   __m16__reindent_block:
     calls: 0
-    bytes: 3092
+    bytes: 3472
   __m17__dedent:
     calls: 1
     bytes: 1276
@@ -4672,7 +4672,7 @@ functions:
     bytes: 368
   __m23__unescape:
     calls: 32
-    bytes: 1060
+    bytes: 1052
   __m24__process_raw_string:
     calls: 1
     bytes: 556

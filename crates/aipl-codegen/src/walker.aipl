@@ -3002,12 +3002,12 @@ fn at(self: Doc, width: u64) -> str { self.print(width) }
 allocations: 117217
 deallocations: 117217
 reallocations: 1915
-bytes allocated: 6321628
-instructions executed: 22761373
-binary size: 8951736
-  code: 5651104
+bytes allocated: 6321497
+instructions executed: 22761403
+binary size: 8952368
+  code: 5651476
   data: 28444
-  metadata: 3272188
+  metadata: 3272448
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3143,7 +3143,7 @@ functions:
     bytes: 140
   __m10__unescape:
     calls: 10
-    bytes: 1060
+    bytes: 1052
   __m11__process_raw_string:
     calls: 1
     bytes: 556
@@ -3179,7 +3179,7 @@ functions:
     bytes: 4268
   __m2__reindent_block:
     calls: 2
-    bytes: 3092
+    bytes: 3472
   __m3__dedent:
     calls: 2
     bytes: 1276
@@ -3329,6 +3329,9 @@ functions:
     bytes: (external)
   aipl_test_summary:
     calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 4
     bytes: (external)
   array_atom:
     calls: 3
