@@ -103,10 +103,10 @@ deallocations: 78
 reallocations: 2
 bytes allocated: 5870
 instructions executed: 3627
-binary size: 65072
-  code: 41228
+binary size: 66128
+  code: 42028
   data: 646
-  metadata: 23198
+  metadata: 23454
 functions:
   __arr_drop___m1__Expr:
     calls: 3
@@ -131,7 +131,7 @@ functions:
     bytes: 1560
   __m1__show_expr:
     calls: 21
-    bytes: 16984
+    bytes: 17376
   __m1__show_exprs:
     calls: 1
     bytes: 460
@@ -140,7 +140,7 @@ functions:
     bytes: 620
   __m4__show_ty:
     calls: 0
-    bytes: 4656
+    bytes: 5064
   __m4__show_tys:
     calls: 0
     bytes: 460

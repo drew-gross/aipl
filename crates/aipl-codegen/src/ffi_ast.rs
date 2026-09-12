@@ -159,6 +159,16 @@ fn bound(v: &FfiValue) -> R<ast::Bound> {
     })
 }
 
+fn set_order(v: &FfiValue) -> R<ast::SetOrder> {
+    let (case, _) = variant(v)?;
+    Ok(match case {
+        "Unordered" => ast::SetOrder::Unordered,
+        "Desc" => ast::SetOrder::Desc,
+        "Asc" => ast::SetOrder::Asc,
+        other => return Err(unknown("SetOrder", other)),
+    })
+}
+
 fn struct_decl(v: &FfiValue) -> R<ast::StructDecl> {
     Ok(ast::StructDecl {
         name: text(field(v, "name")?)?,
@@ -243,7 +253,7 @@ fn ty(v: &FfiValue) -> R<ast::Type> {
         "TypeVar" => T::TypeVar(text(at(payload, 0, case)?)?),
         "Optional" => T::Optional(one(0)?),
         "Array" => T::Array(one(0)?),
-        "Set" => T::Set(one(0)?),
+        "Set" => T::Set(one(0)?, set_order(at(payload, 1, case)?)?),
         "Dict" => T::Dict(one(0)?, one(1)?),
         "Result" => T::Result(one(0)?, one(1)?),
         "Fn" => T::Fn(each(at(payload, 0, case)?, ty)?, one(1)?),
@@ -374,7 +384,10 @@ fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {
         ),
         "ArrayLit" => K::ArrayLit(each(at(payload, 0, case)?, expr)?),
         "Spread" => K::Spread(sub(0)?),
-        "SetLit" => K::SetLit(each(at(payload, 0, case)?, expr)?),
+        "SetLit" => K::SetLit(
+            each(at(payload, 0, case)?, expr)?,
+            set_order(at(payload, 1, case)?)?,
+        ),
         "DictLit" => K::DictLit(each(at(payload, 0, case)?, expr_pair)?),
         "Index" => K::Index(sub(0)?, sub(1)?),
         "Slice" => K::Slice(

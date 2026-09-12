@@ -145,8 +145,8 @@ fn fold_expr(e: &Expr, env: &HashMap<String, ExprKind>) -> Expr {
         ExprKind::ArrayLit(elems) => {
             ExprKind::ArrayLit(elems.iter().map(|x| fold_expr(x, env)).collect())
         }
-        ExprKind::SetLit(elems) => {
-            ExprKind::SetLit(elems.iter().map(|x| fold_expr(x, env)).collect())
+        ExprKind::SetLit(elems, o) => {
+            ExprKind::SetLit(elems.iter().map(|x| fold_expr(x, env)).collect(), *o)
         }
         ExprKind::TupleLit(elems) => {
             ExprKind::TupleLit(elems.iter().map(|x| fold_expr(x, env)).collect())

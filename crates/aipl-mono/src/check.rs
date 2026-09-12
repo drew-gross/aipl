@@ -83,7 +83,7 @@ pub(crate) fn mangle_type(ty: &Type) -> String {
         Type::TypeVar(v) => format!("{}{v}", TYPEVAR.replace('$', "_")),
         Type::Array(e) => format!("arr_{}", mangle_type(e)),
         Type::Optional(e) => format!("opt_{}", mangle_type(e)),
-        Type::Set(e) => format!("set_{}", mangle_type(e)),
+        Type::Set(e, o) => format!("{}_{}", set_mangle(*o), mangle_type(e)),
         Type::Dict(k, v) => format!("dict_{}_{}", mangle_type(k), mangle_type(v)),
         Type::Result(ok, err) => format!("res_{}_{}", mangle_type(ok), mangle_type(err)),
         Type::Fn(ps, ret) => {
@@ -497,7 +497,7 @@ impl<'a> Cx<'a> {
             }
             Type::Optional(i) => Type::Optional(Box::new(self.resolve_generic_ty(i)?)),
             Type::Array(i) => Type::Array(Box::new(self.resolve_generic_ty(i)?)),
-            Type::Set(i) => Type::Set(Box::new(self.resolve_generic_ty(i)?)),
+            Type::Set(i, o) => Type::Set(Box::new(self.resolve_generic_ty(i)?), *o),
             Type::Dict(k, v) => Type::Dict(
                 Box::new(self.resolve_generic_ty(k)?),
                 Box::new(self.resolve_generic_ty(v)?),
@@ -547,7 +547,9 @@ impl<'a> Cx<'a> {
             (Type::Optional(p), Type::Optional(a)) if !is_none_inner(a) => {
                 self.bind_field(p, a, vars, map)
             }
-            (Type::Set(p), Type::Set(a)) if !is_none_inner(a) => self.bind_field(p, a, vars, map),
+            (Type::Set(p, _), Type::Set(a, _)) if !is_none_inner(a) => {
+                self.bind_field(p, a, vars, map)
+            }
             (Type::Dict(pk, pv), Type::Dict(ak, av)) => {
                 self.bind_field(pk, ak, vars, map);
                 self.bind_field(pv, av, vars, map);
@@ -678,7 +680,7 @@ impl<'a> Cx<'a> {
                 .instance_args(n)
                 .filter(|(b, _)| b == base)
                 .map(|(_, a)| a),
-            Type::Optional(i) | Type::Array(i) | Type::Set(i) => self.find_generic_args(i, base),
+            Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => self.find_generic_args(i, base),
             Type::Dict(k, v) => self
                 .find_generic_args(k, base)
                 .or_else(|| self.find_generic_args(v, base)),
@@ -1515,9 +1517,9 @@ impl Cx<'_> {
             // A set element: a scalar (i64/bool/char), `str`, or a type
             // parameter (pinned to one of those when monomorphized). No nested
             // containers, no struct/variant.
-            Type::Set(inner) => {
+            Type::Set(inner, order) => {
                 if is_set_elem(inner) || is_abstract_scalar_ty(inner, type_params) {
-                    Ok(())
+                    check_ordered_elem(inner, *order, type_params, ctx)
                 } else {
                     Err(Error::msg(format!(
                         "{ctx}: a set element must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
@@ -1711,7 +1713,7 @@ impl Cx<'_> {
             // Validate the set/dict on its own terms — its element type, or its
             // key and value — which is exactly what `check_ty` does for one
             // written anywhere else.
-            Type::Set(_) | Type::Dict(_, _) => self.check_ty(t, type_params, ctx),
+            Type::Set(..) | Type::Dict(_, _) => self.check_ty(t, type_params, ctx),
             _ => self.check_elem_ty(t, type_params, ctx),
         }
     }
@@ -1753,7 +1755,7 @@ impl Cx<'_> {
             // A set or dict is allowed as an *array* element, which reaches here
             // through `check_array_elem_ty`; in an optional core or a dict value
             // it is not, and this is that refusal.
-            Type::Set(_) | Type::Dict(_, _) => Err(Error::msg(format!(
+            Type::Set(..) | Type::Dict(_, _) => Err(Error::msg(format!(
                 "{ctx}: a set or dict can be an array element but not an optional \
                  or dict element"
             ))),
@@ -2671,7 +2673,7 @@ impl Cx<'_> {
                     // elements. No order is promised: a set is unordered, and the
                     // representation that gives it an order today is not a
                     // guarantee to write code against.
-                    Type::Array(inner) | Type::Set(inner) => (**inner).clone(),
+                    Type::Array(inner) | Type::Set(inner, _) => (**inner).clone(),
                     t if *t == Type::Primitive(Primitive::Str) => Type::Primitive(Primitive::Char),
                     other => {
                         return Err(Error::at(
@@ -2736,11 +2738,12 @@ impl Cx<'_> {
                 }
                 Type::Array(Box::new(elem_ty))
             }
-            ExprKind::SetLit(elems) => {
+            ExprKind::SetLit(elems, order) => {
                 // Elements share one type (i64/bool/char/str); an empty `#{}` is
                 // `__none__`, which coerces to any `T{}` *and* to any `#{K: V}` —
                 // an empty brace pair does not say which it is, so `coerce`
-                // decides from the use site. Dups dropped at runtime.
+                // decides from the use site. Dups dropped at runtime. An ordered
+                // literal wants an `ord` element, since it sorts them.
                 let mut elem_ty = Type::NoneInner;
                 for (i, e) in elems.iter().enumerate() {
                     let t = self.check_expr(e, env, effects)?;
@@ -2759,7 +2762,11 @@ impl Cx<'_> {
                         span.clone(),
                     ));
                 }
-                Type::Set(Box::new(elem_ty))
+                if !elems.is_empty() {
+                    check_ordered_elem(&elem_ty, *order, &[], "set literal")
+                        .map_err(|e| Error::at(e.message, span.clone()))?;
+                }
+                Type::Set(Box::new(elem_ty), *order)
             }
             ExprKind::DictLit(pairs) => {
                 // Keys share one scalar/str type; values share one value type.
@@ -3196,9 +3203,27 @@ impl Cx<'_> {
         // receivers here. (An array receiver falls through to the generic
         // signature below.) For a string `len` is the byte length, and
         // `is_nonempty` asks whether there is any byte at all.
+        // `to_array` reads a set's elements *in order*, so only an ordered set
+        // has one to give; the signature's `#{T}` would accept any.
+        if name == "__builtin_to_array" && args.len() == 1 {
+            let t = self.check_expr(&args[0], env, effects)?;
+            if let Type::Set(inner, order) = &t {
+                if order.is_ordered() || is_typevar(inner) {
+                    return Ok(Type::Array(inner.clone()));
+                }
+                return Err(Error::at(
+                    format!(
+                        "\"to_array\" needs an ordered set (`#>{{..}}` or `#<{{..}}`) — a {} promises \
+                         no order for its elements to come out in",
+                        tyname(&t)
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
+        }
         if matches!(name, "__builtin_len" | "__builtin_is_nonempty") && args.len() == 1 {
             let t = self.check_expr(&args[0], env, effects)?;
-            if matches!(t, Type::Set(_) | Type::Dict(_, _)) || is_str_repr(&t) {
+            if matches!(t, Type::Set(..) | Type::Dict(_, _)) || is_str_repr(&t) {
                 return Ok(if name == "__builtin_len" {
                     Type::Primitive(Primitive::U64)
                 } else {
@@ -3325,7 +3350,7 @@ impl Cx<'_> {
             }
             // Set membership is its own builtin — point at it rather than
             // reporting a confusing mismatch against the `T[]` signature.
-            if name == "__builtin_contains" && matches!(recv, Type::Set(_)) {
+            if name == "__builtin_contains" && matches!(recv, Type::Set(..)) {
                 return Err(Error::at(
                     "\"contains\" takes an array or str receiver; for set membership use \"has\"",
                     args[0].span.clone(),
@@ -3611,6 +3636,8 @@ impl Cx<'_> {
             // per-builtin override is needed here to keep e.g. `fn f(s: str)
             // -> str { s.reverse() }` type-checking.
             let ret = subst_vars(&return_ty, &map, &vars);
+            let ptys: Vec<Type> = sig.params.iter().map(|p| p.ty.clone()).collect();
+            let ret = aipl_syntax::inherit_set_order(ret, &ptys, &atys);
             // A generic-struct/variant return (`fn wrap<T>(..) -> Box<T>`) came
             // back as a `Type::Generic`; once its arguments are concrete at the
             // call site, resolve it to the synthesized named instance so the rest
@@ -4203,11 +4230,11 @@ fn shape_fits(pty: &Type, aty: &Type) -> bool {
         // actually hit: a scalar, a struct, a variant, an optional or a result
         // where an array was wanted.
         Type::Array(_) => {
-            matches!(aty, Type::Array(_) | Type::Set(_) | Type::Dict(_, _))
+            matches!(aty, Type::Array(_) | Type::Set(..) | Type::Dict(_, _))
                 || aipl_syntax::is_str_repr(aty)
         }
         Type::Optional(_) => matches!(aty, Type::Optional(_)),
-        Type::Set(_) => matches!(aty, Type::Set(_)),
+        Type::Set(..) => matches!(aty, Type::Set(..)),
         Type::Dict(_, _) => matches!(aty, Type::Dict(_, _)),
         Type::Result(_, _) => matches!(aty, Type::Result(_, _)),
         // A concrete parameter type is left to the synthesis-only rule: it still
@@ -4224,7 +4251,7 @@ fn shape_name(pty: &Type) -> &'static str {
     match pty {
         Type::Array(_) => "an array",
         Type::Optional(_) => "an optional",
-        Type::Set(_) => "a set",
+        Type::Set(..) => "a set",
         Type::Dict(_, _) => "a dict",
         Type::Result(_, _) => "a result",
         _ => "a value",
@@ -4255,7 +4282,7 @@ fn is_unknown(t: &Type) -> bool {
 fn needs_lock(k: &ExprKind) -> bool {
     match k {
         ExprKind::None => true,
-        ExprKind::ArrayLit(v) | ExprKind::SetLit(v) => v.is_empty(),
+        ExprKind::ArrayLit(v) | ExprKind::SetLit(v, _) => v.is_empty(),
         ExprKind::DictLit(v) => v.is_empty(),
         ExprKind::Call(n, _, _) => n == "ok" || n == "err" || n == "some",
         _ => false,
@@ -4268,7 +4295,7 @@ fn needs_lock(k: &ExprKind) -> bool {
 fn mentions_placeholder(t: &Type) -> bool {
     match t {
         Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg | Type::Any => true,
-        Type::Optional(i) | Type::Array(i) | Type::Set(i) => mentions_placeholder(i),
+        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => mentions_placeholder(i),
         Type::Dict(k, v) => mentions_placeholder(k) || mentions_placeholder(v),
         Type::Result(a, b) => mentions_placeholder(a) || mentions_placeholder(b),
         Type::Fn(ps, r) => ps.iter().any(mentions_placeholder) || mentions_placeholder(r),
@@ -4306,7 +4333,7 @@ fn is_context_typed(t: &Type) -> bool {
     match t {
         Type::Any | Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg => true,
         Type::Case(v) => is_context_typed(v),
-        Type::Optional(i) | Type::Array(i) | Type::Set(i) => is_context_typed(i),
+        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => is_context_typed(i),
         Type::Dict(k, v) => is_context_typed(k) || is_context_typed(v),
         Type::Result(a, b) => is_context_typed(a) || is_context_typed(b),
         Type::Fn(ps, r) => ps.iter().any(is_context_typed) || is_context_typed(r),
@@ -4317,11 +4344,44 @@ fn is_context_typed(t: &Type) -> bool {
     }
 }
 
+/// The name fragment a set contributes to a synthetic type name: `set_` for
+/// the unordered set, and one per ordered form, since they are distinct types.
+pub fn set_mangle(order: aipl_syntax::ast::SetOrder) -> &'static str {
+    use aipl_syntax::ast::SetOrder;
+    match order {
+        SetOrder::Unordered => "set",
+        SetOrder::Desc => "setdesc",
+        SetOrder::Asc => "setasc",
+    }
+}
+
+/// An ordered set (`#>{T}` / `#<{T}`) sorts its elements, so its element must
+/// be `ord` — an integer, `char`, or `str`. A type parameter passes: its bound
+/// is checked where it is declared, and its instance where it is used.
+fn check_ordered_elem(
+    inner: &Type,
+    order: aipl_syntax::ast::SetOrder,
+    type_params: &[String],
+    ctx: &str,
+) -> Result<(), Error> {
+    if !order.is_ordered()
+        || is_abstract_scalar_ty(inner, type_params)
+        || aipl_syntax::ast::Bound::Ord.accepts(inner, &|_| false)
+    {
+        return Ok(());
+    }
+    Err(Error::msg(format!(
+        "{ctx}: an ordered set (`#>{{..}}` / `#<{{..}}`) sorts its elements, so its element must \
+         be an integer, char, or str, got {}",
+        tyname(inner)
+    )))
+}
+
 fn mentions_typevar(t: &Type) -> bool {
     match t {
         Type::TypeVar(_) => true,
         Type::Case(v) => mentions_typevar(v),
-        Type::Optional(i) | Type::Array(i) | Type::Set(i) => mentions_typevar(i),
+        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => mentions_typevar(i),
         Type::Dict(k, v) => mentions_typevar(k) || mentions_typevar(v),
         Type::Result(a, b) => mentions_typevar(a) || mentions_typevar(b),
         Type::Fn(ps, r) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
@@ -4370,7 +4430,7 @@ fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
         | Type::NoneLiteralArg
         | Type::ConcatStr => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_typevars(inner, type_params))),
-        Type::Set(inner) => Type::Set(Box::new(subst_typevars(inner, type_params))),
+        Type::Set(inner, o) => Type::Set(Box::new(subst_typevars(inner, type_params)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(subst_typevars(k, type_params)),
             Box::new(subst_typevars(v, type_params)),
@@ -4418,7 +4478,7 @@ fn tyname(t: &Type) -> String {
         },
         Type::Optional(inner) if is_typevar(inner) => "an optional type parameter".to_string(),
         Type::Array(inner) if is_typevar(inner) => "an array of a type parameter".to_string(),
-        Type::Set(inner) if is_typevar(inner) => "a set of a type parameter".to_string(),
+        Type::Set(inner, _) if is_typevar(inner) => "a set of a type parameter".to_string(),
         Type::Named(n) if n == "__unknown__" => "_".to_string(),
         // A builtin type (`Span`), a per-file name (`__m1__LexError`), or a
         // generic instance (`Token$AiplTok`) carries internal mangling — render
@@ -4426,7 +4486,7 @@ fn tyname(t: &Type) -> String {
         Type::Named(n) => demangle_named(n),
         Type::Optional(inner) => format!("{}?", tyname(inner)),
         Type::Array(inner) => format!("{}[]", tyname(inner)),
-        Type::Set(inner) => format!("#{{{}}}", tyname(inner)),
+        Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), tyname(inner)),
         Type::Dict(k, v) => format!("#{{{}: {}}}", tyname(k), tyname(v)),
         Type::Result(ok, err) => format!("{}!{}", tyname(ok), tyname(err)),
         Type::Fn(params, ret) => {
@@ -4550,7 +4610,7 @@ fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     //
     // Only the *empty* set: `#{__none__}` cannot arise any other way, since a
     // non-empty set literal takes its element type from its first element.
-    if let (Type::Set(a), Type::Dict(_, _)) = (actual, expected) {
+    if let (Type::Set(a, _), Type::Dict(_, _)) = (actual, expected) {
         if is_none_inner(a) {
             return Ok(());
         }
@@ -4558,7 +4618,11 @@ fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     match (actual, expected) {
         (Type::Optional(a), Type::Optional(b)) => coerce(a, b),
         (Type::Array(a), Type::Array(b)) => coerce(a, b),
-        (Type::Set(a), Type::Set(b)) => coerce(a, b),
+        // An empty `#{}` is any set, ordered or not, on either side (a binding
+        // seeded with one has no order yet); anything else has to agree on the
+        // order, since the two are different types over one runtime.
+        (Type::Set(a, _), Type::Set(b, _)) if is_none_inner(a) || is_none_inner(b) => coerce(a, b),
+        (Type::Set(a, oa), Type::Set(b, ob)) if oa == ob => coerce(a, b),
         (Type::Dict(ak, av), Type::Dict(bk, bv)) => coerce(ak, bk).and_then(|()| coerce(av, bv)),
         (Type::Result(ao, ae), Type::Result(bo, be)) => {
             coerce(ao, bo).and_then(|()| coerce(ae, be))
@@ -4647,7 +4711,11 @@ fn merge(a: Type, b: Type) -> Type {
         (Type::Array(x), Type::Array(y)) => {
             Type::Array(Box::new(merge((**x).clone(), (**y).clone())))
         }
-        (Type::Set(x), Type::Set(y)) => Type::Set(Box::new(merge((**x).clone(), (**y).clone()))),
+        (Type::Set(x, ox), Type::Set(y, oy)) => Type::Set(
+            Box::new(merge((**x).clone(), (**y).clone())),
+            // The empty literal has no order of its own; the other side's wins.
+            if is_none_inner(x) { *oy } else { *ox },
+        ),
         (Type::Dict(xk, xv), Type::Dict(yk, yv)) => Type::Dict(
             Box::new(merge((**xk).clone(), (**yk).clone())),
             Box::new(merge((**xv).clone(), (**yv).clone())),
@@ -4742,7 +4810,9 @@ pub(crate) fn collect_var_bindings(
         (Type::Array(p), Type::Primitive(Primitive::Str)) => {
             collect_var_bindings(p, &Type::Primitive(Primitive::Char), vars, map)
         }
-        (Type::Set(p), Type::Set(a)) if !is_none_inner(a) => collect_var_bindings(p, a, vars, map),
+        (Type::Set(p, _), Type::Set(a, _)) if !is_none_inner(a) => {
+            collect_var_bindings(p, a, vars, map)
+        }
         (Type::Dict(pk, pv), Type::Dict(ak, av)) => {
             // Bind from whichever side carries concrete structure; an empty
             // An empty dict literal has `__none__` key/value and pins nothing.
@@ -4796,7 +4866,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Ty
         | Type::NoneLiteralArg
         | Type::ConcatStr => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_vars(inner, map, vars))),
-        Type::Set(inner) => Type::Set(Box::new(subst_vars(inner, map, vars))),
+        Type::Set(inner, o) => Type::Set(Box::new(subst_vars(inner, map, vars)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(subst_vars(k, map, vars)),
             Box::new(subst_vars(v, map, vars)),

@@ -41,7 +41,7 @@ fn constant_default(e: &Expr) -> bool {
         | ExprKind::None
         | ExprKind::Unit => true,
         ExprKind::Construct(_, inits) => inits.iter().all(|i| constant_default(&i.value)),
-        ExprKind::ArrayLit(xs) | ExprKind::SetLit(xs) | ExprKind::TupleLit(xs) => {
+        ExprKind::ArrayLit(xs) | ExprKind::SetLit(xs, _) | ExprKind::TupleLit(xs) => {
             xs.iter().all(constant_default)
         }
         ExprKind::DictLit(pairs) => pairs

@@ -306,7 +306,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
     // A template carries its escapes *and* an interpolation that includes the
     // whole language back into itself; a raw one (no escapes) carries only the
     // interpolation.
-    let interp: Pat = Region("\\{", "\\}", [Include("main")]);
+    let interp: Pat = Region("\\{", "\\}", [Include("brace-group"), Include("main")]);
     assert(
         matcher_pat(Template("`", "nt", |segs: str[]| segs), "s", "esc") == Region(
             "`",
@@ -350,11 +350,30 @@ fn escape_pat(escapes: str, scope: str) -> Pat { Match(`\\\\{char_class(escapes)
 
 # What lies inside a template literal: its escapes, when it has any, and the
 # `{ .. }` interpolation, which includes the whole language back into itself so
-# an interpolated expression keeps its ordinary scopes.
+# an interpolated expression keeps its ordinary scopes. The brace group comes
+# first so a `{ .. }` *inside* the expression — a set literal, a struct — closes
+# itself rather than the interpolation; see `brace_group_entry`.
 fn template_inner(escapes: str, esc_scope: str) -> Pat[] {
-    let interp: Pat = Region("\\{", "\\}", [Include("main")]);
+    let interp: Pat = Region("\\{", "\\}", [Include("brace-group"), Include("main")]);
     if (escapes.is_empty()) { [interp] } else { [escape_pat(escapes, esc_scope), interp] }
 }
+
+# The repository entry an interpolation nests braces through: a `{ .. }` whose
+# inside is the language again, itself included, so `{#{1, 2}}` and
+# `{P { x: 1 }}` balance to the interpolation's own closing brace. A grammar
+# with templates has to carry this entry, since `template_inner` refers to it.
+#
+# The region is scoped as punctuation for the sake of its two braces — the only
+# way to paint the closing one, since the model has no end capture — and every
+# token between them is painted over by `main`'s own patterns.
+pub fn brace_group_entry(punct_scope: str) -> Entry {
+    name: "brace-group",
+    pats: [Region("\\{", "\\}", [Include("brace-group"), Include("main")], scope=punct_scope)],
+}.test({
+    let Entry { name, pats } = brace_group_entry("p");
+    assert(name == "brace-group");
+    assert(pats == [Region("\\{", "\\}", [Include("brace-group"), Include("main")], scope="p")]);
+})
 
 # The repository entry name a scope makes: its parts joined with `-`, without
 # the trailing language suffix — `comment.block.aipl` becomes `comment-block`.
@@ -748,15 +767,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 1085
-deallocations: 1085
+allocations: 1099
+deallocations: 1099
 reallocations: 33
-bytes allocated: 93191
-instructions executed: 72879
-binary size: 130160
-  code: 81656
-  data: 5138
-  metadata: 43366
+bytes allocated: 95079
+instructions executed: 73864
+binary size: 133488
+  code: 83804
+  data: 5298
+  metadata: 44386
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -765,7 +784,7 @@ functions:
     calls: 14
     bytes: 172
   __arr_drop_Pat:
-    calls: 29
+    calls: 33
     bytes: 116
   __arr_drop___m3__TokenRule$Kind:
     calls: 2
@@ -792,10 +811,10 @@ functions:
     calls: 2
     bytes: 284
   __eq_Pat:
-    calls: 14
+    calls: 19
     bytes: 480
   __eq_Pat$arr:
-    calls: 11
+    calls: 13
     bytes: 300
   __eq_str$arr:
     calls: 1
@@ -816,8 +835,11 @@ functions:
     calls: 12
     bytes: 724
   __rec_drop_Pat:
-    calls: 64
+    calls: 74
     bytes: 268
+  __test$brace_group_entry:
+    calls: 1
+    bytes: 1868
   __test$char_class_body:
     calls: 1
     bytes: 1852
@@ -829,7 +851,7 @@ functions:
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 11896
+    bytes: 12024
   __test$matcher_regex:
     calls: 1
     bytes: 8712
@@ -849,7 +871,7 @@ functions:
     calls: 0
     bytes: 204
   aipl_arr_inc:
-    calls: 150
+    calls: 151
     bytes: (external)
   aipl_arr_reserve:
     calls: 20
@@ -858,10 +880,10 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 265
+    calls: 270
     bytes: (external)
   aipl_array_new:
-    calls: 63
+    calls: 67
     bytes: (external)
   aipl_array_push:
     calls: 1
@@ -873,22 +895,22 @@ functions:
     calls: 24
     bytes: (external)
   aipl_assert:
-    calls: 44
+    calls: 46
     bytes: (external)
   aipl_rec_alloc:
-    calls: 64
+    calls: 74
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 187
+    calls: 197
     bytes: (external)
   aipl_rec_inc_strong:
     calls: 123
     bytes: (external)
   aipl_test_begin:
-    calls: 9
+    calls: 10
     bytes: (external)
   aipl_test_end:
-    calls: 9
+    calls: 10
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -922,10 +944,10 @@ functions:
     bytes: 728
   main:
     calls: 1
-    bytes: 676
+    bytes: 760
   matcher_pat:
     calls: 26
-    bytes: 6508
+    bytes: 6576
   obj_fld:
     calls: 1
     bytes: 1576

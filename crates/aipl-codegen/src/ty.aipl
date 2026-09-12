@@ -17,13 +17,32 @@ variant Ty =
     | TypeVar(str)
     | Optional(Ty)
     | Array(Ty)
-    | Set(Ty)
+    | Set(Ty, SetOrder)
     | Dict(Ty, Ty)
     | Result(Ty, Ty)
     | Fn(Ty[], Ty)
     | Tuple(Ty[])
     | Generic(str, Ty[])
     | Any
+
+# How a set orders its elements: `#{T}` promises no order, `#>{T}` walks
+# largest first, `#<{T}` smallest first. The two ordered forms require an `ord`
+# element type; all three are distinct types.
+variant SetOrder = Unordered | Desc | Asc
+
+# The dump suffix for an order: nothing for the unordered set, so the plain
+# `Set(i64)` reads as it always has.
+pub fn show_order(self: SetOrder) -> str {
+    match (self) {
+        Unordered => "",
+        Desc => ", Desc",
+        Asc => ", Asc",
+    }
+}.test({
+    assert(Unordered.show_order() == "");
+    assert(Desc.show_order() == ", Desc");
+    assert(Asc.show_order() == ", Asc");
+})
 
 # A type as a one-line structural dump: constructors named, leaves bare. It is
 # the oracle the lowering's tests assert against, so it is deliberately *not*
@@ -39,7 +58,7 @@ pub fn show_ty(self: Ty) -> str {
         Case(t) => `Case({t.show_ty()})`,
         Optional(t) => `Optional({t.show_ty()})`,
         Array(t) => `Array({t.show_ty()})`,
-        Set(t) => `Set({t.show_ty()})`,
+        Set(t, o) => `Set({t.show_ty()}{o.show_order()})`,
         Dict(k, v) => `Dict({k.show_ty()}, {v.show_ty()})`,
         Result(o, e) => `Result({o.show_ty()}, {e.show_ty()})`,
         Fn(ps, r) => `Fn([{show_tys(ps)}], {r.show_ty()})`,
@@ -56,7 +75,9 @@ pub fn show_ty(self: Ty) -> str {
     assert(Tuple([i64_ty, Any]).show_ty() == "Tuple(i64, any)");
     assert(Generic("Box", [Named("T")]).show_ty() == "Generic(Box, T)");
     assert(Case(Named("V")).show_ty() == "Case(V)");
-    assert(Set(i64_ty).show_ty() == "Set(i64)");
+    assert(Set(i64_ty, Unordered).show_ty() == "Set(i64)");
+    assert(Set(i64_ty, Desc).show_ty() == "Set(i64, Desc)");
+    assert(Set(Primitive(Str), Asc).show_ty() == "Set(str, Asc)");
     assert(TypeVar("T").show_ty() == "TypeVar(T)");
 })
 
@@ -69,15 +90,15 @@ pub fn show_tys(self: Ty[]) -> str { self.map(show_ty).join(sep=", ") }.test({
     assert([Primitive(I64), Named("P")].show_tys() == "i64, P");
 })
 --- performance ---
-allocations: 68
-deallocations: 68
+allocations: 77
+deallocations: 77
 reallocations: 8
-bytes allocated: 4794
-instructions executed: 2884
-binary size: 17792
-  code: 9956
-  data: 966
-  metadata: 6870
+bytes allocated: 5538
+instructions executed: 3508
+binary size: 21392
+  code: 12160
+  data: 1302
+  metadata: 7930
 functions:
   __arr_drop_Ty:
     calls: 5
@@ -86,11 +107,14 @@ functions:
     calls: 0
     bytes: 116
   __rec_drop_Ty:
-    calls: 22
+    calls: 25
     bytes: 408
+  __test$show_order:
+    calls: 1
+    bytes: 1164
   __test$show_ty:
     calls: 1
-    bytes: 3228
+    bytes: 3792
   __test$show_tys:
     calls: 1
     bytes: 796
@@ -110,38 +134,38 @@ functions:
     calls: 6
     bytes: (external)
   aipl_assert:
-    calls: 13
+    calls: 18
     bytes: (external)
   aipl_rec_alloc:
-    calls: 22
+    calls: 25
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 41
+    calls: 46
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 9
+    calls: 11
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 19
+    calls: 21
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 9
+    calls: 11
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 3
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 3
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 176
+    bytes: 244
   show_ty:
-    calls: 27
-    bytes: 4656
+    calls: 31
+    bytes: 5064
   show_tys:
     calls: 6
     bytes: 460

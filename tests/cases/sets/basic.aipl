@@ -21,9 +21,9 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 160
-instructions executed: 310
-binary size: 3224
-  code: 1600
+instructions executed: 313
+binary size: 3264
+  code: 1640
   data: 128
   metadata: 1496
 functions:
@@ -32,7 +32,7 @@ functions:
     bytes: 256
   __test$build:
     calls: 1
-    bytes: 1240
+    bytes: 1280
   aipl_array_dec:
     calls: 3
     bytes: (external)

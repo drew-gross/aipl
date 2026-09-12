@@ -682,7 +682,7 @@ fn bake_asserts(e: &mut Expr, src: &str) {
         ExprKind::Shim(_, _, body) => bake_asserts(body, src),
         ExprKind::Call(_, args, _)
         | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args)
+        | ExprKind::SetLit(args, _)
         | ExprKind::TupleLit(args) => {
             for a in args {
                 bake_asserts(a, src);

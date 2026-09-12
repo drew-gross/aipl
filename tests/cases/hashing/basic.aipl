@@ -48,11 +48,11 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 848
-instructions executed: 2835
-binary size: 14488
-  code: 9860
+instructions executed: 2839
+binary size: 14544
+  code: 9920
   data: 942
-  metadata: 3686
+  metadata: 3682
 functions:
   __dict_drop_i64$str:
     calls: 4
@@ -80,7 +80,7 @@ functions:
     bytes: 1104
   __test$triple:
     calls: 1
-    bytes: 1964
+    bytes: 2024
   aipl_array_dec:
     calls: 12
     bytes: (external)

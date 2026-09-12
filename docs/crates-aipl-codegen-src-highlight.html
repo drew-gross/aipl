@@ -137,6 +137,20 @@
 
 
 
+        <section class="item" id="item-brace_group_entry">
+          <h3>
+            <a class="anchor" href="#item-brace_group_entry">brace_group_entry</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn brace_group_entry(punct_scope: str) -&#62; Entry</code></pre>
+
+          <div class="doc"><p>The repository entry an interpolation nests braces through: a <code>{ .. }</code> whose inside is the language again, itself included, so <code>{#{1, 2}}</code> and <code>{P { x: 1 }}</code> balance to the interpolation's own closing brace. A grammar with templates has to carry this entry, since <code>template_inner</code> refers to it.</p><p>The region is scoped as punctuation for the sake of its two braces — the only way to paint the closing one, since the model has no end capture — and every token between them is painted over by <code>main</code>'s own patterns.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-Expansion">
           <h3>
             <a class="anchor" href="#item-Expansion">Expansion</a>
@@ -212,7 +226,7 @@
             <a class="anchor" href="#item-tm_json">tm_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn tm_json(__spat$22966: Tm) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn tm_json(__spat$24093: Tm) -&#62; str</code></pre>
 
           <div class="doc"><p><code>g</code> as the <code>.tmLanguage.json</code> text an editor extension ships: two-space indented, one trailing newline. Generated files are read in diffs, so the layout is fixed and deterministic rather than minified.</p></div>
 
@@ -369,7 +383,7 @@
           </h3>
           <pre class="signature"><code>fn template_inner(escapes: str, esc_scope: str) -&#62; Pat[]</code></pre>
 
-          <div class="doc"><p>What lies inside a template literal: its escapes, when it has any, and the <code>{ .. }</code> interpolation, which includes the whole language back into itself so an interpolated expression keeps its ordinary scopes.</p></div>
+          <div class="doc"><p>What lies inside a template literal: its escapes, when it has any, and the <code>{ .. }</code> interpolation, which includes the whole language back into itself so an interpolated expression keeps its ordinary scopes. The brace group comes first so a <code>{ .. }</code> *inside* the expression — a set literal, a struct — closes itself rather than the interpolation; see <code>brace_group_entry</code>.</p></div>
 
 
         </section>
@@ -479,7 +493,7 @@
             <a class="anchor" href="#item-entry_json">entry_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn entry_json(__spat$25733: Entry) -&#62; str</code></pre>
+          <pre class="signature"><code>fn entry_json(__spat$26860: Entry) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

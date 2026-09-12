@@ -695,7 +695,7 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
                 check_operators(a, view)?;
             }
         }
-        ExprKind::ArrayLit(args) | ExprKind::SetLit(args) | ExprKind::TupleLit(args) => {
+        ExprKind::ArrayLit(args) | ExprKind::SetLit(args, _) | ExprKind::TupleLit(args) => {
             for a in args {
                 check_operators(a, view)?;
             }
@@ -967,7 +967,7 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
         }
         Type::Optional(inner) => Type::Optional(Box::new(rewrite_type(inner, view, type_vars))),
         Type::Array(inner) => Type::Array(Box::new(rewrite_type(inner, view, type_vars))),
-        Type::Set(inner) => Type::Set(Box::new(rewrite_type(inner, view, type_vars))),
+        Type::Set(inner, o) => Type::Set(Box::new(rewrite_type(inner, view, type_vars)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(rewrite_type(k, view, type_vars)),
             Box::new(rewrite_type(v, view, type_vars)),
@@ -1227,11 +1227,12 @@ fn rewrite_expr(
                 .map(|e| rewrite_expr(e, view, sc, locals))
                 .collect(),
         ),
-        ExprKind::SetLit(elems) => ExprKind::SetLit(
+        ExprKind::SetLit(elems, o) => ExprKind::SetLit(
             elems
                 .iter()
                 .map(|e| rewrite_expr(e, view, sc, locals))
                 .collect(),
+            *o,
         ),
         ExprKind::TupleLit(elems) => ExprKind::TupleLit(
             elems

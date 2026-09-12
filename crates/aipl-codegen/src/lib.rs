@@ -617,6 +617,86 @@ extern "C" fn aipl_arr_sort(
     raw
 }
 
+/// How an ordered set's `aipl_set_insert` places an element — the `order`
+/// argument of the set runtime entries. Zero is the unordered set (append);
+/// otherwise the sign is the direction (positive smallest first, negative
+/// largest first) and the magnitude the word comparison: `1` signed, `2`
+/// unsigned. A `str` element is compared by content regardless (the runtime
+/// asks `str_cmp` for that), so it only carries the sign. Kept in step with
+/// [`sort_words`]'s kinds by construction: both read the element the same way.
+const SET_ORDER_NONE: i64 = 0;
+
+/// The `order` argument for a set of `elem` with the given [`SetOrder`] — see
+/// [`SET_ORDER_NONE`].
+fn set_order_code(elem: &ConcreteType, order: aipl_syntax::ast::SetOrder) -> i64 {
+    use aipl_syntax::ast::SetOrder;
+    let magnitude = match elem {
+        ConcreteType::Primitive(Primitive::Str) => 1,
+        // A `char` is a byte value, so it orders as an unsigned word.
+        ConcreteType::Primitive(Primitive::Char) => 2,
+        ConcreteType::Primitive(p) if p.is_int() && !p.int_signed() => 2,
+        _ => 1,
+    };
+    match order {
+        SetOrder::Unordered => SET_ORDER_NONE,
+        SetOrder::Asc => magnitude,
+        SetOrder::Desc => -magnitude,
+    }
+}
+
+/// Where the element at `x` goes in the ordered set `a`, or `None` when an
+/// equal element is already there: the index of the first element that should
+/// follow it. Shared by both runtimes' `aipl_set_insert` and kept byte-for-byte
+/// identical, like [`sort_words`]. Linear — an ordered set is small and its
+/// insert shifts the tail anyway, so a binary search would not change the cost
+/// class.
+///
+/// # Safety
+/// `a` is a non-null array block whose elements are `elem_size` bytes (a word
+/// for scalars, the wide value for a `str`), and `x` addresses one such element.
+unsafe fn ordered_set_position(
+    a: *const u8,
+    x: *const u8,
+    elem_size: i64,
+    str_cmp: i64,
+    order: i64,
+) -> Option<usize> {
+    use core::cmp::Ordering;
+    let len = unsafe { array_len_of(a) };
+    let width = elem_size.max(8) as usize;
+    // `cmp(existing, new)` in the set's own direction: `Less` means the
+    // existing element comes first.
+    let cmp = |i: usize| -> Ordering {
+        let ep = unsafe { arr_elem_ptr(a, i, width) };
+        let natural = if str_cmp == str24::STR_SIZE as i64 {
+            let e = unsafe { core::ptr::read(ep as *const str24::Str) };
+            let n = unsafe { core::ptr::read(x as *const str24::Str) };
+            str24::cmp(e, n).cmp(&0)
+        } else if order.abs() == 2 {
+            let e = unsafe { core::ptr::read(ep as *const u64) };
+            let n = unsafe { core::ptr::read(x as *const u64) };
+            e.cmp(&n)
+        } else {
+            let e = unsafe { core::ptr::read(ep as *const i64) };
+            let n = unsafe { core::ptr::read(x as *const i64) };
+            e.cmp(&n)
+        };
+        if order < 0 {
+            natural.reverse()
+        } else {
+            natural
+        }
+    };
+    for i in 0..len {
+        match cmp(i) {
+            Ordering::Less => {}
+            Ordering::Equal => return None,
+            Ordering::Greater => return Some(i),
+        }
+    }
+    Some(len)
+}
+
 /// Order `words` in place by [`SORT_KIND_SIGNED`]/`_UNSIGNED`/`_STR`. Shared by
 /// both runtimes' `aipl_arr_sort`; kept byte-for-byte identical, which is why it
 /// uses `sort_unstable_by` — the stable sorts need an allocation, and the linker
@@ -1964,6 +2044,11 @@ extern "C" fn aipl_set_contains(a: *const u8, x: *const u8, elem_size: i64, str_
 /// `aipl_set_contains`). Returns the (possibly relocated) set pointer. For heap
 /// elements (`str`), `drop_fn`/`retain_fn` are the element helpers so the block
 /// frees/retains its strings; for scalars they're 0.
+///
+/// `order` (see `SET_ORDER_NONE`) is what makes an ordered set: a non-zero order
+/// keeps the block sorted, so the element is placed at its position and the
+/// tail shifted up — an append followed by a move of the elements after it, so
+/// the block grows exactly as an unordered insert does.
 #[no_mangle]
 extern "C" fn aipl_set_insert(
     a: *const u8,
@@ -1972,11 +2057,50 @@ extern "C" fn aipl_set_insert(
     retain_fn: i64,
     elem_size: i64,
     str_cmp: i64,
+    order: i64,
 ) -> *const u8 {
-    if aipl_set_contains(a, x, elem_size, str_cmp) != 0 {
-        return a;
+    if order == SET_ORDER_NONE {
+        if aipl_set_contains(a, x, elem_size, str_cmp) != 0 {
+            return a;
+        }
+        return aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size);
     }
-    aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size)
+    let at = if a.is_null() {
+        0
+    } else {
+        match unsafe { ordered_set_position(a, x, elem_size, str_cmp, order) } {
+            None => return a,
+            Some(i) => i,
+        }
+    };
+    let grown = aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size);
+    unsafe { shift_last_to(grown, at, elem_size) };
+    grown
+}
+
+/// Move the last element of `a` down to index `at`, shifting `[at, len - 1)` up
+/// by one. Elements are plain bytes to this — an ordered set's elements are
+/// words or wide `str` values, and moving a value moves its ownership with it.
+/// Shared by both runtimes, byte for byte.
+///
+/// # Safety
+/// `a` is a non-null array block with at least one element of `elem_size`
+/// bytes, and `at` is at most `len - 1`.
+unsafe fn shift_last_to(a: *const u8, at: usize, elem_size: i64) {
+    let len = unsafe { array_len_of(a) };
+    let last = len - 1;
+    if at >= last {
+        return;
+    }
+    let width = elem_size.max(8) as usize;
+    let base = unsafe { arr_elem_ptr(a, at, width) } as *mut u8;
+    let mut moved = [0u8; 32];
+    unsafe {
+        let last_ptr = arr_elem_ptr(a, last, width);
+        core::ptr::copy_nonoverlapping(last_ptr, moved.as_mut_ptr(), width);
+        core::ptr::copy(base, base.add(width), (last - at) * width);
+        core::ptr::copy_nonoverlapping(moved.as_ptr(), base, width);
+    }
 }
 
 /// The address to hand `aipl_set_insert` for element `i` of `src`, and a
@@ -2006,6 +2130,7 @@ extern "C" fn aipl_set_union(
     retain_fn: i64,
     elem_size: i64,
     str_cmp: i64,
+    order: i64,
 ) -> *const u8 {
     let a_len = if a.is_null() {
         0
@@ -2022,12 +2147,12 @@ extern "C" fn aipl_set_union(
     for i in 0..a_len {
         let mut scratch = 0i64;
         let vp = unsafe { set_elem_ptr(a, i, elem_size, &mut scratch) };
-        dest = aipl_set_insert(dest, vp, drop_fn, retain_fn, elem_size, str_cmp);
+        dest = aipl_set_insert(dest, vp, drop_fn, retain_fn, elem_size, str_cmp, order);
     }
     for i in 0..b_len {
         let mut scratch = 0i64;
         let vp = unsafe { set_elem_ptr(b, i, elem_size, &mut scratch) };
-        dest = aipl_set_insert(dest, vp, drop_fn, retain_fn, elem_size, str_cmp);
+        dest = aipl_set_insert(dest, vp, drop_fn, retain_fn, elem_size, str_cmp, order);
     }
     aipl_array_dec(a);
     aipl_array_dec(b);
@@ -2045,6 +2170,7 @@ extern "C" fn aipl_set_union_mut(
     retain_fn: i64,
     elem_size: i64,
     str_cmp: i64,
+    order: i64,
 ) -> *const u8 {
     let mut a = a;
     let b_len = if b.is_null() {
@@ -2055,7 +2181,7 @@ extern "C" fn aipl_set_union_mut(
     for i in 0..b_len {
         let mut scratch = 0i64;
         let vp = unsafe { set_elem_ptr(b, i, elem_size, &mut scratch) };
-        a = aipl_set_insert(a, vp, drop_fn, retain_fn, elem_size, str_cmp);
+        a = aipl_set_insert(a, vp, drop_fn, retain_fn, elem_size, str_cmp, order);
     }
     aipl_array_dec(b);
     a
@@ -7083,7 +7209,9 @@ fn referenced_named_types<'a>(ty: &'a aipl_syntax::ast::ConcreteType, out: &mut 
     use aipl_syntax::ast::ConcreteType as C;
     match ty {
         C::Named(n) => out.push(n),
-        C::Optional(inner) | C::Array(inner) | C::Set(inner) => referenced_named_types(inner, out),
+        C::Optional(inner) | C::Array(inner) | C::Set(inner, _) => {
+            referenced_named_types(inner, out)
+        }
         C::Result(a, b) | C::Dict(a, b) => {
             referenced_named_types(a, out);
             referenced_named_types(b, out);
@@ -7665,8 +7793,8 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_arr_sort"
         | "aipl_arr_reserve"
         | "aipl_arr_extend" => (5, Ret::Word),
-        "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" | "aipl_dict_insert"
-        | "aipl_arr_slice" => (6, Ret::Word),
+        "aipl_dict_insert" | "aipl_arr_slice" => (6, Ret::Word),
+        "aipl_set_insert" | "aipl_set_union" | "aipl_set_union_mut" => (7, Ret::Word),
         // ---- a `str` back, through the out pointer ----
         "aipl_trim" | "aipl_str_reverse" | "aipl_str_sort" | "aipl_str_alloc"
         | "aipl_char_to_str" => (1, Ret::Str),
@@ -8046,8 +8174,15 @@ fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
         // The empty `#{}` is the empty literal for a set *and* a dict, and it
         // reaches codegen as `#{__none__}` — the type only an empty brace pair
         // produces. Mirrors the checker's rule in `coerce`.
-        (ConcreteType::Set(a), ConcreteType::Dict(_, _)) if is_none_inner(a) => true,
-        (ConcreteType::Set(a), ConcreteType::Set(b)) => coercible(a, b),
+        (ConcreteType::Set(a, _), ConcreteType::Dict(_, _)) if is_none_inner(a) => true,
+        // An empty `#{}` is any set, on either side (a binding seeded with one
+        // has no order yet); otherwise the orders are part of the type.
+        (ConcreteType::Set(a, _), ConcreteType::Set(b, _))
+            if is_none_inner(a) || is_none_inner(b) =>
+        {
+            coercible(a, b)
+        }
+        (ConcreteType::Set(a, oa), ConcreteType::Set(b, ob)) => oa == ob && coercible(a, b),
         (ConcreteType::Dict(ak, av), ConcreteType::Dict(bk, bv)) => {
             coercible(ak, bk) && coercible(av, bv)
         }
@@ -8100,8 +8235,9 @@ fn merge_types(a: &ConcreteType, b: &ConcreteType) -> Option<ConcreteType> {
         (ConcreteType::Array(x), ConcreteType::Array(y)) => {
             Some(ConcreteType::Array(Box::new(merge_types(x, y)?)))
         }
-        (ConcreteType::Set(x), ConcreteType::Set(y)) => {
-            Some(ConcreteType::Set(Box::new(merge_types(x, y)?)))
+        (ConcreteType::Set(x, ox), ConcreteType::Set(y, oy)) => {
+            let order = if is_none_inner(x) { *oy } else { *ox };
+            Some(ConcreteType::Set(Box::new(merge_types(x, y)?), order))
         }
         (ConcreteType::Dict(xk, xv), ConcreteType::Dict(yk, yv)) => Some(ConcreteType::Dict(
             Box::new(merge_types(xk, yk)?),
@@ -9132,7 +9268,7 @@ fn needs_drop(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
                 .any(|c| c.fields.iter().any(|f| needs_drop(&f.ty, structs))),
             None => false,
         },
-        ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _) => true,
+        ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => true,
         ConcreteType::Optional(inner) => needs_drop(inner, structs),
         // A result needs cleanup if either payload does (only the active one is
         // released, dispatched on the tag — see `emit_rc`).
@@ -9301,7 +9437,7 @@ fn is_char_array(ty: &ConcreteType) -> bool {
 /// representation that isn't a pointer), and `str` has its own established slot
 /// model.
 fn mut_binding_owns_slot_ref(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
-    matches!(ty, ConcreteType::Set(_) | ConcreteType::Dict(_, _))
+    matches!(ty, ConcreteType::Set(..) | ConcreteType::Dict(_, _))
         || (matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty))
         || is_boxed(ty, structs)
 }
@@ -9708,7 +9844,7 @@ fn emit_rc_w<M: Module>(
         }
         // Other primitives own no heap (and `needs_drop` gated them out above).
         ConcreteType::Primitive(_) | ConcreteType::Unit => {}
-        ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _) => {
+        ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
             // A set/dict shares the array heap block, so refcounting is
             // identical. Retain bumps the block's refcount (co-ownership of the
             // whole array — elements are untouched). Drop routes through
@@ -10152,7 +10288,7 @@ fn uses_eq_helper(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool
     match ty {
         ConcreteType::Optional(_)
         | ConcreteType::Array(_)
-        | ConcreteType::Set(_)
+        | ConcreteType::Set(..)
         | ConcreteType::Dict(_, _)
         | ConcreteType::Result(_, _) => true,
         ConcreteType::Named(n) => structs
@@ -10349,7 +10485,7 @@ fn emit_eq_body<M: Module>(
                 builder.ins().stack_load(types::I64, types::I64, res, 0)
             }
         }
-        ConcreteType::Set(elem) => {
+        ConcreteType::Set(elem, _) => {
             // Order-independent: same length and every element of the left set is
             // a member of the right (distinct elements + equal sizes ⇒ equal sets).
             let ll = load_arr_len(builder, lv);
@@ -10963,7 +11099,7 @@ fn emit_hash<M: Module>(
                 emit_seq_hash(module, builder, builtins, structs, v, elem, seed, false)?
             }
         }
-        ConcreteType::Set(elem) => {
+        ConcreteType::Set(elem, _) => {
             let len = load_arr_len(builder, v);
             let seed = emit_scalar_hash(builder, len);
             if is_none_inner(elem) {
@@ -11310,7 +11446,7 @@ fn array_drop_fn_addr<M: Module>(
         // A set or a dict *is* an array block (see `is_heap`), so the element
         // drop for a nested array serves them unchanged: it decs each element's
         // block pointer, and that is what one of these is.
-        ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _) => {
+        ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
             Some(b.id(module, "aipl_arr_drop_arr"))
         }
         ConcreteType::Optional(inner)
@@ -11345,7 +11481,7 @@ fn array_retain_fn_addr<M: Module>(
         ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_retain_ptr")),
         // As in `array_drop_fn_addr`: a set or dict element is a block pointer
         // like a nested array's, and `aipl_arr_retain_ptr` incs exactly that.
-        ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _) => {
+        ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
             Some(b.id(module, "aipl_arr_retain_ptr"))
         }
         ConcreteType::Optional(inner)
@@ -11967,7 +12103,7 @@ fn emit_render<M: Module>(
         ConcreteType::Array(elem) => {
             emit_render_seq(module, builder, cx, value, elem, sink, b'[', b']')?
         }
-        ConcreteType::Set(elem) => {
+        ConcreteType::Set(elem, _) => {
             emit_render_seq(module, builder, cx, value, elem, sink, b'{', b'}')?
         }
         ConcreteType::Dict(k, v) => emit_render_dict(module, builder, cx, value, k, v, sink)?,
@@ -13366,7 +13502,9 @@ fn type_symbol(ty: &ConcreteType) -> String {
         ConcreteType::Case(n) => format!("{}$case", sanitize_symbol(n)),
         ConcreteType::Optional(inner) => format!("{}$opt", type_symbol(inner)),
         ConcreteType::Array(inner) => format!("{}$arr", type_symbol(inner)),
-        ConcreteType::Set(inner) => format!("set${}", type_symbol(inner)),
+        ConcreteType::Set(inner, o) => {
+            format!("{}${}", aipl_mono::set_mangle(*o), type_symbol(inner))
+        }
         ConcreteType::Dict(k, v) => format!("dict${}${}", type_symbol(k), type_symbol(v)),
         ConcreteType::Result(ok, err) => format!("{}$err${}", type_symbol(ok), type_symbol(err)),
         ConcreteType::Fn(params, ret) => {
@@ -15298,7 +15436,7 @@ fn compile_call_expr<M: Module>(
                 builtins.call(module, builder, "aipl_str_len", &[ptr])
             } else if matches!(
                 t,
-                ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _)
+                ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _)
             ) {
                 // A set/dict shares the array layout, so its element/pair count is
                 // the same `len` field.
@@ -15609,6 +15747,45 @@ fn compile_call_expr<M: Module>(
                     .push(Tracked::new(out, &out_ty));
                 (out, out_ty)
             }
+        }
+        "__builtin_to_array" => {
+            // `s.to_array() -> T[]` on an ordered set: the elements in the set's
+            // order. A set *is* an array block kept sorted, so the result is the
+            // same block, retained, seen as an array — no copy. The checker has
+            // already refused an unordered receiver.
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"to_array\" expects 1 argument, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let ConcreteType::Set(elem, order) = &t else {
+                return Err(Error::at(
+                    format!(
+                        "\"to_array\" requires an ordered set, got {}",
+                        type_name(&t)
+                    ),
+                    args[0].span.clone(),
+                ));
+            };
+            if !order.is_ordered() {
+                return Err(Error::at(
+                    format!(
+                        "\"to_array\" requires an ordered set, got {}",
+                        type_name(&t)
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
+            // Sets are array blocks — see the note at `reverse`'s array arm.
+            builtins.call_void(module, builder, "aipl_arr_inc", &[ptr]);
+            let arr_ty = ConcreteType::Array(elem.clone());
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(ptr, &arr_ty));
+            (ptr, arr_ty)
         }
         "__builtin_reverse" => {
             // `xs.reverse() -> T[]` / `s.reverse() -> str` — new sequence with
@@ -15977,7 +16154,7 @@ fn compile_call_expr<M: Module>(
             }
             let (set_ptr, set_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let elem = match &set_ty {
-                ConcreteType::Set(inner) => (**inner).clone(),
+                ConcreteType::Set(inner, _) => (**inner).clone(),
                 other => {
                     return Err(Error::at(
                         format!("\"has\" expects a set, got {}", type_name(other)),
@@ -16037,7 +16214,7 @@ fn compile_call_expr<M: Module>(
             // Both sides must be the same set type (up to an empty-`#{}` operand,
             // whose element merges to the concrete side).
             let merged = merge_types(&a_ty, &b_ty);
-            let Some(result_ty @ ConcreteType::Set(_)) = merged else {
+            let Some(result_ty @ ConcreteType::Set(..)) = merged else {
                 return Err(Error::at(
                     format!(
                         "\"union\" expects two sets of the same type, got {} and {}",
@@ -16047,7 +16224,7 @@ fn compile_call_expr<M: Module>(
                     span.clone(),
                 ));
             };
-            let ConcreteType::Set(elem) = &result_ty else {
+            let ConcreteType::Set(elem, order) = &result_ty else {
                 unreachable!()
             };
             // Sets are array blocks — see the note at `reverse`'s array arm.
@@ -16059,11 +16236,14 @@ fn compile_call_expr<M: Module>(
                 .ins()
                 .iconst(types::I64, runtime_elem_size(elem, structs));
             let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
+            let ord = builder
+                .ins()
+                .iconst(types::I64, set_order_code(elem, *order));
             let res = builtins.call(
                 module,
                 builder,
                 "aipl_set_union",
-                &[a_ptr, b_ptr, drop_fn, retain_fn, esz, str_cmp],
+                &[a_ptr, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord],
             );
             scopes
                 .last_mut()
@@ -17453,7 +17633,7 @@ fn has_placeholder_ty(t: &ConcreteType) -> bool {
         ConcreteType::NoneInner | ConcreteType::EmptyArrayArg | ConcreteType::NoneLiteralArg => {
             true
         }
-        ConcreteType::Optional(i) | ConcreteType::Array(i) | ConcreteType::Set(i) => {
+        ConcreteType::Optional(i) | ConcreteType::Array(i) | ConcreteType::Set(i, _) => {
             has_placeholder_ty(i)
         }
         ConcreteType::Dict(k, v) => has_placeholder_ty(k) || has_placeholder_ty(v),
@@ -18258,8 +18438,8 @@ fn compile_expr_inner<M: Module>(
             let binding = env.get(name).cloned().ok_or_else(|| {
                 Error::at(format!("set: undeclared variable {name:?}"), span.clone())
             })?;
-            let (slot, expected_ty, exclusive) = match binding {
-                EnvBinding::Mut(slot, ty, excl) => (slot, ty.borrow().clone(), excl),
+            let (slot, ty_cell, expected_ty, exclusive) = match binding {
+                EnvBinding::Mut(slot, ty, excl) => (slot, ty.clone(), ty.borrow().clone(), excl),
                 EnvBinding::Immut(_, _) => {
                     return Err(Error::at(
                         format!(
@@ -18346,7 +18526,7 @@ fn compile_expr_inner<M: Module>(
             // `a`'s element type is still `__none__` (a `mut a = #{}`); that falls
             // through to the copy path, which merges to `b`'s concrete type.
             if exclusive {
-                if let ConcreteType::Set(elem) = &expected_ty {
+                if let ConcreteType::Set(elem, order) = &expected_ty {
                     // `set a = a.union(b)` / `set a = union(a, b)` both fold to
                     // the call `union(a, b)` with args `[a, b]`.
                     let other = match &value.kind {
@@ -18372,11 +18552,14 @@ fn compile_expr_inner<M: Module>(
                             .ins()
                             .iconst(types::I64, runtime_elem_size(elem, structs));
                         let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
+                        let ord = builder
+                            .ins()
+                            .iconst(types::I64, set_order_code(elem, *order));
                         let new_ptr = builtins.call(
                             module,
                             builder,
                             "aipl_set_union_mut",
-                            &[a_ptr, b_ptr, drop_fn, retain_fn, esz, str_cmp],
+                            &[a_ptr, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord],
                         );
                         builder.ins().stack_store(types::I64, new_ptr, slot, 0);
                         // No new track — the binding's slot-track owns the result.
@@ -18405,6 +18588,14 @@ fn compile_expr_inner<M: Module>(
             // A bare literal takes the binding's int type.
             let t = flex_int_ty(value, &t, &expected_ty);
             expect_type(&t, &expected_ty, "set", value.span.clone())?;
+            // A binding seeded with an empty literal (`mut s = #{};`) is typed by
+            // its placeholder until something concrete lands in it — as `push`
+            // refines an `[]` binding, a `set` refines here, so a later read
+            // (a render, a `for`) sees the element type it now holds rather than
+            // the placeholder, which renders as empty.
+            if has_placeholder_ty(&expected_ty) && !has_placeholder_ty(&t) {
+                *ty_cell.borrow_mut() = t.clone();
+            }
             if let Some(old) = old {
                 if arr_slot_ref {
                     // The slot takes its *own* reference on the new value
@@ -18561,7 +18752,7 @@ fn compile_expr_inner<M: Module>(
                 // set walk — same length word, same element reads. The order is
                 // whatever the representation happens to give and is deliberately
                 // not promised; see the checker for the same note.
-                ConcreteType::Array(inner) | ConcreteType::Set(inner) => {
+                ConcreteType::Array(inner) | ConcreteType::Set(inner, _) => {
                     let elem_ty = (**inner).clone();
                     let len = load_arr_len(builder, it_ptr);
                     let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
@@ -19153,7 +19344,7 @@ fn compile_expr_inner<M: Module>(
                 .push(Tracked::new(ptr, &arr_ty));
             (ptr, arr_ty)
         }
-        ExprKind::SetLit(elems) => {
+        ExprKind::SetLit(elems, order) => {
             // A set reuses the array heap block. Pre-size to the literal length
             // (an upper bound), then insert each element deduplicated via
             // `aipl_set_insert`. For `str` elements the block carries the array
@@ -19189,6 +19380,9 @@ fn compile_expr_inner<M: Module>(
             let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
             let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
             let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
+            let ord = builder
+                .ins()
+                .iconst(types::I64, set_order_code(&elem, *order));
             let cap = builder.ins().iconst(types::I64, elems.len() as i64);
             let mut ptr = builtins.call(
                 module,
@@ -19207,10 +19401,10 @@ fn compile_expr_inner<M: Module>(
                     module,
                     builder,
                     "aipl_set_insert",
-                    &[ptr, x_ptr, drop_fn, retain_fn, esz_v, str_cmp],
+                    &[ptr, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
                 );
             }
-            let set_ty = ConcreteType::Set(Box::new(elem));
+            let set_ty = ConcreteType::Set(Box::new(elem), *order);
             scopes
                 .last_mut()
                 .expect("scope")
@@ -19866,7 +20060,7 @@ fn copy_composite(
 fn is_heap(t: &ConcreteType) -> bool {
     *t == ConcreteType::Primitive(Primitive::Str)
         || is_error(t)
-        || matches!(t, ConcreteType::Array(_) | ConcreteType::Set(_))
+        || matches!(t, ConcreteType::Array(_) | ConcreteType::Set(..))
 }
 
 /// The name to show in diagnostics for a (possibly canonicalized) fn

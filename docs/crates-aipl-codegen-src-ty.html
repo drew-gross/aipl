@@ -59,7 +59,7 @@
 
             </li>
 
-            <li id="item-Set"><code>Set(Ty)</code>
+            <li id="item-Set"><code>Set(Ty, SetOrder)</code>
 
             </li>
 
@@ -88,6 +88,50 @@
             </li>
 
           </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-SetOrder">
+          <h3>
+            <a class="anchor" href="#item-SetOrder">SetOrder</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant SetOrder</code></pre>
+
+          <div class="doc"><p>How a set orders its elements: <code>#{T}</code> promises no order, <code>#&gt;{T}</code> walks largest first, <code>#&lt;{T}</code> smallest first. The two ordered forms require an <code>ord</code> element type; all three are distinct types.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Unordered"><code>Unordered</code>
+
+            </li>
+
+            <li id="item-Desc"><code>Desc</code>
+
+            </li>
+
+            <li id="item-Asc"><code>Asc</code>
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-show_order">
+          <h3>
+            <a class="anchor" href="#item-show_order">show_order</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_order(self: SetOrder) -&#62; str</code></pre>
+
+          <div class="doc"><p>The dump suffix for an order: nothing for the unordered set, so the plain <code>Set(i64)</code> reads as it always has.</p></div>
+
 
         </section>
 

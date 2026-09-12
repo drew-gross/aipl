@@ -50,9 +50,9 @@
             <a class="anchor" href="#item-brace_literal">brace_literal</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn brace_literal(entries: BraceEntry[], span: Span) -&#62; Expr!ParseError</code></pre>
+          <pre class="signature"><code>pub fn brace_literal(entries: BraceEntry[], order: SetOrder, span: Span) -&#62; Expr!ParseError</code></pre>
 
-          <div class="doc"><p><code>#{ .. }</code> — a set, a dict, or an empty of either, which is both until its use site says. Mixing the two spellings is refused here, where the whole body is in scope for the first time.</p></div>
+          <div class="doc"><p><code>#{ .. }</code> — a set, a dict, or an empty of either, which is both until its use site says. Mixing the two spellings is refused here, where the whole body is in scope for the first time. An ordered <code>#&gt;{ .. }</code> / <code>#&lt;{ .. }</code> is a set and nothing else: a pair in one is refused too.</p></div>
 
 
         </section>
@@ -64,6 +64,20 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-ordered_pairs_message">
+          <h3>
+            <a class="anchor" href="#item-ordered_pairs_message">ordered_pairs_message</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn ordered_pairs_message() -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
 
 
         <section class="item" id="item-brace_mix_message">

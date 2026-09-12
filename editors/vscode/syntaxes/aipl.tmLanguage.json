@@ -46,7 +46,7 @@
           "name": "comment.line.allow.aipl"
         },
         {
-          "match": "#(?:[^{\\[].*)?$",
+          "match": "#(?:[^{\\[<>].*)?$",
           "name": "comment.line.documentation.aipl"
         },
         {
@@ -109,6 +109,7 @@
               "begin": "\\{",
               "end": "\\}",
               "patterns": [
+                { "include": "#brace-group" },
                 { "include": "#main" }
               ]
             }
@@ -127,6 +128,7 @@
               "begin": "\\{",
               "end": "\\}",
               "patterns": [
+                { "include": "#brace-group" },
                 { "include": "#main" }
               ]
             }
@@ -156,6 +158,19 @@
               "match": "^[ \\t]*---[ \\t]+\\S.*?\\S[ \\t]+---[ \\t]*\\r?$",
               "name": "comment.line.section-marker.aipl"
             }
+          ]
+        }
+      ]
+    },
+    "brace-group": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "name": "punctuation.aipl",
+          "patterns": [
+            { "include": "#brace-group" },
+            { "include": "#main" }
           ]
         }
       ]

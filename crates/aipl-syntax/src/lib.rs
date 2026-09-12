@@ -459,7 +459,7 @@ pub mod ast {
             | Type::NoneLiteralArg
             | Type::ConcatStr => false,
             Type::Any => true,
-            Type::Array(inner) | Type::Optional(inner) | Type::Set(inner) => ty_mentions_any(inner),
+            Type::Array(inner) | Type::Optional(inner) | Type::Set(inner, _) => ty_mentions_any(inner),
             Type::Dict(k, v) => ty_mentions_any(k) || ty_mentions_any(v),
             Type::Result(ok, err) => ty_mentions_any(ok) || ty_mentions_any(err),
             Type::Fn(params, ret) => params.iter().any(ty_mentions_any) || ty_mentions_any(ret),
@@ -744,6 +744,35 @@ pub mod ast {
         matches!(t, Type::Unit)
     }
 
+    /// What a walk over a set promises — see [`Type::Set`]. Carried on the
+    /// type, so `#{T}`, `#>{T}` and `#<{T}` are three types that share a runtime.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum SetOrder {
+        /// `#{T}`: no promised order.
+        Unordered,
+        /// `#>{T}`: largest element first.
+        Desc,
+        /// `#<{T}`: smallest element first.
+        Asc,
+    }
+
+    impl SetOrder {
+        /// The character between the `#` and the `{` that spells this order —
+        /// nothing for the unordered set.
+        pub fn spelling(self) -> &'static str {
+            match self {
+                SetOrder::Unordered => "",
+                SetOrder::Desc => ">",
+                SetOrder::Asc => "<",
+            }
+        }
+
+        /// Whether the set keeps its elements sorted at all.
+        pub fn is_ordered(self) -> bool {
+            !matches!(self, SetOrder::Unordered)
+        }
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum Type {
         /// The unit type — what a function with no declared return type produces:
@@ -811,7 +840,12 @@ pub mod ast {
         /// refcounted heap block — but constructed deduplicated and given a
         /// distinct type so it isn't index-able or array-assignable, renders
         /// as `{a, b, c}`, and offers `contains`/`len`.
-        Set(Box<Type>),
+        ///
+        /// The [`SetOrder`] says what a walk over it promises: nothing for
+        /// `#{T}`, largest first for `#>{T}`, smallest first for `#<{T}`. The
+        /// ordered forms keep the block sorted and require an `ord` element;
+        /// all three are distinct types.
+        Set(Box<Type>, SetOrder),
         /// `#{K: V}` — a dictionary mapping keys of type `K` (a scalar/`str`,
         /// like a set element) to values of type `V` (any value type). Stored
         /// at runtime as a refcounted heap block holding an array of
@@ -895,7 +929,7 @@ pub mod ast {
         Named(String),
         Optional(Box<ConcreteType>),
         Array(Box<ConcreteType>),
-        Set(Box<ConcreteType>),
+        Set(Box<ConcreteType>, SetOrder),
         Dict(Box<ConcreteType>, Box<ConcreteType>),
         Result(Box<ConcreteType>, Box<ConcreteType>),
         Fn(Vec<ConcreteType>, Box<ConcreteType>),
@@ -931,7 +965,7 @@ pub mod ast {
                 Type::ConcatStr => ConcreteType::ConcatStr,
                 Type::Optional(i) => ConcreteType::Optional(Box::new(i.to_concrete()?)),
                 Type::Array(i) => ConcreteType::Array(Box::new(i.to_concrete()?)),
-                Type::Set(i) => ConcreteType::Set(Box::new(i.to_concrete()?)),
+                Type::Set(i, o) => ConcreteType::Set(Box::new(i.to_concrete()?), *o),
                 Type::Dict(k, v) => {
                     ConcreteType::Dict(Box::new(k.to_concrete()?), Box::new(v.to_concrete()?))
                 }
@@ -970,7 +1004,7 @@ pub mod ast {
                 ConcreteType::ConcatStr => Type::ConcatStr,
                 ConcreteType::Optional(i) => Type::Optional(Box::new(i.widen())),
                 ConcreteType::Array(i) => Type::Array(Box::new(i.widen())),
-                ConcreteType::Set(i) => Type::Set(Box::new(i.widen())),
+                ConcreteType::Set(i, o) => Type::Set(Box::new(i.widen()), *o),
                 ConcreteType::Dict(k, v) => Type::Dict(Box::new(k.widen()), Box::new(v.widen())),
                 ConcreteType::Result(a, b) => {
                     Type::Result(Box::new(a.widen()), Box::new(b.widen()))
@@ -1358,7 +1392,10 @@ pub mod ast {
         /// `none` and a bare integer do (see `coerce`). `#{__none__}` cannot
         /// arise any other way — a non-empty set takes its element type from its
         /// first element — so that type *is* the marker.
-        SetLit(Vec<Expr>),
+        ///
+        /// The [`SetOrder`] is the literal's own: `#>{..}` / `#<{..}` build an
+        /// ordered set (and an empty one of those is a set, never a dict).
+        SetLit(Vec<Expr>, SetOrder),
         /// `#{k0: v0, k1: v1, ...}` — a dict literal. Keys must share one
         /// scalar/`str` type and values one value type; duplicate keys keep the
         /// last binding (by value for scalars, by content for `str`).
@@ -1715,8 +1752,13 @@ pub fn flex_fit(
             K::ArrayLit(elems) if !elems.is_empty() => flex_all(elems.iter(), inner, target),
             _ => Ok(None),
         },
-        Type::Set(inner) => match &e.kind {
-            K::SetLit(elems) if !elems.is_empty() => flex_all(elems.iter(), inner, target),
+        // A set literal flexes only into a set of its own order: the order is
+        // part of the type, and retyping `#<{1}` as a `#>{i64}` would hand a
+        // block sorted one way to code reading it the other.
+        Type::Set(inner, order) => match &e.kind {
+            K::SetLit(elems, lit_order) if !elems.is_empty() && lit_order == order => {
+                flex_all(elems.iter(), inner, target)
+            }
             _ => Ok(None),
         },
         Type::Dict(kt, vt) => match &e.kind {
@@ -1909,6 +1951,33 @@ pub fn binop_for_builtin(canonical: &str) -> Option<BinOp> {
     })
 }
 
+/// A set in a generic signature's return type takes the order of the set the
+/// call was made on: `union(self: #{T}, other: #{T}) -> #{T}` is written once,
+/// for every order, and `#>{1}.union(#>{2})` has to come back a `#>{i64}`.
+///
+/// So `#{T}` in a signature is order-agnostic — a parameter accepts any set
+/// (unification ignores the order; see `collect_var_bindings`), and a return
+/// inherits from the argument bound to the first set-typed parameter. `ret` is
+/// the substituted return type; `params` and `args` are the signature's
+/// parameter types and the call's argument types, aligned by position.
+pub fn inherit_set_order(ret: Type, params: &[Type], args: &[Type]) -> Type {
+    let Type::Set(inner, ast::SetOrder::Unordered) = &ret else {
+        return ret;
+    };
+    let from = params
+        .iter()
+        .zip(args)
+        .find(|(p, _)| matches!(p, Type::Set(..)))
+        .and_then(|(_, a)| match a {
+            Type::Set(_, order) => Some(*order),
+            _ => None,
+        });
+    match from {
+        Some(order) => Type::Set(inner.clone(), order),
+        None => ret,
+    }
+}
+
 /// The right operand of `name +++ r` — the shape `set a = a +++ b;` takes, where
 /// the append can go into `a`'s own buffer instead of building a fresh string.
 ///
@@ -2097,7 +2166,7 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
                 collect_operators(c, out);
             }
         }
-        K::ArrayLit(args) | K::SetLit(args) => {
+        K::ArrayLit(args) | K::SetLit(args, _) => {
             for a in args {
                 collect_operators(a, out);
             }
@@ -2293,9 +2362,14 @@ fn __builtin_is_digit(self: char) -> bool { false }
 // ASCII decimal digit ('0'..'9') to its 0..9 value, `none` for any other char.
 fn __builtin_to_digit(self: char) -> i64? { none }
 
-// Set ops: membership and union.
+// Set ops: membership and union. `#{T}` in a signature takes a set of any
+// order, and a set *returned* takes the receiver's (see `inherit_set_order`).
 fn __builtin_has<T: any>(self: #{T}, x: T) -> bool { false }
 fn __builtin_union<T: any>(self: #{T}, other: #{T}) -> #{T} { self }
+// The elements of an *ordered* set, in its order, as an array — the checker
+// refuses a `#{T}` receiver, whose order is not one to write code against.
+// Free at runtime: a set is an array block, so this is the same block retained.
+fn __builtin_to_array<T: any>(self: #{T}) -> T[] { [] }
 
 // Dict ops: lookup (none if absent) and membership.
 fn __builtin_get<K: any, V: any>(self: #{K: V}, key: K) -> V? { none }
@@ -2457,7 +2531,7 @@ pub mod concrete {
                 t,
                 ConcreteType::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
                     | ConcreteType::Array(_)
-                    | ConcreteType::Set(_)
+                    | ConcreteType::Set(..)
                     | ConcreteType::Dict(_, _)
             )
     }
@@ -2485,7 +2559,7 @@ pub mod concrete {
             ConcreteType::Case(v) => format!("Case<{v}>"),
             ConcreteType::Optional(inner) => format!("{}?", type_name(inner)),
             ConcreteType::Array(inner) => format!("{}[]", type_name(inner)),
-            ConcreteType::Set(inner) => format!("#{{{}}}", type_name(inner)),
+            ConcreteType::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), type_name(inner)),
             ConcreteType::Dict(k, v) => format!("#{{{}: {}}}", type_name(k), type_name(v)),
             ConcreteType::Result(ok, err) => format!("{}!{}", type_name(ok), type_name(err)),
             ConcreteType::Fn(params, ret) => {
@@ -2518,7 +2592,7 @@ pub fn type_name(t: &Type) -> String {
         Type::TypeVar(v) => v.clone(),
         Type::Optional(inner) => format!("{}?", type_name(inner)),
         Type::Array(inner) => format!("{}[]", type_name(inner)),
-        Type::Set(inner) => format!("#{{{}}}", type_name(inner)),
+        Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), type_name(inner)),
         Type::Dict(k, v) => format!("#{{{}: {}}}", type_name(k), type_name(v)),
         Type::Result(ok, err) => format!("{}!{}", type_name(ok), type_name(err)),
         Type::Fn(params, ret) => {
@@ -2552,7 +2626,7 @@ pub fn is_array_elem(t: &Type) -> bool {
             t,
             Type::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
                 | Type::Array(_)
-                | Type::Set(_)
+                | Type::Set(..)
                 | Type::Dict(_, _)
         )
 }
@@ -2663,6 +2737,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "value_or_err",
     "contains",
     "has",
+    "to_array",
     "read_file_to_string",
     "write_string_to_file",
     "list_files",
@@ -2866,7 +2941,7 @@ fn promote_ty(ty: &mut ast::Type, vars: &[String]) {
         | T::EmptyArrayArg
         | T::NoneLiteralArg
         | T::ConcatStr => {}
-        T::Optional(i) | T::Array(i) | T::Set(i) => promote_ty(i, vars),
+        T::Optional(i) | T::Array(i) | T::Set(i, _) => promote_ty(i, vars),
         T::Dict(a, b) | T::Result(a, b) => {
             promote_ty(a, vars);
             promote_ty(b, vars);
@@ -2918,7 +2993,7 @@ pub fn each_subexpr_mut(e: &mut ast::Expr) -> Vec<&mut ast::Expr> {
             vec![]
         }
         K::Shim(_, _, body) => vec![body.as_mut()],
-        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args) | K::TupleLit(args) => {
+        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args, _) | K::TupleLit(args) => {
             args.iter_mut().collect()
         }
         K::Construct(_, inits) => inits.iter_mut().map(|i| &mut i.value).collect(),
@@ -2962,7 +3037,7 @@ pub fn each_subexpr(e: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
         K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::Ident(_) | K::None | K::Unit => {}
         // A shim's bindings name functions; only its body nests expressions.
         K::Shim(_, _, body) => each_subexpr(body, f),
-        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args) | K::TupleLit(args) => {
+        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args, _) | K::TupleLit(args) => {
             for a in args {
                 each_subexpr(a, f);
             }
@@ -3117,7 +3192,7 @@ fn children(e: &ast::Expr) -> Vec<&ast::Expr> {
             vec![]
         }
         K::Shim(_, _, body) => vec![body],
-        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args) | K::TupleLit(args) => {
+        K::Call(_, args, _) | K::ArrayLit(args) | K::SetLit(args, _) | K::TupleLit(args) => {
             args.iter().collect()
         }
         K::Construct(_, inits) => inits.iter().map(|i| &i.value).collect(),
@@ -3159,7 +3234,7 @@ pub fn mentions_typevar(t: &ast::Type) -> bool {
     use ast::Type as T;
     match t {
         T::TypeVar(_) | T::Any => true,
-        T::Case(v) | T::Optional(v) | T::Array(v) | T::Set(v) => mentions_typevar(v),
+        T::Case(v) | T::Optional(v) | T::Array(v) | T::Set(v, _) => mentions_typevar(v),
         T::Dict(k, v) | T::Result(k, v) => mentions_typevar(k) || mentions_typevar(v),
         T::Fn(ps, r) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
         T::Tuple(es) | T::Generic(_, es) => es.iter().any(mentions_typevar),

@@ -197,6 +197,14 @@
 
             </li>
 
+            <li id="item-DescBraces"><code>DescBraces</code>
+
+            </li>
+
+            <li id="item-AscBraces"><code>AscBraces</code>
+
+            </li>
+
             <li id="item-SpacedBraces"><code>SpacedBraces</code>
 
             </li>
@@ -1039,6 +1047,20 @@
 
 
 
+        <section class="item" id="item-hash_opener">
+          <h3>
+            <a class="anchor" href="#item-hash_opener">hash_opener</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hash_opener(self: W) -&#62; WStr</code></pre>
+
+          <div class="doc"><p>The rest of a <code>#</code>-led bracket's opener, after the <code>#</code>: the <code>&gt;</code> / <code>&lt;</code> of an ordered set, consumed, or nothing for the plain <code>#{</code>. The text is what goes between the <code>#</code> and the <code>{</code>.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-dict_value_ty">
           <h3>
             <a class="anchor" href="#item-dict_value_ty">dict_value_ty</a>
@@ -1506,7 +1528,7 @@
             <a class="anchor" href="#item-range_has_semi">range_has_semi</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_semi(self: W, __spat$53028: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_semi(self: W, __spat$53795: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 

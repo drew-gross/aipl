@@ -1163,7 +1163,7 @@ impl Expander {
                     ExprKind::ArrayLit(expanded)
                 }
             }
-            ExprKind::SetLit(elems) => ExprKind::SetLit(self.expand_all(elems, locals)?),
+            ExprKind::SetLit(elems, o) => ExprKind::SetLit(self.expand_all(elems, locals)?, *o),
             ExprKind::TupleLit(elems) => ExprKind::TupleLit(self.expand_all(elems, locals)?),
             ExprKind::DictLit(pairs) => ExprKind::DictLit(
                 pairs

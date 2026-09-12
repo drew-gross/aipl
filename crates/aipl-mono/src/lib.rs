@@ -27,7 +27,7 @@ use std::{
 };
 
 mod check;
-pub use check::check;
+pub use check::{check, set_mangle};
 
 mod fold;
 pub use fold::fold_constants;
@@ -220,8 +220,9 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
         K::ArrayLit(xs) => rw(K::ArrayLit(
             xs.iter().map(|x| lcr_expr(x, ctors, scope)).collect(),
         )),
-        K::SetLit(xs) => rw(K::SetLit(
+        K::SetLit(xs, o) => rw(K::SetLit(
             xs.iter().map(|x| lcr_expr(x, ctors, scope)).collect(),
+            *o,
         )),
         K::TupleLit(xs) => rw(K::TupleLit(
             xs.iter().map(|x| lcr_expr(x, ctors, scope)).collect(),
@@ -526,7 +527,7 @@ fn tuple_template_vars(name: &str) -> Vec<TypeParam> {
 fn ty_has_var(t: &Type) -> bool {
     match t {
         Type::TypeVar(_) => true,
-        Type::Case(i) | Type::Optional(i) | Type::Array(i) | Type::Set(i) => ty_has_var(i),
+        Type::Case(i) | Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => ty_has_var(i),
         Type::Dict(a, b) | Type::Result(a, b) => ty_has_var(a) || ty_has_var(b),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(ty_has_var),
         Type::Fn(ps, r) => ps.iter().any(ty_has_var) || ty_has_var(r),
@@ -593,7 +594,7 @@ fn lt_ty(
         }
         Type::TypeVar(v) => Type::TypeVar(v.clone()),
         Type::Array(inner) => Type::Array(Box::new(lt_ty(inner, fields_map, order))),
-        Type::Set(inner) => Type::Set(Box::new(lt_ty(inner, fields_map, order))),
+        Type::Set(inner, o) => Type::Set(Box::new(lt_ty(inner, fields_map, order)), *o),
         Type::Optional(inner) => Type::Optional(Box::new(lt_ty(inner, fields_map, order))),
         Type::Dict(k, v) => Type::Dict(
             Box::new(lt_ty(k, fields_map, order)),
@@ -720,8 +721,8 @@ fn lt_expr(e: &Expr, fm: &mut HashMap<String, Vec<FieldDecl>>, ord: &mut Vec<Str
         ExprKind::ArrayLit(elems) => {
             ExprKind::ArrayLit(elems.iter().map(|a| lt_expr(a, fm, ord)).collect())
         }
-        ExprKind::SetLit(elems) => {
-            ExprKind::SetLit(elems.iter().map(|a| lt_expr(a, fm, ord)).collect())
+        ExprKind::SetLit(elems, o) => {
+            ExprKind::SetLit(elems.iter().map(|a| lt_expr(a, fm, ord)).collect(), *o)
         }
         ExprKind::TupleLit(elems) => {
             ExprKind::TupleLit(elems.iter().map(|a| lt_expr(a, fm, ord)).collect())
@@ -802,7 +803,7 @@ fn subst_type_params(t: &Type, map: &HashMap<String, Type>) -> Type {
         Type::Named(_) => t.clone(),
         Type::Optional(i) => Type::Optional(Box::new(subst_type_params(i, map))),
         Type::Array(i) => Type::Array(Box::new(subst_type_params(i, map))),
-        Type::Set(i) => Type::Set(Box::new(subst_type_params(i, map))),
+        Type::Set(i, o) => Type::Set(Box::new(subst_type_params(i, map)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(subst_type_params(k, map)),
             Box::new(subst_type_params(v, map)),
@@ -902,7 +903,7 @@ impl GenericLowerer {
             }
             Type::Optional(i) => Type::Optional(Box::new(self.lower_ty(i)?)),
             Type::Array(i) => Type::Array(Box::new(self.lower_ty(i)?)),
-            Type::Set(i) => Type::Set(Box::new(self.lower_ty(i)?)),
+            Type::Set(i, o) => Type::Set(Box::new(self.lower_ty(i)?), *o),
             Type::Dict(k, v) => {
                 Type::Dict(Box::new(self.lower_ty(k)?), Box::new(self.lower_ty(v)?))
             }
@@ -1044,10 +1045,11 @@ impl GenericLowerer {
                     .map(|a| self.lower_expr(a))
                     .collect::<Result<_, _>>()?,
             ),
-            K::SetLit(es) => K::SetLit(
+            K::SetLit(es, o) => K::SetLit(
                 es.iter()
                     .map(|a| self.lower_expr(a))
                     .collect::<Result<_, _>>()?,
+                *o,
             ),
             K::TupleLit(es) => K::TupleLit(
                 es.iter()
@@ -4608,7 +4610,7 @@ impl Mono<'_> {
             }
             Type::Optional(i) => Type::Optional(Box::new(self.resolve_generic_ty(i)?)),
             Type::Array(i) => Type::Array(Box::new(self.resolve_generic_ty(i)?)),
-            Type::Set(i) => Type::Set(Box::new(self.resolve_generic_ty(i)?)),
+            Type::Set(i, o) => Type::Set(Box::new(self.resolve_generic_ty(i)?), *o),
             Type::Dict(k, v) => Type::Dict(
                 Box::new(self.resolve_generic_ty(k)?),
                 Box::new(self.resolve_generic_ty(v)?),
@@ -4714,7 +4716,7 @@ impl Mono<'_> {
             (Type::Optional(p), Type::Optional(a)) if !is_none_inner(a) => {
                 self.bind_generic_or(p, a, vars, map, gname, span)
             }
-            (Type::Set(p), Type::Set(a)) if !is_none_inner(a) => {
+            (Type::Set(p, _), Type::Set(a, _)) if !is_none_inner(a) => {
                 self.bind_generic_or(p, a, vars, map, gname, span)
             }
             _ => collect_bindings(pty, aty, vars, map, gname, span),
@@ -4751,7 +4753,9 @@ impl Mono<'_> {
             (Type::Optional(p), Type::Optional(a)) if !is_none_inner(a) => {
                 self.bind_field(p, a, vars, map)
             }
-            (Type::Set(p), Type::Set(a)) if !is_none_inner(a) => self.bind_field(p, a, vars, map),
+            (Type::Set(p, _), Type::Set(a, _)) if !is_none_inner(a) => {
+                self.bind_field(p, a, vars, map)
+            }
             (Type::Dict(pk, pv), Type::Dict(ak, av)) => {
                 self.bind_field(pk, ak, vars, map);
                 self.bind_field(pv, av, vars, map);
@@ -5011,7 +5015,7 @@ impl Mono<'_> {
                 .instance_args(n)
                 .filter(|(b, _)| b == base)
                 .map(|(_, a)| a),
-            Type::Optional(i) | Type::Array(i) | Type::Set(i) => self.find_generic_args(i, base),
+            Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => self.find_generic_args(i, base),
             Type::Dict(k, v) => self
                 .find_generic_args(k, base)
                 .or_else(|| self.find_generic_args(v, base)),
@@ -5282,7 +5286,7 @@ impl Mono<'_> {
                     Type::Named(name),
                 )
             }
-            ExprKind::SetLit(elems) => {
+            ExprKind::SetLit(elems, order) => {
                 let mut relems = Vec::with_capacity(elems.len());
                 let mut elem_ty = Type::NoneInner;
                 for (i, e) in elems.iter().enumerate() {
@@ -5293,8 +5297,8 @@ impl Mono<'_> {
                     relems.push(re);
                 }
                 (
-                    node(ExprKind::SetLit(relems)),
-                    Type::Set(Box::new(decay_concat(elem_ty))),
+                    node(ExprKind::SetLit(relems, *order)),
+                    Type::Set(Box::new(decay_concat(elem_ty)), *order),
                 )
             }
             ExprKind::DictLit(pairs) => {
@@ -6240,8 +6244,8 @@ fn collect_bindings(
             ),
             _ => Ok(()),
         },
-        Type::Set(inner) if ty_contains_var(inner, vars) => match arg_ty {
-            Type::Set(a) if !is_none_inner(a) => {
+        Type::Set(inner, _) if ty_contains_var(inner, vars) => match arg_ty {
+            Type::Set(a, _) if !is_none_inner(a) => {
                 collect_bindings(inner, a, vars, map, gname, span.clone())
             }
             _ => Ok(()),
@@ -6677,8 +6681,8 @@ fn bind_builtin_var(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
             Type::Primitive(Primitive::Str) => Some(Type::Primitive(Primitive::Char)),
             _ => None,
         },
-        Type::Set(inner) if ty_mentions(inner, v) => match arg_ty {
-            Type::Set(a) => bind_builtin_var(inner, a, v),
+        Type::Set(inner, _) if ty_mentions(inner, v) => match arg_ty {
+            Type::Set(a, _) => bind_builtin_var(inner, a, v),
             _ => None,
         },
         Type::Dict(pk, pv) if ty_mentions(pk, v) || ty_mentions(pv, v) => match arg_ty {
@@ -6737,8 +6741,9 @@ fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         map.entry(tp.name.clone())
             .or_insert_with(|| none_ish.unwrap_or(Type::Primitive(Primitive::I64)));
     }
+    let ptys: Vec<Type> = sig.params.iter().map(|p| p.ty.clone()).collect();
     Some(match &sig.return_ty {
-        Some(t) => subst_vars(t, &map),
+        Some(t) => aipl_syntax::inherit_set_order(subst_vars(t, &map), &ptys, arg_tys),
         None => Type::Unit,
     })
 }
@@ -6871,7 +6876,9 @@ fn merge(a: Type, b: Type) -> Type {
         (Type::Array(x), Type::Array(y)) => {
             Type::Array(Box::new(merge((**x).clone(), (**y).clone())))
         }
-        (Type::Set(x), Type::Set(y)) => Type::Set(Box::new(merge((**x).clone(), (**y).clone()))),
+        (Type::Set(x, o), Type::Set(y, _)) => {
+            Type::Set(Box::new(merge((**x).clone(), (**y).clone())), *o)
+        }
         (Type::Dict(xk, xv), Type::Dict(yk, yv)) => Type::Dict(
             Box::new(merge((**xk).clone(), (**yk).clone())),
             Box::new(merge((**xv).clone(), (**yv).clone())),
@@ -7016,9 +7023,10 @@ fn normalize_param_ty(
         Type::Array(inner) => Ok(Type::Array(Box::new(normalize_inner(
             inner, type_vars, counter,
         )))),
-        Type::Set(inner) => Ok(Type::Set(Box::new(normalize_inner(
-            inner, type_vars, counter,
-        )))),
+        Type::Set(inner, o) => Ok(Type::Set(
+            Box::new(normalize_inner(inner, type_vars, counter)),
+            *o,
+        )),
         Type::Dict(k, v) => Ok(Type::Dict(
             Box::new(normalize_inner(k, type_vars, counter)),
             Box::new(normalize_inner(v, type_vars, counter)),
@@ -7078,7 +7086,7 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
             Type::Optional(Box::new(normalize_inner(inner, type_vars, counter)))
         }
         Type::Array(inner) => Type::Array(Box::new(normalize_inner(inner, type_vars, counter))),
-        Type::Set(inner) => Type::Set(Box::new(normalize_inner(inner, type_vars, counter))),
+        Type::Set(inner, o) => Type::Set(Box::new(normalize_inner(inner, type_vars, counter)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(normalize_inner(k, type_vars, counter)),
             Box::new(normalize_inner(v, type_vars, counter)),
@@ -7199,7 +7207,7 @@ fn subst_expr_tys(e: &Expr, map: &HashMap<String, Type>) -> Expr {
             r(else_b),
         ),
         K::ArrayLit(es) => K::ArrayLit(es.iter().map(|x| *r(x)).collect()),
-        K::SetLit(es) => K::SetLit(es.iter().map(|x| *r(x)).collect()),
+        K::SetLit(es, o) => K::SetLit(es.iter().map(|x| *r(x)).collect(), *o),
         K::TupleLit(es) => K::TupleLit(es.iter().map(|x| *r(x)).collect()),
         K::DictLit(entries) => K::DictLit(entries.iter().map(|(k, v)| (*r(k), *r(v))).collect()),
         K::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
@@ -7257,7 +7265,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
                 Type::Array(Box::new(i))
             }
         }
-        Type::Set(inner) => Type::Set(Box::new(subst_vars(inner, map))),
+        Type::Set(inner, o) => Type::Set(Box::new(subst_vars(inner, map)), *o),
         Type::Dict(k, v) => Type::Dict(Box::new(subst_vars(k, map)), Box::new(subst_vars(v, map))),
         Type::Result(ok, err) => {
             // Each side independently collapses its none-literal marker, like the
@@ -7303,7 +7311,9 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
         // not the type parameter `T`.
         Type::TypeVar(n) => n == name,
         Type::Named(_) => false,
-        Type::Optional(inner) | Type::Array(inner) | Type::Set(inner) => ty_mentions(inner, name),
+        Type::Optional(inner) | Type::Array(inner) | Type::Set(inner, _) => {
+            ty_mentions(inner, name)
+        }
         Type::Dict(k, v) => ty_mentions(k, name) || ty_mentions(v, name),
         Type::Result(ok, err) => ty_mentions(ok, name) || ty_mentions(err, name),
         Type::Fn(ps, ret) => ps.iter().any(|p| ty_mentions(p, name)) || ty_mentions(ret, name),
@@ -7327,7 +7337,7 @@ fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
         | Type::ConcatStr => false,
         Type::TypeVar(v) => vars.contains(v.as_str()),
         Type::Named(_) => false,
-        Type::Optional(inner) | Type::Array(inner) | Type::Set(inner) => {
+        Type::Optional(inner) | Type::Array(inner) | Type::Set(inner, _) => {
             ty_contains_var(inner, vars)
         }
         Type::Dict(k, v) => ty_contains_var(k, vars) || ty_contains_var(v, vars),
@@ -7419,7 +7429,7 @@ fn collect_free(
         }
         ExprKind::Call(_, args, _)
         | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args)
+        | ExprKind::SetLit(args, _)
         | ExprKind::TupleLit(args) => {
             for a in args {
                 collect_free(a, bound, env, out, seen);
@@ -7608,7 +7618,7 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
                 count_uses(c, bound, counts);
             }
         }
-        ExprKind::ArrayLit(args) | ExprKind::SetLit(args) | ExprKind::TupleLit(args) => {
+        ExprKind::ArrayLit(args) | ExprKind::SetLit(args, _) | ExprKind::TupleLit(args) => {
             for a in args {
                 count_uses(a, bound, counts);
             }
@@ -7913,7 +7923,7 @@ fn mentions_abstract_type(ty: &Type) -> bool {
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
         | Type::ConcatStr => true,
-        Type::Optional(t) | Type::Array(t) | Type::Set(t) => mentions_abstract_type(t),
+        Type::Optional(t) | Type::Array(t) | Type::Set(t, _) => mentions_abstract_type(t),
         Type::Dict(k, v) | Type::Result(k, v) => {
             mentions_abstract_type(k) || mentions_abstract_type(v)
         }
@@ -8332,7 +8342,7 @@ pub fn children(e: &Expr) -> Vec<&Expr> {
         }
         ExprKind::Call(_, args, _)
         | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args)
+        | ExprKind::SetLit(args, _)
         | ExprKind::TupleLit(args) => args.iter().collect(),
         ExprKind::DictLit(pairs) => pairs.iter().flat_map(|(k, v)| [k, v]).collect(),
         ExprKind::Construct(_, inits) => inits.iter().map(|i| &i.value).collect(),
@@ -8351,7 +8361,7 @@ pub fn children(e: &Expr) -> Vec<&Expr> {
 fn has_placeholder(t: &Type) -> bool {
     match t {
         Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg | Type::Any => true,
-        Type::Optional(i) | Type::Array(i) | Type::Set(i) => has_placeholder(i),
+        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => has_placeholder(i),
         Type::Dict(k, v) => has_placeholder(k) || has_placeholder(v),
         Type::Result(a, b) => has_placeholder(a) || has_placeholder(b),
         Type::Fn(ps, r) => ps.iter().any(has_placeholder) || has_placeholder(r),
@@ -8394,7 +8404,7 @@ pub fn children_mut(e: &mut Expr) -> Vec<&mut Expr> {
         }
         ExprKind::Call(_, args, _)
         | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args)
+        | ExprKind::SetLit(args, _)
         | ExprKind::TupleLit(args) => args.iter_mut().collect(),
         ExprKind::DictLit(pairs) => pairs.iter_mut().flat_map(|(k, v)| [k, v]).collect(),
         ExprKind::Construct(_, inits) => inits.iter_mut().map(|i| &mut i.value).collect(),
@@ -8444,7 +8454,7 @@ fn contains_inplace_hof_intrinsic(e: &Expr) -> bool {
 fn contains_context_literal(e: &Expr) -> bool {
     let here = match &e.kind {
         ExprKind::None => true,
-        ExprKind::ArrayLit(v) | ExprKind::SetLit(v) => v.is_empty(),
+        ExprKind::ArrayLit(v) | ExprKind::SetLit(v, _) => v.is_empty(),
         ExprKind::DictLit(v) => v.is_empty(),
         // `ok(x)` types as `Result<typeof x, __none__>` and `err(e)` as
         // `Result<__none__, typeof e>`: the *other* side is a placeholder that
@@ -8572,7 +8582,9 @@ fn replace_call(
             c.as_ref().map(|c| Box::new(rc(c, replaced))),
         ),
         ExprKind::ArrayLit(xs) => ExprKind::ArrayLit(xs.iter().map(|x| rc(x, replaced)).collect()),
-        ExprKind::SetLit(xs) => ExprKind::SetLit(xs.iter().map(|x| rc(x, replaced)).collect()),
+        ExprKind::SetLit(xs, o) => {
+            ExprKind::SetLit(xs.iter().map(|x| rc(x, replaced)).collect(), *o)
+        }
         ExprKind::TupleLit(xs) => ExprKind::TupleLit(xs.iter().map(|x| rc(x, replaced)).collect()),
         ExprKind::DictLit(pairs) => ExprKind::DictLit(
             pairs
@@ -8775,8 +8787,8 @@ pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
         ExprKind::ArrayLit(xs) => {
             ExprKind::ArrayLit(xs.iter().map(|x| rename_params(x, map)).collect())
         }
-        ExprKind::SetLit(xs) => {
-            ExprKind::SetLit(xs.iter().map(|x| rename_params(x, map)).collect())
+        ExprKind::SetLit(xs, o) => {
+            ExprKind::SetLit(xs.iter().map(|x| rename_params(x, map)).collect(), *o)
         }
         ExprKind::TupleLit(xs) => {
             ExprKind::TupleLit(xs.iter().map(|x| rename_params(x, map)).collect())
@@ -8866,7 +8878,7 @@ pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
 fn is_heap(t: &Type) -> bool {
     *t == Type::Primitive(Primitive::Str)
         || is_error(t)
-        || matches!(t, Type::Array(_) | Type::Set(_) | Type::Dict(_, _))
+        || matches!(t, Type::Array(_) | Type::Set(..) | Type::Dict(_, _))
 }
 
 /// [`is_heap`] over the post-monomorphization representation, for the analyses
@@ -8880,7 +8892,7 @@ fn is_heap_concrete(t: &ConcreteType) -> bool {
         || aipl_syntax::concrete::is_error(t)
         || matches!(
             t,
-            ConcreteType::Array(_) | ConcreteType::Set(_) | ConcreteType::Dict(_, _)
+            ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _)
         )
 }
 
@@ -9173,7 +9185,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
         // returned, so every element is a last use — including `name` nested
         // inside one (`(f(xs), 1)`): the call runs, the tuple is built, and
         // nothing in this function touches `xs` again.
-        ExprKind::ArrayLit(elems) | ExprKind::SetLit(elems) | ExprKind::TupleLit(elems) => elems
+        ExprKind::ArrayLit(elems) | ExprKind::SetLit(elems, _) | ExprKind::TupleLit(elems) => elems
             .iter()
             .any(|x| if is_n(x) { !tail } else { rec_tail(x) }),
         ExprKind::DictLit(pairs) => pairs.iter().any(|(k, v)| {
@@ -9322,7 +9334,7 @@ pub(crate) fn count_ident(name: &str, e: &Expr) -> usize {
         ExprKind::Slice(a, b, d) => c(a) + c(b) + d.as_ref().map_or(0, |d| c(d)),
         ExprKind::Call(_, args, _)
         | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args)
+        | ExprKind::SetLit(args, _)
         | ExprKind::TupleLit(args) => args.iter().map(c).sum(),
         ExprKind::DictLit(pairs) => pairs.iter().map(|(k, v)| c(k) + c(v)).sum(),
         ExprKind::Construct(_, inits) => inits.iter().map(|i| c(&i.value)).sum(),
@@ -9360,7 +9372,7 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         }
         ExprKind::Call(_, args, _)
         | ExprKind::ArrayLit(args)
-        | ExprKind::SetLit(args)
+        | ExprKind::SetLit(args, _)
         | ExprKind::TupleLit(args) => args.iter().find_map(|a| find_move_into(param, a)),
         ExprKind::DictLit(pairs) => pairs
             .iter()

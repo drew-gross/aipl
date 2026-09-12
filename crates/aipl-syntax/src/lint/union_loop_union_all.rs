@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind, Program};
+use crate::ast::{Expr, ExprKind, Program, Type};
 use crate::Error;
 
 use super::{imported_as, liftable, lone_stmt, spans_its_text};
@@ -90,11 +90,16 @@ pub(super) fn union_loop_union_all(e: &Expr, src: &str, names: &UnionNames, hits
     };
     // `mut acc = #{};` — the seed. An annotation is allowed (and usual: for a
     // set it is often the only thing that gives the empty literal its element
-    // type) but says nothing about the iterable, so it is not inspected.
-    let ExprKind::LetMut(acc, _, seed, body) = &e.kind else {
+    // type) but says nothing about the iterable, so it is not inspected — except
+    // for its order: `union_all` builds an unordered set, so a loop
+    // accumulating into a `#>{..}` / `#<{..}` is not one it can replace.
+    let ExprKind::LetMut(acc, ann, seed, body) = &e.kind else {
         return;
     };
-    if !matches!(&seed.kind, ExprKind::SetLit(xs) if xs.is_empty()) {
+    if !matches!(&seed.kind, ExprKind::SetLit(xs, o) if xs.is_empty() && !o.is_ordered()) {
+        return;
+    }
+    if matches!(ann, Some(Type::Set(_, o)) if o.is_ordered()) {
         return;
     }
     // The very next statement must be the loop: a statement between the two

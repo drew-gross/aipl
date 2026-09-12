@@ -91,9 +91,9 @@ allocations: 25
 deallocations: 25
 reallocations: 0
 bytes allocated: 1037
-instructions executed: 3486
-binary size: 26744
-  code: 14324
+instructions executed: 3492
+binary size: 26768
+  code: 14348
   data: 1755
   metadata: 10665
 functions:
@@ -192,7 +192,7 @@ functions:
     bytes: 284
   evens:
     calls: 7
-    bytes: 536
+    bytes: 560
   first_of_pair:
     calls: 1
     bytes: 284

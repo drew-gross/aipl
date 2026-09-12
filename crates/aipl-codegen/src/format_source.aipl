@@ -73,10 +73,10 @@ deallocations: 2103
 reallocations: 29
 bytes allocated: 125498
 instructions executed: 419611
-binary size: 1035400
-  code: 671160
+binary size: 1041600
+  code: 675120
   data: 2235
-  metadata: 362005
+  metadata: 364245
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -326,7 +326,7 @@ functions:
     bytes: 9968
   __m6__comma_list_docs:
     calls: 3
-    bytes: 4640
+    bytes: 5244
   __m6__comment_starts_before:
     calls: 10
     bytes: 280
@@ -374,7 +374,10 @@ functions:
     bytes: 11316
   __m6__format_program:
     calls: 4
-    bytes: 138008
+    bytes: 138012
+  __m6__hash_opener:
+    calls: 0
+    bytes: 1708
   __m6__hug_close:
     calls: 0
     bytes: 732
@@ -485,10 +488,10 @@ functions:
     bytes: 10904
   __m6__set_or_dict_atom:
     calls: 0
-    bytes: 3480
+    bytes: 4264
   __m6__set_or_dict_ty:
     calls: 0
-    bytes: 6408
+    bytes: 7268
   __m6__set_stmt:
     calls: 0
     bytes: 13084

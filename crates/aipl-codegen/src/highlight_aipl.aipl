@@ -37,13 +37,14 @@ import {
     Pat,
     Region,
     Tm,
+    brace_group_entry,
     decl_pat,
     matcher_regex,
     rule_pats,
     tm_json,
     word_pat,
 } from "./highlight.aipl";
-import { aipl_rules, ident_cont, ident_start } from "./lex_aipl.aipl";
+import { aipl_rules, ident_cont, ident_start, s_punct } from "./lex_aipl.aipl";
 import { CharRun } from "./lexer.aipl";
 
 # AIPL's TextMate grammar as `.tmLanguage.json` text — what
@@ -85,6 +86,7 @@ pub fn aipl_tmlanguage() -> str {
         repo: [
             Entry { name: "main", pats: main },
             Entry { name: "section-tail", pats: [section_tail()] },
+            brace_group_entry(s_punct()),
             ..entries,
         ],
     })
@@ -170,15 +172,15 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 7292
-deallocations: 7292
-reallocations: 288
-bytes allocated: 880489
-instructions executed: 708328
-binary size: 231408
-  code: 167112
+allocations: 7555
+deallocations: 7555
+reallocations: 315
+bytes allocated: 907918
+instructions executed: 737322
+binary size: 232864
+  code: 168232
   data: 3376
-  metadata: 60920
+  metadata: 61256
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -187,7 +189,7 @@ functions:
     calls: 93
     bytes: 172
   __arr_drop___m1__Pat:
-    calls: 36
+    calls: 38
     bytes: 116
   __arr_drop___m4__TokenRule$__m6__AiplTok:
     calls: 1
@@ -205,7 +207,7 @@ functions:
     calls: 0
     bytes: 832
   __builtin_all$char$s0$lam43:
-    calls: 811
+    calls: 882
     bytes: 212
   __builtin_count_while$char$s0$lam31:
     calls: 0
@@ -253,7 +255,7 @@ functions:
     calls: 0
     bytes: 340
   __m1__arr_fld:
-    calls: 12
+    calls: 14
     bytes: 1036
   __m1__caps_fld:
     calls: 4
@@ -262,7 +264,7 @@ functions:
     calls: 11
     bytes: 620
   __m1__class_char:
-    calls: 268
+    calls: 270
     bytes: 996
   __m1__decl_pat:
     calls: 2
@@ -274,25 +276,25 @@ functions:
     calls: 6
     bytes: 456
   __m1__fld:
-    calls: 65
+    calls: 68
     bytes: 348
   __m1__json_char:
-    calls: 2555
+    calls: 2616
     bytes: 1228
   __m1__json_str:
-    calls: 157
+    calls: 166
     bytes: 728
   __m1__matcher_pat:
     calls: 77
-    bytes: 6508
+    bytes: 6576
   __m1__obj_fld:
     calls: 5
     bytes: 1576
   __m1__obj_of:
-    calls: 29
+    calls: 30
     bytes: 928
   __m1__pat_json:
-    calls: 34
+    calls: 39
     bytes: 4600
   __m1__re_escape:
     calls: 100
@@ -301,7 +303,7 @@ functions:
     calls: 17
     bytes: 1340
   __m2__indent:
-    calls: 126
+    calls: 137
     bytes: 724
   __m5__unescape:
     calls: 0
@@ -328,11 +330,11 @@ functions:
     calls: 0
     bytes: 1712
   __rec_drop___m1__Pat:
-    calls: 172
+    calls: 179
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 123908
+    bytes: 124960
   __to_str_u64:
     calls: 7
     bytes: 204
@@ -340,40 +342,40 @@ functions:
     calls: 2
     bytes: (external)
   aipl_arr_inc:
-    calls: 828
+    calls: 843
     bytes: (external)
   aipl_arr_reserve:
-    calls: 148
+    calls: 150
     bytes: (external)
   aipl_arr_slice:
     calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 1374
+    calls: 1422
     bytes: (external)
   aipl_array_new:
-    calls: 195
+    calls: 209
     bytes: (external)
   aipl_array_push:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1190
+    calls: 1278
     bytes: (external)
   aipl_array_with_cap:
-    calls: 193
+    calls: 209
     bytes: (external)
   aipl_assert:
     calls: 15
     bytes: (external)
   aipl_rec_alloc:
-    calls: 172
+    calls: 179
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 3511
+    calls: 3523
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 3339
+    calls: 3344
     bytes: (external)
   aipl_test_begin:
     calls: 1

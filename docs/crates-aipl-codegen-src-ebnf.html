@@ -353,9 +353,9 @@
             <a class="anchor" href="#item-powers_desc">powers_desc</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn powers_desc(precs: Prec[]) -&#62; u64[]</code></pre>
+          <pre class="signature"><code>fn powers_desc(precs: Prec[]) -&#62; #&#62;{u64}</code></pre>
 
-          <div class="doc"><p>The distinct binding powers in <code>precs</code>, tightest first.</p></div>
+          <div class="doc"><p>The distinct binding powers in <code>precs</code>, tightest first — an ordered set, so the dedup and the order are the type's rather than a <code>contains</code> check and a sort of our own.</p></div>
 
 
         </section>

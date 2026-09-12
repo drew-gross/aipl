@@ -1,0 +1,14 @@
+import { print } from builtins;
+
+// An ordered set sorts its elements, so they must be `ord` — an integer, char,
+// or str. `bool` is a set element, but not an ordered one.
+fn main() !prints {
+    let b = #>{true, false};
+    print(`{b}`);
+}
+--- errors ---
+error: set literal: an ordered set (`#>{..}` / `#<{..}`) sorts its elements, so its element must be an integer, char, or str, got bool
+ --> ./tests/cases/sets/err_ordered_elem.aipl:6:13
+  |
+6 |     let b = #>{true, false};
+  |             ^^^^^^^^^^^^^^^

@@ -1,0 +1,13 @@
+import { print } from builtins;
+
+// An ordered `#>{ .. }` is a set: a `key: value` pair has no place in one.
+fn main() !prints {
+    let d = #>{"a": 1};
+    print(`{d}`);
+}
+--- errors ---
+error: an ordered "#>{ .. }" / "#<{ .. }" literal is a set, so it holds bare elements — a "key: value" pair belongs in a "#{ .. }" dict
+ --> ./tests/cases/sets/err_ordered_pairs.aipl:5:13
+  |
+5 |     let d = #>{"a": 1};
+  |             ^^^^^^^^^^

@@ -1591,11 +1591,11 @@ allocations: 9523
 deallocations: 9523
 reallocations: 1869
 bytes allocated: 676645
-instructions executed: 1348586
-binary size: 691464
-  code: 419008
+instructions executed: 1348911
+binary size: 691504
+  code: 419044
   data: 10388
-  metadata: 262068
+  metadata: 262072
 functions:
   __arr_drop_Node:
     calls: 16
@@ -2109,7 +2109,7 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 130
-    bytes: 4628
+    bytes: 4660
   rule_nullable$Tok:
     calls: 0
     bytes: 36
@@ -2121,7 +2121,7 @@ functions:
     bytes: 44
   seq_labels$Tok$Node$tail:
     calls: 13
-    bytes: 908
+    bytes: 912
   shown:
     calls: 67
     bytes: 844

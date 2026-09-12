@@ -1,0 +1,155 @@
+import {
+    equal as ==,
+    has,
+    is_empty,
+    len,
+    print,
+    to_array,
+    to_str,
+    union,
+    wrapping_add as +,
+} from builtins;
+
+// An ordered set: `#>{T}` walks its elements largest first, `#<{T}` smallest
+// first. Both are sets — deduplicated, `has`/`len`/`union`, `==` regardless of
+// how they were built — and distinct types from each other and from the
+// unordered `#{T}`, which promises no order at all. The block is kept sorted,
+// so iteration is the array walk and `to_array` is the same block seen as an
+// array. The element must be `ord`: an integer, char, or str (bytewise).
+fn main() !prints {
+    // Literals sort and dedup at construction.
+    let d = #>{3, 1, 2, 3, 10};
+    print(`{d}`);
+    let a = #<{"pear", "apple", "fig", "apple"};
+    print(`{a}`);
+    print(`{#<{'z', 'a', 'm'}}`);
+    print(`{#<{-5, 3, -20, 0}}`);
+
+    // An empty `#{}` is any set, so it seeds an ordered binding; `union` keeps
+    // the receiver's order, and takes any set of the element type for the other
+    // side — a plain `#{x}` is the natural way to add one element. (The
+    // `union_all` lint leaves this loop alone: its rewrite builds an unordered
+    // set.)
+    mut s: #>{i64} = #{};
+    for (let x : [5, 9, 1, 9, 7]) {
+        set s = s.union(#{x});
+    }
+    print(`{s}`);
+    // Walking one visits the elements in its order.
+    for (let x : s) {
+        print(x.to_str());
+    }
+    // The set operations, and equality across orders of construction.
+    print(`{s.has(9)} {s.has(2)} {s.len()} {s.is_empty()}`);
+    print(`{#>{1, 2} == #>{2, 1}}`);
+    // `to_array` is the elements in order — the array that a `map`/`join` wants.
+    print(`{d.to_array()}`);
+    print(`{a.to_array()}`);
+
+    // Unsigned elements order as unsigned: the top bit is a big number, not a
+    // sign.
+    let half: u64 = 9223372036854775807;
+    let u = #<{half + half + 1, half + 1, half};
+    print(`{u}`);
+}
+--- stdout ---
+{10, 3, 2, 1}
+{"apple", "fig", "pear"}
+{'a', 'm', 'z'}
+{-20, -5, 0, 3}
+{9, 7, 5, 1}
+9
+7
+5
+1
+true false 4 false
+true
+[10, 3, 2, 1]
+["apple", "fig", "pear"]
+{9223372036854775807, 9223372036854775808, 18446744073709551615}
+--- performance ---
+allocations: 42
+deallocations: 42
+reallocations: 0
+bytes allocated: 2051
+instructions executed: 4897
+binary size: 18096
+  code: 11016
+  data: 547
+  metadata: 6533
+functions:
+  __eq_setdesc$i64:
+    calls: 1
+    bytes: 256
+  __to_str_bool:
+    calls: 4
+    bytes: 232
+  __to_str_i64:
+    calls: 4
+    bytes: 204
+  __to_str_i64$arr:
+    calls: 1
+    bytes: 708
+  __to_str_setasc$char:
+    calls: 1
+    bytes: 700
+  __to_str_setasc$i64:
+    calls: 1
+    bytes: 708
+  __to_str_setasc$str:
+    calls: 1
+    bytes: 812
+  __to_str_setasc$u64:
+    calls: 1
+    bytes: 708
+  __to_str_setdesc$i64:
+    calls: 2
+    bytes: 708
+  __to_str_str$arr:
+    calls: 1
+    bytes: 812
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_arr_inc:
+    calls: 18
+    bytes: (external)
+  aipl_array_dec:
+    calls: 37
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 39
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 18
+    bytes: (external)
+  aipl_i64_len:
+    calls: 40
+    bytes: (external)
+  aipl_set_contains:
+    calls: 9
+    bytes: (external)
+  aipl_set_insert:
+    calls: 42
+    bytes: (external)
+  aipl_set_union:
+    calls: 5
+    bytes: (external)
+  aipl_u64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 46
+    bytes: (external)
+  aipl_write_i64:
+    calls: 20
+    bytes: (external)
+  aipl_write_u64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 4964

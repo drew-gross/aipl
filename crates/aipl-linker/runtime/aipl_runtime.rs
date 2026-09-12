@@ -2524,7 +2524,9 @@ pub extern "C" fn aipl_set_contains(
 
 /// Dedup-insert the element at `x` into the uniquely-owned array-backed set `a`
 /// (membership per `str_cmp`); returns the (possibly relocated) set. `drop_fn`/
-/// `retain_fn` are the element helpers for `str`, else 0.
+/// `retain_fn` are the element helpers for `str`, else 0. A non-zero `order`
+/// keeps the block sorted (an ordered set): the element is appended and then
+/// moved down to its position. Mirrors codegen's `aipl_set_insert`.
 #[no_mangle]
 pub extern "C" fn aipl_set_insert(
     a: *const u8,
@@ -2533,12 +2535,101 @@ pub extern "C" fn aipl_set_insert(
     retain_fn: i64,
     elem_size: i64,
     str_cmp: i64,
+    order: i64,
 ) -> *const u8 {
     count_builtin!(builtin_calls::AIPL_SET_INSERT);
-    if aipl_set_contains(a, x, elem_size, str_cmp) != 0 {
-        return a;
+    if order == SET_ORDER_NONE {
+        if aipl_set_contains(a, x, elem_size, str_cmp) != 0 {
+            return a;
+        }
+        return aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size);
     }
-    aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size)
+    let at = if a.is_null() {
+        0
+    } else {
+        match unsafe { ordered_set_position(a, x, elem_size, str_cmp, order) } {
+            None => return a,
+            Some(i) => i,
+        }
+    };
+    let grown = aipl_array_push_mut(a, x, drop_fn, retain_fn, elem_size);
+    unsafe { shift_last_to(grown, at, elem_size) };
+    grown
+}
+
+/// The unordered set's `order` argument; see codegen's `SET_ORDER_NONE`, whose
+/// encoding this mirrors: the sign is the direction, the magnitude the word
+/// comparison (`1` signed, `2` unsigned).
+const SET_ORDER_NONE: i64 = 0;
+
+/// Where the element at `x` goes in the ordered set `a`, or `None` when an
+/// equal element is already there. Byte-for-byte the JIT runtime's.
+///
+/// # Safety
+/// `a` is a non-null array block whose elements are `elem_size` bytes, and `x`
+/// addresses one such element.
+unsafe fn ordered_set_position(
+    a: *const u8,
+    x: *const u8,
+    elem_size: i64,
+    str_cmp: i64,
+    order: i64,
+) -> Option<usize> {
+    use core::cmp::Ordering;
+    let len = unsafe { array_len(a) };
+    let width = elem_size.max(8) as usize;
+    let cmp = |i: usize| -> Ordering {
+        let ep = unsafe { arr_elem_ptr_rt(a, i, width) };
+        let natural = if str_cmp == str24::STR_SIZE as i64 {
+            let e = unsafe { core::ptr::read(ep as *const str24::Str) };
+            let n = unsafe { core::ptr::read(x as *const str24::Str) };
+            str24::cmp(e, n).cmp(&0)
+        } else if order.abs() == 2 {
+            let e = unsafe { core::ptr::read(ep as *const u64) };
+            let n = unsafe { core::ptr::read(x as *const u64) };
+            e.cmp(&n)
+        } else {
+            let e = unsafe { core::ptr::read(ep as *const i64) };
+            let n = unsafe { core::ptr::read(x as *const i64) };
+            e.cmp(&n)
+        };
+        if order < 0 {
+            natural.reverse()
+        } else {
+            natural
+        }
+    };
+    for i in 0..len {
+        match cmp(i) {
+            Ordering::Less => {}
+            Ordering::Equal => return None,
+            Ordering::Greater => return Some(i),
+        }
+    }
+    Some(len)
+}
+
+/// Move the last element of `a` down to index `at`, shifting `[at, len - 1)`
+/// up by one. Byte-for-byte the JIT runtime's.
+///
+/// # Safety
+/// `a` is a non-null array block with at least one element of `elem_size`
+/// bytes, and `at` is at most `len - 1`.
+unsafe fn shift_last_to(a: *const u8, at: usize, elem_size: i64) {
+    let len = unsafe { array_len(a) };
+    let last = len - 1;
+    if at >= last {
+        return;
+    }
+    let width = elem_size.max(8) as usize;
+    let base = unsafe { arr_elem_ptr_rt(a, at, width) } as *mut u8;
+    let mut moved = [0u8; 32];
+    unsafe {
+        let last_ptr = arr_elem_ptr_rt(a, last, width);
+        core::ptr::copy_nonoverlapping(last_ptr, moved.as_mut_ptr(), width);
+        core::ptr::copy(base, base.add(width), (last - at) * width);
+        core::ptr::copy_nonoverlapping(moved.as_ptr(), base, width);
+    }
 }
 
 /// Make `a` uniquely owned with room for `extra` more elements, so the appends
@@ -2858,6 +2949,7 @@ pub extern "C" fn aipl_set_union(
     retain_fn: i64,
     elem_size: i64,
     str_cmp: i64,
+    order: i64,
 ) -> *const u8 {
     count_builtin!(builtin_calls::AIPL_SET_UNION);
     unsafe {
@@ -2874,6 +2966,7 @@ pub extern "C" fn aipl_set_union(
                 retain_fn,
                 elem_size,
                 str_cmp,
+                order,
             );
         }
         for i in 0..b_len {
@@ -2886,6 +2979,7 @@ pub extern "C" fn aipl_set_union(
                 retain_fn,
                 elem_size,
                 str_cmp,
+                order,
             );
         }
         aipl_array_dec(a);
@@ -2905,6 +2999,7 @@ pub extern "C" fn aipl_set_union_mut(
     retain_fn: i64,
     elem_size: i64,
     str_cmp: i64,
+    order: i64,
 ) -> *const u8 {
     count_builtin!(builtin_calls::AIPL_SET_UNION_MUT);
     unsafe {
@@ -2920,6 +3015,7 @@ pub extern "C" fn aipl_set_union_mut(
                 retain_fn,
                 elem_size,
                 str_cmp,
+                order,
             );
         }
         aipl_array_dec(b);

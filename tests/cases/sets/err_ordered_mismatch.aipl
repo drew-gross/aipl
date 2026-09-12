@@ -1,0 +1,14 @@
+import { print } from builtins;
+
+// The three orders are three types: a literal of one order cannot bind as
+// another, since the block behind it is sorted the other way.
+fn main() !prints {
+    let a: #>{i64} = #<{1};
+    print(`{a}`);
+}
+--- errors ---
+error: binding "a" is declared #>{i64}, but its value is #<{i64}
+ --> ./tests/cases/sets/err_ordered_mismatch.aipl:6:22
+  |
+6 |     let a: #>{i64} = #<{1};
+  |                      ^^^^^

@@ -1,0 +1,91 @@
+import { print, push, union } from builtins;
+
+// A binding seeded with an empty literal takes its element type from the first
+// concrete value stored into it — through `set` as well as through `push`. A
+// plain `set` used to leave the binding typed by its placeholder, so a later
+// read rendered the set (or array) as empty while it held elements.
+fn main() !prints {
+    mut s = #{};
+    set s = s.union(#{2, 1});
+    print(`{s}`);
+    // Seeded empty, then given an ordered set: the binding takes its order too.
+    mut o = #{};
+    set o = o.union(#>{2, 1, 3});
+    print(`{o}`);
+    for (let x : o) {
+        print(`{x}`);
+    }
+    mut a = [];
+    set a = [1, 2];
+    set a.push(3);
+    print(`{a}`);
+}
+--- stdout ---
+{2, 1}
+{3, 2, 1}
+3
+2
+1
+[1, 2, 3]
+--- performance ---
+allocations: 15
+deallocations: 15
+reallocations: 0
+bytes allocated: 531
+instructions executed: 1459
+binary size: 7784
+  code: 4300
+  data: 211
+  metadata: 3273
+functions:
+  __to_str_i64:
+    calls: 3
+    bytes: 204
+  __to_str_i64$arr:
+    calls: 1
+    bytes: 708
+  __to_str_set$i64:
+    calls: 1
+    bytes: 708
+  __to_str_setdesc$i64:
+    calls: 1
+    bytes: 708
+  aipl_arr_inc:
+    calls: 11
+    bytes: (external)
+  aipl_array_dec:
+    calls: 20
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 10
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 6
+    bytes: (external)
+  aipl_i64_len:
+    calls: 22
+    bytes: (external)
+  aipl_set_contains:
+    calls: 4
+    bytes: (external)
+  aipl_set_insert:
+    calls: 10
+    bytes: (external)
+  aipl_set_union:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 11
+    bytes: (external)
+  aipl_write_i64:
+    calls: 11
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1972

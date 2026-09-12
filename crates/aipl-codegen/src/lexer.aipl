@@ -257,9 +257,10 @@ variant Matcher =
     // `marker`, then everything up to (not including) the next newline — but
     // only when the character right after `marker` is *not* in `blocked`. Line
     // comments whose marker is also the start of something else: AIPL's `#`
-    // leads a doc comment, and also a set/dict literal (`#{..}`) and the
-    // `#[allow]` lint marker, so `ToEolUnless("#", "{[")` claims the comment
-    // and leaves the other two to the rules that want them.
+    // leads a doc comment, and also a set/dict literal (`#{..}`), an ordered
+    // set (`#>{..}` / `#<{..}`) and the `#[allow]` lint marker, so
+    // `ToEolUnless("#", "{[<>")` claims the comment and leaves the others to
+    // the rules that want them.
     //
     // The marker alone at end of line still matches — an empty doc line has no
     // following character to block it, and writing one as `marker` plus a space

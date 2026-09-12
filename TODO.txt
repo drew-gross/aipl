@@ -75,9 +75,10 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  make it so builtin .aipl files can contain helper functions
   only should be named one and use a nested_in kwarg (i.e. thinner wrapper over Many)
   destructuring in for loops should be DRYer with destructuring in let bindings
-  powers_desc looks like an ad-hoc reimplementaiton of an ordered set. We should make that a language feature.
+  all_ops should also be built on sets
   lex doc comments as one big token, not one per line
   section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
@@ -116,6 +117,7 @@ dev loop:
   a_directory_argument_checks_the_tree_under_it is failing early and preventing more useful tests from failing
 
 self-hosting:
+  format_source can be full-aipl now
   make formatter command that is fully self-hosted
   parser library in aipl (grammar as data; generates highlighter + formatter)
     -> plan and progress checkboxes live in PARSER_LIBRARY.md
@@ -170,6 +172,7 @@ syntax:
   allow destructuring self while having it still be self e.g. fn foo(self: Span { start, end }). Maybe do this for other args too for doc purposes?
   limitation: a struct default must be a literal
   a lambda bound to a let is not a value (this would let test helpers move into the test, big cleanup)
+    is_nine is a silly test helper
   only allow doc comments at the start of lines
   allow default args to be implicitly optional so that you pass T explicitly, but if you pass nothing the callee gets none.
   expr! should return the err held in expr, or exit the test if expr is not an error (only valid in tests for now)
@@ -243,6 +246,8 @@ formatter:
     """)
 
 sets:
+  add insert method
+  add to_set (Q: how to decide if ordered?)
   support #{T}?
   bug: #{} does not flex through a generic parameter.
   Dicts and sets can't be optional cores or dict elements, so #{} can't flex there either.
@@ -252,6 +257,7 @@ sets:
   support other types
 
 parser:
+  cleanup/remove nest/nest2/nest3
   OneOf([Then([T, U]), T]) should instead be Then([T, Maybe(U)]) (e.g. in variant)
   remove expr_unary, it's silly
   a bracketed list's separator must be a literal, so the printer can write it back <--- lift this restriction
@@ -286,6 +292,8 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
+  lint against set literals that contain duplicates
+  set out = [..out, o]; should lint to set out.push(a);
   we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway
   err_lints being all one big file is kinda annoying, lets group by kind
   for (let sub : rs) { if (cond(sub)) return true } else return false => line require this to return any
@@ -338,6 +346,7 @@ chain_docs:
 abi:
 
 design:
+  don't repeat information in the docs that can be determined form the signature: whether it's callable as a method, and which arguments are generic.
   backwards compatibility is less important the age of AI: you can get claude to migrade all your code (note: changes that cause code that used to compile to stop is fine, change that silently change behaviour of existing code is still 100% banned)
   representation is not introspectable
   it's safe to call an untrusted function that doesn't declare any effects
@@ -546,7 +555,6 @@ handoff:
 
 optimize enumerate/reverse/right_fold with streams
 "AIPL-implemented builtin sources are valid AIPL" error should include more info
-make it so builtin .aipl files can contain helper functions
 make it so functions can call functions defined later in the file
 
 figure out / fix why template literals are peforming worse than concat chains

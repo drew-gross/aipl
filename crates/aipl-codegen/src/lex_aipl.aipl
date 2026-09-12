@@ -453,7 +453,7 @@ fn s_char() -> str { "string.quoted.single.aipl" }
 
 fn s_operator() -> str { "keyword.operator.aipl" }
 
-fn s_punct() -> str { "punctuation.aipl" }
+pub fn s_punct() -> str { "punctuation.aipl" }
 
 # A doc comment is documentation, not an aside — a highlighter paints it like a
 # doc string rather than like a `//` comment, which is what every editor theme
@@ -500,10 +500,10 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // is what keeps the `////////` section banners people write inside a
         // function working — those are `//` comments and stay trivia.
         //
-        // `#` also leads a set/dict literal (`#{..}`) and the `#[allow]` marker
-        // above, so the matcher declines both leads and they fall through to the
-        // rules that want them.
-        TokenRule { matcher: ToEolUnless("#", "{["), emit: Of(doc_text), scope: s_doc() },
+        // `#` also leads a set/dict literal (`#{..}`), an ordered set's
+        // `#>{..}` / `#<{..}`, and the `#[allow]` marker above, so the matcher
+        // declines those leads and they fall through to the rules that want them.
+        TokenRule { matcher: ToEolUnless("#", "{[<>"), emit: Of(doc_text), scope: s_doc() },
         // Keywords and constants, each its own `kw` rule (identifier-boundary
         // matched, so `iffy`/`noneish` stay `Name`s). Order among them is
         // immaterial — the spellings are disjoint — but all must precede the
@@ -736,6 +736,19 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
             trivia: [atok("#{ #[allow]", AllowMarker, 3..11)],
         },
     );
+    // The ordered-set brackets are three tokens each, not a doc comment.
+    assert(
+        lex_aipl("#>{")? == LexResult {
+            tokens: [atok("#>{", Hash, 0..1), atok("#>{", Gt, 1..2), atok("#>{", LBrace, 2..3)],
+            trivia: [],
+        },
+    );
+    assert(
+        lex_aipl("#<{")? == LexResult {
+            tokens: [atok("#<{", Hash, 0..1), atok("#<{", Lt, 1..2), atok("#<{", LBrace, 2..3)],
+            trivia: [],
+        },
+    );
 
     // Block comments are trivia, and `Nested` depth-tracks them, so the inner
     // `/* */` doesn't close the outer — the whole `/* a /* b */ c */` is one
@@ -917,30 +930,30 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 4428
-deallocations: 4428
-reallocations: 88
-bytes allocated: 490540
-instructions executed: 1223534
-binary size: 503232
-  code: 342772
-  data: 9572
-  metadata: 150888
+allocations: 5176
+deallocations: 5176
+reallocations: 94
+bytes allocated: 540428
+instructions executed: 1380916
+binary size: 557960
+  code: 378736
+  data: 9956
+  metadata: 169268
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
     bytes: 140
   __arr_drop___m1__Token$AiplTok:
-    calls: 145
+    calls: 157
     bytes: 388
   __arr_drop___m1__TokenRule$AiplTok:
-    calls: 27
+    calls: 29
     bytes: 832
   __arr_retain___m1__StepResult$AiplTok:
     calls: 2
     bytes: 140
   __arr_retain___m1__Token$AiplTok:
-    calls: 71
+    calls: 77
     bytes: 388
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
@@ -952,7 +965,7 @@ functions:
     calls: 50
     bytes: 220
   __builtin_count_while$char$s0$lam24:
-    calls: 34
+    calls: 40
     bytes: 184
   __builtin_count_while$char$s0$lam31:
     calls: 0
@@ -961,7 +974,7 @@ functions:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam44$tail:
-    calls: 4
+    calls: 6
     bytes: 256
   __builtin_count_while$char$s0$lam49:
     calls: 4
@@ -973,28 +986,28 @@ functions:
     calls: 4
     bytes: 1028
   __eq_AiplTok:
-    calls: 60
+    calls: 66
     bytes: 600
   __eq_StrStyle:
     calls: 8
     bytes: 64
   __eq___builtin_Span:
-    calls: 65
+    calls: 71
     bytes: 104
   __eq___m1__LexError:
     calls: 5
     bytes: 128
   __eq___m1__LexResult$AiplTok:
-    calls: 21
+    calls: 23
     bytes: 120
   __eq___m1__SpanStr:
-    calls: 60
+    calls: 66
     bytes: 128
   __eq___m1__Token$AiplTok:
-    calls: 60
+    calls: 66
     bytes: 120
   __eq___m1__Token$AiplTok$arr:
-    calls: 43
+    calls: 47
     bytes: 284
   __eq_char$opt:
     calls: 2
@@ -1036,10 +1049,10 @@ functions:
     calls: 3
     bytes: 744
   __m1__between_len:
-    calls: 30
+    calls: 36
     bytes: 752
   __m1__delimited_len:
-    calls: 54
+    calls: 66
     bytes: 1592
   __m1__finalize_template$AiplTok:
     calls: 6
@@ -1051,31 +1064,31 @@ functions:
     calls: 2
     bytes: 2028
   __m1__lex$AiplTok:
-    calls: 27
+    calls: 29
     bytes: 1328
   __m1__lex_step$AiplTok:
-    calls: 99
+    calls: 105
     bytes: 29192
   __m1__nested_len:
-    calls: 64
+    calls: 70
     bytes: 940
   __m1__step_result$AiplTok:
-    calls: 2050
+    calls: 2407
     bytes: 15088
   __m1__template_scan$AiplTok:
     calls: 6
     bytes: 2728
   __m1__template_step$AiplTok:
-    calls: 40
+    calls: 52
     bytes: 476
   __m1__to_eol_len:
     calls: 0
     bytes: 52
   __m1__to_eol_len$tail:
-    calls: 127
+    calls: 139
     bytes: 252
   __m1__to_eol_unless_len:
-    calls: 61
+    calls: 67
     bytes: 368
   __m2__unescape:
     calls: 33
@@ -1100,7 +1113,7 @@ functions:
     bytes: 2264
   __test$lex_aipl:
     calls: 1
-    bytes: 130732
+    bytes: 166692
   __test$lex_aipl_stripped:
     calls: 1
     bytes: 7188
@@ -1120,19 +1133,19 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 204
+    calls: 216
     bytes: (external)
   aipl_arr_inc:
-    calls: 8946
+    calls: 10454
     bytes: (external)
   aipl_arr_reserve:
-    calls: 204
+    calls: 216
     bytes: (external)
   aipl_array_dec:
-    calls: 13357
+    calls: 15613
     bytes: (external)
   aipl_array_new:
-    calls: 4360
+    calls: 5108
     bytes: (external)
   aipl_array_push:
     calls: 29
@@ -1144,11 +1157,11 @@ functions:
     calls: 22
     bytes: (external)
   aipl_assert:
-    calls: 45
+    calls: 47
     bytes: (external)
   aipl_rules:
-    calls: 27
-    bytes: 90364
+    calls: 29
+    bytes: 90368
   aipl_test_begin:
     calls: 7
     bytes: (external)

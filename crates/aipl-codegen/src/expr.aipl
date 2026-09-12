@@ -4,7 +4,7 @@
 import { Span, equal as ==, first, is_empty, join, logical_not as !, map } from builtins;
 import { Ctor, Pat, show_pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";
-import { Primitive, Ty, show_ty } from "./ty.aipl";
+import { Desc, Primitive, SetOrder, Ty, Unordered, show_order, show_ty } from "./ty.aipl";
 
 # block) where its *value* is.
 #
@@ -76,7 +76,7 @@ variant ExprKind =
     | IfLet(MatchArm, Expr, Expr)
     | ArrayLit(Expr[])
     | Spread(Expr)
-    | SetLit(Expr[])
+    | SetLit(Expr[], SetOrder)
     | DictLit((Expr, Expr)[])
     | Index(Expr, Expr)
     | Slice(Expr, Expr, Expr?)
@@ -118,7 +118,7 @@ pub fn show_expr(self: Expr) -> str {
         IfLet(arm, e, f) => `IfLet({arm.show_arm()}, {e.show_expr()}, {f.show_expr()})`,
         ArrayLit(es) => `[{show_exprs(es)}]`,
         Spread(e) => `..{e.show_expr()}`,
-        SetLit(es) => `Set([{show_exprs(es)}])`,
+        SetLit(es, o) => `Set([{show_exprs(es)}]{o.show_order()})`,
         DictLit(ps) => `Dict([{ps.map(show_dict_entry).join(sep=", ")}])`,
         Index(a, i) => `Index({a.show_expr()}, {i.show_expr()})`,
         Slice(a, lo, hi) => `Slice({a.show_expr()}, {lo.show_expr()}, {show_opt_expr(hi)})`,
@@ -152,7 +152,8 @@ pub fn show_expr(self: Expr) -> str {
     assert(expr(Spread(ident("xs"))).show_expr() == "..xs");
     assert(expr(ArrayLit([three, three])).show_expr() == "[3, 3]");
     assert(expr(TupleLit([three, ident("x")])).show_expr() == "Tuple(3, x)");
-    assert(expr(SetLit([three])).show_expr() == "Set([3])");
+    assert(expr(SetLit([three], Unordered)).show_expr() == "Set([3])");
+    assert(expr(SetLit([three], Desc)).show_expr() == "Set([3], Desc)");
     assert(expr(DictLit([(three, ident("v"))])).show_expr() == "Dict([3: v])");
     assert(expr(Slice(ident("s"), three, none)).show_expr() == "Slice(s, 3, )");
     assert(expr(Slice(ident("s"), three, some(three))).show_expr() == "Slice(s, 3, 3)");
@@ -246,18 +247,18 @@ fn show_binds(self: (str, str)[]) -> str { self.map(show_bind).join(sep=", ") }
 
 fn show_bind(self: (str, str)) -> str { `{self.0} = {self.1}` }
 --- performance ---
-allocations: 216
-deallocations: 216
-reallocations: 13
-bytes allocated: 15750
-instructions executed: 9136
-binary size: 72944
-  code: 45096
-  data: 2394
-  metadata: 25454
+allocations: 227
+deallocations: 227
+reallocations: 14
+bytes allocated: 16494
+instructions executed: 9578
+binary size: 74904
+  code: 46428
+  data: 2490
+  metadata: 25986
 functions:
   __arr_drop_Expr:
-    calls: 8
+    calls: 9
     bytes: 116
   __arr_drop_LambdaParam:
     calls: 2
@@ -288,15 +289,15 @@ functions:
     bytes: 140
   __m3__show_ty:
     calls: 2
-    bytes: 4656
+    bytes: 5064
   __m3__show_tys:
     calls: 0
     bytes: 460
   __rec_drop_Expr:
-    calls: 37
+    calls: 38
     bytes: 36
   __rec_drop_ExprKind:
-    calls: 37
+    calls: 38
     bytes: 1260
   __rec_drop_MatchArm:
     calls: 1
@@ -312,48 +313,48 @@ functions:
     bytes: 72
   __test$show_expr:
     calls: 1
-    bytes: 14296
+    bytes: 14828
   __to_str_i64:
-    calls: 18
+    calls: 19
     bytes: 204
   aipl_arr_inc:
-    calls: 12
+    calls: 13
     bytes: (external)
   aipl_arr_slice:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 37
+    calls: 40
     bytes: (external)
   aipl_array_new:
-    calls: 12
-    bytes: (external)
-  aipl_array_push_mut:
     calls: 13
     bytes: (external)
+  aipl_array_push_mut:
+    calls: 14
+    bytes: (external)
   aipl_array_with_cap:
-    calls: 11
+    calls: 12
     bytes: (external)
   aipl_assert:
-    calls: 25
+    calls: 26
     bytes: (external)
   aipl_i64_len:
-    calls: 36
+    calls: 38
     bytes: (external)
   aipl_rec_alloc:
-    calls: 78
+    calls: 80
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 183
+    calls: 189
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 57
+    calls: 58
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 105
+    calls: 109
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 57
+    calls: 58
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -365,7 +366,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_write_i64:
-    calls: 18
+    calls: 19
     bytes: (external)
   main:
     calls: 1
@@ -380,10 +381,10 @@ functions:
     calls: 3
     bytes: 1560
   show_expr:
-    calls: 54
-    bytes: 16984
+    calls: 56
+    bytes: 17376
   show_exprs:
-    calls: 6
+    calls: 7
     bytes: 460
   show_field_init:
     calls: 0
