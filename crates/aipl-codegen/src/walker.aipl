@@ -1604,8 +1604,10 @@ fn for_stmt(self: W) -> WDoc!FmtError {
         if (b.w.peek_text() == ",") {
             // `for (let i, x : xs)` — the index-and-item form: two names, and the
             // comma is part of the binder rather than a separator the header
-            // walker would otherwise stop on.
-            let item = b.w.bump().w.bump();
+            // walker would otherwise stop on. The item may itself be a tuple
+            // pattern: `for (let i, (a, b) : xs)`.
+            let after = b.w.bump().w;
+            let item = if (after.peek_text() == "(") { after.tuple_binder() } else { after.bump() };
             WStr { w: item.w, text: `{b.text}, {item.text}` }
         } else {
             WStr { w: b.w, text: b.text }
@@ -2691,6 +2693,16 @@ fn walker_of(src: str) -> W!FmtError {
             .block()
             .rendered(100)? == "{\n    for (let (i, x) : xs) {\n        f();\n    }\n}\n",
     );
+    assert(
+        walker_of("{ for ( let i , x : xs ) { f ( ) ; } }")?
+            .block()
+            .rendered(100)? == "{\n    for (let i, x : xs) {\n        f();\n    }\n}\n",
+    );
+    assert(
+        walker_of("{ for ( let i , ( a , b ) : xs ) { f ( ) ; } }")?
+            .block()
+            .rendered(100)? == "{\n    for (let i, (a, b) : xs) {\n        f();\n    }\n}\n",
+    );
 
     // --- items ------------------------------------------------------------------
     assert(
@@ -2999,15 +3011,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 117217
-deallocations: 117217
-reallocations: 1915
-bytes allocated: 6321497
-instructions executed: 22761869
-binary size: 8952496
-  code: 5651592
-  data: 28444
-  metadata: 3272460
+allocations: 121457
+deallocations: 121457
+reallocations: 1961
+bytes allocated: 6498198
+instructions executed: 23538998
+binary size: 9179112
+  code: 5794828
+  data: 29108
+  metadata: 3355176
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3022,16 +3034,16 @@ functions:
     calls: 25
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1567
+    calls: 1597
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
     calls: 1
     bytes: 140
   __arr_drop___m9__Token$__m8__AiplTok:
-    calls: 1410
+    calls: 1452
     bytes: 388
   __arr_drop___m9__TokenRule$__m8__AiplTok:
-    calls: 154
+    calls: 156
     bytes: 832
   __arr_retain_ImportEntry:
     calls: 30
@@ -3046,13 +3058,13 @@ functions:
     calls: 35
     bytes: 140
   __arr_retain___m1__Doc:
-    calls: 1628
+    calls: 1652
     bytes: 116
   __arr_retain___m9__StepResult$__m8__AiplTok:
     calls: 1
     bytes: 140
   __arr_retain___m9__Token$__m8__AiplTok:
-    calls: 1108
+    calls: 1146
     bytes: 388
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
@@ -3064,13 +3076,13 @@ functions:
     calls: 0
     bytes: 32
   __builtin_any$__m1__Doc$lam46$tail:
-    calls: 644
+    calls: 652
     bytes: 324
   __builtin_count_is_at_least$char$s0:
-    calls: 50
+    calls: 54
     bytes: 252
   __builtin_count_while$char$lam65:
-    calls: 1240
+    calls: 1285
     bytes: 220
   __builtin_count_while$char$s0$lam103:
     calls: 2
@@ -3079,7 +3091,7 @@ functions:
     calls: 22
     bytes: 172
   __builtin_count_while$char$s0$lam73:
-    calls: 647
+    calls: 672
     bytes: 184
   __builtin_count_while$char$s0$lam76:
     calls: 0
@@ -3097,7 +3109,7 @@ functions:
     calls: 162
     bytes: 408
   __eq_FmtKind:
-    calls: 976
+    calls: 1010
     bytes: 64
   __eq_FmtTok:
     calls: 0
@@ -3118,7 +3130,7 @@ functions:
     calls: 0
     bytes: 136
   __lambda_39:
-    calls: 333
+    calls: 342
     bytes: 104
   __lambda_40:
     calls: 0
@@ -3154,7 +3166,7 @@ functions:
     calls: 2
     bytes: 340
   __m1__col_after:
-    calls: 1006
+    calls: 1026
     bytes: 596
   __m1__fits:
     calls: 0
@@ -3172,10 +3184,10 @@ functions:
     calls: 0
     bytes: 32
   __m1__has_hard$tail:
-    calls: 1607
+    calls: 1627
     bytes: 688
   __m1__print:
-    calls: 154
+    calls: 156
     bytes: 4268
   __m2__reindent_block:
     calls: 2
@@ -3184,10 +3196,10 @@ functions:
     calls: 2
     bytes: 1276
   __m6__trim_end_while$lam22:
-    calls: 418
+    calls: 430
     bytes: 300
   __m8__aipl_rules:
-    calls: 154
+    calls: 156
     bytes: 90364
   __m8__char_lit_emit:
     calls: 1
@@ -3208,10 +3220,10 @@ functions:
     calls: 2
     bytes: 2608
   __m9__between_len:
-    calls: 625
+    calls: 650
     bytes: 752
   __m9__delimited_len:
-    calls: 1240
+    calls: 1290
     bytes: 1592
   __m9__finalize_template$__m8__AiplTok:
     calls: 1
@@ -3223,40 +3235,40 @@ functions:
     calls: 1
     bytes: 2028
   __m9__lex$__m8__AiplTok:
-    calls: 154
+    calls: 156
     bytes: 1328
   __m9__lex_step$__m8__AiplTok:
-    calls: 2013
+    calls: 2087
     bytes: 29192
   __m9__nested_len:
-    calls: 1104
+    calls: 1142
     bytes: 940
   __m9__step_result$__m8__AiplTok:
-    calls: 50005
+    calls: 51922
     bytes: 15088
   __m9__template_scan$__m8__AiplTok:
     calls: 1
     bytes: 2728
   __m9__template_step$__m8__AiplTok:
-    calls: 1230
+    calls: 1280
     bytes: 476
   __m9__to_eol_len:
     calls: 0
     bytes: 52
   __m9__to_eol_len$tail:
-    calls: 2210
+    calls: 2286
     bytes: 252
   __m9__to_eol_unless_len:
-    calls: 1104
+    calls: 1142
     bytes: 368
   __map24$own0:
-    calls: 154
+    calls: 156
     bytes: 428
   __rec_drop___m1__Doc:
-    calls: 3109
+    calls: 3179
     bytes: 184
   __rec_drop___m1__Work:
-    calls: 4502
+    calls: 4570
     bytes: 84
   __test$binding_ann:
     calls: 1
@@ -3269,7 +3281,7 @@ functions:
     bytes: 2188
   __test$walker_of:
     calls: 1
-    bytes: 4993520
+    bytes: 5136296
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
@@ -3277,49 +3289,49 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 4274
+    calls: 4426
     bytes: (external)
   aipl_arr_inc:
-    calls: 257266
+    calls: 266676
     bytes: (external)
   aipl_arr_reserve:
-    calls: 4352
+    calls: 4504
     bytes: (external)
   aipl_arr_slice:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 366068
+    calls: 379543
     bytes: (external)
   aipl_array_new:
-    calls: 106519
+    calls: 110538
     bytes: (external)
   aipl_array_push:
-    calls: 1759
+    calls: 1801
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1783
+    calls: 1821
     bytes: (external)
   aipl_array_with_cap:
-    calls: 363
+    calls: 367
     bytes: (external)
   aipl_assert:
-    calls: 198
+    calls: 200
     bytes: (external)
   aipl_rec_alloc:
-    calls: 7611
+    calls: 7749
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 52316
+    calls: 53164
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 4610
+    calls: 4684
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 44705
+    calls: 45415
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 4610
+    calls: 4684
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -3340,7 +3352,7 @@ functions:
     calls: 7
     bytes: 76
   atom:
-    calls: 125
+    calls: 129
     bytes: 2904
   base_ty:
     calls: 79
@@ -3349,40 +3361,40 @@ functions:
     calls: 7
     bytes: 2276
   binop_expr:
-    calls: 121
+    calls: 125
     bytes: 3204
   binop_tail:
-    calls: 121
+    calls: 125
     bytes: 4352
   block:
-    calls: 51
+    calls: 55
     bytes: 1144
   block_entries:
-    calls: 56
+    calls: 60
     bytes: 3952
   block_layout:
-    calls: 56
+    calls: 60
     bytes: 5192
   bump:
-    calls: 1125
+    calls: 1165
     bytes: 1284
   call_arg:
     calls: 12
     bytes: 7920
   call_arg_list:
-    calls: 19
+    calls: 21
     bytes: 796
   call_args_until:
-    calls: 22
+    calls: 24
     bytes: 2776
   case_params:
     calls: 7
     bytes: 9968
   comma_list_docs:
-    calls: 102
+    calls: 104
     bytes: 4640
   comment_starts_before:
-    calls: 327
+    calls: 339
     bytes: 280
   construct_body:
     calls: 0
@@ -3406,13 +3418,13 @@ functions:
     calls: 5
     bytes: 848
   expect:
-    calls: 472
+    calls: 491
     bytes: 1228
   expr:
-    calls: 119
+    calls: 123
     bytes: 760
   fmt_kind:
-    calls: 1097
+    calls: 1135
     bytes: 3120
   fn_attrs:
     calls: 26
@@ -3427,8 +3439,8 @@ functions:
     calls: 8
     bytes: 1904
   for_stmt:
-    calls: 2
-    bytes: 13176
+    calls: 4
+    bytes: 11316
   format_program:
     calls: 8
     bytes: 5328
@@ -3436,10 +3448,10 @@ functions:
     calls: 0
     bytes: 732
   hugs_sole_arg:
-    calls: 19
+    calls: 21
     bytes: 1312
   ident_list:
-    calls: 9
+    calls: 10
     bytes: 1708
   if_expr:
     calls: 3
@@ -3469,7 +3481,7 @@ functions:
     calls: 3
     bytes: 3412
   lead:
-    calls: 319
+    calls: 331
     bytes: 1916
   let_stmt:
     calls: 3
@@ -3484,19 +3496,19 @@ functions:
     calls: 2
     bytes: 11936
   more_before:
-    calls: 202
+    calls: 204
     bytes: 200
   mut_stmt:
     calls: 2
     bytes: 7100
   name_atom:
-    calls: 82
+    calls: 86
     bytes: 5740
   named_ty:
     calls: 75
     bytes: 4112
   next_start:
-    calls: 50
+    calls: 54
     bytes: 532
   one_param:
     calls: 12
@@ -3517,13 +3529,13 @@ functions:
     calls: 3
     bytes: 3092
   peek_is_n:
-    calls: 991
+    calls: 1025
     bytes: 296
   postfix:
-    calls: 125
+    calls: 129
     bytes: 5640
   postfix_segs:
-    calls: 125
+    calls: 129
     bytes: 3576
   program:
     calls: 13
@@ -3532,16 +3544,16 @@ functions:
     calls: 13
     bytes: 4696
   range_has_semi:
-    calls: 39
+    calls: 43
     bytes: 220
   range_tail:
-    calls: 119
+    calls: 123
     bytes: 2352
   rendered:
-    calls: 132
+    calls: 134
     bytes: 572
   sep_entry:
-    calls: 41
+    calls: 45
     bytes: 332
   set_member:
     calls: 2
@@ -3571,7 +3583,7 @@ functions:
     calls: 4
     bytes: 1904
   statement:
-    calls: 41
+    calls: 45
     bytes: 5876
   str_atom:
     calls: 5
@@ -3604,10 +3616,10 @@ functions:
     calls: 1
     bytes: 988
   tok_text:
-    calls: 3567
+    calls: 3693
     bytes: 508
   trailing_comment:
-    calls: 90
+    calls: 94
     bytes: 2344
   trim_last_break:
     calls: 0
@@ -3615,6 +3627,9 @@ functions:
   trim_last_break$tail:
     calls: 0
     bytes: 1224
+  tuple_binder:
+    calls: 2
+    bytes: 2320
   tuple_rest:
     calls: 1
     bytes: 2932
@@ -3628,7 +3643,7 @@ functions:
     calls: 51
     bytes: 5788
   unary:
-    calls: 127
+    calls: 131
     bytes: 1884
   variant_cases:
     calls: 15
@@ -3640,7 +3655,7 @@ functions:
     calls: 7
     bytes: 2432
   walker_of:
-    calls: 146
+    calls: 148
     bytes: 3772
   while_stmt:
     calls: 1

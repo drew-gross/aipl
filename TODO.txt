@@ -75,6 +75,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  only should be named one and use a nested_in kwarg (i.e. thinner wrapper over Many)
+  destructuring in for loops should be DRYer with destructuring in let bindings
   powers_desc looks like an ad-hoc reimplementaiton of an ordered set. We should make that a language feature.
   lex doc comments as one big token, not one per line
   section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
@@ -496,8 +498,6 @@ find a way to make sure the code still works even after optimizations (and the t
 warn/err on:
 - self[end].value_or(' ') == '.' should be self[end] == some('.')
 
-make it possible to fill expected output for one test at a time (or a list of tests), add a CLAUDE.md reminder to use that any time you are running tests (the full suite should only be run during handoff)
-
 remove install_parser_hook with lazy loader
 make the vscode extension also auto-format
 constant folding optimization pass
@@ -533,6 +533,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  Make the new-syntax bootstrap faster (maybe by doing just the regen without the full corpus?)
   retire AIPL_CASE, add a non-env alternative
   switch the nextest --no-build to the corresponding cargo build so that we get better progress output
   aipl probably needs streaming for proper tee replacement

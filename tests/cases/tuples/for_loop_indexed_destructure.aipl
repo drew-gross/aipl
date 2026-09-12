@@ -1,0 +1,74 @@
+import { print, to_str, tuple_windows, wrapping_add as + } from builtins;
+
+// `for (let i, (a, b) : xs)` — the indexed loop and the tuple pattern
+// composed: `i` counts iterations from 0, and each element is destructured
+// as `for (let (a, b) : xs)` would. The pattern needs at least two names.
+fn main() !prints {
+    let pairs = [(1, "one"), (2, "two"), (3, "three")];
+    for (let i, (n, s) : pairs) {
+        print(`{i}: {n} {s}`);
+    }
+    // The shape it was added for: an indexed walk over adjacent pairs.
+    for (let i, (c, next) : "abcd".tuple_windows()) {
+        print(`{i}: {c}{next}`);
+    }
+    // Nested: each loop has its own counter.
+    for (let i, (a, b) : [(1, 2), (3, 4)]) {
+        for (let j, (c, d) : [(5, 6)]) {
+            print(`{i}{j} {to_str(a + b + c + d)}`);
+        }
+    }
+}
+--- stdout ---
+0: 1 one
+1: 2 two
+2: 3 three
+0: ab
+1: bc
+2: cd
+00 14
+10 18
+--- performance ---
+allocations: 46
+deallocations: 46
+reallocations: 0
+bytes allocated: 2921
+instructions executed: 1470
+binary size: 6104
+  code: 3568
+  data: 1
+  metadata: 2535
+functions:
+  __arr_drop___tuple$i64$str:
+    calls: 1
+    bytes: 120
+  __arr_retain___tuple$i64$str:
+    calls: 0
+    bytes: 120
+  __to_str_i64:
+    calls: 5
+    bytes: 204
+  __to_str_u64:
+    calls: 10
+    bytes: 204
+  aipl_array_dec:
+    calls: 4
+    bytes: (external)
+  aipl_array_new:
+    calls: 4
+    bytes: (external)
+  aipl_i64_len:
+    calls: 10
+    bytes: (external)
+  aipl_u64_len:
+    calls: 20
+    bytes: (external)
+  aipl_write_i64:
+    calls: 5
+    bytes: (external)
+  aipl_write_u64:
+    calls: 10
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2920

@@ -44,8 +44,7 @@ pub fn escape_text(self: char) -> str {
 pub fn unescape(self: str) -> str {
     mut out = "";
     mut run_start: u64 = 0;
-    for (let i, w : self.tuple_windows()) {
-        let (c, next) = w;
+    for (let i, (c, next) : self.tuple_windows()) {
         if (c == '\\' && run_start <= i) {
             set out.extend(self[run_start..i]);
             set out.extend(next.escape_text());

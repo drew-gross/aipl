@@ -659,6 +659,7 @@ case_tests! {
     cases_tuples_err_none_element = "cases/tuples/err_none_element",
     cases_tuples_field_access = "cases/tuples/field_access",
     cases_tuples_for_loop_destructure = "cases/tuples/for_loop_destructure",
+    cases_tuples_for_loop_indexed_destructure = "cases/tuples/for_loop_indexed_destructure",
     cases_tuples_generic_tuple = "cases/tuples/generic_tuple",
     cases_tuples_optional_tuple = "cases/tuples/optional_tuple",
     cases_tuples_three_elements = "cases/tuples/three_elements",

@@ -1125,7 +1125,7 @@
           </h3>
           <pre class="signature"><code>fn lower_for_stmt(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>for_stmt</code> — the plain loop, the indexed one, and the tuple-destructuring one. A <code>(</code> after the <code>let</code> opens the tuple form; otherwise the number of names says whether an index was written.</p></div>
+          <div class="doc"><p><code>for_stmt</code> — the plain loop, the indexed one, the tuple-destructuring one, and the indexed tuple-destructuring one. A <code>(</code> after the <code>let</code> opens the tuple form, a <code>(</code> after the first name's comma the indexed tuple form; otherwise the number of names says whether an index was written.</p></div>
 
 
         </section>
@@ -1137,10 +1137,10 @@
             <a class="anchor" href="#item-for_tuple">for_tuple</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn for_tuple(names: str[], iterable: Expr, body: Expr, sp: Span) -&#62; Stmt!ParseError</code></pre>
+          <pre class="signature"><code>fn for_tuple(names: str[], index: str?, iterable: Expr, body: Expr, sp: Span) -&#62; Stmt!ParseError</code></pre>
 
           <div class="doc"><p><code>for (let (a, b) : xs) { body }</code> is a plain loop over a temporary with the field reads prepended to the body:</p><pre><code>for (let __fpat$N : xs) { let a = __fpat$N._0; let b = __fpat$N._1; body }
-</code></pre></div>
+</code></pre><p>With an <code>index</code> — <code>for (let i, (a, b) : xs)</code> — it is the indexed loop over that same temporary, so the counter and the pattern compose exactly as each does alone: <code>for_chain</code> binds <code>i</code> outside the field reads.</p></div>
 
 
         </section>
