@@ -40,7 +40,7 @@
           </h3>
           <pre class="signature"><code>pub fn unescape(self: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>Decode every <code>\X</code> escape in <code>self</code>, copying everything else verbatim. A backslash flushes the plain run before it and marks the next char as the escape's X, which is decoded on its own and starts the next run. Copying runs by slicing (rather than char-by-char) keeps the common no-escape case a single copy. A trailing lone backslash can't occur — the matcher already rejected such a token as unterminated — and would be copied verbatim if it did.</p></div>
+          <div class="doc"><p>Decode every <code>\X</code> escape in <code>self</code>, copying everything else verbatim. Each char is read with the one after it, so a backslash flushes the plain run before it and decodes its X in the same step; the next run starts past both. The X is then the *first* half of the following pair, which is what <code>run_start &lt;= i</code> rules out — an escaped backslash is one char, not the start of another escape. Copying runs by slicing (rather than char-by-char) keeps the common no-escape case a single copy. A trailing lone backslash can't occur — the matcher already rejected such a token as unterminated — and would be copied verbatim if it did, since the last char is never the first of a pair.</p></div>
 
 
         </section>

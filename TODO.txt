@@ -141,6 +141,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
+  printing a tuple seems to result in some(__tuple$str$str { _0: "x", _1: "y" }) which is not good, we shouldn't be leaking mangled names into the public API
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
   ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.
   nextest is reporting some tests as leaky
@@ -266,7 +267,6 @@ grammar:
   make an ebnf loader as well as dumper
 
 utilities:
-  make tuple_windows, use to improve unescape
   numeric < vs. lexicographic <. Also maybe a < for map/dict purposes that uses compiler-decided ordering?
   span.start - span.end should have a builtin
   add is_whitespace

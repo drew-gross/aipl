@@ -15,6 +15,31 @@
 //! call on it. `filter_map` is here because the chain fusion runs first and has
 //! already turned a `.filter(p).map(f)` receiver into it.
 //!
+//! A loop over `xs.tuple_windows()` is the same idea with state instead of a
+//! function: each pair is the previous element with the current one, so the
+//! loop carries the previous element along and builds the pair on the stack
+//! per iteration ([`build_windows`]):
+//!
+//! ```text
+//! for (let w : xs.tuple_windows()) { body }
+//!   →   let $src = xs;
+//!       if (let some($first) = $src[0]) {
+//!           mut $prev = $first;
+//!           mut $skip = true;
+//!           for (let $cur : $src) {
+//!               if ($skip) { set $skip = false; }
+//!               else { let w = ($prev, $cur); body; set $prev = $cur; };
+//!           }
+//!       };
+//! ```
+//!
+//! The first element is peeled off by indexing so `$prev` starts as a value of
+//! the element type rather than an optional — the pass runs before types are
+//! known, so it could not annotate a `mut $prev: T? = none;` — and the loop
+//! then skips that element rather than pairing it with itself. Nothing here can
+//! change behaviour: no function is called, `xs` is still evaluated once, and
+//! the pairs reach `body` in the same order.
+//!
 //! # What makes this safe
 //!
 //! The original computes every `f(e)` *before* the first `body` runs; fused,
@@ -42,7 +67,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use aipl_syntax::ast::{Expr, ExprKind};
+use aipl_syntax::ast::{Expr, ExprKind, MatchArm, Pattern};
 
 use crate::sink::can_defer;
 use crate::subst::{assigned_names, read_names};
@@ -90,6 +115,12 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
     let ExprKind::Call(name, args, _) = &iterable.kind else {
         return None;
     };
+    if name == "__builtin_tuple_windows" {
+        let [recv] = args.as_slice() else {
+            return None;
+        };
+        return Some(build_windows(whole, var, recv, body));
+    }
     let f = LOOP_FUSIONS.iter().find(|f| f.over == name)?;
     let (recv, fns) = args.split_first()?;
     // Wrong arity is mono's error to report, not a shape to rewrite.
@@ -146,6 +177,115 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
         ExprKind::For(elem, Box::new(recv.clone()), Box::new(inner)),
         whole,
     ))
+}
+
+/// `for (let var : recv.tuple_windows()) { body }` as the previous-element loop
+/// in the module docs.
+fn build_windows(whole: &Expr, var: &str, recv: &Expr, body: &Expr) -> Expr {
+    let id = crate::next_inline_id();
+    let sp = || recv.span.clone();
+    let name = |what: &str| format!("$fuse{id}_{what}");
+    let ident = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), sp());
+    let unit = || Expr::new(ExprKind::Unit, sp());
+    let (src, first, prev, skip, cur) = (
+        name("src"),
+        name("first"),
+        name("prev"),
+        name("skip"),
+        name("cur"),
+    );
+    // `set $skip = false;`
+    let unskip = Expr::new(
+        ExprKind::Assign(
+            Box::new(ident(&skip)),
+            Box::new(Expr::new(ExprKind::Bool(false), sp())),
+            Box::new(unit()),
+        ),
+        sp(),
+    );
+    // `let var = ($prev, $cur); body; set $prev = $cur;` — the pair is spanned as
+    // the call it replaces, so a diagnostic about it points at what was written.
+    let pair = Expr::new(ExprKind::TupleLit(vec![ident(&prev), ident(&cur)]), sp());
+    let advance = Expr::new(
+        ExprKind::Assign(
+            Box::new(ident(&prev)),
+            Box::new(ident(&cur)),
+            Box::new(unit()),
+        ),
+        sp(),
+    );
+    let paired = Expr::new(
+        ExprKind::Let(
+            var.to_string(),
+            None,
+            Box::new(pair),
+            Box::new(Expr::new(
+                ExprKind::Seq(Box::new(body.clone()), Box::new(advance)),
+                sp(),
+            )),
+        ),
+        sp(),
+    );
+    let step = Expr::new(
+        ExprKind::If(Box::new(ident(&skip)), Box::new(unskip), Box::new(paired)),
+        sp(),
+    );
+    // A loop's own value is an `i64`; sequenced to unit so both sides of the
+    // `if let` below agree.
+    let loop_ = Expr::new(
+        ExprKind::Seq(
+            Box::new(Expr::rebuilt(
+                ExprKind::For(cur, Box::new(ident(&src)), Box::new(step)),
+                whole,
+            )),
+            Box::new(unit()),
+        ),
+        sp(),
+    );
+    let carried = Expr::new(
+        ExprKind::LetMut(
+            prev,
+            None,
+            Box::new(ident(&first)),
+            Box::new(Expr::new(
+                ExprKind::LetMut(
+                    skip,
+                    None,
+                    Box::new(Expr::new(ExprKind::Bool(true), sp())),
+                    Box::new(loop_),
+                ),
+                sp(),
+            )),
+        ),
+        sp(),
+    );
+    // `if (let some($first) = $src[0]) { .. }` — no first element, no pairs.
+    let peeled = Expr::new(
+        ExprKind::IfLet(
+            Box::new(MatchArm {
+                pattern: Pattern::Ctor {
+                    name: "some".to_string(),
+                    bindings: vec![first],
+                    ignore_payload: false,
+                },
+                body: carried,
+                span: sp(),
+            }),
+            Box::new(Expr::new(
+                ExprKind::Index(
+                    Box::new(ident(&src)),
+                    Box::new(Expr::new(ExprKind::Num(0), sp())),
+                ),
+                sp(),
+            )),
+            Box::new(unit()),
+        ),
+        sp(),
+    );
+    Expr::rebuilt(
+        ExprKind::Let(src, None, Box::new(recv.clone()), Box::new(peeled)),
+        whole,
+    )
 }
 
 /// `func` applied to `arg`: a one-parameter lambda is spliced in as its body

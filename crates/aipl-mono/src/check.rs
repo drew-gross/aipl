@@ -2549,6 +2549,25 @@ impl Cx<'_> {
                         elem_tys,
                     ));
                 }
+                // A bare `none` or `[]` takes its type from context, and a tuple
+                // slot gives it none — the struct is named after its element
+                // types, so an element with no type yet has no struct to go in.
+                // (Refused here rather than in `mangle_type`, which panics on a
+                // pseudo-type because nothing else can produce one.)
+                if let Some((i, e)) = elems
+                    .iter()
+                    .enumerate()
+                    .find(|(i, _)| is_context_typed(&elem_tys[*i]))
+                {
+                    return Err(Error::at(
+                        format!(
+                            "tuple element {i} has no type of its own here — a bare `none` or \
+                             `[]` takes its type from context, and a tuple slot gives it none; \
+                             annotate the binding it comes from (e.g. `mut p: i64? = none;`)"
+                        ),
+                        e.span.clone(),
+                    ));
+                }
                 let name = tuple_struct_name(&elem_tys);
                 if !self.has_struct(&name) {
                     let fields: Vec<(String, Type, bool)> = elem_tys
@@ -4280,6 +4299,24 @@ fn typevar_name(t: &Type) -> Option<&str> {
 /// not fully concrete. Used to decide whether a generic instantiation can be
 /// pinned to a synthetic named instance now, or must stay a `Type::Generic` (an
 /// abstract application inside a generic function, resolved at monomorphization).
+/// Whether `t` is still a placeholder for a type that context has yet to
+/// supply — a bare `none` / `[]`, or something built over one (`none?`,
+/// `[[]]`). Such a type has no layout to name a synthetic struct after.
+fn is_context_typed(t: &Type) -> bool {
+    match t {
+        Type::Any | Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg => true,
+        Type::Case(v) => is_context_typed(v),
+        Type::Optional(i) | Type::Array(i) | Type::Set(i) => is_context_typed(i),
+        Type::Dict(k, v) => is_context_typed(k) || is_context_typed(v),
+        Type::Result(a, b) => is_context_typed(a) || is_context_typed(b),
+        Type::Fn(ps, r) => ps.iter().any(is_context_typed) || is_context_typed(r),
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(is_context_typed),
+        Type::Unit | Type::Primitive(_) | Type::Named(_) | Type::TypeVar(_) | Type::ConcatStr => {
+            false
+        }
+    }
+}
+
 fn mentions_typevar(t: &Type) -> bool {
     match t {
         Type::TypeVar(_) => true,

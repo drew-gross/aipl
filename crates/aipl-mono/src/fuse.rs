@@ -20,7 +20,8 @@
 //! - [`loop_fusions`] — a `for` over a derived array. `for (let x : xs.map(f))`
 //!   builds the whole mapped array only to walk it once, so it collapses into a
 //!   loop over `xs` that applies `f` at the top of each iteration and never
-//!   materializes the intermediate.
+//!   materializes the intermediate; a `for` over `xs.tuple_windows()` likewise
+//!   becomes a loop over `xs` carrying the previous element.
 //!
 //! # Adding a fusion
 //!

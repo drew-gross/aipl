@@ -1,0 +1,158 @@
+import {
+    equal as ==,
+    extend,
+    len,
+    less_than as <,
+    print,
+    push,
+    to_str,
+    tuple_windows,
+    wrapping_increment as ++,
+} from builtins;
+
+// Operation fusion: a `for` over `xs.tuple_windows()` never builds the pairs.
+//
+// Unfused, `tuple_windows` allocates an array of every adjacent pair — twice
+// the source's size, for a two-element tuple — that the loop walks once and
+// frees. Fused, the loop runs over `xs` itself carrying the previous element
+// along, and builds each pair on the stack as the loop variable:
+//
+//     let $src = xs;
+//     if (let some($first) = $src[0]) {
+//         mut $prev = $first;
+//         mut $skip = true;
+//         for (let $cur : $src) {
+//             if ($skip) { set $skip = false; }
+//             else { let w = ($prev, $cur); body; set $prev = $cur; };
+//         }
+//     };
+//
+// Nothing about the rewrite can change behaviour — no function is called, `xs`
+// is evaluated once either way, and the pairs reach the body in order — so it
+// fires unconditionally: the body may print, accumulate, or return early.
+//
+// Measured on this case with the fusion switched off: 21 allocations (40
+// reallocations) become 14 (17), and 63,608 instructions become 42,353. The
+// `functions:` list is the readable evidence — no `__builtin_tuple_windows$..`
+// specialization is emitted at all. Unfused, every loop below shares one
+// `__builtin_tuple_windows$i64`; fused, only `materialized` still calls it, and
+// that single use is inlined into `main`.
+
+fn many() -> i64[] {
+    mut xs = [0];
+    mut n = 0;
+    while (n < 200) {
+        set n++;
+        set xs.push(n);
+    }
+    xs
+}
+
+// Each pair, in order; the body accumulates and prints.
+fn rises(xs: i64[]) -> i64 {
+    mut n = 0;
+    for (let (a, b) : xs.tuple_windows()) {
+        if (a < b) {
+            set n++;
+        };
+    }
+    n
+}
+
+// An early return out of the fused loop.
+fn first_drop(xs: i64[]) -> i64? {
+    for (let (a, b) : xs.tuple_windows()) {
+        if (b < a) {
+            return some(a);
+        };
+    }
+    none
+}
+
+// A `str` receiver, and the indexed form.
+fn doubled_at(s: str) -> str {
+    mut at = "";
+    for (let i, w : s.tuple_windows()) {
+        if (w.0 == w.1) {
+            set at.extend(`{w.0}{i}`);
+        };
+    }
+    at
+}
+
+// The array itself: not a loop, so not fused.
+fn materialized(xs: i64[]) -> u64 { xs.tuple_windows().len() }
+
+fn main() !prints {
+    let xs = many();
+    print(rises(xs).to_str());
+    print(`{first_drop(xs)}`);
+    print(`{first_drop([3, 2, 1])}`);
+    print(`{first_drop([])}`);
+    print(`{first_drop([9])}`);
+    print(`{doubled_at("abccd")}`);
+    print(`{doubled_at("")}`);
+    print(materialized(xs).to_str());
+}
+--- stdout ---
+200
+none
+some(3)
+none
+none
+c2
+
+200
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 17
+bytes allocated: 465
+instructions executed: 42353
+binary size: 7672
+  code: 4540
+  data: 67
+  metadata: 3065
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  __to_str_i64$opt:
+    calls: 4
+    bytes: 388
+  __to_str_u64:
+    calls: 2
+    bytes: 204
+  aipl_array_dec:
+    calls: 5
+    bytes: (external)
+  aipl_array_new:
+    calls: 5
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 400
+    bytes: (external)
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 5
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  doubled_at:
+    calls: 2
+    bytes: 824
+  first_drop:
+    calls: 4
+    bytes: 504
+  main:
+    calls: 1
+    bytes: 2416

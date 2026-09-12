@@ -1357,10 +1357,16 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
     // an unreachable one would be dropped as an uninstantiated template anyway,
     // and parsing its source is the expensive part.
     for name in aipl_builtin_demand(program) {
-        let g = &aipl_builtin(name)
-            .expect("a demanded name is an AIPL_BUILTIN_SOURCES entry")
-            .generic;
-        generics.insert(name.to_string(), g.clone());
+        let b = aipl_builtin(name).expect("a demanded name is an AIPL_BUILTIN_SOURCES entry");
+        generics.insert(name.to_string(), b.generic.clone());
+        // A tuple template the builtin needs that the program did not declare
+        // itself (`__tuple2` for `tuple_windows`); every template of one arity
+        // is the same declaration, so an existing one is left alone.
+        for t in &b.templates {
+            generic_structs
+                .entry(t.name.clone())
+                .or_insert_with(|| t.clone());
+        }
     }
 
     // Own a copy of each concrete function so the demand-driven driver can pull
@@ -6390,6 +6396,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_is_err_and", "builtin_is_err_and.aipl"),
     ("__builtin_is_some_and", "builtin_is_some_and.aipl"),
     ("__builtin_intersperse", "builtin_intersperse.aipl"),
+    ("__builtin_tuple_windows", "builtin_tuple_windows.aipl"),
     (
         "__builtin_count_is_less_than",
         "builtin_count_is_less_than.aipl",
@@ -6433,17 +6440,28 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
 /// the spelling and semantics user code gets. Loading (which parses) needs the
 /// parser hooks installed, like any in-process parse — which every caller
 /// already satisfies, having parsed the program it operates on.
-fn load_aipl_builtin_fn(src: &str) -> Function {
+fn load_aipl_builtin_fn(src: &str) -> (Function, Vec<StructDecl>) {
     let program = aipl_loader::load_program_str(src, DebugOptions::default())
         .expect("AIPL-implemented builtin sources are valid AIPL");
-    program
-        .items
-        .into_iter()
-        .find_map(|item| match item {
-            Item::Fn(f) if f.is_pub => Some(f),
-            _ => None,
-        })
-        .expect("an AIPL-implemented builtin source declares its builtin as pub fn")
+    // The same type lowering the user's program gets before mono sees it: a
+    // tuple in the signature (`tuple_windows` returns `(T, T)[]`) becomes the
+    // per-arity template the generic machinery can instantiate, rather than a
+    // `Type::Tuple` that survives specialization as an abstraction. The
+    // templates that lowering synthesizes come back alongside the function:
+    // mono has to know them to instantiate the builtin, and the user's own
+    // program only declares the arities *it* wrote.
+    let program = lower_tuples(&program);
+    let mut func = None;
+    let mut templates = Vec::new();
+    for item in program.items {
+        match item {
+            Item::Fn(f) if f.is_pub => func = Some(f),
+            Item::Struct(s) if s.is_generic() => templates.push(s),
+            _ => {}
+        }
+    }
+    let func = func.expect("an AIPL-implemented builtin source declares its builtin as pub fn");
+    (func, templates)
 }
 
 /// One [`AIPL_BUILTIN_SOURCES`] entry, loaded on first use: the generic
@@ -6454,6 +6472,9 @@ fn load_aipl_builtin_fn(src: &str) -> Function {
 struct AiplBuiltin {
     generic: Generic,
     decl: Item,
+    /// The tuple templates (`__tuple2`, ..) its signature or body mention —
+    /// see [`load_aipl_builtin_fn`].
+    templates: Vec<StructDecl>,
 }
 
 /// [`AIPL_BUILTIN_SOURCES`] as a lookup by canonical name, each file name paired
@@ -6487,7 +6508,7 @@ fn aipl_builtin(canonical: &str) -> Option<&'static AiplBuiltin> {
         let path = std::path::Path::new(BUILTIN_SRC_DIR).join(file);
         let src = std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("AIPL builtin source {path:?}: {e}"));
-        let f = load_aipl_builtin_fn(&src);
+        let (f, templates) = load_aipl_builtin_fn(&src);
         let generic = normalize(&f).expect("AIPL-implemented builtin signatures normalize");
         let mut decl = f;
         decl.name = canonical.to_string();
@@ -6496,6 +6517,7 @@ fn aipl_builtin(canonical: &str) -> Option<&'static AiplBuiltin> {
         AiplBuiltin {
             generic,
             decl: Item::Fn(decl),
+            templates,
         }
     }))
 }
@@ -6548,15 +6570,22 @@ pub fn aipl_builtin_demand(program: &Program) -> BTreeSet<&'static str> {
 /// other builtins are already rewritten to their canonical names by the loader)
 /// so the decl is a complete, checkable function.
 pub fn aipl_builtin_sig_decls(needed: &BTreeSet<&'static str>) -> Vec<Item> {
-    needed
-        .iter()
-        .map(|name| {
-            aipl_builtin(name)
-                .expect("a demanded name is an AIPL_BUILTIN_SOURCES entry")
-                .decl
-                .clone()
-        })
-        .collect()
+    let mut out = Vec::new();
+    let mut seen_templates: HashSet<String> = HashSet::new();
+    for name in needed {
+        let b = aipl_builtin(name).expect("a demanded name is an AIPL_BUILTIN_SOURCES entry");
+        // The tuple templates its signature was lowered against come first, so a
+        // consumer registering declarations in order has `__tuple2` before the
+        // function that returns one. One arity is one declaration, however many
+        // builtins mention it.
+        for t in &b.templates {
+            if seen_templates.insert(t.name.clone()) {
+                out.push(Item::Struct(t.clone()));
+            }
+        }
+        out.push(b.decl.clone());
+    }
+    out
 }
 
 /// [`aipl_syntax::BUILTIN_SIGNATURES`] parsed once and indexed by name, each
