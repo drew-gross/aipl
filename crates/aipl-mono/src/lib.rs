@@ -6813,6 +6813,19 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
                 )),
             ))
         }
+        // `xs.to_set()`: the set whose order the use site decides (see
+        // `SetOrder::Context`), of the array's element type.
+        "__builtin_to_set" => {
+            return Some(match arg_tys.first() {
+                Some(Type::Array(inner)) => {
+                    Type::Set(inner.clone(), aipl_syntax::ast::SetOrder::Context)
+                }
+                _ => Type::Set(
+                    Box::new(Type::NoneInner),
+                    aipl_syntax::ast::SetOrder::Context,
+                ),
+            })
+        }
         // Internal in-place-filter intrinsics (statements; see `expand_filter`).
         "__filter_keep" | "__filter_drop" | "__filter_truncate" => return Some(Type::Unit),
         // Internal in-place-map intrinsic (a statement; see `expand_map`).
@@ -6876,9 +6889,16 @@ fn merge(a: Type, b: Type) -> Type {
         (Type::Array(x), Type::Array(y)) => {
             Type::Array(Box::new(merge((**x).clone(), (**y).clone())))
         }
-        (Type::Set(x, o), Type::Set(y, _)) => {
-            Type::Set(Box::new(merge((**x).clone(), (**y).clone())), *o)
-        }
+        (Type::Set(x, ox), Type::Set(y, oy)) => Type::Set(
+            Box::new(merge((**x).clone(), (**y).clone())),
+            // An empty literal or a `to_set` still awaiting context has no
+            // order of its own; the other side's wins.
+            if is_none_inner(x) || *ox == aipl_syntax::ast::SetOrder::Context {
+                *oy
+            } else {
+                *ox
+            },
+        ),
         (Type::Dict(xk, xv), Type::Dict(yk, yv)) => Type::Dict(
             Box::new(merge((**xk).clone(), (**yk).clone())),
             Box::new(merge((**xv).clone(), (**yv).clone())),

@@ -1,4 +1,4 @@
-import { len, print, to_str, union } from builtins;
+import { len, print, to_str, union, wrapping_add as + } from builtins;
 
 // `mut out = #{}; for (let s : xs) { set out = out.union(s); }` — a set seeded
 // empty and grown by a loop that does nothing else. `union_all` says that in one
@@ -51,33 +51,67 @@ fn from_call(n: i64) -> #{i64} {
     out
 }
 
+// One element at a time — `#{x}` unioned in — is `to_set` over the elements
+// rather than `union_all` over sets: the advice keeps the annotation, since
+// `to_set` takes its order from it, so this fires for an ordered accumulator
+// too, where the set-at-a-time form (which builds an unordered set) would not.
+fn distinct(ns: i64[]) -> #{i64} {
+    mut seen: #{i64} = #{};
+    for (let n : ns) {
+        set seen = seen.union(#{n});
+    }
+    seen
+}
+
+fn powers_desc(ns: i64[]) -> #>{i64} {
+    mut out: #>{i64} = #{};
+    for (let n : ns) {
+        set out = out.union(#{n + n});
+    }
+    out
+}
+
 fn main() !prints {
     print(merged([#{1}, #{2}]).len().to_str());
     print(all_ends([1, 2]).len().to_str());
     print(all_ends_flipped([1, 2]).len().to_str());
     print(from_call(3).len().to_str());
+    print(distinct([1, 1, 2]).len().to_str());
+    print(`{powers_desc([1, 2, 1])}`);
 }
 --- errors ---
-error: "out" is seeded empty and unioned into by this loop and nothing else — write "mut out = xs.union_all();" and drop the loop, importing `union_all` from builtins (or append #[allow] to this line to keep it)
+error: "out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out: #{i64} = xs.union_all();" and drop the loop, importing `union_all` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_union_loop_union_all.aipl:13:23
    |
 13 |     mut out: #{i64} = #{};
    |                       ^^^
 
-error: "acc" is seeded empty and unioned into by this loop and nothing else — write "mut acc = ns.map(|n| ..).union_all();" and drop the loop, importing `map` and `union_all` from builtins (or append #[allow] to this line to keep it)
+error: "acc" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut acc: #{i64} = ns.map(|n| ..).union_all();" and drop the loop, importing `map` and `union_all` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_union_loop_union_all.aipl:25:23
    |
 25 |     mut acc: #{i64} = #{};
    |                       ^^^
 
-error: "acc" is seeded empty and unioned into by this loop and nothing else — write "mut acc = ns.map(|n| ..).union_all();" and drop the loop, importing `map` and `union_all` from builtins (or append #[allow] to this line to keep it)
+error: "acc" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut acc: #{i64} = ns.map(|n| ..).union_all();" and drop the loop, importing `map` and `union_all` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_union_loop_union_all.aipl:35:23
    |
 35 |     mut acc: #{i64} = #{};
    |                       ^^^
 
-error: "out" is seeded empty and unioned into by this loop and nothing else — write "mut out = <iterable>.union_all();" and drop the loop, importing `union_all` from builtins (or append #[allow] to this line to keep it)
+error: "out" is seeded empty and unioned into by this loop a set at a time and nothing else — write "mut out: #{i64} = <iterable>.union_all();" and drop the loop, importing `union_all` from builtins (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_union_loop_union_all.aipl:47:23
    |
 47 |     mut out: #{i64} = #{};
    |                       ^^^
+
+error: "seen" is seeded empty and unioned into by this loop an element at a time and nothing else — write "mut seen: #{i64} = ns.to_set();" and drop the loop, importing `to_set` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_union_loop_union_all.aipl:59:24
+   |
+59 |     mut seen: #{i64} = #{};
+   |                        ^^^
+
+error: "out" is seeded empty and unioned into by this loop an element at a time and nothing else — write "mut out: #>{i64} = ns.map(|n| ..).to_set();" and drop the loop, importing `map` and `to_set` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_union_loop_union_all.aipl:67:24
+   |
+67 |     mut out: #>{i64} = #{};
+   |                        ^^^

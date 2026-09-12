@@ -3203,6 +3203,37 @@ impl Cx<'_> {
         // receivers here. (An array receiver falls through to the generic
         // signature below.) For a string `len` is the byte length, and
         // `is_nonempty` asks whether there is any byte at all.
+        // `to_set` builds whichever set the use site wants: its order is the
+        // placeholder until `lock` records the expected type on the call (see
+        // `needs_lock`), and a plain `#{T}` where nothing does.
+        if name == "__builtin_to_set" && args.len() == 1 {
+            let t = self.check_expr(&args[0], env, effects)?;
+            // Arrays only: a `str` is a char sequence to `T[]` signatures, but
+            // its bytes are not laid out as array elements, so it is refused
+            // here rather than read as one downstream.
+            if is_str_repr(&t) {
+                return Err(Error::at(
+                    "\"to_set\" takes an array, not a str",
+                    args[0].span.clone(),
+                ));
+            }
+            if let Type::Array(inner) = &t {
+                if is_set_elem(inner) || is_abstract_scalar_ty(inner, &[]) || is_typevar(inner) {
+                    return Ok(Type::Set(
+                        inner.clone(),
+                        aipl_syntax::ast::SetOrder::Context,
+                    ));
+                }
+                return Err(Error::at(
+                    format!(
+                        "\"to_set\": a set element must be an integer (i8..i64, u8..u64), bool, \
+                         char, or str, got {}",
+                        tyname(inner)
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
+        }
         // `to_array` reads a set's elements *in order*, so only an ordered set
         // has one to give; the signature's `#{T}` would accept any.
         if name == "__builtin_to_array" && args.len() == 1 {
@@ -4284,7 +4315,10 @@ fn needs_lock(k: &ExprKind) -> bool {
         ExprKind::None => true,
         ExprKind::ArrayLit(v) | ExprKind::SetLit(v, _) => v.is_empty(),
         ExprKind::DictLit(v) => v.is_empty(),
-        ExprKind::Call(n, _, _) => n == "ok" || n == "err" || n == "some",
+        // `to_set` leaves its *order* to context (see `SetOrder::Context`).
+        ExprKind::Call(n, _, _) => {
+            n == "ok" || n == "err" || n == "some" || n == "__builtin_to_set"
+        }
         _ => false,
     }
 }
@@ -4295,6 +4329,8 @@ fn needs_lock(k: &ExprKind) -> bool {
 fn mentions_placeholder(t: &Type) -> bool {
     match t {
         Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg | Type::Any => true,
+        // A set whose order context has yet to decide is a placeholder too.
+        Type::Set(_, aipl_syntax::ast::SetOrder::Context) => true,
         Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => mentions_placeholder(i),
         Type::Dict(k, v) => mentions_placeholder(k) || mentions_placeholder(v),
         Type::Result(a, b) => mentions_placeholder(a) || mentions_placeholder(b),
@@ -4349,7 +4385,10 @@ fn is_context_typed(t: &Type) -> bool {
 pub fn set_mangle(order: aipl_syntax::ast::SetOrder) -> &'static str {
     use aipl_syntax::ast::SetOrder;
     match order {
-        SetOrder::Unordered => "set",
+        // A placeholder order names no instance of its own: it is what a
+        // `to_set` call is typed before context decides, and it becomes the
+        // unordered set when nothing does.
+        SetOrder::Unordered | SetOrder::Context => "set",
         SetOrder::Desc => "setdesc",
         SetOrder::Asc => "setasc",
     }
@@ -4619,9 +4658,17 @@ fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
         (Type::Optional(a), Type::Optional(b)) => coerce(a, b),
         (Type::Array(a), Type::Array(b)) => coerce(a, b),
         // An empty `#{}` is any set, ordered or not, on either side (a binding
-        // seeded with one has no order yet); anything else has to agree on the
-        // order, since the two are different types over one runtime.
-        (Type::Set(a, _), Type::Set(b, _)) if is_none_inner(a) || is_none_inner(b) => coerce(a, b),
+        // seeded with one has no order yet), and so is a `to_set` call whose
+        // order context is deciding right here; anything else has to agree on
+        // the order, since the two are different types over one runtime.
+        (Type::Set(a, oa), Type::Set(b, ob))
+            if is_none_inner(a)
+                || is_none_inner(b)
+                || *oa == aipl_syntax::ast::SetOrder::Context
+                || *ob == aipl_syntax::ast::SetOrder::Context =>
+        {
+            coerce(a, b)
+        }
         (Type::Set(a, oa), Type::Set(b, ob)) if oa == ob => coerce(a, b),
         (Type::Dict(ak, av), Type::Dict(bk, bv)) => coerce(ak, bk).and_then(|()| coerce(av, bv)),
         (Type::Result(ao, ae), Type::Result(bo, be)) => {
@@ -4713,8 +4760,13 @@ fn merge(a: Type, b: Type) -> Type {
         }
         (Type::Set(x, ox), Type::Set(y, oy)) => Type::Set(
             Box::new(merge((**x).clone(), (**y).clone())),
-            // The empty literal has no order of its own; the other side's wins.
-            if is_none_inner(x) { *oy } else { *ox },
+            // The empty literal and the context placeholder have no order of
+            // their own; the other side's wins.
+            if is_none_inner(x) || *ox == aipl_syntax::ast::SetOrder::Context {
+                *oy
+            } else {
+                *ox
+            },
         ),
         (Type::Dict(xk, xv), Type::Dict(yk, yv)) => Type::Dict(
             Box::new(merge((**xk).clone(), (**yk).clone())),

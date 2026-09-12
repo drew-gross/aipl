@@ -55,8 +55,8 @@ import {
     logical_or as ||,
     map,
     to_array,
+    to_set,
     try_map,
-    union,
     value_or,
     value_or_err,
     wrapping_sub as -,
@@ -426,15 +426,9 @@ fn prec_note(precs: Prec[]) -> str {
 }
 
 # The distinct binding powers in `precs`, tightest first — an ordered set, so
-# the dedup and the order are the type's rather than a `contains` check and a
-# sort of our own.
-fn powers_desc(precs: Prec[]) -> #>{u64} {
-    mut out: #>{u64} = #{};
-    for (let pr : precs) {
-        set out = out.union(#{pr.power});
-    }
-    out
-}
+# the dedup and the order are the type's: `to_set` builds the `#>{u64}` the
+# return type asks for.
+fn powers_desc(precs: Prec[]) -> #>{u64} { precs.map(|pr| pr.power).to_set() }
 
 # One level: its operators, gathered across every `Prec` sharing that power,
 # since a power written twice is one level as far as binding goes.
@@ -890,15 +884,15 @@ fn fixture() -> Grammar<Tok, Node> {
     }
 }
 --- performance ---
-allocations: 1872
-deallocations: 1872
+allocations: 1862
+deallocations: 1862
 reallocations: 416
-bytes allocated: 181492
-instructions executed: 206985
-binary size: 159728
-  code: 103664
+bytes allocated: 181148
+instructions executed: 207187
+binary size: 159592
+  code: 103656
   data: 4252
-  metadata: 51812
+  metadata: 51684
 functions:
   __arr_drop_First$Tok:
     calls: 23
@@ -945,7 +939,7 @@ functions:
   __builtin_try_map$__m2__Production$Tok$Node$First<Tok>$__m2__ParseError$lam15:
     calls: 17
     bytes: 828
-  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam36:
+  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam38:
     calls: 46
     bytes: 632
   __eq_First$Tok:
@@ -993,7 +987,7 @@ functions:
   __m2__prod_names$Tok$Node:
     calls: 20
     bytes: 492
-  __map31:
+  __map33:
     calls: 0
     bytes: 380
   __rec_drop_Node:
@@ -1039,7 +1033,7 @@ functions:
     calls: 59
     bytes: (external)
   aipl_arr_inc:
-    calls: 3539
+    calls: 3514
     bytes: (external)
   aipl_arr_join:
     calls: 34
@@ -1051,7 +1045,7 @@ functions:
     calls: 94
     bytes: (external)
   aipl_array_dec:
-    calls: 4495
+    calls: 4460
     bytes: (external)
   aipl_array_new:
     calls: 641
@@ -1060,10 +1054,10 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_push_mut:
-    calls: 774
+    calls: 771
     bytes: (external)
   aipl_array_with_cap:
-    calls: 142
+    calls: 132
     bytes: (external)
   aipl_assert:
     calls: 25
@@ -1083,13 +1077,7 @@ functions:
   aipl_rec_inc_weak:
     calls: 120
     bytes: (external)
-  aipl_set_contains:
-    calls: 7
-    bytes: (external)
   aipl_set_insert:
-    calls: 17
-    bytes: (external)
-  aipl_set_union:
     calls: 7
     bytes: (external)
   aipl_test_begin:
@@ -1148,7 +1136,7 @@ functions:
     bytes: 452
   prec_note:
     calls: 31
-    bytes: 2344
+    bytes: 2336
   render_rule$Tok:
     calls: 101
     bytes: 9808

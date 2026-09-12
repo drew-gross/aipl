@@ -75,6 +75,18 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  union_all can be context ordered, like to_set
+  render_rule Maybe arm could be 1 expression.
+  rep_suffix could be much simpler with multimatch and matching literals:
+    match (min, max) {
+        (1, some(1)) => "",
+        (0, some(1)) => "?",
+        (lo, some(hi)) => `\{{lo},{hi}\}`,
+        (0, none) => "*",
+        (1, none) => "+",
+        (lo, none) => `\{{lo},\},
+    }
+}
   make it so builtin .aipl files can contain helper functions
   only should be named one and use a nested_in kwarg (i.e. thinner wrapper over Many)
   destructuring in for loops should be DRYer with destructuring in let bindings
@@ -399,6 +411,7 @@ optimizations:
   operation fusion:
     fuse sequential extends
     map(f).map(g) should fuse to map(f(g))
+    map(f).to_set() should fuse
     map/join should fuse to map_join
     filter/find.
     depth in grammar_sexp can be xs.map(depth).maximum() + 1 and fuse to map_max

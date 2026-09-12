@@ -638,7 +638,9 @@ fn set_order_code(elem: &ConcreteType, order: aipl_syntax::ast::SetOrder) -> i64
         _ => 1,
     };
     match order {
-        SetOrder::Unordered => SET_ORDER_NONE,
+        // A placeholder that reached codegen is a `to_set` no context decided:
+        // the plain set (see the `__builtin_to_set` arm).
+        SetOrder::Unordered | SetOrder::Context => SET_ORDER_NONE,
         SetOrder::Asc => magnitude,
         SetOrder::Desc => -magnitude,
     }
@@ -8176,9 +8178,13 @@ fn coercible(actual: &ConcreteType, expected: &ConcreteType) -> bool {
         // produces. Mirrors the checker's rule in `coerce`.
         (ConcreteType::Set(a, _), ConcreteType::Dict(_, _)) if is_none_inner(a) => true,
         // An empty `#{}` is any set, on either side (a binding seeded with one
-        // has no order yet); otherwise the orders are part of the type.
-        (ConcreteType::Set(a, _), ConcreteType::Set(b, _))
-            if is_none_inner(a) || is_none_inner(b) =>
+        // has no order yet), and so is a `to_set` whose order context is still
+        // deciding; otherwise the orders are part of the type.
+        (ConcreteType::Set(a, oa), ConcreteType::Set(b, ob))
+            if is_none_inner(a)
+                || is_none_inner(b)
+                || *oa == aipl_syntax::ast::SetOrder::Context
+                || *ob == aipl_syntax::ast::SetOrder::Context =>
         {
             coercible(a, b)
         }
@@ -8236,7 +8242,11 @@ fn merge_types(a: &ConcreteType, b: &ConcreteType) -> Option<ConcreteType> {
             Some(ConcreteType::Array(Box::new(merge_types(x, y)?)))
         }
         (ConcreteType::Set(x, ox), ConcreteType::Set(y, oy)) => {
-            let order = if is_none_inner(x) { *oy } else { *ox };
+            let order = if is_none_inner(x) || *ox == aipl_syntax::ast::SetOrder::Context {
+                *oy
+            } else {
+                *ox
+            };
             Some(ConcreteType::Set(Box::new(merge_types(x, y)?), order))
         }
         (ConcreteType::Dict(xk, xv), ConcreteType::Dict(yk, yv)) => Some(ConcreteType::Dict(
@@ -14496,6 +14506,7 @@ fn compile_call_expr<M: Module>(
     args: &[Expr],
     style: bool,
     span: Span,
+    locked: Option<ConcreteType>,
 ) -> Result<(Value, ConcreteType), Error> {
     let Cx {
         env,
@@ -15747,6 +15758,93 @@ fn compile_call_expr<M: Module>(
                     .push(Tracked::new(out, &out_ty));
                 (out, out_ty)
             }
+        }
+        "__builtin_to_set" => {
+            // `xs.to_set()`: the array's distinct elements as a set — the set the
+            // use site asked for. The checker locked the expected type onto the
+            // call (`SetOrder::Context`, see `needs_lock`); with none, the plain
+            // unordered set. Built like a literal: a block pre-sized to the
+            // array's length, each element inserted deduplicated in that order.
+            if args.len() != 1 {
+                return Err(Error::at(
+                    format!("\"to_set\" expects 1 argument, got {}", args.len()),
+                    span.clone(),
+                ));
+            }
+            let (arr_ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let ConcreteType::Array(elem) = &t else {
+                return Err(Error::at(
+                    format!("\"to_set\" requires an array, got {}", type_name(&t)),
+                    args[0].span.clone(),
+                ));
+            };
+            let elem = (**elem).clone();
+            let order = match &locked {
+                Some(ConcreteType::Set(_, o)) if *o != aipl_syntax::ast::SetOrder::Context => *o,
+                _ => aipl_syntax::ast::SetOrder::Unordered,
+            };
+            let esz = runtime_elem_size(&elem, structs);
+            let esz_v = builder.ins().iconst(types::I64, esz);
+            let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
+            let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
+            let str_cmp = builder.ins().iconst(types::I64, str_cmp_width(&elem));
+            let ord = builder
+                .ins()
+                .iconst(types::I64, set_order_code(&elem, order));
+            let len = load_arr_len(builder, arr_ptr);
+            let first = builtins.call(
+                module,
+                builder,
+                "aipl_array_with_cap",
+                &[len, drop_fn, esz_v],
+            );
+            // Walk the source by index, handing each element's address to the
+            // insert — a wide `str` element is passed in place, spilled through
+            // a slot like a literal's elements are.
+            let i_slot = i64_slot(builder);
+            let set_slot = i64_slot(builder);
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().stack_store(types::I64, zero, i_slot, 0);
+            builder.ins().stack_store(types::I64, first, set_slot, 0);
+            let head = builder.create_block();
+            let body = builder.create_block();
+            let done = builder.create_block();
+            builder.ins().jump(head, &[]);
+            builder.switch_to_block(head);
+            let i = builder.ins().stack_load(types::I64, types::I64, i_slot, 0);
+            let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
+            builder.ins().brif(more, body, &[], done, &[]);
+            builder.switch_to_block(body);
+            builder.seal_block(body);
+            let ev = load_array_elem(module, builder, builtins, arr_ptr, i, &elem, structs);
+            let s = value_slot(builder, &elem, structs);
+            let x_ptr = builder.ins().stack_addr(types::I64, s, 0);
+            store_array_elem(builder, x_ptr, ev, &elem, structs);
+            let cur = builder
+                .ins()
+                .stack_load(types::I64, types::I64, set_slot, 0);
+            let next = builtins.call(
+                module,
+                builder,
+                "aipl_set_insert",
+                &[cur, x_ptr, drop_fn, retain_fn, esz_v, str_cmp, ord],
+            );
+            builder.ins().stack_store(types::I64, next, set_slot, 0);
+            let i1 = builder.ins().iadd_imm_s(i, 1);
+            builder.ins().stack_store(types::I64, i1, i_slot, 0);
+            builder.ins().jump(head, &[]);
+            builder.seal_block(head);
+            builder.switch_to_block(done);
+            builder.seal_block(done);
+            let ptr = builder
+                .ins()
+                .stack_load(types::I64, types::I64, set_slot, 0);
+            let set_ty = ConcreteType::Set(Box::new(elem), order);
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(ptr, &set_ty));
+            (ptr, set_ty)
         }
         "__builtin_to_array" => {
             // `s.to_array() -> T[]` on an ordered set: the elements in the set's
@@ -17633,6 +17731,8 @@ fn has_placeholder_ty(t: &ConcreteType) -> bool {
         ConcreteType::NoneInner | ConcreteType::EmptyArrayArg | ConcreteType::NoneLiteralArg => {
             true
         }
+        // A set order context has yet to decide (a `to_set` call's).
+        ConcreteType::Set(_, aipl_syntax::ast::SetOrder::Context) => true,
         ConcreteType::Optional(i) | ConcreteType::Array(i) | ConcreteType::Set(i, _) => {
             has_placeholder_ty(i)
         }
@@ -17873,6 +17973,9 @@ fn compile_expr_inner<M: Module>(
             args,
             *style,
             span.clone(),
+            // The type the checker locked onto this call, for the one builtin
+            // whose *construction* depends on its context: `to_set`.
+            expr.ty.as_ref().and_then(|t| t.to_concrete()),
         )?,
         ExprKind::Construct(name, field_inits) => {
             let layout = structs

@@ -117,6 +117,18 @@ fn announced(xs: #{i64}[]) !prints -> #{i64} {
     out
 }
 
+// An *ordered* accumulator unioned a set at a time. `union_all` builds an
+// unordered set, so the rewrite would change the type; only the
+// element-at-a-time form (`#{x}`), which `to_set` can take in any order, is
+// advised on an ordered set.
+fn merged_desc(xs: #{i64}[]) -> #>{i64} {
+    mut out: #>{i64} = #{};
+    for (let s : xs) {
+        set out = out.union(s);
+    }
+    out
+}
+
 // Not a loop at all: a bounded fold written out. The lint wants a `for`.
 fn two(a: #{i64}, b: #{i64}) -> #{i64} {
     mut out: #{i64} = #{};
@@ -138,6 +150,7 @@ fn main() !prints {
     };
     print(show(last_wins(xs, #{7})));
     print(show(announced(xs)));
+    print(`{merged_desc(xs)}`);
     print(show(two(#{1}, #{2})));
     // The rewrite of the one shape that *is* flagged, for contrast.
     print(show(xs.union_all()));
@@ -154,22 +167,26 @@ fn main() !prints {
 2,3,7
 0
 1,2,3
+{3, 2, 1}
 1,2
 1,2,3
 --- performance ---
-allocations: 147
-deallocations: 147
+allocations: 151
+deallocations: 151
 reallocations: 20
-bytes allocated: 5776
-instructions executed: 5862
-binary size: 13744
-  code: 8100
-  data: 1
-  metadata: 5643
+bytes allocated: 5929
+instructions executed: 6377
+binary size: 15816
+  code: 9364
+  data: 67
+  metadata: 6385
 functions:
   __to_str_i64:
     calls: 30
     bytes: 204
+  __to_str_setdesc$i64:
+    calls: 1
+    bytes: 708
   __to_str_u64:
     calls: 3
     bytes: 204
@@ -177,13 +194,13 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 148
+    calls: 157
     bytes: (external)
   aipl_arr_sort:
     calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 252
+    calls: 264
     bytes: (external)
   aipl_array_new:
     calls: 13
@@ -192,28 +209,31 @@ functions:
     calls: 30
     bytes: (external)
   aipl_array_push_mut:
-    calls: 87
+    calls: 91
     bytes: (external)
   aipl_array_with_cap:
-    calls: 51
+    calls: 54
     bytes: (external)
   aipl_i64_len:
-    calls: 60
+    calls: 66
     bytes: (external)
   aipl_set_contains:
     calls: 57
     bytes: (external)
   aipl_set_insert:
-    calls: 57
+    calls: 61
     bytes: (external)
   aipl_set_union:
-    calls: 20
+    calls: 22
     bytes: (external)
   aipl_u64_len:
     calls: 6
     bytes: (external)
+  aipl_write_bytes:
+    calls: 4
+    bytes: (external)
   aipl_write_i64:
-    calls: 30
+    calls: 33
     bytes: (external)
   aipl_write_u64:
     calls: 3
@@ -223,7 +243,7 @@ functions:
     bytes: 988
   main:
     calls: 1
-    bytes: 5340
+    bytes: 5896
   show:
     calls: 10
     bytes: 796

@@ -1,4 +1,15 @@
-import { join, map, print, push, sort, to_str, union, union_all } from builtins;
+import {
+    join,
+    map,
+    print,
+    push,
+    sort,
+    to_set,
+    to_str,
+    union,
+    union_all,
+    wrapping_add as +,
+} from builtins;
 
 // `#[allow]` keeps the loop — the escape hatch every lint carries.
 //
@@ -37,6 +48,18 @@ fn all_ends(ns: i64[]) -> #{i64} {
 
 fn all_ends_short(ns: i64[]) -> #{i64} { ns.map(ends).union_all() }
 
+// One element at a time, into an ordered set: the loop, and its `to_set`
+// rewrite, which reads the order from the return type.
+fn doubled_desc(ns: i64[]) -> #>{i64} {
+    mut out: #>{i64} = #{}; #[allow]
+    for (let n : ns) {
+        set out = out.union(#{n + n});
+    }
+    out
+}
+
+fn doubled_desc_short(ns: i64[]) -> #>{i64} { ns.map(|n| n + n).to_set() }
+
 // A set is unordered, so every comparison here sorts first.
 fn show(s: #{i64}) -> str {
     mut out: i64[] = []; #[allow]
@@ -56,6 +79,9 @@ fn main() !prints {
     let none_at_all: #{i64}[] = [];
     print(`[{show(merged(none_at_all))}]`);
     print(`[{show(merged_short(none_at_all))}]`);
+    // The ordered pair renders in its own order, so no sorting is needed.
+    print(`{doubled_desc([2, 1, 2])}`);
+    print(`{doubled_desc_short([2, 1, 2])}`);
 }
 --- stdout ---
 1,2,3
@@ -64,16 +90,18 @@ fn main() !prints {
 4,5
 []
 []
+{4, 2}
+{4, 2}
 --- performance ---
-allocations: 74
-deallocations: 74
+allocations: 87
+deallocations: 87
 reallocations: 8
-bytes allocated: 3028
-instructions executed: 2561
-binary size: 7832
-  code: 4360
-  data: 1
-  metadata: 3471
+bytes allocated: 3592
+instructions executed: 3662
+binary size: 11056
+  code: 6500
+  data: 67
+  metadata: 4489
 functions:
   __builtin_union_all$i64:
     calls: 3
@@ -81,11 +109,14 @@ functions:
   __to_str_i64:
     calls: 10
     bytes: 204
+  __to_str_setdesc$i64:
+    calls: 2
+    bytes: 708
   aipl_arr_drop_arr:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 65
+    calls: 75
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 2
@@ -94,38 +125,41 @@ functions:
     calls: 6
     bytes: (external)
   aipl_array_dec:
-    calls: 121
+    calls: 142
     bytes: (external)
   aipl_array_new:
-    calls: 11
+    calls: 13
     bytes: (external)
   aipl_array_push:
     calls: 10
     bytes: (external)
   aipl_array_push_mut:
-    calls: 40
+    calls: 53
     bytes: (external)
   aipl_array_with_cap:
-    calls: 29
+    calls: 38
     bytes: (external)
   aipl_i64_len:
-    calls: 20
+    calls: 28
     bytes: (external)
   aipl_set_contains:
-    calls: 34
+    calls: 37
     bytes: (external)
   aipl_set_insert:
-    calls: 34
+    calls: 46
     bytes: (external)
   aipl_set_union:
-    calls: 8
+    calls: 11
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 6
     bytes: (external)
   aipl_write_i64:
-    calls: 10
+    calls: 14
     bytes: (external)
   main:
     calls: 1
-    bytes: 2496
+    bytes: 3928
   merged:
     calls: 2
     bytes: 432

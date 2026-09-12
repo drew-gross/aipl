@@ -1,0 +1,91 @@
+import { has, len, map, print, to_set, wrapping_mul as * } from builtins;
+
+// `xs.to_set()` — an array's distinct elements as a set. *Which* set comes from
+// the use site, the way an empty `#{}` takes its type from context: a return
+// type, an annotation or a parameter of `#>{T}` / `#<{T}` gets an ordered set,
+// built in that order; with nothing to say, it is a plain `#{T}`.
+fn tightest_first(xs: i64[]) -> #>{i64} { xs.to_set() }
+
+fn doubled_asc(xs: i64[]) -> #<{i64} { xs.map(|x| x * 2).to_set() }
+
+fn count_distinct(s: #{str}) -> u64 { s.len() }
+
+fn main() !prints {
+    print(`{tightest_first([3, 1, 3, 2])}`);
+    print(`{doubled_asc([3, 1, 3])}`);
+    let names: #<{str} = ["pear", "fig", "pear"].to_set();
+    print(`{names}`);
+    // No context: an unordered set, with the usual set operations.
+    let plain = [2, 2, 5].to_set();
+    print(`{plain.len()} {plain.has(5)} {plain.has(3)}`);
+    // As an argument, the parameter type is the context.
+    print(`{count_distinct(["a", "b", "a"].to_set())}`);
+}
+--- stdout ---
+{3, 2, 1}
+{2, 6}
+{"fig", "pear"}
+2 true false
+2
+--- performance ---
+allocations: 22
+deallocations: 22
+reallocations: 0
+bytes allocated: 1329
+instructions executed: 2283
+binary size: 10816
+  code: 6476
+  data: 263
+  metadata: 4077
+functions:
+  __to_str_bool:
+    calls: 2
+    bytes: 232
+  __to_str_setasc$i64:
+    calls: 1
+    bytes: 708
+  __to_str_setasc$str:
+    calls: 1
+    bytes: 812
+  __to_str_setdesc$i64:
+    calls: 1
+    bytes: 708
+  __to_str_u64:
+    calls: 2
+    bytes: 204
+  aipl_array_dec:
+    calls: 11
+    bytes: (external)
+  aipl_array_new:
+    calls: 5
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 14
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 6
+    bytes: (external)
+  aipl_i64_len:
+    calls: 10
+    bytes: (external)
+  aipl_set_contains:
+    calls: 8
+    bytes: (external)
+  aipl_set_insert:
+    calls: 16
+    bytes: (external)
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 14
+    bytes: (external)
+  aipl_write_i64:
+    calls: 5
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 3812

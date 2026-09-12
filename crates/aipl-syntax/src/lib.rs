@@ -754,14 +754,23 @@ pub mod ast {
         Desc,
         /// `#<{T}`: smallest element first.
         Asc,
+        /// Decided by the use site — the order of `xs.to_set()` before the
+        /// expected type has said which set it builds, the way a bare `none`
+        /// or `[]` is typed by a placeholder until context fills it in. A
+        /// checker placeholder only: it coerces to any order, is never
+        /// recorded as an answer, and codegen resolves it (to the locked
+        /// order, else `Unordered`) at the one call that produces it. No
+        /// value ever has it.
+        Context,
     }
 
     impl SetOrder {
         /// The character between the `#` and the `{` that spells this order —
-        /// nothing for the unordered set.
+        /// nothing for the unordered set, and for the placeholder, which reads
+        /// as the plain set it becomes without context.
         pub fn spelling(self) -> &'static str {
             match self {
-                SetOrder::Unordered => "",
+                SetOrder::Unordered | SetOrder::Context => "",
                 SetOrder::Desc => ">",
                 SetOrder::Asc => "<",
             }
@@ -2370,6 +2379,11 @@ fn __builtin_union<T: any>(self: #{T}, other: #{T}) -> #{T} { self }
 // refuses a `#{T}` receiver, whose order is not one to write code against.
 // Free at runtime: a set is an array block, so this is the same block retained.
 fn __builtin_to_array<T: any>(self: #{T}) -> T[] { [] }
+// An array's distinct elements as a set. Which set — `#{T}`, `#>{T}` or
+// `#<{T}` — comes from the use site, like the type of a bare `#{}`: the
+// checker types the call `SetOrder::Context` and locks the expected type onto
+// it, and codegen builds the set in that order (unordered with no context).
+fn __builtin_to_set<T: any>(self: T[]) -> #{T} { #{} }
 
 // Dict ops: lookup (none if absent) and membership.
 fn __builtin_get<K: any, V: any>(self: #{K: V}, key: K) -> V? { none }
@@ -2738,6 +2752,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "contains",
     "has",
     "to_array",
+    "to_set",
     "read_file_to_string",
     "write_string_to_file",
     "list_files",

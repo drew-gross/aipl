@@ -521,6 +521,7 @@ case_tests! {
     cases_sets_seeded_empty = "cases/sets/seeded_empty",
     cases_sets_set_param = "cases/sets/set_param",
     cases_sets_str_elements = "cases/sets/str_elements",
+    cases_sets_to_set = "cases/sets/to_set",
     cases_sets_union = "cases/sets/union",
     cases_sets_union_from_array_elem = "cases/sets/union_from_array_elem",
     cases_strings_bool_to_str = "cases/strings/bool_to_str",

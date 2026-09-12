@@ -281,10 +281,10 @@ deallocations: 11508
 reallocations: 1565
 bytes allocated: 741542
 instructions executed: 1369919
-binary size: 399800
-  code: 258444
+binary size: 399664
+  code: 258436
   data: 4796
-  metadata: 136560
+  metadata: 136432
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -358,58 +358,58 @@ functions:
   __arr_retain___m5__Doc:
     calls: 416
     bytes: 116
-  __builtin_all$char$s0$lam152:
+  __builtin_all$char$s0$lam154:
     calls: 53
     bytes: 212
-  __builtin_any$__m3__Prec$lam162:
+  __builtin_any$__m3__Prec$lam164:
     calls: 0
     bytes: 276
-  __builtin_any$__m5__Doc$lam163:
+  __builtin_any$__m5__Doc$lam165:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam163$tail:
+  __builtin_any$__m5__Doc$lam165$tail:
     calls: 111
     bytes: 324
-  __builtin_count_while$char$lam89:
+  __builtin_count_while$char$lam91:
     calls: 150
     bytes: 220
-  __builtin_count_while$char$s0$lam117:
+  __builtin_count_while$char$s0$lam119:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam117$tail:
+  __builtin_count_while$char$s0$lam119$tail:
     calls: 12
     bytes: 256
-  __builtin_count_while$char$s0$lam131:
+  __builtin_count_while$char$s0$lam133:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam155:
+  __builtin_count_while$char$s0$lam157:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam97:
+  __builtin_count_while$char$s0$lam99:
     calls: 0
     bytes: 184
-  __builtin_find_if$__m3__Prec$lam170:
+  __builtin_find_if$__m3__Prec$lam172:
     calls: 0
     bytes: 688
-  __builtin_find_index$str$lam49:
+  __builtin_find_index$str$lam51:
     calls: 88
     bytes: 400
-  __builtin_find_index$str$lam58:
+  __builtin_find_index$str$lam60:
     calls: 31
     bytes: 400
-  __builtin_find_index$str$lam79:
+  __builtin_find_index$str$lam81:
     calls: 88
     bytes: 400
   __builtin_intersperse$__m5__Doc:
     calls: 34
     bytes: 408
-  __builtin_try_map$__m1__Cst$__m15__Sexp$__m3__ParseError$lam101:
+  __builtin_try_map$__m1__Cst$__m15__Sexp$__m3__ParseError$lam103:
     calls: 47
     bytes: 668
-  __builtin_try_map$__m3__Production$SexpKind$__m15__Sexp$__m2__First<SexpKind>$__m3__ParseError$lam55:
+  __builtin_try_map$__m3__Production$SexpKind$__m15__Sexp$__m2__First<SexpKind>$__m3__ParseError$lam57:
     calls: 3
     bytes: 828
-  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam74:
+  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam76:
     calls: 45
     bytes: 632
   __eq___m15__Sexp:
@@ -430,7 +430,7 @@ functions:
   __eq___m2__Sym$SexpKind$arr:
     calls: 5
     bytes: 284
-  __filter126$own0:
+  __filter128$own0:
     calls: 47
     bytes: 332
   __lambda_21:
@@ -439,7 +439,7 @@ functions:
   __lambda_22:
     calls: 68
     bytes: 96
-  __m10__trim_end_while$lam64:
+  __m10__trim_end_while$lam66:
     calls: 61
     bytes: 300
   __m11__between_len:
@@ -624,7 +624,7 @@ functions:
     bytes: 1084
   __m2__prec_note:
     calls: 2
-    bytes: 2344
+    bytes: 2336
   __m2__render_rule$SexpKind:
     calls: 7
     bytes: 9756
@@ -676,28 +676,28 @@ functions:
   __m4__breaks_after:
     calls: 6
     bytes: 444
-  __m4__fmt_node$SexpKind$__m15__Sexp$s1$lam59:
+  __m4__fmt_node$SexpKind$__m15__Sexp$s1$lam61:
     calls: 89
     bytes: 4800
   __m4__format_cst$SexpKind$__m15__Sexp$s1$lam31:
     calls: 12
     bytes: 384
-  __m4__gap_wanted$lam127:
+  __m4__gap_wanted$lam129:
     calls: 148
     bytes: 144
-  __m4__group_doc$SexpKind$__m15__Sexp$s1$lam105:
+  __m4__group_doc$SexpKind$__m15__Sexp$s1$lam107:
     calls: 18
     bytes: 2420
-  __m4__inline_doc$lam104:
+  __m4__inline_doc$lam106:
     calls: 148
     bytes: 2428
-  __m4__pieces$SexpKind$__m15__Sexp$s1$lam102:
+  __m4__pieces$SexpKind$__m15__Sexp$s1$lam104:
     calls: 125
     bytes: 3400
   __m4__render_cst$SexpKind$__m15__Sexp$s1$lam8:
     calls: 12
     bytes: 4580
-  __m4__wrapped$lam128:
+  __m4__wrapped$lam130:
     calls: 18
     bytes: 4272
   __m5__col_after:
@@ -724,10 +724,10 @@ functions:
   __m6__reindent_block:
     calls: 0
     bytes: 4636
-  __map43:
+  __map45:
     calls: 0
     bytes: 380
-  __map66$own0:
+  __map68$own0:
     calls: 12
     bytes: 428
   __rec_drop___m15__Sexp:

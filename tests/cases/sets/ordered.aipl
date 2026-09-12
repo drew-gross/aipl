@@ -27,13 +27,11 @@ fn main() !prints {
 
     // An empty `#{}` is any set, so it seeds an ordered binding; `union` keeps
     // the receiver's order, and takes any set of the element type for the other
-    // side — a plain `#{x}` is the natural way to add one element. (The
-    // `union_all` lint leaves this loop alone: its rewrite builds an unordered
-    // set.)
+    // side — a plain `#{x}` is the natural way to add one element.
     mut s: #>{i64} = #{};
-    for (let x : [5, 9, 1, 9, 7]) {
-        set s = s.union(#{x});
-    }
+    set s = s.union(#>{5, 9});
+    set s = s.union(#{1});
+    set s = s.union(#<{9, 7});
     print(`{s}`);
     // Walking one visits the elements in its order.
     for (let x : s) {
@@ -68,15 +66,15 @@ true
 ["apple", "fig", "pear"]
 {9223372036854775807, 9223372036854775808, 18446744073709551615}
 --- performance ---
-allocations: 42
-deallocations: 42
+allocations: 37
+deallocations: 37
 reallocations: 0
-bytes allocated: 2051
-instructions executed: 4897
-binary size: 18096
-  code: 11016
+bytes allocated: 1819
+instructions executed: 4658
+binary size: 18696
+  code: 11376
   data: 547
-  metadata: 6533
+  metadata: 6773
 functions:
   __eq_setdesc$i64:
     calls: 1
@@ -112,31 +110,28 @@ functions:
     calls: 1
     bytes: 204
   aipl_arr_inc:
-    calls: 18
+    calls: 12
     bytes: (external)
   aipl_array_dec:
-    calls: 37
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
+    calls: 26
     bytes: (external)
   aipl_array_push_mut:
-    calls: 39
+    calls: 35
     bytes: (external)
   aipl_array_with_cap:
-    calls: 18
+    calls: 14
     bytes: (external)
   aipl_i64_len:
     calls: 40
     bytes: (external)
   aipl_set_contains:
-    calls: 9
+    calls: 5
     bytes: (external)
   aipl_set_insert:
-    calls: 42
+    calls: 38
     bytes: (external)
   aipl_set_union:
-    calls: 5
+    calls: 3
     bytes: (external)
   aipl_u64_len:
     calls: 8
@@ -152,4 +147,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4964
+    bytes: 5324

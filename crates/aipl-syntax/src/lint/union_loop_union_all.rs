@@ -13,6 +13,7 @@ pub(super) struct UnionNames {
     union: Option<String>,
     map: Option<String>,
     union_all: Option<String>,
+    to_set: Option<String>,
 }
 
 pub(super) fn union_names(program: &Program) -> UnionNames {
@@ -20,6 +21,7 @@ pub(super) fn union_names(program: &Program) -> UnionNames {
         union: imported_as(program, "union"),
         map: imported_as(program, "map"),
         union_all: imported_as(program, "union_all"),
+        to_set: imported_as(program, "to_set"),
     }
 }
 
@@ -99,9 +101,7 @@ pub(super) fn union_loop_union_all(e: &Expr, src: &str, names: &UnionNames, hits
     if !matches!(&seed.kind, ExprKind::SetLit(xs, o) if xs.is_empty() && !o.is_ordered()) {
         return;
     }
-    if matches!(ann, Some(Type::Set(_, o)) if o.is_ordered()) {
-        return;
-    }
+    let ordered = matches!(ann, Some(Type::Set(_, o)) if o.is_ordered());
     // The very next statement must be the loop: a statement between the two
     // could read `acc` while it is still empty, which the rewrite would
     // reorder. (A `for` is folded as `Seq(For, rest)` — see `wrap_stmt`.)
@@ -123,13 +123,29 @@ pub(super) fn union_loop_union_all(e: &Expr, src: &str, names: &UnionNames, hits
     let Some(operand) = unioned_operand(value, acc, union) else {
         return;
     };
-    if !liftable(operand, acc) {
+    // `set out = out.union(#{e});` unions one element at a time: that is
+    // `to_set` over the elements, not `union_all` over sets — and `to_set`
+    // takes its order from the binding, so this form is advised whatever the
+    // accumulator's order. `union_all` builds an unordered set, so the
+    // set-at-a-time form is only advised for an unordered accumulator.
+    let single = match &operand.kind {
+        ExprKind::SetLit(xs, o) if !o.is_ordered() => match xs.as_slice() {
+            [e] => Some(e),
+            _ => None,
+        },
+        _ => None,
+    };
+    if single.is_none() && ordered {
+        return;
+    }
+    let mapped = single.unwrap_or(operand);
+    if !liftable(mapped, acc) {
         return;
     }
 
     // Unioning the loop variable itself is the identity map, which the pipeline
     // just leaves out.
-    let maps = !matches!(&operand.kind, ExprKind::Ident(n) if n == var);
+    let maps = !matches!(&mapped.kind, ExprKind::Ident(n) if n == var);
     // Quote the iterable back only where its span really covers its text — see
     // [`spans_its_text`]. A call-shaped span stops before its closing paren, so
     // splicing one back would produce source that doesn't parse.
@@ -150,7 +166,11 @@ pub(super) fn union_loop_union_all(e: &Expr, src: &str, names: &UnionNames, hits
         let name = stage(&names.map, "map");
         chain.push_str(&format!(".{name}(|{var}| ..)"));
     }
-    let fold = stage(&names.union_all, "union_all");
+    let fold = if single.is_some() {
+        stage(&names.to_set, "to_set")
+    } else {
+        stage(&names.union_all, "union_all")
+    };
     chain.push_str(&format!(".{fold}()"));
     let import = if missing.is_empty() {
         String::new()
@@ -158,6 +178,17 @@ pub(super) fn union_loop_union_all(e: &Expr, src: &str, names: &UnionNames, hits
         format!(", importing `{}` from builtins", missing.join("` and `"))
     };
     let recv = recv.unwrap_or("<iterable>");
+    // The annotation stays: for an ordered set it is what `to_set` reads its
+    // order from.
+    let ann = ann
+        .as_ref()
+        .map(|t| format!(": {}", crate::type_name(t)))
+        .unwrap_or_default();
+    let how = if single.is_some() {
+        "an element at a time"
+    } else {
+        "a set at a time"
+    };
     // Point at the seed, not the loop. `#[allow]` is line-scoped (see
     // `allow_squelch`), so a hit spanning the loop could never be squelched: the
     // marker would have to go on the `for (..) {` header, and `aipl fmt`
@@ -166,8 +197,8 @@ pub(super) fn union_loop_union_all(e: &Expr, src: &str, names: &UnionNames, hits
     // line, and it is where the shape starts.
     hits.push(Error::at(
         format!(
-            "\"{acc}\" is seeded empty and unioned into by this loop and nothing else — \
-             write \"mut {acc} = {recv}{chain};\" and drop the loop\
+            "\"{acc}\" is seeded empty and unioned into by this loop {how} and nothing else — \
+             write \"mut {acc}{ann} = {recv}{chain};\" and drop the loop\
              {import} (or append #[allow] to this line to keep it)"
         ),
         seed.span.clone(),
