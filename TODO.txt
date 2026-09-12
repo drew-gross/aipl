@@ -75,6 +75,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  unescape + unescape_braces can probably be DRYed up
   union_all can be context ordered, like to_set
   render_rule Maybe arm could be 1 expression.
   rep_suffix could be much simpler with multimatch and matching literals:
@@ -205,6 +206,7 @@ syntax:
   map should take any container and return the same container (then replace map_ok)
 
 strings:
+  single-line triple quotes should not eat leading whitespace i.e """   x   """ contains all 6 spaces
   literals should be a separate tag maybe?
 
 default/kwargs:
@@ -638,6 +640,7 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  integrate the readme into the docs
   reflow docs
   make /// docs a thing for things that should be documented (and only for those things)
   make docs renderer part of check

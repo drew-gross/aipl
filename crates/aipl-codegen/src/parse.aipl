@@ -1592,10 +1592,10 @@ deallocations: 9523
 reallocations: 1869
 bytes allocated: 676645
 instructions executed: 1348911
-binary size: 691504
-  code: 419044
+binary size: 691656
+  code: 419180
   data: 10388
-  metadata: 262072
+  metadata: 262088
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1663,19 +1663,19 @@ functions:
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
     bytes: 632
-  __builtin_all$__m3__Rule$Tok$lam121:
+  __builtin_all$__m3__Rule$Tok$lam123:
     calls: 0
     bytes: 36
-  __builtin_all$__m3__Rule$Tok$lam121$tail:
+  __builtin_all$__m3__Rule$Tok$lam123$tail:
     calls: 0
     bytes: 384
-  __builtin_any$__m3__Prec$lam112:
+  __builtin_any$__m3__Prec$lam114:
     calls: 13
     bytes: 276
-  __builtin_any$__m3__Rule$Tok$lam124:
+  __builtin_any$__m3__Rule$Tok$lam126:
     calls: 0
     bytes: 36
-  __builtin_any$__m3__Rule$Tok$lam124$tail:
+  __builtin_any$__m3__Rule$Tok$lam126$tail:
     calls: 0
     bytes: 380
   __builtin_count_while$char$lam52:
@@ -1690,7 +1690,7 @@ functions:
   __builtin_count_while$char$s0$lam78$tail:
     calls: 3
     bytes: 256
-  __builtin_find_if$__m3__Prec$lam139:
+  __builtin_find_if$__m3__Prec$lam141:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam21:
@@ -1756,7 +1756,7 @@ functions:
   __eq_set$str$arr:
     calls: 30
     bytes: 300
-  __filter105$own0:
+  __filter107$own0:
     calls: 18
     bytes: 332
   __lambda_0:
@@ -1896,7 +1896,7 @@ functions:
     bytes: 9188
   __m4__template_scan$Tok:
     calls: 0
-    bytes: 2728
+    bytes: 2864
   __m4__template_step$Tok:
     calls: 0
     bytes: 476

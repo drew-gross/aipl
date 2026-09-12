@@ -4218,11 +4218,11 @@ allocations: 3334580
 deallocations: 3334580
 reallocations: 356182
 bytes allocated: 320393022
-instructions executed: 439439536
-binary size: 4904120
-  code: 3200092
+instructions executed: 439440334
+binary size: 4905504
+  code: 3201136
   data: 46204
-  metadata: 1657824
+  metadata: 1658164
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4404,28 +4404,28 @@ functions:
   __arr_retain___tuple$str$str:
     calls: 1
     bytes: 140
-  __builtin_all$__m7__Rule$__m21__AiplTok$lam377:
+  __builtin_all$__m7__Rule$__m21__AiplTok$lam379:
     calls: 0
     bytes: 36
-  __builtin_all$__m7__Rule$__m21__AiplTok$lam377$tail:
+  __builtin_all$__m7__Rule$__m21__AiplTok$lam379$tail:
     calls: 0
     bytes: 384
   __builtin_all$char$s0$lam359:
     calls: 85
     bytes: 212
-  __builtin_any$__m15__Doc$lam390:
+  __builtin_any$__m15__Doc$lam392:
     calls: 0
     bytes: 32
-  __builtin_any$__m15__Doc$lam390$tail:
+  __builtin_any$__m15__Doc$lam392$tail:
     calls: 161
     bytes: 324
-  __builtin_any$__m7__Prec$lam389:
+  __builtin_any$__m7__Prec$lam391:
     calls: 414
     bytes: 276
-  __builtin_any$__m7__Rule$__m21__AiplTok$lam380:
+  __builtin_any$__m7__Rule$__m21__AiplTok$lam382:
     calls: 0
     bytes: 36
-  __builtin_any$__m7__Rule$__m21__AiplTok$lam380$tail:
+  __builtin_any$__m7__Rule$__m21__AiplTok$lam382$tail:
     calls: 108
     bytes: 380
   __builtin_count_while$char$lam74:
@@ -4449,7 +4449,7 @@ functions:
   __builtin_count_while$char$s0$lam82:
     calls: 1885
     bytes: 184
-  __builtin_find_if$__m7__Prec$lam394:
+  __builtin_find_if$__m7__Prec$lam396:
     calls: 356
     bytes: 688
   __builtin_find_index$str$lam259:
@@ -4697,7 +4697,7 @@ functions:
     bytes: 300
   __m21__dedent_segments:
     calls: 1
-    bytes: 272
+    bytes: 288
   __m21__doc_text:
     calls: 20
     bytes: 196
@@ -4706,10 +4706,10 @@ functions:
     bytes: 1364
   __m21__raw_tpl_kind:
     calls: 2
-    bytes: 2592
+    bytes: 2608
   __m21__str_lit_value:
     calls: 6
-    bytes: 400
+    bytes: 568
   __m21__template_segments:
     calls: 1
     bytes: 1652
@@ -4745,7 +4745,7 @@ functions:
     bytes: 15088
   __m22__template_scan$__m21__AiplTok:
     calls: 5
-    bytes: 2728
+    bytes: 2864
   __m22__template_step$__m21__AiplTok:
     calls: 3429
     bytes: 476
@@ -4761,6 +4761,9 @@ functions:
   __m23__unescape:
     calls: 32
     bytes: 1168
+  __m23__unescape_braces:
+    calls: 2
+    bytes: 708
   __m24__process_raw_string:
     calls: 1
     bytes: 556

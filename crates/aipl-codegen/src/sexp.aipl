@@ -82,10 +82,10 @@ deallocations: 34096
 reallocations: 3048
 bytes allocated: 1588595
 instructions executed: 5216600
-binary size: 259792
-  code: 168612
+binary size: 259944
+  code: 168748
   data: 1780
-  metadata: 89400
+  metadata: 89416
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -135,7 +135,7 @@ functions:
   __arr_retain___m4__Rule$__m1__SexpKind:
     calls: 24
     bytes: 116
-  __builtin_any$__m4__Prec$lam89:
+  __builtin_any$__m4__Prec$lam91:
     calls: 0
     bytes: 276
   __builtin_count_while$char$lam10:
@@ -150,7 +150,7 @@ functions:
   __builtin_count_while$char$s0$lam39$tail:
     calls: 1
     bytes: 256
-  __builtin_find_if$__m4__Prec$lam93:
+  __builtin_find_if$__m4__Prec$lam95:
     calls: 0
     bytes: 688
   __builtin_find_index$str$lam24:
@@ -165,7 +165,7 @@ functions:
   __builtin_try_map$__m2__Cst$Sexp$__m4__ParseError$lam31:
     calls: 836
     bytes: 668
-  __builtin_try_map$__m4__Rule$__m1__SexpKind$__m4__Rule<__m1__SexpKind>$__m4__ParseError$lam70:
+  __builtin_try_map$__m4__Rule$__m1__SexpKind$__m4__Rule<__m1__SexpKind>$__m4__ParseError$lam72:
     calls: 6
     bytes: 632
   __eq_Sexp:
@@ -212,7 +212,7 @@ functions:
     bytes: 8332
   __m12__template_scan$__m1__SexpKind:
     calls: 0
-    bytes: 2728
+    bytes: 2864
   __m12__template_step$__m1__SexpKind:
     calls: 0
     bytes: 476

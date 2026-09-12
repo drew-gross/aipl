@@ -106,6 +106,10 @@
           "name": "string.quoted.double.aipl",
           "patterns": [
             {
+              "match": "\\\\[{}]",
+              "name": "constant.character.escape.aipl"
+            },
+            {
               "begin": "\\{",
               "end": "\\}",
               "patterns": [
@@ -121,7 +125,7 @@
           "name": "string.quoted.double.aipl",
           "patterns": [
             {
-              "match": "\\\\[\\\\`{ntr]",
+              "match": "\\\\[\\\\`ntr{}]",
               "name": "constant.character.escape.aipl"
             },
             {

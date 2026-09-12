@@ -471,10 +471,10 @@ deallocations: 20132
 reallocations: 3334
 bytes allocated: 1362939
 instructions executed: 2449664
-binary size: 419144
-  code: 270152
+binary size: 419296
+  code: 270288
   data: 5948
-  metadata: 143044
+  metadata: 143060
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -554,16 +554,16 @@ functions:
   __arr_retain___m5__Doc:
     calls: 166
     bytes: 116
-  __builtin_all$char$s0$lam151:
+  __builtin_all$char$s0$lam153:
     calls: 12
     bytes: 212
-  __builtin_any$__m3__Prec$lam167:
+  __builtin_any$__m3__Prec$lam169:
     calls: 156
     bytes: 276
-  __builtin_any$__m5__Doc$lam168:
+  __builtin_any$__m5__Doc$lam170:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam168$tail:
+  __builtin_any$__m5__Doc$lam170$tail:
     calls: 0
     bytes: 324
   __builtin_count_while$char$lam88:
@@ -578,7 +578,7 @@ functions:
   __builtin_count_while$char$s0$lam136:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam160:
+  __builtin_count_while$char$s0$lam162:
     calls: 0
     bytes: 172
   __builtin_count_while$char$s0$lam71:
@@ -587,7 +587,7 @@ functions:
   __builtin_count_while$char$s0$lam96:
     calls: 138
     bytes: 184
-  __builtin_find_if$__m3__Prec$lam175:
+  __builtin_find_if$__m3__Prec$lam177:
     calls: 141
     bytes: 688
   __builtin_find_index$str$lam52:
@@ -667,7 +667,7 @@ functions:
     bytes: 6940
   __m11__template_scan$CalcTok:
     calls: 0
-    bytes: 2728
+    bytes: 2864
   __m11__template_step$CalcTok:
     calls: 0
     bytes: 476

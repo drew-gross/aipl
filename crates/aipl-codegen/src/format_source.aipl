@@ -73,10 +73,10 @@ deallocations: 2103
 reallocations: 29
 bytes allocated: 125498
 instructions executed: 419611
-binary size: 1041600
-  code: 675120
+binary size: 1042600
+  code: 675896
   data: 2235
-  metadata: 364245
+  metadata: 364469
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -129,10 +129,10 @@ functions:
   __builtin_all$char$s0$lam90:
     calls: 0
     bytes: 212
-  __builtin_any$__m7__Doc$lam100:
+  __builtin_any$__m7__Doc$lam102:
     calls: 0
     bytes: 32
-  __builtin_any$__m7__Doc$lam100$tail:
+  __builtin_any$__m7__Doc$lam102$tail:
     calls: 0
     bytes: 324
   __builtin_count_is_at_least$char$s0:
@@ -203,7 +203,7 @@ functions:
     bytes: 1772
   __m12__dedent_segments:
     calls: 0
-    bytes: 272
+    bytes: 288
   __m12__doc_text:
     calls: 0
     bytes: 196
@@ -212,7 +212,7 @@ functions:
     bytes: 1364
   __m12__raw_tpl_kind:
     calls: 0
-    bytes: 2592
+    bytes: 3216
   __m12__tpl_kind:
     calls: 0
     bytes: 2608
@@ -245,7 +245,7 @@ functions:
     bytes: 15088
   __m13__template_scan$__m12__AiplTok:
     calls: 0
-    bytes: 2728
+    bytes: 2864
   __m13__template_step$__m12__AiplTok:
     calls: 24
     bytes: 476

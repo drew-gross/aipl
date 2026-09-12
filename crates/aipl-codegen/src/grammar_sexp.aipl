@@ -281,10 +281,10 @@ deallocations: 11508
 reallocations: 1565
 bytes allocated: 741542
 instructions executed: 1369919
-binary size: 399664
-  code: 258436
+binary size: 399816
+  code: 258572
   data: 4796
-  metadata: 136432
+  metadata: 136448
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -358,16 +358,16 @@ functions:
   __arr_retain___m5__Doc:
     calls: 416
     bytes: 116
-  __builtin_all$char$s0$lam154:
+  __builtin_all$char$s0$lam156:
     calls: 53
     bytes: 212
-  __builtin_any$__m3__Prec$lam164:
+  __builtin_any$__m3__Prec$lam166:
     calls: 0
     bytes: 276
-  __builtin_any$__m5__Doc$lam165:
+  __builtin_any$__m5__Doc$lam167:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam165$tail:
+  __builtin_any$__m5__Doc$lam167$tail:
     calls: 111
     bytes: 324
   __builtin_count_while$char$lam91:
@@ -382,13 +382,13 @@ functions:
   __builtin_count_while$char$s0$lam133:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam157:
+  __builtin_count_while$char$s0$lam159:
     calls: 0
     bytes: 172
   __builtin_count_while$char$s0$lam99:
     calls: 0
     bytes: 184
-  __builtin_find_if$__m3__Prec$lam172:
+  __builtin_find_if$__m3__Prec$lam174:
     calls: 0
     bytes: 688
   __builtin_find_index$str$lam51:
@@ -471,7 +471,7 @@ functions:
     bytes: 8332
   __m11__template_scan$SexpKind:
     calls: 0
-    bytes: 2728
+    bytes: 2864
   __m11__template_step$SexpKind:
     calls: 0
     bytes: 476

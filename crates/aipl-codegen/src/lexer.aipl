@@ -49,7 +49,7 @@ import {
 // deliberately provides none (escape meaning is a language's policy), so the
 // test borrows AIPL's own — the same `unescape` the real lexer uses — rather
 // than keeping a second copy in sync.
-import { unescape } from "./unescape.aipl";
+import { unescape, unescape_braces } from "./unescape.aipl";
 
 # What a token carries beyond its span: the processed *value* of the matched
 # text, computed at lex time by the matcher that claimed it (see each
@@ -234,9 +234,14 @@ variant Matcher =
     // A template literal — text with `{expr}` interpolations. The `delim`
     // spelling opens and closes the literal; it may be multi-char and scans
     // like `Between` (a lone backtick under a triple-backtick delim is
-    // content). Text segments follow `escapes` as in `Delimited` (`\{` doesn't
-    // interpolate, an escaped delim doesn't close, `""` turns escapes off — the
-    // verbatim raw-template shape). A `{` in text opens an interpolation, lexed
+    // content). Text segments follow `escapes` as in `Delimited` (an escaped
+    // delim doesn't close, `""` turns escapes off — the verbatim raw-template
+    // shape) — except that `\{` and `\}` are every template's own: the braces
+    // are the template's syntax, so escaping one is the template's business
+    // rather than the escape set's. `\{` is content that doesn't interpolate
+    // and `\}` is content, whatever `escapes` says, and a raw template with
+    // every other backslash verbatim still has a way to write a brace. (The
+    // emit decodes them; see `unescape_braces`.) A `{` in text opens an interpolation, lexed
     // by the full rule set until the balancing `}` — so skip rules and nested
     // template rules apply inside — with brace depth tracked and the closing
     // `}` consumed without a token. `finalize` is a `(str[]) -> str[]` the
@@ -805,7 +810,15 @@ fn template_scan<K>(
             return finalize_template(src, finalize, emit, seg_texts, seg_spans, interp_runs, end);
         };
         let c = src[i].value_or(' '); // in bounds: the loop condition holds
-        if (c == '{') {
+
+        // `\{` / `\}`: a brace as content, in every template (see `Template`).
+        // Checked ahead of both the interpolation and the escape set: the first
+        // so the brace doesn't open one, the second so an escape set without
+        // `{` — a raw template's empty one — doesn't reject it.
+        let escaped_brace = c == '\\' && src[i + 1].is_some_and(|e| e == '{' || e == '}');
+        if (escaped_brace) {
+            set i += 2;
+        } else if (c == '{') {
             set seg_texts.push(src[text_start..i]);
             set seg_spans.push(seg_start..i + 1);
             let interp = interp_scan(src, i + 1, i, rules)?;
@@ -999,11 +1012,12 @@ fn checked_seg(text: str, seg: Seg) -> Kind!str {
 }
 
 fn rawtpl_kind(text: str, seg: Seg) -> Kind {
+    let t = text.unescape_braces();
     match (seg) {
-        Plain => RawTpl(text),
-        Head => RawTplHead(text),
-        Middle => RawTplMid(text),
-        Tail => RawTplTail(text),
+        Plain => RawTpl(t),
+        Head => RawTplHead(t),
+        Middle => RawTplMid(t),
+        Tail => RawTplTail(t),
     }
 }
 
@@ -1280,8 +1294,19 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
             tok("`{x}{y}`", TplTail(""), 6..8),
         ]),
     );
-    // Text escapes: `\{` doesn't interpolate; an unknown escape is a hard error.
+
+    // Text escapes: `\{` doesn't interpolate and `\}` is content — the braces
+    // are every template's own escapes, so they need not be in the set; an
+    // unknown escape is a hard error.
     assert(lex("`a\\{b`", tpls)? == toks([tok("`a\\{b`", Tpl("a{b"), 0..6)]));
+    assert(lex("`a\\}b`", tpls)? == toks([tok("`a\\}b`", Tpl("a}b"), 0..6)]));
+    assert(
+        lex("`\\{{x}\\}`", tpls)? == toks([
+            tok("`\\{{x}\\}`", TplHead("{"), 0..4),
+            tok("`\\{{x}\\}`", Ident("x"), 4..5),
+            tok("`\\{{x}\\}`", TplTail("}"), 5..9),
+        ]),
+    );
     assert(lex("`a\\qb`", tpls) == err(lex_err("unknown escape sequence \\q", 2..4)));
     assert(lex("`ab", tpls) == err(lex_err("unterminated template literal", 0..3)));
     assert(lex("`a{x", tpls) == err(lex_err("unterminated template literal interpolation", 2..3)));
@@ -1306,13 +1331,17 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
             tok("`a{`x`}b`", TplTail("b"), 6..9),
         ]),
     );
-    // A raw-template delim scans like `Between` and `""` escapes make it verbatim.
+
+    // A raw-template delim scans like `Between` and `""` escapes make it
+    // verbatim — every backslash but one before a brace, which is content that
+    // doesn't interpolate here too (`rawtpl_kind` decodes it).
     let raw3 = TokenRule {
         matcher: Template("```", "", |segs: str[]| segs),
         emit: OfSeg(rawtpl_kind),
     };
     let tpl2 = [ws, raw3, tpl, ident, digits];
     assert(lex("```a`b\\c```", tpl2)? == toks([tok("```a`b\\c```", RawTpl("a`b\\c"), 0..11)]));
+    assert(lex("```a\\{b\\}```", tpl2)? == toks([tok("```a\\{b\\}```", RawTpl("a{b}"), 0..12)]));
     assert(
         lex("```a{x}b```", tpl2)? == toks([
             tok("```a{x}b```", RawTplHead("a"), 0..5),
@@ -1466,36 +1495,36 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1415
-deallocations: 1415
-reallocations: 153
-bytes allocated: 84320
-instructions executed: 345267
-binary size: 2314104
-  code: 1547700
-  data: 10908
-  metadata: 755496
+allocations: 1473
+deallocations: 1473
+reallocations: 162
+bytes allocated: 86944
+instructions executed: 357766
+binary size: 2530928
+  code: 1693232
+  data: 11348
+  metadata: 826348
 functions:
   __arr_drop_StepResult$Kind:
-    calls: 8
+    calls: 9
     bytes: 140
   __arr_drop_Token$Kind:
-    calls: 312
+    calls: 330
     bytes: 472
   __arr_drop_TokenRule$Kind:
     calls: 35
     bytes: 916
   __arr_retain_StepResult$Kind:
-    calls: 9
+    calls: 10
     bytes: 140
   __arr_retain_Token$Kind:
-    calls: 148
+    calls: 157
     bytes: 472
   __arr_retain_TokenRule$Kind:
     calls: 6
     bytes: 916
   __builtin_count_while$char$lam35:
-    calls: 84
+    calls: 85
     bytes: 220
   __builtin_count_while$char$s0$lam43:
     calls: 49
@@ -1513,25 +1542,25 @@ functions:
     calls: 13
     bytes: 1028
   __eq_Kind:
-    calls: 108
+    calls: 113
     bytes: 632
   __eq_LexError:
     calls: 15
     bytes: 128
   __eq_LexResult$Kind:
-    calls: 50
+    calls: 53
     bytes: 120
   __eq_SpanStr:
-    calls: 109
+    calls: 114
     bytes: 128
   __eq_Token$Kind:
-    calls: 108
+    calls: 113
     bytes: 120
   __eq_Token$Kind$arr:
-    calls: 100
+    calls: 106
     bytes: 284
   __eq___builtin_Span:
-    calls: 127
+    calls: 132
     bytes: 104
   __lambda_0:
     calls: 0
@@ -1561,13 +1590,13 @@ functions:
     calls: 0
     bytes: 48
   __lambda_17:
-    calls: 8
+    calls: 10
     bytes: 64
   __lambda_18:
     calls: 0
     bytes: 48
   __lambda_19:
-    calls: 2
+    calls: 3
     bytes: 64
   __lambda_20:
     calls: 0
@@ -1600,7 +1629,7 @@ functions:
     calls: 67
     bytes: 140
   __lambda_5:
-    calls: 32
+    calls: 33
     bytes: 96
   __lambda_6:
     calls: 0
@@ -1615,14 +1644,14 @@ functions:
     calls: 1
     bytes: 96
   __m1__unescape:
-    calls: 21
+    calls: 24
     bytes: 1168
   __test$keep_skipped:
     calls: 1
     bytes: 25276
   __test$lex:
     calls: 1
-    bytes: 1420116
+    bytes: 1564868
   __test$span_str:
     calls: 1
     bytes: 3152
@@ -1633,31 +1662,31 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 350
+    calls: 366
     bytes: (external)
   aipl_arr_inc:
-    calls: 3177
+    calls: 3300
     bytes: (external)
   aipl_arr_reserve:
-    calls: 350
+    calls: 366
     bytes: (external)
   aipl_array_dec:
-    calls: 4587
+    calls: 4766
     bytes: (external)
   aipl_array_new:
-    calls: 1355
+    calls: 1402
     bytes: (external)
   aipl_array_push:
-    calls: 52
+    calls: 61
     bytes: (external)
   aipl_array_push_mut:
-    calls: 26
+    calls: 30
     bytes: (external)
   aipl_array_with_cap:
     calls: 3
     bytes: (external)
   aipl_assert:
-    calls: 86
+    calls: 89
     bytes: (external)
   aipl_test_begin:
     calls: 3
@@ -1681,7 +1710,7 @@ functions:
     calls: 2
     bytes: 140
   finalize_template$Kind:
-    calls: 13
+    calls: 16
     bytes: 10180
   float_len:
     calls: 14
@@ -1690,16 +1719,16 @@ functions:
     calls: 13
     bytes: 1580
   interp_scan$Kind:
-    calls: 9
+    calls: 10
     bytes: 2028
   keep_skipped$Kind:
     calls: 3
     bytes: 5956
   lex$Kind:
-    calls: 72
+    calls: 75
     bytes: 1328
   lex_step$Kind:
-    calls: 171
+    calls: 175
     bytes: 30956
   main:
     calls: 1
@@ -1711,16 +1740,16 @@ functions:
     calls: 2
     bytes: 1824
   rawtpl_kind:
-    calls: 3
-    bytes: 3208
+    calls: 4
+    bytes: 3852
   step_result$Kind:
-    calls: 469
+    calls: 474
     bytes: 17440
   template_scan$Kind:
-    calls: 16
-    bytes: 2728
+    calls: 19
+    bytes: 2864
   template_step$Kind:
-    calls: 27
+    calls: 31
     bytes: 476
   to_eol_len:
     calls: 0
@@ -1732,8 +1761,8 @@ functions:
     calls: 8
     bytes: 368
   toks:
-    calls: 47
+    calls: 50
     bytes: 144
   tpl_kind:
-    calls: 17
+    calls: 20
     bytes: 3224

@@ -3044,11 +3044,11 @@ allocations: 124442
 deallocations: 124442
 reallocations: 2005
 bytes allocated: 6654824
-instructions executed: 24112339
-binary size: 9700632
-  code: 6121920
+instructions executed: 24112429
+binary size: 9701632
+  code: 6122696
   data: 29644
-  metadata: 3549068
+  metadata: 3549292
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3235,7 +3235,7 @@ functions:
     bytes: 1772
   __m8__dedent_segments:
     calls: 0
-    bytes: 272
+    bytes: 288
   __m8__doc_text:
     calls: 9
     bytes: 196
@@ -3244,7 +3244,7 @@ functions:
     bytes: 1364
   __m8__raw_tpl_kind:
     calls: 0
-    bytes: 2592
+    bytes: 3216
   __m8__tpl_kind:
     calls: 2
     bytes: 2608
@@ -3277,7 +3277,7 @@ functions:
     bytes: 15088
   __m9__template_scan$__m8__AiplTok:
     calls: 1
-    bytes: 2728
+    bytes: 2864
   __m9__template_step$__m8__AiplTok:
     calls: 1318
     bytes: 476

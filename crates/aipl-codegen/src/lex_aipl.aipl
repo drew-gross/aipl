@@ -8,7 +8,6 @@ import {
     int_parse,
     join,
     len,
-    logical_or as ||,
     map,
     push,
     split,
@@ -47,7 +46,7 @@ import {
 import { process_raw_string } from "./process_raw_string.aipl";
 import { strip_test_sections } from "./strip_test_sections.aipl";
 import { trim_prefix } from "./trim_prefix.aipl";
-import { unescape } from "./unescape.aipl";
+import { unescape, unescape_braces } from "./unescape.aipl";
 
 // AIPL's token kinds — each arm is a kind, carrying that kind's content
 // (`Name` its text, `IntLit` its value) or nothing. Every keyword and every
@@ -212,8 +211,9 @@ fn op(spelling: str, kind: AiplTok, scope: str) -> TokenRule<AiplTok> {
 # The `OfSeg` emit for the `` `...` `` template rule: the `Template` matcher hands
 # each text segment's *raw* text plus its position (`Plain` for an
 # interpolation-free literal, else `Head`/`Middle`/`Tail`), and this maps each to
-# its own `AiplTok` arm — decoding the segment's escapes (`` \` ``/`\{`/`\n`/… as in
-# the `escapes` set below) with `unescape`, exactly as the `"..."` emit does. An
+# its own `AiplTok` arm — decoding the segment's escapes (`` \` ``/`\n`/… as in
+# the `escapes` set below, plus the template's own `\{`/`\}`) with `unescape`,
+# exactly as the `"..."` emit does. An
 # interpolation-free template (`Plain`) folds into `StrLit` (with `Backtick`
 # style) — the same token any other string literal produces — while a template
 # *with* interpolations keeps distinct `TemplateHead`/`Mid`/`Tail` kinds.
@@ -230,25 +230,28 @@ fn tpl_kind(text: str, seg: Seg) -> AiplTok {
 # The segment finalizer for the raw-template rule (the `Template` matcher's
 # `finalize`): de-dent the whole literal's text segments *together*, so the
 # common indent is computed across the entire template — just like a `"""` raw
-# string. The segments are joined by `{` (which can't occur inside a raw
-# segment, since a `{` always opens an interpolation), de-dented as one block
-# via the dogfooded `process_raw_string`, then split back. A no-interpolation
-# raw template is the one-segment case (de-dent that single segment).
-fn dedent_segments(segs: str[]) -> str[] { process_raw_string(segs.join(sep="{")).split("{") }
+# string. The segments are joined by the literal's own delimiter (which can't
+# occur inside a raw segment, since it would have closed the literal — unlike a
+# brace, which `\{` can spell), de-dented as one block via the dogfooded
+# `process_raw_string`, then split back. A no-interpolation raw template is the
+# one-segment case (de-dent that single segment).
+fn dedent_segments(segs: str[]) -> str[] { process_raw_string(segs.join(sep="```")).split("```") }
 
 # The `OfSeg` emit for the ```` ```...``` ```` raw-template rule: like `tpl_kind`,
-# but the delimiter scans verbatim (empty `escapes`), so the segment text isn't
-# escape-decoded — a lone `` ` ``/` `` ` inside is content. The segments arrive
-# already de-dented (by `dedent_segments`, the rule's `finalize`), so this just
+# but the delimiter scans verbatim (empty `escapes`), so the segment text is
+# decoded only for the template's own `\{`/`\}` — a lone `` ` ``/` `` ` or any
+# other backslash inside is content. The segments arrive already de-dented (by
+# `dedent_segments`, the rule's `finalize`), so this decodes the braces and
 # wraps them: an interpolation-free raw template (`Plain`) folds into `StrLit`
 # with `TripleBacktick` style, and an interpolated one keeps distinct
 # `RawTemplate*` kinds.
 fn raw_tpl_kind(text: str, seg: Seg) -> AiplTok {
+    let t = text.unescape_braces();
     match (seg) {
-        Plain => StrLit(text, TripleBacktick),
-        Head => RawTemplateHead(text),
-        Middle => RawTemplateMid(text),
-        Tail => RawTemplateTail(text),
+        Plain => StrLit(t, TripleBacktick),
+        Head => RawTemplateHead(t),
+        Middle => RawTemplateMid(t),
+        Tail => RawTemplateTail(t),
     }
 }
 
@@ -292,7 +295,13 @@ fn char_lit_emit(text: str) -> AiplTok!str {
 # the token the lexer is expected to produce, which is what makes them one claim
 # rather than two.
 pub fn str_lit_value(text: str) -> str {
-    if (text.starts_with("\"\"\"") || text.starts_with("```")) {
+    if (text.starts_with("```")) {
+        // A raw template: de-dented like a raw string, then the one escape a
+        // template always has, its braces, decoded — the order the rule's
+        // `finalize` and emit take.
+        return process_raw_string(text[3..text.len() - 3]).unescape_braces();
+    };
+    if (text.starts_with("\"\"\"")) {
         return process_raw_string(text[3..text.len() - 3]);
     };
     text[1..text.len() - 1].unescape()
@@ -331,6 +340,13 @@ pub fn str_lit_value(text: str) -> str {
 
     let raw_tpl = "```a`b```";
     assert(str_lit_value(raw_tpl) == "a`b");
+
+    // A raw template decodes exactly `\{` and `\}`; every other backslash is
+    // content. A `"""` string decodes nothing at all.
+    let braced = "```a\\{b\\}\\n```";
+    assert(str_lit_value(braced) == "a{b}\\n");
+    assert(str_lit_value("\"\"\"a\\{b\"\"\"") == "a\\{b");
+    assert(str_lit_value("`\\{\\}`") == "{}");
     assert(
         lex_aipl(raw_tpl)? == LexResult {
             tokens: [
@@ -583,7 +599,9 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // the same longest-delim-first ordering as the raw/plain string rules,
         // and matching the Rust lexer's triple-before-single check). The raw form
         // scans verbatim (empty `escapes`); the single form decodes the same
-        // escapes as a string plus `` \` ``/`\{`. Each interpolation re-lexes with
+        // escapes as a string plus `` \` ``. Both recognise `\{` and `\}`, which
+        // every template has of its own (see `Template` in `lexer.aipl`) — the
+        // one escape a raw template decodes. Each interpolation re-lexes with
         // this whole rule set, so templates nest.
         TokenRule {
             matcher: Template("```", "", dedent_segments),
@@ -592,7 +610,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             scope: s_string(),
         },
         TokenRule {
-            matcher: Template("`", "\\`{ntr", |segs: str[]| segs),
+            matcher: Template("`", "\\`ntr", |segs: str[]| segs),
             emit: OfSeg(tpl_kind),
             scope: s_string(),
         },
@@ -930,15 +948,15 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 5176
-deallocations: 5176
-reallocations: 94
-bytes allocated: 540428
-instructions executed: 1380916
-binary size: 557960
-  code: 378736
-  data: 9956
-  metadata: 169268
+allocations: 5185
+deallocations: 5185
+reallocations: 96
+bytes allocated: 540866
+instructions executed: 1384543
+binary size: 560464
+  code: 380312
+  data: 10156
+  metadata: 169996
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -959,7 +977,7 @@ functions:
     calls: 0
     bytes: 832
   __builtin_all$char$s0$lam52:
-    calls: 18
+    calls: 22
     bytes: 212
   __builtin_count_while$char$lam16:
     calls: 50
@@ -980,7 +998,7 @@ functions:
     calls: 4
     bytes: 172
   __builtin_count_while$char$s0$lam51:
-    calls: 9
+    calls: 11
     bytes: 172
   __builtin_int_parse:
     calls: 4
@@ -1077,7 +1095,7 @@ functions:
     bytes: 15088
   __m1__template_scan$AiplTok:
     calls: 6
-    bytes: 2728
+    bytes: 2864
   __m1__template_step$AiplTok:
     calls: 52
     bytes: 476
@@ -1091,13 +1109,16 @@ functions:
     calls: 67
     bytes: 368
   __m2__unescape:
-    calls: 33
+    calls: 34
     bytes: 1168
+  __m2__unescape_braces:
+    calls: 5
+    bytes: 708
   __m3__process_raw_string:
-    calls: 9
+    calls: 11
     bytes: 1712
   __m7__trim_prefix:
-    calls: 30
+    calls: 34
     bytes: 260
   __m8__trim_suffix:
     calls: 0
@@ -1122,7 +1143,7 @@ functions:
     bytes: 5024
   __test$str_lit_value:
     calls: 1
-    bytes: 7932
+    bytes: 8464
   __test$template_segments:
     calls: 1
     bytes: 6496
@@ -1142,22 +1163,22 @@ functions:
     calls: 216
     bytes: (external)
   aipl_array_dec:
-    calls: 15613
+    calls: 15619
     bytes: (external)
   aipl_array_new:
-    calls: 5108
+    calls: 5110
     bytes: (external)
   aipl_array_push:
     calls: 29
     bytes: (external)
   aipl_array_push_mut:
-    calls: 35
+    calls: 39
     bytes: (external)
   aipl_array_with_cap:
-    calls: 22
+    calls: 26
     bytes: (external)
   aipl_assert:
-    calls: 47
+    calls: 50
     bytes: (external)
   aipl_rules:
     calls: 29
@@ -1179,7 +1200,7 @@ functions:
     bytes: 300
   dedent_segments:
     calls: 2
-    bytes: 272
+    bytes: 288
   doc_text:
     calls: 1
     bytes: 196
@@ -1197,10 +1218,10 @@ functions:
     bytes: 584
   raw_tpl_kind:
     calls: 2
-    bytes: 2592
+    bytes: 2608
   str_lit_value:
-    calls: 9
-    bytes: 400
+    calls: 12
+    bytes: 568
   template_segments:
     calls: 5
     bytes: 1652

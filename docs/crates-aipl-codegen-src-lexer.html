@@ -637,7 +637,7 @@
             <a class="anchor" href="#item-apply_emit">apply_emit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31122: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
+          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31538: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
 
           <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its content string — the matcher-computed <code>value</code> (a delimited string, stripped) when there is one, else the raw matched <code>text</code>. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
 

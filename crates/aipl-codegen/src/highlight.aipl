@@ -311,15 +311,16 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
         matcher_pat(Template("`", "nt", |segs: str[]| segs), "s", "esc") == Region(
             "`",
             "`",
-            [Match("\\\\[nt]", "esc"), interp],
+            [Match("\\\\[nt{}]", "esc"), interp],
             scope="s",
         ),
     );
+    // A raw template's escapes are the braces alone.
     assert(
         matcher_pat(Template("```", "", |segs: str[]| segs), "s", "esc") == Region(
             "```",
             "```",
-            [interp],
+            [Match("\\\\[{}]", "esc"), interp],
             scope="s",
         ),
     );
@@ -348,14 +349,18 @@ pub fn matcher_regex(m: Matcher) -> str? {
 # escape rather than as content.
 fn escape_pat(escapes: str, scope: str) -> Pat { Match(`\\\\{char_class(escapes)}`, scope) }
 
-# What lies inside a template literal: its escapes, when it has any, and the
-# `{ .. }` interpolation, which includes the whole language back into itself so
-# an interpolated expression keeps its ordinary scopes. The brace group comes
-# first so a `{ .. }` *inside* the expression — a set literal, a struct — closes
-# itself rather than the interpolation; see `brace_group_entry`.
+# What lies inside a template literal: its escapes and the `{ .. }`
+# interpolation, which includes the whole language back into itself so an
+# interpolated expression keeps its ordinary scopes. The escapes always include
+# the template's own `\{`/`\}` (see `Template` in `lexer.aipl`), listed ahead of
+# the interpolation so an escaped brace is painted as one rather than opening
+# it. The brace group comes first inside so a `{ .. }` *inside* the expression —
+# a set literal, a struct — closes itself rather than the interpolation; see
+# `brace_group_entry`.
 fn template_inner(escapes: str, esc_scope: str) -> Pat[] {
     let interp: Pat = Region("\\{", "\\}", [Include("brace-group"), Include("main")]);
-    if (escapes.is_empty()) { [interp] } else { [escape_pat(escapes, esc_scope), interp] }
+    let braces = "{}";
+    [escape_pat(`{escapes}{braces}`, esc_scope), interp]
 }
 
 # The repository entry an interpolation nests braces through: a `{ .. }` whose
@@ -767,15 +772,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 1099
-deallocations: 1099
+allocations: 1125
+deallocations: 1125
 reallocations: 33
-bytes allocated: 95079
-instructions executed: 73864
-binary size: 133488
-  code: 83804
-  data: 5298
-  metadata: 44386
+bytes allocated: 97337
+instructions executed: 75172
+binary size: 133984
+  code: 84212
+  data: 5322
+  metadata: 44450
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -811,7 +816,7 @@ functions:
     calls: 2
     bytes: 284
   __eq_Pat:
-    calls: 19
+    calls: 20
     bytes: 480
   __eq_Pat$arr:
     calls: 13
@@ -835,7 +840,7 @@ functions:
     calls: 12
     bytes: 724
   __rec_drop_Pat:
-    calls: 74
+    calls: 77
     bytes: 268
   __test$brace_group_entry:
     calls: 1
@@ -851,7 +856,7 @@ functions:
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 12024
+    bytes: 12288
   __test$matcher_regex:
     calls: 1
     bytes: 8712
@@ -871,7 +876,7 @@ functions:
     calls: 0
     bytes: 204
   aipl_arr_inc:
-    calls: 151
+    calls: 148
     bytes: (external)
   aipl_arr_reserve:
     calls: 20
@@ -880,7 +885,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 270
+    calls: 267
     bytes: (external)
   aipl_array_new:
     calls: 67
@@ -898,10 +903,10 @@ functions:
     calls: 46
     bytes: (external)
   aipl_rec_alloc:
-    calls: 74
+    calls: 77
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 197
+    calls: 200
     bytes: (external)
   aipl_rec_inc_strong:
     calls: 123
@@ -922,16 +927,16 @@ functions:
     calls: 0
     bytes: 1344
   char_class_body:
-    calls: 15
+    calls: 17
     bytes: 620
   class_char:
-    calls: 43
+    calls: 49
     bytes: 996
   entry_name:
     calls: 5
     bytes: 444
   escape_pat:
-    calls: 3
+    calls: 5
     bytes: 456
   fld:
     calls: 6
@@ -947,7 +952,7 @@ functions:
     bytes: 760
   matcher_pat:
     calls: 26
-    bytes: 6576
+    bytes: 6720
   obj_fld:
     calls: 1
     bytes: 1576

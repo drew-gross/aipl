@@ -577,7 +577,7 @@
           </h3>
           <pre class="signature"><code>fn tpl_kind(text: str, seg: Seg) -&#62; AiplTok</code></pre>
 
-          <div class="doc"><p>The <code>OfSeg</code> emit for the <code></code> <code>...</code> <code></code> template rule: the <code>Template</code> matcher hands each text segment's *raw* text plus its position (<code>Plain</code> for an interpolation-free literal, else <code>Head</code>/<code>Middle</code>/<code>Tail</code>), and this maps each to its own <code>AiplTok</code> arm — decoding the segment's escapes (<code></code> \<code> </code><code>/</code>\{<code>/</code>\n<code>/… as in the </code>escapes<code> set below) with </code>unescape<code>, exactly as the </code>&quot;...&quot;<code> emit does. An interpolation-free template (</code>Plain<code>) folds into </code>StrLit<code> (with </code>Backtick<code> style) — the same token any other string literal produces — while a template *with* interpolations keeps distinct </code>TemplateHead<code>/</code>Mid<code>/</code>Tail<code> kinds.</code></p></div>
+          <div class="doc"><p>The <code>OfSeg</code> emit for the <code></code> <code>...</code> <code></code> template rule: the <code>Template</code> matcher hands each text segment's *raw* text plus its position (<code>Plain</code> for an interpolation-free literal, else <code>Head</code>/<code>Middle</code>/<code>Tail</code>), and this maps each to its own <code>AiplTok</code> arm — decoding the segment's escapes (<code></code> \<code> </code><code>/</code>\n<code>/… as in the </code>escapes<code> set below, plus the template's own </code>\{<code>/</code>\}<code>) with </code>unescape<code>, exactly as the </code>&quot;...&quot;<code> emit does. An interpolation-free template (</code>Plain<code>) folds into </code>StrLit<code> (with </code>Backtick<code> style) — the same token any other string literal produces — while a template *with* interpolations keeps distinct </code>TemplateHead<code>/</code>Mid<code>/</code>Tail<code> kinds.</code></p></div>
 
 
         </section>
@@ -591,7 +591,7 @@
           </h3>
           <pre class="signature"><code>fn dedent_segments(segs: str[]) -&#62; str[]</code></pre>
 
-          <div class="doc"><p>The segment finalizer for the raw-template rule (the <code>Template</code> matcher's <code>finalize</code>): de-dent the whole literal's text segments *together*, so the common indent is computed across the entire template — just like a <code>&quot;&quot;&quot;</code> raw string. The segments are joined by <code>{</code> (which can't occur inside a raw segment, since a <code>{</code> always opens an interpolation), de-dented as one block via the dogfooded <code>process_raw_string</code>, then split back. A no-interpolation raw template is the one-segment case (de-dent that single segment).</p></div>
+          <div class="doc"><p>The segment finalizer for the raw-template rule (the <code>Template</code> matcher's <code>finalize</code>): de-dent the whole literal's text segments *together*, so the common indent is computed across the entire template — just like a <code>&quot;&quot;&quot;</code> raw string. The segments are joined by the literal's own delimiter (which can't occur inside a raw segment, since it would have closed the literal — unlike a brace, which <code>\{</code> can spell), de-dented as one block via the dogfooded <code>process_raw_string</code>, then split back. A no-interpolation raw template is the one-segment case (de-dent that single segment).</p></div>
 
 
         </section>
@@ -605,7 +605,7 @@
           </h3>
           <pre class="signature"><code>fn raw_tpl_kind(text: str, seg: Seg) -&#62; AiplTok</code></pre>
 
-          <div class="doc"><p>The <code>OfSeg</code> emit for the <code></code><code></code> <code></code><code>...</code><code></code> <code></code><code></code> raw-template rule: like <code>tpl_kind</code>, but the delimiter scans verbatim (empty <code>escapes</code>), so the segment text isn't escape-decoded — a lone <code></code> <code> </code><code>/</code> <code></code> <code> inside is content. The segments arrive already de-dented (by </code>dedent_segments<code>, the rule's </code>finalize<code>), so this just wraps them: an interpolation-free raw template (</code>Plain<code>) folds into </code>StrLit<code> with </code>TripleBacktick<code> style, and an interpolated one keeps distinct </code>RawTemplate*<code> kinds.</code></p></div>
+          <div class="doc"><p>The <code>OfSeg</code> emit for the <code></code><code></code> <code></code><code>...</code><code></code> <code></code><code></code> raw-template rule: like <code>tpl_kind</code>, but the delimiter scans verbatim (empty <code>escapes</code>), so the segment text is decoded only for the template's own <code>\{</code>/<code>\}</code> — a lone <code></code> <code> </code><code>/</code> <code></code> <code> or any other backslash inside is content. The segments arrive already de-dented (by </code>dedent_segments<code>, the rule's </code>finalize<code>), so this decodes the braces and wraps them: an interpolation-free raw template (</code>Plain<code>) folds into </code>StrLit<code> with </code>TripleBacktick<code> style, and an interpolated one keeps distinct </code>RawTemplate*<code> kinds.</code></p></div>
 
 
         </section>

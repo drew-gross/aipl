@@ -46,6 +46,20 @@
         </section>
 
 
+
+        <section class="item" id="item-unescape_braces">
+          <h3>
+            <a class="anchor" href="#item-unescape_braces">unescape_braces</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn unescape_braces(self: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>Decode only <code>\{</code> and <code>\}</code> — the escapes every template literal has of its own, braces being the template's syntax — and copy everything else verbatim, backslashes included: a raw <code></code><code></code> <code></code><code>...</code><code></code> <code></code><code></code> template's segments are otherwise untouched, so <code>\n</code> there stays two chars. Runs of plain text are copied by slicing, as <code>unescape</code> does.</p></div>
+
+
+        </section>
+
+
       </section>
 
 
