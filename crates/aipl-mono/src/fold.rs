@@ -209,7 +209,11 @@ fn pattern_binds(pattern: &Pattern, name: &str) -> bool {
         Pattern::Array(elems) => elems
             .iter()
             .any(|el| matches!(&el.kind, ExprKind::Ident(n) if n == name)),
-        Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => false,
+        Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard | Pattern::Int(_) => false,
+        // A nested pattern's binders, wherever they sit.
+        Pattern::Bind(_) | Pattern::Tuple(_) | Pattern::Nested { .. } => {
+            pattern.bindings().iter().any(|b| b == name)
+        }
     }
 }
 

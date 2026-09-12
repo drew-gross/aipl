@@ -26,7 +26,7 @@
           </h3>
           <pre class="signature"><code>variant Pat</code></pre>
 
-          <div class="doc"><p><code>aipl_syntax::ast::Pattern</code>. Its <code>Ctor</code> case is a struct variant there and a named payload here, which is as close as the two declarations get: the slot names are the same three, in the same order.</p><p><code>Array</code> — the destructuring <code>[a, b] =&gt; ..</code> arm — holds a list of *expressions*, which is why nothing under the <code>pattern</code> production produces one: it hangs off <code>match_arm</code>, where the elements are an ordinary <code>args</code> list.</p></div>
+          <div class="doc"><p><code>aipl_syntax::ast::Pattern</code>, less its <code>Bind</code> case. Its <code>Ctor</code> case is a struct variant there and a named payload here, which is as close as the two declarations get: the slot names are the same three, in the same order.</p><p><code>Array</code> — the destructuring <code>[a, b] =&gt; ..</code> arm — holds a list of *expressions*, which is why nothing under the <code>pattern</code> production produces one: it hangs off <code>match_arm</code>, where the elements are an ordinary <code>args</code> list.</p><p>The nested forms: <code>Tuple</code> is <code>(p, q)</code>, <code>Int</code> an integer literal, and <code>Nested</code> a constructor whose slots are patterns rather than plain names — <code>some(1)</code>, <code>Pair(x, none)</code>. A constructor whose slots are all plain names is the <code>Ctor</code> it always was, so an arm written the old way lowers as it always did; <code>nested_or_ctor</code> makes that choice. Whether a bare name in a nested slot binds or names a case is decided on the Rust side (<code>Pattern::normalized</code>, the <code>Bind</code> case this declaration lacks), by the same rule <code>is_binder_name</code> states here.</p></div>
 
 
           <ul class="cases">
@@ -51,7 +51,47 @@
 
             </li>
 
+            <li id="item-Tuple"><code>Tuple(Pat[])</code>
+
+            </li>
+
+            <li id="item-Nested"><code>Nested(name: str, args: Pat[])</code>
+
+            </li>
+
+            <li id="item-Int"><code>Int(i64)</code>
+
+            </li>
+
           </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-is_binder_name">
+          <h3>
+            <a class="anchor" href="#item-is_binder_name">is_binder_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn is_binder_name(self: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a bare name in a nested pattern slot is a binder rather than a case: everything but <code>none</code> and a capitalised name. The one rule that needs no type, stated once here and once in <code>aipl_syntax::ast::is_binder_name</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-nested_or_ctor">
+          <h3>
+            <a class="anchor" href="#item-nested_or_ctor">nested_or_ctor</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn nested_or_ctor(name: str, args: Pat[]) -&#62; Pat</code></pre>
+
+          <div class="doc"><p>A constructor over sub-patterns, as the simplest <code>Pat</code> that spells it: the plain <code>Ctor</code> when every slot is a bare binder name, else <code>Nested</code>. A nullary sub-pattern arrives as a nullary <code>Ctor</code> (the parser cannot tell a binder from a case by shape alone), which is what the binder test reads.</p></div>
+
 
         </section>
 
@@ -118,6 +158,62 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-is_plain_binder">
+          <h3>
+            <a class="anchor" href="#item-is_plain_binder">is_plain_binder</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_plain_binder(self: Pat) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-binder_name">
+          <h3>
+            <a class="anchor" href="#item-binder_name">binder_name</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn binder_name(self: Pat) -&#62; str</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_pats">
+          <h3>
+            <a class="anchor" href="#item-show_pats">show_pats</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_pats(self: Pat[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>The elements of a pattern list, comma-separated.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-nested_bindings">
+          <h3>
+            <a class="anchor" href="#item-nested_bindings">nested_bindings</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn nested_bindings(self: Pat) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The binders of one nested slot: a bare binder name is itself, a case or a literal nothing, and a deeper pattern its own binders.</p></div>
+
+
+        </section>
+
 
 
         <section class="item" id="item-no_names">

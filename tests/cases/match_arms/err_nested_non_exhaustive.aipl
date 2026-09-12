@@ -1,0 +1,21 @@
+import { print } from builtins;
+
+// A nested match is checked exhaustive over the whole arm list, and a missing
+// case is named as a value shape — here nothing matches a `none` on the right.
+fn f(a: i64, b: i64?) -> str {
+    match (a, b) {
+        (1, some(1)) => "a",
+        (x, some(y)) => "b",
+        (0, none) => "c",
+    }
+}
+
+fn main() !prints {
+    print(f(1, none));
+}
+--- errors ---
+error: non-exhaustive match: (_, none) is not matched
+ --> ./tests/cases/match_arms/err_nested_non_exhaustive.aipl:6:5
+  |
+6 |     match (a, b) {
+  |     ^^^^^^^^^^^^^^

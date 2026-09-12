@@ -19081,6 +19081,12 @@ fn compile_expr_inner<M: Module>(
                         // A char literal never reaches here: it only matches a
                         // `char` scrutinee, which took the scalar path above.
                         Pattern::Char(_) => unreachable!("char arm on a str/array match"),
+                        // Nested patterns are compiled away by mono
+                        // (`infer_nested_match`) before codegen.
+                        Pattern::Tuple(_)
+                        | Pattern::Nested { .. }
+                        | Pattern::Int(_)
+                        | Pattern::Bind(_) => unreachable!("nested pattern reached codegen"),
                         Pattern::Str(lit) => {
                             let lit_expr =
                                 Expr::new(ExprKind::Str(lit.clone()), scrutinee.span.clone());

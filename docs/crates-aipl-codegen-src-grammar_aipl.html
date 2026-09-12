@@ -621,7 +621,7 @@
           </h3>
           <pre class="signature"><code>fn match_expr(kids: Ast[], tsp: Span, sp: Span) -&#62; Expr!ParseError</code></pre>
 
-          <div class="doc"><p><code>match (e) { .. }</code> — every arm child is already a *list* of arms, since an alternation expands to one arm per pattern, so they concatenate.</p></div>
+          <div class="doc"><p><code>match (e) { .. }</code> — every arm child is already a *list* of arms, since an alternation expands to one arm per pattern, so they concatenate. The scrutinee is every leading expression child: one is matched as it is, several are the tuple <code>match (a, b)</code> spells without its own parentheses.</p></div>
 
 
         </section>
@@ -1392,7 +1392,7 @@
           </h3>
           <pre class="signature"><code>fn lower_ctor_payload(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>ctor_payload</code> — <code>Ctor(a, b)</code> names each slot, <code>Ctor(..)</code> says the case carries a payload this arm does not read. Neither alternative has an interior child: the bindings are <code>Name</code> terminals, so both are read off this node's own tokens with the separating commas dropped.</p></div>
+          <div class="doc"><p><code>ctor_payload</code> — <code>Ctor(p, q)</code> matches each slot against a pattern, <code>Ctor(..)</code> says the case carries a payload this arm does not read. The <code>..</code> alternative has no child and is read off this node's own token; the other's slots are its <code>pattern</code> children.</p></div>
 
 
         </section>

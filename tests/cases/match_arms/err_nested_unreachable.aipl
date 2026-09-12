@@ -1,0 +1,20 @@
+import { print } from builtins;
+
+// An arm every value of which an earlier arm already takes is dead code, and
+// refused: `(x, y)` matches everything, so `(0, none)` can never run.
+fn f(a: i64, b: i64?) -> str {
+    match (a, b) {
+        (x, y) => "b",
+        (0, none) => "c",
+    }
+}
+
+fn main() !prints {
+    print(f(1, none));
+}
+--- errors ---
+error: unreachable arm: every value it matches is matched by an arm above it
+ --> ./tests/cases/match_arms/err_nested_unreachable.aipl:8:9
+  |
+8 |         (0, none) => "c",
+  |         ^^^^^^^^^

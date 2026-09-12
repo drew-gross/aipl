@@ -1,21 +1,97 @@
 // `aipl_syntax::ast::Pattern` as AIPL declares it. One of the files the AST is
 // declared across; see `ast.aipl`.
-import { equal as ==, filter_map, is_empty, join, map } from builtins;
+import {
+    all,
+    contains,
+    equal as ==,
+    filter_map,
+    is_empty,
+    is_some_and,
+    join,
+    logical_and as &&,
+    logical_not as !,
+    map,
+    not_equal as !=,
+} from builtins;
 import { Expr, Ident, ident, num, show_exprs } from "./expr.aipl";
 
-# `aipl_syntax::ast::Pattern`. Its `Ctor` case is a struct variant there and a
-# named payload here, which is as close as the two declarations get: the slot
-# names are the same three, in the same order.
+# `aipl_syntax::ast::Pattern`, less its `Bind` case. Its `Ctor` case is a
+# struct variant there and a named payload here, which is as close as the two
+# declarations get: the slot names are the same three, in the same order.
 #
 # `Array` — the destructuring `[a, b] => ..` arm — holds a list of
 # *expressions*, which is why nothing under the `pattern` production produces
 # one: it hangs off `match_arm`, where the elements are an ordinary `args` list.
+#
+# The nested forms: `Tuple` is `(p, q)`, `Int` an integer literal, and `Nested`
+# a constructor whose slots are patterns rather than plain names —
+# `some(1)`, `Pair(x, none)`. A constructor whose slots are all plain names is
+# the `Ctor` it always was, so an arm written the old way lowers as it always
+# did; `nested_or_ctor` makes that choice. Whether a bare name in a nested slot
+# binds or names a case is decided on the Rust side (`Pattern::normalized`, the
+# `Bind` case this declaration lacks), by the same rule `is_binder_name` states
+# here.
 variant Pat =
     | Ctor(name: str, bindings: str[], ignore_payload: bool)
     | Str(str)
     | Char(char)
     | Array(Expr[])
     | Wildcard
+    | Tuple(Pat[])
+    | Nested(name: str, args: Pat[])
+    | Int(i64)
+
+# Whether a bare name in a nested pattern slot is a binder rather than a case:
+# everything but `none` and a capitalised name. The one rule that needs no type,
+# stated once here and once in `aipl_syntax::ast::is_binder_name`.
+pub fn is_binder_name(self: str) -> bool {
+    self != "none" && !self[0].is_some_and(|c| "ABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(c))
+}.test({
+    assert("lo".is_binder_name());
+    assert("_x".is_binder_name());
+    assert(!"none".is_binder_name());
+    assert(!"Nil".is_binder_name());
+    assert(!"Pair".is_binder_name());
+})
+
+# A constructor over sub-patterns, as the simplest `Pat` that spells it: the
+# plain `Ctor` when every slot is a bare binder name, else `Nested`. A nullary
+# sub-pattern arrives as a nullary `Ctor` (the parser cannot tell a binder from
+# a case by shape alone), which is what the binder test reads.
+pub fn nested_or_ctor(name: str, args: Pat[]) -> Pat {
+    if (args.all(is_plain_binder)) {
+        return Ctor(name, args.map(binder_name), false);
+    };
+    Nested(name, args)
+}.test({
+    let plain: Pat[] = [Ctor("a", [], false), Ctor("b", [], false)];
+    assert(nested_or_ctor("Pair", plain).show_pat() == "Pair(a, b)");
+    assert(nested_or_ctor("some", [Int(1)]).show_pat() == "some(1)");
+    // A capitalised name is a case, so the constructor over it nests.
+    assert(
+        nested_or_ctor(
+            "Pair",
+            [Ctor("Nil", [], false), Ctor("x", [], false)],
+        ).show_pat() == "Pair(Nil, x)",
+    );
+    // `..` and no slots keep the plain shape.
+    let no_args: Pat[] = [];
+    assert(nested_or_ctor("Empty", no_args).show_pat() == "Empty");
+})
+
+fn is_plain_binder(self: Pat) -> bool {
+    if (let Ctor(name, bindings, ignore) = self) {
+        return bindings.is_empty() && !ignore && name.is_binder_name();
+    };
+    false
+}
+
+fn binder_name(self: Pat) -> str {
+    if (let Ctor(name, _, _) = self) {
+        return name;
+    };
+    ""
+}
 
 # A pattern as a one-line dump, in the spelling that produced it: `Ctor(a, b)`,
 # `Ctor(..)`, a bare name, `_`. The two literal forms are tagged, because their
@@ -32,6 +108,9 @@ pub fn show_pat(self: Pat) -> str {
         } else {
             if (bindings.is_empty()) { name } else { `{name}({bindings.join(sep=", ")})` }
         },
+        Tuple(ps) => `({show_pats(ps)})`,
+        Nested(name, args) => `{name}({show_pats(args)})`,
+        Int(n) => `{n}`,
     }
 }.test({
     let no_bindings: str[] = [];
@@ -43,7 +122,12 @@ pub fn show_pat(self: Pat) -> str {
     assert(Str("hi").show_pat() == "Str(hi)");
     assert(Char('x').show_pat() == "Char(x)");
     assert(Array([num(1), ident("x")]).show_pat() == "[1, x]");
+    assert(Tuple([Int(1), Nested("some", [Int(1)])]).show_pat() == "(1, some(1))");
+    assert(Nested("Pair", [Ctor("lo", [], false), Wildcard]).show_pat() == "Pair(lo, _)");
 })
+
+# The elements of a pattern list, comma-separated.
+fn show_pats(self: Pat[]) -> str { self.map(show_pat).join(sep=", ") }
 
 # The names a pattern binds, in order — `Pattern::bindings` in Rust. It is what
 # an arm's alternatives must agree on, so that a shared body means the same
@@ -55,7 +139,10 @@ pub fn pat_bindings(self: Pat) -> str[] {
     match (self) {
         Ctor(_, bindings, _) => bindings,
         Array(elems) => elems.filter_map(is_ident, ident_name),
-        Str(..) | Char(..) | Wildcard => no_names(),
+        Str(..) | Char(..) | Wildcard | Int(..) => no_names(),
+        // A nested slot binds where a bare binder name sits, at any depth.
+        Tuple(ps) => ps.map(nested_bindings).join(),
+        Nested(_, args) => args.map(nested_bindings).join(),
     }
 }.test({
     let none_bound: str[] = [];
@@ -65,7 +152,26 @@ pub fn pat_bindings(self: Pat) -> str[] {
     assert(Str("s").pat_bindings() == none_bound);
     // A literal element of an array pattern is matched, not bound.
     assert(Array([ident("a"), num(1), ident("b")]).pat_bindings() == ["a", "b"]);
+    // Nested: every binder, depth first, left to right; a case name is not one.
+    assert(
+        Tuple([Ctor("lo", [], false), Nested("some", [Ctor("hi", [], false)])]).pat_bindings() == [
+            "lo",
+            "hi",
+        ],
+    );
+    assert(Nested("Pair", [Ctor("Nil", [], false), Int(1)]).pat_bindings() == none_bound);
 })
+
+# The binders of one nested slot: a bare binder name is itself, a case or a
+# literal nothing, and a deeper pattern its own binders.
+fn nested_bindings(self: Pat) -> str[] {
+    if (let Ctor(name, bindings, ignore) = self) {
+        if (bindings.is_empty() && !ignore) {
+            return if (name.is_binder_name()) { [name] } else { no_names() };
+        };
+    };
+    self.pat_bindings()
+}
 
 # The empty binding list, which `#{}`'s sibling problem makes worth naming: an
 # empty array literal does not flex through a generic parameter, so a `[]`
@@ -93,10 +199,13 @@ fn ident_name(self: Expr) -> str {
 pub fn pat_label(self: Pat) -> str {
     match (self) {
         Ctor(name, _, _) => `"{name}"`,
+        Nested(name, _) => `"{name}"`,
         Str(..) => "a string pattern",
         Char(..) => "a char pattern",
         Array(..) => "an array pattern",
         Wildcard => "\"_\"",
+        Tuple(..) => "a tuple pattern",
+        Int(..) => "an integer pattern",
     }
 }.test({
     let none_bound: str[] = [];
@@ -124,24 +233,33 @@ pub fn binder_list(self: str[]) -> str {
 
 fn quoted(self: str) -> str { `"{self}"` }
 --- performance ---
-allocations: 81
-deallocations: 81
-reallocations: 6
-bytes allocated: 5860
-instructions executed: 3460
-binary size: 79016
-  code: 50064
-  data: 1654
-  metadata: 27298
+allocations: 169
+deallocations: 169
+reallocations: 16
+bytes allocated: 11161
+instructions executed: 7866
+binary size: 93104
+  code: 57604
+  data: 2859
+  metadata: 32641
 functions:
+  __arr_drop_Pat:
+    calls: 9
+    bytes: 116
   __arr_drop___m1__Expr:
     calls: 3
+    bytes: 116
+  __arr_retain_Pat:
+    calls: 0
     bytes: 116
   __arr_retain___m1__Expr:
     calls: 0
     bytes: 116
+  __builtin_all$Pat$lam2:
+    calls: 4
+    bytes: 264
   __eq_str$arr:
-    calls: 5
+    calls: 7
     bytes: 364
   __m1__show_ann:
     calls: 0
@@ -168,8 +286,8 @@ functions:
     calls: 0
     bytes: 460
   __rec_drop_Pat:
-    calls: 19
-    bytes: 136
+    calls: 42
+    bytes: 204
   __rec_drop___m1__Expr:
     calls: 6
     bytes: 36
@@ -179,81 +297,123 @@ functions:
   __test$binder_list:
     calls: 1
     bytes: 832
+  __test$is_binder_name:
+    calls: 1
+    bytes: 432
+  __test$nested_or_ctor:
+    calls: 1
+    bytes: 1740
   __test$pat_bindings:
     calls: 1
-    bytes: 2384
+    bytes: 3616
   __test$pat_label:
     calls: 1
-    bytes: 6136
+    bytes: 1900
   __test$show_pat:
     calls: 1
-    bytes: 2824
+    bytes: 3840
   __to_str_i64:
-    calls: 1
+    calls: 4
     bytes: 204
+  aipl_arr_drop_arr:
+    calls: 3
+    bytes: (external)
   aipl_arr_inc:
-    calls: 20
+    calls: 80
+    bytes: (external)
+  aipl_arr_join:
+    calls: 3
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 5
     bytes: (external)
   aipl_array_dec:
-    calls: 41
+    calls: 140
     bytes: (external)
   aipl_array_new:
-    calls: 17
+    calls: 43
     bytes: (external)
   aipl_array_push_mut:
-    calls: 7
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 4
-    bytes: (external)
-  aipl_assert:
     calls: 22
     bytes: (external)
+  aipl_array_with_cap:
+    calls: 14
+    bytes: (external)
+  aipl_assert:
+    calls: 35
+    bytes: (external)
   aipl_i64_len:
-    calls: 2
+    calls: 8
     bytes: (external)
   aipl_rec_alloc:
-    calls: 31
+    calls: 54
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 43
+    calls: 92
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 6
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 12
+    calls: 38
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 6
     bytes: (external)
   aipl_test_begin:
-    calls: 4
+    calls: 6
     bytes: (external)
   aipl_test_end:
-    calls: 4
+    calls: 6
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   aipl_write_i64:
-    calls: 1
+    calls: 4
     bytes: (external)
   binder_list:
     calls: 3
     bytes: 740
+  binder_name:
+    calls: 2
+    bytes: 488
   ident_name:
     calls: 2
     bytes: 2928
+  is_binder_name:
+    calls: 11
+    bytes: 244
   is_ident:
     calls: 3
     bytes: 2804
+  is_plain_binder:
+    calls: 4
+    bytes: 436
   main:
     calls: 1
-    bytes: 320
-  pat_bindings:
+    bytes: 472
+  nested_bindings:
+    calls: 0
+    bytes: 32
+  nested_bindings$tail:
     calls: 5
-    bytes: 792
+    bytes: 796
+  nested_or_ctor:
+    calls: 4
+    bytes: 628
+  pat_bindings:
+    calls: 0
+    bytes: 32
+  pat_bindings$tail:
+    calls: 9
+    bytes: 2112
+  pat_label:
+    calls: 6
+    bytes: 1296
   show_pat:
-    calls: 8
-    bytes: 1640
+    calls: 22
+    bytes: 2548
+  show_pats:
+    calls: 5
+    bytes: 460

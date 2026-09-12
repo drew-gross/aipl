@@ -1,0 +1,19 @@
+import { print } from builtins;
+
+// A literal in a nested slot is checked against that slot's type.
+fn f(a: i64?) -> str {
+    match (a) {
+        some("x") => "one",
+        _ => "two",
+    }
+}
+
+fn main() !prints {
+    print(f(some(1)));
+}
+--- errors ---
+error: string-literal pattern matches a str, not i64
+ --> ./tests/cases/match_arms/err_nested_literal_type.aipl:6:9
+  |
+6 |         some("x") => "one",
+  |         ^^^^^^^^^

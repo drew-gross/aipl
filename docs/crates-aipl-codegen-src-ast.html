@@ -26,7 +26,7 @@
           </h3>
           <pre class="signature"><code>variant Ast</code></pre>
 
-          <div class="doc"><p>The one type every <code>build</code> in <code>grammar_aipl.aipl</code> returns, whatever the production is about — <code>Build&lt;A&gt;</code> pins a single <code>A</code> for a whole grammar, so a grammar describing a language rather than one expression type carries the seam here. Each case is a node kind the lowering produces.</p><p>Two cases are not node kinds but the intermediate a production hands its parent. <code>Tys</code> is the *list* a production whose whole content is a comma-separated run of types lowers to, and the case it lands in is what tells <code>ty</code>'s alternatives apart — <code>(A, B)</code> and <code>A</code> reach <code>ty</code> as different <code>Ast</code> cases, so nothing has to count tokens to know which matched. <code>Payload</code> is a constructor pattern's slot list and whether it was written <code>..</code>, which is the pair <code>Pat</code>'s <code>Ctor</code> needs and no node of its own.</p></div>
+          <div class="doc"><p>The one type every <code>build</code> in <code>grammar_aipl.aipl</code> returns, whatever the production is about — <code>Build&lt;A&gt;</code> pins a single <code>A</code> for a whole grammar, so a grammar describing a language rather than one expression type carries the seam here. Each case is a node kind the lowering produces.</p><p>Two cases are not node kinds but the intermediate a production hands its parent. <code>Tys</code> is the *list* a production whose whole content is a comma-separated run of types lowers to, and the case it lands in is what tells <code>ty</code>'s alternatives apart — <code>(A, B)</code> and <code>A</code> reach <code>ty</code> as different <code>Ast</code> cases, so nothing has to count tokens to know which matched. <code>Payload</code> is a constructor pattern's slot list — each slot a pattern — and whether it was written <code>..</code>, which is what <code>Pat</code>'s <code>Ctor</code>/<code>Nested</code> need and no node of its own.</p></div>
 
 
           <ul class="cases">
@@ -43,7 +43,7 @@
 
             </li>
 
-            <li id="item-Payload"><code>Payload(str[], bool)</code>
+            <li id="item-Payload"><code>Payload(PatNode[], bool)</code>
 
             </li>
 

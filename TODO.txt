@@ -75,19 +75,10 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  nothing in format.aipl should be able to be passed as a literal
   unescape + unescape_braces can probably be DRYed up
   union_all can be context ordered, like to_set
   render_rule Maybe arm could be 1 expression.
-  rep_suffix could be much simpler with multimatch and matching literals:
-    match (min, max) {
-        (1, some(1)) => "",
-        (0, some(1)) => "?",
-        (lo, some(hi)) => `\{{lo},{hi}\}`,
-        (0, none) => "*",
-        (1, none) => "+",
-        (lo, none) => `\{{lo},\},
-    }
-}
   make it so builtin .aipl files can contain helper functions
   only should be named one and use a nested_in kwarg (i.e. thinner wrapper over Many)
   destructuring in for loops should be DRYer with destructuring in let bindings
@@ -247,6 +238,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
+  my new pattern walker laid out a constructor's payload with comma_list_docs, which breaks long lists across lines with a trailing comma — and the pattern grammar takes no trailing comma, so aipl fmt rewrote three compiler sources (Let(\n name,\n …,\n) =>) into something that no longer parsed. <--- the formatter should decide whether to output a trailing comma based on the grammer definition. Why isn't it doing that?
   variant_case_docs.aipl is weird: having the leading | should force splitting each onto own line
   wrap comments
   formatter gets list separater directly off the Many
@@ -640,6 +632,7 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  add concept of examples
   integrate the readme into the docs
   reflow docs
   make /// docs a thing for things that should be documented (and only for those things)

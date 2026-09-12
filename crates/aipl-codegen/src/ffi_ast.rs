@@ -298,13 +298,22 @@ fn pattern(v: &FfiValue) -> R<ast::Pattern> {
         "Char" => ast::Pattern::Char(byte(at(payload, 0, case)?)?),
         "Array" => ast::Pattern::Array(each(at(payload, 0, case)?, expr)?),
         "Wildcard" => ast::Pattern::Wildcard,
+        "Tuple" => ast::Pattern::Tuple(each(at(payload, 0, case)?, pattern)?),
+        "Nested" => ast::Pattern::Nested {
+            name: text(at(payload, 0, case)?)?,
+            args: each(at(payload, 1, case)?, pattern)?,
+        },
+        "Int" => ast::Pattern::Int(int(at(payload, 0, case)?)?),
         other => return Err(unknown("Pat", other)),
     })
 }
 
+/// An arm's pattern, in its canonical shape: a name in a nested slot becomes
+/// the `Bind` the AIPL declaration has no case for, and a constructor over
+/// plain binders the simple `Ctor` — see `Pattern::normalized`.
 fn match_arm(v: &FfiValue) -> R<ast::MatchArm> {
     Ok(ast::MatchArm {
-        pattern: pattern(field(v, "pattern")?)?,
+        pattern: pattern(field(v, "pattern")?)?.normalized(true),
         body: expr(field(v, "body")?)?,
         span: span(field(v, "span")?)?,
     })

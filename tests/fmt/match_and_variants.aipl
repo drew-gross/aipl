@@ -2,6 +2,7 @@ import { == , wrapping_add as +, * } from builtins;
 variant Shape = Circle(i64)|Rect(i64,i64)|Empty
 fn area(s: Shape) -> i64 { match(s){ Circle(r)=>r*r*3, Rect(w,h)=>w*h, Empty=>0 } }
 fn tiny(o: i64 ?) -> i64 { match (o) { some(v)=>v, none=>0 } }
+fn pair(a: i64, o: i64?) -> i64 { match ( a , o ) { (1, some ( 1 ))=>0, ( lo , some(hi) ) => hi, ( _ , none ) => a } }
 fn sized(s: Shape) -> i64 { match (s) { Circle(r) => { let d = r + r; d * 3 }, Rect(w,h)=>{
 let a = w * h; a }, Empty => { 0 } } }
 --- formatted ---
@@ -21,6 +22,14 @@ fn tiny(o: i64?) -> i64 {
     match (o) {
         some(v) => v,
         none => 0,
+    }
+}
+
+fn pair(a: i64, o: i64?) -> i64 {
+    match (a, o) {
+        (1, some(1)) => 0,
+        (lo, some(hi)) => hi,
+        (_, none) => a,
     }
 }
 

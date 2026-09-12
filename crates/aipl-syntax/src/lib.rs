@@ -1524,13 +1524,44 @@ pub mod ast {
         /// The wildcard / default arm `_ => body` (matches anything). Only valid
         /// for a `str` or array match, where it must be the last arm.
         Wildcard,
+
+        // ---- Nested patterns ----
+        //
+        // The four below are what makes a pattern compose: a tuple of patterns,
+        // a constructor whose payload slots are themselves patterns, an integer
+        // literal, and a name binding whatever it matched. They exist from the
+        // parser to monomorphization only. The checker types them and proves the
+        // match exhaustive (see `check::usefulness`), and mono's `infer` compiles
+        // an arm that uses any of them into a decision tree of the *simple*
+        // forms above — a `Match` per constructor test, an `if` per literal
+        // test, a `let` per binder — so codegen never sees them.
+        /// `(p0, p1, ...)` — a tuple pattern, one sub-pattern per element. A
+        /// tuple scrutinee is its synthetic struct, and each sub-pattern matches
+        /// the corresponding `_i` field.
+        Tuple(Vec<Pattern>),
+        /// `Ctor(p0, p1, ...)` where at least one slot is not a plain binder —
+        /// `some(1)`, `Pair(x, none)`, `ok((a, b))`. A constructor whose slots
+        /// *are* all plain binders is the simple [`Pattern::Ctor`], which is
+        /// what [`Pattern::normalized`] turns it into.
+        Nested { name: String, args: Vec<Pattern> },
+        /// An integer literal pattern `1 => ..`, matching a scalar by value. The
+        /// domain is open, so a match on one needs a binder or `_` to be
+        /// exhaustive.
+        Int(i64),
+        /// A name at a nested position, binding the value it matched. At the top
+        /// of an arm a bare name is a nullary constructor, as it always was; in a
+        /// nested slot it is a binder unless it spells a case — `none`, or a
+        /// capitalised name — which is the rule [`Pattern::normalized`] applies,
+        /// and the checker then confirms against the type.
+        Bind(String),
     }
 
     impl Pattern {
         /// The positional binders this pattern introduces, in order: a
         /// constructor pattern's payload binders, or an array/`str` pattern's
-        /// identifier elements (its literal elements bind nothing). Empty for a
-        /// string-literal or wildcard pattern.
+        /// identifier elements (its literal elements bind nothing), or — for a
+        /// nested pattern — every [`Pattern::Bind`] in it, depth first, left to
+        /// right. Empty for a string-literal or wildcard pattern.
         pub fn bindings(&self) -> Vec<String> {
             match self {
                 Pattern::Ctor { bindings, .. } => bindings.clone(),
@@ -1541,17 +1572,109 @@ pub mod ast {
                         _ => None,
                     })
                     .collect(),
-                Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => Vec::new(),
+                Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard | Pattern::Int(_) => {
+                    Vec::new()
+                }
+                Pattern::Bind(name) => vec![name.clone()],
+                Pattern::Tuple(ps) | Pattern::Nested { args: ps, .. } => {
+                    ps.iter().flat_map(Pattern::bindings).collect()
+                }
             }
         }
 
-        /// The constructor name for a `Ctor` pattern; `None` otherwise.
+        /// The constructor name for a `Ctor` (or nested constructor) pattern;
+        /// `None` otherwise.
         pub fn ctor_name(&self) -> Option<&str> {
             match self {
-                Pattern::Ctor { name, .. } => Some(name),
-                Pattern::Str(_) | Pattern::Char(_) | Pattern::Array(_) | Pattern::Wildcard => None,
+                Pattern::Ctor { name, .. } | Pattern::Nested { name, .. } => Some(name),
+                Pattern::Str(_)
+                | Pattern::Char(_)
+                | Pattern::Array(_)
+                | Pattern::Wildcard
+                | Pattern::Tuple(_)
+                | Pattern::Int(_)
+                | Pattern::Bind(_) => None,
             }
         }
+
+        /// Whether this pattern uses any of the nested forms — the ones only the
+        /// checker and mono know, which an arm has to be compiled away from.
+        pub fn is_nested(&self) -> bool {
+            match self {
+                Pattern::Tuple(_) | Pattern::Nested { .. } | Pattern::Int(_) | Pattern::Bind(_) => {
+                    true
+                }
+                Pattern::Ctor { .. }
+                | Pattern::Str(_)
+                | Pattern::Char(_)
+                | Pattern::Array(_)
+                | Pattern::Wildcard => false,
+            }
+        }
+
+        /// The pattern as the parser hands it over, in its canonical shape: a
+        /// constructor whose slots are all plain binders is the simple
+        /// [`Pattern::Ctor`], and a bare name in a nested slot is a
+        /// [`Pattern::Bind`] unless it spells a case (`none`, or a capitalised
+        /// name). `top` says whether this is the whole arm's pattern, where a
+        /// bare name is always a nullary constructor.
+        pub fn normalized(self, top: bool) -> Pattern {
+            match self {
+                Pattern::Nested { name, args } => {
+                    let args: Vec<Pattern> =
+                        args.into_iter().map(|p| p.normalized(false)).collect();
+                    if args.is_empty() {
+                        if !top && is_binder_name(&name) {
+                            return Pattern::Bind(name);
+                        }
+                        return Pattern::Ctor {
+                            name,
+                            bindings: Vec::new(),
+                            ignore_payload: false,
+                        };
+                    }
+                    // Plain binders and `_` only: the simple form, with `_` as
+                    // the binder that names nothing — what `Right(_)` always was.
+                    if args
+                        .iter()
+                        .all(|p| matches!(p, Pattern::Bind(_) | Pattern::Wildcard))
+                    {
+                        return Pattern::Ctor {
+                            name,
+                            bindings: args
+                                .into_iter()
+                                .map(|p| match p {
+                                    Pattern::Bind(n) => n,
+                                    _ => "_".to_string(),
+                                })
+                                .collect(),
+                            ignore_payload: false,
+                        };
+                    }
+                    Pattern::Nested { name, args }
+                }
+                Pattern::Tuple(ps) => {
+                    Pattern::Tuple(ps.into_iter().map(|p| p.normalized(false)).collect())
+                }
+                // A bare name the parser could only read as a nullary
+                // constructor is a binder in a nested slot.
+                Pattern::Ctor {
+                    name,
+                    bindings,
+                    ignore_payload: false,
+                } if !top && bindings.is_empty() && is_binder_name(&name) => Pattern::Bind(name),
+                other => other,
+            }
+        }
+    }
+
+    /// Whether a bare name in a nested pattern slot binds rather than names a
+    /// case: everything but `none` and a capitalised name. Cases are
+    /// capitalised by convention and `none` is a keyword, so this is the one
+    /// rule that needs no type to apply — the checker confirms it against the
+    /// scrutinee.
+    pub fn is_binder_name(name: &str) -> bool {
+        name != "none" && !name.starts_with(|c: char| c.is_ascii_uppercase())
     }
 
     /// One arm of a `match`: a [`Pattern`] and its body.

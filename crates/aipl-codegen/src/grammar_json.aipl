@@ -498,11 +498,11 @@ allocations: 33062
 deallocations: 33062
 reallocations: 4003
 bytes allocated: 2658418
-instructions executed: 4397137
-binary size: 447176
-  code: 288880
+instructions executed: 4397119
+binary size: 447576
+  code: 289148
   data: 7860
-  metadata: 150436
+  metadata: 150568
 functions:
   __arr_drop_Json:
     calls: 125
@@ -576,37 +576,37 @@ functions:
   __arr_retain___m5__Doc:
     calls: 460
     bytes: 116
-  __builtin_all$char$s0$lam157:
+  __builtin_all$char$s0$lam162:
     calls: 45
     bytes: 212
-  __builtin_any$__m3__Prec$lam167:
+  __builtin_any$__m3__Prec$lam172:
     calls: 0
     bytes: 276
-  __builtin_any$__m5__Doc$lam168:
+  __builtin_any$__m5__Doc$lam173:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam168$tail:
+  __builtin_any$__m5__Doc$lam173$tail:
     calls: 207
     bytes: 324
-  __builtin_count_while$char$lam92:
+  __builtin_count_while$char$lam97:
     calls: 99
     bytes: 220
-  __builtin_count_while$char$s0$lam100:
+  __builtin_count_while$char$s0$lam105:
     calls: 554
     bytes: 184
-  __builtin_count_while$char$s0$lam120:
+  __builtin_count_while$char$s0$lam125:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam120$tail:
+  __builtin_count_while$char$s0$lam125$tail:
     calls: 0
     bytes: 256
-  __builtin_count_while$char$s0$lam134:
+  __builtin_count_while$char$s0$lam139:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam160:
+  __builtin_count_while$char$s0$lam165:
     calls: 0
     bytes: 172
-  __builtin_find_if$__m3__Prec$lam175:
+  __builtin_find_if$__m3__Prec$lam180:
     calls: 0
     bytes: 688
   __builtin_find_index$str$lam58:
@@ -615,13 +615,13 @@ functions:
   __builtin_find_index$str$lam67:
     calls: 52
     bytes: 400
-  __builtin_find_index$str$lam82:
+  __builtin_find_index$str$lam87:
     calls: 594
     bytes: 400
   __builtin_intersperse$__m5__Doc:
     calls: 34
     bytes: 408
-  __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam104:
+  __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam109:
     calls: 166
     bytes: 668
   __builtin_try_map$__m3__Production$JsonTok$Json$__m2__First<JsonTok>$__m3__ParseError$lam64:
@@ -648,7 +648,7 @@ functions:
   __eq___m2__Sym$JsonTok$arr:
     calls: 11
     bytes: 284
-  __filter129$own0:
+  __filter134$own0:
     calls: 166
     bytes: 332
   __lambda_22:
@@ -851,7 +851,7 @@ functions:
     bytes: 9844
   __m2__rep_suffix:
     calls: 2
-    bytes: 1440
+    bytes: 1708
   __m2__rule_first$JsonTok:
     calls: 72
     bytes: 6508
@@ -903,22 +903,22 @@ functions:
   __m4__format_cst$JsonTok$Json$s1$lam32:
     calls: 13
     bytes: 384
-  __m4__gap_wanted$lam130:
+  __m4__gap_wanted$lam135:
     calls: 195
     bytes: 200
-  __m4__group_doc$JsonTok$Json$s1$lam108:
+  __m4__group_doc$JsonTok$Json$s1$lam113:
     calls: 19
     bytes: 2420
-  __m4__inline_doc$lam107:
+  __m4__inline_doc$lam112:
     calls: 163
     bytes: 2428
-  __m4__pieces$JsonTok$Json$s1$lam105:
+  __m4__pieces$JsonTok$Json$s1$lam110:
     calls: 169
     bytes: 3400
   __m4__render_cst$JsonTok$Json$s1$lam9:
     calls: 13
     bytes: 4580
-  __m4__wrapped$lam131:
+  __m4__wrapped$lam136:
     calls: 19
     bytes: 4272
   __m5__col_after:

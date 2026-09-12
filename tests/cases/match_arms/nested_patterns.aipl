@@ -1,0 +1,129 @@
+import { print, to_str, wrapping_add as + } from builtins;
+
+// Patterns nest. A tuple pattern matches a tuple element by element, a
+// constructor's slots are patterns themselves, an integer literal matches by
+// value, and a bare name in a nested slot binds what it matched. Arms are tried
+// top to bottom, and the whole match is checked exhaustive — the last arm here
+// is `(lo, none)`, not `_`, and it is enough together with `(lo, some(hi))`.
+//
+// `match (a, b)` is a tuple scrutinee without its own parentheses, and its
+// elements are matched directly: no tuple is built.
+fn rep_suffix(min: u64, max: u64?) -> str {
+    match (min, max) {
+        (1, some(1)) => "",
+        (0, some(1)) => "?",
+        (lo, some(hi)) => `\{{lo},{hi}\}`,
+        (0, none) => "*",
+        (1, none) => "+",
+        (lo, none) => `\{{lo},\}`,
+    }
+}
+
+variant Shape = Circle(i64) | Rect(i64, i64) | Dot
+
+// A variant's cases and a string literal in the same tuple; a nested slot that
+// is a capitalised name (`Dot`) is a case, a lowercase one (`t`) a binder.
+fn describe(s: Shape, tag: str) -> str {
+    match (s, tag) {
+        (Circle(0), _) => "point-circle",
+        (Circle(r), "big") => `big circle {r}`,
+        (Circle(r), _) => `circle {r}`,
+        (Rect(w, h), t) => `rect {w}x{h} {t}`,
+        (Dot, _) => "dot",
+    }
+}
+
+// Two levels down, and a nested result.
+fn depth(o: i64??) -> str {
+    match (o) {
+        some(some(0)) => "zero",
+        some(some(n)) => `n={n}`,
+        some(none) => "inner none",
+        none => "none",
+    }
+}
+
+fn pair_ok(r: (i64, i64)!str) -> i64 {
+    match (r) {
+        ok((0, b)) => b,
+        ok((a, b)) => a + b,
+        err(_) => -1,
+    }
+}
+
+fn main() !prints {
+    print(`{rep_suffix(1, some(1))}|{rep_suffix(0, some(1))}`);
+    print(rep_suffix(2, some(5)));
+    print(`{rep_suffix(0, none)}{rep_suffix(1, none)}{rep_suffix(3, none)}`);
+    print(describe(Circle(0), "x"));
+    print(describe(Circle(4), "big"));
+    print(describe(Circle(4), "small"));
+    print(describe(Rect(2, 3), "t"));
+    print(describe(Dot, "t"));
+    print(depth(some(some(0))));
+    print(depth(some(some(7))));
+    print(depth(some(none)));
+    print(depth(none));
+    print(to_str(pair_ok(ok((0, 5)))));
+    print(to_str(pair_ok(ok((2, 5)))));
+    print(to_str(pair_ok(err("no"))));
+    // `if let` takes a nested pattern too.
+    if (let (1, some(x)) = (1, some(9))) {
+        print(`x={x}`);
+    };
+}
+--- stdout ---
+|?
+{2,5}
+*+{3,}
+point-circle
+big circle 4
+circle 4
+rect 2x3 t
+dot
+zero
+n=7
+inner none
+none
+5
+7
+-1
+x=9
+--- performance ---
+allocations: 30
+deallocations: 30
+reallocations: 0
+bytes allocated: 1789
+instructions executed: 1377
+binary size: 11960
+  code: 7860
+  data: 1
+  metadata: 4099
+functions:
+  __to_str_i64:
+    calls: 9
+    bytes: 204
+  __to_str_u64:
+    calls: 3
+    bytes: 204
+  aipl_i64_len:
+    calls: 18
+    bytes: (external)
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 9
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
+  describe:
+    calls: 5
+    bytes: 1256
+  main:
+    calls: 1
+    bytes: 4488
+  rep_suffix:
+    calls: 6
+    bytes: 1708

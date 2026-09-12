@@ -1,0 +1,20 @@
+import { print } from builtins;
+
+// Integer literals never cover their type: a match on them needs a `_` or a
+// binder arm to be exhaustive.
+fn f(a: i64) -> str {
+    match (a) {
+        1 => "one",
+        2 => "two",
+    }
+}
+
+fn main() !prints {
+    print(f(1));
+}
+--- errors ---
+error: non-exhaustive match: not every value is matched — add a `_` or binder arm
+ --> ./tests/cases/match_arms/err_nested_literal_open.aipl:6:5
+  |
+6 |     match (a) {
+  |     ^^^^^^^^^^^

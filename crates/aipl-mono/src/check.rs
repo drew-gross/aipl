@@ -18,6 +18,7 @@
 //! some of those (e.g. `==` over every element type) aren't fully implemented in
 //! codegen yet, so we don't trust this pass enough to drop those checks.
 
+use crate::patterns;
 use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast;
@@ -1880,6 +1881,9 @@ impl Cx<'_> {
                         .to_string(),
                     arm.span.clone(),
                 )),
+                Pattern::Tuple(_) | Pattern::Nested { .. } | Pattern::Int(_) | Pattern::Bind(_) => {
+                    unreachable!("a nested pattern is typed by `bind_nested`")
+                }
             };
         }
         // An array scrutinee matches array patterns (`[e0, ...] => ...`) and a
@@ -1894,6 +1898,9 @@ impl Cx<'_> {
                     "\"match\" on an array expects `[..]` patterns or `_`".to_string(),
                     arm.span.clone(),
                 )),
+                Pattern::Tuple(_) | Pattern::Nested { .. } | Pattern::Int(_) | Pattern::Bind(_) => {
+                    unreachable!("a nested pattern is typed by `bind_nested`")
+                }
             };
         }
         // A `char` scrutinee matches char-literal arms (`'a' => ...`) and a
@@ -1906,6 +1913,9 @@ impl Cx<'_> {
                     "\"match\" on a char expects char literals or `_`".to_string(),
                     arm.span.clone(),
                 )),
+                Pattern::Tuple(_) | Pattern::Nested { .. } | Pattern::Int(_) | Pattern::Bind(_) => {
+                    unreachable!("a nested pattern is typed by `bind_nested`")
+                }
             };
         }
         // The non-constructor patterns only apply to a `str` / array / `char`
@@ -1943,6 +1953,9 @@ impl Cx<'_> {
                     ),
                     arm.span.clone(),
                 ))
+            }
+            Pattern::Tuple(_) | Pattern::Nested { .. } | Pattern::Int(_) | Pattern::Bind(_) => {
+                unreachable!("a nested pattern is typed by `bind_nested`")
             }
         };
         // A pattern constructor may be variant-qualified (`Case@Variant`); the
@@ -2034,6 +2047,276 @@ impl Cx<'_> {
             ));
         }
         Ok(payload)
+    }
+
+    /// Type a nested pattern against `ty`: the binders it introduces, each with
+    /// the type of the value it names, and the pattern as the matrix algorithm
+    /// reads it (`patterns::Pat`), built here because a `Ctor(..)`'s arity is
+    /// only known against the type.
+    ///
+    /// The rules per form: a tuple pattern needs a tuple of that arity; a
+    /// constructor needs a case of its type with as many slots as it has
+    /// sub-patterns; a literal needs the scalar it spells; a binder or `_`
+    /// takes anything. A name in a nested slot is a binder unless it spells a
+    /// case (see `Pattern::normalized`), and a capitalised binder that names no
+    /// case of the type is refused rather than silently bound.
+    fn bind_nested(
+        &self,
+        pattern: &Pattern,
+        ty: &Type,
+        span: Span,
+    ) -> Result<(patterns::Pat, Vec<(String, Type)>), Error> {
+        let (pat, binders) = self.bind_nested_inner(pattern, ty, &span)?;
+        let mut seen: Vec<&str> = Vec::new();
+        for (name, _) in &binders {
+            if seen.contains(&name.as_str()) {
+                return Err(Error::at(
+                    format!("binder {name:?} appears more than once in this pattern"),
+                    span,
+                ));
+            }
+            seen.push(name);
+        }
+        Ok((pat, binders))
+    }
+
+    fn bind_nested_inner(
+        &self,
+        pattern: &Pattern,
+        ty: &Type,
+        span: &Span,
+    ) -> Result<(patterns::Pat, Vec<(String, Type)>), Error> {
+        use patterns::{Lit, Pat};
+        Ok(match pattern {
+            Pattern::Wildcard => (Pat::Wild, Vec::new()),
+            Pattern::Bind(name) => (Pat::Wild, vec![(name.clone(), ty.clone())]),
+            Pattern::Int(n) => {
+                if !aipl_syntax::is_int_ty(ty) && !is_typevar(ty) {
+                    return Err(Error::at(
+                        format!("integer pattern {n} matches an integer, not {}", tyname(ty)),
+                        span.clone(),
+                    ));
+                }
+                (Pat::Lit(Lit::Int(*n)), Vec::new())
+            }
+            Pattern::Str(s) => {
+                if !is_str_repr(ty) && !is_typevar(ty) {
+                    return Err(Error::at(
+                        format!("string-literal pattern matches a str, not {}", tyname(ty)),
+                        span.clone(),
+                    ));
+                }
+                (Pat::Lit(Lit::Str(s.clone())), Vec::new())
+            }
+            Pattern::Char(c) => {
+                if !matches!(ty, Type::Primitive(Primitive::Char)) && !is_typevar(ty) {
+                    return Err(Error::at(
+                        format!("char-literal pattern matches a char, not {}", tyname(ty)),
+                        span.clone(),
+                    ));
+                }
+                (Pat::Lit(Lit::Char(*c)), Vec::new())
+            }
+            Pattern::Array(_) => {
+                return Err(Error::at(
+                    "an array pattern cannot nest inside another pattern".to_string(),
+                    span.clone(),
+                ));
+            }
+            Pattern::Tuple(ps) => {
+                let Some(elems) = self.tuple_elems(ty) else {
+                    return Err(Error::at(
+                        format!(
+                            "tuple pattern of {} matches a tuple, not {}",
+                            ps.len(),
+                            tyname(ty)
+                        ),
+                        span.clone(),
+                    ));
+                };
+                if elems.len() != ps.len() {
+                    return Err(Error::at(
+                        format!(
+                            "tuple pattern has {} elements, but {} has {}",
+                            ps.len(),
+                            tyname(ty),
+                            elems.len()
+                        ),
+                        span.clone(),
+                    ));
+                }
+                let mut subs = Vec::with_capacity(ps.len());
+                let mut binders = Vec::new();
+                for (p, t) in ps.iter().zip(&elems) {
+                    let (sp, b) = self.bind_nested_inner(p, t, span)?;
+                    subs.push(sp);
+                    binders.extend(b);
+                }
+                (Pat::Ctor(patterns::TUPLE.to_string(), subs), binders)
+            }
+            Pattern::Ctor {
+                name,
+                bindings,
+                ignore_payload,
+            } => {
+                let payload = self.pattern_case_payload(ty, name, span)?;
+                // The matrix compares against the type's own case names, which
+                // are bare; a pattern's may carry its `@Variant` qualification.
+                let name = name.split('@').next().unwrap_or(name).to_string();
+                if *ignore_payload {
+                    if payload.is_empty() {
+                        return Err(Error::at(
+                            format!(
+                                "constructor {name:?} carries no payload, so \"..\" ignores \
+                                 nothing — write {name:?} instead"
+                            ),
+                            span.clone(),
+                        ));
+                    }
+                    return Ok((
+                        Pat::Ctor(name.clone(), vec![Pat::Wild; payload.len()]),
+                        Vec::new(),
+                    ));
+                }
+                if bindings.len() != payload.len() {
+                    return Err(Error::at(
+                        format!(
+                            "constructor {name:?} binds {} value(s), but {} given",
+                            payload.len(),
+                            bindings.len()
+                        ),
+                        span.clone(),
+                    ));
+                }
+                let binders: Vec<(String, Type)> = bindings
+                    .iter()
+                    .zip(payload.iter())
+                    .filter(|(b, _)| b.as_str() != "_")
+                    .map(|(b, t)| (b.clone(), t.clone()))
+                    .collect();
+                (
+                    Pat::Ctor(name.clone(), vec![Pat::Wild; payload.len()]),
+                    binders,
+                )
+            }
+            Pattern::Nested { name, args } => {
+                let payload = self.pattern_case_payload(ty, name, span)?;
+                let name = name.split('@').next().unwrap_or(name).to_string();
+                if args.len() != payload.len() {
+                    return Err(Error::at(
+                        format!(
+                            "constructor {name:?} carries {} value(s), but the pattern has {}",
+                            payload.len(),
+                            args.len()
+                        ),
+                        span.clone(),
+                    ));
+                }
+                let mut subs = Vec::with_capacity(args.len());
+                let mut binders = Vec::new();
+                for (p, t) in args.iter().zip(&payload) {
+                    let (sp, b) = self.bind_nested_inner(p, t, span)?;
+                    subs.push(sp);
+                    binders.extend(b);
+                }
+                (Pat::Ctor(name.clone(), subs), binders)
+            }
+        })
+    }
+
+    /// The element types of a tuple type — the synthetic struct a tuple lowers
+    /// to, read back by its `_i` fields — or `None` for anything else.
+    fn tuple_elems(&self, ty: &Type) -> Option<Vec<Type>> {
+        match ty {
+            Type::Tuple(es) => Some(es.clone()),
+            Type::Named(n) if crate::tuple_instance_arity(n).is_some() => {
+                Some(self.fields_of(ty)?.into_iter().map(|(_, t, _)| t).collect())
+            }
+            Type::Generic(base, _) if !crate::tuple_template_vars(base).is_empty() => {
+                Some(self.fields_of(ty)?.into_iter().map(|(_, t, _)| t).collect())
+            }
+            _ => None,
+        }
+    }
+
+    /// The payload types of case `name` of `ty` — `some`/`none` of an optional,
+    /// `ok`/`err` of a result, or a variant's case — or an error naming what
+    /// `ty` does offer.
+    fn pattern_case_payload(&self, ty: &Type, name: &str, span: &Span) -> Result<Vec<Type>, Error> {
+        let bare: &str = name.split('@').next().unwrap_or(name);
+        match ty {
+            Type::Optional(inner) => match bare {
+                "some" => Ok(vec![(**inner).clone()]),
+                "none" => Ok(vec![]),
+                other => Err(Error::at(
+                    format!("\"match\" on an optional expects \"some\"/\"none\", got {other:?}"),
+                    span.clone(),
+                )),
+            },
+            Type::Result(ok, err) => match bare {
+                "ok" if is_unit(ok) => Ok(vec![]),
+                "ok" => Ok(vec![(**ok).clone()]),
+                "err" => Ok(vec![(**err).clone()]),
+                other => Err(Error::at(
+                    format!("\"match\" on a result expects \"ok\"/\"err\", got {other:?}"),
+                    span.clone(),
+                )),
+            },
+            _ if self.cases_of(ty).is_some() => {
+                let cases = self.cases_of(ty).expect("just checked");
+                match cases.into_iter().find(|(c, _)| c.as_str() == bare) {
+                    Some((_, p)) => Ok(p),
+                    None => Err(Error::at(
+                        format!("{} has no constructor {bare:?}", tyname(ty)),
+                        span.clone(),
+                    )),
+                }
+            }
+            other => Err(Error::at(
+                format!(
+                    "constructor pattern {bare:?} needs an optional, result or variant, got {}",
+                    tyname(other)
+                ),
+                span.clone(),
+            )),
+        }
+    }
+
+    /// A match with nested patterns is exhaustive when no value escapes every
+    /// arm, and every arm must be reachable — both asked of the matrix
+    /// algorithm (`patterns::useful`), with the witness it hands back naming
+    /// what is missing.
+    fn check_nested_exhaustive(
+        &self,
+        rows: &[patterns::Row],
+        st: &Type,
+        arms: &[MatchArm],
+        span: Span,
+    ) -> Result<(), Error> {
+        use patterns::Pat;
+        let tys = [st.clone()];
+        for (i, arm) in arms.iter().enumerate() {
+            if patterns::useful(&rows[..i], &rows[i], &tys, self).is_none() {
+                return Err(Error::at(
+                    "unreachable arm: every value it matches is matched by an arm above it"
+                        .to_string(),
+                    arm.span.clone(),
+                ));
+            }
+        }
+        if let Some(witness) = patterns::useful(rows, &[Pat::Wild], &tys, self) {
+            let what = patterns::render(&witness[0]);
+            let message = if what == "_" {
+                // An open domain (a literal column) with no catch-all: there is
+                // no one value to name.
+                "non-exhaustive match: not every value is matched — add a `_` or binder arm"
+                    .to_string()
+            } else {
+                format!("non-exhaustive match: {what} is not matched")
+            };
+            return Err(Error::at(message, span));
+        }
+        Ok(())
     }
 
     /// Every constructor of the scrutinee's type must be matched exactly once.
@@ -2958,13 +3241,27 @@ impl Cx<'_> {
                 // round — the same courtesy `if` branches get. Without it,
                 // `match (w) { WNil => 0, WC(n, ..) => n }` with a `u64` payload
                 // has no spelling at all now that `u64(0)` is gone.
+                //
+                // An arm with a nested pattern takes the typed walk instead
+                // (`bind_nested`), and the whole match is then proved exhaustive
+                // by the matrix algorithm rather than by the per-case list.
+                let nested = arms.iter().any(|a| a.pattern.is_nested());
+                let mut rows: Vec<patterns::Row> = Vec::new();
                 let mut merged: Option<(Type, &Expr)> = None;
                 for arm in arms {
-                    let bind_tys =
-                        self.match_arm_bindings(&st, arm, scrut.span.clone(), env, effects)?;
+                    let binders: Vec<(String, Type)> = if nested {
+                        let (pat, binders) =
+                            self.bind_nested(&arm.pattern, &st, arm.span.clone())?;
+                        rows.push(vec![pat]);
+                        binders
+                    } else {
+                        let bind_tys =
+                            self.match_arm_bindings(&st, arm, scrut.span.clone(), env, effects)?;
+                        arm.pattern.bindings().into_iter().zip(bind_tys).collect()
+                    };
                     let mut env2 = env.clone();
-                    for (name, ty) in arm.pattern.bindings().iter().zip(bind_tys) {
-                        env2.insert(name.clone(), Binding { ty, mutable: false });
+                    for (name, ty) in binders {
+                        env2.insert(name, Binding { ty, mutable: false });
                     }
                     let t = self.check_expr_at(&arm.body, &env2, effects, pos)?;
                     merged = Some(match merged {
@@ -2977,7 +3274,11 @@ impl Cx<'_> {
                     });
                 }
                 let merged = merged.map(|(t, _)| t);
-                self.check_match_exhaustive(&st, arms, span.clone())?;
+                if nested {
+                    self.check_nested_exhaustive(&rows, &st, arms, span.clone())?;
+                } else {
+                    self.check_match_exhaustive(&st, arms, span.clone())?;
+                }
                 let ty = merged.unwrap_or(Type::Primitive(Primitive::I64));
                 self.check_match_kind(&ty, arms, pos, span.clone())?;
                 ty
@@ -2994,11 +3295,16 @@ impl Cx<'_> {
             // `THEN` is no more surprising than an ordinary `if` doing the same.
             ExprKind::IfLet(arm, scrut, else_b) => {
                 let st = self.check_expr(scrut, env, effects)?;
-                let bind_tys =
-                    self.match_arm_bindings(&st, arm, scrut.span.clone(), env, effects)?;
+                let binders: Vec<(String, Type)> = if arm.pattern.is_nested() {
+                    self.bind_nested(&arm.pattern, &st, arm.span.clone())?.1
+                } else {
+                    let bind_tys =
+                        self.match_arm_bindings(&st, arm, scrut.span.clone(), env, effects)?;
+                    arm.pattern.bindings().into_iter().zip(bind_tys).collect()
+                };
                 let mut env2 = env.clone();
-                for (name, ty) in arm.pattern.bindings().iter().zip(bind_tys) {
-                    env2.insert(name.clone(), Binding { ty, mutable: false });
+                for (name, ty) in binders {
+                    env2.insert(name, Binding { ty, mutable: false });
                 }
                 let tt = self.check_expr_at(&arm.body, &env2, effects, pos)?;
                 let et = self.check_expr_at(else_b, env, effects, pos)?;
@@ -4937,5 +5243,36 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Ty
             name.clone(),
             args.iter().map(|a| subst_vars(a, map, vars)).collect(),
         ),
+    }
+}
+
+/// What the matrix algorithm asks of a type — see `patterns::TypeInfo`.
+impl patterns::TypeInfo for Cx<'_> {
+    fn signature(&self, ty: &Type) -> patterns::Signature {
+        use patterns::Signature;
+        match ty {
+            Type::Optional(inner) => Signature::Complete(vec![
+                ("some".to_string(), vec![(**inner).clone()]),
+                ("none".to_string(), vec![]),
+            ]),
+            Type::Result(ok, err) => Signature::Complete(vec![
+                (
+                    "ok".to_string(),
+                    if is_unit(ok) {
+                        vec![]
+                    } else {
+                        vec![(**ok).clone()]
+                    },
+                ),
+                ("err".to_string(), vec![(**err).clone()]),
+            ]),
+            _ if self.cases_of(ty).is_some() => {
+                Signature::Complete(self.cases_of(ty).expect("just checked"))
+            }
+            _ => match self.tuple_elems(ty) {
+                Some(elems) => Signature::Complete(vec![(patterns::TUPLE.to_string(), elems)]),
+                None => Signature::Open,
+            },
+        }
     }
 }

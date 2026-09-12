@@ -63,13 +63,14 @@ import { Ty as TyNode, Unit } from "./ty.aipl";
 # comma-separated run of types lowers to, and the case it lands in is what tells
 # `ty`'s alternatives apart — `(A, B)` and `A` reach `ty` as different `Ast`
 # cases, so nothing has to count tokens to know which matched. `Payload` is a
-# constructor pattern's slot list and whether it was written `..`, which is the
-# pair `Pat`'s `Ctor` needs and no node of its own.
+# constructor pattern's slot list — each slot a pattern — and whether it was
+# written `..`, which is what `Pat`'s `Ctor`/`Nested` need and no node of its
+# own.
 variant Ast =
     | Ty(TyNode)
     | Tys(TyNode[])
     | Pat(PatNode)
-    | Payload(str[], bool)
+    | Payload(PatNode[], bool)
     | Expr(ExprNode)
     | Exprs(ExprNode[])
     | Suffix(SuffixNode)

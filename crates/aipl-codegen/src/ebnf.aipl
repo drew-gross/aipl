@@ -292,22 +292,19 @@ fn render_nested<K: variant>(
 ) -> str { render_rule(Then([open, body, close]), names, ctx) }
 
 # `*`, `+`, `?`, or the `{n,}` / `{n,m}` longhand for the bounds EBNF has no
-# operator for. The braces come from bindings rather than from the template,
-# which has no escape for a literal one.
+# operator for.
 #
 # A repetition bounded at one item is not a repetition: `min=1, max=1` is the
 # body written on its own, and `min=0, max=1` is `?` — the same thing `Maybe`
 # renders as, because it is the same rule.
 fn rep_suffix(min: u64, max: u64?) -> str {
-    let open = "{";
-    let close = "}";
-    match (max) {
-        some(m) => if (m == 1) {
-            if (min == 1) { "" } else { "?" }
-        } else {
-            `{open}{min},{m}{close}`
-        },
-        none => if (min == 0) { "*" } else { if (min == 1) { "+" } else { `{open}{min},{close}` } },
+    match (min, max) {
+        (1, some(1)) => "",
+        (0, some(1)) => "?",
+        (lo, some(hi)) => `\{{lo},{hi}\}`,
+        (0, none) => "*",
+        (1, none) => "+",
+        (lo, none) => `\{{lo},\}`,
     }
 }
 
@@ -884,15 +881,15 @@ fn fixture() -> Grammar<Tok, Node> {
     }
 }
 --- performance ---
-allocations: 1862
-deallocations: 1862
+allocations: 1861
+deallocations: 1861
 reallocations: 416
-bytes allocated: 181148
-instructions executed: 207187
-binary size: 159592
-  code: 103656
+bytes allocated: 181060
+instructions executed: 206959
+binary size: 159992
+  code: 103924
   data: 4252
-  metadata: 51684
+  metadata: 51816
 functions:
   __arr_drop_First$Tok:
     calls: 23
@@ -1142,7 +1139,7 @@ functions:
     bytes: 9808
   rep_suffix:
     calls: 14
-    bytes: 1440
+    bytes: 1708
   rule_first$Tok:
     calls: 235
     bytes: 6508

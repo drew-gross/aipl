@@ -251,11 +251,11 @@ allocations: 227
 deallocations: 227
 reallocations: 14
 bytes allocated: 16494
-instructions executed: 9578
-binary size: 74904
-  code: 46428
+instructions executed: 9589
+binary size: 77192
+  code: 47952
   data: 2490
-  metadata: 25986
+  metadata: 26750
 functions:
   __arr_drop_Expr:
     calls: 9
@@ -287,6 +287,12 @@ functions:
   __arr_retain___tuple$str$str:
     calls: 0
     bytes: 140
+  __m1__show_pat:
+    calls: 1
+    bytes: 2548
+  __m1__show_pats:
+    calls: 0
+    bytes: 460
   __m3__show_ty:
     calls: 2
     bytes: 5064
@@ -304,7 +310,7 @@ functions:
     bytes: 72
   __rec_drop___m1__Pat:
     calls: 1
-    bytes: 136
+    bytes: 204
   __rec_drop___m3__Ty:
     calls: 1
     bytes: 408
@@ -376,7 +382,7 @@ functions:
     bytes: 416
   show_arm:
     calls: 1
-    bytes: 2028
+    bytes: 476
   show_call:
     calls: 3
     bytes: 1560

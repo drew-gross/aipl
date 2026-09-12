@@ -73,10 +73,10 @@ deallocations: 2103
 reallocations: 29
 bytes allocated: 125498
 instructions executed: 419611
-binary size: 1042600
-  code: 675896
+binary size: 1057784
+  code: 685140
   data: 2235
-  metadata: 364469
+  metadata: 370409
 functions:
   __arr_drop___m13__StepResult$__m12__AiplTok:
     calls: 0
@@ -357,6 +357,9 @@ functions:
   __m6__expr:
     calls: 0
     bytes: 760
+  __m6__flat_parens:
+    calls: 0
+    bytes: 560
   __m6__fn_attrs:
     calls: 3
     bytes: 5908
@@ -425,7 +428,7 @@ functions:
     bytes: 8432
   __m6__match_expr:
     calls: 0
-    bytes: 11936
+    bytes: 12048
   __m6__more_before:
     calls: 3
     bytes: 200
@@ -455,10 +458,13 @@ functions:
     bytes: 11104
   __m6__pattern:
     calls: 0
-    bytes: 8516
+    bytes: 14592
   __m6__pattern_alts:
     calls: 0
     bytes: 3092
+  __m6__pattern_list:
+    calls: 0
+    bytes: 2496
   __m6__peek_is_n:
     calls: 3
     bytes: 296

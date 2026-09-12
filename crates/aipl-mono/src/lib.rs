@@ -27,6 +27,7 @@ use std::{
 };
 
 mod check;
+mod patterns;
 pub use check::{check, set_mangle};
 
 mod fold;
@@ -474,7 +475,7 @@ pub fn lower_tuples(program: &Program) -> Program {
 /// its arity is the number of `$`-separated mangles after the prefix. Element
 /// mangles never contain a `$` themselves — `mangle_type` flattens one to `_` —
 /// so the split is exact.
-fn tuple_instance_arity(inst: &str) -> Option<usize> {
+pub(crate) fn tuple_instance_arity(inst: &str) -> Option<usize> {
     inst.strip_prefix(&format!("{}$", check::TUPLE_TEMPLATE))
         .map(|rest| rest.split('$').count())
 }
@@ -505,7 +506,7 @@ fn tuple_var_name(i: usize) -> String {
 /// struct with none. Read off the name rather than carried alongside it: a
 /// template's arity *is* the digits in its name, so there is nothing to keep in
 /// step.
-fn tuple_template_vars(name: &str) -> Vec<TypeParam> {
+pub(crate) fn tuple_template_vars(name: &str) -> Vec<TypeParam> {
     let Some(arity) = name.strip_prefix(check::TUPLE_TEMPLATE) else {
         return Vec::new();
     };
@@ -4550,6 +4551,181 @@ impl Mono<'_> {
         all.into_iter().filter(|(c, _)| c != given).collect()
     }
 
+    /// A `match` whose arms use nested patterns, compiled to a decision tree of
+    /// the simple forms every later pass knows — a `Match` per constructor
+    /// test, an `if` per literal test, a `let` per binder — so codegen never
+    /// sees a nested pattern. The checker has already proved the arms
+    /// exhaustive and each reachable (`check::check_nested_exhaustive`), which
+    /// is what lets the tree be built without a fallthrough.
+    ///
+    /// The scrutinee is bound to a temporary once and the tree reads it
+    /// through further temporaries — one per payload slot or tuple field it
+    /// has to look at — so no sub-value is computed twice. A tuple *literal*
+    /// scrutinee (`match (a, b)`) never becomes a struct at all: its elements
+    /// are the tree's first columns directly.
+    ///
+    /// The tree is Maranget's: the first column the first row constrains is
+    /// tested, the matrix is specialized per constructor (or per literal, with
+    /// the wildcard rows as the default), and a row whose remaining patterns
+    /// are all wildcards is a leaf. Each arm body is inferred once, with its
+    /// binders in scope; a leaf that reaches an arm through several paths
+    /// clones the inferred body, as the `if let` desugar above does.
+    fn infer_nested_match(
+        &mut self,
+        scrut: &Expr,
+        arms: &[MatchArm],
+        env: &Env,
+        span: Span,
+    ) -> Result<(Expr, Type), Error> {
+        let (rs, st) = self.infer(scrut, env)?;
+
+        // Infer every body once, with the binders the pattern introduces.
+        let mut bodies = Vec::with_capacity(arms.len());
+        let mut merged: Option<Type> = None;
+        for arm in arms {
+            let mut env2 = env.clone();
+            for (name, ty) in self.nested_binders(&arm.pattern, &st) {
+                env2.insert(name, ty);
+            }
+            let (rb, t) = self.infer(&arm.body, &env2)?;
+            bodies.push(rb);
+            merged = Some(match merged {
+                None => t,
+                Some(prev) => merge(prev, t),
+            });
+        }
+        let ty = merged.unwrap_or(Type::Primitive(Primitive::I64));
+
+        // The first columns: a tuple literal's elements directly, when every
+        // arm destructures it (a `_` arm needs no whole value either); else the
+        // scrutinee itself.
+        let tuple_elems = match &rs.kind {
+            ExprKind::Construct(name, inits)
+                if tuple_instance_arity(name).is_some()
+                    && arms.iter().all(|a| {
+                        matches!(&a.pattern, Pattern::Tuple(ps) if ps.len() == inits.len())
+                            || matches!(a.pattern, Pattern::Wildcard)
+                    }) =>
+            {
+                Some(inits.clone())
+            }
+            _ => None,
+        };
+        let mut tree = MatchTree {
+            mono: self,
+            bodies: &bodies,
+            span: span.clone(),
+        };
+        let (cols, rows, prelude): (Vec<(String, Type)>, Vec<TreeRow>, Vec<(String, Expr)>) =
+            match tuple_elems {
+                Some(inits) => {
+                    let field_tys = tree
+                        .mono
+                        .tuple_field_tys(&st)
+                        .expect("a tuple literal has its struct");
+                    let cols: Vec<(String, Type)> =
+                        field_tys.into_iter().map(|t| (tree.fresh(), t)).collect();
+                    let rows = arms
+                        .iter()
+                        .enumerate()
+                        .map(|(i, a)| TreeRow {
+                            pats: match &a.pattern {
+                                Pattern::Tuple(ps) => ps.clone(),
+                                _ => vec![Pattern::Wildcard; cols.len()],
+                            },
+                            arm: i,
+                            binds: Vec::new(),
+                        })
+                        .collect();
+                    let prelude = cols
+                        .iter()
+                        .zip(inits)
+                        .map(|((var, _), init)| (var.clone(), init.value))
+                        .collect();
+                    (cols, rows, prelude)
+                }
+                None => {
+                    let var = tree.fresh();
+                    let rows = arms
+                        .iter()
+                        .enumerate()
+                        .map(|(i, a)| TreeRow {
+                            pats: vec![a.pattern.clone()],
+                            arm: i,
+                            binds: Vec::new(),
+                        })
+                        .collect();
+                    (vec![(var.clone(), st.clone())], rows, vec![(var, rs)])
+                }
+            };
+        let mut out = tree.compile(rows, &cols)?;
+        for (var, value) in prelude.into_iter().rev() {
+            out = Expr::new(
+                ExprKind::Let(var, None, Box::new(value), Box::new(out)),
+                span.clone(),
+            );
+        }
+        Ok((out, ty))
+    }
+
+    /// The binders a nested pattern introduces against `ty`, with their types
+    /// — mono's twin of the checker's `bind_nested`, minus the diagnostics the
+    /// checker has already issued.
+    fn nested_binders(&self, pattern: &Pattern, ty: &Type) -> Vec<(String, Type)> {
+        match pattern {
+            Pattern::Wildcard
+            | Pattern::Int(_)
+            | Pattern::Str(_)
+            | Pattern::Char(_)
+            | Pattern::Array(_) => Vec::new(),
+            Pattern::Bind(name) => vec![(name.clone(), ty.clone())],
+            Pattern::Tuple(ps) => {
+                let elems = self.tuple_field_tys(ty).unwrap_or_default();
+                ps.iter()
+                    .zip(elems)
+                    .flat_map(|(p, t)| self.nested_binders(p, &t))
+                    .collect()
+            }
+            Pattern::Ctor {
+                name,
+                bindings,
+                ignore_payload,
+            } => {
+                if *ignore_payload {
+                    return Vec::new();
+                }
+                let payload = self.match_payload_tys(ty, name, bindings.len());
+                bindings
+                    .iter()
+                    .zip(payload)
+                    .filter(|(b, _)| b.as_str() != "_")
+                    .map(|(b, t)| (b.clone(), t))
+                    .collect()
+            }
+            Pattern::Nested { name, args } => {
+                let payload = self.match_payload_tys(ty, name, args.len());
+                args.iter()
+                    .zip(payload)
+                    .flat_map(|(p, t)| self.nested_binders(p, &t))
+                    .collect()
+            }
+        }
+    }
+
+    /// The field types of a tuple type's synthetic struct, in order, or `None`
+    /// for anything that is not a tuple.
+    fn tuple_field_tys(&self, ty: &Type) -> Option<Vec<Type>> {
+        let Type::Named(name) = ty else {
+            return None;
+        };
+        tuple_instance_arity(name)?;
+        let fields = self
+            .structs
+            .get(name)
+            .or_else(|| self.syn_structs.get(name))?;
+        Some(fields.iter().map(|(_, t, _)| t.clone()).collect())
+    }
+
     fn match_payload_tys(&self, scrut: &Type, ctor: &str, n: usize) -> Vec<Type> {
         // A pattern constructor may be variant-qualified (`Case@Variant`); the
         // scrutinee's type already fixes the variant, so match on the bare case.
@@ -5584,6 +5760,24 @@ impl Mono<'_> {
                     Type::Primitive(Primitive::I64),
                 )
             }
+            ExprKind::Match(scrut, arms) if arms.iter().any(|a| a.pattern.is_nested()) => {
+                // A nested pattern anywhere: the whole match is compiled to a
+                // decision tree of the simple forms (see `infer_nested_match`).
+                return self.infer_nested_match(scrut, arms, env, span.clone());
+            }
+            ExprKind::IfLet(arm, scrut, else_b) if arm.pattern.is_nested() => {
+                // `if let` with a nested pattern: the two-arm match it means,
+                // through the same tree — its `else` is the wildcard arm.
+                let arms = vec![
+                    (**arm).clone(),
+                    MatchArm {
+                        pattern: Pattern::Wildcard,
+                        body: (**else_b).clone(),
+                        span: else_b.span.clone(),
+                    },
+                ];
+                return self.infer_nested_match(scrut, &arms, env, span.clone());
+            }
             ExprKind::Match(scrut, arms) => {
                 let (rs, st) = self.infer(scrut, env)?;
                 let mut rarms = Vec::with_capacity(arms.len());
@@ -5606,6 +5800,10 @@ impl Mono<'_> {
                             vec![elem; arm.pattern.bindings().len()]
                         }
                         Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => Vec::new(),
+                        Pattern::Tuple(_)
+                        | Pattern::Nested { .. }
+                        | Pattern::Int(_)
+                        | Pattern::Bind(_) => unreachable!("routed to `infer_nested_match`"),
                     };
                     // `Ctor(..)` is expanded here and nowhere else: this is the
                     // first point that knows how many slots the case has. It
@@ -5666,6 +5864,10 @@ impl Mono<'_> {
                         vec![elem; arm.pattern.bindings().len()]
                     }
                     Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => Vec::new(),
+                    Pattern::Tuple(_)
+                    | Pattern::Nested { .. }
+                    | Pattern::Int(_)
+                    | Pattern::Bind(_) => unreachable!("routed to `infer_nested_match`"),
                 };
                 let pattern = expand_ignored_payload(&arm.pattern, bind_tys.len());
                 let mut env2 = env.clone();
@@ -9412,4 +9614,281 @@ fn find_move_into<'a>(param: &str, e: &'a Expr) -> Option<(&'a str, &'a Expr)> {
         | ExprKind::None
         | ExprKind::Unit => None,
     }
+}
+
+// ---- Nested-pattern decision trees (see `Mono::infer_nested_match`) --------
+
+/// One row of the matrix a nested match is compiled from: a pattern per
+/// column, the arm it belongs to, and the binders collected so far — each the
+/// user's name for a column temporary.
+#[derive(Clone)]
+struct TreeRow {
+    pats: Vec<Pattern>,
+    arm: usize,
+    binds: Vec<(String, String)>,
+}
+
+/// The state of one nested match's compilation: the monomorphizer (for types
+/// and fresh names), the arms' already-inferred bodies, and the span every
+/// synthesized node carries.
+struct MatchTree<'m, 'a> {
+    mono: &'m mut Mono<'a>,
+    bodies: &'m [Expr],
+    span: Span,
+}
+
+impl MatchTree<'_, '_> {
+    /// A fresh temporary. `$` keeps it out of any user's namespace.
+    fn fresh(&mut self) -> String {
+        let n = self.mono.synth;
+        self.mono.synth += 1;
+        format!("$mt{n}")
+    }
+
+    fn ident(&self, var: &str) -> Expr {
+        Expr::new(ExprKind::Ident(var.to_string()), self.span.clone())
+    }
+
+    /// Compile `rows` over `cols` — see `infer_nested_match` for the algorithm.
+    fn compile(&mut self, rows: Vec<TreeRow>, cols: &[(String, Type)]) -> Result<Expr, Error> {
+        if rows.is_empty() {
+            // The checker proved every value reaches some arm, so an empty
+            // matrix is a bug in this compiler, not in the program.
+            return Err(Error::at(
+                "internal error: a nested match compiled to an empty case".to_string(),
+                self.span.clone(),
+            ));
+        }
+        // Binders and `_` constrain nothing: absorb them into the row's binds
+        // and treat the column as a wildcard for it.
+        let rows: Vec<TreeRow> = rows
+            .into_iter()
+            .map(|mut row| {
+                for (p, (var, _)) in row.pats.iter_mut().zip(cols) {
+                    if let Pattern::Bind(name) = p {
+                        row.binds.push((name.clone(), var.clone()));
+                        *p = Pattern::Wildcard;
+                    }
+                }
+                row
+            })
+            .collect();
+        // A leaf: the first row's remaining patterns are all wildcards, so it
+        // is the arm every value reaching here takes.
+        let Some(col) = rows[0]
+            .pats
+            .iter()
+            .position(|p| !matches!(p, Pattern::Wildcard))
+        else {
+            return Ok(self.leaf(&rows[0]));
+        };
+        let (var, ty) = cols[col].clone();
+        let head = rows[0].pats[col].clone();
+        match head {
+            Pattern::Tuple(ps) => {
+                // The one constructor of a tuple: every row splits into the
+                // element columns, read out of the tuple's fields once here.
+                let field_tys = self
+                    .mono
+                    .tuple_field_tys(&ty)
+                    .unwrap_or_else(|| vec![Type::Primitive(Primitive::I64); ps.len()]);
+                let sub_cols: Vec<(String, Type)> =
+                    field_tys.into_iter().map(|t| (self.fresh(), t)).collect();
+                let arity = sub_cols.len();
+                let spec: Vec<TreeRow> = rows
+                    .iter()
+                    .filter_map(|row| {
+                        let subs = match &row.pats[col] {
+                            Pattern::Tuple(qs) if qs.len() == arity => qs.clone(),
+                            Pattern::Wildcard => vec![Pattern::Wildcard; arity],
+                            _ => return None,
+                        };
+                        Some(replace_col(row, col, subs))
+                    })
+                    .collect();
+                let new_cols = splice_cols(cols, col, &sub_cols);
+                let mut out = self.compile(spec, &new_cols)?;
+                for (i, (sub_var, _)) in sub_cols.iter().enumerate().rev() {
+                    let field = Expr::new(
+                        ExprKind::Field(Box::new(self.ident(&var)), format!("_{i}")),
+                        self.span.clone(),
+                    );
+                    out = Expr::new(
+                        ExprKind::Let(sub_var.clone(), None, Box::new(field), Box::new(out)),
+                        self.span.clone(),
+                    );
+                }
+                Ok(out)
+            }
+            Pattern::Ctor { .. } | Pattern::Nested { .. } => {
+                // A tagged column: one `Match` arm per case of the type, each
+                // binding its payload to fresh columns.
+                let cases = self.mono.other_cases(&ty, "");
+                let mut arms = Vec::with_capacity(cases.len());
+                for (case, payload) in cases {
+                    let sub_cols: Vec<(String, Type)> =
+                        payload.into_iter().map(|t| (self.fresh(), t)).collect();
+                    let arity = sub_cols.len();
+                    let spec: Vec<TreeRow> = rows
+                        .iter()
+                        .filter_map(|row| {
+                            let subs = match &row.pats[col] {
+                                Pattern::Ctor {
+                                    name,
+                                    bindings,
+                                    ignore_payload,
+                                } if bare(name) == case => {
+                                    if *ignore_payload {
+                                        vec![Pattern::Wildcard; arity]
+                                    } else {
+                                        bindings
+                                            .iter()
+                                            .map(|b| {
+                                                if b == "_" {
+                                                    Pattern::Wildcard
+                                                } else {
+                                                    Pattern::Bind(b.clone())
+                                                }
+                                            })
+                                            .collect()
+                                    }
+                                }
+                                Pattern::Nested { name, args } if bare(name) == case => {
+                                    args.clone()
+                                }
+                                Pattern::Wildcard => vec![Pattern::Wildcard; arity],
+                                _ => return None,
+                            };
+                            Some(replace_col(row, col, subs))
+                        })
+                        .collect();
+                    if spec.is_empty() {
+                        // No row reaches this case: the checker proved that
+                        // cannot happen for a value, so this arm is dead — but
+                        // a `Match` has to name every case. Reuse the first
+                        // row's leaf; it can never run.
+                        arms.push(MatchArm {
+                            pattern: Pattern::Ctor {
+                                name: case.clone(),
+                                bindings: sub_cols.iter().map(|(v, _)| v.clone()).collect(),
+                                ignore_payload: false,
+                            },
+                            body: self.leaf(&rows[0]),
+                            span: self.span.clone(),
+                        });
+                        continue;
+                    }
+                    let new_cols = splice_cols(cols, col, &sub_cols);
+                    let body = self.compile(spec, &new_cols)?;
+                    arms.push(MatchArm {
+                        pattern: Pattern::Ctor {
+                            name: case,
+                            bindings: sub_cols.iter().map(|(v, _)| v.clone()).collect(),
+                            ignore_payload: false,
+                        },
+                        body,
+                        span: self.span.clone(),
+                    });
+                }
+                Ok(Expr::new(
+                    ExprKind::Match(Box::new(self.ident(&var)), arms),
+                    self.span.clone(),
+                ))
+            }
+            Pattern::Int(_) | Pattern::Str(_) | Pattern::Char(_) => {
+                // A literal column: test each distinct literal in row order,
+                // falling through to the rows that accept anything.
+                let mut lits: Vec<Pattern> = Vec::new();
+                for row in &rows {
+                    let p = &row.pats[col];
+                    if !matches!(p, Pattern::Wildcard) && !lits.contains(p) {
+                        lits.push(p.clone());
+                    }
+                }
+                let default: Vec<TreeRow> = rows
+                    .iter()
+                    .filter(|row| matches!(row.pats[col], Pattern::Wildcard))
+                    .map(|row| drop_col(row, col))
+                    .collect();
+                let rest_cols = splice_cols(cols, col, &[]);
+                let mut out = self.compile(default, &rest_cols)?;
+                for lit in lits.into_iter().rev() {
+                    let spec: Vec<TreeRow> = rows
+                        .iter()
+                        .filter(|row| {
+                            row.pats[col] == lit || matches!(row.pats[col], Pattern::Wildcard)
+                        })
+                        .map(|row| drop_col(row, col))
+                        .collect();
+                    let then = self.compile(spec, &rest_cols)?;
+                    let value = match &lit {
+                        Pattern::Int(n) => ExprKind::Num(*n),
+                        Pattern::Str(s) => ExprKind::Str(s.clone()),
+                        Pattern::Char(c) => ExprKind::Char(*c),
+                        _ => unreachable!("only literals are collected"),
+                    };
+                    let test = op_call(
+                        "__builtin_equal",
+                        vec![self.ident(&var), Expr::new(value, self.span.clone())],
+                        self.span.clone(),
+                    );
+                    out = Expr::new(
+                        ExprKind::If(Box::new(test), Box::new(then), Box::new(out)),
+                        self.span.clone(),
+                    );
+                }
+                Ok(out)
+            }
+            Pattern::Wildcard | Pattern::Bind(_) => unreachable!("absorbed above"),
+            Pattern::Array(_) => Err(Error::at(
+                "an array pattern cannot nest inside another pattern".to_string(),
+                self.span.clone(),
+            )),
+        }
+    }
+
+    /// The arm `row` reaches: its body under the binders the row collected.
+    fn leaf(&self, row: &TreeRow) -> Expr {
+        let mut out = self.bodies[row.arm].clone();
+        for (name, var) in row.binds.iter().rev() {
+            out = Expr::new(
+                ExprKind::Let(name.clone(), None, Box::new(self.ident(var)), Box::new(out)),
+                self.span.clone(),
+            );
+        }
+        out
+    }
+}
+
+/// A case name without its `@Variant` qualification.
+fn bare(name: &str) -> &str {
+    name.split('@').next().unwrap_or(name)
+}
+
+/// `row` with column `col` replaced by `subs` (which may be empty).
+fn replace_col(row: &TreeRow, col: usize, subs: Vec<Pattern>) -> TreeRow {
+    let mut pats = row.pats[..col].to_vec();
+    pats.extend(subs);
+    pats.extend(row.pats[col + 1..].iter().cloned());
+    TreeRow {
+        pats,
+        arm: row.arm,
+        binds: row.binds.clone(),
+    }
+}
+
+fn drop_col(row: &TreeRow, col: usize) -> TreeRow {
+    replace_col(row, col, Vec::new())
+}
+
+/// `cols` with column `col` replaced by `subs`.
+fn splice_cols(
+    cols: &[(String, Type)],
+    col: usize,
+    subs: &[(String, Type)],
+) -> Vec<(String, Type)> {
+    let mut out = cols[..col].to_vec();
+    out.extend(subs.iter().cloned());
+    out.extend(cols[col + 1..].iter().cloned());
+    out
 }

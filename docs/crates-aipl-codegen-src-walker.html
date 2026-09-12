@@ -2195,6 +2195,34 @@
 
 
 
+        <section class="item" id="item-flat_parens">
+          <h3>
+            <a class="anchor" href="#item-flat_parens">flat_parens</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn flat_parens(docs: Doc[]) -&#62; Doc</code></pre>
+
+          <div class="doc"><p><code>(a, b, c)</code> on one line, whatever the width: the parenthesized lists whose grammar takes no trailing comma — a pattern's, a match head's — cannot be broken the way <code>comma_list_docs</code> breaks a call's arguments.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-pattern_list">
+          <h3>
+            <a class="anchor" href="#item-pattern_list">pattern_list</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn pattern_list(self: W, end: str, acc0: Doc[]) -&#62; WDocs!FmtError</code></pre>
+
+          <div class="doc"><p>A comma-separated run of patterns up to (not including) <code>end</code>.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-qualified_case">
           <h3>
             <a class="anchor" href="#item-qualified_case">qualified_case</a>

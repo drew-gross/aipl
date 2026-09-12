@@ -93,3 +93,31 @@ Where this lives: the string rules are declared once in
 `crates/aipl-codegen/src/lex_aipl.aipl` (escape sets, delimiters, dedent),
 decoding in `unescape.aipl`, dedent in `process_raw_string.aipl`. The VS Code
 grammar under `editors/` is generated from the same rule table.
+
+## Pattern matching
+
+`match` takes one or more scrutinees and tries its arms top to bottom:
+
+```
+fn rep_suffix(min: u64, max: u64?) -> str {
+    match (min, max) {
+        (1, some(1)) => "",
+        (0, some(1)) => "?",
+        (lo, some(hi)) => `\{{lo},{hi}\}`,
+        (0, none) => "*",
+        (1, none) => "+",
+        (lo, none) => `\{{lo},\}`,
+    }
+}
+```
+
+Patterns nest: a tuple `(p, q)`, a constructor over patterns (`some(1)`,
+`Rect(w, _)`, `ok((a, b))`), an integer/string/char literal, a binder, and `_`.
+`Ctor(..)` matches a case without naming its payload. In a nested slot a bare
+name binds the value unless it spells a case — `none`, or a capitalised name
+(`Dot`) — which is how the checker tells `(lo, none)` apart. The whole match is
+checked exhaustive: the last arm above is `(lo, none)`, not `_`, and that is
+accepted because together with `(lo, some(hi))` it covers everything; a missing
+shape is named in the error (`(_, none) is not matched`), an arm no value can
+reach is refused, and a match on a literal column needs a `_` or binder arm.
+`if (let (1, some(x)) = pair) { .. }` takes the same patterns.
