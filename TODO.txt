@@ -143,7 +143,6 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
-  printing a tuple seems to result in some(__tuple$str$str { _0: "x", _1: "y" }) which is not good, we shouldn't be leaking mangled names into the public API
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
   ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.
   nextest is reporting some tests as leaky
@@ -468,6 +467,9 @@ optimizations:
 
 effects:
   all effects should be shimmable actually
+
+to_str:
+  accept some keyword args for things like indent, max witdth, ultimately forward to walker
 
 assert:
   assert should not cause the test to stop, we can keep running the subsequent lines in most cases (e.g. past write file effects at least until all effects are shimmed) and then it gets baked into a return, not an abort. Then there is no such thing as ABORTING_BUILTINS

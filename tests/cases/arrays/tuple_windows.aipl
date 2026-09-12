@@ -35,7 +35,7 @@ fn main() !prints {
 2 -> 3
 3 -> 4
 2
-some(__tuple$str$str { _0: "x", _1: "y" })
+some(("x", "y"))
 true
 true
 2
@@ -43,12 +43,12 @@ true
 allocations: 25
 deallocations: 25
 reallocations: 2
-bytes allocated: 1146
-instructions executed: 1802
-binary size: 9768
-  code: 5492
-  data: 255
-  metadata: 4021
+bytes allocated: 1120
+instructions executed: 1776
+binary size: 9472
+  code: 5392
+  data: 191
+  metadata: 3889
 functions:
   __arr_drop___tuple$str$str:
     calls: 1
@@ -61,7 +61,7 @@ functions:
     bytes: 364
   __to_str___tuple$str$str$opt:
     calls: 1
-    bytes: 848
+    bytes: 748
   __to_str_bool:
     calls: 2
     bytes: 232
@@ -93,7 +93,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_write_bytes:
-    calls: 11
+    calls: 9
     bytes: (external)
   aipl_write_i64:
     calls: 7

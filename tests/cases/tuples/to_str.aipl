@@ -1,0 +1,61 @@
+import { print, to_str } from builtins;
+
+// A tuple renders as it is written — `(1, "a")` — through `to_str` and
+// interpolation alike, and nested inside anything else that renders. It lowers
+// to a synthetic struct, but that struct's name and field names are the
+// compiler's, and never appear in output.
+fn main() !prints {
+    let t = (1, "a");
+    print(t.to_str());
+    print(`{t}`);
+    print(`{(1, (2, 3), [4])}`);
+    print(`{[(1, 'x'), (2, 'y')]}`);
+    print(`{some((true, "yes"))}`);
+}
+--- stdout ---
+(1, "a")
+(1, "a")
+(1, (2, 3), [4])
+[(1, 'x'), (2, 'y')]
+some((true, "yes"))
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 255
+instructions executed: 1273
+binary size: 9392
+  code: 4624
+  data: 643
+  metadata: 4125
+functions:
+  __to_str___tuple$bool$str$opt:
+    calls: 1
+    bytes: 708
+  __to_str___tuple$i64$__tuple_i64_i64$arr_i64:
+    calls: 1
+    bytes: 1168
+  __to_str___tuple$i64$char$arr:
+    calls: 1
+    bytes: 880
+  __to_str___tuple$i64$str:
+    calls: 2
+    bytes: 468
+  aipl_array_dec:
+    calls: 2
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_i64_len:
+    calls: 16
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 33
+    bytes: (external)
+  aipl_write_i64:
+    calls: 8
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1400

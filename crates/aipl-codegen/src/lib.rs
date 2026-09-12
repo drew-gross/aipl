@@ -12404,6 +12404,9 @@ fn emit_render_result<M: Module>(
 /// Render a struct as `Name { field: <value>, ... }`, recursing on each field
 /// (read via `component`, which loads a scalar/str/array or addresses an inline
 /// composite). Returns the rendered byte length.
+///
+/// A tuple is a struct only by lowering — its name and field names are the
+/// compiler's, not the user's — so it renders as it was written: `(1, "a")`.
 fn emit_render_struct<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
@@ -12424,25 +12427,27 @@ fn emit_render_struct<M: Module>(
         .iter()
         .map(|f| (f.name.clone(), f.offset, f.ty.clone()))
         .collect();
-    let mut len = emit_lit(
-        module,
-        builder,
-        cx,
-        sink,
-        format!("{} {{ ", display_name(sname)).as_bytes(),
-    )?;
+    let tuple = aipl_mono::is_tuple_struct(sname);
+    let open = if tuple {
+        "(".to_string()
+    } else {
+        format!("{} {{ ", display_name(sname))
+    };
+    let mut len = emit_lit(module, builder, cx, sink, open.as_bytes())?;
     for (i, (fname, offset, fty)) in fields.iter().enumerate() {
         if i > 0 {
             let sep = emit_lit(module, builder, cx, sink, b", ")?;
             len = builder.ins().iadd(len, sep);
         }
-        let label = emit_lit(module, builder, cx, sink, format!("{fname}: ").as_bytes())?;
-        len = builder.ins().iadd(len, label);
+        if !tuple {
+            let label = emit_lit(module, builder, cx, sink, format!("{fname}: ").as_bytes())?;
+            len = builder.ins().iadd(len, label);
+        }
         let fval = component(builder, base, *offset, fty, cx.structs);
         let fstr = emit_render(module, builder, cx, fval, fty, sink)?;
         len = builder.ins().iadd(len, fstr);
     }
-    let close = emit_lit(module, builder, cx, sink, b" }")?;
+    let close = emit_lit(module, builder, cx, sink, if tuple { b")" } else { b" }" })?;
     Ok(builder.ins().iadd(len, close))
 }
 

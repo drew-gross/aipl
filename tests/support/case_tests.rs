@@ -663,6 +663,7 @@ case_tests! {
     cases_tuples_generic_tuple = "cases/tuples/generic_tuple",
     cases_tuples_optional_tuple = "cases/tuples/optional_tuple",
     cases_tuples_three_elements = "cases/tuples/three_elements",
+    cases_tuples_to_str = "cases/tuples/to_str",
     cases_tuples_trailing_comma = "cases/tuples/trailing_comma",
     cases_tuples_vec_of_tuples = "cases/tuples/vec_of_tuples",
     cases_variants_basic = "cases/variants/basic",
