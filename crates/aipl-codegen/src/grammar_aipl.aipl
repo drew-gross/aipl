@@ -4126,15 +4126,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 3028477
-deallocations: 3028477
+allocations: 3028475
+deallocations: 3028475
 reallocations: 331496
-bytes allocated: 293377705
-instructions executed: 407728321
-binary size: 4869424
-  code: 3178144
+bytes allocated: 293377529
+instructions executed: 407727849
+binary size: 4869304
+  code: 3178028
   data: 44596
-  metadata: 1646684
+  metadata: 1646680
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4672,7 +4672,7 @@ functions:
     bytes: 368
   __m23__unescape:
     calls: 32
-    bytes: 1176
+    bytes: 1060
   __m24__process_raw_string:
     calls: 1
     bytes: 556

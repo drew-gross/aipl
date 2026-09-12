@@ -1,55 +1,47 @@
 // AIPL's string-escape decoder.
-import {
-    concat as +++,
-    equal as ==,
-    len,
-    less_than as <,
-    logical_and as &&,
-    wrapping_add as +,
-    wrapping_add_assign as +=,
-    wrapping_increment as ++,
-} from builtins;
+import { concat as +++, equal as ==, wrapping_add as + } from builtins;
 
 # Map a `\X` escape's X to its meaning: `n`/`t`/`r` to the control chars, and
 # any other escaped char (`"`, `\`, `` ` ``, `{`) to itself. Validity was
 # already enforced by the matcher's scan (its `escapes` set), so an unknown `\X`
-# never reaches here. `self` is the single char following the backslash.
-pub fn escape_text(self: str) -> str {
+# never reaches here. `self` is the char following the backslash.
+pub fn escape_text(self: char) -> str {
     match (self) {
-        "n" => "\n",
-        "t" => "\t",
-        "r" => "\r",
-        _ => self,
+        'n' => "\n",
+        't' => "\t",
+        'r' => "\r",
+        _ => `{self}`,
     }
 }.test({
     // The three control-char escapes.
-    assert(escape_text("n") == "\n");
-    assert(escape_text("t") == "\t");
-    assert(escape_text("r") == "\r");
+    assert(escape_text('n') == "\n");
+    assert(escape_text('t') == "\t");
+    assert(escape_text('r') == "\r");
     // Every other escaped char decodes to itself.
-    assert(escape_text("\\") == "\\");
-    assert(escape_text("\"") == "\"");
-    assert(escape_text("{") == "{");
-    assert(escape_text("`") == "`");
+    assert(escape_text('\\') == "\\");
+    assert(escape_text('"') == "\"");
+    assert(escape_text('{') == "{");
+    assert(escape_text('`') == "`");
 })
 
-# Decode every `\X` escape in `self`, copying everything else verbatim. Walks
-# byte-by-byte: at each backslash (with a char after it) splice the run since the
-# last escape plus the decoded `\X`, then resume past it; the trailing run is
-# appended at the end. Copying whole runs by slicing (rather than char-by-char)
-# keeps the common no-escape case a single copy. A trailing lone backslash can't
-# occur — the matcher already rejected such a token as unterminated.
+# Decode every `\X` escape in `self`, copying everything else verbatim. A
+# backslash flushes the plain run before it and marks the next char as the
+# escape's X, which is decoded on its own and starts the next run. Copying runs
+# by slicing (rather than char-by-char) keeps the common no-escape case a single
+# copy. A trailing lone backslash can't occur — the matcher already rejected such
+# a token as unterminated — and would be copied verbatim if it did.
 pub fn unescape(self: str) -> str {
     mut out = "";
     mut run_start: u64 = 0;
-    mut i: u64 = 0;
-    while (i < self.len()) {
-        if (self[i] == some('\\') && i + 1 < self.len()) {
-            set out = out +++ self[run_start..i] +++ self[i + 1..i + 2].escape_text();
-            set i += 2;
-            set run_start = i;
-        } else {
-            set i++;
+    mut escaped = false;
+    for (let i, c : self) {
+        if (escaped) {
+            set out = out +++ c.escape_text();
+            set run_start = i + 1;
+            set escaped = false;
+        } else if (c == '\\') {
+            set out = out +++ self[run_start..i];
+            set escaped = true;
         };
     }
     out +++ self[run_start..]
@@ -73,26 +65,30 @@ pub fn unescape(self: str) -> str {
     assert(unescape("x\\ny\\tz") == "x\ny\tz");
     // Adjacent escapes with no plain runs between them.
     assert(unescape("\\n\\t\\r") == "\n\t\r");
+
+    // An escaped backslash is one char: the one after it is plain, not another
+    // escape's X.
+    assert(unescape("\\\\n") == "\\n");
 })
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 880
-instructions executed: 4005
-binary size: 12512
-  code: 7172
-  data: 1084
-  metadata: 4256
+bytes allocated: 352
+instructions executed: 3773
+binary size: 13152
+  code: 7356
+  data: 1141
+  metadata: 4655
 functions:
   __test$escape_text:
     calls: 1
-    bytes: 3924
+    bytes: 4072
   __test$unescape:
     calls: 1
-    bytes: 1892
+    bytes: 2044
   aipl_assert:
-    calls: 19
+    calls: 20
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -107,5 +103,5 @@ functions:
     calls: 1
     bytes: 180
   unescape:
-    calls: 12
-    bytes: 1176
+    calls: 13
+    bytes: 1060

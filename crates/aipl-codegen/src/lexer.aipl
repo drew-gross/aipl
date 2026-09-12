@@ -1465,15 +1465,15 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 1418
-deallocations: 1418
+allocations: 1415
+deallocations: 1415
 reallocations: 153
-bytes allocated: 84584
-instructions executed: 345114
-binary size: 2314112
-  code: 1547708
+bytes allocated: 84320
+instructions executed: 344987
+binary size: 2313976
+  code: 1547592
   data: 10908
-  metadata: 755496
+  metadata: 755476
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1615,7 +1615,7 @@ functions:
     bytes: 96
   __m1__unescape:
     calls: 21
-    bytes: 1176
+    bytes: 1060
   __test$keep_skipped:
     calls: 1
     bytes: 25276

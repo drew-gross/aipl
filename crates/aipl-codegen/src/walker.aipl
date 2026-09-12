@@ -3003,11 +3003,11 @@ allocations: 117217
 deallocations: 117217
 reallocations: 1915
 bytes allocated: 6321628
-instructions executed: 22761725
-binary size: 8951872
-  code: 5651220
+instructions executed: 22761373
+binary size: 8951736
+  code: 5651104
   data: 28444
-  metadata: 3272208
+  metadata: 3272188
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3143,7 +3143,7 @@ functions:
     bytes: 140
   __m10__unescape:
     calls: 10
-    bytes: 1176
+    bytes: 1060
   __m11__process_raw_string:
     calls: 1
     bytes: 556

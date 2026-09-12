@@ -266,6 +266,7 @@ grammar:
   make an ebnf loader as well as dumper
 
 utilities:
+  make tuple_windows, use to improve unescape
   numeric < vs. lexicographic <. Also maybe a < for map/dict purposes that uses compiler-decided ordering?
   span.start - span.end should have a builtin
   add is_whitespace
@@ -284,6 +285,7 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
+  lint require set out = out +++ expr; to be out.extend(expr)
   we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway
   err_lints being all one big file is kinda annoying, lets group by kind
   for (let sub : rs) { if (cond(sub)) return true } else return false => line require this to return any
@@ -370,7 +372,7 @@ optimizations:
     also opt-in memoize
   constant match arm elimination
   fancier code sinking: if a value is computed outside a branch, but used e.g. 2/3 arms of a match, code sinking should still be made to work somehow.
-  generators! Maybe even implicitly transform array builders into generators
+  generators! Maybe even implicitly transform array builders into generators. Could probably replace a lot of the fusions.
   try_map should be native, so it can pre-allocate and so it can fuse
   combine adjacent reserves (even across expressions)
   interp_scan has a bunch of inspiration:
@@ -384,6 +386,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    fuse for (x : xs.map(f)) to not materialize the actual array
     map/join should fuse to map_join
     filter/find.
     depth in grammar_sexp can be xs.map(depth).maximum() + 1 and fuse to map_max
