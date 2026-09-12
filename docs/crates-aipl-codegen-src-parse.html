@@ -435,7 +435,7 @@
             <a class="anchor" href="#item-match_many">match_many</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, nested_in: (Rule&#60;K&#62;, Rule&#60;K&#62;)?, group: u64?, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+          <pre class="signature"><code>fn match_many&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, nested_in: (Rule&#60;K&#62;, Rule&#60;K&#62;)?, group: u64?, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
           <div class="doc"><p><code>sub</code> until it stops matching, at least <code>min</code> times — and, with a <code>sep</code>, with that separator between consecutive items.</p><p>A rule that can match empty input would repeat forever here, and AIPL has no <code>break</code> to escape with — so a zero-width iteration is refused outright, the same invariant <code>lexer.aipl</code> keeps by having no matcher accept empty input. It is a grammar bug, reported as one rather than hung on.</p><p>The separated case is the same loop with one step in front of each item after the first. What the separator matched is held back until an item follows it, because a separator with nothing after it is only part of the list when <code>trailing_sep</code> says so; otherwise the position rewinds to before it and the enclosing rule is the one that complains — which is how <code>[1, 2,]</code> can be either the list or a list followed by a stray comma.</p></div>
 
@@ -449,7 +449,7 @@
             <a class="anchor" href="#item-match_group">match_group</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_group&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, gi: u64, brackets: (Rule&#60;K&#62;, Rule&#60;K&#62;), sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+          <pre class="signature"><code>fn match_group&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, gi: u64, brackets: (Rule&#60;K&#62;, Rule&#60;K&#62;), sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
           <div class="doc"><p>A bracketed repetition: <code>open</code>, then the items, then <code>close</code>, kept as one <code>Group</code> naming style <code>gi</code>. It parses exactly as <code>Then</code> of the three would; what it adds is on either side of that.</p><p>On the way in, the three runs stay separate in the tree, so the formatter knows which tokens are brackets without inferring it from where they sit. On the way out, a <code>close</code> that fails after <code>open</code> matched records the opening bracket's span on the furthest failure — the parse still backtracks like any non-match, but if nothing else works the message can say which bracket was left open.</p></div>
 
@@ -463,7 +463,7 @@
             <a class="anchor" href="#item-match_reps">match_reps</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn match_reps&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+          <pre class="signature"><code>fn match_reps&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sub: Rule&#60;K&#62;, min: u64, max: u64?, sep: Rule&#60;K&#62;?, trailing_sep: bool, leading_sep: bool, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
           <div class="doc"><p>The repetition itself, without brackets.</p></div>
 
@@ -480,6 +480,20 @@
           <pre class="signature"><code>fn match_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: Rule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
 
           <div class="doc"><p>The separator step: what <code>sep</code> matched, or an empty match when there is none.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-match_leading_sep">
+          <h3>
+            <a class="anchor" href="#item-match_leading_sep">match_leading_sep</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn match_leading_sep&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, sep: Rule&#60;K&#62;?, pos: u64, cur: u64, far: Far) -&#62; Step!ParseError</code></pre>
+
+          <div class="doc"><p>The optional separator in front of a list's first item: what <code>sep</code> matched, or the empty step when it is absent. Its expectations still reach <code>far</code>, as <code>match_maybe</code>'s do, so a leading separator that was started and went wrong still reports.</p></div>
 
 
         </section>

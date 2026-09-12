@@ -8,7 +8,7 @@ variant Shape =
      | Rect(i64, i64)
 variant Flat =
     # Documented, so it cannot stay flat.
-    A | B
+    | A | B
 fn main() { }
 --- formatted ---
 # A shape.

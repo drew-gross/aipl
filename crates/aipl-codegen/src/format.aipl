@@ -676,10 +676,10 @@ fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
 allocations: 2388
 deallocations: 2388
 reallocations: 349
-bytes allocated: 171827
-instructions executed: 237224
-binary size: 232328
-  code: 148848
+bytes allocated: 172579
+instructions executed: 237282
+binary size: 232384
+  code: 148904
   data: 5020
   metadata: 78460
 functions:
@@ -802,7 +802,7 @@ functions:
     bytes: 700
   __m8__desugar_rule$FKind:
     calls: 44
-    bytes: 11936
+    bytes: 11964
   __m8__failure_message:
     calls: 2
     bytes: 488
@@ -811,7 +811,7 @@ functions:
     bytes: 32
   __m8__group_styles$FKind$tail:
     calls: 74
-    bytes: 4724
+    bytes: 4732
   __m8__link$FKind$str:
     calls: 8
     bytes: 3048
@@ -820,7 +820,7 @@ functions:
     bytes: 716
   __m8__link_rule$FKind:
     calls: 44
-    bytes: 8236
+    bytes: 8248
   __m8__link_rules$FKind:
     calls: 0
     bytes: 732
@@ -982,7 +982,7 @@ functions:
     bytes: 468
   grammar_of:
     calls: 2
-    bytes: 2168
+    bytes: 2176
   group_doc$FKind$str$s1$lam41:
     calls: 0
     bytes: 2420

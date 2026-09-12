@@ -269,9 +269,9 @@
             <a class="anchor" href="#item-render_list">render_list</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn render_list&#60;K: variant&#62;(item: Rule&#60;K&#62;, sep: Rule&#60;K&#62;, min: u64, max: u64?, trailing_sep: bool, names: str[]) -&#62; str</code></pre>
+          <pre class="signature"><code>fn render_list&#60;K: variant&#62;(item: Rule&#60;K&#62;, sep: Rule&#60;K&#62;, min: u64, max: u64?, trailing_sep: bool, leading_sep: bool, names: str[]) -&#62; str</code></pre>
 
-          <div class="doc"><p>A separated list, longhand: the first item, then as many <code>sep item</code> pairs as the minimum demands and more. The outer <code>?</code> on a zero-minimum list is not decoration — an empty list is a list, so the whole thing is optional.</p></div>
+          <div class="doc"><p>A separated list, longhand: the first item, then as many <code>sep item</code> pairs as the minimum demands and more — with an optional <code>sep</code> in front when the list allows a leading one, and one behind when it allows a trailing one. The outer <code>?</code> on a zero-minimum list is not decoration — an empty list is a list, so the whole thing is optional.</p></div>
 
 
         </section>

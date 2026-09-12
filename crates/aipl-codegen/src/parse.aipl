@@ -320,13 +320,14 @@ fn match_rule<K: variant, A: any>(
         Literal(s) => ok(match_spelling(p, s, pos, far)),
         Then(rs) => match_then(p, rs, pos, cur, far),
         OneOf(rs) => match_one_of(p, rs, pos, cur, far),
-        Many(sub, min, max, sep, trailing_sep, nested_in, _, _, group) => match_many(
+        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, _, _, group) => match_many(
             p,
             sub,
             min,
             max,
             sep,
             trailing_sep,
+            leading_sep,
             nested_in,
             group,
             pos,
@@ -431,6 +432,7 @@ fn match_many<K: variant, A: any>(
     max: u64?,
     sep: Rule<K>?,
     trailing_sep: bool,
+    leading_sep: bool,
     nested_in: (Rule<K>, Rule<K>)?,
     group: u64?,
     pos: u64,
@@ -438,13 +440,26 @@ fn match_many<K: variant, A: any>(
     far: Far,
 ) -> Step!ParseError {
     match (nested_in) {
-        none => match_reps(p, sub, min, max, sep, trailing_sep, pos, cur, far),
+        none => match_reps(p, sub, min, max, sep, trailing_sep, leading_sep, pos, cur, far),
         some(brackets) => {
             // `link` stamps every bracketed repetition with its style's index;
             // reaching one without means the grammar was handed to the driver
             // unlinked, which `parse_cst` makes impossible.
             let gi = group.value_or_err(ParseError { message: "unlinked group", span: 0..0 })?;
-            match_group(p, gi, brackets, sub, min, max, sep, trailing_sep, pos, cur, far)
+            match_group(
+                p,
+                gi,
+                brackets,
+                sub,
+                min,
+                max,
+                sep,
+                trailing_sep,
+                leading_sep,
+                pos,
+                cur,
+                far,
+            )
         },
     }
 }
@@ -467,6 +482,7 @@ fn match_group<K: variant, A: any>(
     max: u64?,
     sep: Rule<K>?,
     trailing_sep: bool,
+    leading_sep: bool,
     pos: u64,
     cur: u64,
     far: Far,
@@ -475,7 +491,7 @@ fn match_group<K: variant, A: any>(
     if (!so.hit) {
         return ok(no(so.far, pos));
     };
-    let sb = match_reps(p, sub, min, max, sep, trailing_sep, so.pos, cur, so.far)?;
+    let sb = match_reps(p, sub, min, max, sep, trailing_sep, leading_sep, so.pos, cur, so.far)?;
     if (!sb.hit) {
         return ok(no(sb.far, pos));
     };
@@ -504,6 +520,7 @@ fn match_reps<K: variant, A: any>(
     max: u64?,
     sep: Rule<K>?,
     trailing_sep: bool,
+    leading_sep: bool,
     pos: u64,
     cur: u64,
     far: Far,
@@ -542,9 +559,19 @@ fn match_reps<K: variant, A: any>(
             // Everything after the first item is preceded by the separator, when
             // there is one. An unseparated list, and the first item of any list,
             // take the empty step — so `before` and `after` coincide and the
-            // trailing-separator rule below never fires.
+            // trailing-separator rule below never fires. A list that allows a
+            // *leading* separator tries one before the first item too, and
+            // simply goes without when it is not there.
             let before = cp;
-            let led = if (n == 0) { hit_nothing(cp, f) } else { match_sep(p, sep, cp, cur, f)? };
+            let led = if (n == 0) {
+                if (leading_sep) {
+                    match_leading_sep(p, sep, cp, cur, f)?
+                } else {
+                    hit_nothing(cp, f)
+                }
+            } else {
+                match_sep(p, sep, cp, cur, f)?
+            };
             set f = led.far;
             if (led.hit) {
                 let after = led.pos;
@@ -570,8 +597,10 @@ fn match_reps<K: variant, A: any>(
                     // A separator with nothing after it takes the trailing rule.
                     // An item *did* follow, but we are at the bound and cannot
                     // take it — so the separator leads something that is not
-                    // ours, and both are rewound.
-                    if (!st.hit && trailing_sep && before != after) {
+                    // ours, and both are rewound. So is a leading separator
+                    // with no first item: it is not a trailing one, there being
+                    // nothing for it to trail.
+                    if (!st.hit && trailing_sep && before != after && 0 < n) {
                         set acc.extend(led.kids);
                         set cp = after;
                     } else {
@@ -602,6 +631,21 @@ fn match_sep<K: variant, A: any>(
         some(s) => match_rule(p, s, pos, cur, far),
         none => ok(hit_nothing(pos, far)),
     }
+}
+
+# The optional separator in front of a list's first item: what `sep` matched,
+# or the empty step when it is absent. Its expectations still reach `far`, as
+# `match_maybe`'s do, so a leading separator that was started and went wrong
+# still reports.
+fn match_leading_sep<K: variant, A: any>(
+    p: Parser<K, A>,
+    sep: Rule<K>?,
+    pos: u64,
+    cur: u64,
+    far: Far,
+) -> Step!ParseError {
+    let st = match_sep(p, sep, pos, cur, far)?;
+    if (st.hit) { ok(st) } else { ok(hit_nothing(pos, st.far)) }
 }
 
 # A match that consumed nothing and succeeded — the identity step.
@@ -766,7 +810,7 @@ fn rule_labels<K: variant, A: any>(
         // A bracketed repetition is reached through its opening bracket, so
         // that is what is expected at its first token; an unbracketed one is
         // reached through its body.
-        Many(sub, _, _, _, _, nested_in, _, _, _) => match (nested_in) {
+        Many(sub, _, _, _, _, _, nested_in, _, _, _) => match (nested_in) {
             some(brackets) => rule_labels(brackets.0, prods, firsts, labels),
             none => rule_labels(sub, prods, firsts, labels),
         },
@@ -816,7 +860,7 @@ fn rule_nullable<K: variant>(r: Rule<K>, firsts: First<K>[]) -> bool {
         OneOf(rs) => rs.any(|sub| rule_nullable(sub, firsts)),
         // A bracket pair always matches at least its two brackets, so a
         // bracketed repetition is never nullable however small its minimum.
-        Many(sub, min, _, _, _, nested_in, _, _, _) => match (nested_in) {
+        Many(sub, min, _, _, _, _, nested_in, _, _, _) => match (nested_in) {
             some(brackets) => rule_nullable(brackets.0, firsts) && min == 0 && rule_nullable(
                 brackets.1,
                 firsts,
@@ -1240,6 +1284,25 @@ pub fn parse<K: variant, A: any>(
     let g_bstrict = g_of([one("l", r_bstrict)]);
     assert(msg_of("[1, 2,]", g_bstrict, "l") == "expected `]`, found `,`");
 
+    // ---- The leading separator ----
+    // `leading_sep` lets the list open with its separator — present or absent,
+    // the items are the same items. A separator with no item after it is not a
+    // leading one, and the list does not take it as a trailing one either.
+    let pipe: Rule<Tok> = Literal("+");
+    let led = Many(Term(Num), min=1, sep=pipe, trailing_sep=false, leading_sep=true);
+    let r_led: Rule<Tok> = Then([Literal("["), led, Literal("]")]);
+    let g_led = g_of([one("l", r_led)]);
+    assert(shown("[1 + 2]", g_led, "l")? == "(l [ 1 + 2 ])");
+    assert(shown("[+ 1 + 2]", g_led, "l")? == "(l [ + 1 + 2 ])");
+    assert(shown("[+ 1]", g_led, "l")? == "(l [ + 1 ])");
+    assert(msg_of("[+]", g_led, "l") == "expected Num, found `]`");
+    assert(msg_of("[1 +]", g_led, "l") == "expected Num, found `]`");
+    // Without it, the same list refuses the opening separator.
+    let unled = Many(Term(Num), min=1, sep=pipe, trailing_sep=false);
+    let r_unled: Rule<Tok> = Then([Literal("["), unled, Literal("]")]);
+    let g_unled = g_of([one("l", r_unled)]);
+    assert(msg_of("[+ 1]", g_unled, "l") == "expected Num, found `+`");
+
     // ---- Climb: precedence and associativity ----
     let plus = Prec { power: 1, right: false, ops: ["+"] };
     let times = Prec { power: 2, right: false, ops: ["*"] };
@@ -1524,21 +1587,21 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 8858
-deallocations: 8858
-reallocations: 1737
-bytes allocated: 621987
-instructions executed: 1247352
-binary size: 640048
-  code: 389392
-  data: 9852
-  metadata: 240804
+allocations: 9523
+deallocations: 9523
+reallocations: 1869
+bytes allocated: 676645
+instructions executed: 1348586
+binary size: 691464
+  code: 419008
+  data: 10388
+  metadata: 262068
 functions:
   __arr_drop_Node:
     calls: 16
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 573
+    calls: 615
     bytes: 116
   __arr_drop___m2__First$Tok:
     calls: 44
@@ -1547,31 +1610,31 @@ functions:
     calls: 146
     bytes: 140
   __arr_drop___m3__ListStyle:
-    calls: 273
+    calls: 297
     bytes: 120
   __arr_drop___m3__Prec:
     calls: 2
     bytes: 120
   __arr_drop___m3__Production$Tok$Node:
-    calls: 118
+    calls: 126
     bytes: 188
   __arr_drop___m3__Rule$Tok:
-    calls: 211
+    calls: 225
     bytes: 116
   __arr_drop___m4__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_drop___m4__Token$Tok:
-    calls: 404
+    calls: 442
     bytes: 188
   __arr_drop___m4__TokenRule$Tok:
-    calls: 81
+    calls: 87
     bytes: 632
   __arr_retain_Node:
     calls: 13
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 551
+    calls: 603
     bytes: 116
   __arr_retain___m2__First$Tok:
     calls: 76
@@ -1580,22 +1643,22 @@ functions:
     calls: 115
     bytes: 140
   __arr_retain___m3__ListStyle:
-    calls: 112
+    calls: 118
     bytes: 120
   __arr_retain___m3__Prec:
     calls: 0
     bytes: 120
   __arr_retain___m3__Production$Tok$Node:
-    calls: 139
+    calls: 145
     bytes: 188
   __arr_retain___m3__Rule$Tok:
-    calls: 440
+    calls: 476
     bytes: 116
   __arr_retain___m4__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_retain___m4__Token$Tok:
-    calls: 247
+    calls: 273
     bytes: 188
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
@@ -1616,7 +1679,7 @@ functions:
     calls: 0
     bytes: 380
   __builtin_count_while$char$lam52:
-    calls: 192
+    calls: 207
     bytes: 220
   __builtin_count_while$char$s0$lam60:
     calls: 0
@@ -1631,10 +1694,10 @@ functions:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam21:
-    calls: 139
+    calls: 145
     bytes: 400
   __builtin_find_index$str$lam31:
-    calls: 81
+    calls: 87
     bytes: 400
   __builtin_find_index$str$lam42:
     calls: 47
@@ -1646,7 +1709,7 @@ functions:
     calls: 32
     bytes: 828
   __builtin_try_map$__m3__Rule$Tok$__m3__Rule<Tok>$__m3__ParseError$lam62:
-    calls: 94
+    calls: 100
     bytes: 632
   __eq_Node:
     calls: 13
@@ -1715,7 +1778,7 @@ functions:
     calls: 0
     bytes: 128
   __lambda_28:
-    calls: 38
+    calls: 45
     bytes: 96
   __lambda_3:
     calls: 0
@@ -1742,7 +1805,7 @@ functions:
     calls: 64
     bytes: 3684
   __m1__show:
-    calls: 208
+    calls: 226
     bytes: 2968
   __m1__span:
     calls: 1
@@ -1770,39 +1833,39 @@ functions:
     bytes: 1084
   __m2__rule_first$Tok:
     calls: 149
-    bytes: 6188
+    bytes: 6508
   __m2__union_syms$Tok:
     calls: 84
     bytes: 736
   __m3__desugar_opt$Tok:
-    calls: 54
+    calls: 60
     bytes: 700
   __m3__desugar_rule$Tok:
-    calls: 486
-    bytes: 11936
+    calls: 522
+    bytes: 11964
   __m3__failure_message:
-    calls: 39
+    calls: 42
     bytes: 488
   __m3__group_styles$Tok:
     calls: 0
     bytes: 32
   __m3__group_styles$Tok$tail:
-    calls: 926
-    bytes: 4724
+    calls: 1010
+    bytes: 4732
   __m3__link$Tok$Node:
-    calls: 95
+    calls: 101
     bytes: 2604
   __m3__link_opt$Tok:
-    calls: 54
+    calls: 60
     bytes: 716
   __m3__link_rule$Tok:
-    calls: 486
-    bytes: 8236
+    calls: 522
+    bytes: 8248
   __m3__link_rules$Tok:
-    calls: 94
+    calls: 100
     bytes: 732
   __m3__prod_names$Tok$Node:
-    calls: 211
+    calls: 226
     bytes: 492
   __m4__between_len:
     calls: 0
@@ -1820,16 +1883,16 @@ functions:
     calls: 0
     bytes: 2028
   __m4__lex$Tok:
-    calls: 81
+    calls: 87
     bytes: 1328
   __m4__lex_step$Tok:
-    calls: 310
+    calls: 344
     bytes: 24988
   __m4__nested_len:
     calls: 0
     bytes: 940
   __m4__step_result$Tok:
-    calls: 826
+    calls: 931
     bytes: 9188
   __m4__template_scan$Tok:
     calls: 0
@@ -1853,10 +1916,10 @@ functions:
     calls: 30
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 428
+    calls: 460
     bytes: 132
   __rec_drop___m3__Rule$Tok:
-    calls: 1060
+    calls: 1143
     bytes: 340
   __rec_drop___tuple$__m3__Rule_Tok$__m3__Rule_Tok:
     calls: 37
@@ -1866,7 +1929,7 @@ functions:
     bytes: 3360
   __test$parse:
     calls: 1
-    bytes: 186072
+    bytes: 213196
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -1877,58 +1940,58 @@ functions:
     calls: 5
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 304
+    calls: 316
     bytes: (external)
   aipl_arr_extend:
-    calls: 1209
+    calls: 1323
     bytes: (external)
   aipl_arr_inc:
-    calls: 29032
+    calls: 31354
     bytes: (external)
   aipl_arr_join:
-    calls: 156
+    calls: 162
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1295
+    calls: 1409
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 690
+    calls: 734
     bytes: (external)
   aipl_arr_sort:
-    calls: 37
+    calls: 40
     bytes: (external)
   aipl_array_dec:
-    calls: 35537
+    calls: 38364
     bytes: (external)
   aipl_array_new:
-    calls: 5006
+    calls: 5449
     bytes: (external)
   aipl_array_push:
-    calls: 246
+    calls: 272
     bytes: (external)
   aipl_array_push_mut:
-    calls: 2190
+    calls: 2306
     bytes: (external)
   aipl_array_with_cap:
-    calls: 868
+    calls: 892
     bytes: (external)
   aipl_assert:
-    calls: 77
+    calls: 83
     bytes: (external)
   aipl_rec_alloc:
-    calls: 1555
+    calls: 1670
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 10732
+    calls: 11506
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 315
+    calls: 343
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 9177
+    calls: 9836
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 315
+    calls: 343
     bytes: (external)
   aipl_set_contains:
     calls: 201
@@ -1955,7 +2018,7 @@ functions:
     calls: 5
     bytes: (external)
   attach_trivia$Tok:
-    calls: 82
+    calls: 88
     bytes: 1876
   build_node:
     calls: 17
@@ -1964,10 +2027,10 @@ functions:
     calls: 15
     bytes: 3388
   error_at$Tok$Node:
-    calls: 37
+    calls: 40
     bytes: 3108
   far_miss:
-    calls: 133
+    calls: 142
     bytes: 1084
   far_unclosed:
     calls: 5
@@ -1976,10 +2039,10 @@ functions:
     calls: 22
     bytes: 228
   leaf_at$Tok$Node:
-    calls: 203
+    calls: 224
     bytes: 404
   lex_toks:
-    calls: 81
+    calls: 87
     bytes: 776
   lower_node$Tok$Node:
     calls: 18
@@ -1989,10 +2052,13 @@ functions:
     bytes: 180
   match_group$Tok$Node:
     calls: 15
-    bytes: 6196
+    bytes: 6208
+  match_leading_sep$Tok$Node:
+    calls: 5
+    bytes: 1288
   match_many$Tok$Node:
-    calls: 52
-    bytes: 1436
+    calls: 58
+    bytes: 1444
   match_maybe$Tok$Node:
     calls: 6
     bytes: 1076
@@ -2000,25 +2066,28 @@ functions:
     calls: 78
     bytes: 1692
   match_prod$Tok$Node:
-    calls: 175
+    calls: 181
     bytes: 7068
   match_reps$Tok$Node:
-    calls: 50
-    bytes: 4928
+    calls: 56
+    bytes: 4752
   match_rule$Tok$Node:
-    calls: 578
-    bytes: 6272
+    calls: 620
+    bytes: 6280
+  match_sep$Tok$Node:
+    calls: 89
+    bytes: 968
   match_then$Tok$Node:
-    calls: 49
+    calls: 55
     bytes: 2036
   parse$Tok$Node:
     calls: 5
     bytes: 380
   parse_cst$Tok$Node:
-    calls: 69
+    calls: 75
     bytes: 624
   parse_prepared$Tok$Node:
-    calls: 81
+    calls: 87
     bytes: 5968
   parsed:
     calls: 5
@@ -2030,7 +2099,7 @@ functions:
     calls: 11
     bytes: 1344
   quoted:
-    calls: 98
+    calls: 107
     bytes: 456
   refuse:
     calls: 1
@@ -2040,13 +2109,13 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 130
-    bytes: 4620
+    bytes: 4628
   rule_nullable$Tok:
     calls: 0
     bytes: 36
   rule_nullable$Tok$tail:
     calls: 13
-    bytes: 1592
+    bytes: 1600
   seq_labels$Tok$Node:
     calls: 0
     bytes: 44
@@ -2054,16 +2123,16 @@ functions:
     calls: 13
     bytes: 908
   shown:
-    calls: 61
+    calls: 67
     bytes: 844
   shown_prepared:
     calls: 12
     bytes: 1304
   tok_rules:
-    calls: 78
+    calls: 84
     bytes: 2736
   tok_text$Tok$Node:
-    calls: 183
+    calls: 207
     bytes: 904
   trivia_rules:
     calls: 3

@@ -75,6 +75,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  lex doc comments as one big token, not one per line
   improve unescape using the for (let i, c : v) syntax
   section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
@@ -227,6 +228,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
+  variant_case_docs.aipl is weird: having the leading | should force splitting each onto own line
   wrap comments
   formatter gets list separater directly off the Many
   Why the formatter isn't already a thin wrapper
@@ -248,6 +250,7 @@ sets:
   support other types
 
 parser:
+  OneOf([Then([T, U]), T]) should instead be Then([T, Maybe(U)]) (e.g. in variant)
   remove expr_unary, it's silly
   a bracketed list's separator must be a literal, so the printer can write it back <--- lift this restriction
   trailing separater = Allowed | Disallowed | Required

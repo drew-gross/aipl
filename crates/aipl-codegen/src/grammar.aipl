@@ -126,7 +126,10 @@ variant Rule<K: variant> =
     // With a `sep` it is a *separated* list: `r`, then `sep r` for as long as
     // the separator keeps appearing. `trailing_sep` decides what happens to a
     // separator with nothing after it — consumed (`[1, 2,]` is the list) or
-    // rewound and left for the enclosing rule to complain about.
+    // rewound and left for the enclosing rule to complain about. `leading_sep`
+    // is its mirror at the front: the list may open with a separator before
+    // its first item (`| A | B` as well as `A | B`), which is the shape a
+    // variant's cases take once they break one per line.
     //
     // `sep` and `max` are both written with the `?` on the *name*: a caller
     // gives the rule itself (`sep=Lit(",")`), and leaving it out is what yields
@@ -181,6 +184,7 @@ variant Rule<K: variant> =
         max?: u64 = none,
         sep?: Rule<K> = none,
         trailing_sep: bool = true,
+        leading_sep: bool = false,
         nested_in?: (Rule<K>, Rule<K>) = none,
         spaced: bool = false,
         style?: ListStyle = none,
@@ -329,7 +333,7 @@ fn group_styles<K: variant>(r: Rule<K>) -> ListStyle[] {
         // A bracketed repetition is a group, and its own style comes first —
         // before the brackets' insides and before its own body. `link_rule`
         // hands out indices by walking this same tree the same way.
-        Many(sub, _, _, sep, _, nested_in, _, style, _) => match (nested_in) {
+        Many(sub, _, _, sep, _, _, nested_in, _, style, _) => match (nested_in) {
             some(brackets) => [
                 style.value_or(ListStyle {}),
                 ..group_styles(brackets.0),
@@ -373,7 +377,7 @@ fn group_count<K: variant>(r: Rule<K>) -> u64 { group_styles(r).len() }
 # is nothing to break at a width in that case, so it lays out inline.
 pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
     match (r) {
-        Many(sub, min, max, sep, trailing_sep, nested_in, spaced, style, _) => {
+        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, spaced, style, _) => {
             // `none` reads as "no bound", which is never below the minimum — so
             // the check needs no case of its own for it.
             let cap = max.value_or(min);
@@ -393,6 +397,7 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
                     max?=max,
                     sep?=desugar_opt(sep)?,
                     trailing_sep=trailing_sep,
+                    leading_sep=leading_sep,
                     spaced=spaced,
                 )),
                 some(brackets) => {
@@ -413,6 +418,7 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
                         max?=max,
                         sep?=desugar_opt(sep)?,
                         trailing_sep=trailing_sep,
+                        leading_sep=leading_sep,
                         nested_in=(desugar_rule(brackets.0)?, desugar_rule(brackets.1)?),
                         spaced=spaced,
                         style=style.value_or(derived),
@@ -492,13 +498,14 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
         // and reassigns the same index, which is what keeps `link` idempotent —
         // and why the style rides on the rule rather than living in the table
         // alone.
-        Many(sub, min, max, sep, trailing_sep, nested_in, spaced, style, _) => match (nested_in) {
+        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, spaced, style, _) => match (nested_in) {
             none => ok(Many(
                 link_rule(sub, names, base)?,
                 min=min,
                 max?=max,
                 sep?=link_opt(sep, names, base + group_count(sub))?,
                 trailing_sep=trailing_sep,
+                leading_sep=leading_sep,
                 spaced=spaced,
                 style?=style,
             )),
@@ -517,6 +524,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
                     max?=max,
                     sep?=link_opt(sep, names, after_sub)?,
                     trailing_sep=trailing_sep,
+                    leading_sep=leading_sep,
                     nested_in=(linked_open, linked_close),
                     spaced=spaced,
                     style?=style,
@@ -858,12 +866,12 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
 allocations: 607
 deallocations: 607
 reallocations: 77
-bytes allocated: 60418
-instructions executed: 59399
-binary size: 136544
-  code: 86264
+bytes allocated: 62226
+instructions executed: 59670
+binary size: 137016
+  code: 86732
   data: 3484
-  metadata: 46796
+  metadata: 46800
 functions:
   __arr_drop_ListStyle:
     calls: 41
@@ -924,7 +932,7 @@ functions:
     bytes: 284
   __eq_Rule$Kind:
     calls: 29
-    bytes: 676
+    bytes: 708
   __eq_Rule$Kind$arr:
     calls: 3
     bytes: 300
@@ -960,7 +968,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 45756
+    bytes: 46144
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -1038,7 +1046,7 @@ functions:
     bytes: 700
   desugar_rule$Kind:
     calls: 78
-    bytes: 11936
+    bytes: 11964
   failure_message:
     calls: 2
     bytes: 488
@@ -1047,7 +1055,7 @@ functions:
     bytes: 32
   group_styles$Kind$tail:
     calls: 188
-    bytes: 4724
+    bytes: 4732
   keep:
     calls: 0
     bytes: 268
@@ -1059,7 +1067,7 @@ functions:
     bytes: 716
   link_rule$Kind:
     calls: 76
-    bytes: 8236
+    bytes: 8248
   link_rules$Kind:
     calls: 4
     bytes: 732

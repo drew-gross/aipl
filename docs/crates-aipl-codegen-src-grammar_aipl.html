@@ -1812,7 +1812,21 @@
           </h3>
           <pre class="signature"><code>fn lower_variant_decl(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p><code>variant_decl</code> — the name, the type parameters, and the cases. The cases' <code># ..</code> lines are this node's own tokens (they ride with the <code>|</code> separator, see the rule), so each case is given the lines written between the previous case and itself here, where both are in hand.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-doc_lines_between">
+          <h3>
+            <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn doc_lines_between(src: str, node: Cst, lo: u64, hi: u64) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
 
         </section>
@@ -1826,7 +1840,7 @@
           </h3>
           <pre class="signature"><code>fn lower_variant_case(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>variant_case</code> — its <code># ..</code> lines, the <code>|</code> if it has one, the name, and the payload slots as children. The docs are the own tokens that start with <code>#</code>; what is left after them and the separator is the name.</p></div>
+          <div class="doc"><p><code>variant_case</code> — the name and the payload slots as children. Its docs are filled in by <code>lower_variant_decl</code>, which holds them.</p></div>
 
 
         </section>

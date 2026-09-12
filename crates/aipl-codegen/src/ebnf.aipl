@@ -136,6 +136,14 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     let r_empty: Rule<Tok> = Then(no_rules);
     let r_never: Rule<Tok> = OneOf(no_rules);
     let r_list: Rule<Tok> = Many(Term(Num), sep=Literal(","), trailing_sep=false);
+    // A leading separator is an optional one in front, spelled as such.
+    let r_led: Rule<Tok> = Many(
+        Term(Num),
+        min=1,
+        sep=Literal("|"),
+        trailing_sep=false,
+        leading_sep=true,
+    );
 
     // Bounds. One-at-most is `?` and exactly-one is the body written alone,
     // because those are what those bounds mean; anything else is the `{n,m}`
@@ -153,6 +161,7 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
         one("empty", r_empty),
         one("never", r_never),
         one("list", r_list),
+        one("led", r_led),
         one("upto", r_upto),
         one("exactly", r_exactly),
         one("range", r_range),
@@ -168,6 +177,7 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
             empty = (* empty *) ;
             never = (* never *) ;
             list = (Num ("," Num)*)? ;
+            led = "|"? Num ("|" Num)* ;
             upto = Num? ;
             exactly = Num ;
             range = Num{2,4} ;
@@ -243,9 +253,9 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
         // A bracketed repetition renders as the sequence it is — bracket,
         // contents, bracket. EBNF has no way to say "and these two are a pair",
         // and the reader does not need one: the brackets are right there.
-        Many(sub, min, max, sep, trailing_sep, nested_in, _, _, _) => {
+        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, _, _, _) => {
             let reps = match (sep) {
-                some(s) => render_list(sub, s, min, max, trailing_sep, names),
+                some(s) => render_list(sub, s, min, max, trailing_sep, leading_sep, names),
                 none => {
                     let body = render_rule(sub, names, Item);
                     `{body}{rep_suffix(min, max)}`
@@ -302,14 +312,17 @@ fn rep_suffix(min: u64, max: u64?) -> str {
 }
 
 # A separated list, longhand: the first item, then as many `sep item` pairs as
-# the minimum demands and more. The outer `?` on a zero-minimum list is not
-# decoration — an empty list is a list, so the whole thing is optional.
+# the minimum demands and more — with an optional `sep` in front when the list
+# allows a leading one, and one behind when it allows a trailing one. The outer
+# `?` on a zero-minimum list is not decoration — an empty list is a list, so
+# the whole thing is optional.
 fn render_list<K: variant>(
     item: Rule<K>,
     sep: Rule<K>,
     min: u64,
     max: u64?,
     trailing_sep: bool,
+    leading_sep: bool,
     names: str[],
 ) -> str {
     let it = render_rule(item, names, Item);
@@ -328,7 +341,8 @@ fn render_list<K: variant>(
         rep_suffix(min - 1, inner_max)
     };
     let core = `{it} ({s} {it}){pairs}`;
-    let body = if (trailing_sep) { `{core} {s}?` } else { core };
+    let led = if (leading_sep) { `{s}? {core}` } else { core };
+    let body = if (trailing_sep) { `{led} {s}?` } else { led };
     if (min == 0) { `({body})?` } else { body }
 }
 
@@ -381,7 +395,7 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
         // refused as binding different names.
         // A bracketed repetition begins with its opening bracket, so that is
         // where a climb could sit; an unbracketed one begins with its body.
-        Many(sub, _, _, _, _, nested_in, _, _, _) => match (nested_in) {
+        Many(sub, _, _, _, _, _, nested_in, _, _, _) => match (nested_in) {
             some(brackets) => first_precs([brackets.0, sub]),
             none => climb_precs(sub),
         },
@@ -571,16 +585,21 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
             }
             ok(First { syms: acc, nullable: empty_ok })
         },
-        // A separated list begins with its item and never with its separator,
-        // so the separator contributes nothing here.
+        // A separated list begins with its item, and with its separator only
+        // when it allows a leading one — then the optional separator in front
+        // is the sequence `sep? item`, and contributes like one.
         // A bracketed one begins with its opening bracket, and is never
         // nullable: a bracket pair always matches at least its two brackets.
         // Written as the sequence it is, so a nullable `open` still lets the
         // body contribute.
-        Many(sub, min, _, sep, trailing_sep, nested_in, _, _, _) => match (nested_in) {
+        Many(sub, min, _, sep, _, leading_sep, nested_in, _, _, _) => match (nested_in) {
             some(brackets) => rule_first(Then([brackets.0, sub, brackets.1]), sets),
             none => {
-                let First { syms, nullable } = rule_first(sub, sets)?;
+                let head = match (sep) {
+                    some(s) => if (leading_sep) { Then([Maybe(s), sub]) } else { sub },
+                    none => sub,
+                };
+                let First { syms, nullable } = rule_first(head, sets)?;
                 ok(First { syms, nullable: nullable || min == 0 })
             },
         },
@@ -618,6 +637,23 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     assert(
         rule_first(r_all_opt, sets)?.show_first() == """
             "!" Num <empty>
+        """,
+    );
+
+    // A separated list begins with its item — or, allowing a leading separator,
+    // with that too.
+    let r_sep: Rule<Tok> = Many(Term(Num), min=1, sep=Literal("|"), trailing_sep=false);
+    assert(rule_first(r_sep, sets)?.show_first() == "Num");
+    let r_led: Rule<Tok> = Many(
+        Term(Num),
+        min=1,
+        sep=Literal("|"),
+        trailing_sep=false,
+        leading_sep=true,
+    );
+    assert(
+        rule_first(r_led, sets)?.show_first() == """
+            "|" Num
         """,
     );
 
@@ -854,21 +890,21 @@ fn fixture() -> Grammar<Tok, Node> {
     }
 }
 --- performance ---
-allocations: 1849
-deallocations: 1849
-reallocations: 420
-bytes allocated: 173354
-instructions executed: 204402
-binary size: 154264
-  code: 100320
-  data: 3996
-  metadata: 49948
+allocations: 1890
+deallocations: 1890
+reallocations: 423
+bytes allocated: 182060
+instructions executed: 208573
+binary size: 161264
+  code: 104788
+  data: 4252
+  metadata: 52224
 functions:
   __arr_drop_First$Tok:
     calls: 23
     bytes: 116
   __arr_drop_Sym$Tok:
-    calls: 182
+    calls: 187
     bytes: 140
   __arr_drop___m2__ListStyle:
     calls: 60
@@ -880,13 +916,13 @@ functions:
     calls: 16
     bytes: 188
   __arr_drop___m2__Rule$Tok:
-    calls: 89
+    calls: 90
     bytes: 116
   __arr_retain_First$Tok:
     calls: 95
     bytes: 116
   __arr_retain_Sym$Tok:
-    calls: 139
+    calls: 142
     bytes: 140
   __arr_retain___m2__ListStyle:
     calls: 34
@@ -919,7 +955,7 @@ functions:
     calls: 17
     bytes: 284
   __eq_Sym$Tok:
-    calls: 103
+    calls: 104
     bytes: 144
   __eq_Sym$Tok$arr:
     calls: 36
@@ -931,17 +967,17 @@ functions:
     calls: 1
     bytes: 128
   __m2__desugar_opt$Tok:
-    calls: 25
+    calls: 26
     bytes: 700
   __m2__desugar_rule$Tok:
-    calls: 237
-    bytes: 11936
+    calls: 240
+    bytes: 11964
   __m2__group_styles$Tok:
     calls: 0
     bytes: 32
   __m2__group_styles$Tok$tail:
     calls: 262
-    bytes: 4724
+    bytes: 4732
   __m2__link$Tok$Node:
     calls: 9
     bytes: 2604
@@ -950,7 +986,7 @@ functions:
     bytes: 716
   __m2__link_rule$Tok:
     calls: 139
-    bytes: 8236
+    bytes: 8248
   __m2__link_rules$Tok:
     calls: 27
     bytes: 732
@@ -964,7 +1000,7 @@ functions:
     calls: 0
     bytes: 72
   __rec_drop___m2__Rule$Tok:
-    calls: 476
+    calls: 490
     bytes: 340
   __rec_drop___tuple$__m2__Rule_Tok$__m2__Rule_Tok:
     calls: 0
@@ -974,13 +1010,13 @@ functions:
     bytes: 900
   __test$ebnf:
     calls: 1
-    bytes: 13072
+    bytes: 14296
   __test$first_sets:
     calls: 1
     bytes: 5228
   __test$rule_first:
     calls: 1
-    bytes: 2296
+    bytes: 4780
   __test$show_first:
     calls: 1
     bytes: 1044
@@ -1003,13 +1039,13 @@ functions:
     calls: 66
     bytes: (external)
   aipl_arr_inc:
-    calls: 3550
+    calls: 3595
     bytes: (external)
   aipl_arr_join:
     calls: 34
     bytes: (external)
   aipl_arr_reserve:
-    calls: 196
+    calls: 198
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 94
@@ -1018,37 +1054,37 @@ functions:
     calls: 21
     bytes: (external)
   aipl_array_dec:
-    calls: 4514
+    calls: 4569
     bytes: (external)
   aipl_array_new:
-    calls: 643
+    calls: 649
     bytes: (external)
   aipl_array_push:
     calls: 7
     bytes: (external)
   aipl_array_push_mut:
-    calls: 764
+    calls: 771
     bytes: (external)
   aipl_array_with_cap:
-    calls: 122
+    calls: 124
     bytes: (external)
   aipl_assert:
-    calls: 23
+    calls: 25
     bytes: (external)
   aipl_rec_alloc:
-    calls: 476
+    calls: 490
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 3218
+    calls: 3325
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 111
+    calls: 120
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2742
+    calls: 2835
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 111
+    calls: 120
     bytes: (external)
   aipl_test_begin:
     calls: 6
@@ -1072,10 +1108,10 @@ functions:
     calls: 0
     bytes: 32
   climb_precs$Tok$tail:
-    calls: 90
-    bytes: 1644
+    calls: 92
+    bytes: 1648
   dq:
-    calls: 47
+    calls: 49
     bytes: 456
   ebnf$Tok$Node:
     calls: 6
@@ -1094,7 +1130,7 @@ functions:
     bytes: 356
   fixture:
     calls: 2
-    bytes: 5320
+    bytes: 5340
   keep:
     calls: 0
     bytes: 268
@@ -1105,23 +1141,23 @@ functions:
     calls: 1
     bytes: 452
   prec_note:
-    calls: 30
+    calls: 31
     bytes: 3468
   render_rule$Tok:
-    calls: 98
-    bytes: 9440
+    calls: 101
+    bytes: 9808
   rep_suffix:
-    calls: 13
+    calls: 14
     bytes: 1440
   rule_first$Tok:
-    calls: 228
-    bytes: 6188
+    calls: 235
+    bytes: 6508
   show_first$Tok:
-    calls: 25
+    calls: 27
     bytes: 1344
   show_first_sets$Tok$Node:
     calls: 5
     bytes: 2608
   union_syms$Tok:
-    calls: 99
+    calls: 101
     bytes: 736

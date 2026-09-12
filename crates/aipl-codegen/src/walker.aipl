@@ -2983,9 +2983,9 @@ fn walker_of(src: str) -> W!FmtError {
                 100,
             )? == "variant V =\n    # Round.\n    # Radius.\n    | A(i64)\n    | B\n    # Cornered.\n    | C\n",
     );
-    // Written flat with the docs on the first case, the docs still win.
+    // Written flat after the docs on the first case, the docs still win.
     assert(
-        walker_of("variant V =\n    # Doc.\n    A | B")?
+        walker_of("variant V =\n    # Doc.\n    | A | B")?
             .variant_item()
             .rendered(100)? == "variant V =\n    # Doc.\n    | A\n    | B\n",
     );
@@ -2999,14 +2999,14 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 117097
-deallocations: 117097
-reallocations: 1914
-bytes allocated: 6317700
-instructions executed: 22740865
-binary size: 8951864
+allocations: 117217
+deallocations: 117217
+reallocations: 1915
+bytes allocated: 6321628
+instructions executed: 22761725
+binary size: 8951872
   code: 5651220
-  data: 28436
+  data: 28444
   metadata: 3272208
 functions:
   __arr_drop_ImportEntry:
@@ -3028,7 +3028,7 @@ functions:
     calls: 1
     bytes: 140
   __arr_drop___m9__Token$__m8__AiplTok:
-    calls: 1409
+    calls: 1410
     bytes: 388
   __arr_drop___m9__TokenRule$__m8__AiplTok:
     calls: 154
@@ -3052,7 +3052,7 @@ functions:
     calls: 1
     bytes: 140
   __arr_retain___m9__Token$__m8__AiplTok:
-    calls: 1107
+    calls: 1108
     bytes: 388
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
@@ -3070,7 +3070,7 @@ functions:
     calls: 50
     bytes: 252
   __builtin_count_while$char$lam65:
-    calls: 1239
+    calls: 1240
     bytes: 220
   __builtin_count_while$char$s0$lam103:
     calls: 2
@@ -3079,7 +3079,7 @@ functions:
     calls: 22
     bytes: 172
   __builtin_count_while$char$s0$lam73:
-    calls: 646
+    calls: 647
     bytes: 184
   __builtin_count_while$char$s0$lam76:
     calls: 0
@@ -3208,10 +3208,10 @@ functions:
     calls: 2
     bytes: 2608
   __m9__between_len:
-    calls: 624
+    calls: 625
     bytes: 752
   __m9__delimited_len:
-    calls: 1238
+    calls: 1240
     bytes: 1592
   __m9__finalize_template$__m8__AiplTok:
     calls: 1
@@ -3226,28 +3226,28 @@ functions:
     calls: 154
     bytes: 1328
   __m9__lex_step$__m8__AiplTok:
-    calls: 2011
+    calls: 2013
     bytes: 29192
   __m9__nested_len:
-    calls: 1103
+    calls: 1104
     bytes: 940
   __m9__step_result$__m8__AiplTok:
-    calls: 49947
+    calls: 50005
     bytes: 15088
   __m9__template_scan$__m8__AiplTok:
     calls: 1
     bytes: 2728
   __m9__template_step$__m8__AiplTok:
-    calls: 1228
+    calls: 1230
     bytes: 476
   __m9__to_eol_len:
     calls: 0
     bytes: 52
   __m9__to_eol_len$tail:
-    calls: 2208
+    calls: 2210
     bytes: 252
   __m9__to_eol_unless_len:
-    calls: 1103
+    calls: 1104
     bytes: 368
   __map24$own0:
     calls: 154
@@ -3277,28 +3277,28 @@ functions:
     calls: 0
     bytes: 824
   aipl_arr_extend:
-    calls: 4270
+    calls: 4274
     bytes: (external)
   aipl_arr_inc:
-    calls: 257011
+    calls: 257266
     bytes: (external)
   aipl_arr_reserve:
-    calls: 4348
+    calls: 4352
     bytes: (external)
   aipl_arr_slice:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 365693
+    calls: 366068
     bytes: (external)
   aipl_array_new:
-    calls: 106399
+    calls: 106519
     bytes: (external)
   aipl_array_push:
     calls: 1759
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1782
+    calls: 1783
     bytes: (external)
   aipl_array_with_cap:
     calls: 363
@@ -3361,7 +3361,7 @@ functions:
     calls: 56
     bytes: 5192
   bump:
-    calls: 1124
+    calls: 1125
     bytes: 1284
   call_arg:
     calls: 12
@@ -3409,7 +3409,7 @@ functions:
     calls: 119
     bytes: 760
   fmt_kind:
-    calls: 1096
+    calls: 1097
     bytes: 3120
   fn_attrs:
     calls: 26

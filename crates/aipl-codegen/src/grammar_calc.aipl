@@ -469,12 +469,12 @@ fn is_calc_op(self: str) -> bool {
 allocations: 20144
 deallocations: 20144
 reallocations: 3337
-bytes allocated: 1343403
+bytes allocated: 1363371
 instructions executed: 2450353
-binary size: 415760
-  code: 268092
+binary size: 420168
+  code: 270916
   data: 5948
-  metadata: 141720
+  metadata: 143304
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -703,10 +703,13 @@ functions:
     bytes: 3844
   __m13__match_group$CalcTok$Calc:
     calls: 0
-    bytes: 6196
+    bytes: 6208
+  __m13__match_leading_sep$CalcTok$Calc:
+    calls: 0
+    bytes: 1288
   __m13__match_many$CalcTok$Calc:
     calls: 0
-    bytes: 1436
+    bytes: 1444
   __m13__match_maybe$CalcTok$Calc:
     calls: 0
     bytes: 1076
@@ -718,10 +721,13 @@ functions:
     bytes: 6272
   __m13__match_reps$CalcTok$Calc:
     calls: 0
-    bytes: 4928
+    bytes: 4752
   __m13__match_rule$CalcTok$Calc:
     calls: 1375
-    bytes: 5816
+    bytes: 5828
+  __m13__match_sep$CalcTok$Calc:
+    calls: 0
+    bytes: 968
   __m13__match_then$CalcTok$Calc:
     calls: 206
     bytes: 2036
@@ -796,7 +802,7 @@ functions:
     bytes: 32
   __m2__climb_precs$CalcTok$tail:
     calls: 12
-    bytes: 1644
+    bytes: 1648
   __m2__dq:
     calls: 20
     bytes: 456
@@ -817,13 +823,13 @@ functions:
     bytes: 3468
   __m2__render_rule$CalcTok:
     calls: 13
-    bytes: 9416
+    bytes: 9756
   __m2__rep_suffix:
     calls: 0
     bytes: 1440
   __m2__rule_first$CalcTok:
     calls: 40
-    bytes: 6188
+    bytes: 6508
   __m2__show_first$CalcTok:
     calls: 3
     bytes: 1300
@@ -838,7 +844,7 @@ functions:
     bytes: 700
   __m3__desugar_rule$CalcTok:
     calls: 832
-    bytes: 11936
+    bytes: 11964
   __m3__failure_message:
     calls: 7
     bytes: 488
@@ -847,7 +853,7 @@ functions:
     bytes: 32
   __m3__group_styles$CalcTok$tail:
     calls: 1701
-    bytes: 4724
+    bytes: 4732
   __m3__link$CalcTok$Calc:
     calls: 63
     bytes: 2604
@@ -856,7 +862,7 @@ functions:
     bytes: 716
   __m3__link_rule$CalcTok:
     calls: 819
-    bytes: 8236
+    bytes: 8248
   __m3__link_rules$CalcTok:
     calls: 252
     bytes: 732
