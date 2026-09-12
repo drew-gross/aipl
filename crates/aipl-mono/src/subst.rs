@@ -295,7 +295,7 @@ pub(crate) fn substitute(e: &Expr, name: &str, value: &Expr) -> Expr {
 
 /// Every binding written anywhere in `e`: the *root* of each `set` target, so
 /// `set w.pos = ..` and `set w[i] = ..` both report `w`.
-fn assigned_names(e: &Expr, out: &mut HashSet<String>) {
+pub(crate) fn assigned_names(e: &Expr, out: &mut HashSet<String>) {
     if let ExprKind::Assign(lhs, _, _) = &e.kind {
         if let Some(root) = root_name(lhs) {
             out.insert(root.to_string());
@@ -326,7 +326,7 @@ fn root_name(e: &Expr) -> Option<&str> {
 
 /// Every name `e` reads. Shadowing is ignored: this only ever adds names, and
 /// an extra one costs a missed substitution rather than a wrong one.
-fn read_names(e: &Expr, out: &mut HashSet<String>) {
+pub(crate) fn read_names(e: &Expr, out: &mut HashSet<String>) {
     if let ExprKind::Ident(n) = &e.kind {
         out.insert(n.clone());
     }

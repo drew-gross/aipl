@@ -345,6 +345,7 @@ design:
   apis should express intent
 
 optimizations:
+  after fusion there should be more inlining opportunities. Make a pass manager that re-enqueues functions for optimization after they are optimized
   owned spread: { ..var, field: f } should edit var if it's uniquely owned
   loop invariant/match invariant/branch invariant code motion
   unused variant elimination
@@ -386,7 +387,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
-    fuse for (x : xs.map(f)) to not materialize the actual array
+    map(f).map(g) should fuse to map(f(g))
     map/join should fuse to map_join
     filter/find.
     depth in grammar_sexp can be xs.map(depth).maximum() + 1 and fuse to map_max
@@ -459,7 +460,6 @@ optimizations:
     F. Worth a look, lower confidence
 
     - find_files walks the corpus via the dogfooded engine on every fmt/ffi test — fine, but it's repeated per test binary.
-    - The --- performance --- corpus totals 178,604 instructions and 1,400 allocations across 369 cases; 178 of them allocate nothing at all. The heavy tail (strings/int_parse at 6,779 instructions) is where C1/C2 would show up first, so those cases double as the benchmark for any of this.
 
   Re-analyze with a focus on why nextest discovery takes so long
 

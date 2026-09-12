@@ -1,0 +1,127 @@
+import {
+    filter,
+    less_than as <,
+    map,
+    print,
+    push,
+    to_str,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+    wrapping_mul as *,
+} from builtins;
+
+// Operation fusion: a `for` over a mapped array never builds the array.
+//
+// `for (let y : xs.map(f)) { body }` would allocate an array of every `f(x)`,
+// walk it once, and free it. Fused, it is a loop over `xs` itself that applies
+// `f` at the top of each iteration — `for (let $e : xs) { let y = f($e); body }`
+// — so the element goes straight from `xs` through `f` into the body and no
+// intermediate exists. A `filter` receiver becomes an `if` around the body,
+// and a `filter(p).map(f)` chain (already fused into `filter_map`) both.
+//
+// Only the mapping function has to be pure: the body may print or accumulate
+// freely, since with nothing observable in `f` there is no order for the body's
+// effects to change.
+//
+// Measured on this case with the fusion switched off: 17 allocations totalling
+// 6,879 bytes become 13 totalling 319, and 65,129 instructions become 38,693.
+// The `functions:` list is the readable evidence — no `__map*` or `__filter*`
+// specialization is emitted for any loop below; unfused it reads `__map4$own0`
+// and `__map7$own0`, each a whole array built to be walked once.
+
+fn many() -> i64[] {
+    mut xs = [0];
+    mut n = 0;
+    while (n < 200) {
+        set n++;
+        set xs.push(n);
+    }
+    xs
+}
+
+fn triple(x: i64) -> i64 { x * 3 }
+
+fn main() !prints {
+    let xs = many();
+    // A lambda, capturing a local; the body accumulates.
+    let offset = 1000;
+    mut total = 0;
+    for (let y : xs.map(|x| x + offset)) {
+        set total += y;
+    }
+    print(total.to_str());
+    // A named function; the body prints.
+    mut n = 0;
+    for (let y : xs.map(triple)) {
+        if (n < 3) {
+            print(y.to_str());
+        };
+        set n++;
+    }
+
+    // The lambda's parameter shares the loop variable's name, and an outer
+    // binding of that name is what the lambda reads: each still means what it
+    // did unfused.
+    let x = 5;
+    for (let x : [1, 2].map(|x| x * 10)) {
+        print(x.to_str());
+    }
+    for (let y : [1, 2].map(|z| z + x)) {
+        print(y.to_str());
+    }
+    // A filter, and a filter-then-map chain.
+    mut kept = 0;
+    for (let y : xs.filter(|x| x < 100)) {
+        set kept += y;
+    }
+    print(kept.to_str());
+    mut chained = 0;
+    for (let y : xs.filter(|x| x < 100).map(|x| x * 2)) {
+        set chained += y;
+    }
+    print(chained.to_str());
+}
+--- stdout ---
+221100
+0
+3
+6
+10
+20
+6
+7
+4950
+9900
+--- performance ---
+allocations: 13
+deallocations: 13
+reallocations: 8
+bytes allocated: 319
+instructions executed: 38693
+binary size: 3096
+  code: 1700
+  data: 1
+  metadata: 1395
+functions:
+  __to_str_i64:
+    calls: 10
+    bytes: 204
+  aipl_array_dec:
+    calls: 3
+    bytes: (external)
+  aipl_array_new:
+    calls: 3
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 200
+    bytes: (external)
+  aipl_i64_len:
+    calls: 20
+    bytes: (external)
+  aipl_write_i64:
+    calls: 10
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1496

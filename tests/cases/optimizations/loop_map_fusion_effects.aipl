@@ -1,0 +1,85 @@
+import { map, print, to_str, wrapping_add as +, wrapping_add_assign as += } from builtins;
+
+// Loop fusion is refused when interleaving the mapping function with the body
+// would change what the program does — for either of two reasons.
+//
+// The mapping function has an effect. Unfused, every `f(x)` runs before the
+// first iteration of the body; fused, they would alternate. Both orders are
+// visible below, and only the first is what the source says.
+//
+// The body writes something the mapping function reads. Unfused, every `f(x)`
+// sees the binding as it was before the loop; fused, later calls would see
+// the body's updates. The second loop's output is the unfused answer: every
+// element offset by the *initial* `n`.
+fn noisy(x: i64) !prints -> i64 {
+    print(`f{x}`);
+    x
+}
+
+fn main() !prints {
+    // Not fused: `noisy` prints, so all three `f` lines come first.
+    for (let y : [1, 2, 3].map(noisy)) {
+        print(`body{y}`);
+    }
+    // Not fused: the body assigns `n`, which the lambda reads.
+    mut n = 0;
+    for (let y : [1, 2, 3].map(|x| x + n)) {
+        set n += 100;
+        print(y.to_str());
+    }
+    // Fused: same lambda, but the body leaves `n` alone.
+    for (let y : [1, 2, 3].map(|x| x + n)) {
+        print(y.to_str());
+    }
+}
+--- stdout ---
+f1
+f2
+f3
+body1
+body2
+body3
+1
+2
+3
+301
+302
+303
+--- performance ---
+allocations: 21
+deallocations: 21
+reallocations: 0
+bytes allocated: 906
+instructions executed: 1184
+binary size: 3496
+  code: 1920
+  data: 1
+  metadata: 1575
+functions:
+  __map0$own0:
+    calls: 1
+    bytes: 460
+  __map3$own0:
+    calls: 1
+    bytes: 268
+  __to_str_i64:
+    calls: 12
+    bytes: 204
+  aipl_arr_inc:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 5
+    bytes: (external)
+  aipl_array_new:
+    calls: 3
+    bytes: (external)
+  aipl_i64_len:
+    calls: 24
+    bytes: (external)
+  aipl_write_i64:
+    calls: 12
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 988

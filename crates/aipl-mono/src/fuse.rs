@@ -1,7 +1,7 @@
 //! Operation fusion: rewriting a composite expression into one builtin that
 //! computes the same answer with less work.
 //!
-//! There are three families, each in its own file with its own table:
+//! There are four families, each in its own file with its own table:
 //!
 //! - [`comparison_fusions`] — a call against a comparison. `xs.count(x)` always
 //!   walks the whole collection, but `xs.count(x) < 4` is settled the moment a
@@ -17,6 +17,10 @@
 //!   builds the whole tail of `xs` — for an array, a fresh block with every
 //!   element copied — only to look at its first few elements, so it collapses
 //!   into `starts_with_at`, which compares in place from `i`.
+//! - [`loop_fusions`] — a `for` over a derived array. `for (let x : xs.map(f))`
+//!   builds the whole mapped array only to walk it once, so it collapses into a
+//!   loop over `xs` that applies `f` at the top of each iteration and never
+//!   materializes the intermediate.
 //!
 //! # Adding a fusion
 //!
@@ -25,11 +29,13 @@
 //! *that* call"; a slice row says "*this* call, on a receiver sliced from `i`,
 //! is *that* call, with `i` as its last argument"; a chain row says "*this*
 //! call, on the result of *that* one, is *this third* call, taking both argument
-//! lists". Either way the driver here handles the rest — finding the shape (in
-//! both operand orders, for a comparison) and refusing when it would change
-//! observable behaviour. Nothing else needs to know the family exists.
+//! lists"; a loop row says "a `for` over *this* call is a `for` over its
+//! receiver, applying *these* of its arguments per element". Either way the
+//! driver here handles the rest — finding the shape (in both operand orders,
+//! for a comparison) and refusing when it would change observable behaviour.
+//! Nothing else needs to know the family exists.
 //!
-//! A whole new family is a new file next to those three, exporting a
+//! A whole new family is a new file next to those four, exporting a
 //! `build(..) -> Option<Expr>` that [`try_fuse`] calls; everything downstream of
 //! the shape match — the effect guard, the bottom-up traversal — is shared.
 //!
@@ -43,14 +49,23 @@
 //! that does that is a bug rather than an optimization. So any effect anywhere
 //! in the expression disables the rewrite. The check is deliberately syntactic
 //! and conservative: it costs a missed fusion, never a wrong one.
+//!
+//! The loop family draws the line more finely, because a loop *body* is where
+//! effects normally live and an effect check over the whole loop would refuse
+//! the shape every time it matters: there only the mapping function has to be
+//! pure — and free of aborts, since its calls move later, past the body's own
+//! effects. See [`loop_fusions`] for the argument.
 
 mod chain_fusions;
 mod comparison_fusions;
+mod loop_fusions;
 mod slice_fusions;
 
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Expr, ExprKind, Item, Program};
+
+use crate::sink::undeferrable_fns;
 
 /// Rewrite every fusable shape in `program`.
 ///
@@ -58,25 +73,41 @@ use aipl_syntax::ast::{Expr, ExprKind, Item, Program};
 /// supplies it because the effect declarations live with the builtin signatures,
 /// which this crate does not parse.
 pub fn fuse_operations(program: &Program, effectful: &HashSet<String>) -> Program {
+    // The loop family's bar: effects *and* aborts, closed over the call graph,
+    // because a mapping function's calls move later rather than merely being
+    // reordered among pure operands.
+    let guards = Guards {
+        effectful,
+        blocked: &undeferrable_fns(program, effectful),
+    };
     let mut out = program.clone();
     for item in &mut out.items {
         if let Item::Fn(f) = item {
-            fuse_expr(&mut f.body, effectful);
+            fuse_expr(&mut f.body, &guards);
             if let Some(t) = f.test_body.as_mut() {
-                fuse_expr(t, effectful);
+                fuse_expr(t, &guards);
             }
         }
     }
     out
 }
 
+/// The two sets the families refuse against.
+struct Guards<'a> {
+    /// Functions whose signature declares an effect.
+    effectful: &'a HashSet<String>,
+    /// [`undeferrable_fns`]: `effectful` plus the aborting builtins, closed
+    /// over every function that reaches one.
+    blocked: &'a HashSet<String>,
+}
+
 /// Bottom-up: children first, so a fusion can be built from an already-fused
 /// sub-expression rather than racing it.
-fn fuse_expr(e: &mut Expr, effectful: &HashSet<String>) {
+fn fuse_expr(e: &mut Expr, guards: &Guards) {
     for c in crate::children_mut(e) {
-        fuse_expr(c, effectful);
+        fuse_expr(c, guards);
     }
-    if let Some(fused) = try_fuse(e, effectful) {
+    if let Some(fused) = try_fuse(e, guards) {
         *e = fused;
     }
 }
@@ -86,7 +117,7 @@ fn fuse_expr(e: &mut Expr, effectful: &HashSet<String>) {
 ///
 /// Shape first, effects second: this runs on every node of every body, and the
 /// effect check walks a whole subtree — worth paying only once a shape matched.
-fn try_fuse(e: &Expr, effectful: &HashSet<String>) -> Option<Expr> {
+fn try_fuse(e: &Expr, guards: &Guards) -> Option<Expr> {
     let fused = match &e.kind {
         // A resolved operator call is the comparison fusions' shape (`xs.count(..)
         // < k`); any other call is the slice/chain shapes'. Operators arrive here
@@ -97,11 +128,15 @@ fn try_fuse(e: &Expr, effectful: &HashSet<String>) -> Option<Expr> {
                 _ => slice_fusions::build(e).or_else(|| chain_fusions::build(e)),
             }
         }
+        // A loop guards itself: only its mapping function has to be pure, not
+        // the body (see the module docs), so the whole-expression effect check
+        // below would be the wrong bar.
+        ExprKind::For(..) => return loop_fusions::build(e, guards.blocked),
         _ => None,
     }?;
     // An effect *anywhere* in `e` rules the rewrite out, wherever the call sits:
     // fusing reorders the evaluation within it.
-    (!has_effect(e, effectful)).then_some(fused)
+    (!has_effect(e, guards.effectful)).then_some(fused)
 }
 
 /// Whether evaluating `e` can do anything observable — call a function that

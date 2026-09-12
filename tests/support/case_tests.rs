@@ -461,6 +461,8 @@ case_tests! {
     cases_optimizations_inline_mutating_method = "cases/optimizations/inline_mutating_method",
     cases_optimizations_inline_small_stale_body = "cases/optimizations/inline_small_stale_body",
     cases_optimizations_inspect_only_args = "cases/optimizations/inspect_only_args",
+    cases_optimizations_loop_map_fusion = "cases/optimizations/loop_map_fusion",
+    cases_optimizations_loop_map_fusion_effects = "cases/optimizations/loop_map_fusion_effects",
     cases_optimizations_sink_effects_stay_put = "cases/optimizations/sink_effects_stay_put",
     cases_optimizations_sink_into_branch = "cases/optimizations/sink_into_branch",
     cases_optimizations_sink_past_trailing_statements = "cases/optimizations/sink_past_trailing_statements",

@@ -8605,7 +8605,7 @@ struct InlineParam {
 /// outer, and a `self.span()` that meant the outer receiver reads the inner
 /// one. Ids only ever have to be unique within one program, so sharing the
 /// counter between concurrent compiles costs nothing but a few skipped numbers.
-fn next_inline_id() -> usize {
+pub(crate) fn next_inline_id() -> usize {
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
@@ -8679,7 +8679,7 @@ fn build_inlined(fparams: &[InlineParam], fbody: &Expr, args: &[Expr], span: Spa
 /// binder of a mapped name removes it from the map within that scope (there the
 /// name is the local, not the parameter). Body-internal binders are left as-is —
 /// only the substituted *parameter* references are renamed.
-fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
+pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
     let sub = |n: &String| map.get(n).cloned().unwrap_or_else(|| n.clone());
     let without = |n: &str| -> HashMap<String, String> {
         let mut m = map.clone();
