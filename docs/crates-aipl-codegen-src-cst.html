@@ -249,7 +249,7 @@
           </h3>
           <pre class="signature"><code>fn first_token_of(ks: Cst[]) -&#62; Span?</code></pre>
 
-          <div class="doc"><p>The first of <code>ks</code> that holds a token, and its leftmost one. Stops there rather than walking the rest.</p></div>
+          <div class="doc"><p>The first of <code>ks</code> that holds a token, and its leftmost one. Stops there rather than walking the rest: the <code>map(..).find_if(..)</code> chain fuses into one pass, so no child after the hit is asked.</p></div>
 
 
         </section>

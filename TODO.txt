@@ -299,6 +299,7 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
+  lint against value_or(none), that's silly
   lint against set literals that contain duplicates
   set out = [..out, o]; should lint to set out.push(a);
   we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway

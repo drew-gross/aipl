@@ -1,0 +1,109 @@
+import {
+    find_if,
+    less_than as <,
+    map,
+    print,
+    push,
+    wrapping_increment as ++,
+    wrapping_mul as *,
+} from builtins;
+
+// Operation fusion: `xs.map(f).find_if(p)` collapses into `map_find_if`, which
+// maps and tests one element at a time and stops at the first match — instead
+// of mapping every element into a fresh array that `find_if` then reads only
+// the front of.
+//
+// Both halves have to be pure for the pass to fire (an effect in `f` would be
+// observably skipped for the elements after the match), which `stepped` and
+// `is_big` are.
+//
+// Measured on this case with the fusion switched off: 31,909 instructions
+// become 22,716 and 3,638 bytes allocated become 1,998. The `functions:` list
+// is the readable evidence: three chains, but one `aipl_array_with_cap` — the
+// unfused chain's array in `first_big_twice` — and no `__map*` beside the two
+// `__builtin_map_find_if*` specializations.
+
+fn many() -> i64[] {
+    mut xs = [0];
+    mut n = 0;
+    while (n < 200) {
+        set n++;
+        set xs.push(n);
+    }
+    xs
+}
+
+fn stepped(x: i64) -> i64 { x * 10 }
+
+fn is_big(y: i64) -> bool { 5 < y }
+
+// Fused: `stepped` runs on the first two elements only.
+fn first_big(xs: i64[]) -> i64? { xs.map(stepped).find_if(is_big) }
+
+// Not fused: the array is bound in between, and read twice below, so it has
+// to exist. Every element is mapped.
+fn first_big_twice(xs: i64[]) -> str {
+    let ys = xs.map(stepped);
+    `{ys.find_if(is_big)} {ys.find_if(|y| 1990 < y)}`
+}
+
+fn main() !prints {
+    let xs = many();
+    print(`{first_big(xs)}`);
+    print(first_big_twice(xs));
+    print(`{[1, 2].map(stepped).find_if(|y| 99 < y)}`);
+}
+--- stdout ---
+some(10)
+some(10) some(2000)
+none
+--- performance ---
+allocations: 9
+deallocations: 9
+reallocations: 8
+bytes allocated: 1998
+instructions executed: 22716
+binary size: 4912
+  code: 2764
+  data: 67
+  metadata: 2081
+functions:
+  __builtin_find_if$i64$lam2:
+    calls: 1
+    bytes: 272
+  __builtin_find_if$i64$lam4:
+    calls: 1
+    bytes: 272
+  __builtin_map_find_if$i64$i64$lam0:
+    calls: 1
+    bytes: 280
+  __builtin_map_find_if$i64$i64$lam6:
+    calls: 1
+    bytes: 280
+  __to_str_i64$opt:
+    calls: 4
+    bytes: 388
+  aipl_array_dec:
+    calls: 3
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 401
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 7
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1272

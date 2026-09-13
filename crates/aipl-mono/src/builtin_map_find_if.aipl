@@ -1,0 +1,129 @@
+import {
+    equal as ==,
+    greater_than as >,
+    is_some,
+    logical_not as !,
+    wrapping_mul as *,
+} from builtins;
+
+// The AIPL implementation of the `map_find_if` builtin. Monomorphization
+// registers this function under the canonical name `__builtin_map_find_if`
+// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.map_find_if(f, p)`
+// resolves through the ordinary generic / higher-order machinery — the in-file
+// name is only for this file's own tests, which read exactly like user code.
+//
+// It is what `xs.map(f).find_if(p)` means, in one pass: `map` would apply `f`
+// to every element and build the whole array before `find_if` looked at any
+// of it, where the answer may be the first element. Written by the compiler's
+// operation-fusion pass for that chain (see `chain_fusions` in aipl-mono);
+// also callable directly, and worth writing by hand when the two halves
+// belong together.
+//
+// No lint steers a hand-written loop here: the shape it replaces is
+// `return_loop_find_if`'s with a `let` in front, and that lint already sends
+// the loop to `find_if`, from where the chain fuses.
+# The first `f(x)` over the elements of `self` that satisfies `pred`, or
+# `none` when none does — `self.map(f).find_if(pred)` without the array between,
+# and without mapping the elements after the match. Generic over both types and
+# callable as a method; a `str` receiver iterates its chars.
+pub fn map_find_if<T: any, U: any>(self: T[], f: (T) -> U, pred: (U) -> bool) -> U? {
+    for (let x : self) {
+        let y = f(x);
+        if (pred(y)) {
+            return some(y);
+        };
+    }
+    none
+}.test({
+    assert([1, 2, 3].map_find_if(|x| x * 10, |y| y > 15) == some(20));
+    assert([1, 2, 3].map_find_if(|x| x * 10, |y| y > 99) == none);
+    // The first match, not the last.
+    assert([5, 1, 7].map_find_if(|x| x * 2, |y| y > 2) == some(10));
+    // Free-call form, and named functions for both halves.
+    assert(map_find_if([1, 2, 3], double, is_big) == some(6));
+    // A `str` receiver iterates its chars.
+    assert("ab c".map_find_if(|c| c == ' ', |hit| hit) == some(true));
+    // The empty array.
+    assert([1, 2][..0].map_find_if(double, is_big) == none);
+    // The mapped value may be an optional: the first `some` of a lookup.
+    assert([0, 3, 5].map_find_if(nonzero, is_some) == some(some(3)));
+})
+
+fn double(self: i64) -> i64 { self * 2 }.test({
+    assert(double(4) == 8);
+})
+
+fn is_big(self: i64) -> bool { self > 5 }.test({
+    assert(is_big(6));
+    assert(!is_big(5));
+})
+
+fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }.test({
+    assert(nonzero(0) == none);
+    assert(nonzero(2) == some(2));
+})
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 360
+instructions executed: 1063
+binary size: 7064
+  code: 3800
+  data: 728
+  metadata: 2536
+functions:
+  __eq_i64$opt:
+    calls: 4
+    bytes: 100
+  __test$is_big:
+    calls: 1
+    bytes: 180
+  __test$map_find_if:
+    calls: 1
+    bytes: 1256
+  __test$nonzero:
+    calls: 1
+    bytes: 252
+  aipl_arr_slice:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 7
+    bytes: (external)
+  aipl_array_new:
+    calls: 6
+    bytes: (external)
+  aipl_assert:
+    calls: 12
+    bytes: (external)
+  aipl_test_begin:
+    calls: 4
+    bytes: (external)
+  aipl_test_end:
+    calls: 4
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 372
+  map_find_if$char$bool$s0$lam12:
+    calls: 1
+    bytes: 224
+  map_find_if$i64$i64$lam2:
+    calls: 1
+    bytes: 276
+  map_find_if$i64$i64$lam5:
+    calls: 1
+    bytes: 276
+  map_find_if$i64$i64$lam8:
+    calls: 1
+    bytes: 276
+  map_find_if$i64$i64$lam9:
+    calls: 2
+    bytes: 276
+  map_find_if$i64$i64?$lam13:
+    calls: 1
+    bytes: 312

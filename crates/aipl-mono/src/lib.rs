@@ -6523,6 +6523,15 @@ fn bind(
             Ok(())
         }
         Some(prev) if prev == ty => Ok(()),
+        // A binding still carrying a placeholder — a bare `none` argument's
+        // `__none__?`, an empty `[]`'s `__none__[]` — says less than one
+        // without: it agrees with any binding of the same shape, and defers to
+        // it. `x.value_or(none)` with `x: T?` binds `T` from `x`.
+        Some(prev) if has_placeholder(ty) && check::coerce(ty, prev).is_ok() => Ok(()),
+        Some(prev) if has_placeholder(prev) && check::coerce(prev, ty).is_ok() => {
+            map.insert(v.to_string(), ty.clone());
+            Ok(())
+        }
         Some(prev) => Err(Error::at(
             format!(
                 "conflicting types for \"{}\" in \"{}\": {} vs {}",
@@ -6605,6 +6614,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_count_while", "builtin_count_while.aipl"),
     ("__builtin_count_if", "builtin_count_if.aipl"),
     ("__builtin_find_if", "builtin_find_if.aipl"),
+    ("__builtin_map_find_if", "builtin_map_find_if.aipl"),
     ("__builtin_find_index", "builtin_find_index.aipl"),
     ("__builtin_union_all", "builtin_union_all.aipl"),
     (

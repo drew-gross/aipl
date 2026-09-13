@@ -4890,7 +4890,7 @@ pub(crate) fn is_char_array(t: &Type) -> bool {
     matches!(t, Type::Array(inner) if **inner == Type::Primitive(Primitive::Char))
 }
 
-fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
+pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     if actual == expected || is_unknown(actual) || is_unknown(expected) {
         return Ok(());
     }

@@ -20,11 +20,20 @@ struct ChainFusion {
 }
 
 /// Every chain shape the pass knows. See the module docs for how to add one.
-const CHAIN_FUSIONS: &[ChainFusion] = &[ChainFusion {
-    inner: "__builtin_filter",
-    outer: "__builtin_map",
-    into: "__builtin_filter_map",
-}];
+const CHAIN_FUSIONS: &[ChainFusion] = &[
+    ChainFusion {
+        inner: "__builtin_filter",
+        outer: "__builtin_map",
+        into: "__builtin_filter_map",
+    },
+    // `xs.map(f).find_if(p)`: the answer may be the first element, and `map`
+    // would have applied `f` to every one and built the array first.
+    ChainFusion {
+        inner: "__builtin_map",
+        outer: "__builtin_find_if",
+        into: "__builtin_map_find_if",
+    },
+];
 
 /// `inner(recv, ..).outer(..)` as a single call to the [`CHAIN_FUSIONS`] row's
 /// `into`, taking the inner argument list followed by the outer's rest.
