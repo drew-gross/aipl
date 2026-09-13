@@ -55,12 +55,12 @@ import {
     print,
 } from "./doc.aipl";
 import {
+    Const,
     Grammar,
     Inline,
     Layout,
     ListStyle,
     Many,
-    Mk,
     ParseError,
     Production,
     Rule,
@@ -626,7 +626,7 @@ fn group_prod(i: u64, st: ListStyle) -> Production<FKind, str> {
     Production {
         name: `g{i}`,
         rule: Many(word, min=1, max=1, nested_in=(word, word), style=st),
-        build: Mk(nothing),
+        build: Const(""),
         layout: Inline,
     }
 }
@@ -635,13 +635,11 @@ fn group_prod(i: u64, st: ListStyle) -> Production<FKind, str> {
 # two productions of one name.
 fn prod_of(i: u64, l: Layout) -> Production<FKind, str> {
     let word: Rule<FKind> = Term(Word);
-    Production { name: `p{i}`, rule: word, build: Mk(nothing), layout: l }
+    Production { name: `p{i}`, rule: word, build: Const(""), layout: l }
 }
 
 # A `build` that lowers nothing: the formatter never lowers, and a `Production`
 # needs one anyway.
-fn nothing(src: str, node: Cst, kids: str[]) -> str!ParseError { ok("") }
-
 fn always_space(l: str, r: str) -> bool { true }
 
 fn never_space(l: str, r: str) -> bool { false }
@@ -677,11 +675,11 @@ allocations: 2388
 deallocations: 2388
 reallocations: 349
 bytes allocated: 172579
-instructions executed: 237282
-binary size: 233128
-  code: 149232
+instructions executed: 240282
+binary size: 235720
+  code: 151124
   data: 5020
-  metadata: 78876
+  metadata: 79576
 functions:
   __arr_drop_Piece:
     calls: 95
@@ -697,7 +695,7 @@ functions:
     bytes: 120
   __arr_drop___m8__Production$FKind$str:
     calls: 10
-    bytes: 188
+    bytes: 236
   __arr_drop___m8__Rule$FKind:
     calls: 0
     bytes: 116
@@ -715,7 +713,7 @@ functions:
     bytes: 120
   __arr_retain___m8__Production$FKind$str:
     calls: 31
-    bytes: 188
+    bytes: 236
   __arr_retain___m8__Rule$FKind:
     calls: 0
     bytes: 116
@@ -814,7 +812,7 @@ functions:
     bytes: 4732
   __m8__link$FKind$str:
     calls: 8
-    bytes: 3048
+    bytes: 3320
   __m8__link_opt$FKind:
     calls: 6
     bytes: 716
@@ -952,13 +950,13 @@ functions:
     bytes: 236
   fmt_node$FKind$str$s1$lam23:
     calls: 1
-    bytes: 4072
+    bytes: 4588
   fmt_node$FKind$str$s1$lam31:
     calls: 1
-    bytes: 4072
+    bytes: 4588
   fmt_node$FKind$str$s1$lam34:
     calls: 17
-    bytes: 4072
+    bytes: 4588
   format_cst$FKind$str$s1$lam18:
     calls: 1
     bytes: 384
@@ -982,7 +980,7 @@ functions:
     bytes: 468
   grammar_of:
     calls: 2
-    bytes: 2176
+    bytes: 2380
   group_doc$FKind$str$s1$lam41:
     calls: 0
     bytes: 2420
@@ -1013,9 +1011,6 @@ functions:
   main:
     calls: 1
     bytes: 576
-  nothing:
-    calls: 0
-    bytes: 228
   piece_doc:
     calls: 14
     bytes: 820

@@ -61,15 +61,14 @@ import {
     value_or_err,
     wrapping_sub as -,
 } from builtins;
-import { Cst } from "./cst.aipl";
 import {
     Climb,
     Grammar,
     Inline,
+    Kids,
     Literal,
     Many,
     Maybe,
-    Mk,
     Named,
     NamedIdx,
     OneOf,
@@ -833,12 +832,12 @@ variant Node = Leaf(str) | List(Node[])
 
 # The trivial lowering every fixture production passes: `Build` has no
 # payload-free arm to mean "nothing to lower".
-fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(List(kids)) }
+fn keep(kids: Node[]) -> Node!ParseError { ok(List(kids)) }
 
 fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> {
     name,
     rule,
-    build: Mk(keep),
+    build: Kids(keep),
     layout: Inline,
 }
 
@@ -885,11 +884,11 @@ allocations: 1861
 deallocations: 1861
 reallocations: 416
 bytes allocated: 181060
-instructions executed: 206959
-binary size: 159992
-  code: 103924
+instructions executed: 211617
+binary size: 160976
+  code: 104572
   data: 4252
-  metadata: 51816
+  metadata: 52152
 functions:
   __arr_drop_First$Tok:
     calls: 23
@@ -897,16 +896,16 @@ functions:
   __arr_drop_Sym$Tok:
     calls: 187
     bytes: 140
-  __arr_drop___m2__ListStyle:
+  __arr_drop___m1__ListStyle:
     calls: 60
     bytes: 120
-  __arr_drop___m2__Prec:
+  __arr_drop___m1__Prec:
     calls: 3
     bytes: 120
-  __arr_drop___m2__Production$Tok$Node:
+  __arr_drop___m1__Production$Tok$Node:
     calls: 16
-    bytes: 188
-  __arr_drop___m2__Rule$Tok:
+    bytes: 236
+  __arr_drop___m1__Rule$Tok:
     calls: 90
     bytes: 116
   __arr_retain_First$Tok:
@@ -915,16 +914,16 @@ functions:
   __arr_retain_Sym$Tok:
     calls: 142
     bytes: 140
-  __arr_retain___m2__ListStyle:
+  __arr_retain___m1__ListStyle:
     calls: 34
     bytes: 120
-  __arr_retain___m2__Prec:
+  __arr_retain___m1__Prec:
     calls: 0
     bytes: 120
-  __arr_retain___m2__Production$Tok$Node:
+  __arr_retain___m1__Production$Tok$Node:
     calls: 34
-    bytes: 188
-  __arr_retain___m2__Rule$Tok:
+    bytes: 236
+  __arr_retain___m1__Rule$Tok:
     calls: 189
     bytes: 116
   __builtin_find_index$str$lam20:
@@ -933,10 +932,10 @@ functions:
   __builtin_find_index$str$lam7:
     calls: 35
     bytes: 400
-  __builtin_try_map$__m2__Production$Tok$Node$First<Tok>$__m2__ParseError$lam15:
+  __builtin_try_map$__m1__Production$Tok$Node$First<Tok>$__m1__ParseError$lam15:
     calls: 17
-    bytes: 828
-  __builtin_try_map$__m2__Rule$Tok$__m2__Rule<Tok>$__m2__ParseError$lam38:
+    bytes: 924
+  __builtin_try_map$__m1__Rule$Tok$__m1__Rule<Tok>$__m1__ParseError$lam38:
     calls: 46
     bytes: 632
   __eq_First$Tok:
@@ -954,46 +953,46 @@ functions:
   __eq___builtin_Span:
     calls: 1
     bytes: 104
-  __eq___m2__ParseError:
+  __eq___m1__ParseError:
     calls: 1
     bytes: 128
-  __m2__desugar_opt$Tok:
+  __m1__desugar_opt$Tok:
     calls: 26
     bytes: 700
-  __m2__desugar_rule$Tok:
+  __m1__desugar_rule$Tok:
     calls: 240
     bytes: 11964
-  __m2__group_styles$Tok:
+  __m1__group_styles$Tok:
     calls: 0
     bytes: 32
-  __m2__group_styles$Tok$tail:
+  __m1__group_styles$Tok$tail:
     calls: 262
     bytes: 4732
-  __m2__link$Tok$Node:
+  __m1__link$Tok$Node:
     calls: 9
-    bytes: 2604
-  __m2__link_opt$Tok:
+    bytes: 2772
+  __m1__link_opt$Tok:
     calls: 12
     bytes: 716
-  __m2__link_rule$Tok:
+  __m1__link_rule$Tok:
     calls: 139
     bytes: 8248
-  __m2__link_rules$Tok:
+  __m1__link_rules$Tok:
     calls: 27
     bytes: 732
-  __m2__prod_names$Tok$Node:
+  __m1__prod_names$Tok$Node:
     calls: 20
-    bytes: 492
+    bytes: 548
   __map33:
     calls: 0
     bytes: 380
   __rec_drop_Node:
     calls: 0
     bytes: 72
-  __rec_drop___m2__Rule$Tok:
+  __rec_drop___m1__Rule$Tok:
     calls: 490
     bytes: 340
-  __rec_drop___tuple$__m2__Rule_Tok$__m2__Rule_Tok:
+  __rec_drop___tuple$__m1__Rule_Tok$__m1__Rule_Tok:
     calls: 0
     bytes: 72
   __test$can_start:
@@ -1014,10 +1013,10 @@ functions:
   __test$show_first_sets:
     calls: 1
     bytes: 1840
-  __test_try_fail___m2__ParseError:
+  __test_try_fail___m1__ParseError:
     calls: 0
     bytes: 84
-  __to_str___m2__ParseError:
+  __to_str___m1__ParseError:
     calls: 0
     bytes: 824
   __to_str_u64:
@@ -1106,7 +1105,7 @@ functions:
     bytes: 456
   ebnf$Tok$Node:
     calls: 6
-    bytes: 2416
+    bytes: 2608
   first_msg:
     calls: 2
     bytes: 556
@@ -1124,10 +1123,10 @@ functions:
     bytes: 5340
   keep:
     calls: 0
-    bytes: 268
+    bytes: 252
   linked_first_sets$Tok$Node:
     calls: 6
-    bytes: 1084
+    bytes: 1140
   main:
     calls: 1
     bytes: 452

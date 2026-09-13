@@ -81,11 +81,11 @@ allocations: 34096
 deallocations: 34096
 reallocations: 3048
 bytes allocated: 1588595
-instructions executed: 5216600
-binary size: 260072
-  code: 168708
+instructions executed: 5367386
+binary size: 263224
+  code: 170968
   data: 1780
-  metadata: 89584
+  metadata: 90476
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -107,7 +107,7 @@ functions:
     bytes: 120
   __arr_drop___m4__Production$__m1__SexpKind$Sexp:
     calls: 12
-    bytes: 188
+    bytes: 236
   __arr_drop___m4__Rule$__m1__SexpKind:
     calls: 18
     bytes: 116
@@ -131,7 +131,7 @@ functions:
     bytes: 120
   __arr_retain___m4__Production$__m1__SexpKind$Sexp:
     calls: 12
-    bytes: 188
+    bytes: 236
   __arr_retain___m4__Rule$__m1__SexpKind:
     calls: 24
     bytes: 116
@@ -251,7 +251,7 @@ functions:
     bytes: 404
   __m14__lower_node$__m1__SexpKind$Sexp:
     calls: 836
-    bytes: 3844
+    bytes: 4896
   __m14__match_group$__m1__SexpKind$Sexp:
     calls: 820
     bytes: 6208
@@ -269,7 +269,7 @@ functions:
     bytes: 1692
   __m14__match_prod$__m1__SexpKind$Sexp:
     calls: 1656
-    bytes: 6760
+    bytes: 7540
   __m14__match_reps$__m1__SexpKind$Sexp:
     calls: 410
     bytes: 4752
@@ -308,10 +308,10 @@ functions:
     bytes: 532
   __m1__lower_item:
     calls: 426
-    bytes: 1052
+    bytes: 704
   __m1__lower_list:
     calls: 410
-    bytes: 268
+    bytes: 252
   __m1__parse_sexp:
     calls: 6
     bytes: 5980
@@ -339,6 +339,9 @@ functions:
   __m2__token_leaves:
     calls: 39
     bytes: 3648
+  __m2__token_text:
+    calls: 16
+    bytes: 472
   __m3__can_start$__m1__SexpKind:
     calls: 0
     bytes: 600
@@ -356,7 +359,7 @@ functions:
     bytes: 4732
   __m4__link$__m1__SexpKind$Sexp:
     calls: 6
-    bytes: 2604
+    bytes: 2772
   __m4__link_opt$__m1__SexpKind:
     calls: 6
     bytes: 716
@@ -368,7 +371,7 @@ functions:
     bytes: 732
   __m4__prod_names$__m1__SexpKind$Sexp:
     calls: 12
-    bytes: 492
+    bytes: 548
   __rec_drop_Sexp:
     calls: 427
     bytes: 72

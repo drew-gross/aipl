@@ -65,12 +65,26 @@ import {
     wrapping_add as +,
     wrapping_increment as ++,
 } from builtins;
-import { Cst, Group, Leaf, Tree, Trivia, nodes, show, span, text, token_leaves } from "./cst.aipl";
+import {
+    Cst,
+    Group,
+    Leaf,
+    Tree,
+    Trivia,
+    nodes,
+    show,
+    span,
+    text,
+    token_leaves,
+    token_text,
+} from "./cst.aipl";
 import { First, can_start, first_sets } from "./ebnf.aipl";
 import {
     Climb,
+    Const,
     Grammar,
     Inline,
+    Kids,
     ListStyle,
     Literal,
     Many,
@@ -84,6 +98,7 @@ import {
     Production,
     Rule,
     Term,
+    Text,
     Then,
     failure_message,
     link,
@@ -1125,6 +1140,9 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
             })?;
             match (build) {
                 Mk(f) => f(src, node, vals),
+                Kids(f) => f(vals),
+                Text(f) => f(node.token_text(src)),
+                Const(v) => ok(v),
             }
         },
         Leaf(span) => err(ParseError { message: "a token leaf has no lowered value", span }),
@@ -1591,11 +1609,11 @@ allocations: 9524
 deallocations: 9524
 reallocations: 1869
 bytes allocated: 676693
-instructions executed: 1348879
-binary size: 691784
-  code: 419140
+instructions executed: 1371107
+binary size: 695928
+  code: 422012
   data: 10388
-  metadata: 262256
+  metadata: 263528
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1617,7 +1635,7 @@ functions:
     bytes: 120
   __arr_drop___m3__Production$Tok$Node:
     calls: 126
-    bytes: 188
+    bytes: 236
   __arr_drop___m3__Rule$Tok:
     calls: 225
     bytes: 116
@@ -1650,7 +1668,7 @@ functions:
     bytes: 120
   __arr_retain___m3__Production$Tok$Node:
     calls: 145
-    bytes: 188
+    bytes: 236
   __arr_retain___m3__Rule$Tok:
     calls: 476
     bytes: 116
@@ -1663,19 +1681,19 @@ functions:
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
     bytes: 632
-  __builtin_all$__m3__Rule$Tok$lam125:
+  __builtin_all$__m3__Rule$Tok$lam134:
     calls: 0
     bytes: 36
-  __builtin_all$__m3__Rule$Tok$lam125$tail:
+  __builtin_all$__m3__Rule$Tok$lam134$tail:
     calls: 0
     bytes: 384
-  __builtin_any$__m3__Prec$lam116:
+  __builtin_any$__m3__Prec$lam119:
     calls: 13
     bytes: 276
-  __builtin_any$__m3__Rule$Tok$lam128:
+  __builtin_any$__m3__Rule$Tok$lam137:
     calls: 0
     bytes: 36
-  __builtin_any$__m3__Rule$Tok$lam128$tail:
+  __builtin_any$__m3__Rule$Tok$lam137$tail:
     calls: 0
     bytes: 380
   __builtin_count_while$char$lam52:
@@ -1690,7 +1708,7 @@ functions:
   __builtin_count_while$char$s0$lam80$tail:
     calls: 3
     bytes: 256
-  __builtin_find_if$__m3__Prec$lam143:
+  __builtin_find_if$__m3__Prec$lam146:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam21:
@@ -1713,7 +1731,7 @@ functions:
     bytes: 668
   __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam94:
     calls: 32
-    bytes: 828
+    bytes: 924
   __builtin_try_map$__m3__Rule$Tok$__m3__Rule<Tok>$__m3__ParseError$lam64:
     calls: 100
     bytes: 632
@@ -1830,7 +1848,7 @@ functions:
     bytes: 356
   __m2__linked_first_sets$Tok$Node:
     calls: 12
-    bytes: 1084
+    bytes: 1140
   __m2__rule_first$Tok:
     calls: 149
     bytes: 6508
@@ -1854,7 +1872,7 @@ functions:
     bytes: 4732
   __m3__link$Tok$Node:
     calls: 101
-    bytes: 2604
+    bytes: 2772
   __m3__link_opt$Tok:
     calls: 60
     bytes: 716
@@ -1866,7 +1884,7 @@ functions:
     bytes: 732
   __m3__prod_names$Tok$Node:
     calls: 226
-    bytes: 492
+    bytes: 548
   __m4__between_len:
     calls: 0
     bytes: 752
@@ -2052,7 +2070,7 @@ functions:
     bytes: 776
   lower_node$Tok$Node:
     calls: 18
-    bytes: 3844
+    bytes: 5244
   main:
     calls: 1
     bytes: 180
@@ -2073,7 +2091,7 @@ functions:
     bytes: 1692
   match_prod$Tok$Node:
     calls: 181
-    bytes: 7068
+    bytes: 7808
   match_reps$Tok$Node:
     calls: 56
     bytes: 4752
@@ -2100,7 +2118,7 @@ functions:
     bytes: 452
   prepare$Tok$Node:
     calls: 12
-    bytes: 2068
+    bytes: 2184
   pruned$Tok$Node:
     calls: 11
     bytes: 1344
@@ -2115,7 +2133,7 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 130
-    bytes: 4660
+    bytes: 4804
   rule_nullable$Tok:
     calls: 0
     bytes: 36

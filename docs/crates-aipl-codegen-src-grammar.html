@@ -122,12 +122,24 @@
           </h3>
           <pre class="signature"><code>variant Build&#60;A: any&#62;</code></pre>
 
-          <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>: a function from the source text, the node itself, and the already-lowered values of its interior children (<code>nodes</code>, in match order). It may fail — a literal that overflows, a duplicate key — with a <code>ParseError</code> the driver passes straight through.</p><p>A one-arm variant rather than a bare function type, so a later arm can be added without every grammar changing shape. It stays one arm deliberately: a payload-free <code>NoLower</code> would pin no <code>A</code> of its own, leaving nothing to infer the type parameter from, so a production with nothing to lower passes a trivial named function instead.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so each is a named top-level <code>fn lower_x(src: str, node: Cst, kids: A[]) -&gt; A!ParseError</code>. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar *parses*, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
+          <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>. <code>Mk</code> is the general form: a function from the source text, the node itself, and the already-lowered values of its interior children (<code>nodes</code>, in match order). It may fail — a literal that overflows, a duplicate key — with a <code>ParseError</code> the driver passes straight through.</p><p>The other arms are <code>Mk</code> with the arguments a lowering does not read left out, so a function is declared with what it uses and nothing else:</p><p>- <code>Kids</code> takes only the children — a node that is its children regrouped (<code>Object(kids)</code>). - <code>Text</code> takes only the node's token text (<code>token_text</code>, the matched tokens run together) — a leaf-only node whose value is its spelling. - <code>Const</code> takes nothing and *is* the value — a keyword production.</p><p>Every arm carries an <code>A</code> (a function returning one, or the value itself), so each pins the type parameter on its own; a payload-free arm could not, which is why there is no <code>NoLower</code>.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so each is a named top-level <code>fn lower_x(..) -&gt; A!ParseError</code>. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar *parses*, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
 
 
           <ul class="cases">
 
             <li id="item-Mk"><code>Mk((str, Cst, A[]) -&#62; A!ParseError)</code>
+
+            </li>
+
+            <li id="item-Kids"><code>Kids((A[]) -&#62; A!ParseError)</code>
+
+            </li>
+
+            <li id="item-Text"><code>Text((str) -&#62; A!ParseError)</code>
+
+            </li>
+
+            <li id="item-Const"><code>Const(A)</code>
 
             </li>
 
@@ -399,7 +411,7 @@
             <a class="anchor" href="#item-keep">keep</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn keep(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
+          <pre class="signature"><code>fn keep(kids: Node[]) -&#62; Node!ParseError</code></pre>
 
           <div class="doc"><p>The trivial lowering a production with nothing to lower passes, and all these fixtures need: <code>Build</code> has no payload-free arm to mean &quot;don't&quot;.</p></div>
 

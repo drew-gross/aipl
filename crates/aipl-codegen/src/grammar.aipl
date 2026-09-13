@@ -204,24 +204,34 @@ variant Rule<K: variant> =
     // one flat run.
     | Climb(Rule<K>, Prec[])
 
-# How a production's matched node becomes a value of the caller's AST type `A`:
-# a function from the source text, the node itself, and the already-lowered
-# values of its interior children (`nodes`, in match order). It may fail —
-# a literal that overflows, a duplicate key — with a `ParseError` the driver
-# passes straight through.
+# How a production's matched node becomes a value of the caller's AST type `A`.
+# `Mk` is the general form: a function from the source text, the node itself,
+# and the already-lowered values of its interior children (`nodes`, in match
+# order). It may fail — a literal that overflows, a duplicate key — with a
+# `ParseError` the driver passes straight through.
 #
-# A one-arm variant rather than a bare function type, so a later arm can be
-# added without every grammar changing shape. It stays one arm deliberately: a
-# payload-free `NoLower` would pin no `A` of its own, leaving nothing to infer
-# the type parameter from, so a production with nothing to lower passes a
-# trivial named function instead.
+# The other arms are `Mk` with the arguments a lowering does not read left
+# out, so a function is declared with what it uses and nothing else:
+#
+#   - `Kids` takes only the children — a node that is its children regrouped
+#     (`Object(kids)`).
+#   - `Text` takes only the node's token text (`token_text`, the matched
+#     tokens run together) — a leaf-only node whose value is its spelling.
+#   - `Const` takes nothing and *is* the value — a keyword production.
+#
+# Every arm carries an `A` (a function returning one, or the value itself), so
+# each pins the type parameter on its own; a payload-free arm could not, which
+# is why there is no `NoLower`.
 #
 # Function values are non-capturing and non-generic (`check.rs`), so each is a
-# named top-level `fn lower_x(src: str, node: Cst, kids: A[]) -> A!ParseError`.
-# They also can't be compared with `==`, which is why the tests below assert on
-# what a grammar *parses*, never on a grammar value — the same constraint
-# `lexer.aipl` lives with.
-variant Build<A: any> = Mk((str, Cst, A[]) -> A!ParseError)
+# named top-level `fn lower_x(..) -> A!ParseError`. They also can't be compared
+# with `==`, which is why the tests below assert on what a grammar *parses*,
+# never on a grammar value — the same constraint `lexer.aipl` lives with.
+variant Build<A: any> =
+    | Mk((str, Cst, A[]) -> A!ParseError)
+    | Kids((A[]) -> A!ParseError)
+    | Text((str) -> A!ParseError)
+    | Const(A)
 
 # How a bracketed list lays out: what separates its items, whether the brackets
 # take inner spaces while the list stays on one line (`{ a, b }` against
@@ -606,11 +616,11 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     let r_item: Rule<Kind> = OneOf([Term(Atom), Named("list")]);
     let g: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "list", rule: r_list, build: Mk(keep), layout: Inline },
+            Production { name: "list", rule: r_list, build: Kids(keep), layout: Inline },
             Production {
                 name: "item",
                 rule: r_item,
-                build: Mk(keep),
+                build: Kids(keep),
                 expect_as: "an item",
                 layout: Inline,
             },
@@ -638,23 +648,23 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // Every rule shape carries its reference, and every one is rewritten.
     let shapes: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "a", rule: Maybe(Named("a")), build: Mk(keep), layout: Inline },
+            Production { name: "a", rule: Maybe(Named("a")), build: Kids(keep), layout: Inline },
             Production {
                 name: "b",
                 rule: Many(Named("a"), sep=Literal(",")),
-                build: Mk(keep),
+                build: Kids(keep),
                 layout: Inline,
             },
             Production {
                 name: "c",
                 rule: Climb(Named("a"), [Prec { power: 1, right: false, ops: ["+"] }]),
-                build: Mk(keep),
+                build: Kids(keep),
                 layout: Inline,
             },
             Production {
                 name: "d",
                 rule: Many(Named("b"), min=1),
-                build: Mk(keep),
+                build: Kids(keep),
                 layout: Inline,
             },
         ],
@@ -667,15 +677,17 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 
     // An unresolved reference is a grammar error, named in the message.
     let bad: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: Named("missing"), build: Mk(keep), layout: Inline }],
+        prods: [
+            Production { name: "a", rule: Named("missing"), build: Kids(keep), layout: Inline },
+        ],
     };
     assert(link(bad) == err(ParseError { message: "no rule named \"missing\"", span: 0..0 }));
 
     // So is a duplicate name — the typo that otherwise reads as a working grammar.
     let dup: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "a", rule: Literal("x"), build: Mk(keep), layout: Inline },
-            Production { name: "a", rule: Literal("y"), build: Mk(keep), layout: Inline },
+            Production { name: "a", rule: Literal("x"), build: Kids(keep), layout: Inline },
+            Production { name: "a", rule: Literal("y"), build: Kids(keep), layout: Inline },
         ],
     };
     assert(link(dup) == err(ParseError { message: "duplicate rule name \"a\"", span: 0..0 }));
@@ -706,8 +718,8 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     );
     let nests: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "p", rule: outer, build: Mk(keep), layout: Inline },
-            Production { name: "q", rule: q_rule, build: Mk(keep), layout: Inline },
+            Production { name: "p", rule: outer, build: Kids(keep), layout: Inline },
+            Production { name: "q", rule: q_rule, build: Kids(keep), layout: Inline },
         ],
     };
     let ns = link(nests)?;
@@ -764,7 +776,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
         nested_in=(Literal("("), Literal(")")),
     );
     let short_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: sugar, build: Mk(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: sugar, build: Kids(keep), layout: Inline }],
     };
     assert(link(short_g)?.groups == [ListStyle { sep: ",", trailing: false }]);
 
@@ -772,14 +784,14 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // the shorthand says "a bracket pair holding one thing" without restating it.
     let single: Rule<Kind> = Many(Term(Atom), min=1, max=1, nested_in=(Literal("("), Literal(")")));
     let single_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: single, build: Mk(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: single, build: Kids(keep), layout: Inline }],
     };
     assert(link(single_g)?.groups == [ListStyle { sep: "", wraps: false }]);
 
     // A maximum below the minimum is a rule that could never match.
     let backwards: Rule<Kind> = Many(Term(Atom), min=2, max=1);
     let back_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: backwards, build: Mk(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: backwards, build: Kids(keep), layout: Inline }],
     };
     assert(
         link(back_g) == err(ParseError {
@@ -792,7 +804,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // `spaced` is the one thing the `Many` cannot answer for itself.
     let words: Rule<Kind> = Many(Term(Atom), nested_in=(Literal("{"), Literal("}")), spaced=true);
     let words_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: words, build: Mk(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: words, build: Kids(keep), layout: Inline }],
     };
     assert(link(words_g)?.groups == [ListStyle { sep: "", spaced: true }]);
 
@@ -807,7 +819,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
         nested_in=(Literal("("), Literal(")")),
     );
     let odd_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: odd_sep, build: Mk(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: odd_sep, build: Kids(keep), layout: Inline }],
     };
     assert(
         link(odd_g) == err(ParseError {
@@ -823,7 +835,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
             Production {
                 name: "a",
                 rule: Many(Named("nope"), min=1, max=1, nested_in=(Literal("("), Literal(")"))),
-                build: Mk(keep),
+                build: Kids(keep),
                 layout: Inline,
             },
         ],
@@ -844,7 +856,7 @@ variant Node = Leaf(str) | List(Node[])
 
 # The trivial lowering a production with nothing to lower passes, and all these
 # fixtures need: `Build` has no payload-free arm to mean "don't".
-fn keep(src: str, node: Cst, kids: Node[]) -> Node!ParseError { ok(List(kids)) }
+fn keep(kids: Node[]) -> Node!ParseError { ok(List(kids)) }
 
 # The rule of production `i` of `g`, for the assertions above — a grammar value
 # can't be compared with `==` (it holds function values), but the rule inside one
@@ -867,11 +879,11 @@ allocations: 607
 deallocations: 607
 reallocations: 77
 bytes allocated: 62226
-instructions executed: 59670
-binary size: 137016
-  code: 86732
+instructions executed: 60938
+binary size: 138280
+  code: 87596
   data: 3484
-  metadata: 46800
+  metadata: 47200
 functions:
   __arr_drop_ListStyle:
     calls: 41
@@ -881,7 +893,7 @@ functions:
     bytes: 120
   __arr_drop_Production$Kind$Node:
     calls: 20
-    bytes: 188
+    bytes: 236
   __arr_drop_Rule$Kind:
     calls: 13
     bytes: 116
@@ -893,7 +905,7 @@ functions:
     bytes: 120
   __arr_retain_Production$Kind$Node:
     calls: 17
-    bytes: 188
+    bytes: 236
   __arr_retain_Rule$Kind:
     calls: 20
     bytes: 116
@@ -968,7 +980,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 46144
+    bytes: 46540
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -1058,10 +1070,10 @@ functions:
     bytes: 4732
   keep:
     calls: 0
-    bytes: 268
+    bytes: 252
   link$Kind$Node:
     calls: 14
-    bytes: 2604
+    bytes: 2772
   link_opt$Kind:
     calls: 16
     bytes: 716
@@ -1076,7 +1088,7 @@ functions:
     bytes: 180
   prod_names$Kind$Node:
     calls: 18
-    bytes: 492
+    bytes: 548
   rule_of$Kind$Node:
     calls: 11
-    bytes: 820
+    bytes: 984

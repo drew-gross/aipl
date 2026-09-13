@@ -33,6 +33,7 @@ import { render_cst } from "./format.aipl";
 import {
     Grammar,
     Inline,
+    Kids,
     Literal as Lit,
     Many,
     Mk,
@@ -71,7 +72,7 @@ fn sexp_rules() -> TokenRule<SexpKind>[] {
 
 # A `list` node's children are exactly its interior `item`s — the parentheses
 # are leaves, and leaves have no lowered value — so the list *is* its kids.
-fn lower_list(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError { ok(List(kids)) }
+fn lower_list(kids: Sexp[]) -> Sexp!ParseError { ok(List(kids)) }
 
 # An `item` is one of its two alternatives, told apart by whether it got an
 # interior child: the `list` branch lowered one, and the `Atom` branch matched a
@@ -103,7 +104,7 @@ pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
     let r_item: Rule<SexpKind> = OneOf([Term(Atom), Named("list")]);
     Grammar {
         prods: [
-            Production { name: "list", rule: r_list, build: Mk(lower_list), layout: Inline },
+            Production { name: "list", rule: r_list, build: Kids(lower_list), layout: Inline },
             Production {
                 name: "item",
                 rule: r_item,
@@ -280,11 +281,11 @@ allocations: 11508
 deallocations: 11508
 reallocations: 1565
 bytes allocated: 741542
-instructions executed: 1369910
-binary size: 400336
-  code: 258800
+instructions executed: 1394492
+binary size: 404696
+  code: 261876
   data: 4796
-  metadata: 136740
+  metadata: 138024
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -312,7 +313,7 @@ functions:
     bytes: 120
   __arr_drop___m3__Production$SexpKind$__m15__Sexp:
     calls: 94
-    bytes: 188
+    bytes: 236
   __arr_drop___m3__Rule$SexpKind:
     calls: 143
     bytes: 116
@@ -348,7 +349,7 @@ functions:
     bytes: 120
   __arr_retain___m3__Production$SexpKind$__m15__Sexp:
     calls: 88
-    bytes: 188
+    bytes: 236
   __arr_retain___m3__Rule$SexpKind:
     calls: 178
     bytes: 116
@@ -414,7 +415,7 @@ functions:
     bytes: 668
   __builtin_try_map$__m3__Production$SexpKind$__m15__Sexp$__m2__First<SexpKind>$__m3__ParseError$lam57:
     calls: 3
-    bytes: 828
+    bytes: 924
   __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam76:
     calls: 45
     bytes: 632
@@ -510,7 +511,7 @@ functions:
     bytes: 404
   __m13__lower_node$SexpKind$__m15__Sexp:
     calls: 47
-    bytes: 3844
+    bytes: 4896
   __m13__match_group$SexpKind$__m15__Sexp:
     calls: 78
     bytes: 6208
@@ -528,7 +529,7 @@ functions:
     bytes: 1692
   __m13__match_prod$SexpKind$__m15__Sexp:
     calls: 222
-    bytes: 6760
+    bytes: 7540
   __m13__match_reps$SexpKind$__m15__Sexp:
     calls: 38
     bytes: 4752
@@ -598,6 +599,9 @@ functions:
   __m1__token_leaves:
     calls: 1338
     bytes: 3648
+  __m1__token_text:
+    calls: 21
+    bytes: 472
   __m2__can_start$SexpKind:
     calls: 0
     bytes: 600
@@ -621,7 +625,7 @@ functions:
     bytes: 356
   __m2__linked_first_sets$SexpKind$__m15__Sexp:
     calls: 1
-    bytes: 1084
+    bytes: 1140
   __m2__prec_note:
     calls: 2
     bytes: 2336
@@ -660,7 +664,7 @@ functions:
     bytes: 4732
   __m3__link$SexpKind$__m15__Sexp:
     calls: 44
-    bytes: 2604
+    bytes: 2772
   __m3__link_opt$SexpKind:
     calls: 44
     bytes: 716
@@ -672,13 +676,13 @@ functions:
     bytes: 732
   __m3__prod_names$SexpKind$__m15__Sexp:
     calls: 82
-    bytes: 492
+    bytes: 548
   __m4__breaks_after:
     calls: 6
     bytes: 444
   __m4__fmt_node$SexpKind$__m15__Sexp$s1$lam61:
     calls: 89
-    bytes: 4800
+    bytes: 5276
   __m4__format_cst$SexpKind$__m15__Sexp$s1$lam31:
     calls: 12
     bytes: 384
@@ -759,7 +763,7 @@ functions:
     bytes: 2352
   __test$sexp_grammar:
     calls: 1
-    bytes: 2936
+    bytes: 3124
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -846,10 +850,10 @@ functions:
     bytes: 3440
   lower_item:
     calls: 34
-    bytes: 1052
+    bytes: 704
   lower_list:
     calls: 13
-    bytes: 268
+    bytes: 252
   main:
     calls: 1
     bytes: 320

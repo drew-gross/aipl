@@ -4279,12 +4279,12 @@ fn why_prepared(src: str) -> str {
 allocations: 3479798
 deallocations: 3479798
 reallocations: 368529
-bytes allocated: 334314323
-instructions executed: 457628316
-binary size: 5156152
-  code: 3359812
+bytes allocated: 338255603
+instructions executed: 465800710
+binary size: 5840096
+  code: 3812180
   data: 47780
-  metadata: 1748560
+  metadata: 1980136
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4342,7 +4342,7 @@ functions:
     bytes: 120
   __arr_drop___m7__Production$__m21__AiplTok$__m1__Ast:
     calls: 3251
-    bytes: 188
+    bytes: 3360
   __arr_drop___m7__Rule$__m21__AiplTok:
     calls: 208110
     bytes: 116
@@ -4432,7 +4432,7 @@ functions:
     bytes: 120
   __arr_retain___m7__Production$__m21__AiplTok$__m1__Ast:
     calls: 20350
-    bytes: 188
+    bytes: 3360
   __arr_retain___m7__Rule$__m21__AiplTok:
     calls: 420776
     bytes: 116
@@ -4469,28 +4469,28 @@ functions:
   __builtin_all$__m4__Pat$lam360:
     calls: 17
     bytes: 264
-  __builtin_all$__m7__Rule$__m21__AiplTok$lam396:
+  __builtin_all$__m7__Rule$__m21__AiplTok$lam399:
     calls: 0
     bytes: 36
-  __builtin_all$__m7__Rule$__m21__AiplTok$lam396$tail:
+  __builtin_all$__m7__Rule$__m21__AiplTok$lam399$tail:
     calls: 0
     bytes: 384
-  __builtin_all$char$s0$lam372:
+  __builtin_all$char$s0$lam375:
     calls: 85
     bytes: 212
-  __builtin_any$__m15__Doc$lam411:
+  __builtin_any$__m15__Doc$lam414:
     calls: 0
     bytes: 32
-  __builtin_any$__m15__Doc$lam411$tail:
+  __builtin_any$__m15__Doc$lam414$tail:
     calls: 161
     bytes: 324
-  __builtin_any$__m7__Prec$lam408:
+  __builtin_any$__m7__Prec$lam411:
     calls: 426
     bytes: 276
-  __builtin_any$__m7__Rule$__m21__AiplTok$lam399:
+  __builtin_any$__m7__Rule$__m21__AiplTok$lam402:
     calls: 0
     bytes: 36
-  __builtin_any$__m7__Rule$__m21__AiplTok$lam399$tail:
+  __builtin_any$__m7__Rule$__m21__AiplTok$lam402$tail:
     calls: 108
     bytes: 380
   __builtin_count_while$char$lam79:
@@ -4505,16 +4505,16 @@ functions:
   __builtin_count_while$char$s0$lam326$tail:
     calls: 51
     bytes: 256
-  __builtin_count_while$char$s0$lam369:
+  __builtin_count_while$char$s0$lam372:
     calls: 469
     bytes: 172
-  __builtin_count_while$char$s0$lam371:
+  __builtin_count_while$char$s0$lam374:
     calls: 1
     bytes: 172
   __builtin_count_while$char$s0$lam87:
     calls: 1963
     bytes: 184
-  __builtin_find_if$__m7__Prec$lam415:
+  __builtin_find_if$__m7__Prec$lam418:
     calls: 365
     bytes: 688
   __builtin_find_index$str$lam268:
@@ -4529,7 +4529,7 @@ functions:
   __builtin_find_map$__m8__Cst$__builtin_Span$lam281:
     calls: 1362
     bytes: 364
-  __builtin_find_map$__m8__Cst$__builtin_Span$lam381:
+  __builtin_find_map$__m8__Cst$__builtin_Span$lam384:
     calls: 5113
     bytes: 364
   __builtin_int_parse:
@@ -4541,7 +4541,7 @@ functions:
   __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam282:
     calls: 1644
     bytes: 440
-  __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam382:
+  __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam385:
     calls: 5889
     bytes: 440
   __builtin_try_map$__m1__Ast$__m2__BraceEntry$__m7__ParseError$lam248:
@@ -4618,7 +4618,7 @@ functions:
     bytes: 9360
   __builtin_try_map$__m7__Production$__m21__AiplTok$__m1__Ast$__m30__First<AiplTok>$__m7__ParseError$lam298:
     calls: 72
-    bytes: 828
+    bytes: 10304
   __builtin_try_map$__m7__Rule$__m21__AiplTok$__m7__Rule<AiplTok>$__m7__ParseError$lam363:
     calls: 57539
     bytes: 632
@@ -4720,7 +4720,7 @@ functions:
     bytes: 444
   __m14__fmt_node$__m21__AiplTok$__m1__Ast$s1$lam43:
     calls: 158
-    bytes: 4800
+    bytes: 43240
   __m14__format_cst$__m21__AiplTok$__m1__Ast$s1$lam16:
     calls: 22
     bytes: 384
@@ -4882,7 +4882,7 @@ functions:
     bytes: 404
   __m29__lower_node$__m21__AiplTok$__m1__Ast:
     calls: 2260
-    bytes: 22856
+    bytes: 91508
   __m29__match_group$__m21__AiplTok$__m1__Ast:
     calls: 11565
     bytes: 6208
@@ -4900,7 +4900,7 @@ functions:
     bytes: 1692
   __m29__match_prod$__m21__AiplTok$__m1__Ast:
     calls: 12476
-    bytes: 8972
+    bytes: 66388
   __m29__match_reps$__m21__AiplTok$__m1__Ast:
     calls: 3065
     bytes: 4752
@@ -4924,7 +4924,7 @@ functions:
     bytes: 9136
   __m29__prepare$__m21__AiplTok$__m1__Ast:
     calls: 9
-    bytes: 2068
+    bytes: 14660
   __m29__pruned$__m21__AiplTok$__m1__Ast:
     calls: 70
     bytes: 1344
@@ -4936,7 +4936,7 @@ functions:
     bytes: 44
   __m29__rule_labels$__m21__AiplTok$__m1__Ast$tail:
     calls: 19872
-    bytes: 8076
+    bytes: 20844
   __m29__rule_nullable$__m21__AiplTok:
     calls: 0
     bytes: 36
@@ -4966,7 +4966,7 @@ functions:
     bytes: 356
   __m30__linked_first_sets$__m21__AiplTok$__m1__Ast:
     calls: 9
-    bytes: 1084
+    bytes: 7396
   __m30__rule_first$__m21__AiplTok:
     calls: 28080
     bytes: 6508
@@ -5059,7 +5059,7 @@ functions:
     bytes: 4732
   __m7__link$__m21__AiplTok$__m1__Ast:
     calls: 353
-    bytes: 2604
+    bytes: 21628
   __m7__link_opt$__m21__AiplTok:
     calls: 25416
     bytes: 716
@@ -5071,7 +5071,7 @@ functions:
     bytes: 732
   __m7__prod_names$__m21__AiplTok$__m1__Ast:
     calls: 675
-    bytes: 492
+    bytes: 6804
   __m8__first_leaf:
     calls: 7190
     bytes: 696
@@ -5434,7 +5434,7 @@ functions:
     bytes: 552
   expressions:
     calls: 644
-    bytes: 34840
+    bytes: 91040
   field_name:
     calls: 8
     bytes: 888
@@ -5449,7 +5449,7 @@ functions:
     bytes: 808
   items:
     calls: 322
-    bytes: 33404
+    bytes: 109864
   join_spans:
     calls: 89
     bytes: 172
@@ -5677,7 +5677,7 @@ functions:
     bytes: 864
   p:
     calls: 24150
-    bytes: 428
+    bytes: 3804
   parens:
     calls: 3220
     bytes: 376
@@ -5686,7 +5686,7 @@ functions:
     bytes: 552
   patterns:
     calls: 644
-    bytes: 7560
+    bytes: 24000
   pipes:
     calls: 1288
     bytes: 376
@@ -5710,7 +5710,7 @@ functions:
     bytes: 3544
   statements:
     calls: 644
-    bytes: 26828
+    bytes: 69724
   tuple_slot_names:
     calls: 3
     bytes: 544
@@ -5722,7 +5722,7 @@ functions:
     bytes: 552
   types:
     calls: 644
-    bytes: 9048
+    bytes: 28708
   variadic_seq_ty:
     calls: 2
     bytes: 924
