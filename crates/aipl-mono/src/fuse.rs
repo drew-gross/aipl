@@ -21,7 +21,8 @@
 //!   builds the whole mapped array only to walk it once, so it collapses into a
 //!   loop over `xs` that applies `f` at the top of each iteration and never
 //!   materializes the intermediate; a `for` over `xs.tuple_windows()` likewise
-//!   becomes a loop over `xs` carrying the previous element.
+//!   becomes a loop over `xs` carrying the previous element, and one over
+//!   `xs.reverse()` a loop that codegen walks backwards.
 //!
 //! # Adding a fusion
 //!
@@ -61,6 +62,8 @@ mod chain_fusions;
 mod comparison_fusions;
 mod loop_fusions;
 mod slice_fusions;
+
+pub use loop_fusions::REVERSE_ITER;
 
 use std::collections::HashSet;
 

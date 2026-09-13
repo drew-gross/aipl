@@ -2105,6 +2105,11 @@ unsafe fn shift_last_to(a: *const u8, at: usize, elem_size: i64) {
     }
 }
 
+/// The iterable of a `for` that walks its array backwards: what the fusion
+/// pass wraps `xs.reverse()` in when it is only ever iterated (see
+/// `aipl_mono::REVERSE_ITER`). Only the `For` arm ever sees it.
+const REVERSE_ITER: &str = aipl_mono::REVERSE_ITER;
+
 /// The address to hand `aipl_set_insert` for element `i` of `src`, and a
 /// one-word scratch backing it.
 ///
@@ -18804,7 +18809,35 @@ fn compile_expr_inner<M: Module>(
             // byte-by-byte until NUL (binding `v: char`); over a `T[]` it
             // walks index 0..len (binding `v: T`). Body's value is
             // discarded; the loop evaluates to i64 0.
+            //
+            // `for (let v : xs.reverse())` arrives with the iterable wrapped as
+            // `__reverse_iter(xs)` by the fusion pass (see `loop_fusions`): the
+            // walk itself runs backwards, len..0, and no reversed view or copy
+            // of `xs` is ever made. A `str` has no backward cursor (its rope
+            // streams one way), so there the reversed string is built and
+            // walked forwards, as `xs.reverse()` itself would.
+            let (iterable, reverse) = match &iterable.kind {
+                ExprKind::Call(f, args, _) if f == REVERSE_ITER && args.len() == 1 => {
+                    (&args[0], true)
+                }
+                _ => (&**iterable, false),
+            };
             let (it_ptr, it_ty) = compile_expr(module, builder, cx, scopes, iterable)?;
+            let it_ptr = if reverse && is_str_shaped(&it_ty) {
+                // As the `reverse` builtin's str arm: the entry consumes its
+                // receiver (the caller incs to balance its own track) and hands
+                // back a fresh value, tracked here.
+                builtins.call_void(module, builder, "aipl_inc", &[it_ptr]);
+                let rev = builtins.call(module, builder, "aipl_str_reverse", &[it_ptr]);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(rev, &it_ty));
+                rev
+            } else {
+                it_ptr
+            };
+            let reverse = reverse && !is_str_shaped(&it_ty);
 
             // For a `str` iterable, set up a char cursor: a small codegen-stacked
             // struct the runtime advances byte-by-byte. It streams every
@@ -18825,14 +18858,19 @@ fn compile_expr_inner<M: Module>(
                     it_ptr // unused for the array branch
                 };
 
-            // Index slot, initialized to 0.
+            // Index slot: the next index to visit walking forwards, or one past
+            // it walking backwards — initialized to 0, or to the length.
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
                 8,
                 3,
             ));
-            let zero = builder.ins().iconst(types::I64, 0);
-            builder.ins().stack_store(types::I64, zero, slot, 0);
+            let start = if reverse {
+                load_arr_len(builder, it_ptr)
+            } else {
+                builder.ins().iconst(types::I64, 0)
+            };
+            builder.ins().stack_store(types::I64, start, slot, 0);
 
             let header = builder.create_block();
             let body_block = builder.create_block();
@@ -18863,19 +18901,29 @@ fn compile_expr_inner<M: Module>(
                 // not promised; see the checker for the same note.
                 ConcreteType::Array(inner) | ConcreteType::Set(inner, _) => {
                     let elem_ty = (**inner).clone();
-                    let len = load_arr_len(builder, it_ptr);
-                    let more = builder.ins().icmp(IntCC::SignedLessThan, i, len);
+                    let more = if reverse {
+                        builder.ins().icmp_imm_s(IntCC::SignedGreaterThan, i, 0)
+                    } else {
+                        let len = load_arr_len(builder, it_ptr);
+                        builder.ins().icmp(IntCC::SignedLessThan, i, len)
+                    };
                     builder.ins().brif(more, body_block, &[], exit, &[]);
                     // Fetch element i in the body block (it's only valid there).
                     // Switch now; the element read (a bit-unpack for `bool`, a
                     // load or composite address otherwise) happens here.
                     builder.switch_to_block(body_block);
+                    // Walking backwards the slot is one past the element.
+                    let at = if reverse {
+                        builder.ins().iadd_imm_s(i, -1)
+                    } else {
+                        i
+                    };
                     let elem = load_array_elem(
                         module,
                         builder,
                         cx.builtins,
                         it_ptr,
-                        i,
+                        at,
                         &elem_ty,
                         cx.structs,
                     );
@@ -18932,7 +18980,7 @@ fn compile_expr_inner<M: Module>(
                 cx.structs,
                 scopes.pop().expect("for-body scope"),
             );
-            let next = builder.ins().iadd_imm_s(i, 1);
+            let next = builder.ins().iadd_imm_s(i, if reverse { -1 } else { 1 });
             builder.ins().stack_store(types::I64, next, slot, 0);
             builder.ins().jump(header, &[]);
             builder.seal_block(header);

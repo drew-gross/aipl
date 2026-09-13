@@ -36,7 +36,7 @@ pub use fold::fold_constants;
 mod ctor_eq;
 mod fuse;
 pub use ctor_eq::unwrap_ctor_eq;
-pub use fuse::{effectful_fns, fuse_operations};
+pub use fuse::{effectful_fns, fuse_operations, REVERSE_ITER};
 
 mod sink;
 pub use sink::{sink_bindings, sink_bindings_post_mono};
@@ -7051,6 +7051,16 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
                     aipl_syntax::ast::SetOrder::Context,
                 ),
             })
+        }
+        // `for (let v : xs.reverse())`'s iterable after fusion: `xs` itself,
+        // walked backwards by codegen — so its type is `xs`'s.
+        REVERSE_ITER => {
+            return Some(
+                arg_tys
+                    .first()
+                    .cloned()
+                    .unwrap_or(Type::Array(Box::new(Type::NoneInner))),
+            )
         }
         // Internal in-place-filter intrinsics (statements; see `expand_filter`).
         "__filter_keep" | "__filter_drop" | "__filter_truncate" => return Some(Type::Unit),

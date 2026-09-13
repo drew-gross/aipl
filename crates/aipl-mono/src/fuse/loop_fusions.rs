@@ -72,6 +72,11 @@ use aipl_syntax::ast::{Expr, ExprKind, MatchArm, Pattern};
 use crate::sink::can_defer;
 use crate::subst::{assigned_names, read_names};
 
+/// The iterable a `for` over `xs.reverse()` is rewritten to: `xs`, marked for
+/// codegen to walk backwards. An internal name (no user identifier can spell
+/// it) that appears only as a `for`'s iterable.
+pub const REVERSE_ITER: &str = "__reverse_iter";
+
 /// One fusable loop shape: a `for` over a call to `over` becomes a `for` over
 /// that call's receiver, with the call's arguments — a predicate, a mapping, or
 /// both — applied per element instead.
@@ -120,6 +125,24 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
             return None;
         };
         return Some(build_windows(whole, var, recv, body));
+    }
+    if name == "__builtin_reverse" {
+        // `for (let v : xs.reverse())`: the walk runs backwards instead of a
+        // reversed view being built — a codegen matter, so the iterable is only
+        // relabelled here (see `REVERSE_ITER`). Nothing observable changes:
+        // `xs` is evaluated once either way, and the elements reach the body
+        // in the same order.
+        let [recv] = args.as_slice() else {
+            return None;
+        };
+        let wrapped = Expr::rebuilt(
+            ExprKind::Call(REVERSE_ITER.to_string(), vec![recv.clone()], false),
+            iterable,
+        );
+        return Some(Expr::rebuilt(
+            ExprKind::For(var.clone(), Box::new(wrapped), body.clone()),
+            whole,
+        ));
     }
     let f = LOOP_FUSIONS.iter().find(|f| f.over == name)?;
     let (recv, fns) = args.split_first()?;

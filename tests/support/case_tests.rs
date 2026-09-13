@@ -475,6 +475,7 @@ case_tests! {
     cases_optimizations_inspect_only_args = "cases/optimizations/inspect_only_args",
     cases_optimizations_loop_map_fusion = "cases/optimizations/loop_map_fusion",
     cases_optimizations_loop_map_fusion_effects = "cases/optimizations/loop_map_fusion_effects",
+    cases_optimizations_loop_reverse_fusion = "cases/optimizations/loop_reverse_fusion",
     cases_optimizations_loop_tuple_windows_fusion = "cases/optimizations/loop_tuple_windows_fusion",
     cases_optimizations_map_find_if_fusion = "cases/optimizations/map_find_if_fusion",
     cases_optimizations_sink_effects_stay_put = "cases/optimizations/sink_effects_stay_put",

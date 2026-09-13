@@ -1,0 +1,135 @@
+import {
+    extend,
+    less_than as <,
+    print,
+    push,
+    reverse,
+    to_str,
+    wrapping_increment as ++,
+} from builtins;
+
+// Operation fusion: a `for` over `xs.reverse()` walks `xs` backwards.
+//
+// `reverse` on its own builds a reversed *view* — an allocation that reads its
+// elements through the array underneath. A loop that only walks it needs
+// neither: the fusion pass marks the iterable and codegen runs the index from
+// the end, so the elements come out reversed straight from `xs`, and nothing
+// is allocated or unwrapped along the way. Nothing observable changes — `xs`
+// is evaluated once either way, and the elements reach the body in the same
+// order — so this fires unconditionally.
+//
+// Measured on this case with the fusion switched off: the two loops' views
+// are two allocations (24 become 22) and, more to the point, every element
+// read through a view is a runtime call — 204 `aipl_arr_elem_ptr` calls become
+// 1 (the `materialized(xs)[0]` index), the fused loop reading straight from
+// the block. The instruction count counts only this object's code, so the
+// calls' own work is invisible in it (14,392 becomes 15,396: the backward
+// index is one add per element more than the forward one). The `functions:`
+// list is the evidence — one `aipl_arr_reverse`, `materialized`'s, where the
+// unfused case has three.
+
+fn many() -> i64[] {
+    mut xs = [0];
+    mut n = 0;
+    while (n < 200) {
+        set n++;
+        set xs.push(n);
+    }
+    xs
+}
+
+fn last_three(xs: i64[]) -> str {
+    mut out = "";
+    mut seen = 0;
+    for (let x : xs.reverse()) {
+        if (seen < 3) {
+            set out.extend(`{x} `);
+        };
+        set seen++;
+    }
+    out
+}
+
+// A `str` has no backward cursor, so its reversed value is built and walked
+// forwards — the same as `reverse` itself would give.
+fn backwards(s: str) -> str {
+    mut out = "";
+    for (let c : s.reverse()) {
+        set out.extend(`{c}`);
+    }
+    out
+}
+
+fn materialized(xs: i64[]) -> i64[] { xs.reverse() }
+
+fn main() !prints {
+    let xs = many();
+    print(last_three(xs));
+    print(backwards("abc"));
+    print(to_str(materialized(xs)[0]));
+    for (let i, x : [7, 8].reverse()) {
+        print(`{i}:{x}`);
+    }
+}
+--- stdout ---
+200 199 198 
+cba
+some(200)
+0:8
+1:7
+--- performance ---
+allocations: 22
+deallocations: 22
+reallocations: 8
+bytes allocated: 1058
+instructions executed: 15396
+binary size: 5392
+  code: 2752
+  data: 67
+  metadata: 2573
+functions:
+  __to_str_i64:
+    calls: 5
+    bytes: 204
+  __to_str_i64$opt:
+    calls: 1
+    bytes: 388
+  __to_str_u64:
+    calls: 2
+    bytes: 204
+  aipl_arr_elem_ptr:
+    calls: 1
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_arr_reverse:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 4
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 200
+    bytes: (external)
+  aipl_i64_len:
+    calls: 12
+    bytes: (external)
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 6
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1956
