@@ -1587,15 +1587,15 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 9523
-deallocations: 9523
+allocations: 9524
+deallocations: 9524
 reallocations: 1869
-bytes allocated: 676645
-instructions executed: 1348919
-binary size: 691792
-  code: 419236
+bytes allocated: 676693
+instructions executed: 1348879
+binary size: 691784
+  code: 419140
   data: 10388
-  metadata: 262168
+  metadata: 262256
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1707,7 +1707,7 @@ functions:
     bytes: 364
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam62:
     calls: 1
-    bytes: 536
+    bytes: 440
   __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam88:
     calls: 18
     bytes: 668
@@ -1942,11 +1942,14 @@ functions:
   aipl_arr_drop_arr:
     calls: 316
     bytes: (external)
+  aipl_arr_elem_ptr:
+    calls: 1
+    bytes: (external)
   aipl_arr_extend:
     calls: 1323
     bytes: (external)
   aipl_arr_inc:
-    calls: 31354
+    calls: 31355
     bytes: (external)
   aipl_arr_join:
     calls: 162
@@ -1957,11 +1960,14 @@ functions:
   aipl_arr_retain_ptr:
     calls: 734
     bytes: (external)
+  aipl_arr_reverse:
+    calls: 1
+    bytes: (external)
   aipl_arr_sort:
     calls: 40
     bytes: (external)
   aipl_array_dec:
-    calls: 38364
+    calls: 38366
     bytes: (external)
   aipl_array_new:
     calls: 5449
@@ -1982,13 +1988,13 @@ functions:
     calls: 1670
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 11506
+    calls: 11505
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 343
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 9836
+    calls: 9835
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 343

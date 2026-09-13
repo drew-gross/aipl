@@ -82,10 +82,10 @@ deallocations: 34096
 reallocations: 3048
 bytes allocated: 1588595
 instructions executed: 5216600
-binary size: 260080
-  code: 168804
+binary size: 260072
+  code: 168708
   data: 1780
-  metadata: 89496
+  metadata: 89584
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -167,7 +167,7 @@ functions:
     bytes: 364
   __builtin_reverse_find_map$__m2__Cst$__builtin_Span$lam83:
     calls: 0
-    bytes: 536
+    bytes: 440
   __builtin_try_map$__m2__Cst$Sexp$__m4__ParseError$lam31:
     calls: 836
     bytes: 668

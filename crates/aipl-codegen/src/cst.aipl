@@ -421,15 +421,15 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 550
-deallocations: 550
+allocations: 558
+deallocations: 558
 reallocations: 39
-bytes allocated: 27526
-instructions executed: 30654
-binary size: 62632
-  code: 37636
+bytes allocated: 27910
+instructions executed: 30292
+binary size: 62568
+  code: 37444
   data: 2517
-  metadata: 22479
+  metadata: 22607
 functions:
   __arr_drop_Cst:
     calls: 137
@@ -445,10 +445,10 @@ functions:
     bytes: 364
   __builtin_reverse_find_map$Cst$__builtin_Span$lam45:
     calls: 6
-    bytes: 536
+    bytes: 440
   __builtin_reverse_find_map$Cst$__builtin_Span$lam47:
     calls: 2
-    bytes: 536
+    bytes: 440
   __eq_Cst:
     calls: 23
     bytes: 360
@@ -476,11 +476,14 @@ functions:
   aipl_arr_drop_arr:
     calls: 76
     bytes: (external)
+  aipl_arr_elem_ptr:
+    calls: 9
+    bytes: (external)
   aipl_arr_extend:
     calls: 22
     bytes: (external)
   aipl_arr_inc:
-    calls: 1112
+    calls: 1120
     bytes: (external)
   aipl_arr_join:
     calls: 78
@@ -491,8 +494,11 @@ functions:
   aipl_arr_retain_ptr:
     calls: 145
     bytes: (external)
+  aipl_arr_reverse:
+    calls: 8
+    bytes: (external)
   aipl_array_dec:
-    calls: 1556
+    calls: 1572
     bytes: (external)
   aipl_array_new:
     calls: 261
@@ -510,10 +516,10 @@ functions:
     calls: 61
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 567
+    calls: 558
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 506
+    calls: 497
     bytes: (external)
   aipl_test_begin:
     calls: 1

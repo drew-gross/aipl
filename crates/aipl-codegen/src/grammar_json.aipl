@@ -499,10 +499,10 @@ deallocations: 33062
 reallocations: 4003
 bytes allocated: 2658418
 instructions executed: 4397119
-binary size: 447720
-  code: 289204
+binary size: 447704
+  code: 289108
   data: 7860
-  metadata: 150656
+  metadata: 150736
 functions:
   __arr_drop_Json:
     calls: 125
@@ -626,7 +626,7 @@ functions:
     bytes: 408
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam77:
     calls: 0
-    bytes: 536
+    bytes: 440
   __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam111:
     calls: 166
     bytes: 668

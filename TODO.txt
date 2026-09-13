@@ -123,14 +123,15 @@ dev loop:
 self-hosting:
   format_source can be full-aipl now
   make formatter command that is fully self-hosted
-  parser library in aipl (grammar as data; generates highlighter + formatter)
-    -> plan and progress checkboxes live in PARSER_LIBRARY.md
 
 highlighter:
   #[allow] should highlight severely
   generate from parser
   improve the highlighter test: correct code should never highlight as a mismatched bracket
   integrate syntect (somehow) (or just make something like syntect, or syncat)
+
+test framework:
+  list number of assertions that were run
 
 env:
   make env a possible argument to main
@@ -165,6 +166,7 @@ bugs:
 
 errors:
   type errors should point to source locations
+  better error when you forget a ; after an if.
 
 HOF:
   lower_item returns a T!E but the body doesn't seem to have any error paths. I think this is because it's passed to a function that accepts lambdas that return errors. There should be a better way to do this (Liskov substitution principle?)

@@ -281,10 +281,10 @@ deallocations: 11508
 reallocations: 1565
 bytes allocated: 741542
 instructions executed: 1369910
-binary size: 400352
-  code: 258896
+binary size: 400336
+  code: 258800
   data: 4796
-  metadata: 136660
+  metadata: 136740
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -408,7 +408,7 @@ functions:
     bytes: 408
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam162:
     calls: 0
-    bytes: 536
+    bytes: 440
   __builtin_try_map$__m1__Cst$__m15__Sexp$__m3__ParseError$lam108:
     calls: 47
     bytes: 668

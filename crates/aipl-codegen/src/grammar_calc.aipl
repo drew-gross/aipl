@@ -466,15 +466,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 20132
-deallocations: 20132
+allocations: 20134
+deallocations: 20134
 reallocations: 3334
-bytes allocated: 1362939
-instructions executed: 2449680
-binary size: 419840
-  code: 270612
+bytes allocated: 1363035
+instructions executed: 2449600
+binary size: 419824
+  code: 270516
   data: 5948
-  metadata: 143280
+  metadata: 143360
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -610,7 +610,7 @@ functions:
     bytes: 408
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam71:
     calls: 2
-    bytes: 536
+    bytes: 440
   __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam107:
     calls: 447
     bytes: 668
@@ -977,11 +977,14 @@ functions:
   aipl_arr_drop_arr:
     calls: 1522
     bytes: (external)
+  aipl_arr_elem_ptr:
+    calls: 2
+    bytes: (external)
   aipl_arr_extend:
     calls: 1320
     bytes: (external)
   aipl_arr_inc:
-    calls: 59527
+    calls: 59529
     bytes: (external)
   aipl_arr_join:
     calls: 1470
@@ -992,11 +995,14 @@ functions:
   aipl_arr_retain_ptr:
     calls: 2984
     bytes: (external)
+  aipl_arr_reverse:
+    calls: 2
+    bytes: (external)
   aipl_arr_sort:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 74574
+    calls: 74578
     bytes: (external)
   aipl_array_new:
     calls: 10629
@@ -1020,13 +1026,13 @@ functions:
     calls: 4129
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 35197
+    calls: 35195
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 525
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 31068
+    calls: 31066
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 525

@@ -1,11 +1,4 @@
-import {
-    equal as ==,
-    greater_than as >,
-    len,
-    to_digit,
-    wrapping_decrement as --,
-    wrapping_mul as *,
-} from builtins;
+import { equal as ==, greater_than as >, reverse, to_digit, wrapping_mul as * } from builtins;
 
 // The AIPL implementation of the `reverse_find_map` builtin. Monomorphization
 // registers this function under the canonical name `__builtin_reverse_find_map`
@@ -24,13 +17,9 @@ import {
 # Generic over both types and callable as a method; a `str` receiver iterates
 # its chars.
 pub fn reverse_find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
-    mut i = self.len();
-    while (i > 0) {
-        set i--;
-        if (let some(x) = self[i]) {
-            if (let some(y) = f(x)) {
-                return some(y);
-            };
+    for (let x : self.reverse()) {
+        if (let some(y) = f(x)) {
+            return some(y);
         };
     }
     none
@@ -51,15 +40,15 @@ fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }.te
     assert(nonzero(2) == some(2));
 })
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 7
+deallocations: 7
 reallocations: 0
-bytes allocated: 288
-instructions executed: 929
-binary size: 5264
-  code: 2652
+bytes allocated: 327
+instructions executed: 751
+binary size: 5280
+  code: 2508
   data: 568
-  metadata: 2044
+  metadata: 2204
 functions:
   __eq_i64$opt:
     calls: 3
@@ -96,10 +85,10 @@ functions:
     bytes: 188
   reverse_find_map$char$i64$s0$lam3:
     calls: 1
-    bytes: 280
+    bytes: 320
   reverse_find_map$i64$i64$lam0:
     calls: 4
-    bytes: 396
+    bytes: 304
   reverse_find_map$i64$i64$lam2:
     calls: 1
-    bytes: 408
+    bytes: 316

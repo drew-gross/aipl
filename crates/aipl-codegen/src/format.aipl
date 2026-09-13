@@ -678,10 +678,10 @@ deallocations: 2388
 reallocations: 349
 bytes allocated: 172579
 instructions executed: 237282
-binary size: 233144
-  code: 149328
+binary size: 233128
+  code: 149232
   data: 5020
-  metadata: 78796
+  metadata: 78876
 functions:
   __arr_drop_Piece:
     calls: 95
@@ -748,7 +748,7 @@ functions:
     bytes: 408
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam82:
     calls: 0
-    bytes: 536
+    bytes: 440
   __builtin_try_map$__m8__Rule$FKind$__m8__Rule<FKind>$__m8__ParseError$lam80:
     calls: 0
     bytes: 632
