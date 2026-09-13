@@ -56,7 +56,6 @@ import {
     Grammar,
     Inline,
     Literal,
-    Mk,
     Named,
     OneOf,
     ParseError,
@@ -66,6 +65,7 @@ import {
     Term,
     Then,
     Tight,
+    TryMk,
     failure_message,
     prod_names,
 } from "./grammar.aipl";
@@ -192,18 +192,18 @@ pub fn calc_grammar() -> Grammar<CalcTok, Calc> {
             // `Inline` spaces by the rule below; a unary minus is written
             // against what it negates, which is `Tight`; and a parenthesized
             // atom hugs its parentheses, which the rule already says.
-            Production { name: "expr", rule: r_expr, build: Mk(lower_expr), layout: Inline },
+            Production { name: "expr", rule: r_expr, build: TryMk(lower_expr), layout: Inline },
             Production {
                 name: "unary",
                 rule: r_unary,
-                build: Mk(lower_unary),
+                build: TryMk(lower_unary),
                 expect_as: "an expression",
                 layout: Tight,
             },
             Production {
                 name: "atom",
                 rule: r_atom,
-                build: Mk(lower_atom),
+                build: TryMk(lower_atom),
                 expect_as: "an expression",
                 layout: Inline,
             },
@@ -470,11 +470,11 @@ allocations: 20134
 deallocations: 20134
 reallocations: 3334
 bytes allocated: 1363035
-instructions executed: 2518794
-binary size: 424520
-  code: 273768
+instructions executed: 2520120
+binary size: 425512
+  code: 274472
   data: 5948
-  metadata: 144804
+  metadata: 145092
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -706,7 +706,7 @@ functions:
     bytes: 404
   __m13__lower_node$CalcTok$Calc:
     calls: 447
-    bytes: 5244
+    bytes: 5476
   __m13__match_group$CalcTok$Calc:
     calls: 0
     bytes: 6208
@@ -794,6 +794,9 @@ functions:
   __m1__token_leaves:
     calls: 530
     bytes: 3648
+  __m1__token_text:
+    calls: 0
+    bytes: 472
   __m2__can_start$CalcTok:
     calls: 0
     bytes: 600

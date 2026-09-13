@@ -72,15 +72,15 @@ fn sexp_rules() -> TokenRule<SexpKind>[] {
 
 # A `list` node's children are exactly its interior `item`s — the parentheses
 # are leaves, and leaves have no lowered value — so the list *is* its kids.
-fn lower_list(kids: Sexp[]) -> Sexp!ParseError { ok(List(kids)) }
+fn lower_list(kids: Sexp[]) -> Sexp { List(kids) }
 
 # An `item` is one of its two alternatives, told apart by whether it got an
 # interior child: the `list` branch lowered one, and the `Atom` branch matched a
 # bare token, whose spelling is the node's own text with trivia dropped.
-fn lower_item(src: str, node: Cst, kids: Sexp[]) -> Sexp!ParseError {
+fn lower_item(src: str, node: Cst, kids: Sexp[]) -> Sexp {
     match (kids.first()) {
-        some(inner) => ok(inner),
-        none => ok(AtomNode(node.token_text(src))),
+        some(inner) => inner,
+        none => AtomNode(node.token_text(src)),
     }
 }
 
@@ -281,11 +281,11 @@ allocations: 11508
 deallocations: 11508
 reallocations: 1565
 bytes allocated: 741542
-instructions executed: 1394492
-binary size: 404696
-  code: 261876
+instructions executed: 1392956
+binary size: 405048
+  code: 262080
   data: 4796
-  metadata: 138024
+  metadata: 138172
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -511,7 +511,7 @@ functions:
     bytes: 404
   __m13__lower_node$SexpKind$__m15__Sexp:
     calls: 47
-    bytes: 4896
+    bytes: 5476
   __m13__match_group$SexpKind$__m15__Sexp:
     calls: 78
     bytes: 6208
@@ -850,10 +850,10 @@ functions:
     bytes: 3440
   lower_item:
     calls: 34
-    bytes: 704
+    bytes: 468
   lower_list:
     calls: 13
-    bytes: 252
+    bytes: 112
   main:
     calls: 1
     bytes: 320

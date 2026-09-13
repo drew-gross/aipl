@@ -832,7 +832,7 @@ variant Node = Leaf(str) | List(Node[])
 
 # The trivial lowering every fixture production passes: `Build` has no
 # payload-free arm to mean "nothing to lower".
-fn keep(kids: Node[]) -> Node!ParseError { ok(List(kids)) }
+fn keep(kids: Node[]) -> Node { List(kids) }
 
 fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> {
     name,
@@ -885,10 +885,10 @@ deallocations: 1861
 reallocations: 416
 bytes allocated: 181060
 instructions executed: 211617
-binary size: 160976
-  code: 104572
+binary size: 160800
+  code: 104432
   data: 4252
-  metadata: 52152
+  metadata: 52116
 functions:
   __arr_drop_First$Tok:
     calls: 23
@@ -1123,7 +1123,7 @@ functions:
     bytes: 5340
   keep:
     calls: 0
-    bytes: 252
+    bytes: 112
   linked_first_sets$Tok$Node:
     calls: 6
     bytes: 1140

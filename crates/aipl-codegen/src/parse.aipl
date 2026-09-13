@@ -100,6 +100,9 @@ import {
     Term,
     Text,
     Then,
+    TryKids,
+    TryMk,
+    TryText,
     failure_message,
     link,
     prod_names,
@@ -1139,9 +1142,12 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
                 span: node.span(),
             })?;
             match (build) {
-                Mk(f) => f(src, node, vals),
-                Kids(f) => f(vals),
-                Text(f) => f(node.token_text(src)),
+                Mk(f) => ok(f(src, node, vals)),
+                TryMk(f) => f(src, node, vals),
+                Kids(f) => ok(f(vals)),
+                TryKids(f) => f(vals),
+                Text(f) => ok(f(node.token_text(src))),
+                TryText(f) => f(node.token_text(src)),
                 Const(v) => ok(v),
             }
         },
@@ -1392,7 +1398,9 @@ pub fn parse<K: variant, A: any>(
         ]),
     );
     // A `build` that refuses fails the parse with its own error, unchanged.
-    let refuser = g_of([Production { name: "w", rule: r_word, build: Mk(refuse), layout: Inline }]);
+    let refuser = g_of([
+        Production { name: "w", rule: r_word, build: TryMk(refuse), layout: Inline },
+    ]);
     assert(parsed("abc", refuser, "w") == err(ParseError { message: "refused", span: 0..3 }));
 
     // ---- link is not optional, and `parse_cst` does it ----
@@ -1545,11 +1553,11 @@ variant Node = Atom(str) | List(Node[])
 
 # The lowering every fixture production uses: a node with no interior children
 # is a leaf carrying its text, anything else a branch carrying its children.
-fn build_node(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
+fn build_node(src: str, node: Cst, kids: Node[]) -> Node {
     if (kids.is_nonempty()) {
-        return ok(List(kids));
+        return List(kids);
     };
-    ok(Atom(node.text(src)))
+    Atom(node.text(src))
 }
 
 # A `build` that always refuses, for the error-propagation assertion.
@@ -1609,11 +1617,11 @@ allocations: 9524
 deallocations: 9524
 reallocations: 1869
 bytes allocated: 676693
-instructions executed: 1371107
-binary size: 695928
-  code: 422012
+instructions executed: 1370787
+binary size: 696704
+  code: 422564
   data: 10388
-  metadata: 263528
+  metadata: 263752
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1840,6 +1848,9 @@ functions:
   __m1__token_leaves:
     calls: 5
     bytes: 3648
+  __m1__token_text:
+    calls: 0
+    bytes: 472
   __m2__can_start$Tok:
     calls: 26
     bytes: 600
@@ -2046,7 +2057,7 @@ functions:
     bytes: 1876
   build_node:
     calls: 17
-    bytes: 440
+    bytes: 288
   climb$Tok$Node:
     calls: 15
     bytes: 3388
@@ -2070,7 +2081,7 @@ functions:
     bytes: 776
   lower_node$Tok$Node:
     calls: 18
-    bytes: 5244
+    bytes: 5476
   main:
     calls: 1
     bytes: 180

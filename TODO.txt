@@ -639,6 +639,7 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  allow documenting each arg of a match arm
   add concept of examples
   integrate the readme into the docs
   reflow docs

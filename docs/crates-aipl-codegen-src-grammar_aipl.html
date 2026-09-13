@@ -815,7 +815,7 @@
             <a class="anchor" href="#item-lower_op_value">lower_op_value</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_op_value(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_op_value(src: str, node: Cst, kids: Ast[]) -&#62; Ast</code></pre>
 
           <div class="doc"><p><code>op_value</code> — an operator passed as a value (<code>apply(2, 3, +)</code>) is a binary lambda whose body is that operator's call, which reuses every lambda mechanism and leaves the operator gated like any other use.</p></div>
 
@@ -913,7 +913,7 @@
             <a class="anchor" href="#item-lower_shim_binding">lower_shim_binding</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_shim_binding(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_shim_binding(src: str, node: Cst, kids: Ast[]) -&#62; Ast</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1642,7 +1642,7 @@
             <a class="anchor" href="#item-lower_operator">lower_operator</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_operator(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_operator(text: str) -&#62; Ast</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1656,7 +1656,7 @@
             <a class="anchor" href="#item-lower_effect">lower_effect</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_effect(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_effect(src: str, node: Cst, kids: Ast[]) -&#62; Ast</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

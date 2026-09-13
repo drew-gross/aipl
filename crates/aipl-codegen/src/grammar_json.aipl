@@ -43,7 +43,6 @@ import {
     Literal as Lit,
     Many,
     Maybe,
-    Mk,
     Named,
     OneOf,
     ParseError,
@@ -53,6 +52,7 @@ import {
     Text,
     Then,
     Tight,
+    TryMk,
     failure_message,
     prod_names,
 } from "./grammar.aipl";
@@ -134,9 +134,9 @@ fn lower_value(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
         })
 }
 
-fn lower_object(kids: Json[]) -> Json!ParseError { ok(Object(kids)) }
+fn lower_object(kids: Json[]) -> Json { Object(kids) }
 
-fn lower_array(kids: Json[]) -> Json!ParseError { ok(Array(kids)) }
+fn lower_array(kids: Json[]) -> Json { Array(kids) }
 
 # A member's value is its one interior child; its key is the string token in
 # front of the `:`, which is a *leaf* and so has no lowered value — the node's
@@ -152,14 +152,14 @@ fn lower_member(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
     ok(Member(unquote(src[key]).unescape(), value))
 }
 
-fn lower_string(text: str) -> Json!ParseError { ok(String(unquote(text).unescape())) }
+fn lower_string(text: str) -> Json { String(unquote(text).unescape()) }
 
 # The spelling, sign included — `Text` hands over the matched tokens run
 # together with nothing between them, which is exactly right for `-` followed
 # by digits.
-fn lower_number(text: str) -> Json!ParseError { ok(Number(text)) }
+fn lower_number(text: str) -> Json { Number(text) }
 
-fn lower_bool(text: str) -> Json!ParseError { ok(Bool(text == "true")) }
+fn lower_bool(text: str) -> Json { Bool(text == "true") }
 
 # `s` without its first and last byte — a string token's surrounding quotes. The
 # lexer guarantees both are there (a `Delimited` match spans them), so this needs
@@ -213,7 +213,7 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
             Production {
                 name: "value",
                 rule: r_value,
-                build: Mk(lower_value),
+                build: TryMk(lower_value),
                 expect_as: "a JSON value",
                 layout: Inline,
             },
@@ -223,7 +223,12 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
                 build: Kids(lower_object),
                 layout: Inline,
             },
-            Production { name: "member", rule: r_member, build: Mk(lower_member), layout: Inline },
+            Production {
+                name: "member",
+                rule: r_member,
+                build: TryMk(lower_member),
+                layout: Inline,
+            },
             Production { name: "array", rule: r_array, build: Kids(lower_array), layout: Inline },
             Production {
                 name: "string",
@@ -504,11 +509,11 @@ allocations: 33126
 deallocations: 33126
 reallocations: 4003
 bytes allocated: 2663026
-instructions executed: 4483483
-binary size: 451152
-  code: 291564
+instructions executed: 4482697
+binary size: 451272
+  code: 291592
   data: 7860
-  metadata: 151728
+  metadata: 151820
 functions:
   __arr_drop_Json:
     calls: 125
@@ -737,7 +742,7 @@ functions:
     bytes: 404
   __m13__lower_node$JsonTok$Json:
     calls: 166
-    bytes: 5244
+    bytes: 5476
   __m13__match_group$JsonTok$Json:
     calls: 265
     bytes: 6208
@@ -822,6 +827,9 @@ functions:
   __m1__token_leaves:
     calls: 2533
     bytes: 3648
+  __m1__token_text:
+    calls: 37
+    bytes: 472
   __m2__can_start$JsonTok:
     calls: 0
     bytes: 600
@@ -1085,22 +1093,22 @@ functions:
     bytes: 6700
   lower_array:
     calls: 13
-    bytes: 252
+    bytes: 112
   lower_bool:
     calls: 5
-    bytes: 276
+    bytes: 164
   lower_member:
     calls: 24
     bytes: 2208
   lower_number:
     calls: 21
-    bytes: 260
+    bytes: 92
   lower_object:
     calls: 14
-    bytes: 252
+    bytes: 112
   lower_string:
     calls: 11
-    bytes: 320
+    bytes: 204
   lower_value:
     calls: 71
     bytes: 832

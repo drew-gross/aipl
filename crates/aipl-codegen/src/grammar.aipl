@@ -205,32 +205,39 @@ variant Rule<K: variant> =
     | Climb(Rule<K>, Prec[])
 
 # How a production's matched node becomes a value of the caller's AST type `A`.
-# `Mk` is the general form: a function from the source text, the node itself,
-# and the already-lowered values of its interior children (`nodes`, in match
-# order). It may fail — a literal that overflows, a duplicate key — with a
-# `ParseError` the driver passes straight through.
 #
-# The other arms are `Mk` with the arguments a lowering does not read left
-# out, so a function is declared with what it uses and nothing else:
-#
-#   - `Kids` takes only the children — a node that is its children regrouped
-#     (`Object(kids)`).
-#   - `Text` takes only the node's token text (`token_text`, the matched
-#     tokens run together) — a leaf-only node whose value is its spelling.
-#   - `Const` takes nothing and *is* the value — a keyword production.
+# Three shapes, by what the lowering reads — the whole node, its children, or
+# its text — each in a total form and a `Try` form that can refuse with a
+# `ParseError` the driver passes straight through (a literal that overflows, a
+# duplicate key). A lowering is declared with exactly what it uses and the
+# failure it can have: a total one returns its `A` bare, so no `ok(..)` wraps
+# a value that could not be anything else.
 #
 # Every arm carries an `A` (a function returning one, or the value itself), so
 # each pins the type parameter on its own; a payload-free arm could not, which
 # is why there is no `NoLower`.
 #
 # Function values are non-capturing and non-generic (`check.rs`), so each is a
-# named top-level `fn lower_x(..) -> A!ParseError`. They also can't be compared
-# with `==`, which is why the tests below assert on what a grammar *parses*,
-# never on a grammar value — the same constraint `lexer.aipl` lives with.
+# named top-level `fn lower_x(..)`. They also can't be compared with `==`,
+# which is why the tests below assert on what a grammar *parses*, never on a
+# grammar value — the same constraint `lexer.aipl` lives with.
 variant Build<A: any> =
-    | Mk((str, Cst, A[]) -> A!ParseError)
-    | Kids((A[]) -> A!ParseError)
-    | Text((str) -> A!ParseError)
+    # The general form: the source text, the node itself, and the already-
+    # lowered values of its interior children (`nodes`, in match order).
+    | Mk((str, Cst, A[]) -> A)
+    # `Mk` for a lowering that can refuse what it matched.
+    | TryMk((str, Cst, A[]) -> A!ParseError)
+    # Only the children — a node that is its children regrouped
+    # (`Object(kids)`).
+    | Kids((A[]) -> A)
+    # `Kids` for a lowering that can refuse.
+    | TryKids((A[]) -> A!ParseError)
+    # Only the node's token text (`token_text`, the matched tokens run
+    # together) — a leaf-only node whose value is its spelling.
+    | Text((str) -> A)
+    # `Text` for a lowering that can refuse — a number that overflows.
+    | TryText((str) -> A!ParseError)
+    # Nothing at all: the value itself — a keyword production.
     | Const(A)
 
 # How a bracketed list lays out: what separates its items, whether the brackets
@@ -856,7 +863,7 @@ variant Node = Leaf(str) | List(Node[])
 
 # The trivial lowering a production with nothing to lower passes, and all these
 # fixtures need: `Build` has no payload-free arm to mean "don't".
-fn keep(kids: Node[]) -> Node!ParseError { ok(List(kids)) }
+fn keep(kids: Node[]) -> Node { List(kids) }
 
 # The rule of production `i` of `g`, for the assertions above — a grammar value
 # can't be compared with `==` (it holds function values), but the rule inside one
@@ -880,10 +887,10 @@ deallocations: 607
 reallocations: 77
 bytes allocated: 62226
 instructions executed: 60938
-binary size: 138280
-  code: 87596
+binary size: 138104
+  code: 87456
   data: 3484
-  metadata: 47200
+  metadata: 47164
 functions:
   __arr_drop_ListStyle:
     calls: 41
@@ -1070,7 +1077,7 @@ functions:
     bytes: 4732
   keep:
     calls: 0
-    bytes: 252
+    bytes: 112
   link$Kind$Node:
     calls: 14
     bytes: 2772

@@ -193,8 +193,10 @@ import {
     Production,
     Rule,
     Term,
+    Text,
     Then,
     Tight,
+    TryMk,
 } from "./grammar.aipl";
 import {
     Builtins,
@@ -516,24 +518,24 @@ fn items() -> Production<AiplTok, Ast>[] {
     ]);
 
     [
-        p("program", program, Mk(lower_program)),
-        pl("item", item, "an item", Mk(lower_item)),
-        p("import_decl", import_decl, Mk(lower_import_decl)),
-        pl("import_name", import_name, "an import name", Mk(lower_import_name)),
-        p("operator", operator, Mk(lower_operator)),
-        p("function", function, Mk(lower_function)),
+        p("program", program, TryMk(lower_program)),
+        pl("item", item, "an item", TryMk(lower_item)),
+        p("import_decl", import_decl, TryMk(lower_import_decl)),
+        pl("import_name", import_name, "an import name", TryMk(lower_import_name)),
+        p("operator", operator, Text(lower_operator)),
+        p("function", function, TryMk(lower_function)),
         pl("effect", effect, "an effect", Mk(lower_effect)),
-        p("type_params", type_params, Mk(lower_type_params)),
-        p("type_param", type_param, Mk(lower_type_param)),
-        pl("param", param, "a parameter", Mk(lower_param)),
-        p("fn_body", fn_body, Mk(lower_fn_body)),
-        pl("construct_fields", construct_fields, "a field", Mk(lower_construct_fields)),
-        p("fn_attr", fn_attr, Mk(lower_fn_attr)),
-        p("struct_decl", struct_decl, Mk(lower_struct_decl)),
-        p("field_decl", field_decl, Mk(lower_field_decl)),
-        p("variant_decl", variant_decl, Mk(lower_variant_decl)),
-        p("variant_case", variant_case, Mk(lower_variant_case)),
-        p("case_param", case_param, Mk(lower_case_param)),
+        p("type_params", type_params, TryMk(lower_type_params)),
+        p("type_param", type_param, TryMk(lower_type_param)),
+        pl("param", param, "a parameter", TryMk(lower_param)),
+        p("fn_body", fn_body, TryMk(lower_fn_body)),
+        pl("construct_fields", construct_fields, "a field", TryMk(lower_construct_fields)),
+        p("fn_attr", fn_attr, TryMk(lower_fn_attr)),
+        p("struct_decl", struct_decl, TryMk(lower_struct_decl)),
+        p("field_decl", field_decl, TryMk(lower_field_decl)),
+        p("variant_decl", variant_decl, TryMk(lower_variant_decl)),
+        p("variant_case", variant_case, TryMk(lower_variant_case)),
+        p("case_param", case_param, TryMk(lower_case_param)),
     ]
 }
 
@@ -591,18 +593,18 @@ fn types() -> Production<AiplTok, Ast>[] {
     ]);
 
     [
-        pl("ty", ty, "a type", Mk(lower_ty)),
+        pl("ty", ty, "a type", TryMk(lower_ty)),
         // Type position takes no trailing comma even when a list breaks — the
         // grammar says so twice, once with `trailing_sep: false` to the parser
         // and once with `strict()` to the printer.
-        p("ty_parens", ty_parens, Mk(lower_ty_parens)),
+        p("ty_parens", ty_parens, TryMk(lower_ty_parens)),
         // A core and its `?`/`[]` suffixes are written against each other.
-        pt("base_ty", base_ty, Mk(lower_base_ty)),
+        pt("base_ty", base_ty, TryMk(lower_base_ty)),
         // Three bracket pairs across three alternatives — `#{k: v}`, `#{k}` and
         // `Name<A, B>` — and the fourth alternative has none. Each pair carries
         // its own style, so nothing here has to hold for the production as a
         // whole, and the bare-`Name` alternative simply has no group in it.
-        p("ty_core", ty_core, Mk(lower_ty_core)),
+        p("ty_core", ty_core, TryMk(lower_ty_core)),
     ]
 }
 
@@ -757,18 +759,18 @@ fn statements() -> Production<AiplTok, Ast>[] {
     let return_stmt: Rule<AiplTok> = Then([Lit("return"), Named("expr"), Lit(";")]);
 
     [
-        p("block", block, Mk(lower_block)),
-        p("block_body", block_body, Mk(lower_block_body)),
-        p("block_tail", block_tail, Mk(lower_block_tail)),
-        p("loop_body", loop_body, Mk(lower_loop_body)),
-        p("loop_inner", loop_inner, Mk(lower_loop_inner)),
-        pl("kw_stmt", kw_stmt, "a statement", Mk(lower_kw_stmt)),
-        p("let_stmt", let_stmt, Mk(lower_let_stmt)),
-        p("mut_stmt", mut_stmt, Mk(lower_mut_stmt)),
-        p("assign_stmt", assign_stmt, Mk(lower_assign_stmt)),
-        p("for_stmt", for_stmt, Mk(lower_for_stmt)),
-        p("while_stmt", while_stmt, Mk(lower_while_stmt)),
-        p("return_stmt", return_stmt, Mk(lower_return_stmt)),
+        p("block", block, TryMk(lower_block)),
+        p("block_body", block_body, TryMk(lower_block_body)),
+        p("block_tail", block_tail, TryMk(lower_block_tail)),
+        p("loop_body", loop_body, TryMk(lower_loop_body)),
+        p("loop_inner", loop_inner, TryMk(lower_loop_inner)),
+        pl("kw_stmt", kw_stmt, "a statement", TryMk(lower_kw_stmt)),
+        p("let_stmt", let_stmt, TryMk(lower_let_stmt)),
+        p("mut_stmt", mut_stmt, TryMk(lower_mut_stmt)),
+        p("assign_stmt", assign_stmt, TryMk(lower_assign_stmt)),
+        p("for_stmt", for_stmt, TryMk(lower_for_stmt)),
+        p("while_stmt", while_stmt, TryMk(lower_while_stmt)),
+        p("return_stmt", return_stmt, TryMk(lower_return_stmt)),
     ]
 }
 
@@ -971,22 +973,22 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     ]);
 
     [
-        pl("expr", expr, "an expression", Mk(lower_expr)),
-        p("unary", expr_unary(unary), Mk(lower_unary)),
-        p("postfix", postfix, Mk(lower_postfix)),
-        p("suffix", suffix, Mk(lower_suffix)),
-        p("atom", atom, Mk(lower_atom)),
-        p("else_branch", else_branch, Mk(lower_else_branch)),
-        p("template", template, Mk(lower_template)),
+        pl("expr", expr, "an expression", TryMk(lower_expr)),
+        p("unary", expr_unary(unary), TryMk(lower_unary)),
+        p("postfix", postfix, TryMk(lower_postfix)),
+        p("suffix", suffix, TryMk(lower_suffix)),
+        p("atom", atom, TryMk(lower_atom)),
+        p("else_branch", else_branch, TryMk(lower_else_branch)),
+        p("template", template, TryMk(lower_template)),
         p("shim_binding", shim_binding, Mk(lower_shim_binding)),
-        p("args", args, Mk(lower_args)),
-        p("arg", arg, Mk(lower_arg)),
+        p("args", args, TryMk(lower_args)),
+        p("arg", arg, TryMk(lower_arg)),
         p("op_value", op_value, Mk(lower_op_value)),
-        p("lambda", lambda, Mk(lower_lambda)),
-        p("lambda_param", lambda_param, Mk(lower_lambda_param)),
-        p("field_init", field_init, Mk(lower_field_init)),
-        p("brace_body", brace_body, Mk(lower_brace_body)),
-        p("entry", entry, Mk(lower_entry)),
+        p("lambda", lambda, TryMk(lower_lambda)),
+        p("lambda_param", lambda_param, TryMk(lower_lambda_param)),
+        p("field_init", field_init, TryMk(lower_field_init)),
+        p("brace_body", brace_body, TryMk(lower_brace_body)),
+        p("entry", entry, TryMk(lower_entry)),
     ]
 }
 
@@ -1033,10 +1035,10 @@ fn patterns() -> Production<AiplTok, Ast>[] {
     ]);
 
     [
-        p("match_arm", match_arm, Mk(lower_match_arm)),
-        p("arm_body", arm_body, Mk(lower_arm_body)),
-        pl("pattern", pattern, "a pattern", Mk(lower_pattern)),
-        p("ctor_payload", ctor_payload, Mk(lower_ctor_payload)),
+        p("match_arm", match_arm, TryMk(lower_match_arm)),
+        p("arm_body", arm_body, TryMk(lower_arm_body)),
+        pl("pattern", pattern, "a pattern", TryMk(lower_pattern)),
+        p("ctor_payload", ctor_payload, TryMk(lower_ctor_payload)),
     ]
 }
 
@@ -1518,7 +1520,7 @@ fn lower_arg(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `op_value` — an operator passed as a value (`apply(2, 3, +)`) is a binary
 # lambda whose body is that operator's call, which reuses every lambda mechanism
 # and leaves the operator gated like any other use.
-fn lower_op_value(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_op_value(src: str, node: Cst, kids: Ast[]) -> Ast {
     let tsp = node.tok_span();
     let body = at(
         Call(node.own_token_text(src), [at(Ident("lhs"), tsp), at(Ident("rhs"), tsp)], false),
@@ -1528,7 +1530,7 @@ fn lower_op_value(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         LambdaParam { name: "lhs", ty: none, span: tsp },
         LambdaParam { name: "rhs", ty: none, span: tsp },
     ];
-    ok(AExpr(at(Lambda(params, body), tsp)))
+    AExpr(at(Lambda(params, body), tsp))
 }
 
 # `lambda` — `|a, b| body`, or the no-parameter `|| body`. The `||` is one
@@ -1605,9 +1607,9 @@ fn lower_entry(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     ok(AEntry(Pair(key, kid_expr(kids, 1, sp)?)))
 }
 
-fn lower_shim_binding(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_shim_binding(src: str, node: Cst, kids: Ast[]) -> Ast {
     let toks = node.own_texts(src);
-    ok(AShimBind(toks[0].value_or(""), toks[2].value_or("")))
+    AShimBind(toks[0].value_or(""), toks[2].value_or(""))
 }
 
 // ---------- lowering: blocks ----------
@@ -2484,12 +2486,10 @@ fn op_import_span(op: str, span: Span) -> Span {
 
 fn spanless_ops() -> str[] { ["-", "<", ">", "||", "!"] }
 
-fn lower_operator(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
-    ok(AName(node.own_token_text(src)))
-}
+fn lower_operator(text: str) -> Ast { AName(text) }
 
-fn lower_effect(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
-    ok(AName(node.own_texts(src)[1].value_or("")))
+fn lower_effect(src: str, node: Cst, kids: Ast[]) -> Ast {
+    AName(node.own_texts(src)[1].value_or(""))
 }
 
 fn lower_type_params(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
@@ -4276,15 +4276,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 3479798
-deallocations: 3479798
+allocations: 3479795
+deallocations: 3479795
 reallocations: 368529
-bytes allocated: 338255603
-instructions executed: 465800710
-binary size: 5840096
-  code: 3812180
+bytes allocated: 338255459
+instructions executed: 465806780
+binary size: 5859808
+  code: 3825180
   data: 47780
-  metadata: 1980136
+  metadata: 1986848
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4347,7 +4347,7 @@ functions:
     calls: 208110
     bytes: 116
   __arr_drop___m8__Cst:
-    calls: 35770
+    calls: 35761
     bytes: 116
   __arr_drop___m9__CaseParam:
     calls: 5
@@ -4437,7 +4437,7 @@ functions:
     calls: 420776
     bytes: 116
   __arr_retain___m8__Cst:
-    calls: 23167
+    calls: 23164
     bytes: 116
   __arr_retain___m9__CaseParam:
     calls: 7
@@ -4882,7 +4882,7 @@ functions:
     bytes: 404
   __m29__lower_node$__m21__AiplTok$__m1__Ast:
     calls: 2260
-    bytes: 91508
+    bytes: 128796
   __m29__match_group$__m21__AiplTok$__m1__Ast:
     calls: 11565
     bytes: 6208
@@ -5082,7 +5082,7 @@ functions:
     calls: 0
     bytes: 32
   __m8__flat_kids$tail:
-    calls: 4586
+    calls: 4583
     bytes: 3832
   __m8__last_leaf:
     calls: 7966
@@ -5094,10 +5094,10 @@ functions:
     calls: 374
     bytes: 3684
   __m8__own_token_text:
-    calls: 407
+    calls: 404
     bytes: 472
   __m8__own_tokens:
-    calls: 1021
+    calls: 1018
     bytes: 916
   __m8__span:
     calls: 2195
@@ -5106,17 +5106,20 @@ functions:
     calls: 0
     bytes: 32
   __m8__splice$tail:
-    calls: 11503
+    calls: 11497
     bytes: 612
   __m8__text:
     calls: 10
     bytes: 472
   __m8__token_leaves:
-    calls: 1476
+    calls: 1485
     bytes: 3648
   __m8__token_span:
     calls: 666
     bytes: 288
+  __m8__token_text:
+    calls: 3
+    bytes: 472
   __m9__opt_marker:
     calls: 3
     bytes: 188
@@ -5235,7 +5238,7 @@ functions:
     calls: 261766
     bytes: (external)
   aipl_arr_inc:
-    calls: 7085402
+    calls: 7085396
     bytes: (external)
   aipl_arr_join:
     calls: 136553
@@ -5256,7 +5259,7 @@ functions:
     calls: 38
     bytes: (external)
   aipl_array_dec:
-    calls: 9315695
+    calls: 9315686
     bytes: (external)
   aipl_array_new:
     calls: 1847819
@@ -5265,10 +5268,10 @@ functions:
     calls: 4907
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1070909
+    calls: 1070906
     bytes: (external)
   aipl_array_with_cap:
-    calls: 193565
+    calls: 193562
     bytes: (external)
   aipl_assert:
     calls: 330
@@ -5295,13 +5298,13 @@ functions:
     calls: 1180782
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 6136489
+    calls: 6136462
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 348952
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 4955707
+    calls: 4955680
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 348952
@@ -5524,7 +5527,7 @@ functions:
     bytes: 17232
   lower_effect:
     calls: 2
-    bytes: 7120
+    bytes: 948
   lower_else_branch:
     calls: 4
     bytes: 20656
@@ -5590,10 +5593,10 @@ functions:
     bytes: 256
   lower_op_value:
     calls: 1
-    bytes: 7904
+    bytes: 1740
   lower_operator:
     calls: 3
-    bytes: 6476
+    bytes: 216
   lower_param:
     calls: 15
     bytes: 43368
@@ -5611,7 +5614,7 @@ functions:
     bytes: 10056
   lower_shim_binding:
     calls: 1
-    bytes: 7536
+    bytes: 1372
   lower_struct_decl:
     calls: 4
     bytes: 30348
