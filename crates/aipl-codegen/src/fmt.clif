@@ -158800,7 +158800,7 @@ block0(v0: i64, v1: i64):
 
 ; source variables:
 ;   v1 = e
-; __builtin_map_err$__m12__LexResult<__m13__AiplTok>$__m12__LexError$__m18__FmtError$lam71
+; __builtin_map_err$__m12__LexResult<AiplTok>$__m12__LexError$__m18__FmtError$lam71
 function u0:364(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
     ss1 = explicit_slot 24, align = 8
@@ -166543,7 +166543,7 @@ block0(v0: i64, v1: i64):
 
 ; source variables:
 ;   v1 = e
-; __builtin_map_err$__m12__LexResult<__m13__AiplTok>$__m12__LexError$__m18__FmtError$lam107
+; __builtin_map_err$__m12__LexResult<AiplTok>$__m12__LexError$__m18__FmtError$lam107
 function u0:398(i64, i64) apple_aarch64 {
     ss0 = explicit_slot 24, align = 8
     ss1 = explicit_slot 24, align = 8

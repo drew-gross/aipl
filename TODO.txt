@@ -164,6 +164,7 @@ bugs:
       `xs.filter(keep).map(f)`; restructured around it rather than fixing.
 
 errors:
+  type errors should point to source locations
 
 HOF:
   lower_item returns a T!E but the body doesn't seem to have any error paths. I think this is because it's passed to a function that accepts lambdas that return errors. There should be a better way to do this (Liskov substitution principle?)
@@ -403,6 +404,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    .map(f).find(p) should fuse to map_find and not keep mapping after found
     fuse sequential extends
     map(f).map(g) should fuse to map(f(g))
     map(f).to_set() should fuse

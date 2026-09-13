@@ -165,7 +165,7 @@ functions:
   __builtin_try_map$__m2__Cst$Sexp$__m4__ParseError$lam31:
     calls: 836
     bytes: 668
-  __builtin_try_map$__m4__Rule$__m1__SexpKind$__m4__Rule<__m1__SexpKind>$__m4__ParseError$lam72:
+  __builtin_try_map$__m4__Rule$__m1__SexpKind$__m4__Rule<SexpKind>$__m4__ParseError$lam72:
     calls: 6
     bytes: 632
   __eq_Sexp:

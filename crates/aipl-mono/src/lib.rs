@@ -2663,7 +2663,7 @@ impl Mono<'_> {
         let mut base = gname.to_string();
         for t in &type_args {
             base.push('$');
-            base.push_str(&type_name(t));
+            base.push_str(&aipl_syntax::raw_type_name(t));
         }
         for (i, is_str) in str_arg.iter().enumerate() {
             if *is_str {
@@ -4113,7 +4113,7 @@ impl Mono<'_> {
         let mut mangled = template.to_string();
         for t in &specs.type_args {
             mangled.push('$');
-            mangled.push_str(&type_name(t));
+            mangled.push_str(&aipl_syntax::raw_type_name(t));
         }
         for i in specs.indices(|p| p.owned) {
             mangled.push_str(&format!("$own{i}"));
@@ -4577,7 +4577,25 @@ impl Mono<'_> {
         env: &Env,
         span: Span,
     ) -> Result<(Expr, Type), Error> {
-        let (rs, st) = self.infer(scrut, env)?;
+        // A tuple literal every arm takes apart is matched element by element
+        // (see the checker's `check_scrutinee`): its elements are inferred on
+        // their own and become the tree's first columns, and no struct exists.
+        let elementwise: Option<Vec<(Expr, Type)>> = match &scrut.kind {
+            ExprKind::TupleLit(elems) if check::matches_elementwise(arms, elems.len()) => Some(
+                elems
+                    .iter()
+                    .map(|e| self.infer(e, env))
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+            _ => None,
+        };
+        let (rs, st) = match &elementwise {
+            Some(parts) => (
+                Expr::new(ExprKind::Unit, span.clone()),
+                Type::Tuple(parts.iter().map(|(_, t)| t.clone()).collect()),
+            ),
+            None => self.infer(scrut, env)?,
+        };
 
         // Infer every body once, with the binders the pattern introduces.
         let mut bodies = Vec::with_capacity(arms.len());
@@ -4596,35 +4614,18 @@ impl Mono<'_> {
         }
         let ty = merged.unwrap_or(Type::Primitive(Primitive::I64));
 
-        // The first columns: a tuple literal's elements directly, when every
-        // arm destructures it (a `_` arm needs no whole value either); else the
-        // scrutinee itself.
-        let tuple_elems = match &rs.kind {
-            ExprKind::Construct(name, inits)
-                if tuple_instance_arity(name).is_some()
-                    && arms.iter().all(|a| {
-                        matches!(&a.pattern, Pattern::Tuple(ps) if ps.len() == inits.len())
-                            || matches!(a.pattern, Pattern::Wildcard)
-                    }) =>
-            {
-                Some(inits.clone())
-            }
-            _ => None,
-        };
         let mut tree = MatchTree {
             mono: self,
             bodies: &bodies,
             span: span.clone(),
         };
         let (cols, rows, prelude): (Vec<(String, Type)>, Vec<TreeRow>, Vec<(String, Expr)>) =
-            match tuple_elems {
-                Some(inits) => {
-                    let field_tys = tree
-                        .mono
-                        .tuple_field_tys(&st)
-                        .expect("a tuple literal has its struct");
-                    let cols: Vec<(String, Type)> =
-                        field_tys.into_iter().map(|t| (tree.fresh(), t)).collect();
+            match elementwise {
+                Some(parts) => {
+                    let cols: Vec<(String, Type)> = parts
+                        .iter()
+                        .map(|(_, t)| (tree.fresh(), t.clone()))
+                        .collect();
                     let rows = arms
                         .iter()
                         .enumerate()
@@ -4639,8 +4640,8 @@ impl Mono<'_> {
                         .collect();
                     let prelude = cols
                         .iter()
-                        .zip(inits)
-                        .map(|((var, _), init)| (var.clone(), init.value))
+                        .zip(parts)
+                        .map(|((var, _), (value, _))| (var.clone(), value))
                         .collect();
                     (cols, rows, prelude)
                 }
@@ -4712,9 +4713,13 @@ impl Mono<'_> {
         }
     }
 
-    /// The field types of a tuple type's synthetic struct, in order, or `None`
+    /// The element types of a tuple type — a `Type::Tuple` (an element-wise
+    /// scrutinee's), or a synthetic tuple struct's fields in order — or `None`
     /// for anything that is not a tuple.
     fn tuple_field_tys(&self, ty: &Type) -> Option<Vec<Type>> {
+        if let Type::Tuple(es) = ty {
+            return Some(es.clone());
+        }
         let Type::Named(name) = ty else {
             return None;
         };
@@ -5760,7 +5765,11 @@ impl Mono<'_> {
                     Type::Primitive(Primitive::I64),
                 )
             }
-            ExprKind::Match(scrut, arms) if arms.iter().any(|a| a.pattern.is_nested()) => {
+            ExprKind::Match(scrut, arms)
+                if arms.iter().any(|a| a.pattern.is_nested())
+                    || matches!(&scrut.kind, ExprKind::TupleLit(es)
+                        if check::matches_elementwise(arms, es.len())) =>
+            {
                 // A nested pattern anywhere: the whole match is compiled to a
                 // decision tree of the simple forms (see `infer_nested_match`).
                 return self.infer_nested_match(scrut, arms, env, span.clone());

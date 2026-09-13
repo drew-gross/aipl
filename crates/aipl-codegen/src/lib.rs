@@ -7413,8 +7413,14 @@ fn build_struct_layout(
                 {}
             _ => {
                 return Err(Error::msg(format!(
-                    "struct {}: field {} has type {}, but struct fields must be an integer (i8..i64, u8..u64), bool, char, str, a function, a struct, a variant, an array, or an optional of (an integer, bool, char, str, an array, or a recursive type)",
-                    decl.name,
+                    "{}: field {} has type {}, but struct fields must be an integer (i8..i64, u8..u64), bool, char, str, a function, a struct, a variant, an array, or an optional of (an integer, bool, char, str, an array, or a recursive type)",
+                    // A tuple's struct is the compiler's, so it is named as the
+                    // tuple the user wrote.
+                    if decl.is_tuple {
+                        format!("tuple {}", aipl_syntax::demangle_named(&decl.name))
+                    } else {
+                        format!("struct {}", aipl_syntax::demangle_named(&decl.name))
+                    },
                     f.name,
                     type_name(&f.ty),
                 )));

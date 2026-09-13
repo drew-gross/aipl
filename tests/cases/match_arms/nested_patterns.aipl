@@ -43,6 +43,18 @@ fn depth(o: i64??) -> str {
     }
 }
 
+// A tuple scrutinee is matched element by element and never built, so its
+// elements may be anything — here optionals of a struct, which a tuple *value*
+// could not hold.
+struct Span { start: i64, end: i64 }
+
+fn span_of(first: Span?, last: Span?) -> Span? {
+    match (first, last) {
+        (some(f), some(l)) => some(Span { start: f.start, end: l.end }),
+        _ => none,
+    }
+}
+
 fn pair_ok(r: (i64, i64)!str) -> i64 {
     match (r) {
         ok((0, b)) => b,
@@ -67,6 +79,8 @@ fn main() !prints {
     print(to_str(pair_ok(ok((0, 5)))));
     print(to_str(pair_ok(ok((2, 5)))));
     print(to_str(pair_ok(err("no"))));
+    print(`{span_of(some(Span { start: 1, end: 2 }), some(Span { start: 5, end: 9 }))}`);
+    print(`{span_of(some(Span { start: 1, end: 2 }), none)}`);
     // `if let` takes a nested pattern too.
     if (let (1, some(x)) = (1, some(9))) {
         print(`x={x}`);
@@ -88,18 +102,23 @@ none
 5
 7
 -1
+some(Span { start: 1, end: 9 })
+none
 x=9
 --- performance ---
-allocations: 30
-deallocations: 30
+allocations: 32
+deallocations: 32
 reallocations: 0
-bytes allocated: 1789
-instructions executed: 1377
-binary size: 11960
-  code: 7860
-  data: 1
-  metadata: 4099
+bytes allocated: 1856
+instructions executed: 1725
+binary size: 14616
+  code: 9356
+  data: 187
+  metadata: 5073
 functions:
+  __to_str_Span$opt:
+    calls: 2
+    bytes: 700
   __to_str_i64:
     calls: 9
     bytes: 204
@@ -107,13 +126,16 @@ functions:
     calls: 3
     bytes: 204
   aipl_i64_len:
-    calls: 18
+    calls: 22
     bytes: (external)
   aipl_u64_len:
     calls: 6
     bytes: (external)
+  aipl_write_bytes:
+    calls: 8
+    bytes: (external)
   aipl_write_i64:
-    calls: 9
+    calls: 11
     bytes: (external)
   aipl_write_u64:
     calls: 3
@@ -123,7 +145,10 @@ functions:
     bytes: 1256
   main:
     calls: 1
-    bytes: 4488
+    bytes: 5052
   rep_suffix:
     calls: 6
     bytes: 1708
+  span_of:
+    calls: 2
+    bytes: 232

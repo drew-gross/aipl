@@ -2049,6 +2049,33 @@ impl Cx<'_> {
         Ok(payload)
     }
 
+    /// The type a match's scrutinee is matched at. A tuple *literal* matched
+    /// by tuple patterns — `match (a, b) { (p, q) => .. }` — is typed element
+    /// by element and never becomes a struct: `Type::Tuple` of the element
+    /// types is what the patterns are checked against, and mono matches the
+    /// elements directly (`infer_nested_match`). That is what lets the elements
+    /// be anything at all — an optional of a struct, say — rather than only
+    /// what a struct field may hold. Any other scrutinee is checked as the
+    /// expression it is.
+    fn check_scrutinee(
+        &self,
+        scrut: &Expr,
+        arms: &[MatchArm],
+        env: &Env,
+        effects: &[String],
+    ) -> Result<Type, Error> {
+        if let ExprKind::TupleLit(elems) = &scrut.kind {
+            if matches_elementwise(arms, elems.len()) {
+                let tys = elems
+                    .iter()
+                    .map(|e| self.check_expr(e, env, effects))
+                    .collect::<Result<Vec<_>, _>>()?;
+                return Ok(Type::Tuple(tys));
+            }
+        }
+        self.check_expr(scrut, env, effects)
+    }
+
     /// Type a nested pattern against `ty`: the binders it introduces, each with
     /// the type of the value it names, and the pattern as the matrix algorithm
     /// reads it (`patterns::Pat`), built here because a `Ctor(..)`'s arity is
@@ -3233,7 +3260,7 @@ impl Cx<'_> {
                 Type::Named(name.clone())
             }
             ExprKind::Match(scrut, arms) => {
-                let st = self.check_expr(scrut, env, effects)?;
+                let st = self.check_scrutinee(scrut, arms, env, effects)?;
                 // The scrutinee's type decides the legal patterns: `some`/`none`
                 // for an optional, the declared cases for a variant.
                 // `merged` carries the arm that produced it, so a bare-literal arm
@@ -3294,7 +3321,7 @@ impl Cx<'_> {
             // so an expression-position `if let` mutating an outer binding in
             // `THEN` is no more surprising than an ordinary `if` doing the same.
             ExprKind::IfLet(arm, scrut, else_b) => {
-                let st = self.check_expr(scrut, env, effects)?;
+                let st = self.check_scrutinee(scrut, std::slice::from_ref(arm), env, effects)?;
                 let binders: Vec<(String, Type)> = if arm.pattern.is_nested() {
                     self.bind_nested(&arm.pattern, &st, arm.span.clone())?.1
                 } else {
@@ -4480,37 +4507,6 @@ fn display(name: &str) -> &str {
 /// `__builtin_`, or the loader's per-file module prefix `__m<index>__` (added to
 /// every non-root file's top-level names). Neither can appear in a user-written
 /// identifier, so this only ever strips compiler-internal decoration.
-fn strip_mangle_prefix(s: &str) -> &str {
-    let s = s.strip_prefix("__builtin_").unwrap_or(s);
-    if let Some(rest) = s.strip_prefix("__m") {
-        let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
-        if digits > 0 && rest[digits..].starts_with("__") {
-            return &rest[digits + 2..];
-        }
-    }
-    s
-}
-
-/// Render a (possibly mangled) named type for diagnostics. Strips the module /
-/// `__builtin_` prefixes (see [`strip_mangle_prefix`]) and turns a generic
-/// instance's mangled name back into source-like form: `Box$i64` → `Box<i64>`,
-/// `Pair$i64$str` → `Pair<i64, str>`, a synthetic tuple `__tuple$i64$str` →
-/// `(i64, str)`. Nested instances were already flattened to `_` when mangled
-/// (see [`mangle_type`]), so those don't fully round-trip, but the common
-/// single-level case reads cleanly.
-fn demangle_named(n: &str) -> String {
-    let mut parts = n.split('$');
-    let base = strip_mangle_prefix(parts.next().unwrap_or(n));
-    let args: Vec<&str> = parts.map(strip_mangle_prefix).collect();
-    if args.is_empty() {
-        base.to_string()
-    } else if base == "__tuple" {
-        format!("({})", args.join(", "))
-    } else {
-        format!("{base}<{}>", args.join(", "))
-    }
-}
-
 /// A type the checker can't pin down (e.g. a generic call's type-variable
 /// result that we don't instantiate here). It coerces with anything, so the
 /// checker stays permissive rather than reporting a false mismatch.
@@ -4828,7 +4824,7 @@ fn tyname(t: &Type) -> String {
         // A builtin type (`Span`), a per-file name (`__m1__LexError`), or a
         // generic instance (`Token$AiplTok`) carries internal mangling — render
         // it back to source-like form for diagnostics.
-        Type::Named(n) => demangle_named(n),
+        Type::Named(n) => aipl_syntax::demangle_named(n),
         Type::Optional(inner) => format!("{}?", tyname(inner)),
         Type::Array(inner) => format!("{}[]", tyname(inner)),
         Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), tyname(inner)),
@@ -5275,4 +5271,14 @@ impl patterns::TypeInfo for Cx<'_> {
             },
         }
     }
+}
+
+/// Whether every arm takes a tuple scrutinee apart — a tuple pattern of that
+/// arity, or `_` — so the tuple need never exist as a value. A binder for the
+/// whole tuple would need one, and takes the ordinary path.
+pub(crate) fn matches_elementwise(arms: &[MatchArm], arity: usize) -> bool {
+    arms.iter().all(|a| {
+        matches!(&a.pattern, Pattern::Tuple(ps) if ps.len() == arity)
+            || matches!(a.pattern, Pattern::Wildcard)
+    })
 }

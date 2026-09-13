@@ -2692,7 +2692,7 @@ pub mod concrete {
         match t {
             ConcreteType::Unit => "()".into(),
             ConcreteType::Primitive(p) => p.name().into(),
-            ConcreteType::Named(s) => s.clone(),
+            ConcreteType::Named(s) => super::demangle_named(s),
             ConcreteType::Case(v) => format!("Case<{v}>"),
             ConcreteType::Optional(inner) => format!("{}?", type_name(inner)),
             ConcreteType::Array(inner) => format!("{}[]", type_name(inner)),
@@ -2717,11 +2717,100 @@ pub fn is_str_repr(t: &Type) -> bool {
     matches!(t, Type::Primitive(Primitive::Str)) || is_error(t) || is_concat_str(t)
 }
 
-pub fn type_name(t: &Type) -> String {
+/// Strip the prefixes a name picks up on its way through the compiler: the
+/// `__builtin_` of a builtin type and the `__m<N>__` of a per-file one.
+fn strip_mangle_prefix(s: &str) -> &str {
+    let s = s.strip_prefix("__builtin_").unwrap_or(s);
+    if let Some(rest) = s.strip_prefix("__m") {
+        let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+        if digits > 0 && rest[digits..].starts_with("__") {
+            return &rest[digits + 2..];
+        }
+    }
+    s
+}
+
+/// Render a (possibly mangled) named type for diagnostics. Strips the module /
+/// `__builtin_` prefixes (see [`strip_mangle_prefix`]) and turns a generic
+/// instance's mangled name back into source-like form: `Box$i64` → `Box<i64>`,
+/// `Pair$i64$str` → `Pair<i64, str>`, a synthetic tuple `__tuple$i64$str` →
+/// `(i64, str)`. An element that is itself an optional, array or instance was
+/// flattened when mangled (`opt_`, `arr_`, and `_` for a nested `$`), so those
+/// are read back as far as the flattening allows: `opt___builtin_Span` is
+/// `Span?`. Every `type_name` renders a `Named` through this, so no diagnostic
+/// shows a mangled name.
+pub fn demangle_named(n: &str) -> String {
+    let mut parts = n.split('$');
+    let base = strip_mangle_prefix(parts.next().unwrap_or(n));
+    let args: Vec<String> = parts.map(demangle_elem).collect();
+    if args.is_empty() {
+        base.to_string()
+    } else if base == "__tuple" {
+        format!("({})", args.join(", "))
+    } else {
+        format!("{base}<{}>", args.join(", "))
+    }
+}
+
+/// One mangled type argument back to source form — the `opt_`/`arr_`/`set_`
+/// prefixes `mangle_type` writes, then the name they wrap.
+fn demangle_elem(s: &str) -> String {
+    if let Some(inner) = s.strip_prefix("opt_") {
+        return format!("{}?", demangle_elem(inner));
+    }
+    if let Some(inner) = s.strip_prefix("arr_") {
+        return format!("{}[]", demangle_elem(inner));
+    }
+    if let Some(inner) = s.strip_prefix("set_") {
+        return format!("#{{{}}}", demangle_elem(inner));
+    }
+    strip_mangle_prefix(s).to_string()
+}
+
+/// A type's name as an *identity*: the mangled spelling, `Named` verbatim. This
+/// is what an instance name is built from (mono's specialization memo keys on
+/// it), where two per-file `Tok`s must stay two names. Everything shown to a
+/// user goes through [`type_name`], which demangles.
+pub fn raw_type_name(t: &Type) -> String {
     match t {
         Type::Unit => "()".into(),
         Type::Primitive(p) => p.name().into(),
         Type::Named(s) => s.clone(),
+        Type::Case(v) => format!("Case<{}>", raw_type_name(v)),
+        // A variable renders as the parameter the user wrote; the anonymous one
+        // an `any` normalized to has no name to show, so it renders as `any`.
+        Type::TypeVar(v) if v.is_empty() => "any".into(),
+        Type::TypeVar(v) => v.clone(),
+        Type::Optional(inner) => format!("{}?", raw_type_name(inner)),
+        Type::Array(inner) => format!("{}[]", raw_type_name(inner)),
+        Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), raw_type_name(inner)),
+        Type::Dict(k, v) => format!("#{{{}: {}}}", raw_type_name(k), raw_type_name(v)),
+        Type::Result(ok, err) => format!("{}!{}", raw_type_name(ok), raw_type_name(err)),
+        Type::Fn(params, ret) => {
+            let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
+            format!("({ps}) -> {}", raw_type_name(ret))
+        }
+        Type::Tuple(elems) => {
+            let es = elems.iter().map(type_name).collect::<Vec<_>>().join(", ");
+            format!("({es})")
+        }
+        Type::Generic(name, args) => {
+            let as_ = args.iter().map(type_name).collect::<Vec<_>>().join(", ");
+            format!("{name}<{as_}>")
+        }
+        Type::Any => "any".into(),
+        Type::NoneInner => "__none__".into(),
+        Type::EmptyArrayArg => "EmptyArray".into(),
+        Type::NoneLiteralArg => "NoneLiteral".into(),
+        Type::ConcatStr => "__concat_str__".into(),
+    }
+}
+
+pub fn type_name(t: &Type) -> String {
+    match t {
+        Type::Unit => "()".into(),
+        Type::Primitive(p) => p.name().into(),
+        Type::Named(s) => demangle_named(s),
         Type::Case(v) => format!("Case<{}>", type_name(v)),
         // A variable renders as the parameter the user wrote; the anonymous one
         // an `any` normalized to has no name to show, so it renders as `any`.

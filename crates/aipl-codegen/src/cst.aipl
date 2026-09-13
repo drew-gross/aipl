@@ -98,12 +98,9 @@ pub fn token_leaves(self: Cst) -> Span[] {
 # the whole subtree, and asking it at every node in a tree is quadratic in the
 # tree. These two stop at the first token they reach.
 pub fn token_span(self: Cst) -> Span? {
-    match (self.first_token()) {
-        some(f) => match (self.last_token()) {
-            some(l) => some(f.start..l.end),
-            none => none,
-        },
-        none => none,
+    match (self.first_token(), self.last_token()) {
+        (some(f), some(l)) => some(f.start..l.end),
+        _ => none,
     }
 }
 
