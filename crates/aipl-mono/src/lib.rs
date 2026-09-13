@@ -6616,6 +6616,10 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_find_if", "builtin_find_if.aipl"),
     ("__builtin_map_find_if", "builtin_map_find_if.aipl"),
     ("__builtin_find_map", "builtin_find_map.aipl"),
+    (
+        "__builtin_reverse_find_map",
+        "builtin_reverse_find_map.aipl",
+    ),
     ("__builtin_find_index", "builtin_find_index.aipl"),
     ("__builtin_union_all", "builtin_union_all.aipl"),
     (

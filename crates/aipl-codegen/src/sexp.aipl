@@ -82,10 +82,10 @@ deallocations: 34096
 reallocations: 3048
 bytes allocated: 1588595
 instructions executed: 5216600
-binary size: 259944
-  code: 168748
+binary size: 260080
+  code: 168804
   data: 1780
-  metadata: 89416
+  metadata: 89496
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -135,7 +135,7 @@ functions:
   __arr_retain___m4__Rule$__m1__SexpKind:
     calls: 24
     bytes: 116
-  __builtin_any$__m4__Prec$lam91:
+  __builtin_any$__m4__Prec$lam93:
     calls: 0
     bytes: 276
   __builtin_count_while$char$lam10:
@@ -150,7 +150,7 @@ functions:
   __builtin_count_while$char$s0$lam39$tail:
     calls: 1
     bytes: 256
-  __builtin_find_if$__m4__Prec$lam95:
+  __builtin_find_if$__m4__Prec$lam97:
     calls: 0
     bytes: 688
   __builtin_find_index$str$lam24:
@@ -162,6 +162,12 @@ functions:
   __builtin_find_index$str$lam56:
     calls: 12
     bytes: 400
+  __builtin_find_map$__m2__Cst$__builtin_Span$lam82:
+    calls: 0
+    bytes: 364
+  __builtin_reverse_find_map$__m2__Cst$__builtin_Span$lam83:
+    calls: 0
+    bytes: 536
   __builtin_try_map$__m2__Cst$Sexp$__m4__ParseError$lam31:
     calls: 836
     bytes: 668
@@ -312,9 +318,6 @@ functions:
   __m2__first_leaf:
     calls: 0
     bytes: 696
-  __m2__first_leaf_of:
-    calls: 0
-    bytes: 320
   __m2__flat_kids:
     calls: 0
     bytes: 32
@@ -324,9 +327,6 @@ functions:
   __m2__last_leaf:
     calls: 0
     bytes: 696
-  __m2__last_leaf_of:
-    calls: 0
-    bytes: 524
   __m2__span:
     calls: 0
     bytes: 236

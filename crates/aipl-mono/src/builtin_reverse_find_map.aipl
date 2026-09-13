@@ -1,0 +1,105 @@
+import {
+    equal as ==,
+    greater_than as >,
+    len,
+    to_digit,
+    wrapping_decrement as --,
+    wrapping_mul as *,
+} from builtins;
+
+// The AIPL implementation of the `reverse_find_map` builtin. Monomorphization
+// registers this function under the canonical name `__builtin_reverse_find_map`
+// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.reverse_find_map(f)`
+// resolves through the ordinary generic / higher-order machinery — the in-file
+// name is only for this file's own tests, which read exactly like user code.
+//
+// It walks by index from the end rather than reversing first: `find_map` over
+// `xs.reverse()` would allocate the reversed view each time, and a descent
+// that asks this at every level (the parser's `last_leaf_of`) would pay that
+// per level. The indexed loop is the whole reason the builtin exists rather
+// than being spelled as the two calls.
+# The first `some` that `f` returns over the elements of `self` taken from the
+# *end* — `some(y)` for the last `x` with `f(x) == some(y)`, `none` when every
+# `f(x)` is `none` — stopping at that element. `find_map` from the other end.
+# Generic over both types and callable as a method; a `str` receiver iterates
+# its chars.
+pub fn reverse_find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
+    mut i = self.len();
+    while (i > 0) {
+        set i--;
+        if (let some(x) = self[i]) {
+            if (let some(y) = f(x)) {
+                return some(y);
+            };
+        };
+    }
+    none
+}.test({
+    // The *last* answer, not the first.
+    assert([0, 3, 5].reverse_find_map(nonzero) == some(5));
+    assert([3, 0].reverse_find_map(nonzero) == some(3));
+    assert([0, 0].reverse_find_map(nonzero) == none);
+    // The lambda form, the free-call form, and the empty array.
+    assert([1, 2, 3].reverse_find_map(|x| if (x > 1) { some(x * 10) } else { none }) == some(30));
+    assert(reverse_find_map([1, 2][..0], nonzero) == none);
+    // A `str` receiver iterates its chars.
+    assert("1a2b".reverse_find_map(to_digit) == some(2));
+})
+
+fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }.test({
+    assert(nonzero(0) == none);
+    assert(nonzero(2) == some(2));
+})
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 288
+instructions executed: 929
+binary size: 5264
+  code: 2652
+  data: 568
+  metadata: 2044
+functions:
+  __eq_i64$opt:
+    calls: 3
+    bytes: 100
+  __test$nonzero:
+    calls: 1
+    bytes: 252
+  __test$reverse_find_map:
+    calls: 1
+    bytes: 1028
+  aipl_arr_slice:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 6
+    bytes: (external)
+  aipl_array_new:
+    calls: 5
+    bytes: (external)
+  aipl_assert:
+    calls: 8
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 188
+  reverse_find_map$char$i64$s0$lam3:
+    calls: 1
+    bytes: 280
+  reverse_find_map$i64$i64$lam0:
+    calls: 4
+    bytes: 396
+  reverse_find_map$i64$i64$lam2:
+    calls: 1
+    bytes: 408

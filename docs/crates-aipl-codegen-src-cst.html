@@ -263,7 +263,7 @@
           </h3>
           <pre class="signature"><code>fn last_token_of(ks: Cst[]) -&#62; Span?</code></pre>
 
-          <div class="doc"><p><code>first_token_of</code> from the other end — by index, for the reason <code>last_leaf_of</code> gives.</p></div>
+          <div class="doc"><p><code>first_token_of</code> from the other end.</p></div>
 
 
         </section>
@@ -319,7 +319,7 @@
           </h3>
           <pre class="signature"><code>fn last_leaf_of(ks: Cst[]) -&#62; Span?</code></pre>
 
-          <div class="doc"><p>From the other end, by index rather than by reversing the list: this runs once per level of a descent, and a reversed copy per level is a copy of every sibling list on the way down.</p></div>
+          <div class="doc"><p>From the other end. <code>reverse_find_map</code> walks by index rather than reversing the list: this runs once per level of a descent, and a reversed view per level would be an allocation per level on the way down.</p></div>
 
 
         </section>

@@ -1591,11 +1591,11 @@ allocations: 9523
 deallocations: 9523
 reallocations: 1869
 bytes allocated: 676645
-instructions executed: 1348911
-binary size: 691656
-  code: 419180
+instructions executed: 1348919
+binary size: 691792
+  code: 419236
   data: 10388
-  metadata: 262088
+  metadata: 262168
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1663,19 +1663,19 @@ functions:
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
     bytes: 632
-  __builtin_all$__m3__Rule$Tok$lam123:
+  __builtin_all$__m3__Rule$Tok$lam125:
     calls: 0
     bytes: 36
-  __builtin_all$__m3__Rule$Tok$lam123$tail:
+  __builtin_all$__m3__Rule$Tok$lam125$tail:
     calls: 0
     bytes: 384
-  __builtin_any$__m3__Prec$lam114:
+  __builtin_any$__m3__Prec$lam116:
     calls: 13
     bytes: 276
-  __builtin_any$__m3__Rule$Tok$lam126:
+  __builtin_any$__m3__Rule$Tok$lam128:
     calls: 0
     bytes: 36
-  __builtin_any$__m3__Rule$Tok$lam126$tail:
+  __builtin_any$__m3__Rule$Tok$lam128$tail:
     calls: 0
     bytes: 380
   __builtin_count_while$char$lam52:
@@ -1684,13 +1684,13 @@ functions:
   __builtin_count_while$char$s0$lam60:
     calls: 0
     bytes: 184
-  __builtin_count_while$char$s0$lam78:
+  __builtin_count_while$char$s0$lam80:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam78$tail:
+  __builtin_count_while$char$s0$lam80$tail:
     calls: 3
     bytes: 256
-  __builtin_find_if$__m3__Prec$lam141:
+  __builtin_find_if$__m3__Prec$lam143:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam21:
@@ -1702,13 +1702,19 @@ functions:
   __builtin_find_index$str$lam42:
     calls: 47
     bytes: 400
-  __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam86:
+  __builtin_find_map$__m1__Cst$__builtin_Span$lam61:
+    calls: 1
+    bytes: 364
+  __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam62:
+    calls: 1
+    bytes: 536
+  __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam88:
     calls: 18
     bytes: 668
-  __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam92:
+  __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam94:
     calls: 32
     bytes: 828
-  __builtin_try_map$__m3__Rule$Tok$__m3__Rule<Tok>$__m3__ParseError$lam62:
+  __builtin_try_map$__m3__Rule$Tok$__m3__Rule<Tok>$__m3__ParseError$lam64:
     calls: 100
     bytes: 632
   __eq_Node:
@@ -1756,7 +1762,7 @@ functions:
   __eq_set$str$arr:
     calls: 30
     bytes: 300
-  __filter107$own0:
+  __filter109$own0:
     calls: 18
     bytes: 332
   __lambda_0:
@@ -1786,9 +1792,6 @@ functions:
   __m1__first_leaf:
     calls: 2
     bytes: 696
-  __m1__first_leaf_of:
-    calls: 1
-    bytes: 320
   __m1__flat_kids:
     calls: 0
     bytes: 32
@@ -1798,9 +1801,6 @@ functions:
   __m1__last_leaf:
     calls: 2
     bytes: 696
-  __m1__last_leaf_of:
-    calls: 1
-    bytes: 524
   __m1__leaves:
     calls: 64
     bytes: 3684

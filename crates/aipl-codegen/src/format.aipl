@@ -678,10 +678,10 @@ deallocations: 2388
 reallocations: 349
 bytes allocated: 172579
 instructions executed: 237282
-binary size: 233008
-  code: 149272
+binary size: 233144
+  code: 149328
   data: 5020
-  metadata: 78716
+  metadata: 78796
 functions:
   __arr_drop_Piece:
     calls: 95
@@ -719,7 +719,7 @@ functions:
   __arr_retain___m8__Rule$FKind:
     calls: 0
     bytes: 116
-  __builtin_all$char$s0$lam81:
+  __builtin_all$char$s0$lam83:
     calls: 17
     bytes: 212
   __builtin_any$__m2__Doc$lam33:
@@ -731,7 +731,7 @@ functions:
   __builtin_count_while$char$s0$lam68:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam90:
+  __builtin_count_while$char$s0$lam92:
     calls: 0
     bytes: 172
   __builtin_find_index$str$lam37:
@@ -740,9 +740,15 @@ functions:
   __builtin_find_index$str$lam59:
     calls: 0
     bytes: 400
+  __builtin_find_map$__m1__Cst$__builtin_Span$lam81:
+    calls: 1
+    bytes: 364
   __builtin_intersperse$__m2__Doc:
     calls: 28
     bytes: 408
+  __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam82:
+    calls: 0
+    bytes: 536
   __builtin_try_map$__m8__Rule$FKind$__m8__Rule<FKind>$__m8__ParseError$lam80:
     calls: 0
     bytes: 632
@@ -752,15 +758,9 @@ functions:
   __m1__first_leaf:
     calls: 1
     bytes: 696
-  __m1__first_leaf_of:
-    calls: 1
-    bytes: 320
   __m1__last_leaf:
     calls: 0
     bytes: 696
-  __m1__last_leaf_of:
-    calls: 0
-    bytes: 524
   __m1__span:
     calls: 1
     bytes: 236

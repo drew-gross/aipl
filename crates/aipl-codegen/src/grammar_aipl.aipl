@@ -4280,11 +4280,11 @@ allocations: 3472297
 deallocations: 3472297
 reallocations: 368529
 bytes allocated: 333954275
-instructions executed: 457890271
-binary size: 5156328
-  code: 3360072
+instructions executed: 457929493
+binary size: 5156544
+  code: 3360140
   data: 47780
-  metadata: 1748476
+  metadata: 1748624
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4466,55 +4466,55 @@ functions:
   __arr_retain___tuple$str$str:
     calls: 1
     bytes: 140
-  __builtin_all$__m4__Pat$lam359:
+  __builtin_all$__m4__Pat$lam360:
     calls: 17
     bytes: 264
-  __builtin_all$__m7__Rule$__m21__AiplTok$lam393:
+  __builtin_all$__m7__Rule$__m21__AiplTok$lam396:
     calls: 0
     bytes: 36
-  __builtin_all$__m7__Rule$__m21__AiplTok$lam393$tail:
+  __builtin_all$__m7__Rule$__m21__AiplTok$lam396$tail:
     calls: 0
     bytes: 384
-  __builtin_all$char$s0$lam371:
+  __builtin_all$char$s0$lam372:
     calls: 85
     bytes: 212
-  __builtin_any$__m15__Doc$lam408:
+  __builtin_any$__m15__Doc$lam411:
     calls: 0
     bytes: 32
-  __builtin_any$__m15__Doc$lam408$tail:
+  __builtin_any$__m15__Doc$lam411$tail:
     calls: 161
     bytes: 324
-  __builtin_any$__m7__Prec$lam405:
+  __builtin_any$__m7__Prec$lam408:
     calls: 426
     bytes: 276
-  __builtin_any$__m7__Rule$__m21__AiplTok$lam396:
+  __builtin_any$__m7__Rule$__m21__AiplTok$lam399:
     calls: 0
     bytes: 36
-  __builtin_any$__m7__Rule$__m21__AiplTok$lam396$tail:
+  __builtin_any$__m7__Rule$__m21__AiplTok$lam399$tail:
     calls: 108
     bytes: 380
   __builtin_count_while$char$lam79:
     calls: 2378
     bytes: 220
-  __builtin_count_while$char$s0$lam312:
+  __builtin_count_while$char$s0$lam313:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam325:
+  __builtin_count_while$char$s0$lam326:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam325$tail:
+  __builtin_count_while$char$s0$lam326$tail:
     calls: 51
     bytes: 256
-  __builtin_count_while$char$s0$lam368:
+  __builtin_count_while$char$s0$lam369:
     calls: 469
     bytes: 172
-  __builtin_count_while$char$s0$lam370:
+  __builtin_count_while$char$s0$lam371:
     calls: 1
     bytes: 172
   __builtin_count_while$char$s0$lam87:
     calls: 1963
     bytes: 184
-  __builtin_find_if$__m7__Prec$lam412:
+  __builtin_find_if$__m7__Prec$lam415:
     calls: 365
     bytes: 688
   __builtin_find_index$str$lam268:
@@ -4529,12 +4529,21 @@ functions:
   __builtin_find_map$__m8__Cst$__builtin_Span$lam281:
     calls: 1362
     bytes: 364
+  __builtin_find_map$__m8__Cst$__builtin_Span$lam381:
+    calls: 5113
+    bytes: 364
   __builtin_int_parse:
     calls: 469
     bytes: 1028
   __builtin_intersperse$__m15__Doc:
     calls: 30
     bytes: 408
+  __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam282:
+    calls: 1644
+    bytes: 536
+  __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam382:
+    calls: 5889
+    bytes: 536
   __builtin_try_map$__m1__Ast$__m2__BraceEntry$__m7__ParseError$lam248:
     calls: 7
     bytes: 9436
@@ -4571,7 +4580,7 @@ functions:
   __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam217:
     calls: 3
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__m3__LambdaParam$__m7__ParseError$lam357:
+  __builtin_try_map$__m1__Ast$__m3__LambdaParam$__m7__ParseError$lam358:
     calls: 3
     bytes: 9452
   __builtin_try_map$__m1__Ast$__m4__Pat$__m7__ParseError$lam251:
@@ -4604,16 +4613,16 @@ functions:
   __builtin_try_map$__m1__Ast$__m9__TypeParam$__m7__ParseError$lam115:
     calls: 34
     bytes: 9328
-  __builtin_try_map$__m1__Ast$__tuple$str$str$__m7__ParseError$lam351:
+  __builtin_try_map$__m1__Ast$__tuple$str$str$__m7__ParseError$lam352:
     calls: 1
     bytes: 9360
-  __builtin_try_map$__m7__Production$__m21__AiplTok$__m1__Ast$__m30__First<AiplTok>$__m7__ParseError$lam297:
+  __builtin_try_map$__m7__Production$__m21__AiplTok$__m1__Ast$__m30__First<AiplTok>$__m7__ParseError$lam298:
     calls: 72
     bytes: 828
-  __builtin_try_map$__m7__Rule$__m21__AiplTok$__m7__Rule<AiplTok>$__m7__ParseError$lam362:
+  __builtin_try_map$__m7__Rule$__m21__AiplTok$__m7__Rule<AiplTok>$__m7__ParseError$lam363:
     calls: 57539
     bytes: 632
-  __builtin_try_map$__m8__Cst$__m1__Ast$__m7__ParseError$lam291:
+  __builtin_try_map$__m8__Cst$__m1__Ast$__m7__ParseError$lam292:
     calls: 2260
     bytes: 6792
   __builtin_value_or$__builtin_Span:
@@ -4664,7 +4673,7 @@ functions:
   __lambda_30:
     calls: 0
     bytes: 136
-  __lambda_308:
+  __lambda_309:
     calls: 439
     bytes: 140
   __lambda_31:
@@ -4715,7 +4724,7 @@ functions:
   __m14__format_cst$__m21__AiplTok$__m1__Ast$s1$lam16:
     calls: 22
     bytes: 384
-  __m14__gap_wanted$lam363:
+  __m14__gap_wanted$lam364:
     calls: 178
     bytes: 304
   __m14__group_doc$__m21__AiplTok$__m1__Ast$s1$lam276:
@@ -4730,7 +4739,7 @@ functions:
   __m14__render_cst$__m21__AiplTok$__m1__Ast$s1$lam3:
     calls: 22
     bytes: 4580
-  __m14__wrapped$lam364:
+  __m14__wrapped$lam365:
     calls: 15
     bytes: 4272
   __m15__col_after:
@@ -5066,9 +5075,6 @@ functions:
   __m8__first_leaf:
     calls: 7190
     bytes: 696
-  __m8__first_leaf_of:
-    calls: 5113
-    bytes: 320
   __m8__first_token:
     calls: 2376
     bytes: 660
@@ -5081,15 +5087,9 @@ functions:
   __m8__last_leaf:
     calls: 7966
     bytes: 696
-  __m8__last_leaf_of:
-    calls: 5889
-    bytes: 524
   __m8__last_token:
     calls: 2306
     bytes: 660
-  __m8__last_token_of:
-    calls: 1644
-    bytes: 524
   __m8__leaves:
     calls: 374
     bytes: 3684

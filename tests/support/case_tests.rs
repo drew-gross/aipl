@@ -798,6 +798,7 @@ case_tests! {
     crates_aipl_mono_src_builtin_map_ok = "crates/aipl-mono/src/builtin_map_ok",
     crates_aipl_mono_src_builtin_opt_left_fold = "crates/aipl-mono/src/builtin_opt_left_fold",
     crates_aipl_mono_src_builtin_opt_right_fold = "crates/aipl-mono/src/builtin_opt_right_fold",
+    crates_aipl_mono_src_builtin_reverse_find_map = "crates/aipl-mono/src/builtin_reverse_find_map",
     crates_aipl_mono_src_builtin_right_fold = "crates/aipl-mono/src/builtin_right_fold",
     crates_aipl_mono_src_builtin_sort_by = "crates/aipl-mono/src/builtin_sort_by",
     crates_aipl_mono_src_builtin_trim_while = "crates/aipl-mono/src/builtin_trim_while",

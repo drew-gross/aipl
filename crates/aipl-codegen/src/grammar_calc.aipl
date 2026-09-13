@@ -470,11 +470,11 @@ allocations: 20132
 deallocations: 20132
 reallocations: 3334
 bytes allocated: 1362939
-instructions executed: 2449664
-binary size: 419696
-  code: 270556
+instructions executed: 2449680
+binary size: 419840
+  code: 270612
   data: 5948
-  metadata: 143192
+  metadata: 143280
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -554,40 +554,40 @@ functions:
   __arr_retain___m5__Doc:
     calls: 166
     bytes: 116
-  __builtin_all$char$s0$lam158:
+  __builtin_all$char$s0$lam160:
     calls: 12
     bytes: 212
-  __builtin_any$__m3__Prec$lam174:
+  __builtin_any$__m3__Prec$lam176:
     calls: 156
     bytes: 276
-  __builtin_any$__m5__Doc$lam175:
+  __builtin_any$__m5__Doc$lam177:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam175$tail:
+  __builtin_any$__m5__Doc$lam177$tail:
     calls: 0
     bytes: 324
-  __builtin_count_while$char$lam93:
+  __builtin_count_while$char$lam95:
     calls: 156
     bytes: 220
-  __builtin_count_while$char$s0$lam101:
+  __builtin_count_while$char$s0$lam103:
     calls: 138
     bytes: 184
-  __builtin_count_while$char$s0$lam127:
+  __builtin_count_while$char$s0$lam129:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam127$tail:
+  __builtin_count_while$char$s0$lam129$tail:
     calls: 0
     bytes: 256
-  __builtin_count_while$char$s0$lam141:
+  __builtin_count_while$char$s0$lam143:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam167:
+  __builtin_count_while$char$s0$lam169:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam71:
+  __builtin_count_while$char$s0$lam73:
     calls: 106
     bytes: 172
-  __builtin_find_if$__m3__Prec$lam182:
+  __builtin_find_if$__m3__Prec$lam184:
     calls: 141
     bytes: 688
   __builtin_find_index$str$lam52:
@@ -596,22 +596,28 @@ functions:
   __builtin_find_index$str$lam61:
     calls: 53
     bytes: 400
-  __builtin_find_index$str$lam83:
+  __builtin_find_index$str$lam85:
     calls: 252
     bytes: 400
+  __builtin_find_map$__m1__Cst$__builtin_Span$lam70:
+    calls: 2
+    bytes: 364
   __builtin_int_parse:
     calls: 106
     bytes: 1028
   __builtin_intersperse$__m5__Doc:
     calls: 0
     bytes: 408
-  __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam105:
+  __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam71:
+    calls: 2
+    bytes: 536
+  __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam107:
     calls: 447
     bytes: 668
   __builtin_try_map$__m3__Production$CalcTok$Calc$__m2__First<CalcTok>$__m3__ParseError$lam58:
     calls: 4
     bytes: 828
-  __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule<CalcTok>$__m3__ParseError$lam73:
+  __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule<CalcTok>$__m3__ParseError$lam75:
     calls: 256
     bytes: 632
   __eq_Calc:
@@ -629,7 +635,7 @@ functions:
   __eq___m2__Sym$CalcTok$arr:
     calls: 7
     bytes: 284
-  __filter136$own0:
+  __filter138$own0:
     calls: 447
     bytes: 332
   __lambda_34:
@@ -758,9 +764,6 @@ functions:
   __m1__first_leaf:
     calls: 4
     bytes: 696
-  __m1__first_leaf_of:
-    calls: 2
-    bytes: 320
   __m1__flat_kids:
     calls: 0
     bytes: 32
@@ -770,9 +773,6 @@ functions:
   __m1__last_leaf:
     calls: 4
     bytes: 696
-  __m1__last_leaf_of:
-    calls: 2
-    bytes: 524
   __m1__leaves:
     calls: 31
     bytes: 3684
@@ -878,22 +878,22 @@ functions:
   __m4__format_cst$CalcTok$Calc$s1$lam28:
     calls: 9
     bytes: 384
-  __m4__gap_wanted$lam137:
+  __m4__gap_wanted$lam139:
     calls: 103
     bytes: 192
-  __m4__group_doc$CalcTok$Calc$s1$lam109:
+  __m4__group_doc$CalcTok$Calc$s1$lam111:
     calls: 0
     bytes: 2420
-  __m4__inline_doc$lam108:
+  __m4__inline_doc$lam110:
     calls: 67
     bytes: 2428
-  __m4__pieces$CalcTok$Calc$s1$lam106:
+  __m4__pieces$CalcTok$Calc$s1$lam108:
     calls: 99
     bytes: 3400
   __m4__render_cst$CalcTok$Calc$s1$lam7:
     calls: 9
     bytes: 4580
-  __m4__wrapped$lam138:
+  __m4__wrapped$lam140:
     calls: 0
     bytes: 4272
   __m5__col_after:

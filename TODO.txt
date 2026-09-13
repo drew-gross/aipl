@@ -406,6 +406,7 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    .reverse().find_map() should fuse
     .map(f).find(p) should fuse to map_find and not keep mapping after found
     fuse sequential extends
     map(f).map(g) should fuse to map(f(g))
