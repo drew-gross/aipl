@@ -4280,11 +4280,11 @@ allocations: 3472297
 deallocations: 3472297
 reallocations: 368529
 bytes allocated: 333954275
-instructions executed: 457928049
-binary size: 5156776
-  code: 3360508
+instructions executed: 457890271
+binary size: 5156328
+  code: 3360072
   data: 47780
-  metadata: 1748488
+  metadata: 1748476
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4526,15 +4526,15 @@ functions:
   __builtin_find_index$str$lam42:
     calls: 19062
     bytes: 400
+  __builtin_find_map$__m8__Cst$__builtin_Span$lam281:
+    calls: 1362
+    bytes: 364
   __builtin_int_parse:
     calls: 469
     bytes: 1028
   __builtin_intersperse$__m15__Doc:
     calls: 30
     bytes: 408
-  __builtin_map_find_if$__m8__Cst$__builtin_Span?$lam281:
-    calls: 1362
-    bytes: 368
   __builtin_try_map$__m1__Ast$__m2__BraceEntry$__m7__ParseError$lam248:
     calls: 7
     bytes: 9436
@@ -5071,7 +5071,7 @@ functions:
     bytes: 320
   __m8__first_token:
     calls: 2376
-    bytes: 1092
+    bytes: 660
   __m8__flat_kids:
     calls: 0
     bytes: 32

@@ -22,7 +22,7 @@ import {
     equal as ==,
     filter,
     filter_map,
-    find_if,
+    find_map,
     greater_than as >,
     is_empty,
     is_some,
@@ -138,9 +138,8 @@ fn last_token(self: Cst) -> Span? {
 }
 
 # The first of `ks` that holds a token, and its leftmost one. Stops there rather
-# than walking the rest: the `map(..).find_if(..)` chain fuses into one pass,
-# so no child after the hit is asked.
-fn first_token_of(ks: Cst[]) -> Span? { ks.map(first_token).find_if(is_some).value_or(none) }
+# than walking the rest.
+fn first_token_of(ks: Cst[]) -> Span? { ks.find_map(first_token) }
 
 # `first_token_of` from the other end — by index, for the reason `last_leaf_of`
 # gives.
@@ -463,11 +462,11 @@ allocations: 550
 deallocations: 550
 reallocations: 39
 bytes allocated: 27526
-instructions executed: 30697
-binary size: 62864
-  code: 38004
+instructions executed: 30623
+binary size: 62416
+  code: 37568
   data: 2517
-  metadata: 22343
+  metadata: 22331
 functions:
   __arr_drop_Cst:
     calls: 137
@@ -475,9 +474,9 @@ functions:
   __arr_retain_Cst:
     calls: 63
     bytes: 116
-  __builtin_map_find_if$Cst$__builtin_Span?$lam44:
+  __builtin_find_map$Cst$__builtin_Span$lam44:
     calls: 3
-    bytes: 368
+    bytes: 364
   __eq_Cst:
     calls: 23
     bytes: 360
@@ -561,7 +560,7 @@ functions:
     bytes: 320
   first_token:
     calls: 7
-    bytes: 1092
+    bytes: 660
   flat_kids:
     calls: 0
     bytes: 32

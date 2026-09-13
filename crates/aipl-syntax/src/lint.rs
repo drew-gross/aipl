@@ -19,6 +19,7 @@ mod field_init_shorthand;
 mod fn_body_type_stutter;
 mod is_empty_longhand;
 mod len_gt_zero;
+mod map_find_if_some;
 mod match_is_some_and;
 mod match_map_err;
 mod match_map_ok;
@@ -49,6 +50,7 @@ use self::field_init_shorthand::field_init_shorthand;
 use self::fn_body_type_stutter::fn_body_type_stutter;
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
+use self::map_find_if_some::{find_map_names, map_find_if_some};
 use self::match_is_some_and::match_is_some_and;
 use self::match_map_err::match_map_err;
 use self::match_map_ok::match_map_ok;
@@ -82,6 +84,10 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     each_expr(program, &mut |e| slice_to_len(e, src, &mut hits));
     each_expr(program, &mut |e| slice_from_zero(e, src, &mut hits));
     each_expr(program, &mut |e| eta_lambda(e, &mut hits));
+    // `map(f).find_if(is_some)` is `find_map(f)` — see `find_map_names` for the
+    // three names the shape is made of.
+    let find_map = find_map_names(program);
+    each_expr(program, &mut |e| map_find_if_some(e, &find_map, &mut hits));
     each_expr(program, &mut |e| match_is_some_and(e, &mut hits));
     each_expr(program, &mut |e| match_value_or(e, src, &mut hits));
     // Not `each_expr`: this lint needs to know whether the *enclosing* function

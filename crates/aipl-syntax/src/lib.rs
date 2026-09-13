@@ -2543,7 +2543,7 @@ fn __builtin_drop_first<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_last<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
 fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
-// NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `map_find_if`,
+// NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
 // `tuple_windows`, `union_all`, `value_or`, and `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
@@ -2959,6 +2959,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "count_if",
     "find_if",
     "map_find_if",
+    "find_map",
     "find_index",
     "value_or",
     "value_or_err",

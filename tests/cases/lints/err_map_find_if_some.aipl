@@ -1,0 +1,34 @@
+import { equal as ==, find_if, is_some, map, print } from builtins;
+
+// `xs.map(f).find_if(is_some)` hands back the first answer wrapped twice, and
+// every caller then peels it; `find_map` is the one word for it and returns
+// the answer once. Both spellings of the predicate are flagged (the lambda one
+// by `eta_lambda` as well), and the advice names the import, since this file
+// has no `find_map`.
+fn nonzero(x: i64) -> i64? { if (x == 0) { none } else { some(x) } }
+
+fn first_nonzero(xs: i64[]) -> i64?? { xs.map(nonzero).find_if(is_some) }
+
+fn first_nonzero_lambda(xs: i64[]) -> i64?? { xs.map(nonzero).find_if(|o| o.is_some()) }
+
+fn main() !prints {
+    print(`{first_nonzero([0, 2])} {first_nonzero_lambda([0, 0])}`);
+}
+--- errors ---
+error: lambda only forwards its argument(s) to "is_some" — pass "is_some" directly (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_find_if_some.aipl:12:71
+   |
+12 | fn first_nonzero_lambda(xs: i64[]) -> i64?? { xs.map(nonzero).find_if(|o| o.is_some()) }
+   |                                                                       ^^^^^^^^^^^^^^^
+
+error: "map" then "find_if(is_some)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once, importing `find_map` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_find_if_some.aipl:10:40
+   |
+10 | fn first_nonzero(xs: i64[]) -> i64?? { xs.map(nonzero).find_if(is_some) }
+   |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: "map" then "find_if(is_some)" is the first element with an answer, wrapped twice — write "find_map(..)" over the mapping function, which hands the answer back once, importing `find_map` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_map_find_if_some.aipl:12:47
+   |
+12 | fn first_nonzero_lambda(xs: i64[]) -> i64?? { xs.map(nonzero).find_if(|o| o.is_some()) }
+   |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

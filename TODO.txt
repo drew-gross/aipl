@@ -212,6 +212,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  We need to improve how functions are passed as parameter. I want to inline first_token_of into it's call sites since it's so simple, but that will require recursion by predicate.
   self.syms.map(|s| show_sym(s)) -> self.syms.map(show_sym) should work
   (Rule<K>, Rule<K>)?!ParseError doesn't parse
   pass expected-type context into tuples -> fix five bracket helpers for nested_in

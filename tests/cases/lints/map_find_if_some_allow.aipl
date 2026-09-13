@@ -1,0 +1,55 @@
+import { equal as ==, find_if, find_map, is_some, map, print, value_or } from builtins;
+
+// `#[allow]` keeps the chain; beside it, the `find_map` it is advised to be.
+// The chain's answer is wrapped twice and needs peeling; `find_map`'s is not.
+fn nonzero(x: i64) -> i64? { if (x == 0) { none } else { some(x) } }
+
+fn chained(xs: i64[]) -> i64? { xs.map(nonzero).find_if(is_some).value_or(none) } #[allow]
+
+fn direct(xs: i64[]) -> i64? { xs.find_map(nonzero) }
+
+fn main() !prints {
+    print(`{chained([0, 2, 3])} {direct([0, 2, 3])}`);
+    print(`{chained([0])} {direct([0])}`);
+}
+--- stdout ---
+some(2) some(2)
+none none
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 0
+bytes allocated: 630
+instructions executed: 686
+binary size: 4160
+  code: 2236
+  data: 67
+  metadata: 1857
+functions:
+  __builtin_find_map$i64$i64$lam1:
+    calls: 2
+    bytes: 308
+  __builtin_map_find_if$i64$i64?$lam0:
+    calls: 2
+    bytes: 312
+  __to_str_i64$opt:
+    calls: 4
+    bytes: 388
+  aipl_array_dec:
+    calls: 4
+    bytes: (external)
+  aipl_array_new:
+    calls: 4
+    bytes: (external)
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1228
