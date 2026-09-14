@@ -23,8 +23,8 @@ pub const OFF: &str = "\x1b[0m";
 const MESSAGE_FORMAT_VERSION: &str = "0.1";
 
 /// A command to run as a step: program, arguments, and any environment
-/// additions. (`AIPL_CASE`, `AIPL_DOGFOOD_IR` and `AIPL_FMT_IR` are the only
-/// ones the gate sets — the bash original spelled them with `env`.)
+/// additions. (`AIPL_CASE` and `AIPL_DOGFOOD_IR` are the only ones the gate
+/// sets — the bash original spelled them with `env`.)
 pub struct Cmd {
     program: String,
     args: Vec<String>,

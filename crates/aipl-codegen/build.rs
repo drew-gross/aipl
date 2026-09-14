@@ -1,9 +1,9 @@
-//! Compile the checked-in dogfood CLIF artifacts into machine code **at build
+//! Compile the checked-in dogfood CLIF artifact into machine code **at build
 //! time**, so a normal `aipl` run never re-does that work.
 //!
 //! The compiler dogfoods AIPL: parsing (and formatting) call into AIPL
 //! functions through the FFI, and those functions live as checked-in Cranelift
-//! IR in `src/dogfood.clif` and `src/fmt.clif`. Linking them at process start
+//! IR in `src/dogfood.clif`. Linking it at process start
 //! meant every invocation re-parsed several megabytes of IR and re-lowered ~470
 //! functions to identical machine code — around 200ms before `aipl check` could
 //! look at its first byte of input, paid again by every one of the hundreds of
@@ -24,8 +24,8 @@
 //!   runtime still needs for FFI signatures and struct layouts. Carrying just
 //!   the header keeps the multi-megabyte IR bodies out of the binary.
 //!
-//! The JIT path stays exactly where it was, and is what `AIPL_DOGFOOD_IR` /
-//! `AIPL_FMT_IR` select — so the staged-IR workflow can still validate
+//! The JIT path stays exactly where it was, and is what `AIPL_DOGFOOD_IR`
+//! selects — so the staged-IR workflow can still validate
 //! candidate IR across the corpus without a rebuild.
 
 use std::collections::HashMap;
@@ -36,11 +36,9 @@ use cranelift::codegen::settings::{self, Configurable};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
 /// The artifacts to prebuild: the `.clif` under `src/`, and the prefix its
-/// exported entry symbols get (they share a namespace once archived together).
-const ARTIFACTS: &[(&str, &str)] = &[
-    ("dogfood", "__aipl_pre_dogfood__"),
-    ("fmt", "__aipl_pre_fmt__"),
-];
+/// exported entry symbols get (a namespace of their own in the archive). One
+/// today; the loop below is written for the list so a second costs a line.
+const ARTIFACTS: &[(&str, &str)] = &[("dogfood", "__aipl_pre_dogfood__")];
 
 fn main() {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));

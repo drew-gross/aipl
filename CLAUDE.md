@@ -583,40 +583,42 @@ compiler runs on.
 
 **The one case handoff genuinely cannot bootstrap: a change to the language's
 own syntax.** Both of the compiler's syntax descriptions are dogfooded AIPL
-compiled into a checked-in artifact — the **parser** (`grammar_aipl.aipl`, the
-grammar as data, run by `parse.aipl`; in `dogfood.clif`) and the **formatter**
-(`walker.aipl`, a hand-written token walker; in `fmt.clif`) — and the compiler
-that regenerates an artifact is running the *checked-in* one. So a source
-written in a syntax form the checked-in parser does not know cannot be parsed
-to regenerate anything, and a source the checked-in formatter does not know is
-what `aipl fmt` (handoff's step 1, before any regeneration) chokes on or,
-worse, silently rewrites into something that means something else — a struct
-spread `T { ..base, x: 1 }` became `T { .., base, x: 1 }` before the walker
-knew the form. Adding a syntax form means teaching both.
+compiled into the checked-in `dogfood.clif` — the **parser**
+(`grammar_aipl.aipl`, the grammar as data, run by `parse.aipl`) and the
+**formatter** (`walker.aipl`, a hand-written token walker, driven by
+`format_source.aipl`) — and the compiler that regenerates the artifact is
+running the *checked-in* one. So a source written in a syntax form the
+checked-in parser does not know cannot be parsed to regenerate anything, and a
+source the checked-in formatter does not know is what `aipl fmt` (handoff's
+step 1, before any regeneration) chokes on or, worse, silently rewrites into
+something that means something else — a struct spread `T { ..base, x: 1 }`
+became `T { .., base, x: 1 }` before the walker knew the form. Adding a syntax
+form means teaching both.
 
-**The procedure, in the only order that works** (the parser is one level worse
-than the formatter, since nothing at all can be regenerated until it parses):
+**The procedure, in the only order that works:**
 
-1. Add the form to `grammar_aipl.aipl` — the rule *and* its lowering — writing
-   the grammar file itself in syntax the checked-in parser already knows. Its
-   own `.test` blocks can use the new form: they run in-engine, not through
-   the artifact.
-2. Hand off. The staged flow regenerates `dogfood.clif` with the new parser in
-   it, and the corpus (which does not use the form yet) validates it.
-3. Teach `walker.aipl` the form, still written in old syntax; hand off again
-   for `fmt.clif`. Confirm the new form round-trips through `aipl fmt` before
-   trusting a formatted corpus.
-4. Only now write the form anywhere else — including in those two files.
+1. Add the form to `grammar_aipl.aipl` — the rule *and* its lowering — and
+   teach `walker.aipl` to lay it out, writing both files in syntax the
+   checked-in parser already knows. Their own `.test` blocks can use the new
+   form: they run in-engine, not through the artifact.
+2. Hand off. The staged flow regenerates `dogfood.clif` with the new parser and
+   walker in it, and the corpus (which does not use the form yet) validates
+   it. Confirm the new form round-trips through `aipl fmt` before trusting a
+   formatted corpus.
+3. Only now write the form anywhere else — including in those two files.
 
 Skip step 2 and the symptom is a parse error, from the checked-in parser, on
-`grammar_aipl.aipl` itself. Skip step 3 and it is the `aipl fmt` failure or the
-silent rewrite above. If you find the formatter half already stranded — the
-corpus is written in a form only the staged `fmt.clif` knows — the escape is:
-`fill_staged_ir`; format the corpus with the staged formatter
-(`AIPL_FMT_IR=<abs>/fmt.clif.staged AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged
-cargo test --test compiler -- --ignored fmt::format_corpus`); `fill_staged_ir`
-**again**, since formatting rewrote the sources the artifact is generated
-from; validate + promote as below; then hand off normally for the refills.
+`grammar_aipl.aipl` itself, or the `aipl fmt` failure or silent rewrite above.
+If you find the formatter already stranded — the corpus is written in a form
+only the staged artifact knows — the escape is: `fill_staged_ir`; format the
+corpus with the staged formatter
+(`AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged cargo test --test compiler --
+--ignored fmt::format_corpus`); `fill_staged_ir` **again**, since formatting
+rewrote the sources the artifact is generated from; validate + promote as
+below; then hand off normally for the refills. The same escape applies when
+the formatter's *FFI surface* changes — a renamed or new entry the checked-in
+artifact doesn't export — since `aipl fmt` then has nothing to call until the
+artifact is regenerated.
 
 This is not a licence to hand-drive generally: it announces itself as a hard
 failure in the parser or in `aipl fmt`, and it's the only ordering the gate
@@ -625,10 +627,10 @@ can't express.
 The steps, for those cases:
 
 1. **Generate staged IR** — compiles each `.aipl` source with the new frontend
-   and writes `*.clif.staged` files next to the live `*.clif` files:
+   and writes `dogfood.clif.staged` next to the live `dogfood.clif`:
    `cargo test --test dogfood -- --ignored dogfood_ir::fill_staged_ir`
 
-2. **Entry-level pre-check (fast)** — loads each `*.clif.staged` and calls its
+2. **Entry-level pre-check (fast)** — loads `dogfood.clif.staged` and calls its
    entry functions with known inputs; confirms the IR links and each entry
    computes correctly. This does *not* run the compiler on the staged IR — it's
    just the quick gate before the corpus run:
@@ -636,11 +638,11 @@ The steps, for those cases:
 
 3. **Validate by running the corpus against the staged IR, not by reading the
    diff** — the real check is running the whole suite with the compiler itself
-   linking the staged files, via the `AIPL_DOGFOOD_IR` and `AIPL_FMT_IR` env
-   vars (each points one engine at an alternate `.clif` instead of the baked-in
-   one), so every parse in the corpus — including the compiler parsing its own
-   source — exercises the candidates:
-   `AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged AIPL_FMT_IR=<abs>/fmt.clif.staged cargo test`
+   linking the staged file, via the `AIPL_DOGFOOD_IR` env var (which points the
+   engine at an alternate `.clif` instead of the baked-in one), so every parse
+   in the corpus — including the compiler parsing its own source — exercises
+   the candidate:
+   `AIPL_DOGFOOD_IR=<abs>/dogfood.clif.staged cargo test`
    The path **must be absolute** — the cases harness spawns the compiler as a
    subprocess whose CWD isn't the repo root, so a relative path won't resolve
    there. (The `fill_staged_ir` / `validate_staged_ir` messages print the exact

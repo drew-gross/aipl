@@ -19,7 +19,7 @@
 //!    goes after `cargo fmt` (which can invalidate what it built) and before
 //!    `format_corpus` (which, since the dogfooded `.aipl` sources became
 //!    run-time reads, no longer can).
-//! 1b. If any dogfooded `.aipl` is newer than `dogfood.clif`/`fmt.clif`,
+//! 1b. If any dogfooded `.aipl` is newer than `dogfood.clif`,
 //!    regenerate and promote the artifact *before* anything runs against it.
 //!    A stale artifact does not fail tidily — the compiler runs on it, so the
 //!    fresh Rust half and the stale AIPL half disagree and misbehave wherever
@@ -150,9 +150,9 @@ fn nextest_build() -> Cmd {
 /// Whether any dogfooded `.aipl` is newer than the artifact compiled from it.
 ///
 /// The sources are every `.aipl` under `crates/aipl-codegen/src/`, which is a
-/// superset of `DOGFOOD_SOURCE_FILES` and `FMT_SOURCE_FILES` — deliberately, so
-/// that adding a file to either list cannot leave this check silently blind to
-/// it. A file in that directory that neither list names costs at most one
+/// superset of `DOGFOOD_SOURCE_FILES` — deliberately, so that adding a file to
+/// the list cannot leave this check silently blind to it. A file in that
+/// directory that the list doesn't name costs at most one
 /// needless regeneration, on the run that edits it and not after: generation is
 /// deterministic, so an artifact rebuilt from sources that did not really change
 /// comes out byte-identical and the promote leaves nothing in the diff — it
@@ -168,10 +168,9 @@ fn ir_is_behind_sources(repo: &Path) -> bool {
             .and_then(|m| m.modified())
             .ok()
     };
-    let (Some(dogfood), Some(fmt)) = (artifact("dogfood.clif"), artifact("fmt.clif")) else {
+    let Some(artifact) = artifact("dogfood.clif") else {
         return false;
     };
-    let oldest = dogfood.min(fmt);
     let Ok(entries) = std::fs::read_dir(&dir) else {
         return false;
     };
@@ -180,7 +179,7 @@ fn ir_is_behind_sources(repo: &Path) -> bool {
         path.extension().is_some_and(|x| x == "aipl")
             && e.metadata()
                 .and_then(|m| m.modified())
-                .is_ok_and(|t| t > oldest)
+                .is_ok_and(|t| t > artifact)
     })
 }
 
@@ -237,12 +236,9 @@ fn handoff() -> ! {
     std::env::set_current_dir(&repo).expect("repo root is a directory");
 
     // The dogfood-IR corpus run spawns the compiler as a subprocess whose CWD
-    // isn't the repo root, so these paths must be absolute. Two artifacts are
-    // staged and promoted together: the parser-hook engine and the formatter
-    // engine (see `FMT_SOURCE_FILES` in aipl-codegen). Either one pending means
-    // an interrupted workflow.
+    // isn't the repo root, so this path must be absolute. A pending staged
+    // artifact means an interrupted workflow.
     let staged = repo.join("crates/aipl-codegen/src/dogfood.clif.staged");
-    let staged_fmt = repo.join("crates/aipl-codegen/src/fmt.clif.staged");
 
     let mut r = Runner::new();
 
@@ -260,21 +256,19 @@ fn handoff() -> ! {
     // A leftover staged artifact means a previous IR workflow was interrupted; a
     // plain suite run fails on `no_staged_ir_pending` until it's resolved. Don't
     // guess.
-    if staged.exists() || staged_fmt.exists() {
+    if staged.exists() {
         r.set_saved(staged.clone());
         r.fail(
             "startup",
             &format!(
                 "A staged IR artifact already exists:
-    {} / {}
+    {}
 Resolve the interrupted workflow first — promote it
     cargo nextest run --run-ignored only -E 'test(=dogfood_ir::promote_staged_ir)'
 or discard it
-    rm -f '{}' '{}'",
+    rm -f '{}'",
                 staged.display(),
-                staged_fmt.display(),
                 staged.display(),
-                staged_fmt.display(),
             ),
         );
     }
@@ -600,10 +594,8 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
         }
 
         let ok = r.step(
-            "staged-IR corpus run (AIPL_DOGFOOD_IR + AIPL_FMT_IR)",
-            nextest()
-                .env("AIPL_DOGFOOD_IR", &staged.to_string_lossy())
-                .env("AIPL_FMT_IR", &staged_fmt.to_string_lossy()),
+            "staged-IR corpus run (AIPL_DOGFOOD_IR)",
+            nextest().env("AIPL_DOGFOOD_IR", &staged.to_string_lossy()),
         );
         if !ok {
             r.save_out();
@@ -634,11 +626,11 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
     //
     // Nothing else in steps 3-5 invalidates the build. `fill_expected` rewrites
     // case `.aipl` files, read at run time. `promote_staged_ir` rewrites
-    // dogfood.clif and fmt.clif, also read at run time (DOGFOOD_CLIF_PATH /
-    // FMT_CLIF_PATH are compile-time *paths*, not `include_str!`d text) — that
-    // used to cost ~730s here, all of it rebuilding the test binaries, which is
-    // why it's a path now. Nor does the staged-IR corpus run above: the
-    // `.staged` files are read through AIPL_DOGFOOD_IR/AIPL_FMT_IR.
+    // dogfood.clif, also read at run time (DOGFOOD_CLIF_PATH is a compile-time
+    // *path*, not `include_str!`d text) — that used to cost ~730s here, all of
+    // it rebuilding the test binaries, which is why it's a path now. Nor does
+    // the staged-IR corpus run above: the `.staged` file is read through
+    // AIPL_DOGFOOD_IR.
     if plan.need_case_tests
         && !r.step(
             "nextest --no-run (rebuild after regeneration)",
@@ -798,12 +790,12 @@ mod tests {
         assert!(wrote_case_tests("wrote 597 `#[test]` entries"));
         assert!(!wrote_case_tests("wrote 597 lines"));
         assert!(wrote_staged(
-            "wrote crates/aipl-codegen/src/fmt.clif.staged"
+            "wrote crates/aipl-codegen/src/dogfood.clif.staged"
         ));
-        assert!(!wrote_staged("wrote crates/aipl-codegen/src/fmt.clif"));
+        assert!(!wrote_staged("wrote crates/aipl-codegen/src/dogfood.clif"));
         // The path has to follow "wrote " — a line merely mentioning a staged
         // artifact is not `fill_staged_ir` reporting it produced one.
-        assert!(!wrote_staged("removed fmt.clif.staged, wrote nothing"));
+        assert!(!wrote_staged("removed dogfood.clif.staged, wrote nothing"));
     }
 
     #[test]

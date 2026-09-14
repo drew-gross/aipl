@@ -2898,39 +2898,16 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./ebnf.aipl",
     "./format.aipl",
     "./doc.aipl",
-];
-
-/// Every `.aipl` the *formatter* engine needs: the walker and its `Doc` printer,
-/// plus everything they import — which includes the lexer, since
-/// `format_program` tokenizes for itself. That overlaps [`DOGFOOD_SOURCE_FILES`]
-/// heavily, and deliberately so: the two artifacts are linked independently, and
-/// keeping each self-contained is what lets an ordinary compile link only the
-/// parser half.
-///
-/// Splitting them matters because re-linking is not free — it is ~2.4s for the
-/// combined artifact, paid once per process, and the formatter is over two
-/// thirds of it. An ordinary compile never formats, so it should never pay for
-/// the walker; `aipl fmt` links this one on top and is an explicit user action.
-pub const FMT_SOURCE_FILES: &[&str] = &[
-    "./process_raw_string.aipl",
+    // The formatter: `format_source` is the whole pipeline, and its walker
+    // parses with the same `aipl_parse_file` every compile calls — which is why
+    // it lives in this artifact rather than one of its own. It used to have
+    // one, from when re-linking the IR at process start cost ~2.4s and an
+    // ordinary compile shouldn't have paid for the walker; the artifact is a
+    // prebuilt object now, so nothing is linked at run time and there is no
+    // longer anything to save by keeping the formatter apart.
     "./clean_trailing_whitespace.aipl",
-    "./format_source.aipl",
-    "./dedent.aipl",
-    "./lines.aipl",
-    "./trim_prefix.aipl",
-    "./trim_end_while.aipl",
-    "./trim_suffix.aipl",
-    "./parse_test_section_header.aipl",
-    "./strip_test_sections.aipl",
-    "./split_test_sections.aipl",
-    "./is_operator_name.aipl",
-    "./lexer.aipl",
-    "./lex_aipl.aipl",
-    "./unescape.aipl",
-    "./reindent_block.aipl",
-    "./indent.aipl",
-    "./doc.aipl",
     "./walker.aipl",
+    "./format_source.aipl",
 ];
 
 /// Read `files` — module names as spelled in [`DOGFOOD_SOURCE_FILES`] — out of
@@ -2992,21 +2969,8 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "companion_files",
     "parse_spec",
     "aipl_parse_file",
+    "format_source",
 ];
-
-/// The formatter engine's single FFI entry.
-pub const FMT_ENTRIES: &[&str] = &["format_program", "fmt_prepare", "fmt_layout"];
-
-/// Where the checked-in formatter IR lives, and its bare filename for the
-/// `dogfood_ir` test. See [`DOGFOOD_CLIF_PATH`] for why this is a path read at
-/// run time rather than the artifact text baked in with `include_str!`.
-pub const FMT_CLIF_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/fmt.clif");
-pub const FMT_CLIF_FILE: &str = "fmt.clif";
-
-/// Env var naming an alternate *formatter* artifact — the [`DOGFOOD_IR_ENV`]
-/// twin. A staged-IR validation run sets both, since the two artifacts are
-/// regenerated and promoted together.
-pub const FMT_IR_ENV: &str = "AIPL_FMT_IR";
 
 /// Where the checked-in dogfood IR for the whole of [`DOGFOOD_SOURCE_FILES`]/
 /// [`DOGFOOD_ENTRIES`] lives — re-linked at run time instead of recompiling
@@ -3053,15 +3017,14 @@ fn inline_max_exprs() -> usize {
 /// exercises staged IR across the whole corpus before it's promoted to live.
 pub const DOGFOOD_IR_ENV: &str = "AIPL_DOGFOOD_IR";
 
-/// The manifest headers of the two prebuilt artifacts, emitted alongside their
-/// object code by `build.rs`. Just the `;`-comment block — the FFI signatures
-/// and struct layouts the runtime marshals against — not the megabytes of IR
+/// The manifest header of the prebuilt artifact, emitted alongside its object
+/// code by `build.rs`. Just the `;`-comment block — the FFI signatures and
+/// struct layouts the runtime marshals against — not the megabytes of IR
 /// bodies, which are already machine code by the time this crate compiles.
 const DOGFOOD_MANIFEST: &str = include_str!(concat!(env!("OUT_DIR"), "/dogfood.manifest"));
-const FMT_MANIFEST: &str = include_str!(concat!(env!("OUT_DIR"), "/fmt.manifest"));
 
-// Defines `DOGFOOD_PREBUILT` / `FMT_PREBUILT`: each artifact's entry points, as
-// (FFI name, address) pairs resolved by the system linker. See `build.rs`.
+// Defines `DOGFOOD_PREBUILT`: the artifact's entry points, as (FFI name,
+// address) pairs resolved by the system linker. See `build.rs`.
 include!(concat!(env!("OUT_DIR"), "/prebuilt.rs"));
 
 pub use aipl_artifact::fingerprint as artifact_fingerprint;
@@ -3089,12 +3052,7 @@ fn dogfood_engine() -> Compilation {
     )
 }
 
-/// The formatter engine, on the same rules.
-fn fmt_engine() -> Compilation {
-    engine(FMT_IR_ENV, FMT_MANIFEST, FMT_PREBUILT, "formatter engine")
-}
-
-/// Build one dogfood engine.
+/// Build the dogfood engine.
 ///
 /// The default is the prebuilt object: the same artifact, already lowered to
 /// machine code inside this binary, so there is no IR to parse and nothing to
@@ -3131,10 +3089,6 @@ thread_local! {
     /// compile the dogfooded sources, and never recurses even though several of
     /// these hooks are themselves invoked from the parser.
     static DOGFOOD_ENGINE: Compilation = dogfood_engine();
-
-    /// The formatter engine, built lazily and separately — so a compile that
-    /// never formats never links the walker. See [`FMT_SOURCE_FILES`].
-    static FMT_ENGINE: Compilation = fmt_engine();
 }
 
 /// The parser's test-section-header hook (see [`install_parser_hooks`]): whether
@@ -3355,6 +3309,12 @@ pub struct SpecFields {
 /// marshalled AST on this side. A parse failure comes back as the error it was;
 /// a value that does not have the declared shape is a panic, since that is the
 /// two AST declarations disagreeing rather than anything in the source.
+/// How much native stack an FFI call that runs the dogfooded parser is given:
+/// when less than the red zone remains, the call moves to a fresh segment of
+/// this size — see `parse_file`. Shared with `format_source`, which parses too.
+const PARSE_RED_ZONE: usize = 8 * 1024 * 1024;
+const PARSE_SEGMENT: usize = 64 * 1024 * 1024;
+
 fn parse_file(src: &str) -> Result<(Program, Vec<Span>), aipl_syntax::Error> {
     // A recursive-descent parse recurses once per production per level of
     // source nesting, and the lowering once per node — several megabytes of
@@ -3364,9 +3324,7 @@ fn parse_file(src: &str) -> Result<(Program, Vec<Span>), aipl_syntax::Error> {
     // a fresh segment on the *same* thread — which is what keeps the
     // thread-local engine in reach, where a helper thread would have to build
     // its own.
-    const RED_ZONE: usize = 8 * 1024 * 1024;
-    const SEGMENT: usize = 64 * 1024 * 1024;
-    stacker::maybe_grow(RED_ZONE, SEGMENT, || {
+    stacker::maybe_grow(PARSE_RED_ZONE, PARSE_SEGMENT, || {
         DOGFOOD_ENGINE.with(|comp| {
             match comp.call_values("aipl_parse_file", &[FfiValue::Str(src.to_string())]) {
                 Ok(value) => ffi_ast::parse_file_from_ffi(&value),
@@ -3376,76 +3334,30 @@ fn parse_file(src: &str) -> Result<(Program, Vec<Span>), aipl_syntax::Error> {
     })
 }
 
-/// Lay `src` out at `width` — the dogfooded AIPL formatter (`walker.aipl`'s
-/// `format_program`) via the FFI. `src` must already be the *code* half of a
-/// file, with trailing `--- section ---` blocks split off and per-line trailing
-/// whitespace removed; the caller re-attaches the sections and normalizes the
-/// final newline. Errors come back as the AIPL `FmtError` struct and are
-/// rebuilt as a spanned [`Error`]. No native fallback; panics if the engine
-/// can't be built or called.
-pub fn format_program(src: &str, width: usize) -> Result<String, Error> {
-    FMT_ENGINE.with(|comp| {
-        match comp.call_values(
-            "format_program",
-            &[FfiValue::Str(src.to_string()), FfiValue::Int(width as i64)],
-        ) {
-            Ok(FfiValue::Res(Ok(v))) => match *v {
-                FfiValue::Str(out) => Ok(out),
-                other => panic!("dogfooded format_program(): ok side is not a str: {other:?}"),
-            },
-            Ok(FfiValue::Res(Err(e))) => Err(fmt_error_of(*e)),
-            other => panic!("dogfooded format_program() call: {other:?}"),
-        }
-    })
-}
-
-/// `format_source`'s input, as [`fmt_prepare`] splits it: the code to lay out
-/// (trailing whitespace already stripped) and the trailing `--- section ---`
-/// blocks, which are copied to the output verbatim.
-pub struct FmtInput {
-    pub cleaned: String,
-    pub sections: String,
-}
-
-/// The first half of the formatter pipeline, dogfooded — see the AIPL
-/// `fmt_prepare`. No native fallback; panics if it can't be built or called.
-pub fn fmt_prepare(src: &str) -> FmtInput {
-    fn field(fields: &[(String, FfiValue)], name: &str) -> String {
-        match fields.iter().find(|(n, _)| n == name) {
-            Some((_, FfiValue::Str(s))) => s.clone(),
-            other => panic!("dogfooded fmt_prepare() FmtInput.{name}: {other:?}"),
-        }
-    }
-    FMT_ENGINE.with(|comp| {
-        match comp.call_values("fmt_prepare", &[FfiValue::Str(src.to_string())]) {
-            Ok(FfiValue::Struct(fields)) => FmtInput {
-                cleaned: field(&fields, "cleaned"),
-                sections: field(&fields, "sections"),
-            },
-            other => panic!("dogfooded fmt_prepare() call: {other:?}"),
-        }
-    })
-}
-
-/// The second half of the formatter pipeline, dogfooded — see the AIPL
-/// `fmt_layout`. `cleaned` must already have been parsed by the caller. No
-/// native fallback; panics if it can't be built or called.
-pub fn fmt_layout(cleaned: &str, width: usize) -> Result<String, Error> {
-    FMT_ENGINE.with(|comp| {
-        match comp.call_values(
-            "fmt_layout",
-            &[
-                FfiValue::Str(cleaned.to_string()),
-                FfiValue::Int(width as i64),
-            ],
-        ) {
-            Ok(FfiValue::Res(Ok(v))) => match *v {
-                FfiValue::Str(out) => Ok(out),
-                other => panic!("dogfooded fmt_layout(): ok side is not a str: {other:?}"),
-            },
-            Ok(FfiValue::Res(Err(e))) => Err(fmt_error_of(*e)),
-            other => panic!("dogfooded fmt_layout() call: {other:?}"),
-        }
+/// Format AIPL source to the canonical style at `width` — the dogfooded
+/// `format_source` (`format_source.aipl`) via the FFI, which is the whole
+/// pipeline: split off trailing `--- section ---` blocks, strip trailing
+/// whitespace, parse with the real parser, lay out, normalize the final newline,
+/// verify the output holds the input's tokens, re-attach the sections. Errors
+/// come back as the AIPL `FmtError` struct and are rebuilt as a spanned
+/// [`Error`]. No native fallback; panics if the engine can't be built or called.
+pub fn format_source(src: &str, width: usize) -> Result<String, Error> {
+    // The pipeline parses with the same recursive-descent parser `parse_file`
+    // calls, and needs the same room — see the stack note there.
+    stacker::maybe_grow(PARSE_RED_ZONE, PARSE_SEGMENT, || {
+        DOGFOOD_ENGINE.with(|comp| {
+            match comp.call_values(
+                "format_source",
+                &[FfiValue::Str(src.to_string()), FfiValue::Int(width as i64)],
+            ) {
+                Ok(FfiValue::Res(Ok(v))) => match *v {
+                    FfiValue::Str(out) => Ok(out),
+                    other => panic!("dogfooded format_source(): ok side is not a str: {other:?}"),
+                },
+                Ok(FfiValue::Res(Err(e))) => Err(fmt_error_of(*e)),
+                other => panic!("dogfooded format_source() call: {other:?}"),
+            }
+        })
     })
 }
 
@@ -3867,7 +3779,7 @@ fn lex_aipl_stripped(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser:
 /// [`is_operator_name`], and the lexer at [`lex_aipl`] (which de-dents `"""` raw
 /// strings itself, in its emit, so there is no separate raw-string hook).
 /// (The formatter needs no hook: it is dogfooded end to end through
-/// [`format_program`], and its printer imports `reindent_block.aipl` directly.)
+/// [`format_source`], and its printer imports `reindent_block.aipl` directly.)
 /// Idempotent (first install wins). The compiler's entry points (the CLI and the
 /// embedding [`Compilation`] API's callers) install them; there are **no native
 /// fallbacks**, so any in-process parse (or error render, literal
@@ -4050,12 +3962,10 @@ fn compile_program<M: Module>(
     // name — the FFI engines' entries, and the `check` driver's `__test_main` —
     // are named here so they are never elided; they can still be inlined into
     // any AIPL caller, since keeping the definition is all an external call
-    // needs. `DOGFOOD_ENTRIES`/`FMT_ENTRIES` are the same lists the engines are
-    // built and validated against, so this can't drift from what FFI actually
-    // calls.
+    // needs. `DOGFOOD_ENTRIES` is the same list the engine is built and
+    // validated against, so this can't drift from what FFI actually calls.
     let externally_called: std::collections::HashSet<String> = DOGFOOD_ENTRIES
         .iter()
-        .chain(FMT_ENTRIES)
         .map(|s| (*s).to_string())
         .chain(["main".to_string(), "__test_main".to_string()])
         .collect();
@@ -4916,7 +4826,7 @@ pub type PrebuiltFn = unsafe extern "C" fn();
 /// Where a [`Compilation`]'s machine code lives.
 enum Code {
     /// Compiled in this process, and owned by this module — source compilation,
-    /// and the `AIPL_DOGFOOD_IR` / `AIPL_FMT_IR` staging overrides.
+    /// and the `AIPL_DOGFOOD_IR` staging override.
     Jit(JITModule),
     /// Compiled at build time into the binary, addressed by a generated
     /// name→address table. See [`Compilation::from_prebuilt`].
@@ -5087,9 +4997,9 @@ impl Compilation {
     /// Ordinary runs don't come through here: they use
     /// [`Compilation::from_prebuilt`], which reads the same artifact already
     /// lowered to machine code by `build.rs`. This path exists for the artifact
-    /// the binary *wasn't* built against — the `AIPL_DOGFOOD_IR` /
-    /// `AIPL_FMT_IR` staging overrides, which run candidate IR across the whole
-    /// corpus before it is promoted, and the author helpers that validate a
+    /// the binary *wasn't* built against — the `AIPL_DOGFOOD_IR` staging
+    /// override, which runs candidate IR across the whole corpus before it is
+    /// promoted, and the author helpers that validate a
     /// freshly generated artifact.
     ///
     /// The linking itself — the id↔name mapping that makes the artifact's

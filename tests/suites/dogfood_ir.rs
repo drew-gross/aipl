@@ -23,8 +23,7 @@
 
 use aipl::codegen::{
     generate_dogfood_artifact, read_dogfood_sources, source_refs, Compilation, DOGFOOD_CLIF_FILE,
-    DOGFOOD_ENTRIES, DOGFOOD_IR_ENV, DOGFOOD_SOURCE_FILES, FMT_CLIF_FILE, FMT_ENTRIES, FMT_IR_ENV,
-    FMT_SOURCE_FILES,
+    DOGFOOD_ENTRIES, DOGFOOD_IR_ENV, DOGFOOD_SOURCE_FILES,
 };
 use aipl::FfiValue;
 use std::path::PathBuf;
@@ -43,16 +42,17 @@ const PROMOTE_STAGED_CMD: &str =
 /// root — a relative path wouldn't resolve there.
 fn validate_staged_corpus_cmd() -> String {
     format!(
-        "AIPL_DOGFOOD_IR={} AIPL_FMT_IR={} cargo test",
+        "AIPL_DOGFOOD_IR={} cargo test",
         staged_path_of(&ARTIFACTS[0]).display(),
-        staged_path_of(&ARTIFACTS[1]).display(),
     )
 }
 
 /// One checked-in artifact: the sources it is generated from, the FFI entries it
 /// must export, its filename, and the env var that overrides it for a staged
-/// run. There are two — the parser-hook engine and the formatter engine — linked
-/// independently so an ordinary compile never pays to link the walker.
+/// run. There is one — the formatter used to be a second, linked separately so
+/// an ordinary compile never paid to link the walker, until the artifact became
+/// a prebuilt object and nothing was linked at run time any more. The tests
+/// still loop over the list, so a second costs an entry here and nothing else.
 struct Artifact {
     file: &'static str,
     env: &'static str,
@@ -63,20 +63,12 @@ struct Artifact {
     entries: &'static [&'static str],
 }
 
-const ARTIFACTS: &[Artifact] = &[
-    Artifact {
-        file: DOGFOOD_CLIF_FILE,
-        env: DOGFOOD_IR_ENV,
-        sources: DOGFOOD_SOURCE_FILES,
-        entries: DOGFOOD_ENTRIES,
-    },
-    Artifact {
-        file: FMT_CLIF_FILE,
-        env: FMT_IR_ENV,
-        sources: FMT_SOURCE_FILES,
-        entries: FMT_ENTRIES,
-    },
-];
+const ARTIFACTS: &[Artifact] = &[Artifact {
+    file: DOGFOOD_CLIF_FILE,
+    env: DOGFOOD_IR_ENV,
+    sources: DOGFOOD_SOURCE_FILES,
+    entries: DOGFOOD_ENTRIES,
+}];
 
 fn src_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("crates/aipl-codegen/src")
@@ -163,28 +155,21 @@ fn lf(s: &str) -> String {
 }
 
 /// Round-trip sanity: load the artifact through `from_artifact` and call every
-/// entry, so `fill` never writes IR that won't link or compute correctly.
-/// Entry-level check for one artifact: load it and call its entries with known
-/// inputs, so a candidate that links but computes the wrong thing is caught
-/// before the full corpus run.
+/// entry with known inputs, so `fill` never writes IR that won't link or
+/// compute correctly, and a candidate that links but computes the wrong thing
+/// is caught before the full corpus run.
 fn sanity_check_of(a: &Artifact, artifact: &str) {
-    if a.file == FMT_CLIF_FILE {
-        sanity_check_fmt(artifact);
-    } else {
-        sanity_check(artifact);
-    }
-}
-
-/// The formatter artifact's single entry. Messy input on purpose, so this proves
-/// the walker round-trips rather than merely returning something.
-fn sanity_check_fmt(artifact: &str) {
     let comp = Compilation::from_artifact(artifact)
-        .unwrap_or_else(|e| panic!("load regenerated {FMT_CLIF_FILE}: {e}"));
+        .unwrap_or_else(|e| panic!("load regenerated {}: {e}", a.file));
+
+    // The formatter, on messy input on purpose, so this proves the walker
+    // round-trips rather than merely returning something — and with a trailing
+    // section, which the pipeline carries through untouched.
     let formatted = comp
         .call_values(
-            "format_program",
+            "format_source",
             &[
-                FfiValue::Str("fn  f (  a : i64 )->i64{ a }".to_string()),
+                FfiValue::Str("fn  f (  a : i64 )->i64{ a }\n--- stdout ---\nx  \n".to_string()),
                 FfiValue::Int(100),
             ],
         )
@@ -192,14 +177,9 @@ fn sanity_check_fmt(artifact: &str) {
     assert_eq!(
         formatted,
         FfiValue::Res(Ok(Box::new(FfiValue::Str(
-            "fn f(a: i64) -> i64 { a }".to_string()
+            "fn f(a: i64) -> i64 { a }\n--- stdout ---\nx  \n".to_string()
         ))))
     );
-}
-
-fn sanity_check(artifact: &str) {
-    let comp = Compilation::from_artifact(artifact)
-        .unwrap_or_else(|e| panic!("load regenerated {DOGFOOD_CLIF_FILE}: {e}"));
 
     let span = |start, end| {
         FfiValue::Struct(vec![

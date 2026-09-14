@@ -427,16 +427,6 @@ fn width_is_configurable() {
     );
 }
 
-/// Strip trailing spaces/tabs from every line — `format_source`'s own pre-step,
-/// duplicated so the probe below feeds the layout call the same bytes.
-fn clean_trailing_ws(src: &str) -> String {
-    src.lines()
-        .map(|l| l.trim_end_matches([' ', '\t']))
-        .collect::<Vec<_>>()
-        .join("\n")
-        + if src.ends_with('\n') { "\n" } else { "" }
-}
-
 /// Author helper: lay out the file named by `AIPL_FMT_PROBE` with the AIPL
 /// formatter and report which way it went. Handy for measuring how much native
 /// stack the walker needs on a given file — pair it with `RUST_MIN_STACK`.
@@ -446,9 +436,7 @@ fn aipl_fmt_probe() {
     setup();
     let path = std::env::var("AIPL_FMT_PROBE").expect("AIPL_FMT_PROBE");
     let src = std::fs::read_to_string(&path).unwrap();
-    let (code, _) = aipl_parser::split_test_sections(&src);
-    let cleaned = clean_trailing_ws(code);
-    match aipl::codegen::format_program(&cleaned, 100) {
+    match aipl::codegen::format_source(&src, 100) {
         Ok(_) => eprintln!("PROBE-OK"),
         Err(e) => eprintln!("PROBE-ERR {e}"),
     }

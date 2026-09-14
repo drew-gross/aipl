@@ -77,7 +77,6 @@ name = "aipl-fmt"
 version = "0.1.0"
 dependencies = [
  "aipl-codegen",
- "aipl-parser",
  "aipl-syntax",
 ]
 

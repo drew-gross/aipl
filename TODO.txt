@@ -122,7 +122,6 @@ dev loop:
   a_directory_argument_checks_the_tree_under_it is failing early and preventing more useful tests from failing
 
 self-hosting:
-  format_source can be full-aipl now
   make formatter command that is fully self-hosted
 
 highlighter:

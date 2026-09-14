@@ -19,6 +19,20 @@
         <h2 id="public">Public</h2>
 
 
+        <section class="item" id="item-format_source">
+          <h3>
+            <a class="anchor" href="#item-format_source">format_source</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn format_source(src: str, width: u64) -&#62; str!FmtError</code></pre>
+
+          <div class="doc"><p>Format AIPL source to the canonical style, at <code>width</code>. The output always ends in exactly one newline (an empty program formats to just that). The input's trailing <code>--- section ---</code> blocks are preserved byte-for-byte — they follow that newline, and whatever they end with is theirs; trailing whitespace in the source portion is removed (the language rejects it, so fixing it can't change an accepted program's meaning).</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-FmtInput">
           <h3>
             <a class="anchor" href="#item-FmtInput">FmtInput</a>
@@ -32,15 +46,22 @@
         </section>
 
 
+      </section>
+
+
+      <section class="group private">
+        <h2 id="private">Private</h2>
+        <p class="note">Not importable from another file.</p>
+
 
         <section class="item" id="item-fmt_prepare">
           <h3>
             <a class="anchor" href="#item-fmt_prepare">fmt_prepare</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn fmt_prepare(src: str) -&#62; FmtInput</code></pre>
+          <pre class="signature"><code>fn fmt_prepare(src: str) -&#62; FmtInput</code></pre>
 
-          <div class="doc"><p>The first half of <code>format_source</code>: <code>src</code> split into the code to format (trailing whitespace already stripped) and its trailing <code>--- section ---</code> blocks, which are copied to the output verbatim rather than laid out.</p><p>The caller parses <code>cleaned</code> before handing it to <code>fmt_layout</code>.</p></div>
+          <div class="doc"><p><code>src</code> split into the code to format (trailing whitespace already stripped) and its trailing <code>--- section ---</code> blocks, which are copied to the output verbatim rather than laid out.</p></div>
 
 
         </section>
@@ -52,16 +73,57 @@
             <a class="anchor" href="#item-fmt_layout">fmt_layout</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn fmt_layout(cleaned: str, width: u64) -&#62; str!FmtError</code></pre>
+          <pre class="signature"><code>fn fmt_layout(cleaned: str, width: u64) -&#62; str!FmtError</code></pre>
 
-          <div class="doc"><p>The second half of <code>format_source</code>: lay <code>cleaned</code> out at <code>width</code>, then normalize to exactly one trailing newline — including for an empty program, which formats to just that. The printer only keeps a trailing newline when the layout happens to end with one, so the guarantee is made here rather than there.</p><p>The caller verifies the result carries the same tokens as <code>cleaned</code>, then appends the sections <code>fmt_prepare</code> set aside.</p></div>
+          <div class="doc"><p><code>cleaned</code> laid out at <code>width</code>, then normalized to exactly one trailing newline — including for an empty program, which formats to just that. The printer only keeps a trailing newline when the layout happens to end with one, so the guarantee is made here rather than there.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-verify_same_tokens">
+          <h3>
+            <a class="anchor" href="#item-verify_same_tokens">verify_same_tokens</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn verify_same_tokens(input: str, output: str) -&#62; ()!FmtError</code></pre>
+
+          <div class="doc"><p>Refuse unless <code>output</code> holds exactly <code>input</code>'s tokens and comments. Imports may be reordered, so both are compared as sorted multisets rather than in position. A token is compared by its *value* — <code>to_str</code> of its kind, which carries a literal's decoded value and a name's spelling — so the formatter's value-preserving whitespace edits inside a <code>&quot;&quot;&quot;</code> block are not flagged, while any change to a literal's value is.</p><p>Trailing commas are normalized by design (dropped when a list renders flat, added when it breaks), so commas don't take part. A variant's *leading* <code>|</code> is the same normalization at the other end (dropped flat, added when the cases break), so <code>|</code> sits out too — which also excludes the <code>|</code> between match-pattern alternatives, the price of comparing multisets rather than positions.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-token_values">
+          <h3>
+            <a class="anchor" href="#item-token_values">token_values</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn token_values(lexed: LexResult&#60;AiplTok&#62;) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>Every token's value, as a sorted multiset — minus the commas and <code>|</code>s that are layout rather than content (see <code>verify_same_tokens</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-comment_texts">
+          <h3>
+            <a class="anchor" href="#item-comment_texts">comment_texts</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn comment_texts(lexed: LexResult&#60;AiplTok&#62;) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>Every comment's text — the trivia channel is comments and <code>#[allow]</code> markers only — as a sorted multiset.</p></div>
 
 
         </section>
 
 
       </section>
-
 
 
     </main>

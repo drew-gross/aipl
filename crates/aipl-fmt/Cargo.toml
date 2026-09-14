@@ -7,7 +7,6 @@ license = "MIT"
 
 [dependencies]
 aipl-syntax = { workspace = true }
-aipl-parser = { workspace = true }
 aipl-codegen = { workspace = true }
 
 [lints]

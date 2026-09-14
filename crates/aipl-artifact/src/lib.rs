@@ -10,8 +10,8 @@
 //!   [`cranelift_object::ObjectModule`], producing machine code that ships
 //!   inside the `aipl` binary — so a normal run pays no Cranelift cost at all.
 //! * **At run time**, `Compilation::from_artifact` links them into a
-//!   `JITModule`. That path is what the `AIPL_DOGFOOD_IR` / `AIPL_FMT_IR`
-//!   staging overrides use, so candidate IR can be validated across the corpus
+//!   `JITModule`. That path is what the `AIPL_DOGFOOD_IR` staging override
+//!   uses, so candidate IR can be validated across the corpus
 //!   before it is promoted.
 //!
 //! Keeping one implementation is the point. The declaration order below is not
