@@ -269,7 +269,7 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                 out.push(Symbol {
                     name: f.name.clone(),
                     kind: SymbolKind::Function,
-                    detail: fn_detail(f),
+                    detail: fn_detail(f, src),
                     doc: f.doc.clone(),
                     is_pub: f.is_pub,
                     name_span,
@@ -310,19 +310,21 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                     let Some(case_span) = spans.next_case(&case.name) else {
                         continue;
                     };
-                    // A named slot shows its name, and a keyword slot (one
-                    // with a default) shows that it has one — `Many(Rule<K>,
-                    // min: u64 = ..)` says far more about how the case is
-                    // constructed than three bare types do. The default's
-                    // *value* is an expression the AST holds unrendered, so it
-                    // is shown as `..` rather than guessed at.
+                    // A named slot shows its name, and a keyword slot its
+                    // default — `Many(Rule<K>, min: u64 = 0)` says far more
+                    // about how the case is constructed than three bare types
+                    // do.
                     let payload = case
                         .payload
                         .iter()
-                        .map(|p| match (&p.name, &p.default) {
-                            (Some(n), Some(_)) => format!("{n}: {} = ..", type_name(&p.ty)),
-                            (Some(n), None) => format!("{n}: {}", type_name(&p.ty)),
-                            (None, _) => type_name(&p.ty),
+                        .map(|p| {
+                            slot_detail(
+                                p.name.as_deref(),
+                                &p.ty,
+                                p.implicit_some,
+                                p.default.as_ref(),
+                                src,
+                            )
                         })
                         .collect::<Vec<_>>();
                     let detail = if payload.is_empty() {
@@ -446,12 +448,52 @@ fn ty(t: &Option<Type>) -> String {
     }
 }
 
-fn fn_detail(f: &aipl_syntax::ast::Function) -> String {
+/// A parameter or payload slot as its declaration spells it: `name: T`, a
+/// keyword one `name: T = default`, an omittable one `name?: T = none` — whose
+/// declared type is the `T?` the body sees, while the caller supplies a `T` —
+/// and a bare `T` for an unnamed slot.
+///
+/// The default is the expression's own source text, exactly as written. The
+/// AST holds it as an expression with no renderer of its own, and the author's
+/// spelling is the one a reader wants anyway.
+fn slot_detail(
+    name: Option<&str>,
+    ty: &Type,
+    implicit_some: bool,
+    default: Option<&aipl_syntax::ast::Expr>,
+    src: &str,
+) -> String {
+    let Some(name) = name else {
+        return type_name(ty);
+    };
+    let shown_ty = match (implicit_some, ty) {
+        (true, Type::Optional(inner)) => type_name(inner),
+        _ => type_name(ty),
+    };
+    let mark = if implicit_some { "?" } else { "" };
+    match default {
+        Some(e) => format!(
+            "{name}{mark}: {shown_ty} = {}",
+            &src[e.span.start..e.span.end]
+        ),
+        None => format!("{name}{mark}: {shown_ty}"),
+    }
+}
+
+fn fn_detail(f: &aipl_syntax::ast::Function, src: &str) -> String {
     let params = f
         .sig
         .params
         .iter()
-        .map(|p| format!("{}: {}", p.name, type_name(&p.ty)))
+        .map(|p| {
+            slot_detail(
+                Some(&p.name),
+                &p.ty,
+                p.implicit_some,
+                p.default.as_ref(),
+                src,
+            )
+        })
         .collect::<Vec<_>>()
         .join(", ");
     let effects = f
@@ -614,6 +656,16 @@ fn helper(n: i64) !prints -> i64 {
         assert_eq!(helper.doc, None);
         assert!(!helper.is_pub);
 
+        // Keyword parameters show their defaults as written, and an omittable
+        // one keeps its `?` on the name rather than becoming a `T?`.
+        hosted();
+        let kw = "fn clamp(x: u64, lo: u64 = 0, hi?: u64 = none, name: str = \"x\") -> u64 { x }\n";
+        let idx2 = FileIndex::parse("src/k.aipl", kw).expect("indexes");
+        assert_eq!(
+            idx2.define("clamp").expect("clamp").detail,
+            "fn clamp(x: u64, lo: u64 = 0, hi?: u64 = none, name: str = \"x\") -> u64"
+        );
+
         // Generic parameters and their bounds show in the heading.
         assert_eq!(
             idx.define("Shape").expect("Shape").detail,
@@ -630,13 +682,16 @@ fn helper(n: i64) !prints -> i64 {
         assert_eq!(circle.detail, "Circle(i64)");
         assert_eq!(circle.parent.as_deref(), Some("Shape"));
         assert_eq!(idx.define("Rect").expect("Rect").detail, "Rect(i64, i64)");
-        // A named slot shows its name; a keyword slot shows that it has a
-        // default, which is how the case is actually constructed.
-        let named = "variant R = Many(inner: i64, min: u64 = 0) | Plain(str)\n";
+        // A named slot shows its name; a keyword slot shows its default as
+        // written, which is how the case is actually constructed; an
+        // omittable one keeps the `?` on the name, with the type the caller
+        // supplies rather than the optional the body sees.
+        let named =
+            "variant R = Many(inner: i64, min: u64 = 0, max?: u64 = none, sep: str = \"a, b\") | Plain(str)\n";
         let idx2 = FileIndex::parse("src/n.aipl", named).expect("indexes");
         assert_eq!(
             idx2.define("Many").expect("Many").detail,
-            "Many(inner: i64, min: u64 = ..)"
+            "Many(inner: i64, min: u64 = 0, max?: u64 = none, sep: str = \"a, b\")"
         );
         assert_eq!(idx2.define("Plain").expect("Plain").detail, "Plain(str)");
         // A nullary case is just its name — and the one after a payload case,
@@ -652,7 +707,7 @@ fn helper(n: i64) !prints -> i64 {
         let src = "variant R =\n    | Many(\n        # The rule.\n        i64,\n        min: u64 = 0\n    )\n    | Plain(str)\n";
         let idx = FileIndex::parse("src/n.aipl", src).expect("indexes");
         let many = idx.define("Many").expect("Many");
-        assert_eq!(many.detail, "Many(i64, min: u64 = ..)");
+        assert_eq!(many.detail, "Many(i64, min: u64 = 0)");
         assert_eq!(
             many.slots,
             vec![
@@ -661,7 +716,7 @@ fn helper(n: i64) !prints -> i64 {
                     doc: Some("The rule.".into())
                 },
                 Slot {
-                    detail: "min: u64 = ..".into(),
+                    detail: "min: u64 = 0".into(),
                     doc: None
                 },
             ]

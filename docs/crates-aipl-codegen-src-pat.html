@@ -31,7 +31,7 @@
 
           <ul class="cases">
 
-            <li id="item-Ctor"><code>Ctor(name: str, bindings: str[] = .., ignore_payload: bool = ..)</code>
+            <li id="item-Ctor"><code>Ctor(name: str, bindings: str[] = [], ignore_payload: bool = false)</code>
 
               <div class="doc"><p>A constructor whose slots are all plain binder names — <code>some(v)</code>, <code>Pair(a, b)</code> — or a bare name (<code>none</code>, <code>Nil</code>), or the <code>Ctor(..)</code> form that matches a case and ignores what it carries. The two optional slots are both &quot;nothing&quot; for a bare name, which is the common construction.</p></div>
 
@@ -44,13 +44,13 @@
 
                 </li>
 
-                <li><code>bindings: str[] = ..</code>
+                <li><code>bindings: str[] = []</code>
 
                   <div class="doc"><p>One binder per payload slot, in slot order; empty for a bare name.</p></div>
 
                 </li>
 
-                <li><code>ignore_payload: bool = ..</code>
+                <li><code>ignore_payload: bool = false</code>
 
                   <div class="doc"><p>Whether the arm was written <code>name(..)</code>: the case's payload is matched but nothing is bound. Never true alongside bindings.</p></div>
 

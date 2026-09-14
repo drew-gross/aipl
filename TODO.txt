@@ -648,15 +648,13 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
-  variant match arm args should show the defaults
+  make an expression renderer (is this just the formatter?) and use it for defaults
   docs should do highlighting! And allow you to change color scheme. We have this cool highlighter tech lets use it.
-  allow documenting each arg of a match arm
   add concept of examples
   integrate the readme into the docs
   reflow docs
-  make /// docs a thing for things that should be documented (and only for those things)
   make docs renderer part of check
-  doc comments for structs/variants
+  doc comments for struct fields
   make the types and etc. into links
   the docs are showing a mangled name for tm_json, please fix
 

@@ -101,7 +101,7 @@
 
             </li>
 
-            <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = .., max: u64? = .., sep: Rule&#60;K&#62;? = .., trailing_sep: bool = .., leading_sep: bool = .., nested_in: (Rule&#60;K&#62;, Rule&#60;K&#62;)? = .., spaced: bool = .., style: ListStyle? = .., group: u64? = ..)</code>
+            <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = 0, max?: u64 = none, sep?: Rule&#60;K&#62; = none, trailing_sep: bool = true, leading_sep: bool = false, nested_in?: (Rule&#60;K&#62;, Rule&#60;K&#62;) = none, spaced: bool = false, style?: ListStyle = none, group?: u64 = none)</code>
 
               <div class="doc"><p>The rule repeated until it stops matching — by default a PEG <code>*</code>; <code>Many(r, min=1)</code> is a <code>+</code>, and <code>Many(r, min=1, max=1)</code> is exactly one. A rule that can match empty input would spin here forever, so the driver refuses one outright rather than hanging.</p><p>Between <code>sep</code>, <code>trailing_sep</code> and <code>leading_sep</code>, one rule covers every list a grammar writes. An LR grammar spells each combination as its own wrapper production around a left-recursive pair — <code>x_list | x_list COMMA | _</code> — and which of the four you picked is the thing that is easy to get subtly wrong; here it is arguments with names.</p><p><code>sep</code> and <code>max</code> are both written with the <code>?</code> on the *name*: a caller gives the rule itself (<code>sep=Lit(&quot;,&quot;)</code>), and leaving it out is what yields <code>none</code>. A caller that already holds an optional — <code>link_rule</code> and <code>desugar_rule</code>, rebuilding a rule they took apart — forwards it with <code>sep?=..</code>.</p></div>
 
@@ -114,55 +114,55 @@
 
                 </li>
 
-                <li><code>min: u64 = ..</code>
+                <li><code>min: u64 = 0</code>
 
                   <div class="doc"><p>The fewest repetitions that count as a match.</p></div>
 
                 </li>
 
-                <li><code>max: u64? = ..</code>
+                <li><code>max?: u64 = none</code>
 
                   <div class="doc"><p>The most repetitions taken. A bound stops the repetition rather than failing it: the items past <code>max</code> are simply not this rule's, and the enclosing rule sees them. That is what makes <code>min=1, max=1</code> mean &quot;one item, in brackets&quot; when it carries a <code>nested_in</code> — a group that holds one thing rather than a list.</p></div>
 
                 </li>
 
-                <li><code>sep: Rule&#60;K&#62;? = ..</code>
+                <li><code>sep?: Rule&#60;K&#62; = none</code>
 
                   <div class="doc"><p>Given, this is a *separated* list: the rule, then <code>sep</code> and the rule again for as long as the separator keeps appearing.</p></div>
 
                 </li>
 
-                <li><code>trailing_sep: bool = ..</code>
+                <li><code>trailing_sep: bool = true</code>
 
                   <div class="doc"><p>What happens to a separator with nothing after it — consumed (<code>[1, 2,]</code> is the list) or rewound and left for the enclosing rule to complain about. It still applies at the <code>max</code> bound: a separator after the last item ends the list rather than starting the item that would have been next, so <code>Many(x, sep=comma, max=2)</code> takes <code>1, 2,</code> whole — the same answer it gives when the items run out instead.</p></div>
 
                 </li>
 
-                <li><code>leading_sep: bool = ..</code>
+                <li><code>leading_sep: bool = false</code>
 
                   <div class="doc"><p><code>trailing_sep</code>'s mirror at the front: the list may open with a separator before its first item (<code>| A | B</code> as well as <code>A | B</code>), which is the shape a variant's cases take once they break one per line.</p></div>
 
                 </li>
 
-                <li><code>nested_in: (Rule&#60;K&#62;, Rule&#60;K&#62;)? = ..</code>
+                <li><code>nested_in?: (Rule&#60;K&#62;, Rule&#60;K&#62;) = none</code>
 
                   <div class="doc"><p>The bracketed-list shorthand: given <code>(open, close)</code> it is a bracket pair around this <code>Many</code>, which is what makes it a *group* before anything else runs. Nearly every bracket pair in a real grammar holds a list, and writing the brackets as an argument of the list beats wrapping the list in a separate rule — <code>Many(param, sep=comma, nested_in=parens())</code> against a separate production wrapping the list in brackets.</p><p>A pair, so &quot;exactly two brackets&quot; is the type rather than a length <code>desugar</code> has to check and a caller has to get right. It was an array until generic tuples worked — a tuple whose elements mention a type variable has no layout until monomorphization binds it, which is now what <code>lt_ty</code> defers to <code>instantiate_generic</code>.</p></div>
 
                 </li>
 
-                <li><code>spaced: bool = ..</code>
+                <li><code>spaced: bool = false</code>
 
                   <div class="doc"><p>Whether the brackets take inner spaces while the list stays flat — <code>{ a, b }</code> against <code>(a, b)</code>. The rest of the list's *style* is read off the <code>Many</code> rather than restated: <code>sep</code> from this rule's own separator and <code>trailing</code> from <code>trailing_sep</code>, which is the same fact said once instead of twice (strict JSON's <code>[1, 2,]</code> is an error *and* is never printed). Only this one cannot be derived, so it is here.</p></div>
 
                 </li>
 
-                <li><code>style: ListStyle? = ..</code>
+                <li><code>style?: ListStyle = none</code>
 
                   <div class="doc"><p>The group's layout stated outright instead of derived, which is what lets a bracket pair hold something whose list lives one production down: <code>(args)</code> is a group that wraps like a comma list, but the <code>Many</code> holding it has no separator of its own to read one off — <code>args</code> does. Given, it replaces the derivation entirely, <code>spaced</code> included.</p><p>The freedom is real and so is the hazard: nothing checks a stated <code>sep</code> against the one the rule actually matches, so a style that disagrees makes the printer write a separator the parser will not accept. Derive where you can, state it where the list is not this rule's.</p><p>The shape that needs stating is a group holding a list that lives one production down, and inlining the list into the group removes it — at which point this argument, and the disagreement it admits, both go away. Which of those wrapper productions can fold is what the lowering decides; <code>PARSER_LIBRARY.md</code>'s 5d carries the plan.</p></div>
 
                 </li>
 
-                <li><code>group: u64? = ..</code>
+                <li><code>group?: u64 = none</code>
 
                   <div class="doc"><p>The index of this bracket pair's style in the grammar's <code>groups</code>, stamped by <code>link</code> (see <code>Grammar</code>). No grammar file writes it, and a <code>Many</code> without a <code>nested_in</code> never carries one.</p></div>
 
