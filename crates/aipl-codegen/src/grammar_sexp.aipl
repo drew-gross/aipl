@@ -280,9 +280,9 @@ allocations: 7638
 deallocations: 7638
 reallocations: 910
 bytes allocated: 639934
-instructions executed: 1372323
-binary size: 399344
-  code: 258052
+instructions executed: 1403186
+binary size: 400080
+  code: 258788
   data: 4828
   metadata: 136464
 functions:
@@ -360,7 +360,7 @@ functions:
     bytes: 116
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 53
-    bytes: 212
+    bytes: 304
   __builtin_any$__m3__Prec$lam$__m13__climb$SexpKind$__m15__Sexp$lambda0:
     calls: 0
     bytes: 276
@@ -372,22 +372,22 @@ functions:
     bytes: 324
   __builtin_count_while$char$lam$__m11__lex_step$SexpKind$lambda1:
     calls: 150
-    bytes: 220
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 0
-    bytes: 184
+    bytes: 276
   __builtin_count_while$char$s0$lam$__m11__to_eol_len$lambda0:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$__m11__to_eol_len$lambda0$tail:
     calls: 12
-    bytes: 256
+    bytes: 352
   __builtin_count_while$char$s0$lam$__m7__dedent$lambda1:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m7__dedent$lambda2$lambda0:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_find_if$__m3__Prec$lam$__m13__find_prec$lambda0:
     calls: 0
     bytes: 688
@@ -438,7 +438,7 @@ functions:
     bytes: 284
   __m10__trim_end_while$lam$__builtin_is_space:
     calls: 61
-    bytes: 300
+    bytes: 392
   __m11__between_len:
     calls: 0
     bytes: 752
@@ -555,7 +555,7 @@ functions:
     bytes: 648
   __m14__line_at:
     calls: 1
-    bytes: 532
+    bytes: 624
   __m15__render_sexp:
     calls: 0
     bytes: 792

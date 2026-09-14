@@ -16,11 +16,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 347
-binary size: 1440
-  code: 452
+instructions executed: 818
+binary size: 1528
+  code: 544
   data: 73
-  metadata: 915
+  metadata: 911
 functions:
   __test$len:
     calls: 1
@@ -39,7 +39,7 @@ functions:
     bytes: (external)
   len:
     calls: 3
-    bytes: 132
+    bytes: 224
   main:
     calls: 1
     bytes: 100

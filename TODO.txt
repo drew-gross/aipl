@@ -98,7 +98,6 @@ misc cleanup:
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
   DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
   what is `walker.aipl`'s space-splitting test tokenizer? Can it be removed?
-  lead_toks can be count_while I think?
   use an enum for the builtins
   made logical not more like the rest of the operators (lower it to a call immediately)
   rename saturating_remainter to total_remainder (maybe also do total_divide?)
@@ -106,13 +105,12 @@ misc cleanup:
   unify operators with regular functions even more
   field_size and elem_size_of are apparently near duplicates that can be DRYed
   token_value in lexer.aipl should leverage more having multiple arms to same value
-  shift_all can be a map
   use val.method() syntax a _lot_ more. Any time a function could be interpreted as a verb.
   parser lib should use value_or_err more
   why does quoted use str literals instead of char literals?
   trailing_trivia should be a filter map
-  line_at.aipl should use .doc() instead of // header for docs
-  caret_block.aipl should use .doc() instead of // header for docs
+  line_at.aipl should use doc comments
+  caret_block.aipl should use doc comments
   having both min and minimum is kinda weird. Maybe combine somehow?
   min/max shouldn't allow mixed integer types
   split pub mod lint and pub mod ast into separate files

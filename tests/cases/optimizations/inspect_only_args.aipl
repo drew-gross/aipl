@@ -61,11 +61,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 21
-instructions executed: 1038
-binary size: 3784
-  code: 1376
+instructions executed: 1742
+binary size: 3880
+  code: 1468
   data: 426
-  metadata: 1982
+  metadata: 1986
 functions:
   __test$count_via_copy:
     calls: 1
@@ -93,7 +93,7 @@ functions:
     bytes: (external)
   count_ones:
     calls: 4
-    bytes: 152
+    bytes: 244
   main:
     calls: 1
     bytes: 116

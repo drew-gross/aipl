@@ -41,15 +41,15 @@ allocations: 33
 deallocations: 33
 reallocations: 11
 bytes allocated: 2060
-instructions executed: 2009
-binary size: 4688
-  code: 2088
+instructions executed: 2559
+binary size: 4784
+  code: 2180
   data: 361
-  metadata: 2239
+  metadata: 2243
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 13
-    bytes: 212
+    bytes: 304
   __test$indent:
     calls: 1
     bytes: 1048

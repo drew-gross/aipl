@@ -952,9 +952,9 @@ allocations: 284
 deallocations: 284
 reallocations: 58
 bytes allocated: 389794
-instructions executed: 1369590
-binary size: 559696
-  code: 379488
+instructions executed: 1381261
+binary size: 560800
+  code: 380592
   data: 10188
   metadata: 170020
 functions:
@@ -978,31 +978,31 @@ functions:
     bytes: 832
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 22
-    bytes: 212
+    bytes: 304
   __builtin_count_while$char$lam$__m1__lex_step$AiplTok$lambda1:
     calls: 50
-    bytes: 220
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 4
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 40
-    bytes: 184
+    bytes: 276
   __builtin_count_while$char$s0$lam$__m1__to_eol_len$lambda0:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$__m1__to_eol_len$lambda0$tail:
     calls: 6
-    bytes: 256
+    bytes: 352
   __builtin_count_while$char$s0$lam$__m4__dedent$lambda1:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m4__dedent$lambda2$lambda0:
     calls: 11
-    bytes: 172
+    bytes: 264
   __builtin_int_parse:
     calls: 4
-    bytes: 1028
+    bytes: 1104
   __builtin_int_parse$lambda1:
     calls: 5
     bytes: 140
@@ -1086,13 +1086,13 @@ functions:
     bytes: 368
   __m2__unescape:
     calls: 34
-    bytes: 1168
+    bytes: 1264
   __m2__unescape_braces:
     calls: 5
-    bytes: 708
+    bytes: 792
   __m3__process_raw_string:
     calls: 11
-    bytes: 1712
+    bytes: 1828
   __m7__trim_prefix:
     calls: 34
     bytes: 260
@@ -1101,7 +1101,7 @@ functions:
     bytes: 340
   __m9__strip_test_sections:
     calls: 2
-    bytes: 692
+    bytes: 780
   __test$char_lit_value:
     calls: 1
     bytes: 1836

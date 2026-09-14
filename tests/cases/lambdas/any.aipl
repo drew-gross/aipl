@@ -31,15 +31,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 875
-binary size: 5952
-  code: 2460
+instructions executed: 932
+binary size: 6040
+  code: 2552
   data: 806
-  metadata: 2686
+  metadata: 2682
 functions:
   __builtin_any$char$lam$__test$has_big$lambda3:
     calls: 1
-    bytes: 140
+    bytes: 232
   __builtin_any$i64$lam$__test$has_big$lambda0:
     calls: 1
     bytes: 192

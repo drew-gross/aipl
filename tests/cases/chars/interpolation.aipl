@@ -34,9 +34,9 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 774
-instructions executed: 543
-binary size: 5192
-  code: 2772
+instructions executed: 709
+binary size: 5368
+  code: 2948
   data: 139
   metadata: 2281
 functions:
@@ -45,7 +45,7 @@ functions:
     bytes: 204
   __to_str_char$arr:
     calls: 1
-    bytes: 592
+    bytes: 768
   __to_str_char$opt:
     calls: 1
     bytes: 380

@@ -1491,9 +1491,9 @@ allocations: 434
 deallocations: 434
 reallocations: 71
 bytes allocated: 67520
-instructions executed: 354019
-binary size: 2530672
-  code: 1692896
+instructions executed: 366352
+binary size: 2531288
+  code: 1693512
   data: 11292
   metadata: 826484
 functions:
@@ -1517,22 +1517,22 @@ functions:
     bytes: 916
   __builtin_count_while$char$lam$lex_step$Kind$lambda1:
     calls: 85
-    bytes: 220
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 13
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 49
-    bytes: 184
+    bytes: 276
   __builtin_count_while$char$s0$lam$to_eol_len$lambda0:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$to_eol_len$lambda0$tail:
     calls: 8
-    bytes: 256
+    bytes: 352
   __builtin_int_parse:
     calls: 13
-    bytes: 1028
+    bytes: 1104
   __builtin_int_parse$lambda1:
     calls: 67
     bytes: 140
@@ -1559,7 +1559,7 @@ functions:
     bytes: 104
   __m1__unescape:
     calls: 24
-    bytes: 1168
+    bytes: 1264
   __test$keep_skipped:
     calls: 1
     bytes: 25276
@@ -1733,7 +1733,7 @@ functions:
     bytes: 1824
   rawtpl_kind:
     calls: 4
-    bytes: 3852
+    bytes: 3928
   step_result$Kind:
     calls: 474
     bytes: 17516

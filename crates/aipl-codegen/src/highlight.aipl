@@ -776,11 +776,11 @@ allocations: 1113
 deallocations: 1113
 reallocations: 33
 bytes allocated: 96953
-instructions executed: 75774
-binary size: 133768
-  code: 84012
+instructions executed: 91219
+binary size: 134144
+  code: 84392
   data: 5328
-  metadata: 44428
+  metadata: 44424
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -808,7 +808,7 @@ functions:
     bytes: 544
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 38
-    bytes: 212
+    bytes: 304
   __eq_Entry:
     calls: 1
     bytes: 128
@@ -928,7 +928,7 @@ functions:
     bytes: 1300
   char_class_body:
     calls: 17
-    bytes: 664
+    bytes: 756
   class_char:
     calls: 49
     bytes: 996
@@ -946,7 +946,7 @@ functions:
     bytes: 1228
   json_str:
     calls: 21
-    bytes: 764
+    bytes: 864
   main:
     calls: 1
     bytes: 760
@@ -964,7 +964,7 @@ functions:
     bytes: 4600
   re_escape:
     calls: 42
-    bytes: 1532
+    bytes: 1628
   rule_pats$Kind:
     calls: 2
     bytes: 11484

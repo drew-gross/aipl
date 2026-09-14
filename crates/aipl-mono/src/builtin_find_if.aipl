@@ -59,11 +59,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 128
-instructions executed: 1362
-binary size: 10224
-  code: 5340
+instructions executed: 1590
+binary size: 10496
+  code: 5616
   data: 1174
-  metadata: 3710
+  metadata: 3706
 functions:
   __eq_char$opt:
     calls: 1
@@ -106,13 +106,13 @@ functions:
     bytes: (external)
   find_if$char$lam$__test$find_if$lambda4:
     calls: 1
-    bytes: 212
+    bytes: 304
   find_if$char$s0$lam$__test$find_if$lambda6:
     calls: 1
-    bytes: 212
+    bytes: 304
   find_if$char$s0$lam$__test$find_if$lambda7:
     calls: 1
-    bytes: 212
+    bytes: 304
   find_if$i64$lam$__test$find_if$lambda0:
     calls: 1
     bytes: 268

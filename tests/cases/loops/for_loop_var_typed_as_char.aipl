@@ -11,12 +11,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 68
-binary size: 720
-  code: 140
+instructions executed: 182
+binary size: 816
+  code: 232
   data: 1
-  metadata: 579
+  metadata: 583
 functions:
   main:
     calls: 1
-    bytes: 140
+    bytes: 232

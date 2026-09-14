@@ -90,9 +90,9 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 328
-instructions executed: 2382
-binary size: 9872
-  code: 5532
+instructions executed: 2579
+binary size: 10056
+  code: 5716
   data: 1135
   metadata: 3205
 functions:
@@ -104,7 +104,7 @@ functions:
     bytes: 124
   __test$opt_left_fold:
     calls: 1
-    bytes: 4064
+    bytes: 4248
   __test$opt_left_fold$filter2$own0:
     calls: 1
     bytes: 300

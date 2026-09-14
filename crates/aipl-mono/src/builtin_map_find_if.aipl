@@ -67,11 +67,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 32
-instructions executed: 971
-binary size: 7104
-  code: 3340
+instructions executed: 1059
+binary size: 7192
+  code: 3432
   data: 944
-  metadata: 2820
+  metadata: 2816
 functions:
   __eq_i64$opt:
     calls: 4
@@ -108,7 +108,7 @@ functions:
     bytes: 372
   map_find_if$char$bool$s0$lam$__test$map_find_if$lambda6$__test$map_find_if$lambda7:
     calls: 1
-    bytes: 224
+    bytes: 316
   map_find_if$i64$i64$lam$__test$map_find_if$lambda0$__test$map_find_if$lambda1:
     calls: 1
     bytes: 276

@@ -267,9 +267,9 @@ allocations: 36
 deallocations: 36
 reallocations: 0
 bytes allocated: 3228
-instructions executed: 9194
-binary size: 12648
-  code: 5744
+instructions executed: 13904
+binary size: 12832
+  code: 5928
   data: 2784
   metadata: 4120
 functions:
@@ -305,7 +305,7 @@ functions:
     bytes: (external)
   fill_or_add_section:
     calls: 10
-    bytes: 1916
+    bytes: 2100
   main:
     calls: 1
     bytes: 128

@@ -81,9 +81,9 @@ allocations: 19420
 deallocations: 19420
 reallocations: 1782
 bytes allocated: 1130691
-instructions executed: 5284900
-binary size: 259768
-  code: 168376
+instructions executed: 5286755
+binary size: 260136
+  code: 168744
   data: 1812
   metadata: 89580
 functions:
@@ -140,16 +140,16 @@ functions:
     bytes: 276
   __builtin_count_while$char$lam$__m12__lex_step$__m1__SexpKind$lambda1:
     calls: 31
-    bytes: 220
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 0
-    bytes: 184
+    bytes: 276
   __builtin_count_while$char$s0$lam$__m12__to_eol_len$lambda0:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$__m12__to_eol_len$lambda0$tail:
     calls: 1
-    bytes: 256
+    bytes: 352
   __builtin_find_if$__m4__Prec$lam$__m14__find_prec$lambda0:
     calls: 0
     bytes: 688
@@ -296,7 +296,7 @@ functions:
     bytes: 648
   __m15__line_at:
     calls: 0
-    bytes: 532
+    bytes: 624
   __m1__lex_sexp$lambda0:
     calls: 0
     bytes: 128

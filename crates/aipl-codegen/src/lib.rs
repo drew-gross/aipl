@@ -9443,31 +9443,112 @@ fn coerce_empty_to_char_array<M: Module>(
 /// plus its loads and branches for each character, and walking source text a
 /// character at a time is what the dogfooded lexer does for a living.
 ///
-/// The fast path is exactly the runtime's: still inside the string, and still
-/// inside the cached leaf, so the byte is a load at `leaf_ptr + (pos -
-/// leaf_start)` and the only write is the bumped position. Everything else —
-/// descending a rope to the leaf containing `pos`, and caching it — stays in the
-/// runtime, reached by the same call as before.
+/// The fast path is exactly the runtime's (`str24::Iter::next`): still inside
+/// the cached leaf, so the byte is one load and the only write is the bumped
+/// position. Everything else — the end of the string, descending a rope to the
+/// leaf containing `pos` and caching it — stays in the runtime, reached by the
+/// same call as before. A freshly-initialized cursor has an empty leaf, so it
+/// takes the call for any position, which is what fills the cache.
 ///
 /// The leaf test is one unsigned compare rather than two signed ones: `pos <
 /// leaf_start` wraps `rel` negative, which as a `u64` is enormous and so fails
-/// `rel < leaf_len` too. A freshly-initialized cursor has `leaf_len == 0`, so it
-/// fails that test for any position and takes the call — which is what fills the
-/// cache in the first place, and why the null `leaf_ptr` is never loaded from.
+/// `rel < leaf_len` too. And "past the end of the string" needs no test of its
+/// own: the leaf is a piece of the string, so a `pos` inside the leaf is inside
+/// the string, and one past the leaf takes the call, where the runtime answers
+/// `-1` if it is also past the end.
+///
+/// A cached leaf is a buffer window or an inline value — never a rope (the
+/// runtime's `leaf_byte` says so too) — and the two differ only in where the
+/// bytes live: a buffer's at its `w1` data pointer, an inline value's in the
+/// leaf's own three words, laid out little-endian so the content is the leaf's
+/// first `INLINE_CAP` bytes in memory (`str24`'s
+/// `cursor_layout_is_what_codegen_reads` pins that). So the dispatch is a
+/// `select` on the base address and the length, and the load is shared.
 fn emit_str_iter_next<M: Module>(
     module: &mut M,
     builder: &mut FunctionBuilder,
     builtins: &Builtins,
     cur_addr: Value,
 ) -> Value {
-    // The fast path below reads the *tagged* cursor's field layout (`ITER_*`).
-    // The wide cursor is a different struct — two whole `Str` values plus two
-    // positions — so this is not a matter of substituting offsets: a wide leaf
-    // may be inline, in which case there is no `leaf_ptr` to load and the byte
-    // lives in the cursor's own words. Until that version is written, the wide
-    // ABI takes the call per byte, exactly as this code did before the fast path
-    // existed.
-    return builtins.call(module, builder, "aipl_str_iter_next", &[cur_addr]);
+    let leaf_off = str24::ITER_LEAF_OFFSET as i32;
+    let pos = builder.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        cur_addr,
+        str24::ITER_POS_OFFSET as i32,
+    );
+    let leaf_start = builder.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        cur_addr,
+        str24::ITER_LEAF_START_OFFSET as i32,
+    );
+    let leaf_w1 = builder.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        cur_addr,
+        leaf_off + str24::STR_W1_OFFSET as i32,
+    );
+    let leaf_w2 = builder.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        cur_addr,
+        leaf_off + str24::STR_W2_OFFSET as i32,
+    );
+
+    // Classify the leaf: the tag is `w2`'s top byte.
+    let tag = builder.ins().ushr_imm_u(leaf_w2, str24::TAG_SHIFT as i64);
+    let is_inline = builder
+        .ins()
+        .icmp_imm_s(IntCC::Equal, tag, str24::TAG_INLINE as i64);
+    // Its length: 56 bits of `w2` for a buffer, one byte of it for an inline
+    // value.
+    let buf_len = builder.ins().band_imm_u(leaf_w2, str24::LEN_MASK as i64);
+    let inl_len = builder
+        .ins()
+        .ushr_imm_u(leaf_w2, str24::INLINE_LEN_SHIFT as i64);
+    let inl_len = builder.ins().band_imm_u(inl_len, 0xFF);
+    let leaf_len = builder.ins().select(is_inline, inl_len, buf_len);
+    // Where its bytes start: the data pointer, or the leaf itself.
+    let leaf_addr = builder.ins().iadd_imm_s(cur_addr, leaf_off as i64);
+    let bytes = builder.ins().select(is_inline, leaf_addr, leaf_w1);
+
+    let rel = builder.ins().isub(pos, leaf_start);
+    let in_leaf = builder.ins().icmp(IntCC::UnsignedLessThan, rel, leaf_len);
+
+    // The two paths merge through a stack slot, as `load_array_elem` does.
+    let out = i64_slot(builder);
+    let fast = builder.create_block();
+    let slow = builder.create_block();
+    let merge = builder.create_block();
+    builder.ins().brif(in_leaf, fast, &[], slow, &[]);
+
+    builder.switch_to_block(fast);
+    builder.seal_block(fast);
+    let byte_addr = builder.ins().iadd(bytes, rel);
+    let byte = builder
+        .ins()
+        .load(types::I8, MemFlagsData::trusted(), byte_addr, 0);
+    let byte = builder.ins().uextend(types::I64, byte);
+    let next_pos = builder.ins().iadd_imm_s(pos, 1);
+    builder.ins().store(
+        MemFlagsData::trusted(),
+        next_pos,
+        cur_addr,
+        str24::ITER_POS_OFFSET as i32,
+    );
+    builder.ins().stack_store(types::I64, byte, out, 0);
+    builder.ins().jump(merge, &[]);
+
+    builder.switch_to_block(slow);
+    builder.seal_block(slow);
+    let called = builtins.call(module, builder, "aipl_str_iter_next", &[cur_addr]);
+    builder.ins().stack_store(types::I64, called, out, 0);
+    builder.ins().jump(merge, &[]);
+
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    builder.ins().stack_load(types::I64, types::I64, out, 0)
 }
 
 /// The `elem_size` argument handed to the array runtime: a byte stride, or the

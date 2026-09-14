@@ -52,9 +52,9 @@ allocations: 11
 deallocations: 11
 reallocations: 4
 bytes allocated: 712
-instructions executed: 2394
-binary size: 9528
-  code: 5140
+instructions executed: 2534
+binary size: 9608
+  code: 5220
   data: 761
   metadata: 3627
 functions:
@@ -120,7 +120,7 @@ functions:
     bytes: 116
   tuple_windows$char$s0:
     calls: 2
-    bytes: 320
+    bytes: 400
   tuple_windows$i64:
     calls: 5
     bytes: 360

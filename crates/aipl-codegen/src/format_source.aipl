@@ -198,11 +198,11 @@ allocations: 21796
 deallocations: 21796
 reallocations: 2936
 bytes allocated: 3752125
-instructions executed: 8025409
-binary size: 6634688
-  code: 4357944
+instructions executed: 8053208
+binary size: 6636736
+  code: 4359988
   data: 10386
-  metadata: 2266358
+  metadata: 2266362
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -395,7 +395,7 @@ functions:
     bytes: 264
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 4
-    bytes: 212
+    bytes: 304
   __builtin_any$__m11__Prec$lam$__m31__climb$__m23__AiplTok$__m5__Ast$lambda0:
     calls: 0
     bytes: 276
@@ -407,28 +407,28 @@ functions:
     bytes: 324
   __builtin_count_is_at_least$char$s0:
     calls: 0
-    bytes: 252
+    bytes: 344
   __builtin_count_while$char$lam$__m24__lex_step$__m23__AiplTok$lambda1:
     calls: 169
-    bytes: 220
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 4
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 128
-    bytes: 184
+    bytes: 276
   __builtin_count_while$char$s0$lam$__m21__dedent$lambda1:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m21__dedent$lambda2$lambda0:
     calls: 2
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m24__to_eol_len$lambda0:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$__m24__to_eol_len$lambda0$tail:
     calls: 1
-    bytes: 256
+    bytes: 352
   __builtin_find_if$__m11__Prec$lam$__m31__find_prec$lambda0:
     calls: 0
     bytes: 688
@@ -449,7 +449,7 @@ functions:
     bytes: 364
   __builtin_int_parse:
     calls: 4
-    bytes: 1028
+    bytes: 1104
   __builtin_int_parse$lambda1:
     calls: 4
     bytes: 140
@@ -644,7 +644,7 @@ functions:
     bytes: 1124
   __m17__find_trailing_whitespace:
     calls: 4
-    bytes: 500
+    bytes: 568
   __m17__line_end_span:
     calls: 7
     bytes: 176
@@ -776,13 +776,13 @@ functions:
     bytes: 368
   __m25__unescape:
     calls: 8
-    bytes: 1168
+    bytes: 1264
   __m25__unescape_braces:
     calls: 0
-    bytes: 708
+    bytes: 792
   __m26__process_raw_string:
     calls: 2
-    bytes: 556
+    bytes: 656
   __m27__trim_prefix:
     calls: 4
     bytes: 260
@@ -791,7 +791,7 @@ functions:
     bytes: 340
   __m29__strip_test_sections:
     calls: 4
-    bytes: 692
+    bytes: 780
   __m30__parse_test_section_header:
     calls: 19
     bytes: 744
@@ -872,10 +872,10 @@ functions:
     bytes: 600
   __m33__line_at:
     calls: 0
-    bytes: 532
+    bytes: 624
   __m34__split_test_sections:
     calls: 7
-    bytes: 1136
+    bytes: 1260
   __m35__array_atom:
     calls: 0
     bytes: 2444
@@ -1196,19 +1196,19 @@ functions:
     bytes: 528
   __m37__escape_cost:
     calls: 0
-    bytes: 260
+    bytes: 352
   __m37__needs_escape:
     calls: 0
     bytes: 64
   __m37__requote:
     calls: 0
-    bytes: 2196
+    bytes: 2296
   __m3__trim_end_while$lam$__builtin_is_space:
     calls: 14
-    bytes: 300
+    bytes: 392
   __m3__trim_end_while$lam$__m1__clean_trailing_whitespace$lambda0:
     calls: 0
-    bytes: 280
+    bytes: 372
   __m4__aipl_parse_file:
     calls: 4
     bytes: 310844
@@ -1748,10 +1748,10 @@ functions:
     bytes: 996
   fmt_layout:
     calls: 7
-    bytes: 628
+    bytes: 732
   fmt_prepare:
     calls: 7
-    bytes: 924
+    bytes: 1024
   format_source:
     calls: 4
     bytes: 2144

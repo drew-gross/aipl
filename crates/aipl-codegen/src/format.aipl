@@ -675,9 +675,9 @@ allocations: 2121
 deallocations: 2121
 reallocations: 181
 bytes allocated: 168067
-instructions executed: 238625
-binary size: 232728
-  code: 148824
+instructions executed: 256983
+binary size: 233096
+  code: 149192
   data: 5052
   metadata: 78852
 functions:
@@ -719,7 +719,7 @@ functions:
     bytes: 116
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 17
-    bytes: 212
+    bytes: 304
   __builtin_any$__m2__Doc$lam$__m2__has_hard:
     calls: 0
     bytes: 32
@@ -728,10 +728,10 @@ functions:
     bytes: 324
   __builtin_count_while$char$s0$lam$__m4__dedent$lambda1:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m4__dedent$lambda2$lambda0:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_find_index$str$lam$__m8__link$FKind$str$lambda0:
     calls: 26
     bytes: 400
@@ -797,7 +797,7 @@ functions:
     bytes: 4652
   __m7__trim_end_while$lam$__builtin_is_space:
     calls: 96
-    bytes: 300
+    bytes: 392
   __m8__desugar_opt$FKind:
     calls: 6
     bytes: 700

@@ -176,11 +176,11 @@ allocations: 7676
 deallocations: 7676
 reallocations: 323
 bytes allocated: 920749
-instructions executed: 759114
-binary size: 233776
-  code: 168780
+instructions executed: 1002643
+binary size: 234808
+  code: 169816
   data: 3360
-  metadata: 61636
+  metadata: 61632
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -208,19 +208,19 @@ functions:
     bytes: 832
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 908
-    bytes: 212
+    bytes: 304
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m8__dedent$lambda1:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m8__dedent$lambda2$lambda0:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_int_parse:
     calls: 0
-    bytes: 1028
+    bytes: 1104
   __builtin_int_parse$lambda1:
     calls: 0
     bytes: 140
@@ -238,7 +238,7 @@ functions:
     bytes: 1300
   __m1__char_class_body:
     calls: 13
-    bytes: 664
+    bytes: 756
   __m1__class_char:
     calls: 276
     bytes: 996
@@ -259,7 +259,7 @@ functions:
     bytes: 1228
   __m1__json_str:
     calls: 170
-    bytes: 764
+    bytes: 864
   __m1__matcher_pat:
     calls: 77
     bytes: 6684
@@ -274,7 +274,7 @@ functions:
     bytes: 4600
   __m1__re_escape:
     calls: 100
-    bytes: 1532
+    bytes: 1628
   __m1__run_len:
     calls: 17
     bytes: 1340
@@ -283,7 +283,7 @@ functions:
     bytes: 724
   __m5__unescape:
     calls: 0
-    bytes: 1168
+    bytes: 1264
   __m6__aipl_rules$lambda0:
     calls: 0
     bytes: 136
@@ -322,13 +322,13 @@ functions:
     bytes: 1364
   __m6__raw_tpl_kind:
     calls: 0
-    bytes: 3216
+    bytes: 3308
   __m6__tpl_kind:
     calls: 0
     bytes: 2608
   __m7__process_raw_string:
     calls: 0
-    bytes: 1712
+    bytes: 1828
   __rec_drop___m1__Pat:
     calls: 181
     bytes: 268

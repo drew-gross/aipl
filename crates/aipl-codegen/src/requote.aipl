@@ -187,9 +187,9 @@ allocations: 50
 deallocations: 50
 reallocations: 0
 bytes allocated: 3469
-instructions executed: 18300
-binary size: 20536
-  code: 9652
+instructions executed: 28836
+binary size: 20712
+  code: 9828
   data: 3275
   metadata: 7609
 functions:
@@ -222,7 +222,7 @@ functions:
     bytes: (external)
   escape_cost:
     calls: 37
-    bytes: 260
+    bytes: 352
   is_shared_escape:
     calls: 36
     bytes: 64
@@ -234,7 +234,7 @@ functions:
     bytes: 64
   redelimit:
     calls: 16
-    bytes: 1188
+    bytes: 1272
   requote:
     calls: 15
     bytes: 1104

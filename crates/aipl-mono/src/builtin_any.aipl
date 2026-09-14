@@ -42,11 +42,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 912
-binary size: 6512
-  code: 2892
+instructions executed: 1140
+binary size: 6784
+  code: 3168
   data: 812
-  metadata: 2808
+  metadata: 2804
 functions:
   __test$any:
     calls: 1
@@ -80,13 +80,13 @@ functions:
     bytes: (external)
   any$char$lam$__test$any$lambda3:
     calls: 1
-    bytes: 140
+    bytes: 232
   any$char$s0$lam$__test$any$lambda4:
     calls: 1
-    bytes: 140
+    bytes: 232
   any$char$s0$lam$__test$any$lambda5:
     calls: 1
-    bytes: 140
+    bytes: 232
   any$i64$lam$__test$any$lambda0:
     calls: 1
     bytes: 192

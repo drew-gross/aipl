@@ -41,9 +41,9 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 280
-instructions executed: 2171
-binary size: 7608
-  code: 4052
+instructions executed: 2560
+binary size: 7696
+  code: 4140
   data: 904
   metadata: 2652
 functions:
@@ -73,7 +73,7 @@ functions:
     bytes: (external)
   digits_to_int:
     calls: 5
-    bytes: 280
+    bytes: 368
   digits_to_int$lambda0:
     calls: 8
     bytes: 136

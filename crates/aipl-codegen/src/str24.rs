@@ -70,10 +70,10 @@ pub(crate) const BUF_HEADER: usize = 16;
 /// A static buffer's refcount, which `retain`/`release` never touch.
 pub(crate) const STATIC_REFCOUNT: i64 = i64::MAX;
 
-const LEN_MASK: u64 = (1 << 56) - 1;
-const TAG_SHIFT: u32 = 56;
+pub(crate) const LEN_MASK: u64 = (1 << 56) - 1;
+pub(crate) const TAG_SHIFT: u32 = 56;
 /// Inline length lives in byte 22 — `w2`'s sixth byte.
-const INLINE_LEN_SHIFT: u32 = 48;
+pub(crate) const INLINE_LEN_SHIFT: u32 = 48;
 
 /// A `str` value: three words, no indirection for buffer or inline.
 #[repr(C)]
@@ -1414,6 +1414,19 @@ pub(crate) extern "C" fn aipl_arr_retain_str(elems: *const u8, len: i64) {
 /// Bytes of the cursor state codegen must reserve for `for (let c : s)`.
 pub(crate) const ITER_SIZE: usize = core::mem::size_of::<Iter>();
 
+// The cursor's field offsets, for the fast path codegen inlines
+// (`emit_str_iter_next`): it reads the cached leaf and the position straight
+// out of the cursor, so it needs the same layout `Iter::next` reads through the
+// struct. `#[repr(C)]` on `Iter` is what makes these the offsets; the
+// `cursor_layout_is_what_codegen_reads` test pins them to the struct.
+pub(crate) const ITER_LEAF_OFFSET: usize = core::mem::offset_of!(Iter, leaf);
+pub(crate) const ITER_POS_OFFSET: usize = core::mem::offset_of!(Iter, pos);
+pub(crate) const ITER_LEAF_START_OFFSET: usize = core::mem::offset_of!(Iter, leaf_start);
+/// A `Str`'s three words, in memory: `w1` is a buffer's `data` pointer, `w2`
+/// carries the tag and length (see the layout at the top of the file).
+pub(crate) const STR_W1_OFFSET: usize = core::mem::offset_of!(Str, w1);
+pub(crate) const STR_W2_OFFSET: usize = core::mem::offset_of!(Str, w2);
+
 /// A flattened optional is `{tag: i64, value}`, so its value starts one word in
 /// and a `str?` is that word plus a whole `Str`. Mirrors codegen's
 /// `OPT_VALUE_OFFSET` / `elem_size_of`; both runtimes read the same layout.
@@ -1901,6 +1914,29 @@ mod tests {
             assert_eq!(got, src.as_bytes(), "{what}");
         }
         assert!(ITER_SIZE >= core::mem::size_of::<Str>(), "cursor is sized");
+    }
+
+    /// The inlined `for (let c : s)` step reads the cursor by offset, and an
+    /// inline leaf's bytes straight out of the leaf's own words — so the
+    /// offsets, the word order, and the little-endian content layout the
+    /// `inline_bytes` accessor defines all have to be what memory holds.
+    #[test]
+    fn cursor_layout_is_what_codegen_reads() {
+        assert_eq!(ITER_LEAF_OFFSET, STR_SIZE);
+        assert_eq!(ITER_POS_OFFSET, 2 * STR_SIZE);
+        assert_eq!(ITER_LEAF_START_OFFSET, 2 * STR_SIZE + 8);
+        assert_eq!(ITER_SIZE, 2 * STR_SIZE + 16);
+        assert_eq!(STR_W1_OFFSET, 8);
+        assert_eq!(STR_W2_OFFSET, 16);
+        // An inline value's content is its first `INLINE_CAP` bytes in memory.
+        let s = from_bytes(b"inline, twenty-two");
+        assert_eq!(s.tag(), TAG_INLINE);
+        let raw: [u8; STR_SIZE] = unsafe { core::mem::transmute(s) };
+        assert_eq!(&raw[..s.len()], b"inline, twenty-two");
+        // A buffer's byte `i` is at `w1 + i`.
+        let long = from_bytes(b"a buffer, longer than the inline capacity");
+        assert_eq!(long.tag(), TAG_BUFFER);
+        assert_eq!(unsafe { *(long.w1 as *const u8).add(3) }, b'u');
     }
 
     #[test]

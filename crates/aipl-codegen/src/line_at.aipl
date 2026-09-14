@@ -49,11 +49,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2209
-binary size: 4072
-  code: 1924
+instructions executed: 3425
+binary size: 4160
+  code: 2016
   data: 586
-  metadata: 1562
+  metadata: 1558
 functions:
   __eq_LineAt:
     calls: 7
@@ -78,7 +78,7 @@ functions:
     bytes: (external)
   line_at:
     calls: 7
-    bytes: 532
+    bytes: 624
   main:
     calls: 1
     bytes: 108

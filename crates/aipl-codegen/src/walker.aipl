@@ -3125,9 +3125,9 @@ allocations: 15810
 deallocations: 15810
 reallocations: 1777
 bytes allocated: 3300526
-instructions executed: 25103116
-binary size: 10052000
-  code: 6345256
+instructions executed: 25373128
+binary size: 10053560
+  code: 6346816
   data: 30964
   metadata: 3675780
 functions:
@@ -3181,7 +3181,7 @@ functions:
     bytes: 832
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 5
-    bytes: 212
+    bytes: 304
   __builtin_any$__m1__Doc$lam$__m1__has_hard:
     calls: 0
     bytes: 32
@@ -3190,31 +3190,31 @@ functions:
     bytes: 324
   __builtin_count_is_at_least$char$s0:
     calls: 54
-    bytes: 252
+    bytes: 344
   __builtin_count_while$char$lam$__m9__lex_step$__m8__AiplTok$lambda1:
     calls: 1377
-    bytes: 220
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 26
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 736
-    bytes: 184
+    bytes: 276
   __builtin_count_while$char$s0$lam$__m3__dedent$lambda1:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m3__dedent$lambda2$lambda0:
     calls: 2
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m9__to_eol_len$lambda0:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$__m9__to_eol_len$lambda0$tail:
     calls: 24
-    bytes: 256
+    bytes: 352
   __builtin_int_parse:
     calls: 26
-    bytes: 1028
+    bytes: 1104
   __builtin_int_parse$lambda1:
     calls: 26
     bytes: 140
@@ -3241,10 +3241,10 @@ functions:
     bytes: 300
   __m10__unescape:
     calls: 10
-    bytes: 1168
+    bytes: 1264
   __m11__process_raw_string:
     calls: 1
-    bytes: 556
+    bytes: 656
   __m12__trim_prefix:
     calls: 24
     bytes: 260
@@ -3253,13 +3253,13 @@ functions:
     bytes: 340
   __m16__escape_cost:
     calls: 8
-    bytes: 260
+    bytes: 352
   __m16__needs_escape:
     calls: 18
     bytes: 64
   __m16__requote:
     calls: 4
-    bytes: 2196
+    bytes: 2296
   __m1__col_after:
     calls: 1124
     bytes: 596
@@ -3295,7 +3295,7 @@ functions:
     bytes: 1276
   __m6__trim_end_while$lam$__builtin_is_space:
     calls: 461
-    bytes: 300
+    bytes: 392
   __m8__aipl_rules:
     calls: 163
     bytes: 90368
@@ -3337,7 +3337,7 @@ functions:
     bytes: 1364
   __m8__raw_tpl_kind:
     calls: 0
-    bytes: 3216
+    bytes: 3308
   __m8__tpl_kind:
     calls: 2
     bytes: 2608
@@ -3394,7 +3394,7 @@ functions:
     bytes: 7868
   __test$new_walker:
     calls: 1
-    bytes: 11976
+    bytes: 12152
   __test$struct_pattern:
     calls: 1
     bytes: 2188

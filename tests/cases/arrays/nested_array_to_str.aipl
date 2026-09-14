@@ -20,18 +20,18 @@ allocations: 14
 deallocations: 14
 reallocations: 0
 bytes allocated: 700
-instructions executed: 4311
-binary size: 12304
-  code: 6564
+instructions executed: 4623
+binary size: 12464
+  code: 6720
   data: 987
-  metadata: 4753
+  metadata: 4757
 functions:
   __to_str_bool$arr$arr:
     calls: 1
     bytes: 1188
   __to_str_char$arr$arr$arr:
     calls: 1
-    bytes: 1592
+    bytes: 1748
   __to_str_i64$arr$arr:
     calls: 2
     bytes: 1160

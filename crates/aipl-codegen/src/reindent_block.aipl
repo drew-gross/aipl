@@ -107,21 +107,21 @@ allocations: 109
 deallocations: 109
 reallocations: 14
 bytes allocated: 6657
-instructions executed: 8653
-binary size: 12664
-  code: 7084
+instructions executed: 11619
+binary size: 12936
+  code: 7360
   data: 748
-  metadata: 4832
+  metadata: 4828
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 24
-    bytes: 212
+    bytes: 304
   __builtin_count_while$char$s0$lam$__m1__dedent$lambda1:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m1__dedent$lambda2$lambda0:
     calls: 7
-    bytes: 172
+    bytes: 264
   __test$reindent_block:
     calls: 1
     bytes: 1760

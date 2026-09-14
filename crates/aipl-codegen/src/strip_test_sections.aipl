@@ -48,9 +48,9 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 5171
-binary size: 6936
-  code: 3180
+instructions executed: 9229
+binary size: 7024
+  code: 3268
   data: 870
   metadata: 2886
 functions:
@@ -80,4 +80,4 @@ functions:
     bytes: 128
   strip_test_sections:
     calls: 9
-    bytes: 692
+    bytes: 780

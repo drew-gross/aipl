@@ -4307,11 +4307,11 @@ allocations: 1979075
 deallocations: 1979075
 reallocations: 245238
 bytes allocated: 293944877
-instructions executed: 459573813
-binary size: 5911880
-  code: 3860856
+instructions executed: 459947662
+binary size: 5913224
+  code: 3862196
   data: 48556
-  metadata: 2002468
+  metadata: 2002472
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4504,7 +4504,7 @@ functions:
     bytes: 384
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 85
-    bytes: 212
+    bytes: 304
   __builtin_any$__m15__Doc$lam$__m15__has_hard:
     calls: 0
     bytes: 32
@@ -4522,25 +4522,25 @@ functions:
     bytes: 380
   __builtin_count_while$char$lam$__m22__lex_step$__m21__AiplTok$lambda1:
     calls: 2401
-    bytes: 220
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 471
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 1975
-    bytes: 184
+    bytes: 276
   __builtin_count_while$char$s0$lam$__m17__dedent$lambda1:
     calls: 0
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m17__dedent$lambda2$lambda0:
     calls: 1
-    bytes: 172
+    bytes: 264
   __builtin_count_while$char$s0$lam$__m22__to_eol_len$lambda0:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$__m22__to_eol_len$lambda0$tail:
     calls: 53
-    bytes: 256
+    bytes: 352
   __builtin_find_if$__m7__Prec$lam$__m29__find_prec$lambda0:
     calls: 367
     bytes: 688
@@ -4561,7 +4561,7 @@ functions:
     bytes: 364
   __builtin_int_parse:
     calls: 471
-    bytes: 1028
+    bytes: 1104
   __builtin_int_parse$lambda1:
     calls: 439
     bytes: 140
@@ -4708,7 +4708,7 @@ functions:
     bytes: 1124
   __m13__find_trailing_whitespace:
     calls: 3
-    bytes: 500
+    bytes: 568
   __m13__line_end_span:
     calls: 4
     bytes: 176
@@ -4771,7 +4771,7 @@ functions:
     bytes: 1276
   __m20__trim_end_while$lam$__builtin_is_space:
     calls: 47
-    bytes: 300
+    bytes: 392
   __m21__aipl_rules$lambda0:
     calls: 0
     bytes: 136
@@ -4867,13 +4867,13 @@ functions:
     bytes: 368
   __m23__unescape:
     calls: 34
-    bytes: 1168
+    bytes: 1264
   __m23__unescape_braces:
     calls: 2
-    bytes: 708
+    bytes: 792
   __m24__process_raw_string:
     calls: 1
-    bytes: 556
+    bytes: 656
   __m25__trim_prefix:
     calls: 68
     bytes: 260
@@ -4882,7 +4882,7 @@ functions:
     bytes: 340
   __m27__strip_test_sections:
     calls: 146
-    bytes: 692
+    bytes: 780
   __m28__parse_test_section_header:
     calls: 251
     bytes: 744
@@ -4999,7 +4999,7 @@ functions:
     bytes: 736
   __m31__line_at:
     calls: 9
-    bytes: 532
+    bytes: 624
   __m3__at:
     calls: 4
     bytes: 152
