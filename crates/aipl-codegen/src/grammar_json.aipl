@@ -107,7 +107,7 @@ fn json_rules() -> TokenRule<JsonTok>[] {
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
     [
         TokenRule { matcher: CharRun(" \t\r\n"), emit: Bare(Punct), trivia: true },
-        TokenRule { matcher: Delimited("\"", "\"\\/bfnrtu"), emit: Of(Str) },
+        TokenRule { matcher: Delimited(`"`, `"\\/bfnrtu`), emit: Of(Str) },
         TokenRule { matcher: Exact("-"), emit: Bare(Punct) },
         TokenRule { matcher: Float, emit: Bare(Num) },
         TokenRule { matcher: Int, emit: Bare(Num) },
@@ -321,7 +321,7 @@ pub fn parse_json(src: str) -> Json!ParseError {
     assert(parse_json("null")? == Null);
     assert(parse_json("true")? == Bool(true));
     assert(parse_json("false")? == Bool(false));
-    assert(parse_json("\"hi\"")? == String("hi"));
+    assert(parse_json(`"hi"`)? == String("hi"));
     assert(parse_json("42")? == Number("42"));
     assert(parse_json("3.14")? == Number("3.14"));
     assert(parse_json("1e9")? == Number("1e9"));
@@ -331,8 +331,8 @@ pub fn parse_json(src: str) -> Json!ParseError {
     assert(parse_json("-2.5")? == Number("-2.5"));
 
     // Escapes are decoded on the way into the AST.
-    assert(parse_json("\"a\\nb\"")? == String("a\nb"));
-    assert(parse_json("\"q\\\"q\"")? == String("q\"q"));
+    assert(parse_json(`"a\\nb"`)? == String("a\nb"));
+    assert(parse_json(`"q\\"q"`)? == String(`q"q`));
 
     // ---- arrays: a separated `Many`, and the empty case ----
     assert(parse_json("[]")? == Array([]));
@@ -414,7 +414,7 @@ pub fn render_json(self: Json) -> str {
 
     assert(render_json(Array([])) == "[]");
     assert(render_json(Object([])) == "{}");
-    assert(render_json(Member("k", Null)) == "\"k\":null");
+    assert(render_json(Member("k", Null)) == `"k":null`);
 })
 
 # The inverse of the `unescape` lowering applies: the two characters JSON
@@ -427,7 +427,7 @@ fn escape_json(s: str) -> str {
         // append, and the append is the statement. A statement `match` may not
         // assign to a binding declared outside it.
         let piece = match (c) {
-            '"' => "\\\"",
+            '"' => `\\"`,
             '\\' => "\\\\",
             '\n' => "\\n",
             '\t' => "\\t",
@@ -442,7 +442,7 @@ fn escape_json(s: str) -> str {
     out
 }.test({
     assert(escape_json("plain") == "plain");
-    assert(escape_json("a\"b") == """a\"b""");
+    assert(escape_json(`a"b`) == """a\"b""");
     assert(escape_json("a\nb") == """a\nb""");
     assert(escape_json("a\\b") == """a\\b""");
     assert(escape_json("") == "");
@@ -468,7 +468,7 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
     render_cst(json_grammar(), src, json_cst(src)?, json_space, width)
 }.test({
     // Canonical spacing, whatever the source had.
-    assert(format_json("{\"a\":1,\"b\":[1,2]}", 80)? == "{ \"a\": 1, \"b\": [1, 2] }");
+    assert(format_json(`\{"a":1,"b":[1,2]\}`, 80)? == `\{ "a": 1, "b": [1, 2] \}`);
     assert(format_json("[  ]", 80)? == "[]");
     assert(format_json("{}", 80)? == "{}");
     assert(format_json("  -12  ", 80)? == "-12");
@@ -476,15 +476,13 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
 
     // Too wide: one member per indented line, and no trailing comma — strict
     // JSON has none to add.
-    assert(format_json("{\"a\":1,\"b\":2}", 12)? == "{\n    \"a\": 1,\n    \"b\": 2\n}\n");
+    assert(format_json(`\{"a":1,"b":2\}`, 12)? == `\{\n    "a": 1,\n    "b": 2\n\}\n`);
     assert(format_json("[1,2,3]", 5)? == "[\n    1,\n    2,\n    3\n]\n");
     // Only what does not fit breaks; the inner array still fits its line.
-    assert(
-        format_json("{\"xs\":[1,2],\"y\":3}", 18)? == "{\n    \"xs\": [1, 2],\n    \"y\": 3\n}\n",
-    );
+    assert(format_json(`\{"xs":[1,2],"y":3\}`, 18)? == `\{\n    "xs": [1, 2],\n    "y": 3\n\}\n`);
 
     // ---- the two properties a formatter has to have ----
-    let messy = "  {\"b\" : [ 1,2 ] , \"a\":null }  ";
+    let messy = `  \{"b" : [ 1,2 ] , "a":null \}  `;
     assert(parse_json(format_json(messy, 80)?)? == parse_json(messy)?);
     let once = format_json(messy, 80)?;
     assert(format_json(once, 80)? == once);
@@ -502,9 +500,9 @@ deallocations: 20586
 reallocations: 2578
 bytes allocated: 2298738
 instructions executed: 4418969
-binary size: 447200
+binary size: 447176
   code: 288884
-  data: 7892
+  data: 7868
   metadata: 150424
 functions:
   __arr_drop_Json:

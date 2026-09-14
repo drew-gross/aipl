@@ -693,7 +693,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
             Production { name: "a", rule: Named("missing"), build: Kids(keep), layout: Inline },
         ],
     };
-    assert(link(bad) == err(ParseError { message: "no rule named \"missing\"", span: 0..0 }));
+    assert(link(bad) == err(ParseError { message: `no rule named "missing"`, span: 0..0 }));
 
     // So is a duplicate name — the typo that otherwise reads as a working grammar.
     let dup: Grammar<Kind, Node> = Grammar {
@@ -702,7 +702,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
             Production { name: "a", rule: Literal("y"), build: Kids(keep), layout: Inline },
         ],
     };
-    assert(link(dup) == err(ParseError { message: "duplicate rule name \"a\"", span: 0..0 }));
+    assert(link(dup) == err(ParseError { message: `duplicate rule name "a"`, span: 0..0 }));
 
     // Groups are numbered across the whole grammar, a group before its insides,
     // in the order the rules mention them. `p` holds one directly and one nested
@@ -852,7 +852,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
             },
         ],
     };
-    assert(link(bad_nest) == err(ParseError { message: "no rule named \"nope\"", span: 0..0 }));
+    assert(link(bad_nest) == err(ParseError { message: `no rule named "nope"`, span: 0..0 }));
 })
 
 // ---------- test-only fixtures ----------

@@ -28,7 +28,7 @@ pub fn escape_text(self: char) -> str {
     assert(escape_text('r') == "\r");
     // Every other escaped char decodes to itself.
     assert(escape_text('\\') == "\\");
-    assert(escape_text('"') == "\"");
+    assert(escape_text('"') == `"`);
     assert(escape_text('{') == "{");
     assert(escape_text('`') == "`");
 })
@@ -65,7 +65,7 @@ pub fn unescape(self: str) -> str {
     assert(unescape("\\r") == "\r");
     // An escaped backslash / quote / brace / backtick decodes to the bare char.
     assert(unescape("\\\\") == "\\");
-    assert(unescape("\\\"") == "\"");
+    assert(unescape(`\\"`) == `"`);
     assert(unescape("\\{") == "{");
     // Runs before, between, and after escapes are all preserved.
     assert(unescape("a\\nb") == "a\nb");
@@ -115,9 +115,9 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 528
 instructions executed: 6833
-binary size: 17352
+binary size: 17344
   code: 9664
-  data: 1687
+  data: 1679
   metadata: 6001
 functions:
   __test$escape_text:

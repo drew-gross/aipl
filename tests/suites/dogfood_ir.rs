@@ -775,11 +775,28 @@ fn promote_staged_ir() {
         });
         sanity_check_of(a, &artifact);
         let live = artifact_path_of(a);
-        std::fs::write(&live, &artifact)
-            .unwrap_or_else(|e| panic!("write live {}: {e}", live.display()));
+        // A candidate identical to the live artifact is not written: the file's
+        // mtime is a build input (`build.rs` lowers it into the prebuilt object
+        // on `rerun-if-changed`), so rewriting the same bytes would recompile
+        // `aipl-codegen`, relink every test binary, and — on macOS — queue each
+        // for Gatekeeper's first-exec scan, ten minutes of nothing. The gate
+        // reads the `(unchanged)` and skips its rebuild step.
+        let unchanged = std::fs::read_to_string(&live).is_ok_and(|l| lf(&l) == lf(&artifact));
+        if !unchanged {
+            std::fs::write(&live, &artifact)
+                .unwrap_or_else(|e| panic!("write live {}: {e}", live.display()));
+        }
         std::fs::remove_file(&staged)
             .unwrap_or_else(|e| panic!("remove staged {}: {e}", staged.display()));
-        eprintln!("promoted {} → {}", staged.display(), live.display());
+        if unchanged {
+            eprintln!(
+                "promoted {} → {} (unchanged: identical to the live artifact)",
+                staged.display(),
+                live.display()
+            );
+        } else {
+            eprintln!("promoted {} → {}", staged.display(), live.display());
+        }
     }
     panic!(
         "promote_staged_ir updated the live .clif files — review the diff,\n\

@@ -123,7 +123,7 @@ pub fn parse_spec(src: str) -> Spec!str {
     // Rejections: a mistyped marker, and unusable companion paths.
     assert(parse_spec("x\n--- stdou ---\n").is_err_and(|m| m.contains("unknown section")));
     assert(parse_spec("x\n--- file: ---\n").is_err_and(|m| m.contains("needs a path")));
-    assert(parse_spec("x\n--- file: a\\b ---\n").is_err_and(|m| m.contains("use \"/\"")));
+    assert(parse_spec("x\n--- file: a\\b ---\n").is_err_and(|m| m.contains(`use "/"`)));
 })
 
 # Fold one finished section into the spec. `name` is `""` for the preamble.

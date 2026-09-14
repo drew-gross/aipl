@@ -63,6 +63,7 @@ import {
 import { is_operator_name } from "./is_operator_name.aipl";
 import { AiplTok, lex_aipl } from "./lex_aipl.aipl";
 import { LexResult } from "./lexer.aipl";
+import { requote } from "./requote.aipl";
 
 # What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
 # `TokenKind` for an ordinary token, plus the three interpolated-template pieces,
@@ -1910,9 +1911,15 @@ fn atom(self: W) -> WDoc!FmtError {
 }
 
 # A `"""..."""` raw string is a `RawBlock` so its closing delimiter aligns under
-# the opening one; a plain `"..."` string is ordinary verbatim text.
+# the opening one; a single-line string is ordinary text, spelled with whichever
+# of `"` and `` ` `` needs fewer escapes (`requote`) — the one edit the formatter
+# makes inside a literal, and a value-preserving one.
 fn str_atom(self: WStr) -> WDoc {
-    let d = if (self.text.starts_with(`"""`)) { RawBlock(self.text) } else { Text(self.text) };
+    let d = if (self.text.starts_with(`"""`)) {
+        RawBlock(self.text)
+    } else {
+        Text(self.text.requote())
+    };
     WDoc { w: self.w, doc: d }
 }
 
@@ -2205,9 +2212,12 @@ fn pattern_alts(self: W, first: Doc) -> WDoc!FmtError {
 
 fn pattern(self: W) -> WDoc!FmtError {
     // A literal pattern — a string (`"lit" => ..`, str scrutinee), a char
-    // (`'c' => ..`, char scrutinee) or an integer — lays out as its verbatim
-    // source, so its escapes round-trip untouched.
-    if (self.peek_is(StrTok) || self.peek_is(CharTok) || self.peek_is(Num)) {
+    // (`'c' => ..`, char scrutinee) or an integer — lays out as its source,
+    // with a string re-delimited exactly as it would be in expression position.
+    if (self.peek_is(StrTok)) {
+        return ok(self.bump().str_atom());
+    };
+    if (self.peek_is(CharTok) || self.peek_is(Num)) {
         let b = self.bump();
         return ok(WDoc { w: b.w, doc: Text(b.text) });
     };
@@ -2615,7 +2625,7 @@ fn walker_of(src: str) -> W!FmtError {
     assert(format_program(`fn f() -> str \{ "a  b" }`, 100)? == `fn f() -> str \{ "a  b" }`);
     // A lex error surfaces as a formatter error rather than a panic.
     assert(
-        format_program(`fn f() -> str \{ "unterminated }`, 100).is_err_and(
+        format_program("fn f() -> str { \"unterminated }", 100).is_err_and(
             |e| e.message.is_nonempty(),
         ),
     );
@@ -2632,11 +2642,11 @@ fn walker_of(src: str) -> W!FmtError {
 
     // A `"""` block is a `RawBlock`, so its closing delimiter re-aligns under
     // the opening one rather than staying where the author left it.
-    assert(walker_of("\"\"\"\n    a\n\"\"\"")?.expr().rendered(100)? == "\"\"\"\n    a\n\"\"\"\n");
+    assert(walker_of(`"""\n    a\n"""`)?.expr().rendered(100)? == `"""\n    a\n"""\n`);
 
     // A template literal is copied verbatim, interpolations and all — three
     // token positions (head, middle, tail) that only a kind tells apart.
-    assert(walker_of(`\`a\{b}c\``)?.expr().rendered(100)? == `\`a\{b}c\``);
+    assert(walker_of("`a{b}c`")?.expr().rendered(100)? == "`a{b}c`");
 
     // --- expressions ------------------------------------------------------------
     assert(walker_of("a")?.expr().rendered(100)? == "a");
@@ -2892,13 +2902,11 @@ fn walker_of(src: str) -> W!FmtError {
     // Imports hoist above the items, builtins before paths, each on its own line
     // and separated from the first item by a blank line.
     assert(
-        walker_of(
-            `import \{ x } from "./m.aipl" ; import \{ b , a } from builtins ; fn f ( ) \{ }`,
-        )?
+        walker_of("import { x } from \"./m.aipl\" ; import { b , a } from builtins ; fn f ( ) { }")?
             .program()
             .rendered(
                 100,
-            )? == `import \{ a, b } from builtins;\nimport \{ x } from "./m.aipl";\n\nfn f() \{}\n`,
+            )? == "import { a, b } from builtins;\nimport { x } from \"./m.aipl\";\n\nfn f() {}\n",
     );
     // A struct and a variant are items too.
     assert(
@@ -3117,11 +3125,11 @@ allocations: 15810
 deallocations: 15810
 reallocations: 1777
 bytes allocated: 3300526
-instructions executed: 25101878
-binary size: 10047408
-  code: 6342232
-  data: 31012
-  metadata: 3674164
+instructions executed: 25103116
+binary size: 10051640
+  code: 6345256
+  data: 30964
+  metadata: 3675420
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3267,6 +3275,15 @@ functions:
   __m13__trim_suffix:
     calls: 2
     bytes: 340
+  __m16__escape_cost:
+    calls: 8
+    bytes: 260
+  __m16__needs_escape:
+    calls: 18
+    bytes: 64
+  __m16__requote:
+    calls: 4
+    bytes: 2196
   __m1__col_after:
     calls: 1124
     bytes: 596
@@ -3635,7 +3652,7 @@ functions:
     bytes: 11032
   pattern:
     calls: 15
-    bytes: 14532
+    bytes: 14992
   pattern_alts:
     calls: 7
     bytes: 3092
@@ -3701,7 +3718,7 @@ functions:
     bytes: 5876
   str_atom:
     calls: 5
-    bytes: 568
+    bytes: 612
   struct_atom:
     calls: 2
     bytes: 3312

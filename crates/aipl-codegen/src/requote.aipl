@@ -1,0 +1,240 @@
+// The formatter's string re-delimiter. A `"..."` literal and an
+// interpolation-free `` `...` `` literal denote the same value and differ only in
+// which characters they must escape — `"` under the first, `` ` ``/`{`/`}` under
+// the second — so `aipl fmt` spells each literal with whichever delimiter needs
+// fewer escapes. `walker.aipl` applies it to every single-line string token.
+import {
+    equal as ==,
+    extend,
+    first,
+    len,
+    less_than as <,
+    logical_and as &&,
+    logical_not as !,
+    logical_or as ||,
+    not_equal as !=,
+    starts_with,
+    value_or,
+    wrapping_increment as ++,
+    wrapping_sub as -,
+} from builtins;
+
+# Whether `self` must be written escaped inside a single-line literal delimited
+# by `delim`: the delimiter itself, plus `{`/`}` under a backtick, where a bare
+# brace would open an interpolation. Every other escape (`\n`, `\t`, `\r`, `\\`)
+# is spelled the same under both delimiters.
+fn needs_escape(self: char, delim: char) -> bool {
+    self == delim || (delim == '`' && (self == '{' || self == '}'))
+}.test({
+    assert('"'.needs_escape('"'));
+    assert(!'`'.needs_escape('"'));
+    assert(!'{'.needs_escape('"'));
+    assert('`'.needs_escape('`'));
+    assert('{'.needs_escape('`'));
+    assert('}'.needs_escape('`'));
+    assert(!'"'.needs_escape('`'));
+    assert(!'a'.needs_escape('"'));
+    assert(!'\\'.needs_escape('`'));
+})
+
+# Whether `\X` with `self` as X is an escape both delimiters share — so a swap
+# copies it as-is rather than deciding it afresh for the new delimiter.
+fn is_shared_escape(self: char) -> bool {
+    self == 'n' || self == 't' || self == 'r' || self == '\\'
+}.test({
+    assert('n'.is_shared_escape());
+    assert('t'.is_shared_escape());
+    assert('r'.is_shared_escape());
+    assert('\\'.is_shared_escape());
+    assert(!'"'.is_shared_escape());
+    assert(!'`'.is_shared_escape());
+    assert(!'{'.is_shared_escape());
+})
+
+# How many escapes `body` — the source text between a literal's delimiters,
+# escapes undecoded — would need under `delim`. A `\X` pair counts as the one
+# char X, so `\"` costs one under `"` and nothing under a backtick, exactly as a
+# bare `"` does.
+fn escape_cost(body: str, delim: char) -> u64 {
+    mut cost: u64 = 0;
+    mut escaped = false;
+    for (let c : body) {
+        if (escaped) {
+            set escaped = false;
+            if (c.needs_escape(delim)) {
+                set cost++;
+            };
+        } else if (c == '\\') {
+            set escaped = true;
+        } else if (c.needs_escape(delim)) {
+            set cost++;
+        };
+    }
+    cost
+}.test({
+    assert(escape_cost("", '"') == 0);
+    assert(escape_cost("plain", '"') == 0);
+    assert(escape_cost("plain", '`') == 0);
+    // Escaped and bare occurrences cost the same: what matters is the value.
+    assert(escape_cost(`say \\"hi\\"`, '"') == 2);
+    assert(escape_cost(`say "hi"`, '"') == 2);
+    assert(escape_cost(`say \\"hi\\"`, '`') == 0);
+    // Braces and backticks cost under a backtick only.
+    assert(escape_cost("\\{a\\} `b`", '`') == 4);
+    assert(escape_cost("\\{a\\} `b`", '"') == 0);
+    // The shared escapes cost nothing under either.
+    assert(escape_cost("a\\nb\\\\c\\t", '"') == 0);
+    assert(escape_cost("a\\nb\\\\c\\t", '`') == 0);
+    // An escaped backslash's X is not the start of another escape.
+    assert(escape_cost(`\\\\"`, '"') == 1);
+    // Both kinds present: each delimiter pays for its own.
+    assert(escape_cost("\\\"{", '"') == 1);
+    assert(escape_cost("\\\"{", '`') == 1);
+})
+
+# `body` respelled for `delim`: an escape the old delimiter needed and this one
+# doesn't is dropped (`\"` → `"` under a backtick), a bare char this one needs
+# escaped gains its backslash (`{` → `\{`), and everything else — the shared
+# escapes, plain text — copies verbatim. Respelling for the delimiter `body`
+# already has is the identity.
+fn redelimit(body: str, delim: char) -> str {
+    mut out = "";
+    mut escaped = false;
+    for (let c : body) {
+        if (escaped) {
+            set escaped = false;
+            if (c.is_shared_escape() || c.needs_escape(delim)) {
+                set out.extend(`\\{c}`);
+            } else {
+                set out.extend(`{c}`);
+            };
+        } else if (c == '\\') {
+            set escaped = true;
+        } else if (c.needs_escape(delim)) {
+            set out.extend(`\\{c}`);
+        } else {
+            set out.extend(`{c}`);
+        };
+    }
+    out
+}.test({
+    assert(redelimit("", '`') == "");
+    assert(redelimit("plain", '`') == "plain");
+    // `"` → backtick: quotes shed their backslashes.
+    assert(redelimit(`say \\"hi\\"`, '`') == `say "hi"`);
+    // backtick → `"`: braces and backticks shed theirs.
+    assert(redelimit("\\{a\\} \\`b\\`", '"') == "{a} `b`");
+    // The reverse directions gain them.
+    assert(redelimit("{a} `b`", '`') == "\\{a\\} \\`b\\`");
+    assert(redelimit(`say "hi"`, '"') == `say \\"hi\\"`);
+
+    // Shared escapes copy verbatim under either delimiter — and an escaped
+    // backslash is one char, so the quote after it is a bare quote.
+    assert(redelimit("a\\nb\\\\c\\t", '`') == "a\\nb\\\\c\\t");
+    assert(redelimit(`\\\\"`, '`') == `\\\\"`);
+    // Respelling for the delimiter the body already has changes nothing.
+    assert(redelimit(`say \\"hi\\"`, '"') == `say \\"hi\\"`);
+    assert(redelimit("\\{a\\} \\`b\\`", '`') == "\\{a\\} \\`b\\`");
+})
+
+# A string token's source text, re-delimited as whichever of `"` and `` ` ``
+# spells its value with fewer escapes. A tie keeps the delimiter it has, so a
+# literal with nothing to escape is never rewritten; a `"""`/```` ``` ```` block
+# (whose two forms are not interchangeable — only the raw template decodes `\{`)
+# is returned unchanged.
+pub fn requote(self: str) -> str {
+    if (self.starts_with(`"""`) || self.starts_with("```")) {
+        return self;
+    };
+    let delim = self.first().value_or(' ');
+    if (delim != '"' && delim != '`') {
+        return self;
+    };
+    let other = if (delim == '"') { '`' } else { '"' };
+    let body = self[1..self.len() - 1];
+    if (escape_cost(body, other) < escape_cost(body, delim)) {
+        `{other}{redelimit(body, other)}{other}`
+    } else {
+        self
+    }
+}.test({
+    // Nothing to escape either way: the literal keeps its delimiter.
+    assert(requote(`"plain"`) == `"plain"`);
+    assert(requote("`plain`") == "`plain`");
+    assert(requote(`""`) == `""`);
+    assert(requote("``") == "``");
+    // A `"` literal that only escapes quotes: a backtick spells them bare.
+    assert(requote(`"say \\"hi\\""`) == "`say \"hi\"`");
+
+    // A backtick literal that only escapes braces / backticks: `"` spells them
+    // bare.
+    assert(requote("`\\{a\\}`") == "\"{a}\"");
+    assert(requote("`\\`b\\``") == "\"`b`\"");
+    // Mixed content goes to the cheaper side; a tie stays put.
+    assert(requote(`"\\"\\"\{"`) == "`\"\"\\{`");
+    assert(requote("`\\{\\}\"`") == `"\{\}\\""`);
+    assert(requote(`"\\"\{"`) == `"\\"\{"`);
+    assert(requote("`\\{\"`") == "`\\{\"`");
+    // Shared escapes ride along unchanged.
+    assert(requote(`"a\\n\\"b\\""`) == "`a\\n\"b\"`");
+    // The block forms and any other token are left alone.
+    assert(requote(`"""a "b" c"""`) == `"""a "b" c"""`);
+    assert(requote("```\\{a\\}```") == "```\\{a\\}```");
+    assert(requote(`'"'`) == `'"'`);
+})
+--- performance ---
+allocations: 50
+deallocations: 50
+reallocations: 0
+bytes allocated: 3469
+instructions executed: 18300
+binary size: 20536
+  code: 9652
+  data: 3275
+  metadata: 7609
+functions:
+  __test$escape_cost:
+    calls: 1
+    bytes: 1336
+  __test$is_shared_escape:
+    calls: 1
+    bytes: 404
+  __test$needs_escape:
+    calls: 1
+    bytes: 552
+  __test$redelimit:
+    calls: 1
+    bytes: 1756
+  __test$requote:
+    calls: 1
+    bytes: 2524
+  aipl_assert:
+    calls: 54
+    bytes: (external)
+  aipl_test_begin:
+    calls: 5
+    bytes: (external)
+  aipl_test_end:
+    calls: 5
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  escape_cost:
+    calls: 37
+    bytes: 260
+  is_shared_escape:
+    calls: 36
+    bytes: 64
+  main:
+    calls: 1
+    bytes: 400
+  needs_escape:
+    calls: 236
+    bytes: 64
+  redelimit:
+    calls: 16
+    bytes: 1188
+  requote:
+    calls: 15
+    bytes: 1104

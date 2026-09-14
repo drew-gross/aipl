@@ -285,7 +285,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
 
     // A delimited scan closes on its own delimiter and carries its escapes.
     let esc: Pat = Match("\\\\[nt]", "esc");
-    assert(matcher_pat(Delimited("\"", "nt"), "s", "esc") == Region("\"", "\"", [esc], scope="s"));
+    assert(matcher_pat(Delimited(`"`, "nt"), "s", "esc") == Region(`"`, `"`, [esc], scope="s"));
 
     // A verbatim scan has no inner patterns, and may close on a different
     // delimiter than it opened with.
@@ -339,7 +339,7 @@ pub fn matcher_regex(m: Matcher) -> str? {
     assert(matcher_regex(Exact("->")) == some("->"));
     assert(matcher_regex(CharRun("ab1", first="ab")) == some("[ab][ab1]*"));
     // The four delimiter-scanning matchers have no single-expression form.
-    assert(matcher_regex(Delimited("\"", "nt")) == none);
+    assert(matcher_regex(Delimited(`"`, "nt")) == none);
     assert(matcher_regex(Between("<", ">")) == none);
     assert(matcher_regex(Nested("/*", "*/")) == none);
     assert(matcher_regex(Template("`", "", |segs: str[]| segs)) == none);
@@ -736,12 +736,12 @@ pub fn json_str(s: str) -> str {
     }
     `"{body}"`
 }.test({
-    assert(json_str("abc") == "\"abc\"");
-    assert(json_str("") == "\"\"");
+    assert(json_str("abc") == `"abc"`);
+    assert(json_str("") == `""`);
     // A regex's backslashes double, and its quotes escape.
-    assert(json_str("\\bfn\\b") == "\"\\\\bfn\\\\b\"");
-    assert(json_str("say \"hi\"") == "\"say \\\"hi\\\"\"");
-    assert(json_str("a\nb\tc") == "\"a\\nb\\tc\"");
+    assert(json_str("\\bfn\\b") == `"\\\\bfn\\\\b"`);
+    assert(json_str(`say "hi"`) == `"say \\"hi\\""`);
+    assert(json_str("a\nb\tc") == `"a\\nb\\tc"`);
 })
 
 fn json_char(ch: char) -> str {
@@ -777,10 +777,10 @@ deallocations: 1113
 reallocations: 33
 bytes allocated: 96953
 instructions executed: 75774
-binary size: 133728
+binary size: 133696
   code: 84012
-  data: 5354
-  metadata: 44362
+  data: 5328
+  metadata: 44356
 functions:
   __arr_drop_Entry:
     calls: 3

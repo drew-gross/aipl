@@ -1326,7 +1326,7 @@ fn lower_atom(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     if (head == "|") {
         return ok(AExpr(lambda_of(kids, tsp, sp)?));
     };
-    if (head.starts_with("\"") || head.starts_with("`")) {
+    if (head.starts_with(`"`) || head.starts_with("`")) {
         return ok(AExpr(at(Str(str_lit_value(head)), tsp)));
     };
     if (head.starts_with("'")) {
@@ -2274,7 +2274,7 @@ fn lower_pattern(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let head = toks
         .first()
         .value_or_err(ParseError { message: "a pattern matched no token", span: sp })?;
-    if (head.starts_with("\"") || head.starts_with("`")) {
+    if (head.starts_with(`"`) || head.starts_with("`")) {
         return ok(APat(PatStr(str_lit_value(head))));
     };
     if (head.starts_with("'")) {
@@ -3051,7 +3051,7 @@ pub fn lower_aipl_pattern(src: str) -> Pat!ParseError {
     assert(pat_dump("ok((a, b))") == "ok((a, b))");
     assert(pat_dump("Pair(Nil, x)") == "Pair(Nil, x)");
     assert(pat_dump("(a, (b, c))") == "(a, (b, c))");
-    assert(pat_dump("some(\"s\")") == "some(Str(s))");
+    assert(pat_dump(`some("s")`) == "some(Str(s))");
     // The same-bindings check reads the binders of a nested pattern.
     assert(
         expr_dump(
@@ -3067,8 +3067,8 @@ pub fn lower_aipl_pattern(src: str) -> Pat!ParseError {
     // Literal patterns carry their *value*, so the escape is decoded and the
     // delimiters are gone — which is the whole difference between a pattern
     // that matches `a`-newline-`b` and one that matches a backslash.
-    assert(pat_dump("\"s\"") == "Str(s)");
-    assert(pat_dump("\"a\\nb\"") == "Str(a\nb)");
+    assert(pat_dump(`"s"`) == "Str(s)");
+    assert(pat_dump(`"a\\nb"`) == "Str(a\nb)");
     assert(pat_dump("'x'") == "Char(x)");
     assert(pat_dump("'\\n'") == "Char(\n)");
 
@@ -3092,7 +3092,7 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(expr_dump("true") == "true");
     assert(expr_dump("false") == "false");
     assert(expr_dump("none") == "none");
-    assert(expr_dump("\"s\"") == "Str(s)");
+    assert(expr_dump(`"s"`) == "Str(s)");
     assert(expr_dump("'c'") == "Char(c)");
     assert(expr_dump("x") == "x");
 
@@ -3378,7 +3378,7 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     assert(
         program_dump(
             "fn f<T: eq>(a: T) { }",
-        ) == "error: unknown type parameter bound \"eq\"; expected \"any\" or \"ord\"",
+        ) == `error: unknown type parameter bound "eq"; expected "any" or "ord"`,
     );
 
     // The parameter shapes. What is stored is the type the *body* sees: a
@@ -3504,7 +3504,7 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
             "import { a, b as c, equal as ==, - } from builtins;",
         ) == "import [a, b as c, equal as ==, -] from builtins",
     );
-    assert(program_dump("import { x } from \"./p.aipl\";") == "import [x] from \"./p.aipl\"");
+    assert(program_dump("import { x } from \"./p.aipl\";") == `import [x] from "./p.aipl"`);
 
     // Documentation attaches at `item`, in front of the declaration — and an
     // import brings a name in rather than declaring one, so it takes none.
@@ -4309,9 +4309,9 @@ deallocations: 1979075
 reallocations: 245238
 bytes allocated: 293944877
 instructions executed: 459573813
-binary size: 5902664
+binary size: 5902640
   code: 3855332
-  data: 48580
+  data: 48556
   metadata: 1998752
 functions:
   __arr_drop___m11__ParsedParam:

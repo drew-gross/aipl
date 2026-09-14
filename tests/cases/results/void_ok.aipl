@@ -28,7 +28,7 @@ fn describe(r: !str) -> str {
     assert(ok() == ok());
     assert(ok() != err("x"));
     assert(to_str(ok()) == "ok()");
-    assert(to_str(err("bad")) == "err(\"bad\")"); // to_str quotes strings
+    assert(to_str(err("bad")) == `err("bad")`); // to_str quotes strings
 })
 
 fn main() !prints {

@@ -145,8 +145,6 @@ fn nextest_build() -> Cmd {
         .args(ALL_TESTS)
 }
 
-/// One `#[ignore]`d author helper, by exact name. nextest selects ignored tests
-/// with `--run-ignored only` rather than libtest's `-- --ignored <name>`.
 /// Whether any dogfooded `.aipl` is newer than the artifact compiled from it.
 ///
 /// The sources are every `.aipl` under `crates/aipl-codegen/src/`, which is a
@@ -183,6 +181,17 @@ fn ir_is_behind_sources(repo: &Path) -> bool {
     })
 }
 
+/// One `#[ignore]`d author helper, by exact name. nextest selects ignored tests
+/// with `--run-ignored only` rather than libtest's `-- --ignored <name>`.
+///
+/// Passes [`ALL_TESTS`] even though the filter names one test in one binary:
+/// the package set decides *feature unification*, so without `--workspace`
+/// cargo resolves the root crate's dependencies with a different feature set,
+/// keeps a second, parallel set of artifacts for it, and recompiles and relinks
+/// its five test binaries on every switch between the two shapes. On macOS each
+/// freshly linked binary then waits on Gatekeeper's first-exec scan (~100s
+/// apiece, serialized), so a 1s refill cost the gate seven minutes — measured
+/// at 7m38s against 1.4s with the flags.
 fn helper(name: &str) -> Cmd {
     Cmd::new("cargo")
         .args([
@@ -195,6 +204,7 @@ fn helper(name: &str) -> Cmd {
             "-E",
             &format!("test(={name})"),
         ])
+        .args(ALL_TESTS)
         .json()
 }
 
@@ -393,16 +403,25 @@ or discard it
             let detail = tail(&out, 40);
             r.fail("promote_staged_ir", &detail);
         }
-        regenerated_ir = true;
         // The promoted artifact is what the run below loads, and the tree has to
-        // be rebuilt against it before anything reads it.
-        if !r.step(
-            "nextest --no-run (rebuild after IR promote)",
-            nextest_build(),
-        ) {
-            r.save_out();
-            let detail = excerpt(&r.out.merged, 30, |l| l.starts_with("error"));
-            r.fail("compile", &detail);
+        // be rebuilt against it before anything reads it — unless the candidate
+        // came out identical and promotion left the live file alone (see
+        // `promote_staged_ir`): the tree is already built against those bytes,
+        // and the rebuild it would trigger is the most expensive step there is.
+        if promoted_unchanged(&out) {
+            eprintln!(
+                "{DIM}(the regenerated IR is identical to the checked-in artifact; nothing to rebuild){OFF}"
+            );
+        } else {
+            regenerated_ir = true;
+            if !r.step(
+                "nextest --no-run (rebuild after IR promote)",
+                nextest_build(),
+            ) {
+                r.save_out();
+                let detail = excerpt(&r.out.merged, 30, |l| l.starts_with("error"));
+                r.fail("compile", &detail);
+            }
         }
     }
 
@@ -732,6 +751,13 @@ fn wrote_staged(out: &str) -> bool {
     })
 }
 
+/// Whether `promote_staged_ir` reported the candidate identical to the live
+/// artifact, and so left the file — and its build-input mtime — untouched.
+fn promoted_unchanged(out: &str) -> bool {
+    out.lines()
+        .any(|l| l.starts_with("promoted ") && l.contains("(unchanged"))
+}
+
 /// The scoped-fill summary line: `[filter "<case>"]: <n> passed, 0 failed,`.
 fn scoped_fill_succeeded(out: &str) -> bool {
     out.lines().any(|l| {
@@ -796,6 +822,12 @@ mod tests {
         // The path has to follow "wrote " — a line merely mentioning a staged
         // artifact is not `fill_staged_ir` reporting it produced one.
         assert!(!wrote_staged("removed dogfood.clif.staged, wrote nothing"));
+        assert!(promoted_unchanged(
+            "promoted a/dogfood.clif.staged → a/dogfood.clif (unchanged: identical to the live artifact)"
+        ));
+        assert!(!promoted_unchanged(
+            "promoted a/dogfood.clif.staged → a/dogfood.clif"
+        ));
     }
 
     #[test]

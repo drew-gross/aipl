@@ -49,7 +49,7 @@ pub fn reindent_block(self: str, base: u64) -> str {
     // bare triple-quote / triple-backtick delimiter — is touched; anything else
     // (a content-bearing final line) leaves the atom byte-for-byte.
     let closing = ls.last().value_or("").trim();
-    if (closing != "\"\"\"" && closing != "```") {
+    if (closing != `"""` && closing != "```") {
         return self;
     };
 
@@ -65,7 +65,7 @@ pub fn reindent_block(self: str, base: u64) -> str {
     mut out = opening;
     if (n > 2) {
         let content = ls.drop_first().drop_last().join(sep="\n");
-        let body = if (opening == "\"\"\"" || opening == "```") {
+        let body = if (opening == `"""` || opening == "```") {
             content.dedent().indent(base + 4)
         } else {
             content

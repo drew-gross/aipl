@@ -1137,43 +1137,35 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // *un-decoded* — with escapes off ("") that's the whole content verbatim, and
     // here none of the inputs carry a backslash so `Of(Str)` needs no decoding.
     // An unterminated token is a hard error at its open delimiter.
-    let strs = [ws, TokenRule { matcher: Delimited("\"'", ""), emit: Of(Str) }, ident];
+    let strs = [ws, TokenRule { matcher: Delimited(`"'`, ""), emit: Of(Str) }, ident];
     assert(
-        lex("\"hi\" x", strs)? == toks([
-            tok("\"hi\" x", Str("hi"), 0..4),
-            tok("\"hi\" x", Ident("x"), 5..6),
+        lex(`"hi" x`, strs)? == toks([
+            tok(`"hi" x`, Str("hi"), 0..4),
+            tok(`"hi" x`, Ident("x"), 5..6),
         ]),
     );
     assert(lex("''", strs)? == toks([tok("''", Str(""), 0..2)]));
-    assert(lex("\"hi", strs) == err(lex_err("unterminated delimited token", 0..3)));
+    assert(lex(`"hi`, strs) == err(lex_err("unterminated delimited token", 0..3)));
 
     // With escapes on, `escapes` still governs scanning (an unknown escape is a
     // hard error), but *decoding* is the emit's job: `esc_str` calls `unescape`.
-    let esc = [ws, TokenRule { matcher: Delimited("\"", "nt\\\""), emit: Of(esc_str) }, ident];
-    assert(lex("\"a\\\"b\"", esc)? == toks([tok("\"a\\\"b\"", Str("a\"b"), 0..6)]));
-    assert(lex("\"a\\nb\"", esc)? == toks([tok("\"a\\nb\"", Str("a\nb"), 0..6)]));
-    assert(lex("\"a\\xb\"", esc) == err(lex_err("unknown escape sequence \\x", 2..4)));
+    let esc = [ws, TokenRule { matcher: Delimited(`"`, `nt\\"`), emit: Of(esc_str) }, ident];
+    assert(lex(`"a\\"b"`, esc)? == toks([tok(`"a\\"b"`, Str(`a"b`), 0..6)]));
+    assert(lex(`"a\\nb"`, esc)? == toks([tok(`"a\\nb"`, Str("a\nb"), 0..6)]));
+    assert(lex(`"a\\xb"`, esc) == err(lex_err("unknown escape sequence \\x", 2..4)));
 
     // Try: a fallible string emit. `nonempty_str` decodes, then enforces a
     // content rule the *caller* owns — an empty string literal is an error whose
     // message the library pairs with the token's span. A well-formed one passes.
-    let nes = [
-        ws,
-        TokenRule { matcher: Delimited("\"", "nt\\\""), emit: Try(nonempty_str) },
-        ident,
-    ];
-    assert(lex("\"hi\"", nes)? == toks([tok("\"hi\"", Str("hi"), 0..4)]));
-    assert(lex("\"\"", nes) == err(lex_err("empty string literal", 0..2)));
+    let nes = [ws, TokenRule { matcher: Delimited(`"`, `nt\\"`), emit: Try(nonempty_str) }, ident];
+    assert(lex(`"hi"`, nes)? == toks([tok(`"hi"`, Str("hi"), 0..4)]));
+    assert(lex(`""`, nes) == err(lex_err("empty string literal", 0..2)));
 
     // Between: a raw string `"""..."""` — a lone `"`/`""` inside is content.
-    let q3 = "\"\"\"";
+    let q3 = `"""`;
     let raw = [ws, TokenRule { matcher: Between(q3, q3), emit: Of(Raw) }, ident];
-    assert(
-        lex("\"\"\"a\"b\"\"c\"\"\"", raw)? == toks([
-            tok("\"\"\"a\"b\"\"c\"\"\"", Raw("a\"b\"\"c"), 0..12),
-        ]),
-    );
-    assert(lex("\"\"\"hi\"\"", raw) == err(lex_err("unterminated delimited token", 0..7)));
+    assert(lex(`"""a"b""c"""`, raw)? == toks([tok(`"""a"b""c"""`, Raw(`a"b""c`), 0..12)]));
+    assert(lex(`"""hi""`, raw) == err(lex_err("unterminated delimited token", 0..7)));
 
     // Nested: depth-tracked block comments — an inner `/* */` doesn't close the
     // outer. On the same input `Between` (`blk`) stops at the first `*/`.
@@ -1433,7 +1425,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // JSON: strings, numbers, keywords, punctuation.
     let json = [
         ws,
-        TokenRule { matcher: Delimited("\"", "\"\\/bfnrtu"), emit: Of(Str) },
+        TokenRule { matcher: Delimited(`"`, `"\\/bfnrtu`), emit: Of(Str) },
         TokenRule { matcher: Float, emit: Bare(FloatTok) },
         TokenRule { matcher: Int, emit: Try(int_tok) },
         TokenRule { matcher: Keyword("true", alnum), emit: Bare(Kw) },
@@ -1475,14 +1467,14 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: Keyword("set", alnum), emit: Bare(Kw) },
         ident,
         TokenRule { matcher: Int, emit: Try(int_tok) },
-        TokenRule { matcher: Delimited("\"", "ntr\\\""), emit: Of(Str) },
+        TokenRule { matcher: Delimited(`"`, `ntr\\"`), emit: Of(Str) },
         TokenRule { matcher: Exact("=="), emit: Bare(Op) },
         TokenRule { matcher: Exact("->"), emit: Bare(Op) },
         TokenRule { matcher: Exact("&&"), emit: Bare(Op) },
         TokenRule { matcher: Exact("="), emit: Bare(Op) },
         TokenRule { matcher: Exact(";"), emit: Bare(Op) },
     ];
-    let asrc = "let ok = s == \"hi\"; // check";
+    let asrc = `let ok = s == "hi"; // check`;
     let atoks = [
         tok(asrc, Kw, 0..3),
         tok(asrc, Ident("ok"), 4..6),
@@ -1500,9 +1492,9 @@ deallocations: 434
 reallocations: 71
 bytes allocated: 67520
 instructions executed: 354019
-binary size: 2530424
+binary size: 2530336
   code: 1692896
-  data: 11380
+  data: 11292
   metadata: 826148
 functions:
   __arr_drop_StepResult$Kind:

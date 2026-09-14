@@ -94,9 +94,9 @@ pub fn aipl_tmlanguage() -> str {
     let json = aipl_tmlanguage();
 
     // The frame.
-    assert(json.contains("\"scopeName\": \"source.aipl\""));
-    assert(json.contains("\"fileTypes\": [\"aipl\"]"));
-    assert(json.contains("{ \"include\": \"#section-tail\" }"));
+    assert(json.contains(`"scopeName": "source.aipl"`));
+    assert(json.contains(`"fileTypes": ["aipl"]`));
+    assert(json.contains(`\{ "include": "#section-tail" \}`));
 
     // The keyword and constant runs, merged from their individual `kw` rules in
     // table order — every keyword AIPL has, in one alternation.
@@ -109,26 +109,26 @@ pub fn aipl_tmlanguage() -> str {
 
     // The three string forms are regions, and the triple-quoted one is listed
     // before the single — the same ordering the lexer rules carry.
-    let q = "\"";
-    let esc_q = "\\\"";
+    let q = `"`;
+    let esc_q = `\\"`;
     assert(json.contains(`{q}begin{q}: {q}{esc_q}{esc_q}{esc_q}{q}`));
-    assert(json.contains("\"name\": \"string.quoted.double.aipl\""));
-    assert(json.contains("\"name\": \"string.quoted.single.aipl\""));
+    assert(json.contains(`"name": "string.quoted.double.aipl"`));
+    assert(json.contains(`"name": "string.quoted.single.aipl"`));
 
     // A template interpolation includes the whole language back into itself.
-    assert(json.contains("{ \"include\": \"#main\" }"));
+    assert(json.contains(`\{ "include": "#main" \}`));
 
     // The block comment is the one self-referential pattern, so the one that
     // needed a name.
-    assert(json.contains("\"comment-block\": {"));
+    assert(json.contains(`"comment-block": \{`));
 
     // The contextual declarations, and the post-lexical type names.
-    assert(json.contains("\"match\": \"\\\\b(fn)\\\\s+"));
-    assert(json.contains("\"name\": \"entity.name.function.aipl\""));
+    assert(json.contains(`"match": "\\\\b(fn)\\\\s+`));
+    assert(json.contains(`"name": "entity.name.function.aipl"`));
     assert(json.contains("\\\\bi64\\\\b"));
 
     // ... and the section tail, which runs to end of file.
-    assert(json.contains("\"contentName\": \"meta.section-content.aipl\""));
+    assert(json.contains(`"contentName": "meta.section-content.aipl"`));
 })
 
 # What an escape sequence inside a string, char or template literal is painted.
@@ -177,9 +177,9 @@ deallocations: 7676
 reallocations: 323
 bytes allocated: 920749
 instructions executed: 759114
-binary size: 233600
+binary size: 233552
   code: 168780
-  data: 3408
+  data: 3360
   metadata: 61412
 functions:
   __arr_drop___m1__Entry:

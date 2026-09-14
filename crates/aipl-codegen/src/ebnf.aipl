@@ -95,7 +95,7 @@ variant Ctx = Alt | Seq | Item
 
 # `s` in double quotes — how EBNF spells a literal terminal.
 fn dq(s: str) -> str {
-    let q = "\"";
+    let q = `"`;
     `{q}{s}{q}`
 }
 
@@ -495,7 +495,7 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
     // It fails only the way `link` fails.
     let r_bad: Rule<Tok> = Named("nope");
     let bad = g_of([one("a", r_bad)]);
-    assert(first_sets(bad) == err(ParseError { message: "no rule named \"nope\"", span: 0..0 }));
+    assert(first_sets(bad) == err(ParseError { message: `no rule named "nope"`, span: 0..0 }));
 })
 
 # The fixed point itself, over an already-linked grammar. Split out because the
@@ -649,7 +649,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
 
     // A reference that cannot be followed, and one that points nowhere.
     let r_named: Rule<Tok> = Named("atom");
-    assert(first_msg(r_named, sets) == "unlinked rule reference \"atom\"");
+    assert(first_msg(r_named, sets) == `unlinked rule reference "atom"`);
     let nine: u64 = 9;
     let r_far: Rule<Tok> = NamedIdx(nine);
     assert(first_msg(r_far, sets) == "no production at index 9");
@@ -885,9 +885,9 @@ deallocations: 1465
 reallocations: 320
 bytes allocated: 171308
 instructions executed: 208920
-binary size: 157296
+binary size: 157288
   code: 101928
-  data: 4284
+  data: 4276
   metadata: 51084
 functions:
   __arr_drop_First$Tok:

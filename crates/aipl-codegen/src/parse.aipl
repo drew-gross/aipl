@@ -1177,7 +1177,7 @@ pub fn parse<K: variant, A: any>(
     // Every token must be consumed; a partial parse is an error, not a result.
     assert(msg_of("a b", g_word, "w") == "expected end of input, found `b`");
     // A start rule no production answers to.
-    assert(msg_of("a", g_word, "nope") == "no rule named \"nope\"");
+    assert(msg_of("a", g_word, "nope") == `no rule named "nope"`);
 
     // ---- Literal: one token by its text ----
     let r_open: Rule<Tok> = Literal("(");

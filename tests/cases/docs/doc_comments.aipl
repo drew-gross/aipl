@@ -59,22 +59,29 @@ fn main() !prints {
 sum 3
 doubled 4
 yes true
+square false
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 318
-instructions executed: 181
-binary size: 2672
-  code: 1212
+bytes allocated: 427
+instructions executed: 324
+binary size: 3424
+  code: 1784
   data: 47
-  metadata: 1413
+  metadata: 1593
 functions:
   __eq_Maybe:
     calls: 1
     bytes: 64
-  __to_str_bool:
+  __eq_Shape:
     calls: 1
+    bytes: 168
+  __eq_i64$opt:
+    calls: 1
+    bytes: 100
+  __to_str_bool:
+    calls: 2
     bytes: 232
   __to_str_i64:
     calls: 2
@@ -83,11 +90,11 @@ functions:
     calls: 4
     bytes: (external)
   aipl_write_bytes:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_write_i64:
     calls: 2
     bytes: (external)
   main:
     calls: 1
-    bytes: 712
+    bytes: 1016

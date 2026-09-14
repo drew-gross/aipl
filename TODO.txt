@@ -75,6 +75,9 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  in show_first we shouldn't need a typed empty array literal.
+  union_syms should just be actual set union
+  why does rule_first need three as a variable?
   fmt_node can only fail due to bad internal index; see if we can fix that, maybe with a LinkedGrammar type?
   breaks_after can be take_while->starts_with I think?
   Remove need for Member JSON arm. Should be dict probably?
@@ -246,6 +249,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
+  formatter can rewrite single line triple quote strings to one line
   allow formatter to rewrite string literals for fewest escapes
   my new pattern walker laid out a constructor's payload with comma_list_docs, which breaks long lists across lines with a trailing comma — and the pattern grammar takes no trailing comma, so aipl fmt rewrote three compiler sources (Let(\n name,\n …,\n) =>) into something that no longer parsed. <--- the formatter should decide whether to output a trailing comma based on the grammer definition. Why isn't it doing that?
   variant_case_docs.aipl is weird: having the leading | should force splitting each onto own line
@@ -568,6 +572,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  have handoff print started at and elapsed until now per stage so I can see where we are at easier
   seems like a lot of features have required 2 handoffs recently. Lets improve the handoff script to just do both things.
   Make the new-syntax bootstrap faster (maybe by doing just the regen without the full corpus?)
   retire AIPL_CASE, add a non-env alternative

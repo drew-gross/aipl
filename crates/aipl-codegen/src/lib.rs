@@ -2906,6 +2906,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     // prebuilt object now, so nothing is linked at run time and there is no
     // longer anything to save by keeping the formatter apart.
     "./clean_trailing_whitespace.aipl",
+    "./requote.aipl",
     "./walker.aipl",
     "./format_source.aipl",
 ];

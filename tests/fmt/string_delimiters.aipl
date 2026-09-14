@@ -1,0 +1,61 @@
+import { print } from builtins;
+fn main() !prints {
+    // A `"` literal whose only escapes are quotes is respelled with backticks,
+    // where a quote is bare; a backtick literal whose only escapes are braces
+    // or backticks is respelled with quotes, where those are bare.
+    let quoted = "say \"hi\"";
+    let braced = `a \{b\} c`;
+    let ticked = `\`code\``;
+    // The cheaper side wins when both kinds are present; a tie keeps the
+    // delimiter the source has.
+    let mostly_quotes = "\"\"{";
+    let tie = "\"{";
+    let other_tie = `\{"`;
+    // Nothing to escape either way: unchanged, whichever delimiter it has.
+    let plain = "plain";
+    let plain_tick = `plain`;
+    // Shared escapes (`\n`, `\\`) ride along; an escaped backslash is one char.
+    let shared = "a\n\"b\"\\";
+    // Interpolated templates and the block forms are not touched.
+    let tpl = `x {1} "y"`;
+    let raw = """
+        "q" \{
+    """;
+    // Literal patterns are respelled exactly like expression literals.
+    match (quoted) {
+        "\"" => print(`"`),
+        _ => print("_"),
+    };
+}
+--- formatted ---
+import { print } from builtins;
+
+fn main() !prints {
+    // A `"` literal whose only escapes are quotes is respelled with backticks,
+    // where a quote is bare; a backtick literal whose only escapes are braces
+    // or backticks is respelled with quotes, where those are bare.
+    let quoted = `say "hi"`;
+    let braced = "a {b} c";
+    let ticked = "`code`";
+
+    // The cheaper side wins when both kinds are present; a tie keeps the
+    // delimiter the source has.
+    let mostly_quotes = `""\{`;
+    let tie = "\"{";
+    let other_tie = `\{"`;
+    // Nothing to escape either way: unchanged, whichever delimiter it has.
+    let plain = "plain";
+    let plain_tick = `plain`;
+    // Shared escapes (`\n`, `\\`) ride along; an escaped backslash is one char.
+    let shared = `a\n"b"\\`;
+    // Interpolated templates and the block forms are not touched.
+    let tpl = `x {1} "y"`;
+    let raw = """
+        "q" \{
+    """;
+    // Literal patterns are respelled exactly like expression literals.
+    match (quoted) {
+        `"` => print(`"`),
+        _ => print("_"),
+    };
+}

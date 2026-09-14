@@ -301,13 +301,13 @@ pub fn str_lit_value(text: str) -> str {
         // `finalize` and emit take.
         return process_raw_string(text[3..text.len() - 3]).unescape_braces();
     };
-    if (text.starts_with("\"\"\"")) {
+    if (text.starts_with(`"""`)) {
         return process_raw_string(text[3..text.len() - 3]);
     };
     text[1..text.len() - 1].unescape()
 }.test({
     // A `"..."` literal: escapes decoded, nothing else.
-    let q = "\"a\\nb\"";
+    let q = `"a\\nb"`;
     assert(str_lit_value(q) == "a\nb");
     assert(
         lex_aipl(q)? == LexResult {
@@ -317,8 +317,8 @@ pub fn str_lit_value(text: str) -> str {
     );
 
     // A `"""..."""` literal: verbatim contents, de-dented as a block.
-    let raw = "\"\"\"a\"b\"\"\"";
-    assert(str_lit_value(raw) == "a\"b");
+    let raw = `"""a"b"""`;
+    assert(str_lit_value(raw) == `a"b`);
     assert(
         lex_aipl(raw)? == LexResult {
             tokens: [atok(raw, StrLit(str_lit_value(raw), TripleQuoted), 0..raw.len())],
@@ -345,7 +345,7 @@ pub fn str_lit_value(text: str) -> str {
     // content. A `"""` string decodes nothing at all.
     let braced = "```a\\{b\\}\\n```";
     assert(str_lit_value(braced) == "a{b}\\n");
-    assert(str_lit_value("\"\"\"a\\{b\"\"\"") == "a\\{b");
+    assert(str_lit_value(`"""a\\\{b"""`) == "a\\{b");
     assert(str_lit_value("`\\{\\}`") == "{}");
     assert(
         lex_aipl(raw_tpl)? == LexResult {
@@ -357,7 +357,7 @@ pub fn str_lit_value(text: str) -> str {
     );
 
     // The empty literal, where the strip has nothing left to take.
-    assert(str_lit_value("\"\"") == "");
+    assert(str_lit_value(`""`) == "");
 })
 
 # The `char` a char literal written as `text` denotes, delimiters included, or
@@ -477,7 +477,7 @@ pub fn s_punct() -> str { "punctuation.aipl" }
 fn s_doc() -> str { "comment.line.documentation.aipl" }
 
 pub fn aipl_rules() -> TokenRule<AiplTok>[] {
-    let three_quotes = "\"\"\"";
+    let three_quotes = `"""`;
     [
         TokenRule { matcher: CharRun(" \t\n\r"), emit: Bare(Space), skip: true },
         TokenRule {
@@ -574,7 +574,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             scope: s_string(),
         },
         TokenRule {
-            matcher: Delimited("\"", "ntr\\\""),
+            matcher: Delimited(`"`, `ntr\\"`),
             emit: Of(|text: str| StrLit(text.unescape(), Quoted)),
             unterminated: "unterminated string literal",
             scope: s_string(),
@@ -588,7 +588,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // (not `Char`) to avoid the library test `Kind`'s arm (shared constructor
         // namespace). The escape set matches the string rule plus `\'`.
         TokenRule {
-            matcher: Delimited("'", "ntr\\'\""),
+            matcher: Delimited("'", `ntr\\'"`),
             emit: Try(char_lit_emit),
             unterminated: "unterminated char literal",
             scope: s_char(),
@@ -795,7 +795,7 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // style), so the token's
     // value carries an actual newline — escape handling lives in `str_lit`, not in
     // the lexer library.
-    let esc = "s = \"a\\nb\"";
+    let esc = `s = "a\\nb"`;
     assert(
         lex_aipl(esc)? == LexResult {
             tokens: [
@@ -811,10 +811,10 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // quotes). `Between` scans to the balancing `"""`, so the lone `"` inside is
     // content and no escapes are decoded; it lexes to `StrLit` with `TripleQuoted`
     // style. De-denting a single-line literal is a no-op, so the value is `a"b`.
-    let raw = "\"\"\"a\"b\"\"\"";
+    let raw = `"""a"b"""`;
     assert(
         lex_aipl(raw)? == LexResult {
-            tokens: [atok(raw, StrLit("a\"b", TripleQuoted), 0..9)],
+            tokens: [atok(raw, StrLit(`a"b`, TripleQuoted), 0..9)],
             trivia: [],
         },
     );

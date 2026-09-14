@@ -11,7 +11,7 @@
 //!   *idempotently*, and preserve its tokens and comments exactly — imports
 //!   excepted, which may reorder by design and are compared as multisets.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use aipl::fmt::{format_source, FmtOptions};
 use aipl::{lex_signatures_and_comments, FmtTokenKind};
@@ -107,17 +107,22 @@ fn all_aipl_files_stay_formatted() {
     let opts = FmtOptions::default();
     let mut unformatted: Vec<String> = Vec::new();
     let mut checked = 0usize;
-    for path in enforced_files() {
-        let src = std::fs::read_to_string(&path).unwrap();
+    for outcome in par_map(&enforced_files(), |path| {
+        let src = std::fs::read_to_string(path).unwrap();
         if aipl::parse(aipl::strip_test_sections(&src)).is_err() {
-            continue; // parse-error fixture; nothing to format
+            return None; // parse-error fixture; nothing to format
         }
+        Some(match format_source(&src, &opts) {
+            Ok(formatted) if formatted == src => None,
+            Ok(_) => Some(path.display().to_string()),
+            Err(e) => Some(format!("{} (format error: {e})", path.display())),
+        })
+    }) {
+        let Some(verdict) = outcome else {
+            continue;
+        };
         checked += 1;
-        match format_source(&src, &opts) {
-            Ok(formatted) if formatted == src => {}
-            Ok(_) => unformatted.push(path.display().to_string()),
-            Err(e) => unformatted.push(format!("{} (format error: {e})", path.display())),
-        }
+        unformatted.extend(verdict);
     }
     assert!(
         checked > 100,
@@ -141,20 +146,23 @@ fn all_aipl_files_stay_formatted() {
 fn format_corpus() {
     setup();
     let opts = FmtOptions::default();
-    let mut changed = 0usize;
-    for path in enforced_files() {
-        let src = std::fs::read_to_string(&path).unwrap();
+    let changed = par_map(&enforced_files(), |path| {
+        let src = std::fs::read_to_string(path).unwrap();
         if aipl::parse(aipl::strip_test_sections(&src)).is_err() {
-            continue;
+            return false;
         }
         let formatted = format_source(&src, &opts)
             .unwrap_or_else(|e| panic!("[{}] format failed: {e}", path.display()));
-        if formatted != src {
-            std::fs::write(&path, &formatted).unwrap();
-            eprintln!("[{}]: reformatted", path.display());
-            changed += 1;
+        if formatted == src {
+            return false;
         }
-    }
+        std::fs::write(path, &formatted).unwrap();
+        eprintln!("[{}]: reformatted", path.display());
+        true
+    })
+    .into_iter()
+    .filter(|&c| c)
+    .count();
     panic!(
         "reformatted {changed} file(s); review the diff, refill any shifted \
          --- performance ---/--- errors ---/--- check --- sections \
@@ -178,21 +186,22 @@ fn corpus_formats_idempotently_and_losslessly() {
     let opts = FmtOptions::default();
     let mut failures: Vec<String> = Vec::new();
     let mut formatted_count = 0usize;
-    for path in &files {
+    // Per file: whether it was formatted at all, and every invariant it broke.
+    for (formatted, broke) in par_map(&files, |path| {
+        let mut failures: Vec<String> = Vec::new();
         let src = std::fs::read_to_string(path).unwrap();
         let (prefix, sections) = aipl::split_test_sections(&src);
         if aipl::parse(prefix).is_err() {
-            continue; // an error-case fixture; nothing to format
+            return (false, failures); // an error-case fixture; nothing to format
         }
         let ctx = path.display();
         let once = match format_source(&src, &opts) {
             Ok(f) => f,
             Err(e) => {
                 failures.push(format!("[{ctx}] format failed: {e}"));
-                continue;
+                return (false, failures);
             }
         };
-        formatted_count += 1;
         match format_source(&once, &opts) {
             Ok(twice) => {
                 if twice != once {
@@ -214,6 +223,10 @@ fn corpus_formats_idempotently_and_losslessly() {
         if !sections.is_empty() && !once.ends_with(sections) {
             failures.push(format!("[{ctx}] trailing sections were not preserved"));
         }
+        (true, failures)
+    }) {
+        formatted_count += usize::from(formatted);
+        failures.extend(broke);
     }
     assert!(
         failures.is_empty(),
@@ -222,6 +235,35 @@ fn corpus_formats_idempotently_and_losslessly() {
         failures.join("\n\n")
     );
     assert!(formatted_count > 100, "corpus formatted too few files");
+}
+
+/// `f` over every path, on every core, results in input order.
+///
+/// The corpus is ~600 files and each is parsed and laid out independently, so
+/// the three whole-corpus tests here are embarrassingly parallel — and were
+/// paying ~80s each single-threaded on a 12-core machine. The dogfood engine
+/// is thread-local (one lazily built per worker, off the prebuilt object), so
+/// a worker needs no setup beyond the process-wide hooks the caller installed.
+fn par_map<T: Send>(paths: &[PathBuf], f: impl Fn(&Path) -> T + Sync) -> Vec<T> {
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let slots: Vec<std::sync::Mutex<Option<T>>> =
+        paths.iter().map(|_| std::sync::Mutex::new(None)).collect();
+    let workers = std::thread::available_parallelism().map_or(4, |n| n.get());
+    std::thread::scope(|s| {
+        for _ in 0..workers.min(paths.len().max(1)) {
+            s.spawn(|| loop {
+                let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let Some(path) = paths.get(i) else {
+                    break;
+                };
+                *slots[i].lock().unwrap() = Some(f(path));
+            });
+        }
+    });
+    slots
+        .into_iter()
+        .map(|slot| slot.into_inner().unwrap().expect("every path was visited"))
+        .collect()
 }
 
 // ---------- fixtures ----------
