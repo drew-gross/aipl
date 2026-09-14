@@ -267,10 +267,7 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
                 },
             }
         },
-        Maybe(sub) => {
-            let body = render_rule(sub, names, Item);
-            `{body}?`
-        },
+        Maybe(sub) => `{render_rule(sub, names, Item)}?`,
         Climb(atom, precs) => render_climb(atom, precs, names, ctx),
     }
 }

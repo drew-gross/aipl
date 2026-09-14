@@ -76,9 +76,11 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  nested_len should maybe use an all_suffixes type utility
   rename Pat to Pattern (file and variant)
   unterminated error messages can be DRYer
   in show_first we shouldn't need a typed empty array literal.
+  in rule_labels we shouldn't need an empty literal
   union_syms should just be actual set union
   why does rule_first need three as a variable?
   fmt_node can only fail due to bad internal index; see if we can fix that, maybe with a LinkedGrammar type?
@@ -87,7 +89,6 @@ misc cleanup:
   nothing in format.aipl should be able to be passed as a literal
   unescape + unescape_braces can probably be DRYed up
   union_all can be context ordered, like to_set
-  render_rule Maybe arm could be 1 expression.
   make it so builtin .aipl files can contain helper functions
   only should be named one and use a nested_in kwarg (i.e. thinner wrapper over Many)
   destructuring in for loops should be DRYer with destructuring in let bindings
@@ -255,6 +256,7 @@ formatter:
   my new pattern walker laid out a constructor's payload with comma_list_docs, which breaks long lists across lines with a trailing comma — and the pattern grammar takes no trailing comma, so aipl fmt rewrote three compiler sources (Let(\n name,\n …,\n) =>) into something that no longer parsed. <--- the formatter should decide whether to output a trailing comma based on the grammer definition. Why isn't it doing that?
   variant_case_docs.aipl is weird: having the leading | should force splitting each onto own line
   wrap comments
+  make the formatter work on the ast, not the token stream. Needs to make the ast not desugar (or at least be able to recover from desugaring)
   formatter gets list separater directly off the Many,
   Why the formatter isn't already a thin wrapper
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
@@ -648,7 +650,7 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
-  make an expression renderer (is this just the formatter?) and use it for defaults
+  make an expression renderer (q: is this just the formatter? a: the formatter works on token streams not asts because the ast desugars) and use it for defaults
   docs should do highlighting! And allow you to change color scheme. We have this cool highlighter tech lets use it.
   add concept of examples
   integrate the readme into the docs
