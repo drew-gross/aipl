@@ -166,9 +166,6 @@ binary size: 8352
   data: 377
   metadata: 3555
 functions:
-  __filter_map2$own0:
-    calls: 1
-    bytes: 320
   __to_str_i64:
     calls: 20
     bytes: 204
@@ -211,6 +208,9 @@ functions:
   main:
     calls: 1
     bytes: 2844
+  main$filter_map2$own0:
+    calls: 1
+    bytes: 320
   show:
     calls: 8
     bytes: 424

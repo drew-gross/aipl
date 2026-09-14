@@ -29,12 +29,12 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 28
 instructions executed: 130
-binary size: 7448
+binary size: 7480
   code: 4184
   data: 237
-  metadata: 3027
+  metadata: 3059
 functions:
-  __builtin_any$str$lam2:
+  __builtin_any$str$lam$__m1__fill_or_add_section$lambda0:
     calls: 0
     bytes: 468
   __eq_str$opt:

@@ -45,41 +45,41 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 144
 instructions executed: 552
-binary size: 4080
+binary size: 4152
   code: 1692
   data: 369
-  metadata: 2019
+  metadata: 2091
 functions:
   __eq_i64$arr:
     calls: 1
     bytes: 296
-  __lambda_0:
-    calls: 1
-    bytes: 8
-  __lambda_1:
-    calls: 0
-    bytes: 60
-  __lambda_10:
-    calls: 1
-    bytes: 132
-  __lambda_2:
-    calls: 1
-    bytes: 8
-  __lambda_4:
-    calls: 1
-    bytes: 60
-  __lambda_5:
-    calls: 1
-    bytes: 8
-  __map9$own0:
-    calls: 1
-    bytes: 280
   __test$heap_lambda:
     calls: 1
     bytes: 220
+  __test$heap_lambda$lambda0:
+    calls: 1
+    bytes: 132
   __test$probe:
     calls: 1
     bytes: 444
+  __test$probe$lambda0:
+    calls: 1
+    bytes: 8
+  __test$probe$lambda1:
+    calls: 0
+    bytes: 60
+  __test$probe$lambda2:
+    calls: 1
+    bytes: 8
+  __test$probe$lambda4:
+    calls: 1
+    bytes: 60
+  __test$probe$lambda5:
+    calls: 1
+    bytes: 8
+  __test$probe$map9$own0:
+    calls: 1
+    bytes: 280
   aipl_arr_inc:
     calls: 1
     bytes: (external)

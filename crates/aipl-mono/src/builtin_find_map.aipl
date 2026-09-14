@@ -45,10 +45,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 32
 instructions executed: 641
-binary size: 4616
+binary size: 4664
   code: 1984
   data: 664
-  metadata: 1968
+  metadata: 2016
 functions:
   __eq_i64$opt:
     calls: 3
@@ -77,15 +77,15 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  find_map$char$i64$s0$lam3:
+  find_map$char$i64$s0$lam$__builtin_to_digit:
     calls: 1
     bytes: 252
-  find_map$i64$i64$lam0:
-    calls: 3
-    bytes: 308
-  find_map$i64$i64$lam2:
+  find_map$i64$i64$lam$__test$find_map$lambda0:
     calls: 1
     bytes: 320
+  find_map$i64$i64$lam$nonzero:
+    calls: 3
+    bytes: 308
   main:
     calls: 1
     bytes: 176

@@ -37,10 +37,10 @@ deallocations: 2
 reallocations: 2
 bytes allocated: 80
 instructions executed: 843
-binary size: 2904
+binary size: 2912
   code: 996
   data: 425
-  metadata: 1483
+  metadata: 1491
 functions:
   __eq_i64$arr:
     calls: 2
@@ -72,7 +72,7 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  filter_evens$lam0:
+  filter_evens$lam$is_even:
     calls: 2
     bytes: 352
   main:

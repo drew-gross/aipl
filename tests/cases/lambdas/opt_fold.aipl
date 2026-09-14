@@ -42,17 +42,14 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 280
 instructions executed: 2171
-binary size: 7600
+binary size: 7608
   code: 4052
   data: 904
-  metadata: 2644
+  metadata: 2652
 functions:
   __eq_i64$opt:
     calls: 3
     bytes: 100
-  __lambda_10:
-    calls: 8
-    bytes: 136
   __test$parses_a_digit_run:
     calls: 1
     bytes: 3412
@@ -77,6 +74,9 @@ functions:
   digits_to_int:
     calls: 5
     bytes: 280
+  digits_to_int$lambda0:
+    calls: 8
+    bytes: 136
   main:
     calls: 1
     bytes: 124

@@ -61,48 +61,48 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 152
 instructions executed: 2077
-binary size: 12040
+binary size: 12336
   code: 6572
   data: 1501
-  metadata: 3967
+  metadata: 4263
 functions:
-  __builtin_find_index$char$lam10:
+  __builtin_find_index$char$lam$__test$first_big$lambda4:
     calls: 1
     bytes: 236
-  __builtin_find_index$char$s0$lam12:
+  __builtin_find_index$char$s0$lam$__test$first_big$lambda5:
     calls: 1
     bytes: 236
-  __builtin_find_index$i64$lam1:
+  __builtin_find_index$i64$lam$__test$first_big$lambda0:
     calls: 1
     bytes: 292
-  __builtin_find_index$i64$lam16:
+  __builtin_find_index$i64$lam$__test$first_big$lambda1:
     calls: 1
     bytes: 292
-  __builtin_find_index$i64$lam18:
+  __builtin_find_index$i64$lam$__test$first_big$lambda10:
     calls: 1
     bytes: 292
-  __builtin_find_index$i64$lam20:
+  __builtin_find_index$i64$lam$__test$first_big$lambda11:
     calls: 1
     bytes: 292
-  __builtin_find_index$i64$lam22:
+  __builtin_find_index$i64$lam$__test$first_big$lambda12:
     calls: 1
     bytes: 292
-  __builtin_find_index$i64$lam24:
+  __builtin_find_index$i64$lam$__test$first_big$lambda2:
     calls: 1
     bytes: 292
-  __builtin_find_index$i64$lam3:
+  __builtin_find_index$i64$lam$__test$first_big$lambda3:
     calls: 1
     bytes: 292
-  __builtin_find_index$i64$lam5:
+  __builtin_find_index$i64$lam$__test$first_big$lambda8:
     calls: 1
     bytes: 292
-  __builtin_find_index$i64$lam7:
+  __builtin_find_index$i64$lam$__test$first_big$lambda9:
     calls: 1
     bytes: 292
-  __builtin_find_index$i64$lam8:
+  __builtin_find_index$i64$lam$is_neg:
     calls: 1
     bytes: 292
-  __builtin_find_index$str$lam30:
+  __builtin_find_index$str$lam$value_for$lambda0:
     calls: 2
     bytes: 400
   __eq_i64$opt:
@@ -111,12 +111,12 @@ functions:
   __eq_u64$opt:
     calls: 2
     bytes: 100
-  __filter14$own0:
-    calls: 1
-    bytes: 300
   __test$first_big:
     calls: 1
     bytes: 2172
+  __test$first_big$filter7$own0:
+    calls: 1
+    bytes: 300
   aipl_arr_inc:
     calls: 1
     bytes: (external)

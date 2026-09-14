@@ -56,12 +56,6 @@ binary size: 3496
   data: 57
   metadata: 1639
 functions:
-  __map0$own0:
-    calls: 1
-    bytes: 488
-  __map3$own0:
-    calls: 1
-    bytes: 296
   __to_str_i64:
     calls: 12
     bytes: 204
@@ -83,3 +77,9 @@ functions:
   main:
     calls: 1
     bytes: 812
+  main$map0$own0:
+    calls: 1
+    bytes: 488
+  main$map2$own0:
+    calls: 1
+    bytes: 296

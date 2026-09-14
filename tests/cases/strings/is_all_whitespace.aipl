@@ -17,12 +17,12 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 734
-binary size: 2664
+binary size: 2688
   code: 904
   data: 368
-  metadata: 1392
+  metadata: 1416
 functions:
-  __builtin_all$char$s0$lam0:
+  __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 7
     bytes: 212
   __test$blank:

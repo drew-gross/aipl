@@ -3126,10 +3126,10 @@ deallocations: 15810
 reallocations: 1777
 bytes allocated: 3300526
 instructions executed: 25103116
-binary size: 10051640
+binary size: 10052000
   code: 6345256
   data: 30964
-  metadata: 3675420
+  metadata: 3675780
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3179,42 +3179,45 @@ functions:
   __arr_retain___m9__TokenRule$__m8__AiplTok:
     calls: 0
     bytes: 832
-  __builtin_all$char$s0$lam104:
+  __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 5
     bytes: 212
-  __builtin_any$__m1__Doc$lam46:
+  __builtin_any$__m1__Doc$lam$__m1__has_hard:
     calls: 0
     bytes: 32
-  __builtin_any$__m1__Doc$lam46$tail:
+  __builtin_any$__m1__Doc$lam$__m1__has_hard$tail:
     calls: 675
     bytes: 324
   __builtin_count_is_at_least$char$s0:
     calls: 54
     bytes: 252
-  __builtin_count_while$char$lam65:
+  __builtin_count_while$char$lam$__m9__lex_step$__m8__AiplTok$lambda1:
     calls: 1377
     bytes: 220
-  __builtin_count_while$char$s0$lam103:
-    calls: 2
-    bytes: 172
-  __builtin_count_while$char$s0$lam111:
+  __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 26
     bytes: 172
-  __builtin_count_while$char$s0$lam73:
+  __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 736
     bytes: 184
-  __builtin_count_while$char$s0$lam76:
+  __builtin_count_while$char$s0$lam$__m3__dedent$lambda1:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam97:
+  __builtin_count_while$char$s0$lam$__m3__dedent$lambda2$lambda0:
+    calls: 2
+    bytes: 172
+  __builtin_count_while$char$s0$lam$__m9__to_eol_len$lambda0:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam97$tail:
+  __builtin_count_while$char$s0$lam$__m9__to_eol_len$lambda0$tail:
     calls: 24
     bytes: 256
   __builtin_int_parse:
     calls: 26
     bytes: 1028
+  __builtin_int_parse$lambda1:
+    calls: 26
+    bytes: 140
   __builtin_intersperse$__m1__Doc:
     calls: 177
     bytes: 404
@@ -3236,33 +3239,6 @@ functions:
   __eq___m1__Doc$arr:
     calls: 6
     bytes: 300
-  __lambda_38:
-    calls: 0
-    bytes: 136
-  __lambda_39:
-    calls: 364
-    bytes: 104
-  __lambda_40:
-    calls: 0
-    bytes: 144
-  __lambda_41:
-    calls: 1
-    bytes: 164
-  __lambda_42:
-    calls: 0
-    bytes: 144
-  __lambda_43:
-    calls: 7
-    bytes: 164
-  __lambda_44:
-    calls: 0
-    bytes: 48
-  __lambda_45:
-    calls: 1
-    bytes: 64
-  __lambda_88:
-    calls: 26
-    bytes: 140
   __m10__unescape:
     calls: 10
     bytes: 1168
@@ -3308,18 +3284,45 @@ functions:
   __m1__print:
     calls: 165
     bytes: 4180
+  __m1__print$map2$own0:
+    calls: 165
+    bytes: 464
   __m2__reindent_block:
     calls: 2
     bytes: 3536
   __m3__dedent:
     calls: 2
     bytes: 1276
-  __m6__trim_end_while$lam22:
+  __m6__trim_end_while$lam$__builtin_is_space:
     calls: 461
     bytes: 300
   __m8__aipl_rules:
     calls: 163
     bytes: 90368
+  __m8__aipl_rules$lambda0:
+    calls: 0
+    bytes: 136
+  __m8__aipl_rules$lambda1:
+    calls: 364
+    bytes: 104
+  __m8__aipl_rules$lambda2:
+    calls: 0
+    bytes: 144
+  __m8__aipl_rules$lambda3:
+    calls: 1
+    bytes: 164
+  __m8__aipl_rules$lambda4:
+    calls: 0
+    bytes: 144
+  __m8__aipl_rules$lambda5:
+    calls: 7
+    bytes: 164
+  __m8__aipl_rules$lambda6:
+    calls: 0
+    bytes: 48
+  __m8__aipl_rules$lambda7:
+    calls: 1
+    bytes: 64
   __m8__char_lit_emit:
     calls: 1
     bytes: 1772
@@ -3380,9 +3383,6 @@ functions:
   __m9__to_eol_unless_len:
     calls: 1235
     bytes: 368
-  __map24$own0:
-    calls: 165
-    bytes: 464
   __rec_drop___m1__Doc:
     calls: 3430
     bytes: 184

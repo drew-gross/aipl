@@ -1408,6 +1408,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         generic_ctors: &generic_ctors,
         emitted: HashSet::new(),
         queue: VecDeque::new(),
+        cur_fn: String::new(),
         synth: 0,
         cur_effects: Vec::new(),
         cur_lenv: HashMap::new(),
@@ -2150,8 +2151,18 @@ struct Mono<'a> {
     /// specializations and synthesized lambda functions are inserted into
     /// `concrete` and queued here too.
     queue: VecDeque<Instance>,
-    /// Counter for unique synthesized names (lambda functions and lambda-
-    /// specialized callees).
+    /// Mangled name of the instance currently being processed — the prefix of
+    /// every function synthesized while inferring its body (see [`Mono::synth`]).
+    cur_fn: String,
+    /// Ordinal of the next name synthesized for `cur_fn` — a lifted lambda, a
+    /// `map`/`filter`/`filter_map`/`zip` loop wrapper, a desugaring temporary.
+    /// Reset per instance, so a synthesized function is `<instance>$<kind><n>`:
+    /// local to the function that produced it, and stable under edits anywhere
+    /// else. (A temporary's name is only ever bound inside the instance, so the
+    /// per-instance ordinal is all the uniqueness it needs.) A single program-wide counter was
+    /// what it replaced, and under that scheme every edit that added or removed
+    /// a lambda renumbered all the ones discovered after it — hundreds of
+    /// `--- performance ---` lines and a `.clif` diff for a one-line change.
     synth: usize,
     /// Declared effects of the function currently being processed. A lambda's
     /// synthesized function and the lambda-specialized callee inherit these:
@@ -2305,7 +2316,10 @@ impl Mono<'_> {
                 let lit = Expr::new(ExprKind::Num(v), b.span.clone());
                 subst::substitute(&b, &p.name, &lit)
             });
-        // Lambdas synthesized while processing this body inherit its effects.
+        // Lambdas synthesized while processing this body inherit its effects,
+        // and are named under it.
+        self.cur_fn = name.to_string();
+        self.synth = 0;
         self.cur_effects = effects.to_vec();
         self.cur_ret = return_ty.clone().unwrap_or(Type::Unit);
         // A lambda-specialized callee carries its function-typed parameters'
@@ -2452,8 +2466,9 @@ impl Mono<'_> {
                 Some((fn_name, cap_types)) => {
                     let mut cap_idents = Vec::with_capacity(cap_types.len());
                     for ct in cap_types {
-                        let cap = format!("$cap{}", self.synth);
-                        self.synth += 1;
+                        // A parameter name only has to be unique within this
+                        // callee's own list.
+                        let cap = format!("$cap{}", new_params.len());
                         new_params.push(Param {
                             name: cap.clone(),
                             ty: ct.clone(),
@@ -2476,8 +2491,13 @@ impl Mono<'_> {
             }
         }
 
-        let spec_name = format!("{name}$lam{}", self.synth);
-        self.synth += 1;
+        // Named by what specializes it — the callee and the functions bound to
+        // its function-typed parameters, which is exactly the memo key — so the
+        // name is a function of the call, not of discovery order.
+        let spec_name = key
+            .1
+            .iter()
+            .fold(format!("{name}$lam"), |acc, f| format!("{acc}${f}"));
         self.concrete.insert(
             spec_name.clone(),
             ConcreteTemplate {
@@ -2674,6 +2694,15 @@ impl Mono<'_> {
         self.specialize_call_with(&base, &template, ret, args, &inferred, env, span.clone())
     }
 
+    /// A fresh name for a function synthesized while processing the current
+    /// instance: `<instance>$<kind><n>`, `n` counting per instance (see
+    /// [`Mono::synth`]).
+    fn synth_name(&mut self, kind: &str) -> String {
+        let name = format!("{}${kind}{}", self.cur_fn, self.synth);
+        self.synth += 1;
+        name
+    }
+
     /// Synthesize a top-level function from a lambda: its parameters (typed from
     /// the expected function type) followed by one parameter per captured
     /// variable. Returns the function's name (it's inserted and queued).
@@ -2685,8 +2714,7 @@ impl Mono<'_> {
         lret: &Type,
         captures: &[(String, Type)],
     ) -> String {
-        let fn_name = format!("__lambda_{}", self.synth);
-        self.synth += 1;
+        let fn_name = self.synth_name("lambda");
         let mut params: Vec<Param> = lparams
             .iter()
             .zip(ptys)
@@ -2740,8 +2768,9 @@ impl Mono<'_> {
     ) -> Result<Vec<Expr>, Error> {
         let mut idents = Vec::with_capacity(captures.len());
         for (cn, ct) in captures {
-            let cap = format!("$cap{}", self.synth);
-            self.synth += 1;
+            // Unique within `params` — which is all a parameter name needs, and
+            // `filter_map` threads two capture lists into the same one.
+            let cap = format!("$cap{}", params.len());
             params.push(Param {
                 name: cap.clone(),
                 ty: ct.clone(),
@@ -3063,8 +3092,7 @@ impl Mono<'_> {
             )
         };
 
-        let fm_name = format!("__filter_map{}", self.synth);
-        self.synth += 1;
+        let fm_name = self.synth_name("filter_map");
         let ret = Type::Array(Box::new(decay_concat(u)));
         self.concrete.insert(
             fm_name.clone(),
@@ -3313,8 +3341,7 @@ impl Mono<'_> {
                 span.clone(),
             )
         };
-        let map_name = format!("__map{}", self.synth);
-        self.synth += 1;
+        let map_name = self.synth_name("map");
         let ret = Type::Array(Box::new(decay_concat(u)));
         self.concrete.insert(
             map_name.clone(),
@@ -3490,8 +3517,7 @@ impl Mono<'_> {
         let mut call_args = vec![rarr_a, rarr_b];
         let mut cap_idents: Vec<Expr> = Vec::new();
         for (cn, ct) in &captures {
-            let cap = format!("$cap{}", self.synth);
-            self.synth += 1;
+            let cap = format!("$cap{}", zip_params.len());
             zip_params.push(Param {
                 name: cap.clone(),
                 ty: ct.clone(),
@@ -3785,8 +3811,7 @@ impl Mono<'_> {
             )
         };
 
-        let zip_name = format!("__zip{}", self.synth);
-        self.synth += 1;
+        let zip_name = self.synth_name("zip");
         let ret = Type::Array(Box::new(r));
         self.concrete.insert(
             zip_name.clone(),
@@ -4045,8 +4070,7 @@ impl Mono<'_> {
             )
         };
 
-        let filter_name = format!("__filter{}", self.synth);
-        self.synth += 1;
+        let filter_name = self.synth_name("filter");
         let ret = Type::Array(Box::new(elem));
         self.concrete.insert(
             filter_name.clone(),
@@ -8370,7 +8394,7 @@ pub fn inline_small_post_mono(
                 && f.name != "__test_main"
                 // A `.test` body's name changes what `?` means inside it — see
                 // `is_inline_candidate_mono`.
-                && !f.name.starts_with("__test$")
+                && !aipl_syntax::is_test_body(&f.name)
                 && !binders.contains(&f.name)
                 && is_inline_shape(
                     f.params
@@ -8514,7 +8538,7 @@ fn is_inline_candidate_mono(
         // *name* `__test$<fn>` to make `?` fail the current test rather than
         // propagate (see `in_test` in codegen). Folding one into `__test_main`
         // would silently change what `?` means inside it.
-        && !f.name.starts_with("__test$")
+        && !aipl_syntax::is_test_body(&f.name)
         && f.name != "__test_main"
         && !skip.contains(&f.name)
         && !binders.contains(&f.name)

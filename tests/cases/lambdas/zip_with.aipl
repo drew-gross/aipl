@@ -48,17 +48,14 @@ deallocations: 19
 reallocations: 8
 bytes allocated: 485
 instructions executed: 2473
-binary size: 5528
+binary size: 5536
   code: 3324
   data: 257
-  metadata: 1947
+  metadata: 1955
 functions:
   __to_str_i64:
     calls: 14
     bytes: 204
-  __zip8$own0$own1:
-    calls: 1
-    bytes: 1024
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -83,6 +80,9 @@ functions:
   main:
     calls: 1
     bytes: 1872
+  main$zip8$own0$own1:
+    calls: 1
+    bytes: 1024
   show:
     calls: 5
     bytes: 224

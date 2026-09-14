@@ -55,19 +55,19 @@ deallocations: 28
 reallocations: 10
 bytes allocated: 1385
 instructions executed: 9546
-binary size: 7920
+binary size: 7992
   code: 4184
   data: 503
-  metadata: 3233
+  metadata: 3305
 functions:
-  __builtin_all$char$s0$lam12:
+  __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 22
     bytes: 212
-  __builtin_count_while$char$s0$lam11:
-    calls: 9
-    bytes: 172
-  __builtin_count_while$char$s0$lam4:
+  __builtin_count_while$char$s0$lam$__m1__dedent$lambda1:
     calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam$__m1__dedent$lambda2$lambda0:
+    calls: 9
     bytes: 172
   __m4__trim_prefix:
     calls: 14

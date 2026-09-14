@@ -35,47 +35,47 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 48
 instructions executed: 1094
-binary size: 7528
+binary size: 7736
   code: 3784
   data: 994
-  metadata: 2750
+  metadata: 2958
 functions:
-  __builtin_find_if$char$lam10:
+  __builtin_find_if$char$lam$__test$first_big$lambda4:
     calls: 1
     bytes: 212
-  __builtin_find_if$i64$lam1:
+  __builtin_find_if$i64$lam$__test$first_big$lambda0:
     calls: 1
     bytes: 268
-  __builtin_find_if$i64$lam14:
+  __builtin_find_if$i64$lam$__test$first_big$lambda1:
     calls: 1
     bytes: 268
-  __builtin_find_if$i64$lam16:
+  __builtin_find_if$i64$lam$__test$first_big$lambda2:
     calls: 1
     bytes: 268
-  __builtin_find_if$i64$lam18:
+  __builtin_find_if$i64$lam$__test$first_big$lambda3:
     calls: 1
     bytes: 268
-  __builtin_find_if$i64$lam3:
+  __builtin_find_if$i64$lam$__test$first_big$lambda7:
     calls: 1
     bytes: 268
-  __builtin_find_if$i64$lam5:
+  __builtin_find_if$i64$lam$__test$first_big$lambda8:
     calls: 1
     bytes: 268
-  __builtin_find_if$i64$lam7:
+  __builtin_find_if$i64$lam$__test$first_big$lambda9:
     calls: 1
     bytes: 268
-  __builtin_find_if$i64$lam8:
+  __builtin_find_if$i64$lam$is_neg:
     calls: 1
     bytes: 268
   __eq_i64$opt:
     calls: 2
     bytes: 100
-  __filter12$own0:
-    calls: 1
-    bytes: 300
   __test$first_big:
     calls: 1
     bytes: 920
+  __test$first_big$filter6$own0:
+    calls: 1
+    bytes: 300
   aipl_arr_inc:
     calls: 1
     bytes: (external)

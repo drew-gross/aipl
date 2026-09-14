@@ -177,10 +177,10 @@ deallocations: 7676
 reallocations: 323
 bytes allocated: 920749
 instructions executed: 759114
-binary size: 233552
+binary size: 233776
   code: 168780
   data: 3360
-  metadata: 61412
+  metadata: 61636
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -206,48 +206,24 @@ functions:
   __arr_retain___m4__TokenRule$__m6__AiplTok:
     calls: 0
     bytes: 832
-  __builtin_all$char$s0$lam43:
+  __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 908
     bytes: 212
-  __builtin_count_while$char$s0$lam31:
+  __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam40:
+  __builtin_count_while$char$s0$lam$__m8__dedent$lambda1:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam42:
+  __builtin_count_while$char$s0$lam$__m8__dedent$lambda2$lambda0:
     calls: 0
     bytes: 172
   __builtin_int_parse:
     calls: 0
     bytes: 1028
-  __lambda_0:
-    calls: 0
-    bytes: 136
-  __lambda_1:
-    calls: 0
-    bytes: 104
-  __lambda_2:
-    calls: 0
-    bytes: 144
-  __lambda_27:
+  __builtin_int_parse$lambda1:
     calls: 0
     bytes: 140
-  __lambda_3:
-    calls: 0
-    bytes: 164
-  __lambda_4:
-    calls: 0
-    bytes: 144
-  __lambda_5:
-    calls: 0
-    bytes: 164
-  __lambda_6:
-    calls: 0
-    bytes: 48
-  __lambda_7:
-    calls: 0
-    bytes: 64
   __m10__trim_prefix:
     calls: 0
     bytes: 260
@@ -308,6 +284,30 @@ functions:
   __m5__unescape:
     calls: 0
     bytes: 1168
+  __m6__aipl_rules$lambda0:
+    calls: 0
+    bytes: 136
+  __m6__aipl_rules$lambda1:
+    calls: 0
+    bytes: 104
+  __m6__aipl_rules$lambda2:
+    calls: 0
+    bytes: 144
+  __m6__aipl_rules$lambda3:
+    calls: 0
+    bytes: 164
+  __m6__aipl_rules$lambda4:
+    calls: 0
+    bytes: 144
+  __m6__aipl_rules$lambda5:
+    calls: 0
+    bytes: 164
+  __m6__aipl_rules$lambda6:
+    calls: 0
+    bytes: 48
+  __m6__aipl_rules$lambda7:
+    calls: 0
+    bytes: 64
   __m6__char_lit_emit:
     calls: 0
     bytes: 1772

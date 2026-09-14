@@ -32,10 +32,10 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 512
 instructions executed: 2458
-binary size: 7664
+binary size: 7744
   code: 4000
   data: 738
-  metadata: 2926
+  metadata: 3006
 functions:
   __eq_i64$arr:
     calls: 4
@@ -43,27 +43,27 @@ functions:
   __eq_str$arr:
     calls: 1
     bytes: 364
-  __filter1$own0:
-    calls: 1
-    bytes: 300
-  __filter11$own0:
-    calls: 1
-    bytes: 300
-  __filter3$own0:
-    calls: 1
-    bytes: 300
-  __filter5$own0:
-    calls: 1
-    bytes: 300
-  __filter7$own0:
-    calls: 1
-    bytes: 464
-  __map9$own0:
-    calls: 1
-    bytes: 284
   __test$keep_gt3:
     calls: 1
     bytes: 1284
+  __test$keep_gt3$filter1$own0:
+    calls: 1
+    bytes: 300
+  __test$keep_gt3$filter11$own0:
+    calls: 1
+    bytes: 300
+  __test$keep_gt3$filter3$own0:
+    calls: 1
+    bytes: 300
+  __test$keep_gt3$filter5$own0:
+    calls: 1
+    bytes: 300
+  __test$keep_gt3$filter7$own0:
+    calls: 1
+    bytes: 464
+  __test$keep_gt3$map9$own0:
+    calls: 1
+    bytes: 284
   aipl_arr_inc:
     calls: 6
     bytes: (external)

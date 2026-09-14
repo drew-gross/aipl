@@ -89,10 +89,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 2805
-binary size: 21576
+binary size: 21584
   code: 12348
   data: 1639
-  metadata: 7589
+  metadata: 7597
 functions:
   __test$lex:
     calls: 1
@@ -139,6 +139,6 @@ functions:
   main:
     calls: 1
     bytes: 232
-  map_err$str$LexError$FmtError$lam0:
+  map_err$str$LexError$FmtError$lam$to_fmt:
     calls: 6
     bytes: 608

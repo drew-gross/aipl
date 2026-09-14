@@ -19,10 +19,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 62
-binary size: 1144
+binary size: 1184
   code: 252
   data: 52
-  metadata: 840
+  metadata: 880
 functions:
   __test$rec:
     calls: 1
@@ -42,9 +42,9 @@ functions:
   main:
     calls: 1
     bytes: 100
-  rec$lam1:
+  rec$lam$__test$rec$lambda0:
     calls: 0
     bytes: 32
-  rec$lam1$tail:
+  rec$lam$__test$rec$lambda0$tail:
     calls: 4
     bytes: 28

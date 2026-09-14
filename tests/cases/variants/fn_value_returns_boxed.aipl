@@ -75,7 +75,7 @@ functions:
   aipl_write_i64:
     calls: 3
     bytes: (external)
-  build$lam1:
+  build$lam$pair:
     calls: 3
     bytes: 260
   main:

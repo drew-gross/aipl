@@ -238,10 +238,10 @@ deallocations: 149
 reallocations: 16
 bytes allocated: 10521
 instructions executed: 7775
-binary size: 91856
+binary size: 91872
   code: 56764
   data: 2875
-  metadata: 32217
+  metadata: 32233
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -255,7 +255,7 @@ functions:
   __arr_retain___m1__Expr:
     calls: 0
     bytes: 116
-  __builtin_all$Pat$lam2:
+  __builtin_all$Pat$lam$is_plain_binder:
     calls: 4
     bytes: 264
   __eq_str$arr:

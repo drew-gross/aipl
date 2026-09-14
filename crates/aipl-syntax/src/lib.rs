@@ -2207,6 +2207,42 @@ pub fn set_is_operator_name_hook(f: fn(&str) -> bool) {
     let _ = IS_OPERATOR_NAME_HOOK.set(f);
 }
 
+/// The name of the function a `.test` block on `f` becomes — `__test$<f>` — and
+/// the test that a function *is* one (`is_test_body`). Kept as a pair so the
+/// shape is decided in one place: a test body's name changes what `?` means
+/// inside it (an `err` fails the current test rather than returning), so the
+/// test must match exactly the bodies `test_fn_name` produced, and nothing
+/// synthesized *under* one — a lambda lifted out of a test body is
+/// `__test$<f>$lambda0`, and its `?` acts on the lambda's own return type. A
+/// source function name carries no `$`, so a `$` past the prefix is the mark of
+/// something synthesized from the body rather than the body itself.
+pub fn test_fn_name(f: &str) -> String {
+    format!("__test${f}")
+}
+
+/// Whether `name` is exactly a `.test` body — see [`test_fn_name`].
+pub fn is_test_body(name: &str) -> bool {
+    name.strip_prefix("__test$")
+        .is_some_and(|f| !f.contains('$'))
+}
+
+#[cfg(test)]
+mod test_body_tests {
+    use super::*;
+
+    #[test]
+    fn test_body_is_exactly_the_synthesized_name() {
+        assert!(is_test_body(&test_fn_name("map")));
+        assert!(is_test_body(&test_fn_name("__m9__at_end")));
+        // Functions synthesized *from* a test body are not the body.
+        assert!(!is_test_body("__test$map$lambda0"));
+        assert!(!is_test_body("__test$map$map0"));
+        // Nor are the runner's own entry points, or ordinary functions.
+        assert!(!is_test_body("__test_main"));
+        assert!(!is_test_body("map"));
+    }
+}
+
 /// The loader file index encoded in a mangled `__m<N>__name`, or `None` when the
 /// name carries no such prefix — a root-file item (the loader leaves those
 /// unmangled) or a builtin declaration.

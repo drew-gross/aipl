@@ -879,10 +879,10 @@ deallocations: 1465
 reallocations: 320
 bytes allocated: 171308
 instructions executed: 206864
-binary size: 157568
+binary size: 157688
   code: 102136
   data: 4276
-  metadata: 51156
+  metadata: 51276
 functions:
   __arr_drop_First$Tok:
     calls: 23
@@ -920,16 +920,16 @@ functions:
   __arr_retain___m1__Rule$Tok:
     calls: 189
     bytes: 116
-  __builtin_find_index$str$lam20:
-    calls: 24
-    bytes: 400
-  __builtin_find_index$str$lam7:
+  __builtin_find_index$str$lam$__m1__link$Tok$Node$lambda0:
     calls: 35
     bytes: 400
-  __builtin_try_map$__m1__Production$Tok$Node$First<Tok>$__m1__ParseError$lam15:
+  __builtin_find_index$str$lam$__m1__link_rule$Tok$lambda0:
+    calls: 24
+    bytes: 400
+  __builtin_try_map$__m1__Production$Tok$Node$First<Tok>$__m1__ParseError$lam$linked_first_sets$Tok$Node$lambda2:
     calls: 17
     bytes: 896
-  __builtin_try_map$__m1__Rule$Tok$__m1__Rule<Tok>$__m1__ParseError$lam39:
+  __builtin_try_map$__m1__Rule$Tok$__m1__Rule<Tok>$__m1__ParseError$lam$__m1__desugar_rules$Tok$lambda0:
     calls: 46
     bytes: 628
   __eq_First$Tok:
@@ -977,9 +977,6 @@ functions:
   __m1__prod_names$Tok$Node:
     calls: 20
     bytes: 548
-  __map34:
-    calls: 0
-    bytes: 484
   __rec_drop_Node:
     calls: 0
     bytes: 72
@@ -1124,6 +1121,9 @@ functions:
   prec_note:
     calls: 31
     bytes: 2396
+  prec_note$map3:
+    calls: 0
+    bytes: 484
   render_rule$Tok:
     calls: 101
     bytes: 10120

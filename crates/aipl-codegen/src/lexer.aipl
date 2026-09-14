@@ -1492,10 +1492,10 @@ deallocations: 434
 reallocations: 71
 bytes allocated: 67520
 instructions executed: 354019
-binary size: 2530336
+binary size: 2530672
   code: 1692896
   data: 11292
-  metadata: 826148
+  metadata: 826484
 functions:
   __arr_drop_StepResult$Kind:
     calls: 9
@@ -1515,24 +1515,27 @@ functions:
   __arr_retain_TokenRule$Kind:
     calls: 6
     bytes: 916
-  __builtin_count_while$char$lam35:
+  __builtin_count_while$char$lam$lex_step$Kind$lambda1:
     calls: 85
     bytes: 220
-  __builtin_count_while$char$s0$lam43:
-    calls: 49
-    bytes: 184
-  __builtin_count_while$char$s0$lam55:
-    calls: 0
-    bytes: 40
-  __builtin_count_while$char$s0$lam55$tail:
-    calls: 8
-    bytes: 256
-  __builtin_count_while$char$s0$lam60:
+  __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 13
     bytes: 172
+  __builtin_count_while$char$s0$lam$__builtin_is_digit:
+    calls: 49
+    bytes: 184
+  __builtin_count_while$char$s0$lam$to_eol_len$lambda0:
+    calls: 0
+    bytes: 40
+  __builtin_count_while$char$s0$lam$to_eol_len$lambda0$tail:
+    calls: 8
+    bytes: 256
   __builtin_int_parse:
     calls: 13
     bytes: 1028
+  __builtin_int_parse$lambda1:
+    calls: 67
+    bytes: 140
   __eq_Kind:
     calls: 113
     bytes: 632
@@ -1554,96 +1557,93 @@ functions:
   __eq___builtin_Span:
     calls: 132
     bytes: 104
-  __lambda_0:
-    calls: 0
-    bytes: 128
-  __lambda_1:
-    calls: 10
-    bytes: 96
-  __lambda_10:
-    calls: 0
-    bytes: 128
-  __lambda_11:
-    calls: 1
-    bytes: 96
-  __lambda_12:
-    calls: 0
-    bytes: 128
-  __lambda_13:
-    calls: 1
-    bytes: 96
-  __lambda_14:
-    calls: 0
-    bytes: 48
-  __lambda_15:
-    calls: 1
-    bytes: 64
-  __lambda_16:
-    calls: 0
-    bytes: 48
-  __lambda_17:
-    calls: 10
-    bytes: 64
-  __lambda_18:
-    calls: 0
-    bytes: 48
-  __lambda_19:
-    calls: 3
-    bytes: 64
-  __lambda_20:
-    calls: 0
-    bytes: 48
-  __lambda_21:
-    calls: 2
-    bytes: 64
-  __lambda_22:
-    calls: 0
-    bytes: 128
-  __lambda_23:
-    calls: 2
-    bytes: 96
-  __lambda_24:
-    calls: 0
-    bytes: 128
-  __lambda_25:
-    calls: 2
-    bytes: 96
-  __lambda_26:
-    calls: 0
-    bytes: 128
-  __lambda_27:
-    calls: 1
-    bytes: 96
-  __lambda_4:
-    calls: 0
-    bytes: 128
-  __lambda_46:
-    calls: 67
-    bytes: 140
-  __lambda_5:
-    calls: 33
-    bytes: 96
-  __lambda_6:
-    calls: 0
-    bytes: 128
-  __lambda_7:
-    calls: 2
-    bytes: 96
-  __lambda_8:
-    calls: 0
-    bytes: 128
-  __lambda_9:
-    calls: 1
-    bytes: 96
   __m1__unescape:
     calls: 24
     bytes: 1168
   __test$keep_skipped:
     calls: 1
     bytes: 25276
+  __test$keep_skipped$lambda0:
+    calls: 0
+    bytes: 128
+  __test$keep_skipped$lambda1:
+    calls: 10
+    bytes: 96
   __test$lex:
     calls: 1
     bytes: 1564940
+  __test$lex$lambda0:
+    calls: 0
+    bytes: 128
+  __test$lex$lambda1:
+    calls: 33
+    bytes: 96
+  __test$lex$lambda10:
+    calls: 0
+    bytes: 48
+  __test$lex$lambda11:
+    calls: 1
+    bytes: 64
+  __test$lex$lambda12:
+    calls: 0
+    bytes: 48
+  __test$lex$lambda13:
+    calls: 10
+    bytes: 64
+  __test$lex$lambda14:
+    calls: 0
+    bytes: 48
+  __test$lex$lambda15:
+    calls: 3
+    bytes: 64
+  __test$lex$lambda16:
+    calls: 0
+    bytes: 48
+  __test$lex$lambda17:
+    calls: 2
+    bytes: 64
+  __test$lex$lambda18:
+    calls: 0
+    bytes: 128
+  __test$lex$lambda19:
+    calls: 2
+    bytes: 96
+  __test$lex$lambda2:
+    calls: 0
+    bytes: 128
+  __test$lex$lambda20:
+    calls: 0
+    bytes: 128
+  __test$lex$lambda21:
+    calls: 2
+    bytes: 96
+  __test$lex$lambda22:
+    calls: 0
+    bytes: 128
+  __test$lex$lambda23:
+    calls: 1
+    bytes: 96
+  __test$lex$lambda3:
+    calls: 2
+    bytes: 96
+  __test$lex$lambda4:
+    calls: 0
+    bytes: 128
+  __test$lex$lambda5:
+    calls: 1
+    bytes: 96
+  __test$lex$lambda6:
+    calls: 0
+    bytes: 128
+  __test$lex$lambda7:
+    calls: 1
+    bytes: 96
+  __test$lex$lambda8:
+    calls: 0
+    bytes: 128
+  __test$lex$lambda9:
+    calls: 1
+    bytes: 96
   __test$span_str:
     calls: 1
     bytes: 3152

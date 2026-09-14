@@ -56,10 +56,10 @@ deallocations: 4
 reallocations: 1
 bytes allocated: 198
 instructions executed: 1437
-binary size: 11768
+binary size: 11808
   code: 7324
   data: 243
-  metadata: 4201
+  metadata: 4241
 functions:
   __arr_drop_Wrapped:
     calls: 2
@@ -67,30 +67,15 @@ functions:
   __arr_retain_Wrapped:
     calls: 3
     bytes: 120
-  __builtin_try_map$i64$Wrapped$str$lam13:
+  __builtin_try_map$i64$Wrapped$str$lam$main$lambda4:
     calls: 1
     bytes: 548
-  __builtin_try_map$i64$Wrapped$str$lam9:
+  __builtin_try_map$i64$Wrapped$str$lam$main$lambda7:
     calls: 1
     bytes: 548
-  __builtin_try_map$i64$i64$str$lam17:
+  __builtin_try_map$i64$i64$str$lam$main$lambda9:
     calls: 1
     bytes: 488
-  __lambda_0:
-    calls: 1
-    bytes: 564
-  __lambda_12:
-    calls: 2
-    bytes: 564
-  __lambda_16:
-    calls: 1
-    bytes: 508
-  __lambda_4:
-    calls: 1
-    bytes: 564
-  __lambda_8:
-    calls: 2
-    bytes: 564
   __to_str_i64$arr:
     calls: 1
     bytes: 708
@@ -121,3 +106,18 @@ functions:
   main:
     calls: 1
     bytes: 2028
+  main$lambda0:
+    calls: 1
+    bytes: 564
+  main$lambda2:
+    calls: 1
+    bytes: 564
+  main$lambda4:
+    calls: 2
+    bytes: 564
+  main$lambda7:
+    calls: 2
+    bytes: 564
+  main$lambda9:
+    calls: 1
+    bytes: 508

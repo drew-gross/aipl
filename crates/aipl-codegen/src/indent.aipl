@@ -42,12 +42,12 @@ deallocations: 33
 reallocations: 11
 bytes allocated: 2060
 instructions executed: 2009
-binary size: 4672
+binary size: 4688
   code: 2088
   data: 361
-  metadata: 2223
+  metadata: 2239
 functions:
-  __builtin_all$char$s0$lam3:
+  __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 13
     bytes: 212
   __test$indent:

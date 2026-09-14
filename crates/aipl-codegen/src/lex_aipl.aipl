@@ -953,10 +953,10 @@ deallocations: 284
 reallocations: 58
 bytes allocated: 389794
 instructions executed: 1369590
-binary size: 559424
+binary size: 559696
   code: 379488
   data: 10188
-  metadata: 169748
+  metadata: 170020
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -976,33 +976,36 @@ functions:
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
     bytes: 832
-  __builtin_all$char$s0$lam52:
+  __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 22
     bytes: 212
-  __builtin_count_while$char$lam16:
+  __builtin_count_while$char$lam$__m1__lex_step$AiplTok$lambda1:
     calls: 50
     bytes: 220
-  __builtin_count_while$char$s0$lam24:
-    calls: 40
-    bytes: 184
-  __builtin_count_while$char$s0$lam31:
-    calls: 0
-    bytes: 172
-  __builtin_count_while$char$s0$lam44:
-    calls: 0
-    bytes: 40
-  __builtin_count_while$char$s0$lam44$tail:
-    calls: 6
-    bytes: 256
-  __builtin_count_while$char$s0$lam49:
+  __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 4
     bytes: 172
-  __builtin_count_while$char$s0$lam51:
+  __builtin_count_while$char$s0$lam$__builtin_is_digit:
+    calls: 40
+    bytes: 184
+  __builtin_count_while$char$s0$lam$__m1__to_eol_len$lambda0:
+    calls: 0
+    bytes: 40
+  __builtin_count_while$char$s0$lam$__m1__to_eol_len$lambda0$tail:
+    calls: 6
+    bytes: 256
+  __builtin_count_while$char$s0$lam$__m4__dedent$lambda1:
+    calls: 0
+    bytes: 172
+  __builtin_count_while$char$s0$lam$__m4__dedent$lambda2$lambda0:
     calls: 11
     bytes: 172
   __builtin_int_parse:
     calls: 4
     bytes: 1028
+  __builtin_int_parse$lambda1:
+    calls: 5
+    bytes: 140
   __eq_AiplTok:
     calls: 66
     bytes: 600
@@ -1036,33 +1039,6 @@ functions:
   __eq_str$opt:
     calls: 3
     bytes: 100
-  __lambda_0:
-    calls: 0
-    bytes: 136
-  __lambda_1:
-    calls: 17
-    bytes: 104
-  __lambda_2:
-    calls: 0
-    bytes: 144
-  __lambda_27:
-    calls: 5
-    bytes: 140
-  __lambda_3:
-    calls: 2
-    bytes: 164
-  __lambda_4:
-    calls: 0
-    bytes: 144
-  __lambda_5:
-    calls: 2
-    bytes: 164
-  __lambda_6:
-    calls: 0
-    bytes: 48
-  __lambda_7:
-    calls: 4
-    bytes: 64
   __m10__parse_test_section_header:
     calls: 3
     bytes: 744
@@ -1183,6 +1159,30 @@ functions:
   aipl_rules:
     calls: 29
     bytes: 90368
+  aipl_rules$lambda0:
+    calls: 0
+    bytes: 136
+  aipl_rules$lambda1:
+    calls: 17
+    bytes: 104
+  aipl_rules$lambda2:
+    calls: 0
+    bytes: 144
+  aipl_rules$lambda3:
+    calls: 2
+    bytes: 164
+  aipl_rules$lambda4:
+    calls: 0
+    bytes: 144
+  aipl_rules$lambda5:
+    calls: 2
+    bytes: 164
+  aipl_rules$lambda6:
+    calls: 0
+    bytes: 48
+  aipl_rules$lambda7:
+    calls: 4
+    bytes: 64
   aipl_test_begin:
     calls: 7
     bytes: (external)

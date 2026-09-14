@@ -25,9 +25,6 @@ binary size: 4224
   data: 1
   metadata: 1743
 functions:
-  __zip1$own0$own1:
-    calls: 1
-    bytes: 1672
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -43,3 +40,6 @@ functions:
   main:
     calls: 1
     bytes: 808
+  main$zip1$own0$own1:
+    calls: 1
+    bytes: 1672

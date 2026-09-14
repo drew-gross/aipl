@@ -111,17 +111,11 @@ deallocations: 19
 reallocations: 49
 bytes allocated: 5467
 instructions executed: 90410
-binary size: 6336
+binary size: 6352
   code: 3544
   data: 107
-  metadata: 2685
+  metadata: 2701
 functions:
-  __filter_map11$own0:
-    calls: 2
-    bytes: 336
-  __filter_map7$own0:
-    calls: 2
-    bytes: 336
   __to_str_i64$opt:
     calls: 4
     bytes: 388
@@ -173,6 +167,12 @@ functions:
   many:
     calls: 5
     bytes: 172
+  owned$filter_map2$own0:
+    calls: 2
+    bytes: 336
   points:
     calls: 2
     bytes: 476
+  spelled_out$filter_map2$own0:
+    calls: 2
+    bytes: 336

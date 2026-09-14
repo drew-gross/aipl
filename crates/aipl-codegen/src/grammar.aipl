@@ -892,10 +892,10 @@ deallocations: 376
 reallocations: 54
 bytes allocated: 56698
 instructions executed: 59471
-binary size: 136816
+binary size: 136920
   code: 86572
   data: 3516
-  metadata: 46728
+  metadata: 46832
 functions:
   __arr_drop_ListStyle:
     calls: 41
@@ -921,19 +921,19 @@ functions:
   __arr_retain_Rule$Kind:
     calls: 20
     bytes: 116
-  __builtin_find_index$str$lam1:
+  __builtin_find_index$str$lam$__test$link$lambda0:
     calls: 1
     bytes: 412
-  __builtin_find_index$str$lam13:
-    calls: 9
-    bytes: 400
-  __builtin_find_index$str$lam3:
+  __builtin_find_index$str$lam$__test$link$lambda1:
     calls: 1
     bytes: 412
-  __builtin_find_index$str$lam8:
+  __builtin_find_index$str$lam$link$Kind$Node$lambda0:
     calls: 23
     bytes: 400
-  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam19:
+  __builtin_find_index$str$lam$link_rule$Kind$lambda0:
+    calls: 9
+    bytes: 400
+  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam$desugar_rules$Kind$lambda0:
     calls: 4
     bytes: 628
   __eq_ListStyle:

@@ -54,12 +54,12 @@ deallocations: 48
 reallocations: 25
 bytes allocated: 2640
 instructions executed: 6953
-binary size: 8496
+binary size: 8536
   code: 3800
   data: 1312
-  metadata: 3384
+  metadata: 3424
 functions:
-  __m2__trim_end_while$lam1:
+  __m2__trim_end_while$lam$clean_trailing_whitespace$lambda0:
     calls: 0
     bytes: 280
   __test$clean_trailing_whitespace:

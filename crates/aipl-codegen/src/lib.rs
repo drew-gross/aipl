@@ -2748,7 +2748,7 @@ pub fn build_test_program(program: &Program) -> Program {
     for item in &program.items {
         match item {
             Item::Fn(f) if f.test_body.is_some() => {
-                let test_fn = format!("__test${}", f.name);
+                let test_fn = aipl_syntax::test_fn_name(&f.name);
                 let mut orig = f.clone();
                 orig.test_body = None;
                 items.push(Item::Fn(orig));
@@ -8389,7 +8389,7 @@ fn define_fn<M: Module>(
     let unit_main = func.is_unit_main();
     let error_main = func.is_error_main();
     // Synthesized `.test` bodies are named `__test$<fn>` (see `synthesize_test_program`).
-    let in_test = func.name.starts_with("__test$");
+    let in_test = aipl_syntax::is_test_body(&func.name);
     build_signature(&mut ctx.func.signature, func, structs, tail_id.is_some());
 
     // Source-variable legend, filled as bindings are created (params + locals) and

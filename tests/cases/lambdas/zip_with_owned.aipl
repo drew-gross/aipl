@@ -75,32 +75,14 @@ deallocations: 26
 reallocations: 2
 bytes allocated: 1036
 instructions executed: 3794
-binary size: 12864
+binary size: 12880
   code: 8244
   data: 545
-  metadata: 4075
+  metadata: 4091
 functions:
   __to_str_i64:
     calls: 15
     bytes: 204
-  __zip1$own0$own1:
-    calls: 1
-    bytes: 1024
-  __zip11$own0$own1:
-    calls: 1
-    bytes: 1024
-  __zip15$own0$own1:
-    calls: 1
-    bytes: 1672
-  __zip3$own0$own1:
-    calls: 1
-    bytes: 1024
-  __zip5$own0:
-    calls: 1
-    bytes: 492
-  __zip7$own1:
-    calls: 1
-    bytes: 496
   aipl_arr_inc:
     calls: 7
     bytes: (external)
@@ -131,6 +113,24 @@ functions:
   main:
     calls: 1
     bytes: 1828
+  main$zip1$own0$own1:
+    calls: 1
+    bytes: 1024
+  main$zip11$own0$own1:
+    calls: 1
+    bytes: 1024
+  main$zip15$own0$own1:
+    calls: 1
+    bytes: 1672
+  main$zip3$own0$own1:
+    calls: 1
+    bytes: 1024
+  main$zip5$own0:
+    calls: 1
+    bytes: 492
+  main$zip7$own1:
+    calls: 1
+    bytes: 496
   show:
     calls: 5
     bytes: 224

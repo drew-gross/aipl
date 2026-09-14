@@ -333,10 +333,10 @@ deallocations: 314
 reallocations: 2
 bytes allocated: 21728
 instructions executed: 28043
-binary size: 35752
+binary size: 35856
   code: 21416
   data: 881
-  metadata: 13455
+  metadata: 13559
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -344,30 +344,27 @@ functions:
   __arr_retain_Doc:
     calls: 0
     bytes: 116
-  __builtin_all$char$s0$lam25:
+  __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 3
     bytes: 212
-  __builtin_any$Doc$lam7:
+  __builtin_any$Doc$lam$has_hard:
     calls: 0
     bytes: 32
-  __builtin_any$Doc$lam7$tail:
+  __builtin_any$Doc$lam$has_hard$tail:
     calls: 5
     bytes: 324
-  __builtin_count_while$char$s0$lam14:
+  __builtin_count_while$char$s0$lam$__m2__dedent$lambda1:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam24:
+  __builtin_count_while$char$s0$lam$__m2__dedent$lambda2$lambda0:
     calls: 1
     bytes: 172
   __m1__reindent_block:
     calls: 1
     bytes: 4652
-  __m5__trim_end_while$lam4:
+  __m5__trim_end_while$lam$__builtin_is_space:
     calls: 34
     bytes: 300
-  __map6$own0:
-    calls: 11
-    bytes: 464
   __rec_drop_Doc:
     calls: 46
     bytes: 184
@@ -458,3 +455,6 @@ functions:
   print:
     calls: 11
     bytes: 4180
+  print$map2$own0:
+    calls: 11
+    bytes: 464

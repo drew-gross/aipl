@@ -777,10 +777,10 @@ deallocations: 1113
 reallocations: 33
 bytes allocated: 96953
 instructions executed: 75774
-binary size: 133696
+binary size: 133768
   code: 84012
   data: 5328
-  metadata: 44356
+  metadata: 44428
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -806,7 +806,7 @@ functions:
   __arr_retain___m3__TokenRule$Kind:
     calls: 0
     bytes: 544
-  __builtin_all$char$s0$lam21:
+  __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 38
     bytes: 212
   __eq_Entry:
@@ -827,15 +827,6 @@ functions:
   __eq_str$opt:
     calls: 4
     bytes: 100
-  __lambda_0:
-    calls: 0
-    bytes: 64
-  __lambda_1:
-    calls: 0
-    bytes: 64
-  __lambda_2:
-    calls: 0
-    bytes: 64
   __m1__indent:
     calls: 12
     bytes: 724
@@ -857,9 +848,18 @@ functions:
   __test$matcher_pat:
     calls: 1
     bytes: 12256
+  __test$matcher_pat$lambda0:
+    calls: 0
+    bytes: 64
+  __test$matcher_pat$lambda1:
+    calls: 0
+    bytes: 64
   __test$matcher_regex:
     calls: 1
     bytes: 8712
+  __test$matcher_regex$lambda0:
+    calls: 0
+    bytes: 64
   __test$re_escape:
     calls: 1
     bytes: 1104

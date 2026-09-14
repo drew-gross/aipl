@@ -82,10 +82,10 @@ deallocations: 45
 reallocations: 6
 bytes allocated: 2485
 instructions executed: 4547
-binary size: 21632
+binary size: 21744
   code: 12140
   data: 1485
-  metadata: 8007
+  metadata: 8119
 functions:
   __eq_i64$arr:
     calls: 1
@@ -96,18 +96,18 @@ functions:
   __eq_u64$arr:
     calls: 1
     bytes: 296
-  __lambda_10:
-    calls: 2
-    bytes: 340
-  __lambda_8:
-    calls: 2
-    bytes: 340
   __test$label:
     calls: 1
     bytes: 484
   __test$try_map:
     calls: 1
     bytes: 4384
+  __test$try_map$lambda3:
+    calls: 2
+    bytes: 340
+  __test$try_map$lambda4:
+    calls: 2
+    bytes: 340
   __test$width:
     calls: 1
     bytes: 276
@@ -165,22 +165,22 @@ functions:
   main:
     calls: 1
     bytes: 236
-  try_map$i64$i64$str$lam15:
+  try_map$i64$i64$str$lam$__test$try_map$lambda6:
     calls: 1
     bytes: 644
-  try_map$i64$i64$str$lam17:
+  try_map$i64$i64$str$lam$__test$try_map$lambda7:
     calls: 1
     bytes: 644
-  try_map$i64$str$str$lam0:
+  try_map$i64$str$str$lam$__test$try_map$lambda3:
+    calls: 1
+    bytes: 544
+  try_map$i64$str$str$lam$__test$try_map$lambda4:
+    calls: 1
+    bytes: 544
+  try_map$i64$str$str$lam$label:
     calls: 6
     bytes: 544
-  try_map$i64$str$str$lam11:
-    calls: 1
-    bytes: 544
-  try_map$i64$str$str$lam9:
-    calls: 1
-    bytes: 544
-  try_map$str$u64$char$lam1:
+  try_map$str$u64$char$lam$width:
     calls: 1
     bytes: 504
   width:

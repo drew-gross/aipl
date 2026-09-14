@@ -41,17 +41,17 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 48
 instructions executed: 1051
-binary size: 6376
+binary size: 6536
   code: 3000
   data: 773
-  metadata: 2603
+  metadata: 2763
 functions:
-  __filter13$own0:
-    calls: 1
-    bytes: 300
   __test$all:
     calls: 1
     bytes: 668
+  __test$all$filter6$own0:
+    calls: 1
+    bytes: 300
   __test$is_nine:
     calls: 1
     bytes: 184
@@ -76,31 +76,31 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  all$char$lam7:
+  all$char$lam$__test$all$lambda3:
     calls: 1
     bytes: 152
-  all$char$s0$lam11:
+  all$char$s0$lam$__test$all$lambda4:
     calls: 1
     bytes: 152
-  all$char$s0$lam9:
+  all$char$s0$lam$__test$all$lambda5:
     calls: 1
     bytes: 152
-  all$i64$lam1:
+  all$i64$lam$__test$all$lambda0:
     calls: 1
     bytes: 204
-  all$i64$lam12:
+  all$i64$lam$__test$all$lambda1:
     calls: 1
     bytes: 204
-  all$i64$lam15:
+  all$i64$lam$__test$all$lambda2:
     calls: 1
     bytes: 204
-  all$i64$lam17:
+  all$i64$lam$__test$all$lambda7:
     calls: 1
     bytes: 204
-  all$i64$lam3:
+  all$i64$lam$__test$all$lambda8:
     calls: 1
     bytes: 204
-  all$i64$lam5:
+  all$i64$lam$is_nine:
     calls: 1
     bytes: 204
   main:
