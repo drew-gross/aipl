@@ -79,8 +79,6 @@ misc cleanup:
   nested_len should maybe use an all_suffixes type utility
   rename Pat to Pattern (file and variant)
   unterminated error messages can be DRYer
-  in show_first we shouldn't need a typed empty array literal.
-  in rule_labels we shouldn't need an empty literal
   union_syms should just be actual set union
   why does rule_first need three as a variable?
   fmt_node can only fail due to bad internal index; see if we can fix that, maybe with a LinkedGrammar type?

@@ -765,9 +765,8 @@ fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str,
     if (!expect_as.is_empty()) {
         return no(far_miss(far, pos, expect_as), pos);
     };
-    let empty: #{str} = #{};
     mut f = far;
-    for (let l : p.labels[i].value_or(empty)) {
+    for (let l : p.labels[i].value_or(#{})) {
         set f = far_miss(f, pos, l);
     }
     no(f, pos)
@@ -793,8 +792,7 @@ fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str,
 # reaches the same labels by a different route ends the loop instead of spinning
 # — where deduped arrays would have compared unequal on order alone.
 fn label_sets<K: variant, A: any>(prods: Production<K, A>[], firsts: First<K>[]) -> #{str}[] {
-    let empty: #{str} = #{};
-    mut labels = prods.map(|pr| empty);
+    mut labels = prods.map(|pr| #{});
     mut going = true;
     while (going) {
         let prev = labels;
@@ -815,7 +813,6 @@ fn rule_labels<K: variant, A: any>(
     firsts: First<K>[],
     labels: #{str}[],
 ) -> #{str} {
-    let empty: #{str} = #{};
     match (r) {
         Term(k) => #{k.case_name()},
         Literal(s) => #{quoted(s)},
@@ -838,15 +835,15 @@ fn rule_labels<K: variant, A: any>(
         // in a message, and its insides never surface.
         NamedIdx(i) => match (prods[i]) {
             some(pr) => if (pr.expect_as.is_empty()) {
-                labels[i].value_or(empty)
+                labels[i].value_or(#{})
             } else {
                 #{pr.expect_as}
             },
-            none => empty,
+            none => #{},
         },
         // Unlinked — `parse_cst` links first, so neither is reachable from a
         // parse; an unlinked grammar simply prunes nothing.
-        Named(..) => empty,
+        Named(..) => #{},
     }
 }
 
@@ -1613,15 +1610,15 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 5738
-deallocations: 5738
+allocations: 5605
+deallocations: 5605
 reallocations: 1252
-bytes allocated: 590125
-instructions executed: 1359901
-binary size: 690768
-  code: 418144
+bytes allocated: 585869
+instructions executed: 1358837
+binary size: 690720
+  code: 418112
   data: 10484
-  metadata: 262140
+  metadata: 262124
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1972,7 +1969,7 @@ functions:
     calls: 40
     bytes: (external)
   aipl_array_dec:
-    calls: 37675
+    calls: 37542
     bytes: (external)
   aipl_array_new:
     calls: 806
@@ -1984,7 +1981,7 @@ functions:
     calls: 2306
     bytes: (external)
   aipl_array_with_cap:
-    calls: 892
+    calls: 759
     bytes: (external)
   aipl_assert:
     calls: 83
@@ -2105,10 +2102,10 @@ functions:
     bytes: 452
   prepare$Tok$Node:
     calls: 12
-    bytes: 2184
+    bytes: 2180
   pruned$Tok$Node:
     calls: 11
-    bytes: 1304
+    bytes: 1284
   quoted:
     calls: 107
     bytes: 456
@@ -2120,7 +2117,7 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 130
-    bytes: 4804
+    bytes: 4796
   rule_nullable$Tok:
     calls: 0
     bytes: 36

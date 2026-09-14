@@ -471,10 +471,10 @@ deallocations: 14252
 reallocations: 2065
 bytes allocated: 1203955
 instructions executed: 2515219
-binary size: 421016
-  code: 271608
+binary size: 421000
+  code: 271588
   data: 6044
-  metadata: 143364
+  metadata: 143368
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -745,7 +745,7 @@ functions:
     bytes: 7416
   __m13__pruned$CalcTok$Calc:
     calls: 0
-    bytes: 1304
+    bytes: 1284
   __m13__quoted:
     calls: 164
     bytes: 456
