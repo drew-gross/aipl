@@ -471,10 +471,10 @@ deallocations: 14252
 reallocations: 2065
 bytes allocated: 1203955
 instructions executed: 2515219
-binary size: 421000
+binary size: 420992
   code: 271588
   data: 6044
-  metadata: 143368
+  metadata: 143360
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -620,7 +620,7 @@ functions:
   __builtin_try_map$__m3__Production$CalcTok$Calc$__m2__First<CalcTok>$__m3__ParseError$lam$__m2__linked_first_sets$CalcTok$Calc$lambda2:
     calls: 4
     bytes: 896
-  __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule<CalcTok>$__m3__ParseError$lam$__m3__desugar_rules$CalcTok$lambda0:
+  __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule$CalcTok$__m3__ParseError$lam$__m3__desugar_rule$CalcTok:
     calls: 256
     bytes: 628
   __eq_Calc:

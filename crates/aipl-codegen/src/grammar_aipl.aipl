@@ -4306,10 +4306,10 @@ deallocations: 1959472
 reallocations: 245238
 bytes allocated: 293317581
 instructions executed: 459792007
-binary size: 5914176
+binary size: 5914168
   code: 3862852
   data: 48620
-  metadata: 2002704
+  metadata: 2002696
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4647,7 +4647,7 @@ functions:
   __builtin_try_map$__m7__Production$__m21__AiplTok$__m1__Ast$__m30__First<AiplTok>$__m7__ParseError$lam$__m30__linked_first_sets$__m21__AiplTok$__m1__Ast$lambda2:
     calls: 72
     bytes: 10384
-  __builtin_try_map$__m7__Rule$__m21__AiplTok$__m7__Rule<AiplTok>$__m7__ParseError$lam$__m7__desugar_rules$__m21__AiplTok$lambda0:
+  __builtin_try_map$__m7__Rule$__m21__AiplTok$__m7__Rule$__m21__AiplTok$__m7__ParseError$lam$__m7__desugar_rule$__m21__AiplTok:
     calls: 58056
     bytes: 628
   __builtin_try_map$__m8__Cst$__m1__Ast$__m7__ParseError$lam$__m29__lower_node$__m21__AiplTok$__m1__Ast$lambda0:

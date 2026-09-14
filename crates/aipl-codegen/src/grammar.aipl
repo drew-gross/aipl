@@ -348,10 +348,7 @@ pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods.map(|
 # rule it was linked from, which is what makes `link` idempotent.
 fn group_styles<K: variant>(r: Rule<K>) -> ListStyle[] {
     match (r) {
-        // `map(group_styles)` is refused — a function *value* cannot be generic —
-        // and the forwarding lambda that remains is what the lint objects to, so
-        // the two rule each other out and the squelch is the only spelling left.
-        Then(rs) | OneOf(rs) => rs.map(|sub| group_styles(sub)).join(), #[allow]
+        Then(rs) | OneOf(rs) => rs.map(group_styles).join(),
         // A bracketed repetition is a group, and its own style comes first —
         // before the brackets' insides and before its own body. `link_rule`
         // hands out indices by walking this same tree the same way.
@@ -492,11 +489,7 @@ fn desugar_opt<K: variant>(r: Rule<K>?) -> Rule<K>?!ParseError {
     }
 }
 
-fn desugar_rules<K: variant>(rs: Rule<K>[]) -> Rule<K>[]!ParseError {
-    // Generic, so it has no function value to pass; the lint's advice does not
-    // compile here — see `group_styles` for the same pair of rules colliding.
-    rs.try_map(|r| desugar_rule(r)) #[allow]
-}
+fn desugar_rules<K: variant>(rs: Rule<K>[]) -> Rule<K>[]!ParseError { rs.try_map(desugar_rule) }
 
 # One rule with every `Named(n)` in it rewritten to `NamedIdx(i)` and every
 # bracketed repetition given its entry in the grammar's `groups` table. Fails
@@ -892,10 +885,10 @@ deallocations: 376
 reallocations: 54
 bytes allocated: 56698
 instructions executed: 59471
-binary size: 136920
+binary size: 136912
   code: 86572
   data: 3516
-  metadata: 46832
+  metadata: 46824
 functions:
   __arr_drop_ListStyle:
     calls: 41
@@ -933,7 +926,7 @@ functions:
   __builtin_find_index$str$lam$link_rule$Kind$lambda0:
     calls: 9
     bytes: 400
-  __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam$desugar_rules$Kind$lambda0:
+  __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
     calls: 4
     bytes: 628
   __eq_ListStyle:

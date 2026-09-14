@@ -82,10 +82,10 @@ deallocations: 19420
 reallocations: 1782
 bytes allocated: 1130691
 instructions executed: 5286755
-binary size: 261112
+binary size: 261104
   code: 169404
   data: 1876
-  metadata: 89832
+  metadata: 89824
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -171,7 +171,7 @@ functions:
   __builtin_try_map$__m2__Cst$Sexp$__m4__ParseError$lam$__m14__lower_node$__m1__SexpKind$Sexp$lambda0:
     calls: 836
     bytes: 652
-  __builtin_try_map$__m4__Rule$__m1__SexpKind$__m4__Rule<SexpKind>$__m4__ParseError$lam$__m4__desugar_rules$__m1__SexpKind$lambda0:
+  __builtin_try_map$__m4__Rule$__m1__SexpKind$__m4__Rule$__m1__SexpKind$__m4__ParseError$lam$__m4__desugar_rule$__m1__SexpKind:
     calls: 6
     bytes: 628
   __eq_Sexp:

@@ -500,10 +500,10 @@ deallocations: 20586
 reallocations: 2578
 bytes allocated: 2298738
 instructions executed: 4472931
-binary size: 450144
+binary size: 450128
   code: 290672
   data: 7932
-  metadata: 151540
+  metadata: 151524
 functions:
   __arr_drop_Json:
     calls: 125
@@ -634,7 +634,7 @@ functions:
   __builtin_try_map$__m3__Production$JsonTok$Json$__m2__First<JsonTok>$__m3__ParseError$lam$__m2__linked_first_sets$JsonTok$Json$lambda2:
     calls: 3
     bytes: 896
-  __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule<JsonTok>$__m3__ParseError$lam$__m3__desugar_rules$JsonTok$lambda0:
+  __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule$JsonTok$__m3__ParseError$lam$__m3__desugar_rule$JsonTok:
     calls: 268
     bytes: 628
   __eq_Json:

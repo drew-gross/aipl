@@ -1615,10 +1615,10 @@ deallocations: 5605
 reallocations: 1252
 bytes allocated: 585869
 instructions executed: 1358837
-binary size: 690720
+binary size: 690712
   code: 418112
   data: 10484
-  metadata: 262124
+  metadata: 262116
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1737,7 +1737,7 @@ functions:
   __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam$__m2__linked_first_sets$Tok$Node$lambda2:
     calls: 32
     bytes: 896
-  __builtin_try_map$__m3__Rule$Tok$__m3__Rule<Tok>$__m3__ParseError$lam$__m3__desugar_rules$Tok$lambda0:
+  __builtin_try_map$__m3__Rule$Tok$__m3__Rule$Tok$__m3__ParseError$lam$__m3__desugar_rule$Tok:
     calls: 100
     bytes: 628
   __eq_Node:

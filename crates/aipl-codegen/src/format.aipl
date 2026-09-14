@@ -676,10 +676,10 @@ deallocations: 2121
 reallocations: 181
 bytes allocated: 168067
 instructions executed: 256983
-binary size: 233096
+binary size: 233088
   code: 149192
   data: 5052
-  metadata: 78852
+  metadata: 78844
 functions:
   __arr_drop_Piece:
     calls: 95
@@ -747,7 +747,7 @@ functions:
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
     bytes: 440
-  __builtin_try_map$__m8__Rule$FKind$__m8__Rule<FKind>$__m8__ParseError$lam$__m8__desugar_rules$FKind$lambda0:
+  __builtin_try_map$__m8__Rule$FKind$__m8__Rule$FKind$__m8__ParseError$lam$__m8__desugar_rule$FKind:
     calls: 0
     bytes: 628
   __eq_str$arr:

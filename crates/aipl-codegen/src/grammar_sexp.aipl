@@ -281,10 +281,10 @@ deallocations: 7638
 reallocations: 910
 bytes allocated: 639934
 instructions executed: 1403186
-binary size: 401048
+binary size: 401040
   code: 259448
   data: 4892
-  metadata: 136708
+  metadata: 136700
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -415,7 +415,7 @@ functions:
   __builtin_try_map$__m3__Production$SexpKind$__m15__Sexp$__m2__First<SexpKind>$__m3__ParseError$lam$__m2__linked_first_sets$SexpKind$__m15__Sexp$lambda2:
     calls: 3
     bytes: 896
-  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam$__m3__desugar_rules$SexpKind$lambda0:
+  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule$SexpKind$__m3__ParseError$lam$__m3__desugar_rule$SexpKind:
     calls: 45
     bytes: 628
   __eq___m15__Sexp:

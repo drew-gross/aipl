@@ -1,0 +1,13 @@
+import { map } from builtins;
+
+fn pair<A: any, B: any>(a: A, b: B) -> (A, B) { (a, b) }
+
+fn main() {
+    let ps = [1].map(pair);
+}
+--- errors ---
+error: fn "pair" takes 2 parameter(s), but a function taking 1 is expected here
+ --> ./tests/cases/lambdas/err_generic_fn_value_arity.aipl:6:22
+  |
+6 |     let ps = [1].map(pair);
+  |                      ^^^^

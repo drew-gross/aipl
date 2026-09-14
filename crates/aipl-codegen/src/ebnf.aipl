@@ -723,9 +723,7 @@ pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
 # name, a spelling in double quotes — with `<empty>` appended when the rule is
 # nullable. A debug rendering, like `cst.aipl`'s `show`.
 pub fn show_first<K: variant>(self: First<K>) -> str {
-    // The lambda is not forwarding for its own sake: `show_sym` is generic, and
-    // a generic function has no value form to pass to `map`.
-    let syms = self.syms.map(|s| show_sym(s)).join(sep=" "); #[allow]
+    let syms = self.syms.map(show_sym).join(sep=" ");
     if (!self.nullable) {
         return syms;
     };
@@ -876,10 +874,10 @@ deallocations: 1465
 reallocations: 320
 bytes allocated: 171308
 instructions executed: 206864
-binary size: 157688
+binary size: 157680
   code: 102136
   data: 4276
-  metadata: 51276
+  metadata: 51268
 functions:
   __arr_drop_First$Tok:
     calls: 23
@@ -926,7 +924,7 @@ functions:
   __builtin_try_map$__m1__Production$Tok$Node$First<Tok>$__m1__ParseError$lam$linked_first_sets$Tok$Node$lambda2:
     calls: 17
     bytes: 896
-  __builtin_try_map$__m1__Rule$Tok$__m1__Rule<Tok>$__m1__ParseError$lam$__m1__desugar_rules$Tok$lambda0:
+  __builtin_try_map$__m1__Rule$Tok$__m1__Rule$Tok$__m1__ParseError$lam$__m1__desugar_rule$Tok:
     calls: 46
     bytes: 628
   __eq_First$Tok:

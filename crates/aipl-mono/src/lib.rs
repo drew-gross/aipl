@@ -2409,11 +2409,11 @@ impl Mono<'_> {
                         (lb.fn_name, lb.captures)
                     }
                     // A named function (or builtin) passed by name: it *is* the
-                    // target — no lifting and no captures. Ensure it's emitted
-                    // (a no-op for builtins, which aren't in `concrete`).
+                    // target — no lifting and no captures. A generic one is
+                    // instantiated for the parameter's types.
                     ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
-                        self.enqueue_concrete(g);
-                        (g.clone(), Vec::new())
+                        let (fname, _) = self.fn_value(g, ptys, &arg.span)?;
+                        (fname, Vec::new())
                     }
                     _ => {
                         return Err(Error::at(
@@ -2542,7 +2542,9 @@ impl Mono<'_> {
                 self.try_errs.truncate(mark);
                 Ok(Some(ty))
             }
-            ExprKind::Ident(g) if self.is_fn_ref(g, env) => Ok(Some(self.ref_return(g, arg_tys))),
+            ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
+                Ok(Some(self.fn_value(g, arg_tys, &arg.span)?.1))
+            }
             _ => Ok(None),
         }
     }
@@ -2858,8 +2860,8 @@ impl Mono<'_> {
                 (fname, captures)
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
-                self.enqueue_concrete(g);
-                (g.clone(), Vec::new())
+                let (fname, _) = self.fn_value(g, from_ref(&elem), &pred.span)?;
+                (fname, Vec::new())
             }
             _ => {
                 return Err(Error::at(
@@ -2891,9 +2893,8 @@ impl Mono<'_> {
                 (fname, captures, u)
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
-                let u = self.ref_return(g, from_ref(&elem));
-                self.enqueue_concrete(g);
-                (g.clone(), Vec::new(), u)
+                let (fname, u) = self.fn_value(g, from_ref(&elem), &lambda.span)?;
+                (fname, Vec::new(), u)
             }
             _ => {
                 return Err(Error::at(
@@ -3163,10 +3164,9 @@ impl Mono<'_> {
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
                 // A named function (or builtin): `U` is its return type for an
-                // element-typed argument. Ensure it's emitted (no-op for builtins).
-                let u = self.ref_return(g, from_ref(&elem));
-                self.enqueue_concrete(g);
-                (g.clone(), Vec::new(), u)
+                // element-typed argument. A generic one is instantiated for it.
+                let (fname, u) = self.fn_value(g, from_ref(&elem), &lambda.span)?;
+                (fname, Vec::new(), u)
             }
             _ => {
                 return Err(Error::at(
@@ -3455,9 +3455,8 @@ impl Mono<'_> {
                 (fname, captures, r)
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
-                let r = self.ref_return(g, &[elem_a.clone(), elem_b.clone()]);
-                self.enqueue_concrete(g);
-                (g.clone(), Vec::new(), r)
+                let (fname, r) = self.fn_value(g, &[elem_a.clone(), elem_b.clone()], &f.span)?;
+                (fname, Vec::new(), r)
             }
             _ => {
                 return Err(Error::at(
@@ -3898,8 +3897,8 @@ impl Mono<'_> {
                 (fname, captures)
             }
             ExprKind::Ident(g) if self.is_fn_ref(g, env) => {
-                self.enqueue_concrete(g);
-                (g.clone(), Vec::new())
+                let (fname, _) = self.fn_value(g, from_ref(&elem), &pred.span)?;
+                (fname, Vec::new())
             }
             _ => {
                 return Err(Error::at(
@@ -5256,7 +5255,96 @@ impl Mono<'_> {
     /// global) nor a generic (the checker rejects generic functions as values).
     fn is_fn_ref(&self, name: &str, env: &Env) -> bool {
         !env.contains_key(name)
-            && (self.concrete.contains_key(name) || name.starts_with("__builtin_"))
+            && (self.concrete.contains_key(name)
+                || self.generics.contains_key(name)
+                || name.starts_with("__builtin_"))
+    }
+
+    /// `name` used as a function *value* — `xs.map(f)`, or `f` handed to a
+    /// function-typed parameter — resolved to the function that position will
+    /// call, given the parameter types it expects: the callee's name (queued
+    /// for emission) and its return type for those parameters.
+    ///
+    /// A concrete function or builtin is itself. A *generic* function is
+    /// instantiated here, which is what lets `rs.map(desugar_rule)` name one:
+    /// its type variables are pinned by its parameter types against `expected`
+    /// — exactly what the call `desugar_rule(r)` pins from `r`'s type — and the
+    /// instance queued is the one that call would reach, less the per-argument
+    /// specializations a value has no arguments to earn (nothing is moved in,
+    /// no literal flexes). Callers guard with [`Mono::is_fn_ref`], so a name
+    /// reaching here is one of the three.
+    fn fn_value(
+        &mut self,
+        name: &str,
+        expected: &[Type],
+        span: &Span,
+    ) -> Result<(String, Type), Error> {
+        if !self.generics.contains_key(name) {
+            self.enqueue_concrete(name);
+            return Ok((name.to_string(), self.ref_return(name, expected)));
+        }
+        // The checker has already matched the function's arity to the
+        // position's, so `expected` lines up with the parameters one to one.
+        let flexible = vec![false; expected.len()];
+        let (type_args, ret, _) =
+            self.instantiate_types(name, expected, &flexible, span.clone())?;
+        // Substitution can leave a generic application (`(A, B)` is
+        // `__tuple2<A, B>`); the consumers of a function value's result — a
+        // wrapper deciding whether the result fits an array slot — read a
+        // resolved instance type, as `specialize_generic_call` hands them.
+        let ret = self.resolve_generic_ty(&ret)?;
+        let params = self.param_specs(name, &type_args, expected, &[], &[], &HashSet::new());
+        let mangled = self.enqueue_full(name, ParamSpecs { type_args, params });
+        Ok((mangled, ret))
+    }
+
+    /// The per-parameter specialization of an instance of generic `gname` at
+    /// `type_args`, reached with arguments of types `atys`: which are moved in
+    /// (`owned`), which `str` arguments meet a `char[]`/`T[]` parameter and keep
+    /// their representation (`str_kept`), each variadic's shape, and the
+    /// parameters a bare `none` or an integer literal at the call site drops
+    /// (`args` and `lit_pinned` — empty for a function value, which has no
+    /// call site).
+    fn param_specs(
+        &self,
+        gname: &str,
+        type_args: &[Type],
+        atys: &[Type],
+        owned: &[usize],
+        args: &[Expr],
+        lit_pinned: &HashSet<String>,
+    ) -> Vec<ParamSpec> {
+        let chars = Type::Array(Box::new(Type::Primitive(Primitive::Char)));
+        let Generic { sig, .. } = &self.generics[gname];
+        let tmap: HashMap<String, Type> = sig
+            .type_vars
+            .iter()
+            .map(|tp| tp.name.clone())
+            .zip(type_args.iter().cloned())
+            .collect();
+        sig.params
+            .iter()
+            .enumerate()
+            .map(|(i, p)| ParamSpec {
+                owned: owned.contains(&i),
+                str_kept: atys.get(i) == Some(&Type::Primitive(Primitive::Str))
+                    && subst_vars(&p.ty, &tmap) == chars,
+                // A generic function's variadic parameter needs the same
+                // per-shape specialization a concrete one gets; without it
+                // every instance was the sequence form and a bare element was
+                // rejected by codegen's argument check.
+                variadic: if p.variadic {
+                    atys.get(i).map_or(VShape::Seq, |a| {
+                        variadic_shape(a, &subst_vars(&p.ty, &tmap))
+                    })
+                } else {
+                    VShape::Seq
+                },
+                drop_none: is_unpinned_optional(&subst_vars(&p.ty, &tmap)),
+                drop_lit: self.lit_drop_value(gname, p, args.get(i), lit_pinned),
+                ..ParamSpec::default()
+            })
+            .collect()
     }
 
     /// The declared return type of a resolved function value `name` called with
@@ -6191,40 +6279,8 @@ impl Mono<'_> {
                     // `char[]`/`T[]` parameter (`str_kept` — specialize on the str
                     // directly, no `char[]` materialization; `T` is still `char`,
                     // so only the `char[]`-substituted parameter is marked).
-                    let params: Vec<ParamSpec> = {
-                        let chars = Type::Array(Box::new(Type::Primitive(Primitive::Char)));
-                        let Generic { sig, .. } = &self.generics[name];
-                        let tmap: HashMap<String, Type> = sig
-                            .type_vars
-                            .iter()
-                            .map(|tp| tp.name.clone())
-                            .zip(type_args.iter().cloned())
-                            .collect();
-                        sig.params
-                            .iter()
-                            .enumerate()
-                            .map(|(i, p)| ParamSpec {
-                                owned: owned.contains(&i),
-                                str_kept: atys.get(i) == Some(&Type::Primitive(Primitive::Str))
-                                    && subst_vars(&p.ty, &tmap) == chars,
-                                // A generic function's variadic parameter needs
-                                // the same per-shape specialization a concrete
-                                // one gets; without it every instance was the
-                                // sequence form and a bare element was rejected
-                                // by codegen's argument check.
-                                variadic: if p.variadic {
-                                    atys.get(i).map_or(VShape::Seq, |a| {
-                                        variadic_shape(a, &subst_vars(&p.ty, &tmap))
-                                    })
-                                } else {
-                                    VShape::Seq
-                                },
-                                drop_none: is_unpinned_optional(&subst_vars(&p.ty, &tmap)),
-                                drop_lit: self.lit_drop_value(name, p, args.get(i), &lit_pinned),
-                                ..ParamSpec::default()
-                            })
-                            .collect()
-                    };
+                    let params =
+                        self.param_specs(name, &type_args, &atys, &owned, args, &lit_pinned);
                     // The dropped parameters take their arguments with them —
                     // each was a bare `none` the instance now declares itself,
                     // or an integer literal it now has inlined in the body.

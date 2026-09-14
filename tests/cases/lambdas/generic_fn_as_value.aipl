@@ -1,0 +1,127 @@
+import { equal as ==, filter, len, map, print, try_map, wrapping_add as +, zip_with } from builtins;
+
+// A generic function can be passed by name wherever a function value is
+// expected: its type variables are pinned from the parameter types the
+// position calls it with, exactly as a call with such arguments would pin them.
+fn boxed<T: any>(x: T) -> T[] { [x] }
+
+fn is_lone<T: any>(xs: T[]) -> bool { xs.len() == 1 }
+
+fn pair<A: any, B: any>(a: A, b: B) -> (A, B) { (a, b) }
+
+fn checked<T: any>(x: T) -> T!str { ok(x) }
+
+// A user-defined higher-order function takes one the same way.
+fn twice<T: any>(x: T, f: (T) -> T) -> T { f(f(x)) }
+
+fn add_one(n: i64) -> i64 { n + 1 }
+
+fn plus<T: any>(x: T, f: (T) -> T) -> T { f(x) }
+
+fn main() !prints {
+    // `boxed` at `T = i64`, then at `T = str` — two instances of one function.
+    print(`{[1, 2].map(boxed)}`);
+    print(`{["a"].map(boxed)}`);
+    print(`{[[1], [2, 3], [4]].filter(is_lone)}`);
+    print(`{zip_with([1, 2], ["x", "y"], pair)}`);
+    match ([1, 2].try_map(checked)) {
+        ok(xs) => print(`{xs}`),
+        err(e) => print(e),
+    };
+    print(`{twice(1, add_one)}`);
+    // A generic function forwarded to a generic parameter.
+    print(`{plus("s", boxed_first)}`);
+}
+
+fn boxed_first<T: any>(x: T) -> T { x }
+--- stdout ---
+[[1], [2]]
+[["a"]]
+[[1], [4]]
+[(1, "x"), (2, "y")]
+[1, 2]
+3
+s
+--- performance ---
+allocations: 16
+deallocations: 16
+reallocations: 2
+bytes allocated: 670
+instructions executed: 3300
+binary size: 15376
+  code: 8788
+  data: 707
+  metadata: 5881
+functions:
+  __arr_drop___tuple$i64$str:
+    calls: 1
+    bytes: 120
+  __arr_retain___tuple$i64$str:
+    calls: 2
+    bytes: 120
+  __builtin_try_map$i64$i64$str$lam$checked$i64:
+    calls: 1
+    bytes: 448
+  __to_str___tuple$i64$str$arr:
+    calls: 1
+    bytes: 956
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  __to_str_i64$arr:
+    calls: 1
+    bytes: 708
+  __to_str_i64$arr$arr:
+    calls: 2
+    bytes: 1160
+  __to_str_str$arr$arr:
+    calls: 1
+    bytes: 1272
+  add_one:
+    calls: 1
+    bytes: 8
+  aipl_arr_drop_arr:
+    calls: 3
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 10
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 2
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 26
+    bytes: (external)
+  aipl_array_new:
+    calls: 6
+    bytes: (external)
+  aipl_array_push:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 5
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 18
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 33
+    bytes: (external)
+  aipl_write_i64:
+    calls: 9
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 3052
+  main$filter2$own0:
+    calls: 1
+    bytes: 372
+  main$map0$own0:
+    calls: 1
+    bytes: 368

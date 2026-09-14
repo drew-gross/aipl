@@ -199,10 +199,10 @@ deallocations: 21796
 reallocations: 2936
 bytes allocated: 3752125
 instructions executed: 8053873
-binary size: 6637704
+binary size: 6637696
   code: 4360648
   data: 10450
-  metadata: 2266606
+  metadata: 2266598
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -462,7 +462,7 @@ functions:
   __builtin_reverse_find_map$__m12__Cst$__builtin_Span$lam$__m12__last_token:
     calls: 0
     bytes: 440
-  __builtin_try_map$__m11__Rule$__m23__AiplTok$__m11__Rule<AiplTok>$__m11__ParseError$lam$__m11__desugar_rules$__m23__AiplTok$lambda0:
+  __builtin_try_map$__m11__Rule$__m23__AiplTok$__m11__Rule$__m23__AiplTok$__m11__ParseError$lam$__m11__desugar_rule$__m23__AiplTok:
     calls: 656
     bytes: 628
   __builtin_try_map$__m12__Cst$__m5__Ast$__m11__ParseError$lam$__m31__lower_node$__m23__AiplTok$__m5__Ast$lambda0:
