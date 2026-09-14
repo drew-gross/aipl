@@ -18,6 +18,7 @@ type system:
 vscode extension:
   LSP
   go to definition
+  make the extension also auto-format
 
 type checker:
   separate types for concrete and generic - concrete loses Generic arm
@@ -75,6 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  delimited_len can be rewritten as a for loop with early return
   in show_first we shouldn't need a typed empty array literal.
   union_syms should just be actual set union
   why does rule_first need three as a variable?
@@ -376,6 +378,9 @@ design:
   apis should express intent
 
 optimizations:
+  constant folding optimization pass
+  dead store elimination optimization pass
+  Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
   inline if it would create a fusion opportunity
   nextest --no-run (build) took 639s which is unusual. Can you investigate why the build is taking so long? use cargo build --timings
   intern static struct literals into the binary too
@@ -392,7 +397,6 @@ optimizations:
   monomorphize separately when arguments are defaults (so constants can be propagated)
   why is [..arr, val] slower than let v = arr; v.push(val)? turns out it's 2 calls (reserve + append) instead of 1, but the calls should be cheaper. Maybe there is more to do here, maybe not.
   using templates for string builder loops should be just as fast as concat (somehow? Maybe they desugar to concat? maybe only when it's "s = `{s}...`?)
-  for (let c : s) still takes a runtime call per byte
   to_str allocates a buffer for short results instead of packing them inline.
   str builder loops are in place now (STR_REPR stage 2); the *non*-exclusive
     path still rebuilds per append, which is correct but is the remaining cost
@@ -412,7 +416,6 @@ optimizations:
   try_map should be native, so it can pre-allocate and so it can fuse
   combine adjacent reserves (even across expressions)
   interp_scan has a bunch of inspiration:
-    if (src[i..step.end] == "{") {set depth++;}; should fuse to something
     make a "count multiple" thing that counts instances of multiple needles in a given haystack
       if (src[i..step.end] == "{") {
           set depth++;
@@ -500,8 +503,6 @@ optimizations:
 
     - find_files walks the corpus via the dogfooded engine on every fmt/ffi test — fine, but it's repeated per test binary.
 
-  Re-analyze with a focus on why nextest discovery takes so long
-
 effects:
   all effects should be shimmable actually
 
@@ -535,14 +536,7 @@ find a more natural way of testing builtins
 find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
 
 warn/err on:
-- self[end].value_or(' ') == '.' should be self[end] == some('.')
-
-remove install_parser_hook with lazy loader
-make the vscode extension also auto-format
-constant folding optimization pass
-dead store elimination optimization pass
-
-Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
+  - self[end].value_or(' ') == '.' should be self[end] == some('.')
 
 integers:
   type conversions: should return none when out of range. Remove automatic conversion.
