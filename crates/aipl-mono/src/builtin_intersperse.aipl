@@ -40,27 +40,30 @@ pub fn intersperse<T: any>(self: T[], sep: T) -> T[] {
     assert(intersperse([1, 2], 9)[1] == some(9));
 })
 --- performance ---
-allocations: 18
-deallocations: 18
-reallocations: 30
-bytes allocated: 928
-instructions executed: 2485
-binary size: 8120
-  code: 4504
-  data: 607
-  metadata: 3009
+allocations: 14
+deallocations: 14
+reallocations: 21
+bytes allocated: 864
+instructions executed: 2398
+binary size: 8056
+  code: 4240
+  data: 745
+  metadata: 3071
 functions:
   __test$intersperse:
     calls: 1
-    bytes: 3604
+    bytes: 3348
   aipl_arr_inc:
     calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 27
+    calls: 32
     bytes: (external)
   aipl_array_new:
-    calls: 18
+    calls: 5
+    bytes: (external)
+  aipl_array_push:
+    calls: 9
     bytes: (external)
   aipl_array_push_mut:
     calls: 35
@@ -79,10 +82,10 @@ functions:
     bytes: (external)
   intersperse$i64:
     calls: 4
-    bytes: 360
+    bytes: 356
   intersperse$str:
     calls: 5
-    bytes: 428
+    bytes: 424
   main:
     calls: 1
     bytes: 112

@@ -82,13 +82,13 @@ Then([Term(Name("")), Repeat(Idx(3))])
 --- performance ---
 allocations: 41
 deallocations: 41
-reallocations: 2
-bytes allocated: 2196
-instructions executed: 2532
-binary size: 11360
-  code: 5908
-  data: 499
-  metadata: 4953
+reallocations: 1
+bytes allocated: 2204
+instructions executed: 2529
+binary size: 11424
+  code: 5900
+  data: 531
+  metadata: 4993
 functions:
   __arr_drop_Rule$Tok:
     calls: 5
@@ -121,10 +121,13 @@ functions:
     calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 8
+    calls: 9
     bytes: (external)
   aipl_array_new:
-    calls: 5
+    calls: 4
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
     bytes: (external)
   aipl_array_push_mut:
     calls: 2
@@ -161,7 +164,7 @@ functions:
     bytes: 580
   shift$Tok:
     calls: 4
-    bytes: 960
+    bytes: 952
   size$Tok:
     calls: 4
     bytes: 464

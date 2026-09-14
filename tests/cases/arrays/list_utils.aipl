@@ -60,15 +60,15 @@ bc
 ab
 
 --- performance ---
-allocations: 23
-deallocations: 23
+allocations: 22
+deallocations: 22
 reallocations: 0
-bytes allocated: 697
-instructions executed: 990
-binary size: 6944
-  code: 3784
-  data: 139
-  metadata: 3021
+bytes allocated: 633
+instructions executed: 970
+binary size: 6912
+  code: 3696
+  data: 203
+  metadata: 3013
 functions:
   __builtin_drop_last_n$i64:
     calls: 4
@@ -89,10 +89,7 @@ functions:
     calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 14
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
+    calls: 13
     bytes: (external)
   aipl_i64_len:
     calls: 10
@@ -111,4 +108,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2616
+    bytes: 2528

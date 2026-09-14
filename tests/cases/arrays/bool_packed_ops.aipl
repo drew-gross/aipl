@@ -24,27 +24,27 @@ fn grown() -> bool[] {
     assert(bs.filter(|b| b) == [true, true, true]);
 })
 --- performance ---
-allocations: 10
-deallocations: 10
-reallocations: 3
-bytes allocated: 407
-instructions executed: 2552
-binary size: 4376
-  code: 2292
-  data: 337
-  metadata: 1747
+allocations: 4
+deallocations: 4
+reallocations: 1
+bytes allocated: 171
+instructions executed: 2335
+binary size: 4152
+  code: 1536
+  data: 681
+  metadata: 1935
 functions:
   __eq_bool$arr:
     calls: 4
     bytes: 296
   __test$grown:
     calls: 1
-    bytes: 1892
+    bytes: 1136
   aipl_array_dec:
-    calls: 10
+    calls: 7
     bytes: (external)
-  aipl_array_new:
-    calls: 9
+  aipl_array_push:
+    calls: 3
     bytes: (external)
   aipl_array_push_mut:
     calls: 15

@@ -242,6 +242,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
+  allow formatter to rewrite string literals for fewest escapes
   my new pattern walker laid out a constructor's payload with comma_list_docs, which breaks long lists across lines with a trailing comma — and the pattern grammar takes no trailing comma, so aipl fmt rewrote three compiler sources (Let(\n name,\n …,\n) =>) into something that no longer parsed. <--- the formatter should decide whether to output a trailing comma based on the grammer definition. Why isn't it doing that?
   variant_case_docs.aipl is weird: having the leading | should force splitting each onto own line
   wrap comments
@@ -365,6 +366,7 @@ design:
   apis should express intent
 
 optimizations:
+  intern static struct literals into the binary too
   extend should create a rope when the value doesn't fit in the existing capacity
   after fusion there should be more inlining opportunities. Make a pass manager that re-enqueues functions for optimization after they are optimized
   owned spread: { ..var, field: f } should edit var if it's uniquely owned
@@ -651,8 +653,6 @@ docs:
 
 cache the compiled module on disk instead of using clif ir (expensive to parse)
 
-Maybe address this later and unify formatter and parser lexing (maybe allow formatter to rewrite string literals for fewest escapes?):
-
 none.value_or_err doesn't type check. Maybe it should? Unclear.
 Known limitation recorded in #7: cross-iteration struct aliases still see the newer value, since the per-set buffer is a reused stack slot. <--- fix this
 
@@ -757,7 +757,7 @@ Reasons dec.aipl uses a cons list:
 
     2. There is no pop builtin.
 
-    crates/aipl-syntax/src/lib.rs:1367 has push, but nothing pops. The only way to shrink an array is a slice, and xs[start..end] is documented as "a fresh heap array copying the element range" (aipl-codegen/src/lib.rs:13511). So while let Some(x) = stack.pop() has no direct translation — emulating it via slicing makes the printer quadratic in document size.
+    the language has push, but nothing pops. The only way to shrink an array is a slice, and xs[start..end] is documented as "a fresh heap array copying the element range" (aipl-codegen/src/lib.rs:13511). So while let Some(x) = stack.pop() has no direct translation — emulating it via slicing makes the printer quadratic in document size.
 
     3. The loop is recursion, so the stack has to be a value.
 

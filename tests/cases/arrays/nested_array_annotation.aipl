@@ -22,9 +22,9 @@ reallocations: 0
 bytes allocated: 632
 instructions executed: 841
 binary size: 6424
-  code: 3516
-  data: 145
-  metadata: 2763
+  code: 3476
+  data: 177
+  metadata: 2771
 functions:
   __eq_str$arr:
     calls: 2
@@ -37,7 +37,7 @@ functions:
     bytes: 1208
   __test$first:
     calls: 1
-    bytes: 1472
+    bytes: 1432
   aipl_arr_drop_arr:
     calls: 5
     bytes: (external)

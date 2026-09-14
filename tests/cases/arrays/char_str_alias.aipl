@@ -38,15 +38,15 @@ true
 false
 true
 --- performance ---
-allocations: 15
-deallocations: 15
+allocations: 9
+deallocations: 9
 reallocations: 0
-bytes allocated: 334
-instructions executed: 664
-binary size: 4992
-  code: 2444
+bytes allocated: 224
+instructions executed: 614
+binary size: 4144
+  code: 1984
   data: 119
-  metadata: 2429
+  metadata: 2041
 functions:
   __to_str_bool:
     calls: 4
@@ -68,4 +68,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1416
+    bytes: 956

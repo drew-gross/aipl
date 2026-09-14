@@ -15,28 +15,22 @@ pub fn my_custom_lt(a: u64, b: u64) -> bool { !(a < b) }
 --- stdout ---
 false
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 77
-instructions executed: 66
-binary size: 1488
-  code: 452
-  data: 47
-  metadata: 989
+bytes allocated: 21
+instructions executed: 50
+binary size: 1408
+  code: 360
+  data: 103
+  metadata: 945
 functions:
   __to_str_bool:
     calls: 1
     bytes: 232
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
   aipl_write_bytes:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 220
+    bytes: 128

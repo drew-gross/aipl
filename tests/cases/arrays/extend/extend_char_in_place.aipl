@@ -22,19 +22,19 @@ fn doubled(n: str) -> char[] {
     assert(long.len() == 32);
 })
 --- performance ---
-allocations: 10
-deallocations: 10
-reallocations: 1
-bytes allocated: 227
-instructions executed: 533
-binary size: 4000
-  code: 1668
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 160
+instructions executed: 479
+binary size: 3592
+  code: 1420
   data: 275
-  metadata: 2057
+  metadata: 1897
 functions:
   __test$doubled:
     calls: 1
-    bytes: 932
+    bytes: 704
   aipl_assert:
     calls: 4
     bytes: (external)
@@ -52,7 +52,7 @@ functions:
     bytes: (external)
   doubled:
     calls: 3
-    bytes: 628
+    bytes: 608
   main:
     calls: 1
     bytes: 108

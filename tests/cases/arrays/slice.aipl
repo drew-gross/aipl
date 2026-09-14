@@ -38,15 +38,15 @@ fn main() !prints {
 [false, true, true]
 [40, 30]
 --- performance ---
-allocations: 22
-deallocations: 22
+allocations: 20
+deallocations: 20
 reallocations: 0
-bytes allocated: 970
-instructions executed: 3754
-binary size: 7304
-  code: 3884
-  data: 259
-  metadata: 3161
+bytes allocated: 865
+instructions executed: 3702
+binary size: 7272
+  code: 3700
+  data: 371
+  metadata: 3201
 functions:
   __to_str_bool$arr:
     calls: 1
@@ -67,10 +67,10 @@ functions:
     calls: 8
     bytes: (external)
   aipl_array_dec:
-    calls: 13
+    calls: 11
     bytes: (external)
   aipl_array_new:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_i64_len:
     calls: 34
@@ -83,4 +83,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1656
+    bytes: 1472

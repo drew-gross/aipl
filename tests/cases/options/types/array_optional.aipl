@@ -10,27 +10,27 @@ fn pick(b: bool) -> str[]? { if (b) { some(["x", "y", "z"]) } else { none } }.te
     assert(len(present) + len(absent) == 3); // 3 + 0
 })
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 136
-instructions executed: 253
-binary size: 3752
-  code: 1904
-  data: 114
-  metadata: 1734
+bytes allocated: 104
+instructions executed: 248
+binary size: 3672
+  code: 1816
+  data: 146
+  metadata: 1710
 functions:
   __test$pick:
     calls: 1
-    bytes: 1804
+    bytes: 1716
   aipl_arr_inc:
-    calls: 5
+    calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 7
+    calls: 6
     bytes: (external)
   aipl_array_new:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 2

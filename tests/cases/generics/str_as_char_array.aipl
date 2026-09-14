@@ -20,25 +20,19 @@ fn count_eq<T: any>(self: T[], target: T) -> i64 {
     assert(count_eq("", 'z') == 0); // empty string
 })
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 83
-instructions executed: 669
-binary size: 3080
-  code: 1212
-  data: 281
-  metadata: 1587
+bytes allocated: 0
+instructions executed: 638
+binary size: 2736
+  code: 1028
+  data: 345
+  metadata: 1363
 functions:
   __test$count_eq:
     calls: 1
-    bytes: 932
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
+    bytes: 748
   aipl_assert:
     calls: 5
     bytes: (external)

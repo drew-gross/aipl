@@ -30,15 +30,15 @@ some('z')
 none
 some([1, 2])
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 7
+deallocations: 7
 reallocations: 0
-bytes allocated: 266
-instructions executed: 967
-binary size: 9040
-  code: 4204
-  data: 715
-  metadata: 4121
+bytes allocated: 218
+instructions executed: 955
+binary size: 9016
+  code: 4148
+  data: 763
+  metadata: 4105
 functions:
   __to_str_Person:
     calls: 1
@@ -62,9 +62,6 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_new:
     calls: 1
     bytes: (external)
   aipl_i64_len:
@@ -78,4 +75,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 884
+    bytes: 828

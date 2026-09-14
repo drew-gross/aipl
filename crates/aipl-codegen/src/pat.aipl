@@ -233,15 +233,15 @@ pub fn binder_list(self: str[]) -> str {
 
 fn quoted(self: str) -> str { `"{self}"` }
 --- performance ---
-allocations: 169
-deallocations: 169
+allocations: 149
+deallocations: 149
 reallocations: 16
-bytes allocated: 11161
-instructions executed: 7866
-binary size: 93104
-  code: 57604
-  data: 2859
-  metadata: 32641
+bytes allocated: 10521
+instructions executed: 7775
+binary size: 91872
+  code: 56764
+  data: 2891
+  metadata: 32217
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -296,22 +296,22 @@ functions:
     bytes: 1260
   __test$binder_list:
     calls: 1
-    bytes: 832
+    bytes: 796
   __test$is_binder_name:
     calls: 1
     bytes: 432
   __test$nested_or_ctor:
     calls: 1
-    bytes: 1740
+    bytes: 1624
   __test$pat_bindings:
     calls: 1
-    bytes: 3616
+    bytes: 3516
   __test$pat_label:
     calls: 1
-    bytes: 1900
+    bytes: 1848
   __test$show_pat:
     calls: 1
-    bytes: 3840
+    bytes: 3732
   __to_str_i64:
     calls: 4
     bytes: 204
@@ -319,7 +319,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 80
+    calls: 63
     bytes: (external)
   aipl_arr_join:
     calls: 3
@@ -328,10 +328,10 @@ functions:
     calls: 5
     bytes: (external)
   aipl_array_dec:
-    calls: 140
+    calls: 128
     bytes: (external)
   aipl_array_new:
-    calls: 43
+    calls: 23
     bytes: (external)
   aipl_array_push_mut:
     calls: 22
@@ -398,7 +398,7 @@ functions:
     bytes: 32
   nested_bindings$tail:
     calls: 5
-    bytes: 796
+    bytes: 756
   nested_or_ctor:
     calls: 4
     bytes: 628
@@ -407,7 +407,7 @@ functions:
     bytes: 32
   pat_bindings$tail:
     calls: 9
-    bytes: 2112
+    bytes: 1724
   pat_label:
     calls: 6
     bytes: 1296

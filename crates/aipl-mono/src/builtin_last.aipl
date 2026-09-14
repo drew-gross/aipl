@@ -15,30 +15,30 @@ pub fn last<T: any>(self: T[]) -> T? { self[self.len() - 1] }.test({
     assert([1, 2][..0].last() == none);
 })
 --- performance ---
-allocations: 5
-deallocations: 5
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 256
-instructions executed: 358
-binary size: 3616
-  code: 1788
-  data: 213
-  metadata: 1615
+bytes allocated: 112
+instructions executed: 322
+binary size: 3640
+  code: 1596
+  data: 357
+  metadata: 1687
 functions:
   __eq_i64$opt:
     calls: 1
     bytes: 100
   __test$last:
     calls: 1
-    bytes: 1588
+    bytes: 1396
   aipl_arr_slice:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 5
+    calls: 2
     bytes: (external)
   aipl_array_new:
-    calls: 4
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 4

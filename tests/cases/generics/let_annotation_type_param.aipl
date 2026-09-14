@@ -61,15 +61,15 @@ fn main() !prints {
 7
 [1, 2]
 --- performance ---
-allocations: 18
-deallocations: 18
+allocations: 12
+deallocations: 12
 reallocations: 0
-bytes allocated: 794
-instructions executed: 1763
-binary size: 7400
-  code: 4072
-  data: 139
-  metadata: 3189
+bytes allocated: 538
+instructions executed: 1704
+binary size: 7248
+  code: 3712
+  data: 331
+  metadata: 3205
 functions:
   __to_str_i64:
     calls: 1
@@ -81,16 +81,16 @@ functions:
     calls: 1
     bytes: 812
   aipl_arr_inc:
-    calls: 38
+    calls: 35
     bytes: (external)
   aipl_arr_reserve:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 52
+    calls: 46
     bytes: (external)
   aipl_array_new:
-    calls: 7
+    calls: 1
     bytes: (external)
   aipl_array_push_mut:
     calls: 7
@@ -106,4 +106,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2348
+    bytes: 1988

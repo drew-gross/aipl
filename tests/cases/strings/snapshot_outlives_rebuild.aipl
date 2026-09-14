@@ -1,0 +1,59 @@
+import { extend, len, less_than as <, print, wrapping_increment as ++ } from builtins;
+
+// A snapshot of a `mut` string survives the rebuilds that follow it — with
+// strings long enough to live on the heap. `concat_alias_keeps_value_semantics`
+// covers the same shape with inline strings, which own no block and so never
+// noticed that the rebuilt binding used to *free* the version a snapshot still
+// named; the freed block was then handed to the next allocation (`filler`
+// below), and the snapshot read that string's bytes instead of its own.
+//
+// A non-exclusive string binding now keeps each version alive until the scope
+// that built it exits, so a snapshot taken in the outer scope stays good even
+// when the binding is rebuilt inside a loop body.
+fn main() !prints {
+    mut s = "hello world, long enough to live on the heap";
+    set s.extend("!");
+    let snap = s;
+    set s.extend("?");
+    let filler = "a different heap string, glad to reuse a freed block";
+    print(`{snap}`);
+    print(`{s}`);
+    mut n = 0;
+    while (n < 3) {
+        set n++;
+        set s.extend(".");
+    }
+    print(`{snap} {filler.len()}`);
+    print(`{s}`);
+}
+--- stdout ---
+hello world, long enough to live on the heap!
+hello world, long enough to live on the heap!?
+hello world, long enough to live on the heap! 52
+hello world, long enough to live on the heap!?...
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 509
+instructions executed: 406
+binary size: 4456
+  code: 2212
+  data: 133
+  metadata: 2111
+functions:
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 10
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2008

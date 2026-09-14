@@ -59,33 +59,36 @@ fn is_nine(self: i64) -> bool { self == 9 }.test({
     assert(!is_nine(8));
 })
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 563
-instructions executed: 1994
-binary size: 8112
-  code: 4436
-  data: 804
-  metadata: 2872
+bytes allocated: 152
+instructions executed: 1865
+binary size: 7888
+  code: 3776
+  data: 1188
+  metadata: 2924
 functions:
   __filter21$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __test$count_if:
     calls: 1
-    bytes: 3804
+    bytes: 3116
   __test$is_nine:
     calls: 1
     bytes: 184
   aipl_arr_inc:
     calls: 1
     bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
+    bytes: (external)
   aipl_array_dec:
-    calls: 10
+    calls: 4
     bytes: (external)
   aipl_array_new:
-    calls: 9
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 14

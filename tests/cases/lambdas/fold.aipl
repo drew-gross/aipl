@@ -31,30 +31,33 @@ fn sums_an_array() -> i64 { sum([1, 2, 3]) }.test({
     assert([1, 2].fold(0, |acc, x| acc + x + bump) == 23); // a captured value
 })
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 587
-instructions executed: 1234
-binary size: 6352
-  code: 3340
-  data: 552
-  metadata: 2460
+bytes allocated: 328
+instructions executed: 1163
+binary size: 6136
+  code: 2944
+  data: 736
+  metadata: 2456
 functions:
   __filter8$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __test$sums_an_array:
     calls: 1
-    bytes: 2952
+    bytes: 2528
   aipl_arr_inc:
     calls: 1
     bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
+    bytes: (external)
   aipl_array_dec:
-    calls: 8
+    calls: 4
     bytes: (external)
   aipl_array_new:
-    calls: 7
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 9

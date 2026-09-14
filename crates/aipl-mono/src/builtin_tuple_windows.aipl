@@ -48,15 +48,15 @@ pub fn tuple_windows<T: any>(self: T[]) -> (T, T)[] {
     assert(w[1] == some((20, 30)));
 })
 --- performance ---
-allocations: 19
-deallocations: 19
-reallocations: 9
-bytes allocated: 944
-instructions executed: 2482
-binary size: 9488
-  code: 5456
-  data: 529
-  metadata: 3503
+allocations: 11
+deallocations: 11
+reallocations: 4
+bytes allocated: 712
+instructions executed: 2394
+binary size: 9528
+  code: 5140
+  data: 761
+  metadata: 3627
 functions:
   __arr_drop___tuple$str$str:
     calls: 2
@@ -84,7 +84,7 @@ functions:
     bytes: 284
   __test$tuple_windows:
     calls: 1
-    bytes: 3164
+    bytes: 2868
   aipl_arr_inc:
     calls: 7
     bytes: (external)
@@ -95,7 +95,10 @@ functions:
     calls: 26
     bytes: (external)
   aipl_array_new:
-    calls: 18
+    calls: 5
+    bytes: (external)
+  aipl_array_push:
+    calls: 5
     bytes: (external)
   aipl_array_push_mut:
     calls: 9
@@ -117,7 +120,7 @@ functions:
     bytes: 116
   tuple_windows$char$s0:
     calls: 2
-    bytes: 336
+    bytes: 320
   tuple_windows$i64:
     calls: 5
-    bytes: 364
+    bytes: 360

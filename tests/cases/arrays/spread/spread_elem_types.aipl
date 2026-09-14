@@ -19,15 +19,15 @@ fn chars() -> char[] { [..['a', 'b'], 'c'] }.test({
     assert([..empty()] == empty());
 })
 --- performance ---
-allocations: 18
-deallocations: 18
-reallocations: 3
-bytes allocated: 642
-instructions executed: 1008
-binary size: 8112
-  code: 4060
-  data: 425
-  metadata: 3627
+allocations: 9
+deallocations: 9
+reallocations: 2
+bytes allocated: 379
+instructions executed: 925
+binary size: 7712
+  code: 3528
+  data: 577
+  metadata: 3607
 functions:
   __eq_P:
     calls: 2
@@ -43,21 +43,21 @@ functions:
     bytes: 296
   __test$chars:
     calls: 1
-    bytes: 3008
+    bytes: 2476
   aipl_arr_extend:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 16
+    calls: 15
     bytes: (external)
   aipl_arr_reserve:
     calls: 5
     bytes: (external)
   aipl_array_dec:
-    calls: 30
+    calls: 27
     bytes: (external)
   aipl_array_new:
-    calls: 13
+    calls: 3
     bytes: (external)
   aipl_array_push:
     calls: 1

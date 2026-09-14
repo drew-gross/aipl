@@ -84,15 +84,15 @@ fn brace_mix_message() -> str {
     """
 }
 --- performance ---
-allocations: 96
-deallocations: 96
+allocations: 80
+deallocations: 80
 reallocations: 5
-bytes allocated: 5937
-instructions executed: 4153
-binary size: 66328
-  code: 41328
-  data: 1404
-  metadata: 23596
+bytes allocated: 5425
+instructions executed: 4075
+binary size: 65816
+  code: 41000
+  data: 1436
+  metadata: 23380
 functions:
   __arr_drop_BraceEntry:
     calls: 5
@@ -153,7 +153,7 @@ functions:
     bytes: 72
   __test$brace_literal:
     calls: 1
-    bytes: 6192
+    bytes: 6068
   __test_try_fail___m5__ParseError:
     calls: 0
     bytes: 84
@@ -164,13 +164,13 @@ functions:
     calls: 6
     bytes: 204
   aipl_arr_inc:
-    calls: 32
+    calls: 18
     bytes: (external)
   aipl_array_dec:
-    calls: 66
+    calls: 50
     bytes: (external)
   aipl_array_new:
-    calls: 21
+    calls: 5
     bytes: (external)
   aipl_array_push:
     calls: 8
@@ -216,7 +216,7 @@ functions:
     bytes: (external)
   brace_literal:
     calls: 7
-    bytes: 2268
+    bytes: 2064
   main:
     calls: 1
     bytes: 116

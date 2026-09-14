@@ -16,25 +16,19 @@ fn sum(xs: i64[]) -> i64 {
     assert(sum(xs) + n == 63);
 })
 --- performance ---
-allocations: 1
-deallocations: 1
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 56
-instructions executed: 335
-binary size: 1752
-  code: 640
-  data: 84
-  metadata: 1028
+bytes allocated: 0
+instructions executed: 319
+binary size: 1696
+  code: 568
+  data: 140
+  metadata: 988
 functions:
   __test$sum:
     calls: 1
-    bytes: 356
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
+    bytes: 284
   aipl_assert:
     calls: 3
     bytes: (external)

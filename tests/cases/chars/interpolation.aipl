@@ -30,15 +30,15 @@ nested: ['a', 'b']
 opt: some('h')
 str: hi
 --- performance ---
-allocations: 12
-deallocations: 12
+allocations: 11
+deallocations: 11
 reallocations: 0
-bytes allocated: 792
-instructions executed: 550
-binary size: 5344
-  code: 2860
+bytes allocated: 774
+instructions executed: 543
+binary size: 5192
+  code: 2772
   data: 139
-  metadata: 2345
+  metadata: 2281
 functions:
   __to_str_char:
     calls: 1
@@ -54,4 +54,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1684
+    bytes: 1596

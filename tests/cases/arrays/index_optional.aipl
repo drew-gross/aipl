@@ -14,28 +14,22 @@ fn at(xs: i64[], i: i64) -> i64 { xs[i].value_or(-1) }.test({
     assert(xs[9] == none);
 })
 --- performance ---
-allocations: 1
-deallocations: 1
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 56
-instructions executed: 246
-binary size: 2896
-  code: 1380
-  data: 224
-  metadata: 1292
+bytes allocated: 0
+instructions executed: 230
+binary size: 2888
+  code: 1360
+  data: 280
+  metadata: 1248
 functions:
   __eq_i64$opt:
     calls: 1
     bytes: 100
   __test$at:
     calls: 1
-    bytes: 1184
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
+    bytes: 1164
   aipl_assert:
     calls: 5
     bytes: (external)

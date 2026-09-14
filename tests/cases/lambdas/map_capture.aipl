@@ -20,27 +20,27 @@ fn map(xs: i64[], f: (i64) -> i64) -> i64[] {
     assert(map([1, 2, 3], |x| x * x) == [1, 4, 9]);
 })
 --- performance ---
-allocations: 6
-deallocations: 6
-reallocations: 6
-bytes allocated: 288
-instructions executed: 770
-binary size: 2768
-  code: 1328
-  data: 137
-  metadata: 1303
+allocations: 2
+deallocations: 2
+reallocations: 4
+bytes allocated: 80
+instructions executed: 700
+binary size: 2672
+  code: 968
+  data: 337
+  metadata: 1367
 functions:
   __eq_i64$arr:
     calls: 2
     bytes: 296
   __test$map:
     calls: 1
-    bytes: 932
+    bytes: 572
   aipl_array_dec:
-    calls: 6
+    calls: 4
     bytes: (external)
-  aipl_array_new:
-    calls: 6
+  aipl_array_push:
+    calls: 2
     bytes: (external)
   aipl_array_push_mut:
     calls: 6

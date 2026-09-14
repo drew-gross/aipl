@@ -24,15 +24,15 @@ fn main() !prints {
 []
 [7, 8, 9]
 --- performance ---
-allocations: 14
-deallocations: 14
-reallocations: 2
-bytes allocated: 476
-instructions executed: 2051
-binary size: 7808
-  code: 4124
-  data: 356
-  metadata: 3328
+allocations: 9
+deallocations: 9
+reallocations: 1
+bytes allocated: 304
+instructions executed: 1989
+binary size: 7760
+  code: 3804
+  data: 564
+  metadata: 3392
 functions:
   __to_str_bool$arr:
     calls: 1
@@ -50,10 +50,13 @@ functions:
     calls: 1
     bytes: 812
   aipl_array_dec:
-    calls: 6
+    calls: 3
     bytes: (external)
   aipl_array_new:
-    calls: 6
+    calls: 1
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
     bytes: (external)
   aipl_array_push_mut:
     calls: 2
@@ -69,4 +72,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1124
+    bytes: 804

@@ -53,15 +53,15 @@ many
 7
 -1
 --- performance ---
-allocations: 16
-deallocations: 16
+allocations: 12
+deallocations: 12
 reallocations: 0
-bytes allocated: 673
-instructions executed: 783
-binary size: 6000
-  code: 3684
-  data: 1
-  metadata: 2315
+bytes allocated: 497
+instructions executed: 743
+binary size: 5976
+  code: 3452
+  data: 177
+  metadata: 2347
 functions:
   __to_str_char:
     calls: 4
@@ -69,12 +69,6 @@ functions:
   __to_str_i64:
     calls: 4
     bytes: 204
-  aipl_array_dec:
-    calls: 4
-    bytes: (external)
-  aipl_array_new:
-    calls: 4
-    bytes: (external)
   aipl_i64_len:
     calls: 8
     bytes: (external)
@@ -86,4 +80,4 @@ functions:
     bytes: 1124
   main:
     calls: 1
-    bytes: 2152
+    bytes: 1920

@@ -25,30 +25,30 @@ fn double_each(mut self: i64[]) {
     assert(ys == [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
 })
 --- performance ---
-allocations: 6
-deallocations: 6
-reallocations: 9
-bytes allocated: 384
-instructions executed: 1551
-binary size: 3456
-  code: 1716
-  data: 119
-  metadata: 1621
+allocations: 2
+deallocations: 2
+reallocations: 7
+bytes allocated: 80
+instructions executed: 1431
+binary size: 3376
+  code: 1204
+  data: 473
+  metadata: 1699
 functions:
   __eq_i64$arr:
     calls: 2
     bytes: 296
   __test$double_each:
     calls: 1
-    bytes: 904
+    bytes: 404
   aipl_arr_inc:
-    calls: 12
+    calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 18
+    calls: 16
     bytes: (external)
-  aipl_array_new:
-    calls: 6
+  aipl_array_push:
+    calls: 2
     bytes: (external)
   aipl_array_push_mut:
     calls: 16
@@ -67,7 +67,7 @@ functions:
     bytes: (external)
   double_each:
     calls: 2
-    bytes: 404
+    bytes: 392
   main:
     calls: 1
     bytes: 112

@@ -41,24 +41,24 @@ pub fn count<T: any>(self: T[], x: T) -> u64 {
     assert("".count('\n') == 0);
 })
 --- performance ---
-allocations: 7
-deallocations: 7
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 379
-instructions executed: 1353
-binary size: 5544
-  code: 2612
-  data: 542
-  metadata: 2390
+bytes allocated: 104
+instructions executed: 1274
+binary size: 5352
+  code: 2204
+  data: 798
+  metadata: 2350
 functions:
   __test$count:
     calls: 1
-    bytes: 2112
+    bytes: 1704
   aipl_array_dec:
-    calls: 6
+    calls: 1
     bytes: (external)
   aipl_array_new:
-    calls: 6
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 10

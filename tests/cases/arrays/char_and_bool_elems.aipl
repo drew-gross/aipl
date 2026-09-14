@@ -23,28 +23,22 @@ fn first_true(bs: bool[]) -> i64 {
     assert(first_true([]) == -1);
 })
 --- performance ---
-allocations: 5
-deallocations: 5
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 151
-instructions executed: 438
-binary size: 3616
-  code: 1604
-  data: 279
-  metadata: 1733
+bytes allocated: 0
+instructions executed: 379
+binary size: 3200
+  code: 1268
+  data: 391
+  metadata: 1541
 functions:
   __test$count_h:
     calls: 1
-    bytes: 348
+    bytes: 196
   __test$first_true:
     calls: 1
-    bytes: 932
-  aipl_array_dec:
-    calls: 4
-    bytes: (external)
-  aipl_array_new:
-    calls: 4
-    bytes: (external)
+    bytes: 748
   aipl_assert:
     calls: 5
     bytes: (external)

@@ -59,15 +59,15 @@ fn main() !prints {
 --- stdout ---
 one element
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 88
-instructions executed: 128
-binary size: 2056
-  code: 788
-  data: 1
-  metadata: 1267
+bytes allocated: 56
+instructions executed: 125
+binary size: 2096
+  code: 784
+  data: 33
+  metadata: 1279
 functions:
   aipl_arr_inc:
     calls: 9
@@ -78,12 +78,9 @@ functions:
   aipl_array_dec:
     calls: 11
     bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
   aipl_array_push_mut:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 788
+    bytes: 784

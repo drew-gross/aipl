@@ -104,7 +104,7 @@ The dependencies that bite:
   *not* in this set — a string literal's symbol is a content hash, so it keeps
   its name when unrelated source above it moves, and `binary size` and the
   checked-in `.clif` no longer churn for an edit that touches no literal. See
-  `StrLiterals` in `aipl-codegen/src/lib.rs`.)
+  `Literals` in `aipl-codegen/src/lib.rs`.)
 - **A new or deleted case file needs its `#[test]` list regenerated before a
   suite run means anything** — until then the case simply never runs.
 - **Section refills come after the discovery run**, which is what establishes

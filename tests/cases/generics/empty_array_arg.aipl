@@ -7,25 +7,19 @@ fn g(v: any[]) -> i64 { 0 }.test({
     assert(g([]) == 0);
 })
 --- performance ---
-allocations: 1
-deallocations: 1
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 32
-instructions executed: 37
-binary size: 1064
-  code: 264
-  data: 1
-  metadata: 799
+bytes allocated: 0
+instructions executed: 33
+binary size: 992
+  code: 212
+  data: 33
+  metadata: 747
 functions:
   __test$g:
     calls: 1
-    bytes: 168
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
+    bytes: 116
   aipl_assert:
     calls: 1
     bytes: (external)

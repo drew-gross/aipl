@@ -53,13 +53,13 @@ fn main() !prints {
 --- performance ---
 allocations: 17
 deallocations: 17
-reallocations: 3
-bytes allocated: 775
-instructions executed: 1014
-binary size: 4592
-  code: 2208
-  data: 1
-  metadata: 2383
+reallocations: 2
+bytes allocated: 783
+instructions executed: 1011
+binary size: 4648
+  code: 2196
+  data: 33
+  metadata: 2419
 functions:
   __arr_drop_Tree:
     calls: 2
@@ -77,10 +77,13 @@ functions:
     calls: 1
     bytes: 204
   aipl_array_dec:
-    calls: 2
+    calls: 3
     bytes: (external)
   aipl_array_new:
-    calls: 2
+    calls: 1
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
     bytes: (external)
   aipl_array_push_mut:
     calls: 3
@@ -114,7 +117,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1092
+    bytes: 1080
   sum_all:
     calls: 3
     bytes: 232

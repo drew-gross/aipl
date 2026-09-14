@@ -37,15 +37,15 @@ fn is_even(x: i64) -> bool { x - (x / 2) * 2 == 0 }.test({
     assert(words.filter(|w| w != "") == ["hi", "yo"]);
 })
 --- performance ---
-allocations: 15
-deallocations: 15
+allocations: 9
+deallocations: 9
 reallocations: 0
-bytes allocated: 1064
-instructions executed: 3578
-binary size: 8040
-  code: 4784
-  data: 476
-  metadata: 2780
+bytes allocated: 752
+instructions executed: 3484
+binary size: 8160
+  code: 4224
+  data: 852
+  metadata: 3084
 functions:
   __eq_i64$arr:
     calls: 6
@@ -55,21 +55,24 @@ functions:
     bytes: 364
   __filter14$own0:
     calls: 1
-    bytes: 428
+    bytes: 464
   __filter7$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __test$is_even:
     calls: 1
-    bytes: 3316
+    bytes: 2692
   aipl_arr_inc:
     calls: 3
     bytes: (external)
+  aipl_arr_reserve:
+    calls: 2
+    bytes: (external)
   aipl_array_dec:
-    calls: 18
+    calls: 12
     bytes: (external)
   aipl_array_new:
-    calls: 9
+    calls: 2
     bytes: (external)
   aipl_array_push_mut:
     calls: 15

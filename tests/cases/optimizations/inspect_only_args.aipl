@@ -57,28 +57,22 @@ fn count_via_copy(s: str) -> i64 {
     assert(total(xs) == 10);
 })
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 85
-instructions executed: 1058
-binary size: 3856
-  code: 1468
-  data: 362
-  metadata: 2026
+bytes allocated: 21
+instructions executed: 1038
+binary size: 3784
+  code: 1376
+  data: 426
+  metadata: 1982
 functions:
   __test$count_via_copy:
     calls: 1
-    bytes: 812
+    bytes: 720
   __to_str_i64:
     calls: 1
     bytes: 204
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
   aipl_assert:
     calls: 7
     bytes: (external)

@@ -11,27 +11,24 @@ fn item_count() -> u64 {
     assert(item_count() == 3);
 })
 --- performance ---
-allocations: 1
-deallocations: 1
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 56
-instructions executed: 59
-binary size: 1304
-  code: 332
-  data: 44
-  metadata: 928
+bytes allocated: 0
+instructions executed: 44
+binary size: 1312
+  code: 276
+  data: 100
+  metadata: 936
 functions:
   __test$item_count:
     calls: 1
-    bytes: 224
+    bytes: 168
   aipl_arr_inc:
     calls: 1
     bytes: (external)
   aipl_array_dec:
     calls: 2
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 1

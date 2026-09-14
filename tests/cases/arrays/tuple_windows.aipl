@@ -40,15 +40,15 @@ true
 true
 2
 --- performance ---
-allocations: 25
-deallocations: 25
-reallocations: 2
-bytes allocated: 1120
-instructions executed: 1776
-binary size: 9472
-  code: 5392
-  data: 191
-  metadata: 3889
+allocations: 20
+deallocations: 20
+reallocations: 1
+bytes allocated: 952
+instructions executed: 1727
+binary size: 9552
+  code: 5176
+  data: 375
+  metadata: 4001
 functions:
   __arr_drop___tuple$str$str:
     calls: 1
@@ -58,7 +58,7 @@ functions:
     bytes: 140
   __builtin_tuple_windows$i64:
     calls: 2
-    bytes: 364
+    bytes: 360
   __to_str___tuple$str$str$opt:
     calls: 1
     bytes: 748
@@ -78,10 +78,13 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_array_new:
-    calls: 7
+    calls: 1
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
     bytes: (external)
   aipl_array_push_mut:
     calls: 2
@@ -103,4 +106,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3360
+    bytes: 3148

@@ -64,15 +64,15 @@ false
 true
 true
 --- performance ---
-allocations: 21
-deallocations: 21
+allocations: 12
+deallocations: 12
 reallocations: 0
-bytes allocated: 678
-instructions executed: 1292
-binary size: 5512
-  code: 3228
-  data: 47
-  metadata: 2237
+bytes allocated: 246
+instructions executed: 1184
+binary size: 5232
+  code: 2724
+  data: 279
+  metadata: 2229
 functions:
   __builtin_all$i64$lam11:
     calls: 1
@@ -95,12 +95,6 @@ functions:
   __to_str_bool:
     calls: 12
     bytes: 232
-  aipl_array_dec:
-    calls: 9
-    bytes: (external)
-  aipl_array_new:
-    calls: 9
-    bytes: (external)
   aipl_write_bytes:
     calls: 12
     bytes: (external)
@@ -112,4 +106,4 @@ functions:
     bytes: 216
   main:
     calls: 1
-    bytes: 1364
+    bytes: 860

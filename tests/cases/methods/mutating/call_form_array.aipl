@@ -12,30 +12,27 @@ fn extend(mut self: i64[], a: i64, b: i64) {
     assert(grown == [1, 2, 3]); // grown is [1, 2, 3]
 })
 --- performance ---
-allocations: 5
-deallocations: 5
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 240
-instructions executed: 360
-binary size: 2288
-  code: 996
-  data: 45
-  metadata: 1247
+bytes allocated: 104
+instructions executed: 327
+binary size: 2160
+  code: 788
+  data: 141
+  metadata: 1231
 functions:
   __eq_i64$arr:
     calls: 2
     bytes: 296
   __test$extend:
     calls: 1
-    bytes: 596
+    bytes: 388
   aipl_arr_inc:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 8
-    bytes: (external)
-  aipl_array_new:
-    calls: 3
+    calls: 5
     bytes: (external)
   aipl_array_push:
     calls: 2

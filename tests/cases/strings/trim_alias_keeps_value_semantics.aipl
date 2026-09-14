@@ -25,18 +25,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 164
-binary size: 2136
-  code: 860
+instructions executed: 168
+binary size: 2280
+  code: 940
   data: 97
-  metadata: 1179
+  metadata: 1243
 functions:
   __test$snapshot:
     calls: 1
-    bytes: 336
+    bytes: 380
   __test$trimmed:
     calls: 1
-    bytes: 348
+    bytes: 384
   aipl_assert:
     calls: 2
     bytes: (external)

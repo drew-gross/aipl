@@ -17,33 +17,33 @@ fn smallest(xs: i64[]) -> i64 { xs.minimum().value_or(0) }.test({
     assert(smallest([5, 2, 9]) == 2);
 })
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 350
-instructions executed: 1011
-binary size: 6336
-  code: 3540
-  data: 475
-  metadata: 2321
+bytes allocated: 48
+instructions executed: 911
+binary size: 5896
+  code: 3056
+  data: 675
+  metadata: 2165
 functions:
   __eq_i64$opt:
     calls: 1
     bytes: 100
   __filter1$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __test$smallest:
     calls: 1
-    bytes: 3060
+    bytes: 2548
   aipl_arr_inc:
     calls: 1
     bytes: (external)
-  aipl_array_dec:
-    calls: 7
+  aipl_arr_reserve:
+    calls: 1
     bytes: (external)
-  aipl_array_new:
-    calls: 6
+  aipl_array_dec:
+    calls: 3
     bytes: (external)
   aipl_assert:
     calls: 8

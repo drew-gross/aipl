@@ -20,30 +20,27 @@ fn appended(xs: i64[], x: i64) -> i64[] {
     assert(b == [1, 2, 3]);
 })
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 5
+deallocations: 5
 reallocations: 0
-bytes allocated: 544
-instructions executed: 1017
-binary size: 3456
-  code: 1568
-  data: 185
-  metadata: 1703
+bytes allocated: 272
+instructions executed: 940
+binary size: 3200
+  code: 1164
+  data: 337
+  metadata: 1699
 functions:
   __eq_i64$arr:
     calls: 4
     bytes: 296
   __test$appended:
     calls: 1
-    bytes: 1164
+    bytes: 760
   aipl_arr_inc:
-    calls: 7
+    calls: 6
     bytes: (external)
   aipl_array_dec:
-    calls: 17
-    bytes: (external)
-  aipl_array_new:
-    calls: 5
+    calls: 12
     bytes: (external)
   aipl_array_push:
     calls: 5

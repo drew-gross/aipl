@@ -172,15 +172,15 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 7686
-deallocations: 7686
+allocations: 7676
+deallocations: 7676
 reallocations: 323
-bytes allocated: 921069
-instructions executed: 752802
-binary size: 233856
-  code: 169016
-  data: 3376
-  metadata: 61464
+bytes allocated: 920749
+instructions executed: 759114
+binary size: 233600
+  code: 168780
+  data: 3408
+  metadata: 61412
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -259,10 +259,10 @@ functions:
     bytes: 1036
   __m1__caps_fld:
     calls: 4
-    bytes: 1344
+    bytes: 1300
   __m1__char_class_body:
     calls: 13
-    bytes: 620
+    bytes: 664
   __m1__class_char:
     calls: 276
     bytes: 996
@@ -283,10 +283,10 @@ functions:
     bytes: 1228
   __m1__json_str:
     calls: 170
-    bytes: 728
+    bytes: 764
   __m1__matcher_pat:
     calls: 77
-    bytes: 6720
+    bytes: 6684
   __m1__obj_fld:
     calls: 5
     bytes: 1576
@@ -298,7 +298,7 @@ functions:
     bytes: 4600
   __m1__re_escape:
     calls: 100
-    bytes: 1488
+    bytes: 1532
   __m1__run_len:
     calls: 17
     bytes: 1340
@@ -334,7 +334,7 @@ functions:
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 124960
+    bytes: 124680
   __to_str_u64:
     calls: 7
     bytes: 204
@@ -342,7 +342,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_arr_inc:
-    calls: 845
+    calls: 835
     bytes: (external)
   aipl_arr_reserve:
     calls: 151
@@ -351,10 +351,10 @@ functions:
     calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 1433
+    calls: 1423
     bytes: (external)
   aipl_array_new:
-    calls: 213
+    calls: 203
     bytes: (external)
   aipl_array_push:
     calls: 4

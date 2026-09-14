@@ -18,15 +18,15 @@ fn count_true(bs: bool[]) -> i64 {
     assert(bs[9] == none);
 })
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 66
-instructions executed: 673
-binary size: 3064
-  code: 1552
-  data: 200
-  metadata: 1312
+bytes allocated: 0
+instructions executed: 625
+binary size: 2872
+  code: 1376
+  data: 240
+  metadata: 1256
 functions:
   __eq_bool$arr:
     calls: 1
@@ -36,13 +36,7 @@ functions:
     bytes: 100
   __test$count_true:
     calls: 1
-    bytes: 1048
-  aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_new:
-    calls: 2
-    bytes: (external)
+    bytes: 872
   aipl_assert:
     calls: 5
     bytes: (external)

@@ -130,15 +130,15 @@ Climb(Term(1), [Prec { power: 1, right: false }])
 Mixed { tails: [Cons(1, Nil), Nil], head: Cons(2, Nil) }
 Node { v: 1, next: some(Node { v: 2, next: none, kids: [] }), kids: [Node { v: 3, next: none, kids: [] }] }
 --- performance ---
-allocations: 143
-deallocations: 143
+allocations: 139
+deallocations: 139
 reallocations: 0
-bytes allocated: 4769
-instructions executed: 10823
-binary size: 18712
-  code: 9436
-  data: 1229
-  metadata: 8047
+bytes allocated: 4609
+instructions executed: 10795
+binary size: 18744
+  code: 9308
+  data: 1309
+  metadata: 8127
 functions:
   __arr_drop_List:
     calls: 1
@@ -183,7 +183,7 @@ functions:
     calls: 21
     bytes: (external)
   aipl_array_new:
-    calls: 7
+    calls: 3
     bytes: (external)
   aipl_i64_len:
     calls: 118
@@ -217,7 +217,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2576
+    bytes: 2448
   sum:
     calls: 9
     bytes: 104

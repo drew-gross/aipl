@@ -124,15 +124,15 @@ fn main() !prints {
 some(65535)
 [[-128], [127, 0]]
 --- performance ---
-allocations: 17
-deallocations: 17
+allocations: 10
+deallocations: 10
 reallocations: 0
-bytes allocated: 734
-instructions executed: 2152
-binary size: 6624
-  code: 3468
-  data: 283
-  metadata: 2873
+bytes allocated: 398
+instructions executed: 2070
+binary size: 6784
+  code: 3100
+  data: 619
+  metadata: 3065
 functions:
   __to_str_i64$arr:
     calls: 4
@@ -153,10 +153,10 @@ functions:
     calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 14
+    calls: 9
     bytes: (external)
   aipl_array_new:
-    calls: 8
+    calls: 1
     bytes: (external)
   aipl_i64_len:
     calls: 26
@@ -175,4 +175,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1212
+    bytes: 844

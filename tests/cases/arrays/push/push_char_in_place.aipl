@@ -17,19 +17,19 @@ fn build(src: str) -> char[] {
     assert(build("bcdefghijklmnopqrstuvwxyz").len() == 26);
 })
 --- performance ---
-allocations: 5
-deallocations: 5
-reallocations: 2
-bytes allocated: 87
-instructions executed: 874
-binary size: 2968
-  code: 1064
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 60
+instructions executed: 857
+binary size: 2520
+  code: 868
   data: 225
-  metadata: 1679
+  metadata: 1427
 functions:
   __test$build:
     calls: 1
-    bytes: 616
+    bytes: 468
   aipl_assert:
     calls: 3
     bytes: (external)
@@ -44,7 +44,7 @@ functions:
     bytes: (external)
   build:
     calls: 3
-    bytes: 344
+    bytes: 296
   main:
     calls: 1
     bytes: 104

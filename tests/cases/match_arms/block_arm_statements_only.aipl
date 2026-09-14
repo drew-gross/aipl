@@ -39,22 +39,25 @@ tick
 --- performance ---
 allocations: 5
 deallocations: 5
-reallocations: 3
-bytes allocated: 250
-instructions executed: 547
-binary size: 2784
-  code: 1288
-  data: 1
-  metadata: 1495
+reallocations: 2
+bytes allocated: 274
+instructions executed: 544
+binary size: 2848
+  code: 1284
+  data: 33
+  metadata: 1531
 functions:
   __to_str_u64:
     calls: 2
     bytes: 204
   aipl_array_dec:
-    calls: 2
+    calls: 3
     bytes: (external)
   aipl_array_new:
-    calls: 2
+    calls: 1
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
     bytes: (external)
   aipl_array_push_mut:
     calls: 4
@@ -67,4 +70,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1084
+    bytes: 1080

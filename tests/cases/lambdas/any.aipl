@@ -27,15 +27,15 @@ fn has_big(xs: i64[]) -> bool { xs.any(|x| x > 10) }.test({
     assert(!has_big([1, 2, 3]));
 })
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 386
-instructions executed: 976
-binary size: 5896
-  code: 2956
-  data: 438
-  metadata: 2502
+bytes allocated: 48
+instructions executed: 875
+binary size: 5784
+  code: 2460
+  data: 806
+  metadata: 2518
 functions:
   __builtin_any$char$lam8:
     calls: 1
@@ -63,18 +63,18 @@ functions:
     bytes: 192
   __filter10$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __test$has_big:
     calls: 1
-    bytes: 1092
+    bytes: 568
   aipl_arr_inc:
     calls: 1
     bytes: (external)
-  aipl_array_dec:
-    calls: 8
+  aipl_arr_reserve:
+    calls: 1
     bytes: (external)
-  aipl_array_new:
-    calls: 7
+  aipl_array_dec:
+    calls: 3
     bytes: (external)
   aipl_assert:
     calls: 8

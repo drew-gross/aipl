@@ -38,28 +38,28 @@ fn tail_below(xs: i64[], cap: i64) -> i64[]!str {
     assert(tail_below([9], 3) == err("none below"));
 })
 --- performance ---
-allocations: 17
-deallocations: 17
+allocations: 6
+deallocations: 6
 reallocations: 0
-bytes allocated: 760
-instructions executed: 1584
-binary size: 8272
-  code: 4484
-  data: 306
-  metadata: 3482
+bytes allocated: 288
+instructions executed: 1480
+binary size: 8040
+  code: 3820
+  data: 674
+  metadata: 3546
 functions:
   __eq_i64$arr:
     calls: 4
     bytes: 296
   __test$below:
     calls: 1
-    bytes: 1200
+    bytes: 860
   __test$nothing:
     calls: 1
-    bytes: 720
+    bytes: 592
   __test$tail_below:
     calls: 1
-    bytes: 728
+    bytes: 532
   __test_try_fail_str:
     calls: 0
     bytes: 84
@@ -73,10 +73,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 28
-    bytes: (external)
-  aipl_array_new:
-    calls: 11
+    calls: 17
     bytes: (external)
   aipl_array_push_mut:
     calls: 5

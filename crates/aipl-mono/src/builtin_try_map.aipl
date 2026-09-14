@@ -77,15 +77,15 @@ fn width(s: str) -> u64!char { if (s == "") { err('e') } else { ok(s.len()) } }.
     assert(width("").is_err_and(|c| c == 'e'));
 })
 --- performance ---
-allocations: 60
-deallocations: 60
-reallocations: 15
-bytes allocated: 2989
-instructions executed: 4728
-binary size: 23072
-  code: 13440
-  data: 1197
-  metadata: 8435
+allocations: 45
+deallocations: 45
+reallocations: 6
+bytes allocated: 2485
+instructions executed: 4547
+binary size: 21632
+  code: 12140
+  data: 1485
+  metadata: 8007
 functions:
   __eq_i64$arr:
     calls: 1
@@ -107,7 +107,7 @@ functions:
     bytes: 484
   __test$try_map:
     calls: 1
-    bytes: 5608
+    bytes: 4384
   __test$width:
     calls: 1
     bytes: 276
@@ -130,10 +130,13 @@ functions:
     calls: 6
     bytes: (external)
   aipl_array_dec:
-    calls: 34
+    calls: 30
     bytes: (external)
   aipl_array_new:
-    calls: 28
+    calls: 4
+    bytes: (external)
+  aipl_array_push:
+    calls: 9
     bytes: (external)
   aipl_array_push_mut:
     calls: 15
@@ -164,22 +167,22 @@ functions:
     bytes: 236
   try_map$i64$i64$str$lam15:
     calls: 1
-    bytes: 660
+    bytes: 644
   try_map$i64$i64$str$lam17:
     calls: 1
-    bytes: 660
+    bytes: 644
   try_map$i64$str$str$lam0:
     calls: 6
-    bytes: 552
+    bytes: 544
   try_map$i64$str$str$lam11:
     calls: 1
-    bytes: 552
+    bytes: 544
   try_map$i64$str$str$lam9:
     calls: 1
-    bytes: 552
+    bytes: 544
   try_map$str$u64$char$lam1:
     calls: 1
-    bytes: 524
+    bytes: 504
   width:
     calls: 4
     bytes: 168

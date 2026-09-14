@@ -882,15 +882,15 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     }
 }
 --- performance ---
-allocations: 607
-deallocations: 607
-reallocations: 77
-bytes allocated: 62226
-instructions executed: 60938
-binary size: 138104
-  code: 87456
-  data: 3484
-  metadata: 47164
+allocations: 376
+deallocations: 376
+reallocations: 54
+bytes allocated: 56698
+instructions executed: 59471
+binary size: 136816
+  code: 86572
+  data: 3516
+  metadata: 46728
 functions:
   __arr_drop_ListStyle:
     calls: 41
@@ -930,7 +930,7 @@ functions:
     bytes: 400
   __builtin_try_map$Rule$Kind$Rule<Kind>$ParseError$lam19:
     calls: 4
-    bytes: 632
+    bytes: 628
   __eq_ListStyle:
     calls: 14
     bytes: 200
@@ -987,7 +987,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 46540
+    bytes: 46332
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -1004,7 +1004,7 @@ functions:
     calls: 95
     bytes: (external)
   aipl_arr_inc:
-    calls: 625
+    calls: 399
     bytes: (external)
   aipl_arr_join:
     calls: 4
@@ -1016,10 +1016,13 @@ functions:
     calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 958
+    calls: 772
     bytes: (external)
   aipl_array_new:
-    calls: 307
+    calls: 44
+    bytes: (external)
+  aipl_array_push:
+    calls: 17
     bytes: (external)
   aipl_array_push_mut:
     calls: 78
@@ -1074,22 +1077,22 @@ functions:
     bytes: 32
   group_styles$Kind$tail:
     calls: 188
-    bytes: 4732
+    bytes: 4160
   keep:
     calls: 0
     bytes: 112
   link$Kind$Node:
     calls: 14
-    bytes: 2772
+    bytes: 2736
   link_opt$Kind:
     calls: 16
     bytes: 716
   link_rule$Kind:
     calls: 76
-    bytes: 8248
+    bytes: 8200
   link_rules$Kind:
     calls: 4
-    bytes: 732
+    bytes: 716
   main:
     calls: 1
     bytes: 180

@@ -27,15 +27,15 @@ fn keep_gt3(xs: i64[]) -> i64[] { xs.filter(|x| x > 3) }.test({
     assert([1, 2, 3, 4].map(|x| x * 10).filter(|x| x > 15) == [20, 30, 40]);
 })
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 6
+deallocations: 6
 reallocations: 0
-bytes allocated: 712
-instructions executed: 2556
-binary size: 7264
-  code: 4316
-  data: 394
-  metadata: 2554
+bytes allocated: 512
+instructions executed: 2458
+binary size: 7664
+  code: 4000
+  data: 738
+  metadata: 2926
 functions:
   __eq_i64$arr:
     calls: 4
@@ -45,33 +45,36 @@ functions:
     bytes: 364
   __filter1$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __filter11$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __filter3$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __filter5$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __filter7$own0:
     calls: 1
-    bytes: 428
+    bytes: 464
   __map9$own0:
     calls: 1
-    bytes: 256
+    bytes: 284
   __test$keep_gt3:
     calls: 1
-    bytes: 1776
+    bytes: 1284
   aipl_arr_inc:
+    calls: 6
+    bytes: (external)
+  aipl_arr_reserve:
     calls: 6
     bytes: (external)
   aipl_array_dec:
     calls: 16
     bytes: (external)
   aipl_array_new:
-    calls: 10
+    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 5

@@ -63,15 +63,15 @@ fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }.te
     assert(nonzero(2) == some(2));
 })
 --- performance ---
-allocations: 7
-deallocations: 7
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 360
-instructions executed: 1063
-binary size: 7064
-  code: 3800
-  data: 728
-  metadata: 2536
+bytes allocated: 32
+instructions executed: 971
+binary size: 6856
+  code: 3340
+  data: 944
+  metadata: 2572
 functions:
   __eq_i64$opt:
     calls: 4
@@ -81,7 +81,7 @@ functions:
     bytes: 180
   __test$map_find_if:
     calls: 1
-    bytes: 1256
+    bytes: 796
   __test$nonzero:
     calls: 1
     bytes: 252
@@ -89,10 +89,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 7
-    bytes: (external)
-  aipl_array_new:
-    calls: 6
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 12

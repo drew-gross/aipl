@@ -31,15 +31,15 @@ ell
 [20, 30, 40]
 lo, w
 --- performance ---
-allocations: 7
-deallocations: 7
+allocations: 6
+deallocations: 6
 reallocations: 0
-bytes allocated: 227
-instructions executed: 599
-binary size: 4144
-  code: 2004
-  data: 115
-  metadata: 2025
+bytes allocated: 155
+instructions executed: 575
+binary size: 4112
+  code: 1912
+  data: 187
+  metadata: 2013
 functions:
   __eq___builtin_Span:
     calls: 1
@@ -57,9 +57,6 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 2
-    bytes: (external)
-  aipl_array_new:
     calls: 1
     bytes: (external)
   aipl_i64_len:
@@ -79,4 +76,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 756
+    bytes: 664

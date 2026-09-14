@@ -15,33 +15,30 @@ fn with_extra(xs: i64[]) -> i64[] { [..xs, 99] }.test({
     assert(base == [1, 2]);
 })
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 3
+deallocations: 3
 reallocations: 0
-bytes allocated: 488
-instructions executed: 1165
-binary size: 4800
-  code: 2308
-  data: 217
-  metadata: 2275
+bytes allocated: 200
+instructions executed: 1080
+binary size: 4616
+  code: 1856
+  data: 457
+  metadata: 2303
 functions:
   __eq_i64$arr:
     calls: 4
     bytes: 296
   __test$with_extra:
     calls: 1
-    bytes: 1904
+    bytes: 1452
   aipl_arr_inc:
-    calls: 20
+    calls: 19
     bytes: (external)
   aipl_arr_reserve:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 28
-    bytes: (external)
-  aipl_array_new:
-    calls: 5
+    calls: 23
     bytes: (external)
   aipl_array_push:
     calls: 1

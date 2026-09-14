@@ -142,15 +142,15 @@ some(7)
 some(5)
 1,2
 --- performance ---
-allocations: 23
-deallocations: 23
+allocations: 14
+deallocations: 14
 reallocations: 2
-bytes allocated: 791
-instructions executed: 1680
-binary size: 8280
-  code: 5156
-  data: 119
-  metadata: 3005
+bytes allocated: 343
+instructions executed: 1564
+binary size: 7992
+  code: 4588
+  data: 375
+  metadata: 3029
 functions:
   __builtin_find_if$i64$lam1:
     calls: 1
@@ -165,10 +165,7 @@ functions:
     calls: 8
     bytes: 388
   aipl_array_dec:
-    calls: 10
-    bytes: (external)
-  aipl_array_new:
-    calls: 9
+    calls: 1
     bytes: (external)
   aipl_array_push_mut:
     calls: 2
@@ -211,4 +208,4 @@ functions:
     bytes: 280
   main:
     calls: 1
-    bytes: 1700
+    bytes: 1132

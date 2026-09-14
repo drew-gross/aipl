@@ -43,24 +43,24 @@ ab
 found
 other
 --- performance ---
-allocations: 13
-deallocations: 13
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 541
-instructions executed: 956
-binary size: 9408
-  code: 6792
-  data: 1
-  metadata: 2615
+bytes allocated: 301
+instructions executed: 896
+binary size: 9688
+  code: 6716
+  data: 241
+  metadata: 2731
 functions:
   __to_str_i64:
     calls: 5
     bytes: 204
   aipl_array_dec:
-    calls: 8
+    calls: 3
     bytes: (external)
   aipl_array_new:
-    calls: 8
+    calls: 3
     bytes: (external)
   aipl_i64_len:
     calls: 10
@@ -70,4 +70,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 6588
+    bytes: 6512

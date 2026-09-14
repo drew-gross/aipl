@@ -46,33 +46,33 @@ body3
 302
 303
 --- performance ---
-allocations: 21
-deallocations: 21
+allocations: 20
+deallocations: 20
 reallocations: 0
-bytes allocated: 906
-instructions executed: 1184
+bytes allocated: 850
+instructions executed: 1148
 binary size: 3496
-  code: 1920
-  data: 1
-  metadata: 1575
+  code: 1800
+  data: 57
+  metadata: 1639
 functions:
   __map0$own0:
     calls: 1
-    bytes: 460
+    bytes: 488
   __map3$own0:
     calls: 1
-    bytes: 268
+    bytes: 296
   __to_str_i64:
     calls: 12
     bytes: 204
   aipl_arr_inc:
     calls: 2
     bytes: (external)
-  aipl_array_dec:
-    calls: 5
+  aipl_arr_reserve:
+    calls: 2
     bytes: (external)
-  aipl_array_new:
-    calls: 3
+  aipl_array_dec:
+    calls: 6
     bytes: (external)
   aipl_i64_len:
     calls: 24
@@ -82,4 +82,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 988
+    bytes: 812

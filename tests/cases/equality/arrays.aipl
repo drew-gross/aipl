@@ -16,15 +16,15 @@ fn eq_arrays(a: i64[], b: i64[]) -> bool { a == b }.test({
     assert(!([[1, 2], [3]] == [[1, 2], [4]]));
 })
 --- performance ---
-allocations: 26
-deallocations: 26
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 1352
-instructions executed: 1955
-binary size: 7136
-  code: 3916
-  data: 428
-  metadata: 2792
+bytes allocated: 512
+instructions executed: 1759
+binary size: 6568
+  code: 3000
+  data: 700
+  metadata: 2868
 functions:
   __eq_i64$arr:
     calls: 8
@@ -40,15 +40,15 @@ functions:
     bytes: 364
   __test$eq_arrays:
     calls: 1
-    bytes: 2816
+    bytes: 1900
   aipl_arr_drop_arr:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 26
+    calls: 16
     bytes: (external)
   aipl_array_new:
-    calls: 26
+    calls: 8
     bytes: (external)
   aipl_assert:
     calls: 9

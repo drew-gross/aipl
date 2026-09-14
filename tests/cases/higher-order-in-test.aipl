@@ -32,30 +32,30 @@ fn filter_evens(arr: i64[], pred: (i64) -> bool) -> i64[] {
     assert(filter_evens([10, 11, 12, 13], is_even) == [10, 12]);
 })
 --- performance ---
-allocations: 6
-deallocations: 6
-reallocations: 4
-bytes allocated: 296
-instructions executed: 917
-binary size: 2848
-  code: 1316
-  data: 158
-  metadata: 1374
+allocations: 2
+deallocations: 2
+reallocations: 2
+bytes allocated: 80
+instructions executed: 843
+binary size: 2904
+  code: 996
+  data: 425
+  metadata: 1483
 functions:
   __eq_i64$arr:
     calls: 2
     bytes: 296
   __test$filter_evens:
     calls: 1
-    bytes: 552
+    bytes: 236
   aipl_arr_inc:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 8
-    bytes: (external)
-  aipl_array_new:
     calls: 6
+    bytes: (external)
+  aipl_array_push:
+    calls: 2
     bytes: (external)
   aipl_array_push_mut:
     calls: 4
@@ -74,7 +74,7 @@ functions:
     bytes: (external)
   filter_evens$lam0:
     calls: 2
-    bytes: 356
+    bytes: 352
   main:
     calls: 1
     bytes: 112

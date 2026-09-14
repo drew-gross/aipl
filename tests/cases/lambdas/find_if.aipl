@@ -30,15 +30,15 @@ fn first_big(xs: i64[]) -> i64? { xs.find_if(|x| x > 10) }.test({
     assert(!first_big([1, 2, 3]).is_some());
 })
 --- performance ---
-allocations: 9
-deallocations: 9
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 450
-instructions executed: 1215
-binary size: 7784
-  code: 4408
-  data: 618
-  metadata: 2758
+bytes allocated: 48
+instructions executed: 1094
+binary size: 7528
+  code: 3784
+  data: 994
+  metadata: 2750
 functions:
   __builtin_find_if$char$lam10:
     calls: 1
@@ -72,18 +72,18 @@ functions:
     bytes: 100
   __filter12$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __test$first_big:
     calls: 1
-    bytes: 1572
+    bytes: 920
   aipl_arr_inc:
     calls: 1
     bytes: (external)
-  aipl_array_dec:
-    calls: 9
+  aipl_arr_reserve:
+    calls: 1
     bytes: (external)
-  aipl_array_new:
-    calls: 8
+  aipl_array_dec:
+    calls: 3
     bytes: (external)
   aipl_assert:
     calls: 9

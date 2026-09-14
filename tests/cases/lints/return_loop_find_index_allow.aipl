@@ -38,15 +38,15 @@ none
 none
 true
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 7
+deallocations: 7
 reallocations: 0
-bytes allocated: 208
-instructions executed: 1179
-binary size: 5016
-  code: 2856
-  data: 119
-  metadata: 2041
+bytes allocated: 152
+instructions executed: 1163
+binary size: 4968
+  code: 2788
+  data: 175
+  metadata: 2005
 functions:
   __builtin_find_index$i64$lam1:
     calls: 1
@@ -69,12 +69,6 @@ functions:
   __to_str_u64$opt:
     calls: 6
     bytes: 388
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
   aipl_u64_len:
     calls: 8
     bytes: (external)
@@ -89,4 +83,4 @@ functions:
     bytes: 304
   main:
     calls: 1
-    bytes: 648
+    bytes: 580

@@ -12,30 +12,27 @@ fn append<T: any>(mut self: T[], x: T) {
     assert(grown == [10, 20, 30]); // grown is [10, 20, 30]
 })
 --- performance ---
-allocations: 4
-deallocations: 4
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 208
-instructions executed: 418
-binary size: 2400
-  code: 996
-  data: 88
-  metadata: 1316
+bytes allocated: 56
+instructions executed: 377
+binary size: 2248
+  code: 760
+  data: 192
+  metadata: 1296
 functions:
   __eq_i64$arr:
     calls: 2
     bytes: 296
   __test$append:
     calls: 1
-    bytes: 596
+    bytes: 360
   aipl_arr_inc:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 8
-    bytes: (external)
-  aipl_array_new:
-    calls: 3
+    calls: 5
     bytes: (external)
   aipl_array_push:
     calls: 1

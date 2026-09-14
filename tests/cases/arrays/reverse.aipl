@@ -28,28 +28,28 @@ fn reversed_len(xs: i64[]) -> u64 { len(xs.reverse()) }.test({
     assert(reversed_len([]) == 0);
 })
 --- performance ---
-allocations: 18
-deallocations: 18
+allocations: 6
+deallocations: 6
 reallocations: 0
-bytes allocated: 848
-instructions executed: 908
-binary size: 5496
-  code: 2632
-  data: 456
-  metadata: 2408
+bytes allocated: 288
+instructions executed: 772
+binary size: 5048
+  code: 1952
+  data: 712
+  metadata: 2384
 functions:
   __eq_i64$arr:
     calls: 4
     bytes: 296
   __test$reversed_eq:
     calls: 1
-    bytes: 1164
+    bytes: 732
   __test$reversed_len:
     calls: 1
-    bytes: 416
+    bytes: 316
   __test$sum_reversed:
     calls: 1
-    bytes: 320
+    bytes: 172
   aipl_arr_elem_ptr:
     calls: 5
     bytes: (external)
@@ -60,9 +60,6 @@ functions:
     calls: 6
     bytes: (external)
   aipl_array_dec:
-    calls: 24
-    bytes: (external)
-  aipl_array_new:
     calls: 12
     bytes: (external)
   aipl_assert:

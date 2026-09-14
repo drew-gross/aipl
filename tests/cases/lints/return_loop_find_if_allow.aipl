@@ -34,15 +34,15 @@ some(5)
 none
 none
 --- performance ---
-allocations: 8
-deallocations: 8
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 294
-instructions executed: 617
-binary size: 3544
-  code: 1848
-  data: 67
-  metadata: 1629
+bytes allocated: 86
+instructions executed: 561
+binary size: 3320
+  code: 1568
+  data: 171
+  metadata: 1581
 functions:
   __builtin_find_if$i64$lam1:
     calls: 1
@@ -53,12 +53,6 @@ functions:
   __to_str_i64$opt:
     calls: 4
     bytes: 388
-  aipl_array_dec:
-    calls: 4
-    bytes: (external)
-  aipl_array_new:
-    calls: 4
-    bytes: (external)
   aipl_i64_len:
     calls: 4
     bytes: (external)
@@ -73,4 +67,4 @@ functions:
     bytes: 280
   main:
     calls: 1
-    bytes: 636
+    bytes: 356

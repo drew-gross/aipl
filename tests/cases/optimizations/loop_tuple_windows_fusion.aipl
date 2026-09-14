@@ -104,15 +104,15 @@ c2
 
 200
 --- performance ---
-allocations: 14
-deallocations: 14
-reallocations: 17
-bytes allocated: 465
-instructions executed: 42353
-binary size: 7672
-  code: 4540
-  data: 67
-  metadata: 3065
+allocations: 11
+deallocations: 11
+reallocations: 15
+bytes allocated: 361
+instructions executed: 42315
+binary size: 7720
+  code: 4348
+  data: 235
+  metadata: 3137
 functions:
   __to_str_i64:
     calls: 1
@@ -124,10 +124,10 @@ functions:
     calls: 2
     bytes: 204
   aipl_array_dec:
-    calls: 5
+    calls: 4
     bytes: (external)
-  aipl_array_new:
-    calls: 5
+  aipl_array_push:
+    calls: 2
     bytes: (external)
   aipl_array_push_mut:
     calls: 400
@@ -155,4 +155,4 @@ functions:
     bytes: 504
   main:
     calls: 1
-    bytes: 2416
+    bytes: 2224

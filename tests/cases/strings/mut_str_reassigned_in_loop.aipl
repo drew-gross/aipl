@@ -31,15 +31,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 104
-instructions executed: 262
-binary size: 2024
-  code: 704
+instructions executed: 268
+binary size: 2104
+  code: 748
   data: 131
-  metadata: 1189
+  metadata: 1225
 functions:
   __test$shrink:
     calls: 1
-    bytes: 600
+    bytes: 644
   aipl_array_dec:
     calls: 1
     bytes: (external)

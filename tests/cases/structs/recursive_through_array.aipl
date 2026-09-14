@@ -56,15 +56,15 @@ fn main() !prints {
 Tree { label: 7, kids: [] }
 Tree { label: 1, kids: [Tree { label: 2, kids: [] }, Tree { label: 3, kids: [] }] }
 --- performance ---
-allocations: 25
-deallocations: 25
+allocations: 21
+deallocations: 21
 reallocations: 0
-bytes allocated: 1100
-instructions executed: 1755
-binary size: 5640
-  code: 2680
-  data: 188
-  metadata: 2772
+bytes allocated: 972
+instructions executed: 1743
+binary size: 5632
+  code: 2600
+  data: 220
+  metadata: 2812
 functions:
   __arr_drop_Tree:
     calls: 5
@@ -88,7 +88,7 @@ functions:
     calls: 14
     bytes: (external)
   aipl_array_new:
-    calls: 9
+    calls: 5
     bytes: (external)
   aipl_i64_len:
     calls: 14
@@ -110,7 +110,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 892
+    bytes: 812
   total:
     calls: 5
     bytes: 272

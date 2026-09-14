@@ -1,0 +1,147 @@
+import {
+    equal as ==,
+    extend,
+    filter,
+    len,
+    map,
+    print,
+    push,
+    reverse,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+// A constant array literal — every element a scalar literal, or no elements at
+// all — is laid out in the binary's data section, exactly as a string literal
+// is. Reading one costs no allocation: the `--- performance ---` section below
+// counts none for `digits()`, `flags()` or `letters()`, however often they are
+// called (a `char[]` literal *is* a static `str`, the same object `"abc"` is).
+//
+// A static block is shared by every evaluation of the literal, so nothing may
+// write into it. Every path that would — `push`/`extend` on an exclusive
+// `mut`, the in-place buffer reuse behind `map`/`filter` on a fresh value —
+// copies the block first, which is why `digits()` still reads `[0, 3, 5]` after
+// each of them has had a turn: the allocations counted here are exactly those
+// copies. The same guard is what makes `xs.reverse().map(f)` correct — a
+// reversed *view* isn't a writable block either, and the in-place `map` used to
+// store straight through it.
+
+fn digits() -> i64[] { [0, 3, 5] }
+
+fn flags() -> bool[] { [true, false, true, true, true, true, true, true, false] }
+
+fn letters() -> char[] { ['a', 'b', 'c'] }
+
+fn main() !prints {
+    print(`{digits()} {flags()} {letters()} {[-1, -2]} {[]}`);
+
+    // A function's own literal is a constant too, and the caller may treat the
+    // result as fresh: the in-place `map` copies before it writes.
+    print(`{digits().map(|x| x + 1)}`);
+    print(`{digits().filter(|x| x == 3)}`);
+    print(`{digits()}`);
+
+    // An exclusive `mut` seeded from a constant: the first append copies, the
+    // rest grow the copy in place.
+    mut xs = [0, 3, 5];
+    set xs.push(7);
+    set xs.push(8);
+    set xs.extend([1, 2]);
+    print(`{xs} {digits()}`);
+
+    // A reversed view over a constant is neither static nor a heap block of
+    // its own; `map` in place copies it too.
+    print(`{[1, 2, 3].reverse().map(|x| x * 2)}`);
+    print(`{[1, 2, 3].reverse().filter(|x| x == 2)}`);
+    // The same literal anywhere is one data object.
+    print(`{[0, 3, 5] == digits()} {letters() == ['a', 'b', 'c']} {flags().len()}`);
+}
+--- stdout ---
+[0, 3, 5] [true, false, true, true, true, true, true, true, false] ['a', 'b', 'c'] [-1, -2] []
+[1, 4, 6]
+[3]
+[0, 3, 5]
+[0, 3, 5, 7, 8, 1, 2] [0, 3, 5]
+[6, 4, 2]
+[2]
+true true 9
+--- performance ---
+allocations: 38
+deallocations: 38
+reallocations: 0
+bytes allocated: 2178
+instructions executed: 6067
+binary size: 13552
+  code: 7464
+  data: 615
+  metadata: 5473
+functions:
+  __eq_i64$arr:
+    calls: 1
+    bytes: 296
+  __filter3$own0:
+    calls: 1
+    bytes: 300
+  __filter7$own0:
+    calls: 1
+    bytes: 300
+  __map1$own0:
+    calls: 1
+    bytes: 280
+  __map5$own0:
+    calls: 1
+    bytes: 284
+  __to_str_bool:
+    calls: 2
+    bytes: 232
+  __to_str_bool$arr:
+    calls: 1
+    bytes: 708
+  __to_str_char$arr:
+    calls: 1
+    bytes: 592
+  __to_str_i64$arr:
+    calls: 9
+    bytes: 708
+  __to_str_none$arr:
+    calls: 1
+    bytes: 180
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_arr_extend:
+    calls: 1
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 9
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 5
+    bytes: (external)
+  aipl_arr_reverse:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 24
+    bytes: (external)
+  aipl_array_push:
+    calls: 2
+    bytes: (external)
+  aipl_i64_len:
+    calls: 52
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 61
+    bytes: (external)
+  aipl_write_i64:
+    calls: 26
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 3380

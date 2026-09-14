@@ -69,30 +69,30 @@ fn has_header(xs: i64[]) -> bool { xs.starts_with([0, 0]) }.test({
     assert(!has_header([0, 9]));
 })
 --- performance ---
-allocations: 53
-deallocations: 53
+allocations: 14
+deallocations: 14
 reallocations: 0
-bytes allocated: 2656
-instructions executed: 4349
-binary size: 24592
-  code: 15676
-  data: 2110
-  metadata: 6806
+bytes allocated: 904
+instructions executed: 3953
+binary size: 23312
+  code: 13424
+  data: 2878
+  metadata: 7010
 functions:
   __eq_i64$arr:
     calls: 4
     bytes: 296
   __test$has_header:
     calls: 1
-    bytes: 15272
+    bytes: 13020
   aipl_arr_drop_arr:
     calls: 8
     bytes: (external)
   aipl_array_dec:
-    calls: 53
+    calls: 26
     bytes: (external)
   aipl_array_new:
-    calls: 53
+    calls: 14
     bytes: (external)
   aipl_assert:
     calls: 38

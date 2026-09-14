@@ -16,15 +16,15 @@ fn nums() -> V[] {
     assert(map([3], |x| Num(x)) == [Num(3)]); #[allow]
 })
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 4
+deallocations: 4
 reallocations: 2
-bytes allocated: 288
-instructions executed: 569
-binary size: 2944
-  code: 1456
-  data: 115
-  metadata: 1373
+bytes allocated: 200
+instructions executed: 549
+binary size: 2936
+  code: 1308
+  data: 203
+  metadata: 1425
 functions:
   __eq_V:
     calls: 3
@@ -34,12 +34,12 @@ functions:
     bytes: 284
   __test$nums:
     calls: 1
-    bytes: 972
+    bytes: 824
   aipl_array_dec:
-    calls: 6
+    calls: 4
     bytes: (external)
   aipl_array_new:
-    calls: 4
+    calls: 2
     bytes: (external)
   aipl_array_push_mut:
     calls: 3

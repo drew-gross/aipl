@@ -14,30 +14,27 @@ fn probe() -> bool {
     assert(probe());
 })
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 272
-instructions executed: 456
-binary size: 2384
-  code: 1104
-  data: 1
-  metadata: 1279
+bytes allocated: 96
+instructions executed: 415
+binary size: 2272
+  code: 848
+  data: 137
+  metadata: 1287
 functions:
   __eq_i64$arr:
     calls: 3
     bytes: 296
   __test$probe:
     calls: 1
-    bytes: 704
+    bytes: 448
   aipl_arr_inc:
-    calls: 5
+    calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 11
-    bytes: (external)
-  aipl_array_new:
-    calls: 4
+    calls: 7
     bytes: (external)
   aipl_array_push:
     calls: 2

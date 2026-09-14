@@ -28,25 +28,19 @@ fn id(x: i64) -> i64 { x }
 
 fn neg_one() -> i64 { -1 }
 --- performance ---
-allocations: 1
-deallocations: 1
+allocations: 0
+deallocations: 0
 reallocations: 0
-bytes allocated: 56
-instructions executed: 150
-binary size: 2184
-  code: 808
-  data: 202
-  metadata: 1174
+bytes allocated: 0
+instructions executed: 134
+binary size: 2120
+  code: 724
+  data: 258
+  metadata: 1138
 functions:
   __test$probe:
     calls: 1
-    bytes: 704
-  aipl_array_dec:
-    calls: 1
-    bytes: (external)
-  aipl_array_new:
-    calls: 1
-    bytes: (external)
+    bytes: 620
   aipl_assert:
     calls: 7
     bytes: (external)

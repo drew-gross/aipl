@@ -23,30 +23,33 @@ fn tag(self: i64[], f: (i64) -> str) -> str[] {
     assert(xs.tag(|x| to_str(x + suffix)) == ["101", "102", "103"]);
 })
 --- performance ---
-allocations: 16
-deallocations: 16
-reallocations: 9
-bytes allocated: 623
-instructions executed: 1488
+allocations: 15
+deallocations: 15
+reallocations: 6
+bytes allocated: 639
+instructions executed: 1463
 binary size: 5136
-  code: 2644
-  data: 226
-  metadata: 2266
+  code: 2496
+  data: 314
+  metadata: 2326
 functions:
   __eq_str$arr:
     calls: 3
     bytes: 364
   __test$tag:
     calls: 1
-    bytes: 1976
+    bytes: 1828
   __to_str_i64:
     calls: 9
     bytes: 204
   aipl_array_dec:
-    calls: 7
+    calls: 9
     bytes: (external)
   aipl_array_new:
-    calls: 7
+    calls: 3
+    bytes: (external)
+  aipl_array_push:
+    calls: 3
     bytes: (external)
   aipl_array_push_mut:
     calls: 9

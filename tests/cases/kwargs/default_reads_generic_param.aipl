@@ -20,15 +20,15 @@ fn main() !prints {
 ["a", "a"]
 ["a", "b"]
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 5
+deallocations: 5
 reallocations: 0
-bytes allocated: 282
-instructions executed: 1029
-binary size: 4336
-  code: 2224
-  data: 139
-  metadata: 1973
+bytes allocated: 234
+instructions executed: 1017
+binary size: 4344
+  code: 2164
+  data: 187
+  metadata: 1993
 functions:
   __to_str_i64$arr:
     calls: 1
@@ -37,10 +37,10 @@ functions:
     calls: 2
     bytes: 812
   aipl_array_dec:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_array_new:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_i64_len:
     calls: 4
@@ -53,4 +53,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 704
+    bytes: 644

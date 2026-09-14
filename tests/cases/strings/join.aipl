@@ -13,24 +13,24 @@ fn rejoin(s: str, sep: str) -> str { s.split(sep).join(sep=sep) }.test({
     assert(rejoin("a,bb,ccc", ",") == "a,bb,ccc"); // split then join round-trips
 })
 --- performance ---
-allocations: 14
-deallocations: 14
+allocations: 13
+deallocations: 13
 reallocations: 0
-bytes allocated: 857
-instructions executed: 540
-binary size: 5792
-  code: 3056
-  data: 472
-  metadata: 2264
+bytes allocated: 825
+instructions executed: 536
+binary size: 5816
+  code: 3024
+  data: 504
+  metadata: 2288
 functions:
   __test$rejoin:
     calls: 1
-    bytes: 2952
+    bytes: 2920
   aipl_array_dec:
-    calls: 7
+    calls: 6
     bytes: (external)
   aipl_array_new:
-    calls: 7
+    calls: 6
     bytes: (external)
   aipl_assert:
     calls: 7

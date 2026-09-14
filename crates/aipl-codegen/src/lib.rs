@@ -4166,15 +4166,16 @@ fn compile_program<M: Module>(
 
     // One counter across all functions so synthesized literal names are unique.
     let lit_ctr = Cell::new(0u32);
-    // Static string literals interned by content across the whole compilation.
-    let str_data = RefCell::new(StrLiterals::default());
+    // Static literals (`str`, constant arrays) interned by content across the
+    // whole compilation.
+    let literals = RefCell::new(Literals::default());
     // Per-element-type array drop/retain helpers, generated on demand while
     // compiling and defined afterward (below).
     let elem_rc = RefCell::new(ElemRc::default());
     for (id, f) in decls {
         dbg.trace("codegen", format_args!("define `{}`", f.name));
         define_fn(
-            module, &mut ctx, &mut fbc, id, f, &funcs, &structs, &builtins, &lit_ctr, &str_data,
+            module, &mut ctx, &mut fbc, id, f, &funcs, &structs, &builtins, &lit_ctr, &literals,
             &elem_rc, &mut ir, instrument, dbg,
         )?;
     }
@@ -4261,7 +4262,7 @@ fn compile_program<M: Module>(
     let test_fail_pending = std::mem::take(&mut elem_rc.borrow_mut().test_fail_pending);
     for (ty, id) in test_fail_pending {
         define_test_fail_fn(
-            module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &str_data, &elem_rc,
+            module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &literals, &elem_rc,
             id, &ty, &mut ir, instrument,
         )?;
     }
@@ -4276,7 +4277,7 @@ fn compile_program<M: Module>(
         }
         for (ty, id) in batch {
             define_eq_fn(
-                module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &str_data,
+                module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &literals,
                 &elem_rc, id, &ty, &mut ir, instrument,
             )?;
         }
@@ -4295,7 +4296,7 @@ fn compile_program<M: Module>(
         }
         for (ty, id) in batch {
             define_tostr_fn(
-                module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &str_data,
+                module, &mut ctx, &mut fbc, &funcs, &structs, &builtins, &lit_ctr, &literals,
                 &elem_rc, id, &ty, &mut ir, instrument,
             )?;
         }
@@ -4702,9 +4703,10 @@ fn remap_func_ids(ir: &str, remap: &HashMap<u32, u32>) -> String {
 /// (re)generate `dogfood.clif` after a frontend change, and by the verify test
 /// to confirm the checked-in artifact is up to date.
 ///
-/// Data symbols (string literals) aren't round-tripped yet; none of the current
-/// dogfooded functions produce any, and generation errors loudly if one ever
-/// does, rather than silently emitting an artifact that won't link.
+/// Static data objects — `str` and constant array literals, see [`Literals`] —
+/// are carried as `; data <id> <symbol> <hex>` lines, their raw block bytes read
+/// back out of the finalized JIT module, so an artifact links whatever
+/// literals its functions reference.
 pub fn generate_dogfood_artifact(
     sources: &[(&str, &str)],
     entries: &[&str],
@@ -8440,7 +8442,7 @@ fn define_fn<M: Module>(
     structs: &HashMap<String, TypeDef>,
     builtins: &Builtins,
     lit_ctr: &Cell<u32>,
-    str_data: &RefCell<StrLiterals>,
+    literals: &RefCell<Literals>,
     elem_rc: &RefCell<ElemRc>,
     ir_out: &mut String,
     instrument: bool,
@@ -8582,7 +8584,7 @@ fn define_fn<M: Module>(
             effects: &func.effects,
             owned_params: &owned_params,
             lit_ctr,
-            str_data,
+            literals,
             elem_rc,
             ret_ty: &abi_ret,
             sret: sret_val,
@@ -9036,14 +9038,16 @@ fn declared_import<M: Module>(module: &M, sym: &str) -> Result<FuncId, Error> {
 ///     byte literal) — neither owns heap. A heap/view/rope pointer is never a
 ///     codegen-time constant, and a heap-tagged (`..00`) constant is excluded
 ///     anyway, so this can't misfire on a baked pointer;
-///   - `symbol_value + STR_HEADER_SIZE` — a pointer into a static string
-///     literal's data object, whose `STATIC_REFCOUNT` header makes the runtime
-///     ignore every inc/dec on it (and which is never freed).
+///   - `symbol_value + header` — a pointer into a static literal's data object,
+///     whose `STATIC_REFCOUNT` header makes the runtime ignore every inc/dec on
+///     it (and which is never freed). `header` is the literal's header size —
+///     `STR_HEADER_SIZE` for a `str`, `HEADER_SIZE` for a constant array — and
+///     the pointer sits exactly that far past the symbol.
 /// Best-effort by design: a literal that arrives through a block param, a
 /// stack slot, or a component load isn't recognized, and its (no-op) rc call
 /// is emitted exactly as before — eliding is only ever an optimization, never
 /// required for balance, because rc ops on these representations don't count.
-fn rc_statically_noop(func: &Function, v: Value) -> bool {
+fn rc_statically_noop(func: &Function, v: Value, header: usize) -> bool {
     use cranelift::codegen::ir::{instructions::InstructionData, Opcode, ValueDef};
     let ValueDef::Result(inst, _) = func.dfg.value_def(v) else {
         return false;
@@ -9080,7 +9084,7 @@ fn rc_statically_noop(func: &Function, v: Value) -> bool {
                             InstructionData::UnaryImm {
                                 opcode: Opcode::Iconst,
                                 imm,
-                            } if imm.bits() == STR_HEADER_SIZE as i64
+                            } if imm.bits() == header as i64
                         )
                 )
             };
@@ -9454,9 +9458,11 @@ fn is_char_array(ty: &ConcreteType) -> bool {
 /// model until `tests/cases/sets/union_from_array_elem.aipl` demanded otherwise;
 /// they share the array heap block, so they share its answer here too.
 ///
-/// `char[]` is str-shaped (different rc entry points and an inline
-/// representation that isn't a pointer), and `str` has its own established slot
-/// model.
+/// `str` and `char[]` are str-shaped (different rc entry points, a 24-byte value
+/// rather than a pointer) and are not answered here: their `LetMut`/`set`/
+/// rebuild sites apply the same model by hand when the binding is not
+/// exclusive (see `replace_str_binding`), and let an exclusive binding hold the
+/// value's sole reference so the in-place growth paths can grow it.
 fn mut_binding_owns_slot_ref(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
     matches!(ty, ConcreteType::Set(..) | ConcreteType::Dict(_, _))
         || (matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty))
@@ -9852,7 +9858,7 @@ fn emit_rc_w<M: Module>(
         _ if is_str_repr(ty) || is_char_array(ty) => {
             // Skip the call entirely when `v` is a literal the runtime would
             // ignore anyway (static/inline — see `rc_statically_noop`).
-            if rc_statically_noop(builder.func, v) {
+            if rc_statically_noop(builder.func, v, STR_HEADER_SIZE) {
                 return;
             }
             // `active_sym` routes these to their `aipl_*` counterparts when the
@@ -9874,6 +9880,13 @@ fn emit_rc_w<M: Module>(
             // releases each pair's key and value). Arrays use `aipl_arr_inc`
             // (not `aipl_inc`) because `aipl_inc` uses string tag dispatch and
             // would misread the array repr tag bits.
+            //
+            // A constant array literal (`emit_const_array`) is skipped exactly
+            // as a static `str` literal is above: the runtime would ignore the
+            // call anyway.
+            if rc_statically_noop(builder.func, v, HEADER_SIZE) {
+                return;
+            }
             let sym = match op {
                 RcOp::Retain => "aipl_arr_inc",
                 RcOp::Drop => "aipl_array_dec",
@@ -11892,6 +11905,54 @@ fn load_binding_str(builder: &mut FunctionBuilder, slot: StackSlot) -> Value {
     slot_value(builder, slot, &ConcreteType::Primitive(Primitive::Str))
 }
 
+/// Hand the freshly built `buf` (type `ty`, str-shaped) to the *non-exclusive*
+/// `mut` binding living in `slot`, in place of the value `old` it holds — the
+/// writeback half of a rebuilding `push`/`extend`.
+///
+/// A non-exclusive str-shaped binding follows the slot-owned-reference model
+/// that `mut_binding_owns_slot_ref` describes for arrays: the slot holds one
+/// reference of its own on the binding's current value, and every *version* of
+/// the value keeps a track in the scope that created it. So `buf` is retained
+/// for the slot and tracked here, in the current scope, as the new version's
+/// region track — a non-retaining borrow of it (`let snap = cs;`) stays valid
+/// until this scope exits, exactly as one of an array binding does. Inside a
+/// loop body the region track dies with the iteration, but the slot's own
+/// reference carries the value onward. Then the slot's reference on `old` is
+/// released; if a snapshot of the old version is still alive, that version's
+/// own region track is what keeps it.
+///
+/// The binding used to hold the *only* reference to its value, releasing it on
+/// every rebuild — and a snapshot taken between two pushes dangled once the
+/// freed block was reused (`push_char.aipl`'s value-semantics assert failed
+/// whenever the allocator handed the block to the next string).
+///
+/// The release comes *before* the writeback, not after. A tagged `old` was a
+/// snapshot — a pointer loaded out of the slot — so the order did not matter.
+/// A wide `old` *is* the slot's address, so once the new value is stored there
+/// the "old" handle names the new one, and dropping it would free the string
+/// that was just built. The caller has finished reading the old bytes by now.
+#[allow(clippy::too_many_arguments)]
+fn replace_str_binding<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    builtins: &Builtins,
+    structs: &HashMap<String, TypeDef>,
+    scopes: &mut [Vec<Tracked>],
+    cx: Cx,
+    slot: StackSlot,
+    old: Value,
+    buf: Value,
+    ty: &ConcreteType,
+) {
+    emit_retain(builder, module, builtins, structs, buf, ty);
+    scopes
+        .last_mut()
+        .expect("scope")
+        .push(Tracked::new(buf, ty));
+    emit_rc(builder, module, builtins, structs, old, ty, RcOp::Drop);
+    store_binding_str(builder, cx, slot, buf, structs);
+}
+
 /// Write a freshly built `str` back into the stack slot of the `mut` binding it
 /// belongs to.
 ///
@@ -12281,18 +12342,21 @@ fn emit_const_str<M: Module>(
     }
 
     // Static literal: `[cap][refcount = STATIC][bytes]` in the data section, with
-    // `base` past both header words. Interned by content (see `StrLiterals`), so
+    // `base` past both header words. Interned by content (see `Literals`), so
     // a repeated literal shares one object and one content-hash symbol.
     //
     // No NUL: the new representation is length-delimited everywhere, and a
     // buffer no longer promises a terminator.
-    let data_id = cx.str_data.borrow_mut().intern(module, content, || {
-        let mut bytes = Vec::with_capacity(str24::BUF_HEADER + content.len());
-        bytes.extend_from_slice(&(content.len() as i64).to_le_bytes()); // cap
-        bytes.extend_from_slice(&str24::STATIC_REFCOUNT.to_le_bytes());
-        bytes.extend_from_slice(content);
-        bytes.into_boxed_slice()
-    })?;
+    let data_id = cx
+        .literals
+        .borrow_mut()
+        .intern(module, LiteralKind::Str, content, || {
+            let mut bytes = Vec::with_capacity(str24::BUF_HEADER + content.len());
+            bytes.extend_from_slice(&(content.len() as i64).to_le_bytes()); // cap
+            bytes.extend_from_slice(&str24::STATIC_REFCOUNT.to_le_bytes());
+            bytes.extend_from_slice(content);
+            bytes.into_boxed_slice()
+        })?;
     let gv = module.declare_data_in_func(data_id, builder.func);
     let symbol = builder.ins().symbol_value(types::I64, gv);
     let base = builder.ins().iadd_imm_s(symbol, str24::BUF_HEADER as i64);
@@ -12303,6 +12367,108 @@ fn emit_const_str<M: Module>(
     builder.ins().store(flags, base, addr, 8); // data — the whole buffer
     builder.ins().store(flags, meta, addr, 16); // len | tag
     Ok((addr, false))
+}
+
+/// The word a scalar literal — an integer (`3`, `-3`), a `bool` or a `char` —
+/// is stored as, with its type. These are the elements a constant array literal
+/// is made of: their values are known here, so the whole array can be laid out
+/// in the data section (see [`emit_const_array`]) instead of built by stores at
+/// runtime. Anything else (`some(1)`, a name, a call, a nested array) is `None`
+/// and takes the allocating path.
+fn const_scalar(e: &Expr) -> Option<(i64, Primitive)> {
+    match &e.kind {
+        ExprKind::Num(n) => Some((*n, Primitive::I64)),
+        ExprKind::Neg(inner) => match &inner.kind {
+            ExprKind::Num(n) => Some((n.wrapping_neg(), Primitive::I64)),
+            _ => None,
+        },
+        ExprKind::Bool(b) => Some((i64::from(*b), Primitive::Bool)),
+        ExprKind::Char(c) => Some((i64::from(*c), Primitive::Char)),
+        _ => None,
+    }
+}
+
+/// The element words of an array literal whose every element is a scalar
+/// literal of one kind (`[0, 3, 5]`, `[true, false]`, `['a', 'b']`, `[]`), with
+/// the element type they establish — an empty literal's is the untyped
+/// `NoneInner` placeholder, exactly as the allocating path infers it. `None`
+/// when any element has to be computed, or when the kinds disagree (that is a
+/// type error, and the allocating path is what reports it).
+fn const_array_words(elems: &[Expr]) -> Option<(Vec<i64>, ConcreteType)> {
+    let mut words = Vec::with_capacity(elems.len());
+    let mut kind: Option<Primitive> = None;
+    for el in elems {
+        let (w, p) = const_scalar(el)?;
+        if *kind.get_or_insert(p) != p {
+            return None;
+        }
+        words.push(w);
+    }
+    let elem = kind.map_or(ConcreteType::NoneInner, ConcreteType::Primitive);
+    Some((words, elem))
+}
+
+/// Materialize a constant array literal as a static data object and return its
+/// data pointer — the array value, an untagged `ArrRepr::Heap` pointer into the
+/// binary's data section. The block is laid out exactly as `alloc_array` would
+/// lay it out on the heap, `[refcount][len][cap][drop_fn][elems]`, except that
+/// the refcount is `STATIC_REFCOUNT`: every `aipl_arr_inc`/`aipl_array_dec`
+/// no-ops on it, it is never freed, and every path that would write into an
+/// array's own block — `aipl_array_push_mut`, `aipl_arr_reserve`, the in-place
+/// `map`/`filter` reuse behind `__arr_writable` — sees the refcount and copies
+/// first, exactly as `aipl_concat_mut` does for a static `str` literal. So the
+/// value behaves as a fresh array in every respect except that reading it costs
+/// no allocation, which is the point: `"1a2b"` never allocated, and now
+/// `[0, 3, 5]` doesn't either.
+///
+/// Like `emit_const_str`, the result needs no scope tracking — a release at
+/// scope exit would be a no-op. Interned by content (see [`Literals`]), so a
+/// repeated literal shares one object and one content-hash symbol.
+///
+/// `words` are the element values as `const_array_words` gives them; `elem` is
+/// the element type, which fixes the block's layout: an integer is one 8-byte
+/// slot, a `bool[]` is bit-packed (`is_bit_packed`). A `char[]` is str-shaped
+/// and never reaches here — its literal is a static `str` (`emit_const_str`).
+fn emit_const_array<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    words: &[i64],
+    elem: &ConcreteType,
+) -> Result<Value, Error> {
+    let len = words.len();
+    let cap_bytes = cap_bytes_for(runtime_elem_size(elem, cx.structs), len);
+    let mut content = Vec::with_capacity(HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes);
+    content.extend_from_slice(&STATIC_REFCOUNT.to_le_bytes());
+    content.extend_from_slice(&(len as i64).to_le_bytes());
+    content.extend_from_slice(&(cap_bytes as i64).to_le_bytes());
+    // Scalar elements: no drop-fn.
+    content.extend_from_slice(&0i64.to_le_bytes());
+    if is_bit_packed(elem) {
+        // Pack 8 bools per byte, bit `i & 7` of byte `i >> 3` — the layout
+        // `write_packed_bit` produces.
+        for chunk in words.chunks(8) {
+            let byte = chunk
+                .iter()
+                .enumerate()
+                .fold(0u8, |acc, (k, w)| acc | (((*w != 0) as u8) << k));
+            content.push(byte);
+        }
+    } else {
+        for w in words {
+            content.extend_from_slice(&w.to_le_bytes());
+        }
+    }
+    debug_assert_eq!(content.len(), HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes);
+    let data_id = cx
+        .literals
+        .borrow_mut()
+        .intern(module, LiteralKind::Array, &content, || {
+            content.clone().into_boxed_slice()
+        })?;
+    let gv = module.declare_data_in_func(data_id, builder.func);
+    let symbol = builder.ins().symbol_value(types::I64, gv);
+    Ok(builder.ins().iadd_imm_s(symbol, HEADER_SIZE as i64))
 }
 
 /// Build a file-op `Result` value `{tag, value@8}` from a runtime call's raw
@@ -13031,7 +13197,7 @@ fn define_test_fail_fn<M: Module>(
     structs: &HashMap<String, TypeDef>,
     builtins: &Builtins,
     lit_ctr: &Cell<u32>,
-    str_data: &RefCell<StrLiterals>,
+    literals: &RefCell<Literals>,
     elem_rc: &RefCell<ElemRc>,
     id: FuncId,
     err_ty: &ConcreteType,
@@ -13061,7 +13227,7 @@ fn define_test_fail_fn<M: Module>(
             effects: &[],
             owned_params: &owned_params,
             lit_ctr,
-            str_data,
+            literals,
             elem_rc,
             ret_ty: &unit,
             sret: None,
@@ -13119,7 +13285,7 @@ fn define_eq_fn<M: Module>(
     structs: &HashMap<String, TypeDef>,
     builtins: &Builtins,
     lit_ctr: &Cell<u32>,
-    str_data: &RefCell<StrLiterals>,
+    literals: &RefCell<Literals>,
     elem_rc: &RefCell<ElemRc>,
     id: FuncId,
     ty: &ConcreteType,
@@ -13153,7 +13319,7 @@ fn define_eq_fn<M: Module>(
             effects: &[],
             owned_params: &owned_params,
             lit_ctr,
-            str_data,
+            literals,
             elem_rc,
             ret_ty: &unit,
             sret: None,
@@ -13201,7 +13367,7 @@ fn define_tostr_fn<M: Module>(
     structs: &HashMap<String, TypeDef>,
     builtins: &Builtins,
     lit_ctr: &Cell<u32>,
-    str_data: &RefCell<StrLiterals>,
+    literals: &RefCell<Literals>,
     elem_rc: &RefCell<ElemRc>,
     id: FuncId,
     ty: &ConcreteType,
@@ -13241,7 +13407,7 @@ fn define_tostr_fn<M: Module>(
             effects: &[],
             owned_params: &owned_params,
             lit_ctr,
-            str_data,
+            literals,
             elem_rc,
             ret_ty: &unit,
             sret: None,
@@ -13319,7 +13485,7 @@ fn define_tostr_fn<M: Module>(
 
 /// FNV-1a 64-bit hash of `bytes`, computed at compile time (the runtime
 /// [`aipl_str_hash`] is the same fold over a live string's bytes). Used to name
-/// static string-literal data symbols by content — see [`StrLiterals`].
+/// static literal data symbols by content — see [`Literals`].
 fn fnv1a_64(bytes: &[u8]) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325; // offset basis
     for &b in bytes {
@@ -13329,41 +13495,69 @@ fn fnv1a_64(bytes: &[u8]) -> u64 {
     h
 }
 
-/// Interns static string-literal data objects by content across a whole
-/// compilation. Identical literals — the same struct-field default materialized
-/// at many construction sites, or the same text repeated anywhere — share one
-/// data object (so the binary carries each distinct literal once). The symbol
-/// name is a content hash (`__str_<hash>`), so a literal keeps its name when
-/// unrelated source above it changes; the old span-based `__str_<start>_<end>`
-/// name shifted on every earlier edit, churning the whole data section (and the
-/// checked-in dogfood IR) for a change that touched none of the literals.
+/// The kinds of static literal [`Literals`] interns. Each is a value the program
+/// can read straight out of the binary's data section instead of allocating —
+/// its block carries `STATIC_REFCOUNT`, so every retain and release the program
+/// performs on it is a no-op and it is never freed. The kind names the symbol
+/// (`__str_<hash>`, `__arr_<hash>`) and keys the cache alongside the content,
+/// since the same bytes mean different things under different headers.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum LiteralKind {
+    /// A `str` literal's content bytes, behind a `[cap][refcount]` header
+    /// (see [`emit_const_str`]).
+    Str,
+    /// A constant array literal's element words, behind the ordinary array
+    /// block header (see [`emit_const_array`]).
+    Array,
+}
+
+impl LiteralKind {
+    fn prefix(self) -> &'static str {
+        match self {
+            LiteralKind::Str => "str",
+            LiteralKind::Array => "arr",
+        }
+    }
+}
+
+/// Interns static literal data objects by content across a whole compilation.
+/// Identical literals — the same struct-field default materialized at many
+/// construction sites, the same text or the same `[0, 3, 5]` repeated anywhere
+/// — share one data object (so the binary carries each distinct literal once).
+/// The symbol name is a content hash (`__str_<hash>`, `__arr_<hash>`), so a
+/// literal keeps its name when unrelated source above it changes; the old
+/// span-based `__str_<start>_<end>` name shifted on every earlier edit, churning
+/// the whole data section (and the checked-in dogfood IR) for a change that
+/// touched none of the literals.
 ///
 /// `used_names` guards the astronomically rare case of two *different* contents
 /// hashing to the same name: the second is disambiguated with a numeric suffix
 /// so it can never silently alias the first literal's bytes.
 #[derive(Default)]
-struct StrLiterals {
-    by_content: HashMap<Box<[u8]>, DataId>,
+struct Literals {
+    by_content: HashMap<(LiteralKind, Box<[u8]>), DataId>,
     used_names: HashSet<String>,
 }
 
-impl StrLiterals {
-    /// The data object for `content`, declaring and defining it on first sight
-    /// and reusing it thereafter. `define` builds the static string bytes for a
-    /// freshly-declared object; it is not called on a cache hit.
+impl Literals {
+    /// The data object for `content` as a `kind` literal, declaring and defining
+    /// it on first sight and reusing it thereafter. `define` builds the static
+    /// block's bytes for a freshly-declared object; it is not called on a cache
+    /// hit.
     fn intern<M: Module>(
         &mut self,
         module: &mut M,
+        kind: LiteralKind,
         content: &[u8],
         define: impl FnOnce() -> Box<[u8]>,
     ) -> Result<DataId, Error> {
-        if let Some(&id) = self.by_content.get(content) {
+        if let Some(&id) = self.by_content.get(&(kind, Box::from(content))) {
             return Ok(id);
         }
         // Distinct content, not yet interned. Pick a content-hash name unique to
         // it: on a hash collision with a different literal, extend the name until
         // free so `declare_data` mints a new object rather than aliasing.
-        let base = format!("__str_{:016x}", fnv1a_64(content));
+        let base = format!("__{}_{:016x}", kind.prefix(), fnv1a_64(content));
         let mut name = base.clone();
         let mut n: u32 = 0;
         while self.used_names.contains(&name) {
@@ -13380,7 +13574,7 @@ impl StrLiterals {
         module
             .define_data(id, &desc)
             .map_err(|e| Error::msg(format!("define data: {e}")))?;
-        self.by_content.insert(content.into(), id);
+        self.by_content.insert((kind, content.into()), id);
         self.used_names.insert(name);
         Ok(id)
     }
@@ -13406,9 +13600,10 @@ struct Cx<'a> {
     /// Global counter for unique names of the static string literals `to_str`
     /// synthesizes (separators, struct/field labels, `some(`/`none`).
     lit_ctr: &'a Cell<u32>,
-    /// Content-interned static string-literal data objects (see [`StrLiterals`]),
-    /// shared across every function in the compilation.
-    str_data: &'a RefCell<StrLiterals>,
+    /// Content-interned static literal data objects — `str` and constant array
+    /// literals (see [`Literals`]) — shared across every function in the
+    /// compilation.
+    literals: &'a RefCell<Literals>,
     /// On-demand cache of per-element-type array drop/retain helper functions
     /// (for element types the fixed runtime helpers don't cover — structs and
     /// struct/optional combinations). Declared here when first needed and
@@ -14527,7 +14722,7 @@ fn compile_call_expr<M: Module>(
         effects: _,
         owned_params: _,
         lit_ctr: _,
-        str_data: _,
+        literals: _,
         elem_rc: _,
         ret_ty: _,
         sret: _,
@@ -16574,6 +16769,57 @@ fn compile_call_expr<M: Module>(
             );
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
+        "__arr_writable" => {
+            // Internal (in-place `map`/`filter`/`zip_with`): the moved-in array
+            // parameter as a block the body may write element slots into. The
+            // in-place bodies overwrite slots with plain stores (`__map_set`,
+            // `__filter_keep`), which no runtime guard protects, so the block
+            // has to be a uniquely-owned heap block *before* the loop starts —
+            // and a moved-in argument isn't always one: a constant literal
+            // (`[1, 2, 3].map(f)`) or a function returning one is a
+            // `STATIC_REFCOUNT` block in the data section, and `xs.reverse()`
+            // is a view over another array's block. `aipl_arr_reserve` with
+            // nothing extra is exactly the guard: a unique heap block comes
+            // back as is, anything else is copied (and the original released),
+            // so the body's stores land in memory it owns — the same
+            // copy-on-first-write the `push`/`extend` runtime does for an
+            // exclusive `mut` binding.
+            //
+            // Consumes the parameter's reference (the owned instance never
+            // releases it itself) and hands back one owned block, tracked here
+            // like any fresh value; `mut $a = __arr_writable($arr)` then
+            // re-owns it through its slot, as it does `with_capacity`'s.
+            let (arr_ptr, arr_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            let elem = match &arr_ty {
+                ConcreteType::Array(inner) => (**inner).clone(),
+                _ => {
+                    return Err(Error::at(
+                        format!(
+                            "__arr_writable expects an array, got {}",
+                            type_name(&arr_ty)
+                        ),
+                        span.clone(),
+                    ))
+                }
+            };
+            let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
+            let retain_fn = array_retain_fn_addr(builder, module, cx, &elem);
+            let esz = builder
+                .ins()
+                .iconst(types::I64, runtime_elem_size(&elem, structs));
+            let zero = builder.ins().iconst(types::I64, 0);
+            let owned = builtins.call(
+                module,
+                builder,
+                "aipl_arr_reserve",
+                &[arr_ptr, zero, drop_fn, retain_fn, esz],
+            );
+            scopes
+                .last_mut()
+                .expect("scope")
+                .push(Tracked::new(owned, &arr_ty));
+            (owned, arr_ty)
+        }
         "__map_result" => {
             // Internal (in-place `map`): hand the reused buffer back reinterpreted
             // as the enclosing function's declared return type (`U[]`). `$a`'s
@@ -16891,31 +17137,18 @@ fn compile_call_expr<M: Module>(
                     .ins()
                     .istore8(MemFlagsData::trusted(), x_v, dst_addr, 0);
                 emit_str_grew(module, builder, cx, buf, new_len);
-                // The slot owns exactly one reference to its current value
-                // (`LetMut`'s str-shaped branch), so the rebuild keeps that
-                // invariant: release the old value, then let the slot own the
-                // fresh `buf` outright. `buf` gets no value-track of its own —
-                // one in the *current* scope would be wrong inside a loop, where
-                // it frees the buffer the binding still names at the end of the
-                // iteration.
-                //
-                // The release comes *before* the writeback, not after. A tagged
-                // `arr_ptr` was a snapshot — a pointer loaded out of the slot —
-                // so the order did not matter. A wide `arr_ptr` *is* the slot's
-                // address, so once the new value is stored there the "old" handle
-                // names the new one, and dropping it frees the string that was
-                // just built. The copy above is already done, so nothing reads
-                // the old bytes after this point.
-                emit_rc(
+                replace_str_binding(
                     builder,
                     module,
                     builtins,
                     structs,
+                    scopes,
+                    cx,
+                    slot,
                     arr_ptr,
+                    buf,
                     &new_arr_ty,
-                    RcOp::Drop,
                 );
-                store_binding_str(builder, cx, slot, buf, structs);
             } else if exclusive {
                 // Statically proven unaliased: mutate in place. No pre-inc and
                 // no new value-track — the binding's slot-track (added at
@@ -17072,19 +17305,19 @@ fn compile_call_expr<M: Module>(
                 let src1 = str_bytes_ptr(module, builder, cx, src_ptr);
                 let _ = builtins.call(module, builder, "aipl_write_bytes", &[at, src1, add_len]);
                 emit_str_grew(module, builder, cx, buf, new_len);
-                // Same ownership handover as the `push` char path, for the same
-                // reasons — including the release coming before the writeback,
-                // since a wide handle is the slot rather than a snapshot of it.
-                emit_rc(
+                // Same ownership handover as the `push` char path.
+                replace_str_binding(
                     builder,
                     module,
                     builtins,
                     structs,
+                    scopes,
+                    cx,
+                    slot,
                     arr_ptr,
+                    buf,
                     &new_arr_ty,
-                    RcOp::Drop,
                 );
-                store_binding_str(builder, cx, slot, buf, structs);
                 *ty_cell.borrow_mut() = binding_ty;
                 return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
             }
@@ -17771,7 +18004,7 @@ fn compile_expr_inner<M: Module>(
         effects: _,
         owned_params: _,
         lit_ctr: _,
-        str_data: _,
+        literals: _,
         elem_rc: _,
         ret_ty: _,
         sret: _,
@@ -18407,10 +18640,16 @@ fn compile_expr_inner<M: Module>(
             let fresh_literal = match &t {
                 // A reserved-capacity array (`map`'s pre-sized output) is just as
                 // fresh and unaliased as an `[..]` literal, so it's eligible for
-                // the in-place `push` path too.
+                // the in-place `push` path too — and so is the block
+                // `__arr_writable` hands the in-place `map`/`filter` bodies.
+                //
+                // A *constant* literal lives in the data section, and is
+                // exclusive all the same: the first in-place mutation finds its
+                // `STATIC_REFCOUNT` and copies (`emit_const_array`), and every
+                // one after that grows the copy in place.
                 ConcreteType::Array(_) => {
                     matches!(&value.kind, ExprKind::ArrayLit(_))
-                        || matches!(&value.kind, ExprKind::Call(n, _, _) if n == "__builtin_with_capacity")
+                        || matches!(&value.kind, ExprKind::Call(n, _, _) if n == "__builtin_with_capacity" || n == "__arr_writable")
                 }
                 ConcreteType::Primitive(Primitive::Str) => matches!(&value.kind, ExprKind::Str(_)),
                 _ => false,
@@ -18425,12 +18664,25 @@ fn compile_expr_inner<M: Module>(
             let exclusive =
                 (fresh_literal || owned_move) && aipl_mono::binding_is_exclusive(name, body, true);
             if is_str_shaped(&t) {
-                // A `str` binding's slot owns exactly one reference to its current
+                // A `str` binding's slot owns one reference to its current
                 // value, released once at scope exit by this slot-track. `set`
-                // preserves the invariant (drop the old value, take ownership of
-                // the new), so the binding can be reassigned — even across a nested
-                // scope, e.g. `set s = s[..]` in a loop body — without leaking or
+                // preserves the invariant (release the old value, own the new),
+                // so the binding can be reassigned — even across a nested scope,
+                // e.g. `set s = s[..]` in a loop body — without leaking or
                 // freeing a value the slot still points at.
+                //
+                // Whether that reference is the value's *only* one depends on
+                // `exclusive`. An exclusive binding takes the fresh value's own
+                // reference (its value-track is popped), so the block's count is
+                // 1 and the in-place `push`/`extend`/`+++` paths may grow it
+                // under themselves. A non-exclusive one — something else may
+                // name a version of it — follows the array bindings' slot-owned-
+                // reference model (`mut_binding_owns_slot_ref`, and
+                // `replace_str_binding` for the rebuilds): the slot retains its
+                // own reference and the value's existing ownership — a fresh
+                // value's region track, a borrowed source binding — is left in
+                // place, so a snapshot of any version survives until the scope
+                // that made that version exits.
                 //
                 // `is_str_shaped`, so a `char[]` binding is owned this way too.
                 // It used to fall through to the array branches, which give the
@@ -18440,17 +18692,21 @@ fn compile_expr_inner<M: Module>(
                 // iteration while the binding still named it. The next iteration's
                 // allocation reused the block, so the copy read from the buffer it
                 // was writing into (`extend/extend_char_in_place.aipl`).
-                own_value_into_slot(
-                    builder,
-                    module,
-                    builtins,
-                    structs,
-                    scopes,
-                    v,
-                    &t,
-                    value,
-                    cx.owned_params,
-                );
+                if exclusive || owned_move {
+                    own_value_into_slot(
+                        builder,
+                        module,
+                        builtins,
+                        structs,
+                        scopes,
+                        v,
+                        &t,
+                        value,
+                        cx.owned_params,
+                    );
+                } else {
+                    emit_retain(builder, module, builtins, structs, v, &t);
+                }
                 scopes
                     .last_mut()
                     .expect("scope")
@@ -18460,8 +18716,12 @@ fn compile_expr_inner<M: Module>(
                 // unaliased binding is re-owned via its slot so a relocating
                 // `push`/`union` grow is still dropped exactly once.
                 let scope = scopes.last_mut().expect("scope");
-                if fresh_literal {
-                    scope.pop(); // the literal's value-track (just pushed)
+                // The literal's value-track (just pushed) — unless the literal
+                // is a constant, which owns no allocation and tracks nothing.
+                if fresh_literal
+                    && matches!(scope.last(), Some(Tracked { owned: Owned::Value(x), .. }) if *x == v)
+                {
+                    scope.pop();
                 }
                 scope.push(Tracked::slot(slot, &t));
             } else if mut_binding_owns_slot_ref(&t, structs) {
@@ -18722,21 +18982,28 @@ fn compile_expr_inner<M: Module>(
                     builder.ins().stack_store(types::I64, v, slot, 0);
                     emit_drop(builder, module, builtins, structs, old, &expected_ty);
                 } else {
-                    // `str`: take sole ownership of the new value for the slot,
-                    // then release the reference the slot held before —
-                    // preserving the slot-track's single-reference invariant
-                    // across the reassignment.
-                    own_value_into_slot(
-                        builder,
-                        module,
-                        builtins,
-                        structs,
-                        scopes,
-                        v,
-                        &expected_ty,
-                        value,
-                        cx.owned_params,
-                    );
+                    // `str`: own the new value for the slot, then release the
+                    // reference the slot held before — preserving the
+                    // slot-track's invariant across the reassignment. Which
+                    // ownership is `LetMut`'s question, answered the same way:
+                    // an exclusive binding takes the value's sole reference, a
+                    // non-exclusive one retains its own and leaves the value's
+                    // region track to keep snapshots of it alive.
+                    if exclusive {
+                        own_value_into_slot(
+                            builder,
+                            module,
+                            builtins,
+                            structs,
+                            scopes,
+                            v,
+                            &expected_ty,
+                            value,
+                            cx.owned_params,
+                        );
+                    } else {
+                        emit_retain(builder, module, builtins, structs, v, &expected_ty);
+                    }
                     // Release before the store, not after. A tagged `old` is a
                     // pointer copied out of the slot, so either order worked; a
                     // wide `old` is the slot's own address, and once the new
@@ -19382,6 +19649,26 @@ fn compile_expr_inner<M: Module>(
             (result, merged_ty)
         }
         ExprKind::ArrayLit(elems) => {
+            // A constant literal — every element a scalar literal, or no
+            // elements at all — is read out of the data section rather than
+            // built: a static block for an integer or `bool` array, and for a
+            // `char[]` (str-shaped) the very same static/inline `str` a string
+            // literal is. Neither allocates, and neither is tracked for release
+            // (`emit_const_str`'s rule). Everything a fresh literal could be
+            // used for still works, because every path that writes into an
+            // array's own block copies a static one first (`emit_const_array`).
+            if let Some((words, elem)) = const_array_words(elems) {
+                let arr_ty = ConcreteType::Array(Box::new(elem.clone()));
+                let value = if is_char_array(&arr_ty) {
+                    let bytes: Vec<u8> = words.iter().map(|w| *w as u8).collect();
+                    let (v, tracked) = emit_const_str(module, builder, cx, &bytes)?;
+                    debug_assert!(!tracked, "a literal str is never tracked");
+                    v
+                } else {
+                    emit_const_array(module, builder, cx, &words, &elem)?
+                };
+                return Ok((value, arr_ty));
+            }
             // All elements must share one primitive type. An empty
             // literal has element type `__none__` and coerces to any
             // concrete `T[]` (mirrors bare `none`).

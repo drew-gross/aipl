@@ -19,15 +19,15 @@ fn main() !prints {
 [(1, 'x'), (2, 'y')]
 some((true, "yes"))
 --- performance ---
-allocations: 7
-deallocations: 7
+allocations: 6
+deallocations: 6
 reallocations: 0
-bytes allocated: 255
-instructions executed: 1273
-binary size: 9392
-  code: 4624
-  data: 643
-  metadata: 4125
+bytes allocated: 215
+instructions executed: 1266
+binary size: 9440
+  code: 4592
+  data: 683
+  metadata: 4165
 functions:
   __to_str___tuple$bool$str$opt:
     calls: 1
@@ -45,7 +45,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_new:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_i64_len:
     calls: 16
@@ -58,4 +58,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1400
+    bytes: 1368

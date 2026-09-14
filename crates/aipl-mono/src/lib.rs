@@ -3002,7 +3002,7 @@ impl Mono<'_> {
                 ExprKind::LetMut(
                     "$a".to_string(),
                     None,
-                    Box::new(id("$arr")),
+                    Box::new(writable("$arr", &span)),
                     Box::new(inner),
                 ),
                 span.clone(),
@@ -3263,7 +3263,7 @@ impl Mono<'_> {
                 ExprKind::LetMut(
                     "$a".to_string(),
                     None,
-                    Box::new(id("$arr")),
+                    Box::new(writable("$arr", &span)),
                     Box::new(inner),
                 ),
                 span.clone(),
@@ -3676,7 +3676,7 @@ impl Mono<'_> {
                 ExprKind::LetMut(
                     "$z".to_string(),
                     None,
-                    Box::new(id(reused)),
+                    Box::new(writable(reused, &span)),
                     Box::new(with_i),
                 ),
                 span.clone(),
@@ -3984,7 +3984,7 @@ impl Mono<'_> {
                 ExprKind::LetMut(
                     "$a".to_string(),
                     None,
-                    Box::new(id("$arr")),
+                    Box::new(writable("$arr", &span)),
                     Box::new(inner),
                 ),
                 span.clone(),
@@ -7062,6 +7062,16 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
                     .unwrap_or(Type::Array(Box::new(Type::NoneInner))),
             )
         }
+        // Internal: the moved-in array as a writable block (see `writable`) —
+        // the same array, typed as itself.
+        "__arr_writable" => {
+            return Some(
+                arg_tys
+                    .first()
+                    .cloned()
+                    .unwrap_or(Type::Array(Box::new(Type::NoneInner))),
+            )
+        }
         // Internal in-place-filter intrinsics (statements; see `expand_filter`).
         "__filter_keep" | "__filter_drop" | "__filter_truncate" => return Some(Type::Unit),
         // Internal in-place-map intrinsic (a statement; see `expand_map`).
@@ -8691,7 +8701,12 @@ fn contains_inplace_hof_intrinsic(e: &Expr) -> bool {
     if let ExprKind::Call(name, _, _) = &e.kind {
         if matches!(
             name.as_str(),
-            "__map_set" | "__map_result" | "__filter_drop" | "__filter_keep" | "__filter_truncate"
+            "__arr_writable"
+                | "__map_set"
+                | "__map_result"
+                | "__filter_drop"
+                | "__filter_keep"
+                | "__filter_truncate"
         ) {
             return true;
         }
@@ -9152,10 +9167,32 @@ fn is_heap_concrete(t: &ConcreteType) -> bool {
         )
 }
 
-/// Whether `arg` evaluates to a freshly-allocated, uniquely-owned heap value, so
-/// it can be *moved* into an owning parameter rather than borrowed: an array
-/// literal, or a call returning a heap value (a fresh rc-1 block). `arg_ty` is
-/// `arg`'s inferred type. Mirrors codegen's former `is_fresh_heap_arg`.
+/// `__arr_writable(param)`: the moved-in array parameter `param` as a block
+/// whose element slots the in-place `map`/`filter`/`zip_with` bodies may
+/// overwrite. Every such body starts `mut $a = __arr_writable($arr);` rather
+/// than `mut $a = $arr;`.
+///
+/// Moving an argument in makes the callee its sole *owner*; it does not make
+/// the block *writable*. A constant literal (`[1, 2, 3].map(f)`) or a function
+/// that returns one is a `STATIC_REFCOUNT` block in the binary's data section,
+/// and `xs.reverse()` hands back a view over `xs`'s block — both are fresh
+/// values by `is_fresh_heap`'s reckoning, and the in-place body's plain slot
+/// stores would write into memory that isn't its own. The `push`/`extend`
+/// runtime already copies such a block before growing it; this intrinsic is
+/// the same copy-on-first-write for the in-place bodies (codegen lowers it to
+/// `aipl_arr_reserve` with nothing extra: a unique heap block comes back
+/// untouched, anything else is copied).
+fn writable(param: &str, span: &Span) -> Expr {
+    Expr::new(
+        ExprKind::Call(
+            "__arr_writable".to_string(),
+            vec![Expr::new(ExprKind::Ident(param.to_string()), span.clone())],
+            false,
+        ),
+        span.clone(),
+    )
+}
+
 /// Whether `t`'s values are `str`-shaped — a `str`/`Error`/concat-str, or a
 /// `char[]`, which shares the representation.
 fn str_shaped(t: &Type) -> bool {
@@ -9173,6 +9210,16 @@ fn slot_fits(from: &Type, to: &Type) -> bool {
     str_shaped(from) == str_shaped(to)
 }
 
+/// Whether `arg` evaluates to a freshly-allocated, uniquely-owned heap value, so
+/// it can be *moved* into an owning parameter rather than borrowed: an array
+/// literal, or a call returning a heap value (a fresh rc-1 block). `arg_ty` is
+/// `arg`'s inferred type. Mirrors codegen's former `is_fresh_heap_arg`.
+///
+/// "Fresh" is about ownership, not about where the bytes live: a constant
+/// literal is a static block, and a call may return one or a view. That is
+/// fine for a move — the owned instance never writes into a moved-in block
+/// without going through a guard (`aipl_array_push_mut`, `aipl_arr_reserve`,
+/// [`writable`]) that copies a block it must not write.
 fn is_fresh_heap(arg: &Expr, arg_ty: &Type) -> bool {
     is_heap(arg_ty) && matches!(&arg.kind, ExprKind::ArrayLit(_) | ExprKind::Call(_, _, _))
 }

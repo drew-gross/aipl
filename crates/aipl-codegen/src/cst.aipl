@@ -421,18 +421,18 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 558
-deallocations: 558
+allocations: 447
+deallocations: 447
 reallocations: 39
-bytes allocated: 27910
-instructions executed: 30292
-binary size: 62568
-  code: 37444
-  data: 2517
-  metadata: 22607
+bytes allocated: 24366
+instructions executed: 29637
+binary size: 59328
+  code: 35432
+  data: 2549
+  metadata: 21347
 functions:
   __arr_drop_Cst:
-    calls: 137
+    calls: 138
     bytes: 116
   __arr_retain_Cst:
     calls: 63
@@ -466,13 +466,13 @@ functions:
     bytes: 92
   __filter4$own0:
     calls: 7
-    bytes: 332
+    bytes: 368
   __rec_drop_Cst:
     calls: 61
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 13644
+    bytes: 13424
   aipl_arr_drop_arr:
     calls: 76
     bytes: (external)
@@ -483,13 +483,13 @@ functions:
     calls: 22
     bytes: (external)
   aipl_arr_inc:
-    calls: 1120
+    calls: 873
     bytes: (external)
   aipl_arr_join:
     calls: 78
     bytes: (external)
   aipl_arr_reserve:
-    calls: 11
+    calls: 18
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 145
@@ -498,10 +498,10 @@ functions:
     calls: 8
     bytes: (external)
   aipl_array_dec:
-    calls: 1572
+    calls: 1466
     bytes: (external)
   aipl_array_new:
-    calls: 261
+    calls: 149
     bytes: (external)
   aipl_array_push_mut:
     calls: 214
@@ -541,7 +541,7 @@ functions:
     bytes: 32
   flat_kids$tail:
     calls: 20
-    bytes: 3832
+    bytes: 3220
   last_leaf:
     calls: 12
     bytes: 696
@@ -550,13 +550,13 @@ functions:
     bytes: 660
   leaves:
     calls: 48
-    bytes: 3684
+    bytes: 3156
   main:
     calls: 1
     bytes: 100
   own_token_text:
     calls: 3
-    bytes: 1268
+    bytes: 1240
   show:
     calls: 23
     bytes: 2968
@@ -571,13 +571,13 @@ functions:
     bytes: 612
   text:
     calls: 5
-    bytes: 472
+    bytes: 428
   token_leaves:
     calls: 38
-    bytes: 3648
+    bytes: 3076
   token_span:
     calls: 3
     bytes: 288
   token_text:
     calls: 5
-    bytes: 472
+    bytes: 428

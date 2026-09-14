@@ -18,15 +18,15 @@ fn str_arr_rev(xs: str[]) -> str[] { xs.reverse() }.test({
     assert(str_arr_rev(["a", "b", "c"]) == ["c", "b", "a"]);
 })
 --- performance ---
-allocations: 16
-deallocations: 16
+allocations: 11
+deallocations: 11
 reallocations: 0
-bytes allocated: 843
-instructions executed: 837
-binary size: 6632
-  code: 3312
-  data: 498
-  metadata: 2822
+bytes allocated: 595
+instructions executed: 773
+binary size: 6512
+  code: 3000
+  data: 650
+  metadata: 2862
 functions:
   __eq_i64$arr:
     calls: 2
@@ -36,7 +36,7 @@ functions:
     bytes: 364
   __test$arr_rev:
     calls: 1
-    bytes: 776
+    bytes: 464
   __test$str_arr_rev:
     calls: 1
     bytes: 768
@@ -53,10 +53,10 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 15
+    calls: 10
     bytes: (external)
   aipl_array_new:
-    calls: 7
+    calls: 2
     bytes: (external)
   aipl_assert:
     calls: 9

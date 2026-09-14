@@ -56,15 +56,15 @@ fn first_big(xs: i64[]) -> u64? { xs.find_index(|x| x > 10) }.test({
     assert(value_for(keys, [10, 20, 30], "z") == none);
 })
 --- performance ---
-allocations: 13
-deallocations: 13
+allocations: 2
+deallocations: 2
 reallocations: 0
-bytes allocated: 722
-instructions executed: 2246
-binary size: 12256
-  code: 7368
-  data: 1013
-  metadata: 3875
+bytes allocated: 152
+instructions executed: 2077
+binary size: 12040
+  code: 6572
+  data: 1501
+  metadata: 3967
 functions:
   __builtin_find_index$char$lam10:
     calls: 1
@@ -113,18 +113,21 @@ functions:
     bytes: 100
   __filter14$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __test$first_big:
     calls: 1
-    bytes: 2996
+    bytes: 2172
   aipl_arr_inc:
     calls: 1
     bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
+    bytes: (external)
   aipl_array_dec:
-    calls: 13
+    calls: 4
     bytes: (external)
   aipl_array_new:
-    calls: 12
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 14

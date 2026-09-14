@@ -12,19 +12,19 @@ pub fn drop_last<T: any>(self: T[]) -> T[] { self.drop_last_n(1) }.test({
     assert(drop_last(["a", "b"]).last() == some("a")); // free-call form
 })
 --- performance ---
-allocations: 11
-deallocations: 11
+allocations: 7
+deallocations: 7
 reallocations: 0
-bytes allocated: 528
-instructions executed: 425
-binary size: 4480
-  code: 2044
-  data: 316
-  metadata: 2120
+bytes allocated: 328
+instructions executed: 373
+binary size: 4440
+  code: 1808
+  data: 460
+  metadata: 2172
 functions:
   __test$drop_last:
     calls: 1
-    bytes: 1744
+    bytes: 1508
   aipl_arr_inc:
     calls: 5
     bytes: (external)
@@ -32,10 +32,10 @@ functions:
     calls: 6
     bytes: (external)
   aipl_array_dec:
-    calls: 16
+    calls: 12
     bytes: (external)
   aipl_array_new:
-    calls: 5
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 5

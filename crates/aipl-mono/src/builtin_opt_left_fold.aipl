@@ -86,22 +86,22 @@ fn is_big(self: i64) -> bool { self == 99 }.test({
     assert(!is_big(1));
 })
 --- performance ---
-allocations: 12
-deallocations: 12
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 677
-instructions executed: 2484
-binary size: 10336
-  code: 6084
-  data: 983
-  metadata: 3269
+bytes allocated: 328
+instructions executed: 2382
+binary size: 9816
+  code: 5532
+  data: 1135
+  metadata: 3149
 functions:
   __eq_i64$opt:
     calls: 3
     bytes: 100
   __filter5$own0:
     calls: 1
-    bytes: 272
+    bytes: 300
   __lambda_12:
     calls: 3
     bytes: 136
@@ -113,15 +113,18 @@ functions:
     bytes: 124
   __test$opt_left_fold:
     calls: 1
-    bytes: 4644
+    bytes: 4064
   aipl_arr_inc:
     calls: 1
     bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
+    bytes: (external)
   aipl_array_dec:
-    calls: 9
+    calls: 4
     bytes: (external)
   aipl_array_new:
-    calls: 8
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 12

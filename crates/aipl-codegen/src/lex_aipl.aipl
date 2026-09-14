@@ -948,15 +948,15 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 5185
-deallocations: 5185
-reallocations: 96
-bytes allocated: 540866
-instructions executed: 1384543
-binary size: 560464
-  code: 380312
-  data: 10156
-  metadata: 169996
+allocations: 284
+deallocations: 284
+reallocations: 58
+bytes allocated: 389794
+instructions executed: 1369590
+binary size: 559424
+  code: 379488
+  data: 10188
+  metadata: 169748
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -1074,31 +1074,31 @@ functions:
     bytes: 1592
   __m1__finalize_template$AiplTok:
     calls: 6
-    bytes: 8712
+    bytes: 8652
   __m1__float_len:
     calls: 0
     bytes: 816
   __m1__interp_scan$AiplTok:
     calls: 2
-    bytes: 2028
+    bytes: 1996
   __m1__lex$AiplTok:
     calls: 29
-    bytes: 1328
+    bytes: 1292
   __m1__lex_step$AiplTok:
     calls: 105
-    bytes: 29192
+    bytes: 29164
   __m1__nested_len:
     calls: 70
     bytes: 940
   __m1__step_result$AiplTok:
     calls: 2407
-    bytes: 15088
+    bytes: 15164
   __m1__template_scan$AiplTok:
     calls: 6
-    bytes: 2864
+    bytes: 2584
   __m1__template_step$AiplTok:
     calls: 52
-    bytes: 476
+    bytes: 444
   __m1__to_eol_len:
     calls: 0
     bytes: 52
@@ -1128,25 +1128,25 @@ functions:
     bytes: 692
   __test$char_lit_value:
     calls: 1
-    bytes: 1856
+    bytes: 1836
   __test$doc_line_value:
     calls: 1
-    bytes: 2264
+    bytes: 2244
   __test$lex_aipl:
     calls: 1
-    bytes: 166692
+    bytes: 166464
   __test$lex_aipl_stripped:
     calls: 1
-    bytes: 7188
+    bytes: 7168
   __test$lex_aipl_tokens:
     calls: 1
     bytes: 5024
   __test$str_lit_value:
     calls: 1
-    bytes: 8464
+    bytes: 8388
   __test$template_segments:
     calls: 1
-    bytes: 6496
+    bytes: 6476
   __test_try_fail___m1__LexError:
     calls: 0
     bytes: 84
@@ -1157,19 +1157,19 @@ functions:
     calls: 216
     bytes: (external)
   aipl_arr_inc:
-    calls: 10454
+    calls: 10431
     bytes: (external)
   aipl_arr_reserve:
     calls: 216
     bytes: (external)
   aipl_array_dec:
-    calls: 15619
+    calls: 15664
     bytes: (external)
   aipl_array_new:
-    calls: 5110
+    calls: 141
     bytes: (external)
   aipl_array_push:
-    calls: 29
+    calls: 35
     bytes: (external)
   aipl_array_push_mut:
     calls: 39
@@ -1224,7 +1224,7 @@ functions:
     bytes: 568
   template_segments:
     calls: 5
-    bytes: 1652
+    bytes: 1604
   tpl_kind:
     calls: 6
     bytes: 2608

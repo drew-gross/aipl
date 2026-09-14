@@ -183,15 +183,15 @@ fn show_import_source(self: ImportSource) -> str {
     }
 }
 --- performance ---
-allocations: 19
-deallocations: 19
+allocations: 18
+deallocations: 18
 reallocations: 2
-bytes allocated: 1414
-instructions executed: 1133
-binary size: 76936
-  code: 50876
-  data: 206
-  metadata: 25854
+bytes allocated: 1382
+instructions executed: 1128
+binary size: 76848
+  code: 50764
+  data: 238
+  metadata: 25846
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -246,18 +246,18 @@ functions:
     bytes: 408
   __test$show_item:
     calls: 1
-    bytes: 2440
+    bytes: 2372
   __to_str_i64:
     calls: 0
     bytes: 204
   aipl_arr_inc:
-    calls: 7
+    calls: 6
     bytes: (external)
   aipl_array_dec:
-    calls: 12
+    calls: 11
     bytes: (external)
   aipl_array_new:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_array_push_mut:
     calls: 2
@@ -300,7 +300,7 @@ functions:
     bytes: 420
   show_item:
     calls: 2
-    bytes: 12556
+    bytes: 12512
   show_type_params:
     calls: 1
     bytes: 1272

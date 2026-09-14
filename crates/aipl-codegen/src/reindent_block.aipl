@@ -107,11 +107,11 @@ allocations: 109
 deallocations: 109
 reallocations: 14
 bytes allocated: 6657
-instructions executed: 8629
-binary size: 12512
-  code: 7068
+instructions executed: 8653
+binary size: 12592
+  code: 7084
   data: 748
-  metadata: 4696
+  metadata: 4760
 functions:
   __builtin_all$char$s0$lam13:
     calls: 24
@@ -163,4 +163,4 @@ functions:
     bytes: 116
   reindent_block:
     calls: 9
-    bytes: 4636
+    bytes: 4652

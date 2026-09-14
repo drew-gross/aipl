@@ -11,15 +11,15 @@ fn eq() -> bool { #{1: "a", 2: "b"} == #{2: "b", 1: "a"} }.test({
     assert(!(#{1: [1, 2]} == #{1: [1, 9]}));
 })
 --- performance ---
-allocations: 16
-deallocations: 16
+allocations: 12
+deallocations: 12
 reallocations: 0
-bytes allocated: 992
-instructions executed: 1011
-binary size: 7480
-  code: 4100
-  data: 346
-  metadata: 3034
+bytes allocated: 800
+instructions executed: 963
+binary size: 7304
+  code: 3844
+  data: 442
+  metadata: 3018
 functions:
   __dict_drop_i64$i64$arr:
     calls: 4
@@ -44,15 +44,12 @@ functions:
     bytes: 296
   __test$eq:
     calls: 1
-    bytes: 2684
+    bytes: 2428
   aipl_arr_inc:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 20
-    bytes: (external)
-  aipl_array_new:
-    calls: 4
+    calls: 16
     bytes: (external)
   aipl_array_push_mut:
     calls: 15

@@ -93,14 +93,14 @@ fn main() !prints {
 {4, 2}
 {4, 2}
 --- performance ---
-allocations: 87
-deallocations: 87
+allocations: 76
+deallocations: 76
 reallocations: 8
-bytes allocated: 3592
-instructions executed: 3662
-binary size: 11056
-  code: 6500
-  data: 67
+bytes allocated: 3160
+instructions executed: 3572
+binary size: 10816
+  code: 6124
+  data: 203
   metadata: 4489
 functions:
   __builtin_union_all$i64:
@@ -116,7 +116,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 75
+    calls: 69
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 2
@@ -125,10 +125,10 @@ functions:
     calls: 6
     bytes: (external)
   aipl_array_dec:
-    calls: 142
+    calls: 131
     bytes: (external)
   aipl_array_new:
-    calls: 13
+    calls: 2
     bytes: (external)
   aipl_array_push:
     calls: 10
@@ -159,10 +159,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3928
+    bytes: 3600
   merged:
     calls: 2
     bytes: 432
   show:
     calls: 6
-    bytes: 796
+    bytes: 748

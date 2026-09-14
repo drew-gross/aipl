@@ -32,22 +32,22 @@ true
 3
 
 --- performance ---
-allocations: 22
-deallocations: 22
-reallocations: 20
-bytes allocated: 856
-instructions executed: 1681
-binary size: 5824
-  code: 3184
-  data: 47
-  metadata: 2593
+allocations: 16
+deallocations: 16
+reallocations: 14
+bytes allocated: 696
+instructions executed: 1608
+binary size: 5736
+  code: 2916
+  data: 183
+  metadata: 2637
 functions:
   __builtin_intersperse$i64:
     calls: 3
-    bytes: 360
+    bytes: 356
   __builtin_intersperse$str:
     calls: 4
-    bytes: 428
+    bytes: 424
   __to_str_bool:
     calls: 1
     bytes: 232
@@ -58,10 +58,13 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 22
+    calls: 23
     bytes: (external)
   aipl_array_new:
-    calls: 15
+    calls: 3
+    bytes: (external)
+  aipl_array_push:
+    calls: 6
     bytes: (external)
   aipl_array_push_mut:
     calls: 24
@@ -77,4 +80,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1960
+    bytes: 1700

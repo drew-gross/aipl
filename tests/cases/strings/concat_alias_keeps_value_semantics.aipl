@@ -29,18 +29,18 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 120
-instructions executed: 324
-binary size: 4744
-  code: 2412
+instructions executed: 336
+binary size: 5128
+  code: 2608
   data: 94
-  metadata: 2238
+  metadata: 2426
 functions:
   __test$grown:
     calls: 1
-    bytes: 1144
+    bytes: 1228
   __test$snapshot:
     calls: 1
-    bytes: 1096
+    bytes: 1208
   aipl_assert:
     calls: 2
     bytes: (external)
