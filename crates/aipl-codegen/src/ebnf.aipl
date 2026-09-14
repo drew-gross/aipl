@@ -93,12 +93,6 @@ import {
 # postfix `?`/`*`/`+`, where both need them.
 variant Ctx = Alt | Seq | Item
 
-# `s` in double quotes — how EBNF spells a literal terminal.
-fn dq(s: str) -> str {
-    let q = `"`;
-    `{q}{s}{q}`
-}
-
 # `g` rendered as EBNF: one `name = rule ;` line per production, in grammar
 # order, with no trailing newline.
 #
@@ -226,7 +220,7 @@ fn desugared<K: variant, A: any>(p: Production<K, A>) -> Production<K, A> {
 fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
     match (r) {
         Term(k) => k.case_name(),
-        Literal(s) => dq(s),
+        Literal(s) => `"{s}"`,
         Named(n) => n,
         NamedIdx(i) => names[i].value_or("?"),
         Then(rs) => {
@@ -351,9 +345,9 @@ fn render_climb<K: variant>(atom: Rule<K>, precs: Prec[], names: str[], ctx: Ctx
     let ops = all_ops(precs);
     let op = match (ops.first()) {
         some(only) => if (ops.len() == 1) {
-            dq(only)
+            `"{only}"`
         } else {
-            let alts = ops.map(dq).join(sep=" | ");
+            let alts = ops.map(|o| `"{o}"`).join(sep=" | ");
             `({alts})`
         },
         none => "(* never *)",
@@ -439,7 +433,7 @@ fn level_text(precs: Prec[], power: u64) -> str {
             };
         };
     }
-    let listed = ops.map(dq).join(sep=" ");
+    let listed = ops.map(|o| `"{o}"`).join(sep=" ");
     if (right) { `{listed} (right)` } else { listed }
 }
 
@@ -771,7 +765,7 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
 fn show_sym<K: variant>(self: Sym<K>) -> str {
     match (self) {
         Kind(k) => k.case_name(),
-        Text(s) => dq(s),
+        Text(s) => `"{s}"`,
     }
 }
 
@@ -884,11 +878,11 @@ allocations: 1465
 deallocations: 1465
 reallocations: 320
 bytes allocated: 171308
-instructions executed: 208920
-binary size: 157288
-  code: 101928
+instructions executed: 206864
+binary size: 157568
+  code: 102136
   data: 4276
-  metadata: 51084
+  metadata: 51156
 functions:
   __arr_drop_First$Tok:
     calls: 23
@@ -935,7 +929,7 @@ functions:
   __builtin_try_map$__m1__Production$Tok$Node$First<Tok>$__m1__ParseError$lam15:
     calls: 17
     bytes: 896
-  __builtin_try_map$__m1__Rule$Tok$__m1__Rule<Tok>$__m1__ParseError$lam38:
+  __builtin_try_map$__m1__Rule$Tok$__m1__Rule<Tok>$__m1__ParseError$lam39:
     calls: 46
     bytes: 628
   __eq_First$Tok:
@@ -983,9 +977,9 @@ functions:
   __m1__prod_names$Tok$Node:
     calls: 20
     bytes: 548
-  __map33:
+  __map34:
     calls: 0
-    bytes: 380
+    bytes: 484
   __rec_drop_Node:
     calls: 0
     bytes: 72
@@ -1100,9 +1094,6 @@ functions:
   climb_precs$Tok$tail:
     calls: 92
     bytes: 1388
-  dq:
-    calls: 49
-    bytes: 456
   ebnf$Tok$Node:
     calls: 6
     bytes: 2608
@@ -1132,10 +1123,10 @@ functions:
     bytes: 452
   prec_note:
     calls: 31
-    bytes: 2300
+    bytes: 2396
   render_rule$Tok:
     calls: 101
-    bytes: 9760
+    bytes: 10120
   rep_suffix:
     calls: 14
     bytes: 1708
@@ -1144,7 +1135,7 @@ functions:
     bytes: 6428
   show_first$Tok:
     calls: 27
-    bytes: 1344
+    bytes: 1448
   show_first_sets$Tok$Node:
     calls: 5
     bytes: 2548
