@@ -2211,14 +2211,14 @@
 
 
 
-        <section class="item" id="item-only">
+        <section class="item" id="item-one">
           <h3>
-            <a class="anchor" href="#item-only">only</a>
+            <a class="anchor" href="#item-one">one</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn only(open: str, body: Rule&#60;AiplTok&#62;, close: str) -&#62; Rule&#60;AiplTok&#62;</code></pre>
+          <pre class="signature"><code>fn one(body: Rule&#60;AiplTok&#62;, nested_in: (Rule&#60;AiplTok&#62;, Rule&#60;AiplTok&#62;)?) -&#62; Rule&#60;AiplTok&#62;</code></pre>
 
-          <div class="doc"><p>A bracket pair holding exactly one thing — a block's braces, a condition's parentheses, a grouping paren. <code>nest</code> without a stated style: <code>min=1, max=1</code> is what says it is not a list, and <code>desugar</code> reads that back as a group laid out inline rather than broken at a width. It is still a group, so an unclosed one is reported against the token that opened it.</p></div>
+          <div class="doc"><p>Exactly one thing, in a bracket pair — a condition's parentheses, a block's braces, an index's brackets. <code>Many</code> bounded at one, and spelled like one: <code>one(body, nested_in=parens())</code>, <code>nested_in</code> declared exactly as <code>Many</code> declares its own. <code>min=1, max=1</code> is what says it is not a list, and <code>desugar</code> reads that back as a group laid out inline rather than broken at a width. It is still a group, so an unclosed one is reported against the token that opened it.</p></div>
 
 
         </section>

@@ -180,6 +180,7 @@ HOF:
 math:
 
 syntax:
+  forwarding omittables
   more match power: earlier matches in a multi-match can be used in later matches
   generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
   make a syntax for ignoring the rest of the args in a match (just take the ones you want)
@@ -250,11 +251,10 @@ companion_files.aipl:
 
 formatter:
   formatter can rewrite single line triple quote strings to one line
-  allow formatter to rewrite string literals for fewest escapes
   my new pattern walker laid out a constructor's payload with comma_list_docs, which breaks long lists across lines with a trailing comma — and the pattern grammar takes no trailing comma, so aipl fmt rewrote three compiler sources (Let(\n name,\n …,\n) =>) into something that no longer parsed. <--- the formatter should decide whether to output a trailing comma based on the grammer definition. Why isn't it doing that?
   variant_case_docs.aipl is weird: having the leading | should force splitting each onto own line
   wrap comments
-  formatter gets list separater directly off the Many
+  formatter gets list separater directly off the Many,
   Why the formatter isn't already a thin wrapper
   when multiple nested elements should be able to combined e.g. fn foo() -> T {[any_number_of_items]} should put the {[ together
   if a list contains a single template string, it should put the ( and the opening """ on the same line e.g.

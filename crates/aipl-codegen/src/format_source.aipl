@@ -199,10 +199,10 @@ deallocations: 21796
 reallocations: 2936
 bytes allocated: 3752125
 instructions executed: 8025409
-binary size: 6626832
-  code: 4352252
+binary size: 6634688
+  code: 4357944
   data: 10386
-  metadata: 2264194
+  metadata: 2266358
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1288,7 +1288,10 @@ functions:
     calls: 0
     bytes: 1520
   __m4__braces:
-    calls: 52
+    calls: 68
+    bytes: 376
+  __m4__brackets:
+    calls: 24
     bytes: 376
   __m4__concat_call:
     calls: 0
@@ -1307,7 +1310,7 @@ functions:
     bytes: 13380
   __m4__expressions:
     calls: 8
-    bytes: 151120
+    bytes: 154516
   __m4__field_name:
     calls: 0
     bytes: 888
@@ -1515,14 +1518,11 @@ functions:
   __m4__no_spread:
     calls: 0
     bytes: 3328
-  __m4__only:
-    calls: 128
-    bytes: 804
   __m4__op_import_span:
     calls: 0
     bytes: 864
   __m4__parens:
-    calls: 40
+    calls: 128
     bytes: 376
   __m4__patterns:
     calls: 8
@@ -1544,7 +1544,7 @@ functions:
     bytes: 3544
   __m4__statements:
     calls: 8
-    bytes: 113260
+    bytes: 115984
   __m4__tuple_slot_names:
     calls: 0
     bytes: 540

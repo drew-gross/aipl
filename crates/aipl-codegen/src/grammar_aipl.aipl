@@ -620,7 +620,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
     // Gazelle's right recursion, kept: after one expression the parser decides
     // whether a `;` made it a statement or its absence made it the block's
     // value, so the expression is parsed exactly once.
-    let block: Rule<AiplTok> = only("{", Named("block_body"), "}");
+    let block: Rule<AiplTok> = one(Named("block_body"), nested_in=braces());
     let block_body: Rule<AiplTok> = Maybe(OneOf([
         Then([Named("kw_stmt"), Named("block_body")]),
         Then([Named("expr"), Named("block_tail")]),
@@ -629,7 +629,7 @@ fn statements() -> Production<AiplTok, Ast>[] {
 
     // A loop body admits no trailing expression: its value could never be
     // observed, so every expression in it must be an `expr;` statement.
-    let loop_body: Rule<AiplTok> = only("{", Named("loop_inner"), "}");
+    let loop_body: Rule<AiplTok> = one(Named("loop_inner"), nested_in=braces());
     let loop_inner: Rule<AiplTok> = Maybe(OneOf([
         Then([Named("kw_stmt"), Named("loop_inner")]),
         Then([Named("expr"), Lit(";"), Named("loop_inner")]),
@@ -714,22 +714,20 @@ fn statements() -> Production<AiplTok, Ast>[] {
     let for_stmt: Rule<AiplTok> = OneOf([
         Then([
             Lit("for"),
-            only(
-                "(",
+            one(
                 Then([
                     Lit("let"),
                     Many(Term(Name), min=1, sep=Lit(","), trailing_sep=false, nested_in=parens()),
                     Lit(":"),
                     Named("expr"),
                 ]),
-                ")",
+                nested_in=parens(),
             ),
             Named("loop_body"),
         ]),
         Then([
             Lit("for"),
-            only(
-                "(",
+            one(
                 Then([
                     Lit("let"),
                     Term(Name),
@@ -738,28 +736,27 @@ fn statements() -> Production<AiplTok, Ast>[] {
                     Lit(":"),
                     Named("expr"),
                 ]),
-                ")",
+                nested_in=parens(),
             ),
             Named("loop_body"),
         ]),
         Then([
             Lit("for"),
-            only(
-                "(",
+            one(
                 Then([Lit("let"), Term(Name), Lit(","), Term(Name), Lit(":"), Named("expr")]),
-                ")",
+                nested_in=parens(),
             ),
             Named("loop_body"),
         ]),
         Then([
             Lit("for"),
-            only("(", Then([Lit("let"), Term(Name), Lit(":"), Named("expr")]), ")"),
+            one(Then([Lit("let"), Term(Name), Lit(":"), Named("expr")]), nested_in=parens()),
             Named("loop_body"),
         ]),
     ]);
     let while_stmt: Rule<AiplTok> = Then([
         Lit("while"),
-        only("(", Named("expr"), ")"),
+        one(Named("expr"), nested_in=parens()),
         Named("loop_body"),
     ]);
     let return_stmt: Rule<AiplTok> = Then([Lit("return"), Named("expr"), Lit(";")]);
@@ -812,22 +809,22 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         Then([Lit("."), Term(IntLit)]),
         // The three index forms are bracket pairs, not lists: `a[..b]` holds one
         // expression and a `..`, and there is nothing in it to break at.
-        Then([only("[", Then([Lit(".."), Named("expr")]), "]")]),
-        Then([only("[", Then([Named("expr"), Lit("..")]), "]")]),
-        Then([only("[", Named("expr"), "]")]),
+        Then([one(Then([Lit(".."), Named("expr")]), nested_in=brackets())]),
+        Then([one(Then([Named("expr"), Lit("..")]), nested_in=brackets())]),
+        Then([one(Named("expr"), nested_in=brackets())]),
         Lit("?"),
     ]);
 
     let atom: Rule<AiplTok> = OneOf([
         Then([
             Lit("if"),
-            only("(", Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), ")"),
+            one(Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), nested_in=parens()),
             Named("block"),
             Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
         Then([
             Lit("if"),
-            only("(", Named("expr"), ")"),
+            one(Named("expr"), nested_in=parens()),
             Named("block"),
             Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
@@ -840,7 +837,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
         // is a tuple scrutinee without the tuple's own parentheses.
         Then([
             Lit("match"),
-            only("(", Many(Named("expr"), min=1, sep=Lit(","), trailing_sep=false), ")"),
+            one(Many(Named("expr"), min=1, sep=Lit(","), trailing_sep=false), nested_in=parens()),
             Many(Named("match_arm"), sep=Lit(","), nested_in=braces(), spaced=true),
         ]),
         // A bracketed list that is neither the start nor the end of its
@@ -875,7 +872,7 @@ fn expressions() -> Production<AiplTok, Ast>[] {
             loose(),
         ),
         // A grouping paren holds one expression, so there is no list in it.
-        only("(", Named("expr"), ")"),
+        one(Named("expr"), nested_in=parens()),
         nest("[", Named("args"), "]", loose()),
         nest2("#", "{", Named("brace_body"), "}", loose()),
         nest3("#", ">", "{", Named("brace_body"), "}", loose()),
@@ -894,13 +891,13 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     let else_branch: Rule<AiplTok> = OneOf([
         Then([
             Lit("if"),
-            only("(", Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), ")"),
+            one(Then([Lit("let"), Named("pattern"), Lit("="), Named("expr")]), nested_in=parens()),
             Named("block"),
             Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
         Then([
             Lit("if"),
-            only("(", Named("expr"), ")"),
+            one(Named("expr"), nested_in=parens()),
             Named("block"),
             Maybe(Then([Lit("else"), Named("else_branch")])),
         ]),
@@ -4074,13 +4071,15 @@ fn set_order(after_hash: str) -> SetOrder {
     assert(set_order("{").same_case(Unordered));
 })
 
-# A bracket pair holding exactly one thing — a block's braces, a condition's
-# parentheses, a grouping paren. `nest` without a stated style: `min=1, max=1` is
-# what says it is not a list, and `desugar` reads that back as a group laid out
-# inline rather than broken at a width. It is still a group, so an unclosed one
-# is reported against the token that opened it.
-fn only(open: str, body: Rule<AiplTok>, close: str) -> Rule<AiplTok> {
-    Many(body, min=1, max=1, nested_in=(Lit(open), Lit(close)))
+# Exactly one thing, in a bracket pair — a condition's parentheses, a block's
+# braces, an index's brackets. `Many` bounded at one, and spelled like one:
+# `one(body, nested_in=parens())`, `nested_in` declared exactly as `Many`
+# declares its own. `min=1, max=1` is what says it is not a list, and `desugar`
+# reads that back as a group laid out inline rather than broken at a width. It
+# is still a group, so an unclosed one is reported against the token that
+# opened it.
+fn one(body: Rule<AiplTok>, nested_in?: (Rule<AiplTok>, Rule<AiplTok>) = none) -> Rule<AiplTok> {
+    Many(body, min=1, max=1, nested_in?=nested_in)
 }
 
 # A comma-separated list that takes no trailing comma when it breaks, which most
@@ -4309,10 +4308,10 @@ deallocations: 1979075
 reallocations: 245238
 bytes allocated: 293944877
 instructions executed: 459573813
-binary size: 5904192
-  code: 3855332
+binary size: 5911880
+  code: 3860856
   data: 48556
-  metadata: 2000304
+  metadata: 2002468
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -5440,7 +5439,10 @@ functions:
     calls: 31
     bytes: 552
   braces:
-    calls: 4199
+    calls: 5491
+    bytes: 376
+  brackets:
+    calls: 1938
     bytes: 376
   concat_call:
     calls: 2
@@ -5462,7 +5464,7 @@ functions:
     bytes: 552
   expressions:
     calls: 646
-    bytes: 91664
+    bytes: 94956
   field_name:
     calls: 8
     bytes: 888
@@ -5700,9 +5702,6 @@ functions:
   node_spans:
     calls: 27
     bytes: 556
-  only:
-    calls: 10336
-    bytes: 804
   op_import_span:
     calls: 1
     bytes: 864
@@ -5710,7 +5709,7 @@ functions:
     calls: 24225
     bytes: 3844
   parens:
-    calls: 3230
+    calls: 10336
     bytes: 376
   pat_dump:
     calls: 23
@@ -5741,7 +5740,7 @@ functions:
     bytes: 3544
   statements:
     calls: 646
-    bytes: 70184
+    bytes: 72844
   tuple_slot_names:
     calls: 3
     bytes: 540
