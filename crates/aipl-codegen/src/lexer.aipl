@@ -28,6 +28,7 @@ import {
     is_some_and,
     len,
     less_than as <,
+    less_than_or_equal as <=,
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
@@ -36,6 +37,7 @@ import {
     not_equal as !=,
     push,
     starts_with,
+    starts_with_at,
     value_or,
     value_or_err,
     wrapping_add as +,
@@ -492,24 +494,25 @@ fn nested_len(self: str, at: u64, open: str, close: str, msg: str) -> u64!LexErr
         return ok(0);
     };
     mut depth: u64 = 1;
-    mut i = open.len();
-    while (0 < depth && i < self.len()) {
-        if (self[i..].starts_with(open)) {
-            set depth++;
-            set i += open.len();
-        } else {
-            if (self[i..].starts_with(close)) {
+
+    // Where the scan resumes: a delimiter is matched at its first byte, and the
+    // rest of its bytes can't open or close anything on their own.
+    mut next = open.len();
+    for (let i, _ : self) {
+        if (next <= i) {
+            if (self.starts_with_at(open, i)) {
+                set depth++;
+                set next = i + open.len();
+            } else if (self.starts_with_at(close, i)) {
                 set depth--;
-                set i += close.len();
-            } else {
-                set i++;
+                if (depth == 0) {
+                    return ok(i + close.len());
+                };
+                set next = i + close.len();
             };
         };
     }
-    if (0 < depth) {
-        return err(LexError { message: unterminated_msg(msg), span: at..at + self.len() });
-    };
-    ok(i)
+    err(LexError { message: unterminated_msg(msg), span: at..at + self.len() })
 }
 
 # `ToEol`: the marker, then everything up to (not including) the next
@@ -1515,11 +1518,11 @@ allocations: 434
 deallocations: 434
 reallocations: 71
 bytes allocated: 67520
-instructions executed: 370144
-binary size: 2546976
-  code: 1703560
+instructions executed: 371321
+binary size: 2547096
+  code: 1703648
   data: 11700
-  metadata: 831716
+  metadata: 831748
 functions:
   __arr_drop_StepResult$Kind:
     calls: 9
@@ -1751,7 +1754,7 @@ functions:
     bytes: 240
   nested_len:
     calls: 3
-    bytes: 940
+    bytes: 1028
   nonempty_str:
     calls: 2
     bytes: 1824
