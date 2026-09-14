@@ -1,0 +1,65 @@
+import { print, wrapping_add as + } from builtins;
+
+// A value lambda whose parameter types come from its position is still a
+// value lambda: the position and any annotation must agree, and the body may
+// neither capture nor have effects. Where the position leaves a type variable
+// open that only the lambda's parameters could have pinned, the error says so.
+
+variant Build<A: any> = Kids((A[]) -> A) | Const(A)
+
+variant Json = Object(Json[]) | Null
+
+struct Handler { f: (i64) -> i64 }
+
+fn ann_mismatch() -> Handler { f: |x: str| { 1 } }
+
+fn arity() -> Handler { f: |x, y| { x + y } }
+
+fn capture(n: i64) -> Handler { f: |x| { x + n } }
+
+fn effect() -> Handler {
+    f: |x| {
+        print("hi");
+        x
+    },
+}
+
+fn uninferable() -> Json {
+    let w = Kids(|kids| Object([Null, ..kids]));
+    match (w) {
+        Kids(f) => f([]),
+        Const(v) => v,
+    }
+}
+
+fn main() {}
+--- errors ---
+error: lambda parameter "x" is annotated str, but i64 was expected
+  --> ./tests/cases/lambdas/err_value_lambda_inferred.aipl:14:36
+   |
+14 | fn ann_mismatch() -> Handler { f: |x: str| { 1 } }
+   |                                    ^
+
+error: lambda has 2 parameter(s), but (i64) -> i64 was expected
+  --> ./tests/cases/lambdas/err_value_lambda_inferred.aipl:16:28
+   |
+16 | fn arity() -> Handler { f: |x, y| { x + y } }
+   |                            ^^^^^^^^^^^^^^^^
+
+error: a lambda used as a value cannot capture local "n" (function values are non-capturing)
+  --> ./tests/cases/lambdas/err_value_lambda_inferred.aipl:18:36
+   |
+18 | fn capture(n: i64) -> Handler { f: |x| { x + n } }
+   |                                    ^^^^^^^^^^^^^
+
+error: fn "print" has effect "!prints" but the calling function does not declare it
+  --> ./tests/cases/lambdas/err_value_lambda_inferred.aipl:22:9
+   |
+22 |         print("hi");
+   |         ^^^^^^^^^^^
+
+error: cannot infer type parameter "A" of generic variant "Build" — a constructor argument or a single existing instance must determine it (or annotate the lambda's parameters with their types)
+  --> ./tests/cases/lambdas/err_value_lambda_inferred.aipl:28:13
+   |
+28 |     let w = Kids(|kids| Object([Null, ..kids]));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

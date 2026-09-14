@@ -70,10 +70,6 @@ fn sexp_rules() -> TokenRule<SexpKind>[] {
     ]
 }
 
-# A `list` node's children are exactly its interior `item`s — the parentheses
-# are leaves, and leaves have no lowered value — so the list *is* its kids.
-fn lower_list(kids: Sexp[]) -> Sexp { List(kids) }
-
 # An `item` is one of its two alternatives, told apart by whether it got an
 # interior child: the `list` branch lowered one, and the `Atom` branch matched a
 # bare token, whose spelling is the node's own text with trivia dropped.
@@ -104,7 +100,10 @@ pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
     let r_item: Rule<SexpKind> = OneOf([Term(Atom), Named("list")]);
     Grammar {
         prods: [
-            Production { name: "list", rule: r_list, build: Kids(lower_list), layout: Inline },
+            // A `list` node's children are exactly its interior `item`s — the
+            // parentheses are leaves, and leaves have no lowered value — so the
+            // list *is* its kids.
+            Production { name: "list", rule: r_list, build: Kids(List), layout: Inline },
             Production {
                 name: "item",
                 rule: r_item,
@@ -282,10 +281,10 @@ deallocations: 7638
 reallocations: 910
 bytes allocated: 639934
 instructions executed: 1372491
-binary size: 397856
-  code: 257548
+binary size: 398376
+  code: 257836
   data: 4828
-  metadata: 135480
+  metadata: 135712
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -359,64 +358,64 @@ functions:
   __arr_retain___m5__Doc:
     calls: 416
     bytes: 116
-  __builtin_all$char$s0$lam163:
+  __builtin_all$char$s0$lam167:
     calls: 53
     bytes: 212
-  __builtin_any$__m3__Prec$lam173:
+  __builtin_any$__m3__Prec$lam177:
     calls: 0
     bytes: 276
-  __builtin_any$__m5__Doc$lam174:
+  __builtin_any$__m5__Doc$lam178:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam174$tail:
+  __builtin_any$__m5__Doc$lam178$tail:
     calls: 111
     bytes: 324
-  __builtin_count_while$char$lam96:
+  __builtin_count_while$char$lam100:
     calls: 150
     bytes: 220
-  __builtin_count_while$char$s0$lam104:
+  __builtin_count_while$char$s0$lam108:
     calls: 0
     bytes: 184
-  __builtin_count_while$char$s0$lam124:
+  __builtin_count_while$char$s0$lam128:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam124$tail:
+  __builtin_count_while$char$s0$lam128$tail:
     calls: 12
     bytes: 256
-  __builtin_count_while$char$s0$lam138:
+  __builtin_count_while$char$s0$lam142:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam166:
+  __builtin_count_while$char$s0$lam170:
     calls: 0
     bytes: 172
-  __builtin_find_if$__m3__Prec$lam181:
+  __builtin_find_if$__m3__Prec$lam185:
     calls: 0
     bytes: 688
-  __builtin_find_index$str$lam51:
+  __builtin_find_index$str$lam55:
     calls: 88
     bytes: 400
-  __builtin_find_index$str$lam60:
+  __builtin_find_index$str$lam64:
     calls: 31
     bytes: 400
-  __builtin_find_index$str$lam86:
+  __builtin_find_index$str$lam90:
     calls: 88
     bytes: 400
-  __builtin_find_map$__m1__Cst$__builtin_Span$lam161:
+  __builtin_find_map$__m1__Cst$__builtin_Span$lam165:
     calls: 0
     bytes: 364
   __builtin_intersperse$__m5__Doc:
     calls: 34
     bytes: 404
-  __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam162:
+  __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam166:
     calls: 0
     bytes: 440
-  __builtin_try_map$__m1__Cst$__m15__Sexp$__m3__ParseError$lam108:
+  __builtin_try_map$__m1__Cst$__m15__Sexp$__m3__ParseError$lam112:
     calls: 47
     bytes: 652
-  __builtin_try_map$__m3__Production$SexpKind$__m15__Sexp$__m2__First<SexpKind>$__m3__ParseError$lam57:
+  __builtin_try_map$__m3__Production$SexpKind$__m15__Sexp$__m2__First<SexpKind>$__m3__ParseError$lam61:
     calls: 3
     bytes: 896
-  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam76:
+  __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule<SexpKind>$__m3__ParseError$lam80:
     calls: 45
     bytes: 628
   __eq___m15__Sexp:
@@ -437,16 +436,28 @@ functions:
   __eq___m2__Sym$SexpKind$arr:
     calls: 5
     bytes: 284
-  __filter133$own0:
+  __filter137$own0:
     calls: 47
     bytes: 368
-  __lambda_21:
+  __lambda_1:
+    calls: 0
+    bytes: 96
+  __lambda_2:
+    calls: 0
+    bytes: 96
+  __lambda_25:
     calls: 0
     bytes: 128
-  __lambda_22:
+  __lambda_26:
     calls: 68
     bytes: 96
-  __m10__trim_end_while$lam66:
+  __lambda_3:
+    calls: 0
+    bytes: 96
+  __lambda_4:
+    calls: 13
+    bytes: 112
+  __m10__trim_end_while$lam70:
     calls: 61
     bytes: 300
   __m11__between_len:
@@ -680,28 +691,28 @@ functions:
   __m4__breaks_after:
     calls: 6
     bytes: 444
-  __m4__fmt_node$SexpKind$__m15__Sexp$s1$lam61:
+  __m4__fmt_node$SexpKind$__m15__Sexp$s1$lam65:
     calls: 89
     bytes: 5276
-  __m4__format_cst$SexpKind$__m15__Sexp$s1$lam31:
+  __m4__format_cst$SexpKind$__m15__Sexp$s1$lam35:
     calls: 12
     bytes: 384
-  __m4__gap_wanted$lam134:
+  __m4__gap_wanted$lam138:
     calls: 148
     bytes: 144
-  __m4__group_doc$SexpKind$__m15__Sexp$s1$lam112:
+  __m4__group_doc$SexpKind$__m15__Sexp$s1$lam116:
     calls: 18
     bytes: 2420
-  __m4__inline_doc$lam111:
+  __m4__inline_doc$lam115:
     calls: 148
     bytes: 2416
-  __m4__pieces$SexpKind$__m15__Sexp$s1$lam109:
+  __m4__pieces$SexpKind$__m15__Sexp$s1$lam113:
     calls: 125
     bytes: 3392
-  __m4__render_cst$SexpKind$__m15__Sexp$s1$lam8:
+  __m4__render_cst$SexpKind$__m15__Sexp$s1$lam12:
     calls: 12
     bytes: 4492
-  __m4__wrapped$lam135:
+  __m4__wrapped$lam139:
     calls: 18
     bytes: 4096
   __m5__col_after:
@@ -728,10 +739,10 @@ functions:
   __m6__reindent_block:
     calls: 0
     bytes: 4652
-  __map45:
+  __map49:
     calls: 0
     bytes: 380
-  __map68$own0:
+  __map72$own0:
     calls: 12
     bytes: 464
   __rec_drop___m15__Sexp:
@@ -851,9 +862,6 @@ functions:
   lower_item:
     calls: 34
     bytes: 468
-  lower_list:
-    calls: 13
-    bytes: 112
   main:
     calls: 1
     bytes: 320

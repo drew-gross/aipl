@@ -217,10 +217,13 @@ variant Rule<K: variant> =
 # each pins the type parameter on its own; a payload-free arm could not, which
 # is why there is no `NoLower`.
 #
-# Function values are non-capturing and non-generic (`check.rs`), so each is a
-# named top-level `fn lower_x(..)`. They also can't be compared with `==`,
-# which is why the tests below assert on what a grammar *parses*, never on a
-# grammar value — the same constraint `lexer.aipl` lives with.
+# Function values are non-capturing and non-generic (`check.rs`), so a lowering
+# is a named top-level `fn lower_x(..)`, a constructor (`Kids(Object)`), or a
+# lambda that reads only its parameters — whose types it takes from the arm's
+# payload, so `Text(|t| Bool(t == "true"))` needs no annotation. They also can't
+# be compared with `==`, which is why the tests below assert on what a grammar
+# *parses*, never on a grammar value — the same constraint `lexer.aipl` lives
+# with.
 variant Build<A: any> =
     # The general form: the source text, the node itself, and the already-
     # lowered values of its interior children (`nodes`, in match order).

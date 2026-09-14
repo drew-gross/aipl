@@ -3,9 +3,12 @@ import { concat as +++, equal as ==, map, wrapping_add as + } from builtins;
 // A lambda and a payload-carrying constructor can both be used as function
 // *values*: bound to a local or stored in a struct field, then called through.
 // Each is lowered to a synthesized non-capturing top-level function whose
-// 8-byte code address is the value — so a value lambda must annotate its
-// parameter types, must not capture an enclosing local, and (in value position)
-// takes a brace-delimited body.
+// 8-byte code address is the value — so a value lambda must not capture an
+// enclosing local, and (in value position) takes a brace-delimited body. Its
+// parameter types come from the position when it declares a function type (a
+// struct field, a constructor payload, an annotated binding — see
+// `lambdas/value_lambda_inferred`); a bare `let` declares none, so there they
+// are written.
 struct Rule { build: (i64) -> Tok, step: (i64) -> i64 }
 
 variant Tok = Int(i64) | Skip

@@ -120,8 +120,11 @@ fn json_rules() -> TokenRule<JsonTok>[] {
 
 // ---------- lowering ----------
 //
-// One named function per production: `Build`'s function values must be
-// non-capturing and non-generic, so none of these can be a lambda.
+// A production whose value *is* one of its constructors names the constructor
+// (`Kids(Object)`); one that is a one-liner over its text is a lambda at the
+// production, taking its parameter type from `Build`'s payload. Only a lowering
+// with something to say — a child to unwrap, a key to read off a leaf — gets a
+// name of its own.
 
 # The single alternative that matched, unwrapped. Every branch of `value` is a
 # rule *reference*, so exactly one interior child arrives.
@@ -133,10 +136,6 @@ fn lower_value(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
             span: node.span(),
         })
 }
-
-fn lower_object(kids: Json[]) -> Json { Object(kids) }
-
-fn lower_array(kids: Json[]) -> Json { Array(kids) }
 
 # A member's value is its one interior child; its key is the string token in
 # front of the `:`, which is a *leaf* and so has no lowered value — the node's
@@ -151,15 +150,6 @@ fn lower_member(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
         .value_or_err(ParseError { message: "a member has no value", span: node.span() })?;
     ok(Member(unquote(src[key]).unescape(), value))
 }
-
-fn lower_string(text: str) -> Json { String(unquote(text).unescape()) }
-
-# The spelling, sign included — `Text` hands over the matched tokens run
-# together with nothing between them, which is exactly right for `-` followed
-# by digits.
-fn lower_number(text: str) -> Json { Number(text) }
-
-fn lower_bool(text: str) -> Json { Bool(text == "true") }
 
 # `s` without its first and last byte — a string token's surrounding quotes. The
 # lexer guarantees both are there (a `Delimited` match spans them), so this needs
@@ -217,29 +207,31 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
                 expect_as: "a JSON value",
                 layout: Inline,
             },
-            Production {
-                name: "object",
-                rule: r_object,
-                build: Kids(lower_object),
-                layout: Inline,
-            },
+            Production { name: "object", rule: r_object, build: Kids(Object), layout: Inline },
             Production {
                 name: "member",
                 rule: r_member,
                 build: TryMk(lower_member),
                 layout: Inline,
             },
-            Production { name: "array", rule: r_array, build: Kids(lower_array), layout: Inline },
+            Production { name: "array", rule: r_array, build: Kids(Array), layout: Inline },
             Production {
                 name: "string",
                 rule: r_string,
-                build: Text(lower_string),
+                build: Text(|t| String(unquote(t).unescape())),
                 layout: Inline,
             },
-            // A sign and its digits are written together, so the spacing rule
-            // is not consulted at all.
-            Production { name: "number", rule: r_number, build: Text(lower_number), layout: Tight },
-            Production { name: "bool", rule: r_bool, build: Text(lower_bool), layout: Inline },
+            // The spelling, sign included — `Text` hands over the matched tokens
+            // run together with nothing between them, which is exactly right for
+            // `-` followed by digits. And since a sign and its digits are written
+            // together, the spacing rule is not consulted at all.
+            Production { name: "number", rule: r_number, build: Text(Number), layout: Tight },
+            Production {
+                name: "bool",
+                rule: r_bool,
+                build: Text(|t| Bool(t == "true")),
+                layout: Inline,
+            },
             Production { name: "null", rule: r_null, build: Const(Null), layout: Inline },
         ],
     }
@@ -510,10 +502,10 @@ deallocations: 20586
 reallocations: 2578
 bytes allocated: 2298738
 instructions executed: 4418969
-binary size: 444072
-  code: 287024
+binary size: 447200
+  code: 288884
   data: 7892
-  metadata: 149156
+  metadata: 150424
 functions:
   __arr_drop_Json:
     calls: 125
@@ -587,64 +579,64 @@ functions:
   __arr_retain___m5__Doc:
     calls: 460
     bytes: 116
-  __builtin_all$char$s0$lam164:
+  __builtin_all$char$s0$lam184:
     calls: 45
     bytes: 212
-  __builtin_any$__m3__Prec$lam174:
+  __builtin_any$__m3__Prec$lam194:
     calls: 0
     bytes: 276
-  __builtin_any$__m5__Doc$lam175:
+  __builtin_any$__m5__Doc$lam195:
     calls: 0
     bytes: 32
-  __builtin_any$__m5__Doc$lam175$tail:
+  __builtin_any$__m5__Doc$lam195$tail:
     calls: 207
     bytes: 324
-  __builtin_count_while$char$lam96:
+  __builtin_count_while$char$lam116:
     calls: 99
     bytes: 220
-  __builtin_count_while$char$s0$lam104:
+  __builtin_count_while$char$s0$lam124:
     calls: 554
     bytes: 184
-  __builtin_count_while$char$s0$lam124:
+  __builtin_count_while$char$s0$lam144:
     calls: 0
     bytes: 40
-  __builtin_count_while$char$s0$lam124$tail:
+  __builtin_count_while$char$s0$lam144$tail:
     calls: 0
     bytes: 256
-  __builtin_count_while$char$s0$lam141:
+  __builtin_count_while$char$s0$lam161:
     calls: 0
     bytes: 172
-  __builtin_count_while$char$s0$lam167:
+  __builtin_count_while$char$s0$lam187:
     calls: 0
     bytes: 172
-  __builtin_find_if$__m3__Prec$lam182:
+  __builtin_find_if$__m3__Prec$lam202:
     calls: 0
     bytes: 688
-  __builtin_find_index$str$lam55:
-    calls: 528
-    bytes: 400
-  __builtin_find_index$str$lam64:
-    calls: 52
-    bytes: 400
-  __builtin_find_index$str$lam86:
+  __builtin_find_index$str$lam106:
     calls: 594
     bytes: 400
-  __builtin_find_map$__m1__Cst$__builtin_Span$lam73:
+  __builtin_find_index$str$lam75:
+    calls: 528
+    bytes: 400
+  __builtin_find_index$str$lam84:
+    calls: 52
+    bytes: 400
+  __builtin_find_map$__m1__Cst$__builtin_Span$lam93:
     calls: 0
     bytes: 364
   __builtin_intersperse$__m5__Doc:
     calls: 34
     bytes: 404
-  __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam74:
+  __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam94:
     calls: 0
     bytes: 440
-  __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam108:
+  __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam128:
     calls: 166
     bytes: 652
-  __builtin_try_map$__m3__Production$JsonTok$Json$__m2__First<JsonTok>$__m3__ParseError$lam61:
+  __builtin_try_map$__m3__Production$JsonTok$Json$__m2__First<JsonTok>$__m3__ParseError$lam81:
     calls: 3
     bytes: 896
-  __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule<JsonTok>$__m3__ParseError$lam76:
+  __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule<JsonTok>$__m3__ParseError$lam96:
     calls: 268
     bytes: 628
   __eq_Json:
@@ -665,16 +657,76 @@ functions:
   __eq___m2__Sym$JsonTok$arr:
     calls: 11
     bytes: 284
-  __filter133$own0:
+  __filter153$own0:
     calls: 166
     bytes: 368
-  __lambda_22:
+  __lambda_1:
+    calls: 0
+    bytes: 96
+  __lambda_10:
+    calls: 0
+    bytes: 124
+  __lambda_11:
+    calls: 0
+    bytes: 96
+  __lambda_12:
+    calls: 14
+    bytes: 112
+  __lambda_13:
+    calls: 0
+    bytes: 96
+  __lambda_14:
+    calls: 13
+    bytes: 112
+  __lambda_15:
+    calls: 0
+    bytes: 188
+  __lambda_16:
+    calls: 11
+    bytes: 204
+  __lambda_17:
+    calls: 0
+    bytes: 116
+  __lambda_18:
+    calls: 21
+    bytes: 92
+  __lambda_19:
+    calls: 0
+    bytes: 124
+  __lambda_2:
+    calls: 0
+    bytes: 96
+  __lambda_20:
+    calls: 5
+    bytes: 164
+  __lambda_3:
+    calls: 0
+    bytes: 96
+  __lambda_4:
+    calls: 0
+    bytes: 96
+  __lambda_42:
     calls: 0
     bytes: 128
-  __lambda_23:
+  __lambda_43:
     calls: 55
     bytes: 96
-  __m10__trim_end_while$lam70:
+  __lambda_5:
+    calls: 0
+    bytes: 188
+  __lambda_6:
+    calls: 0
+    bytes: 188
+  __lambda_7:
+    calls: 0
+    bytes: 116
+  __lambda_8:
+    calls: 0
+    bytes: 116
+  __lambda_9:
+    calls: 0
+    bytes: 124
+  __m10__trim_end_while$lam90:
     calls: 48
     bytes: 300
   __m11__between_len:
@@ -908,28 +960,28 @@ functions:
   __m4__breaks_after:
     calls: 0
     bytes: 444
-  __m4__fmt_node$JsonTok$Json$s1$lam65:
+  __m4__fmt_node$JsonTok$Json$s1$lam85:
     calls: 131
     bytes: 5276
-  __m4__format_cst$JsonTok$Json$s1$lam32:
+  __m4__format_cst$JsonTok$Json$s1$lam52:
     calls: 13
     bytes: 384
-  __m4__gap_wanted$lam137:
+  __m4__gap_wanted$lam157:
     calls: 195
     bytes: 200
-  __m4__group_doc$JsonTok$Json$s1$lam112:
+  __m4__group_doc$JsonTok$Json$s1$lam132:
     calls: 19
     bytes: 2420
-  __m4__inline_doc$lam111:
+  __m4__inline_doc$lam131:
     calls: 163
     bytes: 2416
-  __m4__pieces$JsonTok$Json$s1$lam109:
+  __m4__pieces$JsonTok$Json$s1$lam129:
     calls: 169
     bytes: 3392
-  __m4__render_cst$JsonTok$Json$s1$lam9:
+  __m4__render_cst$JsonTok$Json$s1$lam29:
     calls: 13
     bytes: 4492
-  __m4__wrapped$lam138:
+  __m4__wrapped$lam158:
     calls: 19
     bytes: 4096
   __m5__col_after:
@@ -956,10 +1008,10 @@ functions:
   __m6__reindent_block:
     calls: 0
     bytes: 4652
-  __map49:
+  __map69:
     calls: 0
     bytes: 380
-  __map72$own0:
+  __map92$own0:
     calls: 13
     bytes: 464
   __rec_drop_Json:
@@ -1091,24 +1143,9 @@ functions:
   lex_json:
     calls: 53
     bytes: 6700
-  lower_array:
-    calls: 13
-    bytes: 112
-  lower_bool:
-    calls: 5
-    bytes: 164
   lower_member:
     calls: 24
     bytes: 2208
-  lower_number:
-    calls: 21
-    bytes: 92
-  lower_object:
-    calls: 14
-    bytes: 112
-  lower_string:
-    calls: 11
-    bytes: 204
   lower_value:
     calls: 71
     bytes: 832

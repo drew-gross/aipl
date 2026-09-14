@@ -204,34 +204,6 @@
 
 
 
-        <section class="item" id="item-lower_object">
-          <h3>
-            <a class="anchor" href="#item-lower_object">lower_object</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lower_object(kids: Json[]) -&#62; Json</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lower_array">
-          <h3>
-            <a class="anchor" href="#item-lower_array">lower_array</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lower_array(kids: Json[]) -&#62; Json</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
         <section class="item" id="item-lower_member">
           <h3>
             <a class="anchor" href="#item-lower_member">lower_member</a>
@@ -240,48 +212,6 @@
           <pre class="signature"><code>fn lower_member(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
           <div class="doc"><p>A member's value is its one interior child; its key is the string token in front of the <code>:</code>, which is a *leaf* and so has no lowered value — the node's first token leaf is where it is read from.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lower_string">
-          <h3>
-            <a class="anchor" href="#item-lower_string">lower_string</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lower_string(text: str) -&#62; Json</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lower_number">
-          <h3>
-            <a class="anchor" href="#item-lower_number">lower_number</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lower_number(text: str) -&#62; Json</code></pre>
-
-          <div class="doc"><p>The spelling, sign included — <code>Text</code> hands over the matched tokens run together with nothing between them, which is exactly right for <code>-</code> followed by digits.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lower_bool">
-          <h3>
-            <a class="anchor" href="#item-lower_bool">lower_bool</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lower_bool(text: str) -&#62; Json</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>

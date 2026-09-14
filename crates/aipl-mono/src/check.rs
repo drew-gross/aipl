@@ -315,6 +315,19 @@ struct Cx<'a> {
     /// `None` as a value means "seen with conflicting types", so nothing can be
     /// locked for it — a wrong lock is far worse than a missing one.
     locks: std::cell::RefCell<HashMap<usize, Option<Type>>>,
+    /// The parameter types a *value* lambda took from its position — a
+    /// constructor payload, a struct field, an annotated binding — for every
+    /// parameter written without an annotation. Keyed like `locks`, and stamped
+    /// onto the lambda's parameters alongside them, because mono lifts a value
+    /// lambda into a top-level function from its parameter annotations alone:
+    /// by then the position that supplied the types is gone.
+    ///
+    /// Separate from `locks` because a lambda's type is not context-dependent
+    /// in the sense that map records — nothing moves it — and because the
+    /// parameter types may still mention the enclosing function's type
+    /// variables, which `lock_node` refuses on purpose. Those are exactly what
+    /// a written annotation may mention too, and mono substitutes both alike.
+    lambda_params: std::cell::RefCell<HashMap<usize, Vec<Type>>>,
     /// The bound declared for each of `current_type_params`, so a call inside a
     /// generic body can check a callee's bound against the *enclosing*
     /// variable's (see `bound_satisfied`).
@@ -751,6 +764,9 @@ impl<'a> Cx<'a> {
         // Type each provided init (against a real field), collecting type-var
         // bindings from the value types.
         let mut provided: HashMap<String, (Type, Span)> = HashMap::new();
+        // A lambda whose unwritten parameter types depend on a variable no
+        // field has pinned yet — the same wait as `infer_generic_variant_ctor`'s.
+        let mut waiting_lambdas: Vec<&FieldInit> = Vec::new();
         for fi in inits {
             let Some(fd) = tmpl.fields.iter().find(|f| f.name == fi.name) else {
                 return Err(Error::at(
@@ -758,13 +774,27 @@ impl<'a> Cx<'a> {
                     fi.value.span.clone(),
                 ));
             };
-            let vt = self.check_expr(&fi.value, env, effects)?;
+            let vt = if let ExprKind::Lambda(params, body) = &fi.value.kind {
+                let known = crate::subst_type_params(&fd.ty, &map);
+                let open = matches!(&known, Type::Fn(ptys, _)
+                    if ptys.iter().any(|t| crate::ty_contains_var(t, &vars)))
+                    && params.iter().any(|p| p.ty.is_none());
+                if open {
+                    waiting_lambdas.push(fi);
+                    continue;
+                }
+                self.check_value_lambda(&fi.value, params, body, Some(&known), env)?
+            } else {
+                self.check_expr(&fi.value, env, effects)?
+            };
             self.bind_field(&fd.ty, &vt, &vars, &mut map);
             provided.insert(fi.name.clone(), (vt, fi.value.span.clone()));
         }
         // Every field without a default must be provided.
         for fd in &tmpl.fields {
-            if fd.default.is_none() && !provided.contains_key(&fd.name) {
+            let given = provided.contains_key(&fd.name)
+                || waiting_lambdas.iter().any(|fi| fi.name == fd.name);
+            if fd.default.is_none() && !given {
                 return Err(Error::at(
                     format!(
                         "struct {name:?} field {:?} has no default and was not provided",
@@ -778,6 +808,11 @@ impl<'a> Cx<'a> {
         // fields don't determine it (an empty `StepResult { tokens: [], .. }`) —
         // by the enclosing function's expected return type.
         let expected = self.ret_generic_args(name);
+        let lambda_hint = if waiting_lambdas.is_empty() {
+            ""
+        } else {
+            " (or annotate the lambda's parameters with their types)"
+        };
         let args: Vec<Type> = tmpl
             .type_vars
             .iter()
@@ -790,7 +825,7 @@ impl<'a> Cx<'a> {
                         Error::at(
                             format!(
                                 "cannot infer type parameter {:?} of generic struct {name:?} \
-                                 — provide a field whose value determines it",
+                                 — provide a field whose value determines it{lambda_hint}",
                                 tv.name
                             ),
                             span.clone(),
@@ -798,6 +833,29 @@ impl<'a> Cx<'a> {
                     })
             })
             .collect::<Result<_, _>>()?;
+        // With the type arguments settled, a waiting lambda has a field type to
+        // take its parameters from; it then joins `provided` like any field.
+        if !waiting_lambdas.is_empty() {
+            let subst: HashMap<String, Type> = tmpl
+                .type_vars
+                .iter()
+                .map(|tv| tv.name.clone())
+                .zip(args.iter().cloned())
+                .collect();
+            for fi in waiting_lambdas {
+                let fd = tmpl
+                    .fields
+                    .iter()
+                    .find(|f| f.name == fi.name)
+                    .expect("found above");
+                let ExprKind::Lambda(params, body) = &fi.value.kind else {
+                    unreachable!("only a lambda waits");
+                };
+                let target = crate::subst_type_params(&fd.ty, &subst);
+                let vt = self.check_value_lambda(&fi.value, params, body, Some(&target), env)?;
+                provided.insert(fi.name.clone(), (vt, fi.value.span.clone()));
+            }
+        }
         // Inside a generic function the arguments may be abstract (`Box { value:
         // x }` where `x: T`); keep the construction generic — monomorphization
         // pins it once `T` is concrete. `bind_field` already checked consistency.
@@ -865,7 +923,17 @@ impl<'a> Cx<'a> {
         // A bare integer literal payload is deferred to the fallback chain below
         // rather than pinning here — see [`literal_pins_nothing`].
         let mut deferred: Vec<(&Type, Type)> = Vec::new();
-        for (arg, pty) in args.iter().zip(case.payload.iter().map(|p| &p.ty)) {
+        // A lambda payload takes its unwritten parameter types from the payload
+        // type (`check_value_lambda`). When those still mention a variable
+        // nothing has pinned — `Kids((A[]) -> A)` before `A` is known — the
+        // lambda cannot be checked yet; it waits for the type arguments to
+        // settle below, pinning nothing itself. Indexes into `args`.
+        let mut waiting_lambdas: Vec<usize> = Vec::new();
+        for (i, (arg, pty)) in args
+            .iter()
+            .zip(case.payload.iter().map(|p| &p.ty))
+            .enumerate()
+        {
             // A constructor reference against a `Case<_>` payload is the case
             // itself, and it is what pins the variable: `Term(Str)` learns
             // `K = Tok` from `Str`. Checking it first would type it as the
@@ -878,6 +946,26 @@ impl<'a> Cx<'a> {
                     arg_tys.push((arg, t));
                     continue;
                 }
+            }
+            if let ExprKind::Lambda(params, body) = &arg.kind {
+                // What the arguments so far have settled, substituted in; a
+                // variable still open stays a variable, which is the signal to
+                // wait. Only an *unwritten* parameter needs the payload, so a
+                // fully annotated lambda is checked at once either way.
+                let known = crate::subst_type_params(pty, &map);
+                let open = matches!(&known, Type::Fn(ptys, _)
+                    if ptys.iter().any(|t| crate::ty_contains_var(t, &vars)))
+                    && params.iter().any(|p| p.ty.is_none());
+                if open {
+                    waiting_lambdas.push(i);
+                    // Placeholder, replaced once the type arguments are known.
+                    arg_tys.push((arg, Type::Unit));
+                    continue;
+                }
+                let at = self.check_value_lambda(arg, params, body, Some(&known), env)?;
+                self.bind_field(pty, &at, &vars, &mut map);
+                arg_tys.push((arg, at));
+                continue;
             }
             let at = self.check_expr(arg, env, effects)?;
             if literal_pins_nothing(arg, pty, &vars) {
@@ -921,6 +1009,13 @@ impl<'a> Cx<'a> {
         for (pty, at) in deferred {
             self.bind_field(pty, &at, &vars, &mut lit);
         }
+        // A lambda left waiting is the likeliest reason a variable is still
+        // open: its parameters would have said, had they been written.
+        let lambda_hint = if waiting_lambdas.is_empty() {
+            ""
+        } else {
+            " (or annotate the lambda's parameters with their types)"
+        };
         let type_args: Vec<Type> = tmpl
             .type_vars
             .iter()
@@ -936,7 +1031,7 @@ impl<'a> Cx<'a> {
                             format!(
                                 "cannot infer type parameter {:?} of generic variant {base:?} \
                                  — a constructor argument or a single existing instance must \
-                                 determine it",
+                                 determine it{lambda_hint}",
                                 tv.name
                             ),
                             span.clone(),
@@ -944,6 +1039,23 @@ impl<'a> Cx<'a> {
                     })
             })
             .collect::<Result<_, _>>()?;
+        // The type arguments are settled, so a waiting lambda now has a payload
+        // type to take its parameters from. Its type joins `arg_tys` and is
+        // checked against the payload with every other argument's below.
+        let subst: HashMap<String, Type> = tmpl
+            .type_vars
+            .iter()
+            .map(|tv| tv.name.clone())
+            .zip(type_args.iter().cloned())
+            .collect();
+        for i in waiting_lambdas {
+            let (arg, pty) = (&args[i], &case.payload[i].ty);
+            let ExprKind::Lambda(params, body) = &arg.kind else {
+                unreachable!("only a lambda waits");
+            };
+            let target = crate::subst_type_params(pty, &subst);
+            arg_tys[i].1 = self.check_value_lambda(arg, params, body, Some(&target), env)?;
+        }
         // Which instance this constructor makes came from the expected type as
         // often as from its own arguments; record it so the answer survives a
         // pass that moves the expression.
@@ -964,12 +1076,6 @@ impl<'a> Cx<'a> {
         // no generic variant was ever *constructed* in a generic body before the
         // parser library, only matched, which is why the two drifted apart.
         if type_args.iter().any(mentions_typevar) {
-            let subst: HashMap<String, Type> = tmpl
-                .type_vars
-                .iter()
-                .map(|tv| tv.name.clone())
-                .zip(type_args.iter().cloned())
-                .collect();
             for ((arg, at), pty) in arg_tys.iter().zip(case.payload.iter().map(|p| &p.ty)) {
                 let target = crate::subst_type_params(pty, &subst);
                 let at = self.flex_int(arg, at, &target)?;
@@ -1109,6 +1215,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
         current_type_params: std::cell::RefCell::new(Vec::new()),
         current_expected: std::cell::RefCell::new(None),
         locks: std::cell::RefCell::new(HashMap::new()),
+        lambda_params: std::cell::RefCell::new(HashMap::new()),
         current_type_bounds: std::cell::RefCell::new(std::collections::HashMap::new()),
         resolving: std::cell::RefCell::new(HashSet::new()),
         try_errs: std::cell::RefCell::new(Vec::new()),
@@ -1227,15 +1334,16 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
     // Stamp what checking learned onto a copy. A span that resolved two ways is
     // recorded as `None` and stamps nothing — see `Cx::locks`.
     let locks = cx.locks.borrow();
+    let lambda_params = cx.lambda_params.borrow();
     let mut out = program.clone();
     // Walked in lockstep with the input: the clone is structurally identical, so
     // the two trees line up node for node, and each output node is stamped from
     // the *input* node's identity.
     for (src, item) in program.items.iter().zip(&mut out.items) {
         if let (Item::Fn(sf), Item::Fn(f)) = (src, item) {
-            stamp_locks(&sf.body, &mut f.body, &locks);
+            stamp_locks(&sf.body, &mut f.body, &locks, &lambda_params);
             if let (Some(st), Some(t)) = (sf.test_body.as_ref(), f.test_body.as_mut()) {
-                stamp_locks(st, t, &locks);
+                stamp_locks(st, t, &locks, &lambda_params);
             }
         }
     }
@@ -1274,16 +1382,32 @@ fn node_id(e: &Expr) -> usize {
     e as *const Expr as usize
 }
 
-/// Apply [`Cx::locks`] to a body, in place.
-fn stamp_locks(src: &Expr, out: &mut Expr, locks: &HashMap<usize, Option<Type>>) {
+/// Apply [`Cx::locks`] and [`Cx::lambda_params`] to a body, in place.
+fn stamp_locks(
+    src: &Expr,
+    out: &mut Expr,
+    locks: &HashMap<usize, Option<Type>>,
+    lambda_params: &HashMap<usize, Vec<Type>>,
+) {
     if let Some(Some(ty)) = locks.get(&node_id(src)) {
         out.ty = Some(Box::new(ty.clone()));
+    }
+    // A value lambda's inferred parameter types become annotations, so the
+    // lambda reads downstream exactly as if they had been written.
+    if let (Some(tys), ExprKind::Lambda(params, _)) =
+        (lambda_params.get(&node_id(src)), &mut out.kind)
+    {
+        for (p, ty) in params.iter_mut().zip(tys) {
+            if p.ty.is_none() {
+                p.ty = Some(ty.clone());
+            }
+        }
     }
     for (s, o) in crate::children(src)
         .into_iter()
         .zip(crate::children_mut(out))
     {
-        stamp_locks(s, o, locks);
+        stamp_locks(s, o, locks, lambda_params);
     }
 }
 
@@ -2789,61 +2913,13 @@ impl Cx<'_> {
                 // `return` doesn't produce a value — it's a statement, like `set`.
                 Type::Unit
             }
-            // A lambda used as a *value* (bound to a local, stored in a struct
-            // field, or a lowered payload constructor `Ctor`) becomes a
-            // non-capturing top-level function whose address is the value. In
-            // argument position the expected function type supplies parameter
-            // types and captures are lifted (handled in `check_call`); here
-            // there is neither, so every parameter must be explicitly typed, the
-            // body must be effect-free (an indirect call can't be effect-checked
-            // at the site), and it may not capture an enclosing local.
+            // A lambda used as a *value*, reached without a position that says
+            // what function type it should have — see `check_value_lambda`. An
+            // annotated binding's type is in `current_expected`; anywhere else
+            // every parameter must be written with its type.
             ExprKind::Lambda(params, body) => {
-                let mut ptys = Vec::with_capacity(params.len());
-                let mut env2 = env.clone();
-                for p in params {
-                    let Some(ann) = &p.ty else {
-                        return Err(Error::at(
-                            format!(
-                                "lambda parameter {:?} used as a value must be typed, \
-                                 e.g. `|{}: i64| ...`",
-                                p.name, p.name
-                            ),
-                            p.span.clone(),
-                        ));
-                    };
-                    ptys.push(ann.clone());
-                    env2.insert(
-                        p.name.clone(),
-                        Binding {
-                            ty: ann.clone(),
-                            mutable: false,
-                        },
-                    );
-                }
-                // Reject captures: any free identifier of the body that resolves
-                // to an enclosing local (not a global function/type). Function
-                // values carry no environment, so a capture can't be honored.
-                let tenv: HashMap<String, Type> =
-                    env.iter().map(|(k, b)| (k.clone(), b.ty.clone())).collect();
-                if let Some((cap, _)) = super::free_vars(body, params, &tenv).into_iter().next() {
-                    return Err(Error::at(
-                        format!(
-                            "a lambda used as a value cannot capture local {cap:?} \
-                             (function values are non-capturing)"
-                        ),
-                        span.clone(),
-                    ));
-                }
-                // Effect-free body: check with an empty effect context so any
-                // effectful call inside is reported.
-                let mark = self.try_errs.borrow().len();
-                let body_ty = self.check_expr(body, &env2, &[])?;
-                let body_ty = {
-                    let errs = self.try_errs.borrow();
-                    err_side_from_tries(body_ty, &errs[mark..])
-                };
-                self.try_errs.borrow_mut().truncate(mark);
-                Type::Fn(ptys, Box::new(body_ty))
+                let expected = self.current_expected.borrow().clone();
+                self.check_value_lambda(expr, params, body, expected.as_ref(), env)?
             }
             ExprKind::TupleLit(elems) => {
                 let mut elem_tys: Vec<Type> = Vec::with_capacity(elems.len());
@@ -3232,7 +3308,7 @@ impl Cx<'_> {
                                 fi.value.span.clone(),
                             )
                         })?;
-                    let vt = self.check_expr(&fi.value, env, effects)?;
+                    let vt = self.check_in_position(&fi.value, expected, env, effects)?;
                     let ctx = format!("struct {:?} field {:?}", display(name), fi.name);
                     // `start..end` desugars to a `__builtin_Span` construction, so
                     // its two fields are slice bounds by another name — accept
@@ -3441,6 +3517,149 @@ impl Cx<'_> {
         }
     }
 
+    /// Check `e` where its position declares a type — a constructor's payload
+    /// or a struct's field. Only a lambda reads the declaration here (it is
+    /// what supplies its unwritten parameter types — see `check_value_lambda`);
+    /// anything else is checked on its own, and the caller compares the two.
+    fn check_in_position(
+        &self,
+        e: &Expr,
+        declared: &Type,
+        env: &Env,
+        effects: &[String],
+    ) -> Result<Type, Error> {
+        match &e.kind {
+            ExprKind::Lambda(params, body) => {
+                self.check_value_lambda(e, params, body, Some(declared), env)
+            }
+            _ => self.check_expr(e, env, effects),
+        }
+    }
+
+    /// A lambda used as a *value* — bound to a local, stored in a struct
+    /// field, or given to a payload constructor — becomes a non-capturing
+    /// top-level function whose address is the value. Unlike a lambda in
+    /// argument position (`check_arg`), where captures are lifted and effects
+    /// are charged to the caller, a value's function is called through a
+    /// pointer with no environment and no site to effect-check, so the body
+    /// must be effect-free and may not capture an enclosing local.
+    ///
+    /// `expected` is what the position declares, when it declares a function
+    /// type — a constructor's payload, a struct field, a binding's annotation.
+    /// It supplies the type of every parameter written without one, so
+    /// `Text(|t| Bool(t == "true"))` needs no `|t: str|` when `Text` carries
+    /// `(str) -> A`; the inferred types are recorded in `lambda_params` for
+    /// mono, which lifts the lambda from its annotations. A parameter that is
+    /// annotated must agree with the position, exactly as in `check_lambda`.
+    /// With no expected function type, every parameter must be written.
+    ///
+    /// Returns the lambda's *own* type — the body's actual return, not the
+    /// expected one — so a generic constructor can pin a variable that appears
+    /// only in the payload's return (`A` in `Text((str) -> A)`).
+    fn check_value_lambda(
+        &self,
+        lambda: &Expr,
+        params: &[LambdaParam],
+        body: &Expr,
+        expected: Option<&Type>,
+        env: &Env,
+    ) -> Result<Type, Error> {
+        let span = &lambda.span;
+        let expected_params: Option<&[Type]> = match expected {
+            Some(Type::Fn(ptys, ret)) => {
+                if ptys.len() != params.len() {
+                    return Err(Error::at(
+                        format!(
+                            "lambda has {} parameter(s), but {} was expected",
+                            params.len(),
+                            tyname(&Type::Fn(ptys.clone(), ret.clone()))
+                        ),
+                        span.clone(),
+                    ));
+                }
+                Some(ptys)
+            }
+            _ => None,
+        };
+        let mut ptys = Vec::with_capacity(params.len());
+        let mut env2 = env.clone();
+        let mut inferred_any = false;
+        for (i, p) in params.iter().enumerate() {
+            let from_position = expected_params.map(|ps| &ps[i]);
+            let ty = match (&p.ty, from_position) {
+                // An annotation against a position that still holds a type
+                // variable is what *pins* that variable (`Kids(Object)` lowers
+                // to `|k: Json[]| Object(k)` against `(A[]) -> A`); only a
+                // settled position can disagree with one. The caller's own
+                // comparison of the lambda's type against the position covers
+                // the rest, once the variable is bound.
+                (Some(ann), Some(pty)) if !mentions_typevar(pty) && ann != pty => {
+                    return Err(Error::at(
+                        format!(
+                            "lambda parameter {:?} is annotated {}, but {} was expected",
+                            p.name,
+                            tyname(ann),
+                            tyname(pty)
+                        ),
+                        p.span.clone(),
+                    ));
+                }
+                (Some(ann), _) => ann.clone(),
+                (None, Some(pty)) => {
+                    inferred_any = true;
+                    pty.clone()
+                }
+                (None, None) => {
+                    return Err(Error::at(
+                        format!(
+                            "lambda parameter {:?} used as a value must be typed, \
+                             e.g. `|{}: i64| ...`",
+                            p.name, p.name
+                        ),
+                        p.span.clone(),
+                    ));
+                }
+            };
+            env2.insert(
+                p.name.clone(),
+                Binding {
+                    ty: ty.clone(),
+                    mutable: false,
+                },
+            );
+            ptys.push(ty);
+        }
+        if inferred_any {
+            self.lambda_params
+                .borrow_mut()
+                .insert(node_id(lambda), ptys.clone());
+        }
+        // Reject captures: any free identifier of the body that resolves to an
+        // enclosing local (not a global function/type). Function values carry
+        // no environment, so a capture can't be honored.
+        let tenv: HashMap<String, Type> =
+            env.iter().map(|(k, b)| (k.clone(), b.ty.clone())).collect();
+        if let Some((cap, _)) = super::free_vars(body, params, &tenv).into_iter().next() {
+            return Err(Error::at(
+                format!(
+                    "a lambda used as a value cannot capture local {cap:?} \
+                     (function values are non-capturing)"
+                ),
+                span.clone(),
+            ));
+        }
+        // Effect-free body: check with an empty effect context so any effectful
+        // call inside is reported.
+        let mark = self.try_errs.borrow().len();
+        let body_ty = self.check_expr(body, &env2, &[])?;
+        let body_ty = {
+            let errs = self.try_errs.borrow();
+            err_side_from_tries(body_ty, &errs[mark..])
+        };
+        self.try_errs.borrow_mut().truncate(mark);
+        Ok(Type::Fn(ptys, Box::new(body_ty)))
+    }
+
     fn check_call(
         &self,
         name: &str,
@@ -3471,7 +3690,7 @@ impl Cx<'_> {
                     ));
                 }
                 for (arg, pty) in args.iter().zip(&payload) {
-                    let at = self.check_expr(arg, env, effects)?;
+                    let at = self.check_in_position(arg, pty, env, effects)?;
                     let at = self.flex_int(arg, &at, pty)?;
                     expect(
                         &at,

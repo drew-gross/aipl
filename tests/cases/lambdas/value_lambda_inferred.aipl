@@ -1,0 +1,71 @@
+import { equal as ==, map, wrapping_add as + } from builtins;
+
+// A lambda used as a *value* takes its parameter types from the position it
+// sits in, when that position declares a function type: a constructor's
+// payload, a struct's field, or a binding's annotation. Only a position that
+// declares nothing (`let g = |x| ..`) needs the types written on the lambda.
+//
+// The lambda is still a value — non-capturing, effect-free — so the rules of
+// `functions/fn_value_lambda` all hold; only the annotations are optional.
+
+variant Build<A: any> = Kids((A[]) -> A) | Text((str) -> A) | Const(A)
+
+variant Json = Object(Json[]) | Number(str) | Bool(bool) | Null
+
+struct Handler { f: (i64) -> i64 }
+
+struct Seeded<T: any> { f: (T) -> T, seed: T }
+
+fn apply(b: Build<Json>, kids: Json[], text: str) -> Json {
+    match (b) {
+        Kids(f) => f(kids),
+        Text(f) => f(text),
+        Const(v) => v,
+    }
+}
+
+// A generic constructor's payload: `t` is a `str` from `Text((str) -> A)`,
+// and the lambda's body is what pins `A`. A constructor that *is* the
+// lowering is passed by name.
+fn payloads() -> Json[] {
+    let builds = [Kids(Object), Text(Number), Text(|t| Bool(t == "true")), Const(Null)];
+    builds.map(|b| apply(b, [Null], "true"))
+}.test({
+    assert(payloads() == [Object([Null]), Number("true"), Bool(true), Null]);
+})
+
+// `Kids((A[]) -> A)` says nothing about `kids` until `A` is known, so the
+// lambda waits for the binding's annotation to settle it.
+fn waiting() -> Json {
+    let w: Build<Json> = Kids(|kids| Object([Null, ..kids]));
+    apply(w, [Bool(false)], "")
+}.test({
+    assert(waiting() == Object([Null, Bool(false)]));
+})
+
+// A struct field, concrete and generic (where `T` is pinned by `seed`), and an
+// annotated binding.
+fn fields() -> i64 {
+    let h = Handler { f: |x| { x + 1 } };
+    let s = Seeded { f: |x| { x + 2 }, seed: 40 };
+    let g: (i64) -> i64 = |x| { x + 3 };
+    h.f(41) + s.f(s.seed) + g(39)
+}.test({
+    assert(fields() == 126);
+})
+
+fn main() {}
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 3
+binary size: 488
+  code: 8
+  data: 1
+  metadata: 479
+functions:
+  main:
+    calls: 1
+    bytes: 8

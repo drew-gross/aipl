@@ -75,6 +75,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  Remove need for Member JSON arm. Should be dict probably?
   nothing in format.aipl should be able to be passed as a literal
   unescape + unescape_braces can probably be DRYed up
   union_all can be context ordered, like to_set
@@ -366,6 +367,8 @@ design:
   apis should express intent
 
 optimizations:
+  inline if it would create a fusion opportunity
+  nextest --no-run (build) took 639s which is unusual. Can you investigate why the build is taking so long? use cargo build --timings
   intern static struct literals into the binary too
   extend should create a rope when the value doesn't fit in the existing capacity
   after fusion there should be more inlining opportunities. Make a pass manager that re-enqueues functions for optimization after they are optimized
