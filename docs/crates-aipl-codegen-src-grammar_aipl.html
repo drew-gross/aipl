@@ -1854,7 +1854,7 @@
           </h3>
           <pre class="signature"><code>fn lower_case_param(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>case_param</code> — a bare type, or a named slot with an optional default. <code>k?: T</code> stores the <code>T?</code> a match arm binds, with the <code>none</code> that was written as its default.</p></div>
+          <div class="doc"><p><code>case_param</code> — a bare type, or a named slot with an optional default, under any <code># ..</code> lines of its own. <code>k?: T</code> stores the <code>T?</code> a match arm binds, with the <code>none</code> that was written as its default. The doc lines are the node's own tokens too, in front of the slot's; they are told apart by their marker.</p></div>
 
 
         </section>

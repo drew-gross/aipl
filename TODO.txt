@@ -75,6 +75,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  fmt_node can only fail due to bad internal index; see if we can fix that, maybe with a LinkedGrammar type?
+  breaks_after can be take_while->starts_with I think?
   Remove need for Member JSON arm. Should be dict probably?
   nothing in format.aipl should be able to be passed as a literal
   unescape + unescape_braces can probably be DRYed up
@@ -175,6 +177,7 @@ HOF:
 math:
 
 syntax:
+  more match power: earlier matches in a multi-match can be used in later matches
   generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
   make a syntax for ignoring the rest of the args in a match (just take the ones you want)
   allow destructuring self while having it still be self e.g. fn foo(self: Span { start, end }). Maybe do this for other args too for doc purposes?
@@ -286,6 +289,7 @@ grammar:
   make an ebnf loader as well as dumper
 
 utilities:
+  (T, U)[] -> (T[], U[]) function
   generic sum function with int bound
   numeric < vs. lexicographic <. Also maybe a < for map/dict purposes that uses compiler-decided ordering?
   span.start - span.end should have a builtin
@@ -564,6 +568,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  seems like a lot of features have required 2 handoffs recently. Lets improve the handoff script to just do both things.
   Make the new-syntax bootstrap faster (maybe by doing just the regen without the full corpus?)
   retire AIPL_CASE, add a non-env alternative
   switch the nextest --no-build to the corresponding cargo build so that we get better progress output

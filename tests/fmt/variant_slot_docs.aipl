@@ -1,0 +1,23 @@
+variant Rule =
+    # One token whose text is `s`.
+    | Literal(s: str)
+    | Many(# The repeated rule.
+      # It may not match empty input.
+      Rule,
+        # Fewest repetitions accepted.
+        min: u64 = 0, max?: u64 = none)
+fn main() { }
+--- formatted ---
+variant Rule =
+    # One token whose text is `s`.
+    | Literal(s: str)
+    | Many(
+        # The repeated rule.
+        # It may not match empty input.
+        Rule,
+        # Fewest repetitions accepted.
+        min: u64 = 0,
+        max?: u64 = none
+    )
+
+fn main() {}

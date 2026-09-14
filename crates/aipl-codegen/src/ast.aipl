@@ -146,10 +146,10 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 240
 instructions executed: 352
-binary size: 55648
-  code: 36196
+binary size: 56112
+  code: 36520
   data: 309
-  metadata: 19143
+  metadata: 19283
 functions:
   __rec_drop___m2__Expr:
     calls: 1
@@ -162,7 +162,7 @@ functions:
     bytes: 408
   __test$ast_case_name:
     calls: 1
-    bytes: 34376
+    bytes: 34700
   aipl_assert:
     calls: 3
     bytes: (external)

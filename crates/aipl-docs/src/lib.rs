@@ -240,6 +240,15 @@ struct CaseRow {
     /// cover it.
     doc: String,
     has_doc: bool,
+    /// The payload slots, listed only when one of them has docs of its own —
+    /// see `aipl_index::Symbol::slots`.
+    slots: Vec<SlotRow>,
+}
+
+struct SlotRow {
+    detail: String,
+    doc: String,
+    has_doc: bool,
 }
 
 impl FilePage {
@@ -258,6 +267,18 @@ impl FilePage {
                         detail: sym.detail.clone(),
                         doc: doc_html(doc),
                         has_doc: !doc.trim().is_empty(),
+                        slots: sym
+                            .slots
+                            .iter()
+                            .map(|slot| {
+                                let doc = slot.doc.as_deref().unwrap_or_default();
+                                SlotRow {
+                                    detail: slot.detail.clone(),
+                                    doc: doc_html(doc),
+                                    has_doc: !doc.trim().is_empty(),
+                                }
+                            })
+                            .collect(),
                     });
                     continue;
                 }
@@ -472,6 +493,11 @@ variant Shape =
     # A circle of radius `r`.
     | Circle(r: i64)
     | Empty
+    | Rect(
+        # The width.
+        w: i64,
+        h: i64
+    )
 
 # The area of `s`.
 #
@@ -572,6 +598,24 @@ fn private_helper() -> i64 { 1 }
         // The variant's own docs are above its cases, not merged into one.
         assert!(page.contains("<p>A shape.</p>"), "{page}");
         assert!(!page.contains("A shape. A circle"), "{page}");
+    }
+
+    /// A case with a documented slot lists its slots one by one under the
+    /// case, each with its docs; an undocumented neighbour is listed bare, and
+    /// a case with no slot docs has no list at all.
+    #[test]
+    fn a_case_lists_its_documented_slots() {
+        let (_d, out) = site();
+        let page = read(&out, "src-shapes.html");
+        let rect = page.find("Rect(w: i64, h: i64)").expect("the case");
+        let w = page
+            .find("<code>w: i64</code>")
+            .expect("the documented slot");
+        let doc = page.find("<p>The width.</p>").expect("the slot doc");
+        let h = page.find("<code>h: i64</code>").expect("the bare slot");
+        assert!(rect < w && w < doc && doc < h, "{page}");
+        // `Circle` documents no slot, so its `r` is not listed on its own.
+        assert!(!page.contains("<code>r: i64</code>"), "{page}");
     }
 
     /// The two sections, and which side of the line each declaration lands on.

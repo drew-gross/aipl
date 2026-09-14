@@ -75,37 +75,46 @@
 
             <li id="item-Term"><code>Term(Case&#60;K&#62;)</code>
 
+
             </li>
 
             <li id="item-Literal"><code>Literal(str)</code>
+
 
             </li>
 
             <li id="item-Then"><code>Then(Rule&#60;K&#62;[])</code>
 
+
             </li>
 
             <li id="item-OneOf"><code>OneOf(Rule&#60;K&#62;[])</code>
+
 
             </li>
 
             <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = .., max: u64? = .., sep: Rule&#60;K&#62;? = .., trailing_sep: bool = .., leading_sep: bool = .., nested_in: (Rule&#60;K&#62;, Rule&#60;K&#62;)? = .., spaced: bool = .., style: ListStyle? = .., group: u64? = ..)</code>
 
+
             </li>
 
             <li id="item-Maybe"><code>Maybe(Rule&#60;K&#62;)</code>
+
 
             </li>
 
             <li id="item-Named"><code>Named(str)</code>
 
+
             </li>
 
             <li id="item-NamedIdx"><code>NamedIdx(u64)</code>
 
+
             </li>
 
             <li id="item-Climb"><code>Climb(Rule&#60;K&#62;, Prec[])</code>
+
 
             </li>
 
@@ -131,11 +140,13 @@
 
               <div class="doc"><p>The general form: the source text, the node itself, and the already- lowered values of its interior children (<code>nodes</code>, in match order).</p></div>
 
+
             </li>
 
             <li id="item-TryMk"><code>TryMk((str, Cst, A[]) -&#62; A!ParseError)</code>
 
               <div class="doc"><p><code>Mk</code> for a lowering that can refuse what it matched.</p></div>
+
 
             </li>
 
@@ -143,11 +154,13 @@
 
               <div class="doc"><p>Only the children — a node that is its children regrouped (<code>Object(kids)</code>).</p></div>
 
+
             </li>
 
             <li id="item-TryKids"><code>TryKids((A[]) -&#62; A!ParseError)</code>
 
               <div class="doc"><p><code>Kids</code> for a lowering that can refuse.</p></div>
+
 
             </li>
 
@@ -155,17 +168,20 @@
 
               <div class="doc"><p>Only the node's token text (<code>token_text</code>, the matched tokens run together) — a leaf-only node whose value is its spelling.</p></div>
 
+
             </li>
 
             <li id="item-TryText"><code>TryText((str) -&#62; A!ParseError)</code>
 
               <div class="doc"><p><code>Text</code> for a lowering that can refuse — a number that overflows.</p></div>
 
+
             </li>
 
             <li id="item-Const"><code>Const(A)</code>
 
               <div class="doc"><p>Nothing at all: the value itself — a keyword production.</p></div>
+
 
             </li>
 
@@ -203,9 +219,11 @@
 
             <li id="item-Tight"><code>Tight</code>
 
+
             </li>
 
             <li id="item-Inline"><code>Inline</code>
+
 
             </li>
 

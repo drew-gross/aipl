@@ -23,6 +23,22 @@ variant Maybe =
     | Yes
     | No
 
+# A case's payload slots take `# ..` lines too, inside the parentheses above
+# each slot — for a case with many keyword slots, what each one means is the
+# slot's business rather than the case's. A documented slot breaks the payload
+# onto one slot per line, and the list takes no trailing comma.
+variant Shape =
+    | Circle(
+        # The radius.
+        r: i64
+    )
+    | Rect(
+        # The width.
+        w: i64,
+        # The height, `w` again when omitted.
+        h?: i64 = none
+    )
+
 // `//` comments are untouched: only `#` documents, so the banner style below
 // still means nothing to the parser.
 fn undocumented(n: i64) -> i64 {
@@ -37,6 +53,7 @@ fn main() !prints {
     print(`sum {add(p.x, p.y)}`);
     print(`doubled {undocumented(2)}`);
     print(`yes {Yes == Maybe.Yes}`);
+    print(`square {Rect(3) == Rect(3, h=3)}`);
 }
 --- stdout ---
 sum 3

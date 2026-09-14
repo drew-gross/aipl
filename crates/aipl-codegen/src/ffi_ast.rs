@@ -209,6 +209,7 @@ fn case_param(v: &FfiValue) -> R<ast::CaseParam> {
         ty: ty(field(v, "ty")?)?,
         default: maybe(field(v, "default")?, expr)?,
         implicit_some: flag(field(v, "implicit_some")?)?,
+        doc: maybe(field(v, "doc")?, text)?,
     })
 }
 

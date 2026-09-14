@@ -93,6 +93,21 @@ pub struct Symbol {
     pub name_span: Span,
     /// For a [`SymbolKind::Case`], the variant it belongs to.
     pub parent: Option<String>,
+    /// For a [`SymbolKind::Case`] whose payload documents any of its slots:
+    /// every slot, in order, as it is spelled in `detail`, with its own `# ..`
+    /// lines. Empty for every other kind — and for a case that documents no
+    /// slot, so a docs page lists slots only where there is something to say.
+    pub slots: Vec<Slot>,
+}
+
+/// One payload slot of a documented case — see [`Symbol::slots`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Slot {
+    /// The slot as `detail` spells it: `min: u64 = ..`, or a bare type.
+    pub detail: String,
+    /// The slot's `# ..` lines, joined with newlines. `None` for a slot without
+    /// any — its neighbours' docs are why the list exists.
+    pub doc: Option<String>,
 }
 
 /// One name brought into a file by an `import`.
@@ -259,6 +274,7 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                     is_pub: f.is_pub,
                     name_span,
                     parent: None,
+                    slots: Vec::new(),
                 });
             }
             Item::Struct(s) => {
@@ -273,6 +289,7 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                     is_pub: true,
                     name_span,
                     parent: None,
+                    slots: Vec::new(),
                 });
             }
             Item::Variant(v) => {
@@ -287,6 +304,7 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                     is_pub: true,
                     name_span,
                     parent: None,
+                    slots: Vec::new(),
                 });
                 for case in &v.cases {
                     let Some(case_span) = spans.next_case(&case.name) else {
@@ -312,6 +330,20 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                     } else {
                         format!("{}({})", case.name, payload.join(", "))
                     };
+                    // The slots are listed one by one only when some slot has
+                    // docs of its own — otherwise `detail` already says it all.
+                    let slots = if case.payload.iter().any(|p| p.doc.is_some()) {
+                        payload
+                            .iter()
+                            .zip(&case.payload)
+                            .map(|(detail, p)| Slot {
+                                detail: detail.clone(),
+                                doc: p.doc.clone(),
+                            })
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
                     out.push(Symbol {
                         name: case.name.clone(),
                         kind: SymbolKind::Case,
@@ -320,6 +352,7 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                         is_pub: true,
                         name_span: case_span,
                         parent: Some(v.name.clone()),
+                        slots,
                     });
                 }
             }
@@ -609,6 +642,31 @@ fn helper(n: i64) !prints -> i64 {
         // A nullary case is just its name — and the one after a payload case,
         // which is where a naive `|` scan would drift.
         assert_eq!(idx.define("Empty").expect("Empty").detail, "Empty");
+    }
+
+    /// A case's slots are listed, each with its own docs, once any slot has
+    /// them; a case with undocumented slots lists none, `detail` sufficing.
+    #[test]
+    fn a_case_lists_its_slots_when_one_is_documented() {
+        hosted();
+        let src = "variant R =\n    | Many(\n        # The rule.\n        i64,\n        min: u64 = 0\n    )\n    | Plain(str)\n";
+        let idx = FileIndex::parse("src/n.aipl", src).expect("indexes");
+        let many = idx.define("Many").expect("Many");
+        assert_eq!(many.detail, "Many(i64, min: u64 = ..)");
+        assert_eq!(
+            many.slots,
+            vec![
+                Slot {
+                    detail: "i64".into(),
+                    doc: Some("The rule.".into())
+                },
+                Slot {
+                    detail: "min: u64 = ..".into(),
+                    doc: None
+                },
+            ]
+        );
+        assert!(idx.define("Plain").expect("Plain").slots.is_empty());
     }
 
     #[test]

@@ -592,6 +592,10 @@ pub mod ast {
         /// a time. `Many(x, max?: u64 = none)` is constructed `Many(r, max = 2)`
         /// rather than `Many(r, max = some(2))`.
         pub implicit_some: bool,
+        /// The `# ..` doc comment above the slot, lines joined with newlines —
+        /// written inside the payload's parentheses, one slot per line. `None`
+        /// when it carries none.
+        pub doc: Option<String>,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]

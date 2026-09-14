@@ -925,6 +925,7 @@ fn rewrite_item(
                                     .as_ref()
                                     .map(|d| rewrite_expr(d, view, sc, &earlier)),
                                 implicit_some: slot.implicit_some,
+                                doc: slot.doc.clone(),
                             });
                             earlier.extend(slot.name.clone());
                         }

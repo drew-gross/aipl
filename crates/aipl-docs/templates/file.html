@@ -18,6 +18,17 @@
 {% if case.has_doc %}
               <div class="doc">{{ case.doc|safe }}</div>
 {% endif %}
+{% if !case.slots.is_empty() %}
+              <ul class="slots">
+{% for slot in case.slots %}
+                <li><code>{{ slot.detail }}</code>
+{% if slot.has_doc %}
+                  <div class="doc">{{ slot.doc|safe }}</div>
+{% endif %}
+                </li>
+{% endfor %}
+              </ul>
+{% endif %}
             </li>
 {% endfor %}
           </ul>

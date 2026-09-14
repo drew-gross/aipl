@@ -40,7 +40,7 @@ struct StructDecl { name: str, doc: str?, type_vars: TypeParam[], fields: FieldD
 # One payload slot of a variant case. A positional slot has no name; the three
 # named forms differ only in whether they carry a default and whether the `?`
 # moved onto the name.
-struct CaseParam { name: str?, ty: Ty, default: Expr?, implicit_some: bool }
+struct CaseParam { name: str?, ty: Ty, default: Expr?, implicit_some: bool, doc: str? }
 
 struct VariantCase { name: str, doc: str?, payload: CaseParam[] }
 
@@ -156,10 +156,11 @@ fn show_case(self: VariantCase) -> str {
 }
 
 fn show_case_param(self: CaseParam) -> str {
-    match (self.name) {
+    let slot = match (self.name) {
         some(n) => `{n}{opt_marker(self.implicit_some)}: {self.ty.show_ty()}{show_default(self.default)}`,
         none => self.ty.show_ty(),
-    }
+    };
+    `{show_doc(self.doc)}{slot}`
 }
 
 fn opt_marker(self: bool) -> str {
@@ -188,10 +189,10 @@ deallocations: 18
 reallocations: 2
 bytes allocated: 1382
 instructions executed: 1128
-binary size: 76848
-  code: 50764
+binary size: 77912
+  code: 51492
   data: 238
-  metadata: 25846
+  metadata: 26182
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -294,7 +295,7 @@ functions:
     bytes: 188
   show_case:
     calls: 0
-    bytes: 2872
+    bytes: 3600
   show_default:
     calls: 1
     bytes: 420

@@ -1625,6 +1625,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                             ty,
                             default: None,
                             implicit_some: false,
+                            doc: None,
                         })
                         .collect(),
                 })
