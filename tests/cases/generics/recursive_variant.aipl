@@ -1,7 +1,7 @@
 import {
     equal as ==,
+    map,
     print,
-    push,
     to_str,
     wrapping_add as +,
     wrapping_add_assign as +=,
@@ -28,6 +28,10 @@ fn size<K: variant>(self: Rule<K>) -> u64 {
     match (self) {
         Term(..) | Idx(..) => 1,
         Repeat(inner) => 1 + inner.size(),
+        // A loop rather than `rs.fold(0, |n, r| n + r.size())`: the bare `0`
+        // pins the accumulator to `i64` before the lambda can say `u64` (see
+        // `specialize_generic_call` in aipl-mono, and TODO.txt on literals
+        // flexing through generic calls).
         Then(rs) => {
             mut n: u64 = 1;
             for (let r : rs) {
@@ -43,24 +47,14 @@ fn size<K: variant>(self: Rule<K>) -> u64 {
 // abstract at this point: the construction resolved to an instance named after
 // the type variable that nothing else agreed with, and the payload bound by
 // `Then(rs)` was read from the wrong map — typing `rs` as `i64` and so failing
-// to pin `K` for the `shift_all` call below.
+// to pin `K` for the `map` over it.
 fn shift<K: variant>(self: Rule<K>, by: u64) -> Rule<K> {
     match (self) {
         Term(k) => Term(k),
         Idx(i) => Idx(i + by),
         Repeat(inner) => Repeat(inner.shift(by)),
-        Then(rs) => Then(shift_all(rs, by)),
+        Then(rs) => Then(rs.map(|r| r.shift(by))),
     }
-}
-
-fn shift_all<K: variant>(rs: Rule<K>[], by: u64) -> Rule<K>[] {
-    // Kept as a loop: the point is the generic recursive payload, not how the
-    // array is built.
-    mut out: Rule<K>[] = []; #[allow]
-    for (let r : rs) {
-        set out.push(r.shift(by));
-    }
-    out
 }
 
 // An array literal whose elements are a *concrete* instance (`Rule<Tok>`), which
@@ -82,13 +76,13 @@ Then([Term(Name("")), Repeat(Idx(3))])
 --- performance ---
 allocations: 41
 deallocations: 41
-reallocations: 1
-bytes allocated: 2204
-instructions executed: 2529
-binary size: 11424
-  code: 5900
-  data: 531
-  metadata: 4993
+reallocations: 0
+bytes allocated: 2212
+instructions executed: 2532
+binary size: 11408
+  code: 5920
+  data: 499
+  metadata: 4989
 functions:
   __arr_drop_Rule$Tok:
     calls: 5
@@ -121,16 +115,16 @@ functions:
     calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 9
+    calls: 8
     bytes: (external)
   aipl_array_new:
     calls: 4
     bytes: (external)
-  aipl_array_push:
-    calls: 1
-    bytes: (external)
   aipl_array_push_mut:
     calls: 2
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 1
     bytes: (external)
   aipl_rec_alloc:
     calls: 22
@@ -164,7 +158,7 @@ functions:
     bytes: 580
   shift$Tok:
     calls: 4
-    bytes: 952
+    bytes: 972
   size$Tok:
     calls: 4
     bytes: 464
