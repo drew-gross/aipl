@@ -76,7 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  delimited_len can be rewritten as a for loop with early return
+  unterminated error messages can be DRYer
   in show_first we shouldn't need a typed empty array literal.
   union_syms should just be actual set union
   why does rule_first need three as a variable?

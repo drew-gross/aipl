@@ -544,7 +544,21 @@
           </h3>
           <pre class="signature"><code>fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -&#62; u64!LexError</code></pre>
 
-          <div class="doc"><p><code>Delimited</code>: a <code>delims</code> char opens the token, which spans to just past the next occurrence of the same char. ok(0) when the first char isn't a delimiter. With a non-empty <code>escapes</code> set, a backslash escapes its next char: an allowed char is content (an escaped delimiter doesn't close), a disallowed one is a hard error, and a dangling backslash at the end of the source leaves the token unterminated. A token still open at the end of the source is a hard error (<code>at</code> is the token's absolute start, so error spans land in the real source).</p></div>
+          <div class="doc"><p><code>Delimited</code>: a <code>delims</code> char opens the token, which spans to just past the next occurrence of the same char. ok(0) when the first char isn't a delimiter. With a non-empty <code>escapes</code> set, a backslash escapes its next char: an allowed char is content (an escaped delimiter doesn't close), a disallowed one is a hard error, and so is a backslash with nothing after it — the end of the source cut the escape off. A token still open at the end of the source is a hard error (<code>at</code> is the token's absolute start, so error spans land in the real source).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-incomplete_escape">
+          <h3>
+            <a class="anchor" href="#item-incomplete_escape">incomplete_escape</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn incomplete_escape() -&#62; str</code></pre>
+
+          <div class="doc"><p>The message for a backslash the end of the source cut off. Shared by the <code>Delimited</code> scan and the template scan, which decode the same escapes.</p></div>
 
 
         </section>
@@ -682,7 +696,7 @@
             <a class="anchor" href="#item-apply_emit">apply_emit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31538: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
+          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31916: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
 
           <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its content string — the matcher-computed <code>value</code> (a delimited string, stripped) when there is one, else the raw matched <code>text</code>. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
 

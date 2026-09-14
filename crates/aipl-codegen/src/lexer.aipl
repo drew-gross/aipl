@@ -15,7 +15,6 @@
 // with a `LexError` — a message plus the span of the offending source.
 import {
     Span,
-    concat as +++,
     contains,
     count_while,
     drop_first,
@@ -403,45 +402,53 @@ fn keyword_len(self: str, spelling: str, boundary: str) -> u64 {
 # next occurrence of the same char. ok(0) when the first char isn't a
 # delimiter. With a non-empty `escapes` set, a backslash escapes its next
 # char: an allowed char is content (an escaped delimiter doesn't close), a
-# disallowed one is a hard error, and a dangling backslash at the end of the
-# source leaves the token unterminated. A token still open at the end of the
-# source is a hard error (`at` is the token's absolute start, so error spans
+# disallowed one is a hard error, and so is a backslash with nothing after it —
+# the end of the source cut the escape off. A token still open at the end of
+# the source is a hard error (`at` is the token's absolute start, so error spans
 # land in the real source).
 fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -> u64!LexError {
     if (!self.first().is_some_and(|c| delims.contains(c))) {
         return ok(0);
     };
     let d = self.first().value_or(' '); // in bounds: the guard above saw a char
-    mut i: u64 = 1;
-    mut closed = false;
-    while (!closed && i < self.len()) {
-        let c = self[i].value_or(' '); // in bounds: the loop condition holds
-        if (c == d) {
-            set closed = true;
-        } else {
-            // A backslash escapes its next char (when escapes are on and one
-            // exists — a dangling backslash at the end of the source escapes
-            // nothing, so the loop just runs out and the token is
-            // unterminated). The escaped char must be allowed, and is content:
-            // the extra step below skips it, so an escaped delimiter can't
-            // close the token.
-            if (c == '\\' && escapes.is_nonempty() && i + 1 < self.len()) {
-                if (!self[i + 1].is_some_and(|e| escapes.contains(e))) {
-                    return err(LexError {
-                        message: "unknown escape sequence \\" +++ self[i + 1..i + 2],
-                        span: at + i..at + i + 2,
-                    });
-                };
-                set i++;
+
+    // The opener is passed over the way an escaped char is: neither is content
+    // that can close the token.
+    mut skip = true;
+    for (let i, c : self) {
+        if (skip) {
+            set skip = false;
+        } else if (c == d) {
+            return ok(i + 1);
+        } else if (c == '\\' && escapes.is_nonempty()) {
+            // A backslash escapes its next char. The escaped char must be
+            // allowed, and is content: skipping it is what keeps an escaped
+            // delimiter from closing the token.
+            match (self[i + 1]) {
+                some(e) => {
+                    if (!escapes.contains(e)) {
+                        return err(LexError {
+                            message: `unknown escape sequence \\{e}`,
+                            span: at + i..at + i + 2,
+                        });
+                    };
+                    set skip = true;
+                },
+                // A backslash with nothing after it: the end of the source cut
+                // the escape off, which is its own error rather than a plain
+                // unterminated token.
+                none => {
+                    return err(LexError { message: incomplete_escape(), span: at + i..at + i + 1 });
+                },
             };
         };
-        set i++;
     }
-    if (!closed) {
-        return err(LexError { message: unterminated_msg(msg), span: at..at + self.len() });
-    };
-    ok(i)
+    err(LexError { message: unterminated_msg(msg), span: at..at + self.len() })
 }
+
+# The message for a backslash the end of the source cut off. Shared by the
+# `Delimited` scan and the template scan, which decode the same escapes.
+fn incomplete_escape() -> str { "incomplete escape sequence: \\ at end of input" }
 
 # The message for an unterminated scan: a rule's own `unterminated` override, or
 # the generic default when it left the field empty.
@@ -831,12 +838,19 @@ fn template_scan<K>(
             set seg_start = i - 1;
             set text_start = i;
         } else {
-            if (c == '\\' && escapes.is_nonempty() && i + 1 < src.len()) {
-                if (!src[i + 1].is_some_and(|e| escapes.contains(e))) {
-                    return err(LexError {
-                        message: "unknown escape sequence \\" +++ src[i + 1..i + 2],
-                        span: i..i + 2,
-                    });
+            if (c == '\\' && escapes.is_nonempty()) {
+                match (src[i + 1]) {
+                    some(e) => {
+                        if (!escapes.contains(e)) {
+                            return err(LexError {
+                                message: `unknown escape sequence \\{e}`,
+                                span: i..i + 2,
+                            });
+                        };
+                    },
+                    none => {
+                        return err(LexError { message: incomplete_escape(), span: i..i + 1 });
+                    },
                 };
                 set i += 2;
             } else {
@@ -1154,6 +1168,13 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(`"a\\nb"`, esc)? == toks([tok(`"a\\nb"`, Str("a\nb"), 0..6)]));
     assert(lex(`"a\\xb"`, esc) == err(lex_err("unknown escape sequence \\x", 2..4)));
 
+    // A backslash the source ends on is an incomplete escape, not merely an
+    // unterminated token — and only where escapes are on: `strs` scans none.
+    assert(
+        lex(`"a\\`, esc) == err(lex_err("incomplete escape sequence: \\ at end of input", 2..3)),
+    );
+    assert(lex(`"a\\`, strs) == err(lex_err("unterminated delimited token", 0..3)));
+
     // Try: a fallible string emit. `nonempty_str` decodes, then enforces a
     // content rule the *caller* owns — an empty string literal is an error whose
     // message the library pairs with the token's span. A well-formed one passes.
@@ -1300,6 +1321,9 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         ]),
     );
     assert(lex("`a\\qb`", tpls) == err(lex_err("unknown escape sequence \\q", 2..4)));
+    assert(
+        lex("`a\\", tpls) == err(lex_err("incomplete escape sequence: \\ at end of input", 2..3)),
+    );
     assert(lex("`ab", tpls) == err(lex_err("unterminated template literal", 0..3)));
     assert(lex("`a{x", tpls) == err(lex_err("unterminated template literal interpolation", 2..3)));
     // Brace depth: braces lexed as their own tokens inside an interpolation nest.
@@ -1491,11 +1515,11 @@ allocations: 434
 deallocations: 434
 reallocations: 71
 bytes allocated: 67520
-instructions executed: 366352
-binary size: 2531288
-  code: 1693512
-  data: 11292
-  metadata: 826484
+instructions executed: 370144
+binary size: 2546976
+  code: 1703560
+  data: 11700
+  metadata: 831716
 functions:
   __arr_drop_StepResult$Kind:
     calls: 9
@@ -1540,7 +1564,7 @@ functions:
     calls: 113
     bytes: 632
   __eq_LexError:
-    calls: 15
+    calls: 18
     bytes: 128
   __eq_LexResult$Kind:
     calls: 53
@@ -1555,7 +1579,7 @@ functions:
     calls: 106
     bytes: 284
   __eq___builtin_Span:
-    calls: 132
+    calls: 135
     bytes: 104
   __m1__unescape:
     calls: 24
@@ -1571,7 +1595,7 @@ functions:
     bytes: 96
   __test$lex:
     calls: 1
-    bytes: 1564940
+    bytes: 1574396
   __test$lex$lambda0:
     calls: 0
     bytes: 128
@@ -1657,13 +1681,13 @@ functions:
     calls: 366
     bytes: (external)
   aipl_arr_inc:
-    calls: 3243
+    calls: 3255
     bytes: (external)
   aipl_arr_reserve:
     calls: 366
     bytes: (external)
   aipl_array_dec:
-    calls: 4881
+    calls: 4908
     bytes: (external)
   aipl_array_new:
     calls: 191
@@ -1678,7 +1702,7 @@ functions:
     calls: 3
     bytes: (external)
   aipl_assert:
-    calls: 89
+    calls: 92
     bytes: (external)
   aipl_test_begin:
     calls: 3
@@ -1696,8 +1720,8 @@ functions:
     calls: 2
     bytes: 1780
   delimited_len:
-    calls: 26
-    bytes: 1592
+    calls: 28
+    bytes: 1856
   esc_str:
     calls: 2
     bytes: 140
@@ -1717,10 +1741,10 @@ functions:
     calls: 3
     bytes: 5956
   lex$Kind:
-    calls: 75
+    calls: 78
     bytes: 1292
   lex_step$Kind:
-    calls: 175
+    calls: 178
     bytes: 30928
   main:
     calls: 1
@@ -1735,13 +1759,13 @@ functions:
     calls: 4
     bytes: 3928
   step_result$Kind:
-    calls: 474
+    calls: 477
     bytes: 17516
   template_scan$Kind:
-    calls: 19
-    bytes: 2584
+    calls: 20
+    bytes: 2912
   template_step$Kind:
-    calls: 31
+    calls: 32
     bytes: 444
   to_eol_len:
     calls: 0

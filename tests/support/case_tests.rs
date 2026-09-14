@@ -573,6 +573,7 @@ case_tests! {
     cases_strings_join = "cases/strings/join",
     cases_strings_join_gap_separators = "cases/strings/join_gap_separators",
     cases_strings_len = "cases/strings/len",
+    cases_strings_literals_err_incomplete_escape = "cases/strings/literals/err_incomplete_escape",
     cases_strings_literals_err_unknown_escape = "cases/strings/literals/err_unknown_escape",
     cases_strings_literals_err_unterminated_string = "cases/strings/literals/err_unterminated_string",
     cases_strings_literals_print_empty_string = "cases/strings/literals/print_empty_string",
