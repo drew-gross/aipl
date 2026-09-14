@@ -19,26 +19,49 @@ import { Expr, Ident, ident, num, show_exprs } from "./expr.aipl";
 # struct variant there and a named payload here, which is as close as the two
 # declarations get: the slot names are the same three, in the same order.
 #
-# `Array` — the destructuring `[a, b] => ..` arm — holds a list of
-# *expressions*, which is why nothing under the `pattern` production produces
-# one: it hangs off `match_arm`, where the elements are an ordinary `args` list.
-#
-# The nested forms: `Tuple` is `(p, q)`, `Int` an integer literal, and `Nested`
-# a constructor whose slots are patterns rather than plain names —
-# `some(1)`, `Pair(x, none)`. A constructor whose slots are all plain names is
-# the `Ctor` it always was, so an arm written the old way lowers as it always
-# did; `nested_or_ctor` makes that choice. Whether a bare name in a nested slot
-# binds or names a case is decided on the Rust side (`Pattern::normalized`, the
-# `Bind` case this declaration lacks), by the same rule `is_binder_name` states
-# here.
+# `Ctor` and `Nested` split one source shape between them: a constructor whose
+# slots are all plain names is the `Ctor` it always was, so an arm written the
+# old way lowers as it always did, and only a constructor over real
+# sub-patterns is `Nested` — `nested_or_ctor` makes that choice. Whether a bare
+# name in a nested slot binds or names a case is decided on the Rust side
+# (`Pattern::normalized`, the `Bind` case this declaration lacks), by the same
+# rule `is_binder_name` states here.
 variant Pat =
-    | Ctor(name: str, bindings: str[], ignore_payload: bool)
+    # A constructor whose slots are all plain binder names — `some(v)`,
+    # `Pair(a, b)` — or a bare name (`none`, `Nil`), or the `Ctor(..)` form that
+    # matches a case and ignores what it carries. The two optional slots are
+    # both "nothing" for a bare name, which is the common construction.
+    | Ctor(
+        # The case name, as written — qualified (`V.A`) or not.
+        name: str,
+        # One binder per payload slot, in slot order; empty for a bare name.
+        bindings: str[] = [],
+        # Whether the arm was written `name(..)`: the case's payload is matched
+        # but nothing is bound. Never true alongside bindings.
+        ignore_payload: bool = false
+    )
+    # A string literal pattern (`"lit" => ..`), against a `str` scrutinee.
     | Str(str)
+    # A char literal pattern (`'c' => ..`), against a `char` scrutinee.
     | Char(char)
+    # The destructuring `[a, b] => ..` arm. The elements are *expressions*, not
+    # patterns — the arm hangs off `match_arm`, where they are an ordinary
+    # `args` list.
     | Array(Expr[])
+    # `_` — matches anything, binds nothing.
     | Wildcard
+    # `(p, q)` — a tuple of sub-patterns, one per element.
     | Tuple(Pat[])
-    | Nested(name: str, args: Pat[])
+    # A constructor whose slots are patterns rather than plain names —
+    # `some(1)`, `Pair(x, none)`. A slot that is a bare name is a nullary `Ctor`
+    # here; whether it binds or names a case is decided on the Rust side.
+    | Nested(
+        # The case name, as written.
+        name: str,
+        # One sub-pattern per payload slot, in slot order.
+        args: Pat[]
+    )
+    # An integer literal pattern (`1 => ..`).
     | Int(i64)
 
 # Whether a bare name in a nested pattern slot is a binder rather than a case:
@@ -60,20 +83,15 @@ pub fn is_binder_name(self: str) -> bool {
 # a case by shape alone), which is what the binder test reads.
 pub fn nested_or_ctor(name: str, args: Pat[]) -> Pat {
     if (args.all(is_plain_binder)) {
-        return Ctor(name, args.map(binder_name), false);
+        return Ctor(name, bindings=args.map(binder_name));
     };
     Nested(name, args)
 }.test({
-    let plain: Pat[] = [Ctor("a", [], false), Ctor("b", [], false)];
+    let plain: Pat[] = [Ctor("a"), Ctor("b")];
     assert(nested_or_ctor("Pair", plain).show_pat() == "Pair(a, b)");
     assert(nested_or_ctor("some", [Int(1)]).show_pat() == "some(1)");
     // A capitalised name is a case, so the constructor over it nests.
-    assert(
-        nested_or_ctor(
-            "Pair",
-            [Ctor("Nil", [], false), Ctor("x", [], false)],
-        ).show_pat() == "Pair(Nil, x)",
-    );
+    assert(nested_or_ctor("Pair", [Ctor("Nil"), Ctor("x")]).show_pat() == "Pair(Nil, x)");
     // `..` and no slots keep the plain shape.
     let no_args: Pat[] = [];
     assert(nested_or_ctor("Empty", no_args).show_pat() == "Empty");
@@ -113,17 +131,16 @@ pub fn show_pat(self: Pat) -> str {
         Int(n) => `{n}`,
     }
 }.test({
-    let no_bindings: str[] = [];
     assert(Wildcard.show_pat() == "_");
-    assert(Ctor("none", no_bindings, false).show_pat() == "none");
-    assert(Ctor("some", ["v"], false).show_pat() == "some(v)");
-    assert(Ctor("Pair", ["a", "b"], false).show_pat() == "Pair(a, b)");
-    assert(Ctor("Circle", no_bindings, true).show_pat() == "Circle(..)");
+    assert(Ctor("none").show_pat() == "none");
+    assert(Ctor("some", bindings=["v"]).show_pat() == "some(v)");
+    assert(Ctor("Pair", bindings=["a", "b"]).show_pat() == "Pair(a, b)");
+    assert(Ctor("Circle", ignore_payload=true).show_pat() == "Circle(..)");
     assert(Str("hi").show_pat() == "Str(hi)");
     assert(Char('x').show_pat() == "Char(x)");
     assert(Array([num(1), ident("x")]).show_pat() == "[1, x]");
     assert(Tuple([Int(1), Nested("some", [Int(1)])]).show_pat() == "(1, some(1))");
-    assert(Nested("Pair", [Ctor("lo", [], false), Wildcard]).show_pat() == "Pair(lo, _)");
+    assert(Nested("Pair", [Ctor("lo"), Wildcard]).show_pat() == "Pair(lo, _)");
 })
 
 # The elements of a pattern list, comma-separated.
@@ -146,20 +163,15 @@ pub fn pat_bindings(self: Pat) -> str[] {
     }
 }.test({
     let none_bound: str[] = [];
-    assert(Ctor("Pair", ["a", "b"], false).pat_bindings() == ["a", "b"]);
-    assert(Ctor("Circle", none_bound, true).pat_bindings() == none_bound);
+    assert(Ctor("Pair", bindings=["a", "b"]).pat_bindings() == ["a", "b"]);
+    assert(Ctor("Circle", ignore_payload=true).pat_bindings() == none_bound);
     assert(Wildcard.pat_bindings() == none_bound);
     assert(Str("s").pat_bindings() == none_bound);
     // A literal element of an array pattern is matched, not bound.
     assert(Array([ident("a"), num(1), ident("b")]).pat_bindings() == ["a", "b"]);
     // Nested: every binder, depth first, left to right; a case name is not one.
-    assert(
-        Tuple([Ctor("lo", [], false), Nested("some", [Ctor("hi", [], false)])]).pat_bindings() == [
-            "lo",
-            "hi",
-        ],
-    );
-    assert(Nested("Pair", [Ctor("Nil", [], false), Int(1)]).pat_bindings() == none_bound);
+    assert(Tuple([Ctor("lo"), Nested("some", [Ctor("hi")])]).pat_bindings() == ["lo", "hi"]);
+    assert(Nested("Pair", [Ctor("Nil"), Int(1)]).pat_bindings() == none_bound);
 })
 
 # The binders of one nested slot: a bare binder name is itself, a case or a
@@ -208,13 +220,12 @@ pub fn pat_label(self: Pat) -> str {
         Int(..) => "an integer pattern",
     }
 }.test({
-    let none_bound: str[] = [];
-    assert(Ctor("some", ["v"], false).pat_label() == `"some"`);
+    assert(Ctor("some", bindings=["v"]).pat_label() == `"some"`);
     assert(Wildcard.pat_label() == `"_"`);
     assert(Str("s").pat_label() == "a string pattern");
     assert(Array([ident("a")]).pat_label() == "an array pattern");
     assert(Char('c').pat_label() == "a char pattern");
-    assert(Ctor("none", none_bound, false).pat_label() == `"none"`);
+    assert(Ctor("none").pat_label() == `"none"`);
 })
 
 # The binder list as the same diagnostic writes it: each name quoted, or the
@@ -237,11 +248,11 @@ allocations: 149
 deallocations: 149
 reallocations: 16
 bytes allocated: 10521
-instructions executed: 7775
-binary size: 91872
-  code: 56764
-  data: 2875
-  metadata: 32233
+instructions executed: 7781
+binary size: 91784
+  code: 56788
+  data: 2731
+  metadata: 32265
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -311,7 +322,7 @@ functions:
     bytes: 1848
   __test$show_pat:
     calls: 1
-    bytes: 3732
+    bytes: 3756
   __to_str_i64:
     calls: 4
     bytes: 204

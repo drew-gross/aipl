@@ -2290,17 +2290,15 @@ fn lower_pattern(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     };
     let name = qualified_name(toks, head);
     if (kids.is_empty()) {
-        let no_bindings: str[] = [];
         if (name == "_") {
             return ok(APat(PatWildcard));
         };
-        return ok(APat(PatCtor(name, no_bindings, false)));
+        return ok(APat(PatCtor(name)));
     };
     let payload = kid(kids, 0, sp)?;
     if (let APayload(slots, ignore_payload) = payload) {
-        let no_bindings: str[] = [];
         if (ignore_payload) {
-            return ok(APat(PatCtor(name, no_bindings, true)));
+            return ok(APat(PatCtor(name, ignore_payload=true)));
         };
         return ok(APat(nested_or_ctor(name, slots)));
     };
@@ -4307,7 +4305,7 @@ allocations: 1979075
 deallocations: 1979075
 reallocations: 245238
 bytes allocated: 293944877
-instructions executed: 459948855
+instructions executed: 459948831
 binary size: 5914216
   code: 3862876
   data: 48620

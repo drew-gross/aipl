@@ -26,47 +26,101 @@
           </h3>
           <pre class="signature"><code>variant Pat</code></pre>
 
-          <div class="doc"><p><code>aipl_syntax::ast::Pattern</code>, less its <code>Bind</code> case. Its <code>Ctor</code> case is a struct variant there and a named payload here, which is as close as the two declarations get: the slot names are the same three, in the same order.</p><p><code>Array</code> — the destructuring <code>[a, b] =&gt; ..</code> arm — holds a list of *expressions*, which is why nothing under the <code>pattern</code> production produces one: it hangs off <code>match_arm</code>, where the elements are an ordinary <code>args</code> list.</p><p>The nested forms: <code>Tuple</code> is <code>(p, q)</code>, <code>Int</code> an integer literal, and <code>Nested</code> a constructor whose slots are patterns rather than plain names — <code>some(1)</code>, <code>Pair(x, none)</code>. A constructor whose slots are all plain names is the <code>Ctor</code> it always was, so an arm written the old way lowers as it always did; <code>nested_or_ctor</code> makes that choice. Whether a bare name in a nested slot binds or names a case is decided on the Rust side (<code>Pattern::normalized</code>, the <code>Bind</code> case this declaration lacks), by the same rule <code>is_binder_name</code> states here.</p></div>
+          <div class="doc"><p><code>aipl_syntax::ast::Pattern</code>, less its <code>Bind</code> case. Its <code>Ctor</code> case is a struct variant there and a named payload here, which is as close as the two declarations get: the slot names are the same three, in the same order.</p><p><code>Ctor</code> and <code>Nested</code> split one source shape between them: a constructor whose slots are all plain names is the <code>Ctor</code> it always was, so an arm written the old way lowers as it always did, and only a constructor over real sub-patterns is <code>Nested</code> — <code>nested_or_ctor</code> makes that choice. Whether a bare name in a nested slot binds or names a case is decided on the Rust side (<code>Pattern::normalized</code>, the <code>Bind</code> case this declaration lacks), by the same rule <code>is_binder_name</code> states here.</p></div>
 
 
           <ul class="cases">
 
-            <li id="item-Ctor"><code>Ctor(name: str, bindings: str[], ignore_payload: bool)</code>
+            <li id="item-Ctor"><code>Ctor(name: str, bindings: str[] = .., ignore_payload: bool = ..)</code>
 
+              <div class="doc"><p>A constructor whose slots are all plain binder names — <code>some(v)</code>, <code>Pair(a, b)</code> — or a bare name (<code>none</code>, <code>Nil</code>), or the <code>Ctor(..)</code> form that matches a case and ignores what it carries. The two optional slots are both &quot;nothing&quot; for a bare name, which is the common construction.</p></div>
+
+
+              <ul class="slots">
+
+                <li><code>name: str</code>
+
+                  <div class="doc"><p>The case name, as written — qualified (<code>V.A</code>) or not.</p></div>
+
+                </li>
+
+                <li><code>bindings: str[] = ..</code>
+
+                  <div class="doc"><p>One binder per payload slot, in slot order; empty for a bare name.</p></div>
+
+                </li>
+
+                <li><code>ignore_payload: bool = ..</code>
+
+                  <div class="doc"><p>Whether the arm was written <code>name(..)</code>: the case's payload is matched but nothing is bound. Never true alongside bindings.</p></div>
+
+                </li>
+
+              </ul>
 
             </li>
 
             <li id="item-Str"><code>Str(str)</code>
+
+              <div class="doc"><p>A string literal pattern (<code>&quot;lit&quot; =&gt; ..</code>), against a <code>str</code> scrutinee.</p></div>
 
 
             </li>
 
             <li id="item-Char"><code>Char(char)</code>
 
+              <div class="doc"><p>A char literal pattern (<code>'c' =&gt; ..</code>), against a <code>char</code> scrutinee.</p></div>
+
 
             </li>
 
             <li id="item-Array"><code>Array(Expr[])</code>
+
+              <div class="doc"><p>The destructuring <code>[a, b] =&gt; ..</code> arm. The elements are *expressions*, not patterns — the arm hangs off <code>match_arm</code>, where they are an ordinary <code>args</code> list.</p></div>
 
 
             </li>
 
             <li id="item-Wildcard"><code>Wildcard</code>
 
+              <div class="doc"><p><code>_</code> — matches anything, binds nothing.</p></div>
+
 
             </li>
 
             <li id="item-Tuple"><code>Tuple(Pat[])</code>
+
+              <div class="doc"><p><code>(p, q)</code> — a tuple of sub-patterns, one per element.</p></div>
 
 
             </li>
 
             <li id="item-Nested"><code>Nested(name: str, args: Pat[])</code>
 
+              <div class="doc"><p>A constructor whose slots are patterns rather than plain names — <code>some(1)</code>, <code>Pair(x, none)</code>. A slot that is a bare name is a nullary <code>Ctor</code> here; whether it binds or names a case is decided on the Rust side.</p></div>
+
+
+              <ul class="slots">
+
+                <li><code>name: str</code>
+
+                  <div class="doc"><p>The case name, as written.</p></div>
+
+                </li>
+
+                <li><code>args: Pat[]</code>
+
+                  <div class="doc"><p>One sub-pattern per payload slot, in slot order.</p></div>
+
+                </li>
+
+              </ul>
 
             </li>
 
             <li id="item-Int"><code>Int(i64)</code>
+
+              <div class="doc"><p>An integer literal pattern (<code>1 =&gt; ..</code>).</p></div>
 
 
             </li>

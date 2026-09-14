@@ -76,6 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  rename Pat to Pattern (file and variant)
   unterminated error messages can be DRYer
   in show_first we shouldn't need a typed empty array literal.
   union_syms should just be actual set union

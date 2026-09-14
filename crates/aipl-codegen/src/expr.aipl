@@ -166,7 +166,7 @@ pub fn show_expr(self: Expr) -> str {
     assert(
         expr(Shim("prints", [("print", "p")], three)).show_expr() == "Shim(prints, [print = p], 3)",
     );
-    let arm = MatchArm { pattern: Ctor("some", ["v"], false), body: ident("v"), span: 0..0 };
+    let arm = MatchArm { pattern: Ctor("some", bindings=["v"]), body: ident("v"), span: 0..0 };
     assert(expr(Match(ident("o"), [arm])).show_expr() == "Match(o, [some(v) => v])");
     assert(
         expr(Lambda(
