@@ -1857,14 +1857,7 @@ fn index_or_from(self: W) -> WDocs!FmtError {
 # The chain layout: a `SoftLine` before every call segment, so a break puts each
 # `.method(..)` on its own line while field access stays glued.
 fn chain_docs(segs: Seg[]) -> Doc[] {
-    mut out = [];
-    for (let s : segs) {
-        if (s.is_call) {
-            set out.push(SoftLine);
-        };
-        set out.push(s.doc);
-    }
-    out
+    segs.map(|s: Seg| if (s.is_call) { [SoftLine, s.doc] } else { [s.doc] }).join()
 }
 
 // ---------- atoms ----------
@@ -3121,15 +3114,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 15808
-deallocations: 15808
-reallocations: 1775
-bytes allocated: 3300382
-instructions executed: 26879310
-binary size: 10057200
-  code: 6351388
+allocations: 15812
+deallocations: 15812
+reallocations: 1771
+bytes allocated: 3300622
+instructions executed: 26879546
+binary size: 10058416
+  code: 6352284
   data: 31028
-  metadata: 3674784
+  metadata: 3675104
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3144,7 +3137,7 @@ functions:
     calls: 26
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1739
+    calls: 1743
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
     calls: 1
@@ -3168,7 +3161,7 @@ functions:
     calls: 36
     bytes: 140
   __arr_retain___m1__Doc:
-    calls: 1779
+    calls: 1775
     bytes: 116
   __arr_retain___m9__StepResult$__m8__AiplTok:
     calls: 1
@@ -3408,28 +3401,28 @@ functions:
     calls: 0
     bytes: 836
   aipl_arr_extend:
-    calls: 4777
+    calls: 4783
     bytes: (external)
   aipl_arr_inc:
-    calls: 288935
+    calls: 288943
     bytes: (external)
   aipl_arr_reserve:
-    calls: 5022
+    calls: 5030
     bytes: (external)
   aipl_arr_slice:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 411815
+    calls: 411829
     bytes: (external)
   aipl_array_new:
-    calls: 3635
+    calls: 3639
     bytes: (external)
   aipl_array_push:
-    calls: 2125
+    calls: 2123
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1963
+    calls: 1955
     bytes: (external)
   aipl_array_with_cap:
     calls: 378
@@ -3664,7 +3657,7 @@ functions:
     bytes: 296
   postfix:
     calls: 144
-    bytes: 5616
+    bytes: 6512
   postfix_segs:
     calls: 144
     bytes: 3576

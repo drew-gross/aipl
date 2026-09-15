@@ -199,10 +199,10 @@ deallocations: 20250
 reallocations: 2930
 bytes allocated: 4068847
 instructions executed: 8615043
-binary size: 6642656
-  code: 4367624
+binary size: 6643872
+  code: 4368520
   data: 10450
-  metadata: 2264582
+  metadata: 2264902
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1088,7 +1088,7 @@ functions:
     bytes: 296
   __m35__postfix:
     calls: 0
-    bytes: 5616
+    bytes: 6512
   __m35__postfix_segs:
     calls: 0
     bytes: 3576

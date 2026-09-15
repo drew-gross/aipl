@@ -182,7 +182,6 @@ HOF:
 math:
 
 syntax:
-  I haven't decided whether I want reserve to be user-accessible so for now please make it an error if it's used outside the implementation of a builtin.
   forwarding omittables
   more match power: earlier matches in a multi-match can be used in later matches
   generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
@@ -365,9 +364,6 @@ nonempty lists:
   let vec: T[1-] = ... is a type that represents a non-empty list
   T[-5] for list len 0-5
   T[5] for list len exactly 5
-
-chain_docs:
-  rewrite this somehow, there must be a better way
 
 abi:
 
