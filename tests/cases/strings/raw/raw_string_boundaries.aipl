@@ -1,15 +1,14 @@
 import { concat as +++, print } from builtins;
 
-// Brackets make the exact boundaries visible. An empty raw string and one
-// holding only the trimmed surrounding newline are both ""; trailing spaces
-// inside a line are kept verbatim.
+// Brackets make the exact boundaries visible. These were written as `"""`
+// blocks — an empty one, one holding only the trimmed surrounding newline,
+// and one with trailing spaces — and the formatter respells a block whose
+// value is one line as the single-line literal, which is the value each of
+// them has: "", "", and "kept  " with its spaces verbatim.
 fn main() !prints -> i64 {
-    print("[" +++ """""" +++ "]");
-    print(
-        "[" +++ """
-        """ +++ "]",
-    );
-    print("[" +++ """kept  """ +++ "]");
+    print("[" +++ "" +++ "]");
+    print("[" +++ "" +++ "]");
+    print("[" +++ "kept  " +++ "]");
     0
 }
 --- stdout ---

@@ -137,13 +137,7 @@ pub fn fill_or_add_section(contents: str, section: str, body: str) -> str {
     // Section present: the header is the final, unterminated line (no
     // trailing `\n` at all).
     assert(
-        fill_or_add_section(
-            """
-                --- foo ---
-            """,
-            "foo",
-            "new",
-        ) == """
+        fill_or_add_section("--- foo ---", "foo", "new") == """
             --- foo ---
             new
 
@@ -268,9 +262,9 @@ deallocations: 36
 reallocations: 0
 bytes allocated: 3228
 instructions executed: 14811
-binary size: 14152
+binary size: 14072
   code: 7340
-  data: 2784
+  data: 2704
   metadata: 4028
 functions:
   __builtin_any$str$lam$fill_or_add_section$lambda0:

@@ -16,10 +16,16 @@ fn main() !prints {
     let plain_tick = `plain`;
     // Shared escapes (`\n`, `\\`) ride along; an escaped backslash is one char.
     let shared = "a\n\"b\"\\";
-    // Interpolated templates and the block forms are not touched.
+    // An interpolated template is not touched. A block whose value is one
+    // line is respelled as a single-line literal, escapes and all — under
+    // whichever delimiter needs fewer — while one spanning lines stays.
     let tpl = `x {1} "y"`;
     let raw = """
         "q" \{
+    """;
+    let block = """
+        two
+        lines
     """;
     // Literal patterns are respelled exactly like expression literals.
     match (quoted) {
@@ -48,10 +54,15 @@ fn main() !prints {
     let plain_tick = `plain`;
     // Shared escapes (`\n`, `\\`) ride along; an escaped backslash is one char.
     let shared = `a\n"b"\\`;
-    // Interpolated templates and the block forms are not touched.
+
+    // An interpolated template is not touched. A block whose value is one
+    // line is respelled as a single-line literal, escapes and all — under
+    // whichever delimiter needs fewer — while one spanning lines stays.
     let tpl = `x {1} "y"`;
-    let raw = """
-        "q" \{
+    let raw = `"q" \\\{`;
+    let block = """
+        two
+        lines
     """;
     // Literal patterns are respelled exactly like expression literals.
     match (quoted) {

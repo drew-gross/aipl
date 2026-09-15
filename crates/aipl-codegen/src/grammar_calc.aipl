@@ -286,7 +286,7 @@ pub fn parse_calc(src: str) -> Calc!ParseError {
     //
     // Too big for an `i64`: a *lowering* error, raised after the parse
     // succeeded, and propagated out unchanged.
-    let too_big = """integer literal "99999999999999999999" overflows i64""";
+    let too_big = `integer literal "99999999999999999999" overflows i64`;
     assert(msg_of("99999999999999999999") == too_big);
     // ... and it is the whole parse that fails, not just that operand.
     assert(msg_of("1 + 99999999999999999999") == too_big);

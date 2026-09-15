@@ -289,9 +289,7 @@ pub fn json_cst(src: str) -> Cst!ParseError {
         shown("[1, true]")? == "(value (array [[ (value (number 1)) , (value (bool ~  true)) ]]))",
     );
     assert(
-        shown(
-            """{"a": null}""",
-        )? == """(value (object [{ (member "a" : (value (null ~  null))) }]))""",
+        shown("{\"a\": null}")? == "(value (object [{ (member \"a\" : (value (null ~  null))) }]))",
     );
 
     // The sign is part of the `number` node, as two leaves rather than one
@@ -302,9 +300,7 @@ pub fn json_cst(src: str) -> Cst!ParseError {
     // concatenate back to the source — including the run after the last token,
     // which no token consumption reaches and which attaches to the root.
     assert(shown(" 7 ")? == "(value (number ~  7) ~ )");
-    let padded = """
-        { "a" : [ 1 , 2 ] }
-    """;
+    let padded = "{ \"a\" : [ 1 , 2 ] }";
     assert(json_cst(padded)?.text(padded) == padded);
 })
 
@@ -343,22 +339,22 @@ pub fn parse_json(src: str) -> Json!ParseError {
 
     // ---- objects ----
     assert(parse_json("{}")? == Object([]));
-    assert(parse_json("""{"a": 1}""")? == Object([Member("a", Number("1"))]));
+    assert(parse_json("{\"a\": 1}")? == Object([Member("a", Number("1"))]));
     assert(
-        parse_json("""{"a": 1, "b": [2]}""")? == Object([
+        parse_json(`\{"a": 1, "b": [2]\}`)? == Object([
             Member("a", Number("1")),
             Member("b", Array([Number("2")])),
         ]),
     );
     // A key with an escape in it goes through the same decoding as a value.
-    assert(parse_json("""{"a\tb": null}""")? == Object([Member("a\tb", Null)]));
+    assert(parse_json("{\"a\\tb\": null}")? == Object([Member("a\tb", Null)]));
 
     // ---- strict about trailing separators ----
     //
     // `trailing_sep=false` leaves the dangling comma unconsumed, so
     // the enclosing rule is what reports it.
     assert(msg_of("[1, 2,]") == "expected a JSON value, found `]`");
-    assert(msg_of("""{"a": 1,}""") == "expected Str, found `}`");
+    assert(msg_of("{\"a\": 1,}") == "expected Str, found `}`");
 
     // ---- errors ----
     assert(msg_of("") == "expected a JSON value, found end of input");
@@ -366,7 +362,7 @@ pub fn parse_json(src: str) -> Json!ParseError {
         msg_of("[1") == "expected `,` or `]`, found end of input (`[` at line 1 is never closed)",
     );
     assert(msg_of("{1: 2}") == "expected Str or `}`, found `1`");
-    assert(msg_of("""{"a" 1}""") == "expected `:`, found `1`");
+    assert(msg_of("{\"a\" 1}") == "expected `:`, found `1`");
     // Every token must be consumed: two documents is not one.
     assert(msg_of("1 2") == "expected end of input, found `2`");
     // A lex failure reports in the same shape as a parse failure.
@@ -394,22 +390,22 @@ pub fn render_json(self: Json) -> str {
     }
 }.test({
     // ---- round trip: parse -> lower -> render -> parse ----
-    let src = """{"name":"ada","tags":["x","y"],"n":-1.5,"ok":true,"nil":null}""";
+    let src = `\{"name":"ada","tags":["x","y"],"n":-1.5,"ok":true,"nil":null\}`;
     let v = parse_json(src)?;
     // Rendering is canonical, and this source is already in that spelling.
     assert(v.render_json() == src);
     assert(parse_json(v.render_json())? == v);
 
     // ... and from a source `render_json` would never have written.
-    let messy = """{ "a" : [ 1 , 2 ] , "b" : { } }""";
+    let messy = "{ \"a\" : [ 1 , 2 ] , \"b\" : { } }";
     let mv = parse_json(messy)?;
-    assert(mv.render_json() == """{"a":[1,2],"b":{}}""");
+    assert(mv.render_json() == "{\"a\":[1,2],\"b\":{}}");
     assert(parse_json(mv.render_json())? == mv);
 
     // Escapes survive the round trip: decoded into the AST, re-escaped on the
     // way out, decoded again by the second parse.
-    let esc = parse_json("""{"a\"b": "c\nd"}""")?;
-    assert(esc.render_json() == """{"a\"b":"c\nd"}""");
+    let esc = parse_json(`\{"a\\"b": "c\\nd"\}`)?;
+    assert(esc.render_json() == `\{"a\\"b":"c\\nd"\}`);
     assert(parse_json(esc.render_json())? == esc);
 
     assert(render_json(Array([])) == "[]");
@@ -442,9 +438,9 @@ fn escape_json(s: str) -> str {
     out
 }.test({
     assert(escape_json("plain") == "plain");
-    assert(escape_json(`a"b`) == """a\"b""");
-    assert(escape_json("a\nb") == """a\nb""");
-    assert(escape_json("a\\b") == """a\\b""");
+    assert(escape_json(`a"b`) == `a\\"b`);
+    assert(escape_json("a\nb") == "a\\nb");
+    assert(escape_json("a\\b") == "a\\\\b");
     assert(escape_json("") == "");
 })
 
@@ -500,9 +496,9 @@ deallocations: 18645
 reallocations: 2721
 bytes allocated: 2303070
 instructions executed: 4797276
-binary size: 462640
+binary size: 462600
   code: 302776
-  data: 7932
+  data: 7892
   metadata: 151932
 functions:
   __arr_drop_Json:

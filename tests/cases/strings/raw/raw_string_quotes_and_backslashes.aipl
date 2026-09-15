@@ -1,10 +1,12 @@
 import { print } from builtins;
 
 // Raw strings are verbatim: embedded quotes (`"`, `""`) and backslashes are
-// ordinary characters (no escapes), and a single-line raw string isn't
-// de-dented. Both lines print exactly as written.
+// ordinary characters (no escapes). The first line was a single-line raw
+// string; the formatter respells one of those as a single-line literal with
+// the escapes its value needs, so it is now the backtick spelling of the same
+// text. Both lines print exactly as written.
 fn main() !prints -> i64 {
-    print("""path C:\dir\new "quoted" and ""doubled"" end""");
+    print(`path C:\\dir\\new "quoted" and ""doubled"" end`);
     let multi = """
         line "with" quotes
         and a \backslash

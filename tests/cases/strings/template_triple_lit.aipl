@@ -5,7 +5,7 @@ fn main() !prints {
     let n = 42;
     print(```hello {name}```);
     print(```value is {n}```);
-    print(```no interpolation```);
+    print(`no interpolation`);
     print(
         ```
             indented {name}

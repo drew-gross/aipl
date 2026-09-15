@@ -167,18 +167,18 @@ fn verify_same_tokens(input: str, output: str) -> !FmtError {
 })
 
 # A token's value for the preservation check: `to_str` of its kind, except that
-# a single-line string's delimiter is not part of it — `"a"` and `` `a` `` are
-# the same token, and respelling one as the other (the walker's `requote`) is
-# the one edit the formatter makes inside a literal.
+# a string's delimiter is not part of it — `"a"`, `` `a` `` and a `"""` block
+# holding `a` are the same token, and respelling one as another (the walker's
+# `requote`) is the one edit the formatter makes inside a literal.
 fn token_value(kind: AiplTok) -> str {
-    match (kind) {
-        StrLit(v, Quoted) | StrLit(v, Backtick) => `str {to_str(v)}`,
-        _ => to_str(kind),
-    }
+    if (let StrLit(v, _) = kind) {
+        return `str {to_str(v)}`;
+    };
+    to_str(kind)
 }.test({
     assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", Backtick)));
+    assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", TripleQuoted)));
     assert(token_value(StrLit("a", Quoted)) != token_value(StrLit("b", Quoted)));
-    assert(token_value(StrLit("a", Quoted)) != token_value(StrLit("a", TripleQuoted)));
 })
 
 # Every token's value, as a sorted multiset — minus the commas and `|`s that
@@ -194,15 +194,15 @@ fn token_values(lexed: LexResult<AiplTok>) -> str[] {
 # only — as a sorted multiset.
 fn comment_texts(lexed: LexResult<AiplTok>) -> str[] { lexed.trivia.map(|t| t.text.text).sort() }
 --- performance ---
-allocations: 20250
-deallocations: 20250
+allocations: 20253
+deallocations: 20253
 reallocations: 2930
-bytes allocated: 4068847
-instructions executed: 8615043
-binary size: 6644816
-  code: 4369160
+bytes allocated: 4069045
+instructions executed: 8613039
+binary size: 6643856
+  code: 4368724
   data: 10450
-  metadata: 2265206
+  metadata: 2264682
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1139,7 +1139,7 @@ functions:
     bytes: 5876
   __m35__str_atom:
     calls: 0
-    bytes: 612
+    bytes: 668
   __m35__struct_atom:
     calls: 0
     bytes: 3312
@@ -1223,7 +1223,10 @@ functions:
     bytes: 64
   __m37__requote:
     calls: 0
-    bytes: 2980
+    bytes: 2988
+  __m37__unblock:
+    calls: 0
+    bytes: 2952
   __m3__trim_end_while$lam$__builtin_is_space:
     calls: 14
     bytes: 392
@@ -1670,15 +1673,15 @@ functions:
     bytes: 1436
   __test$token_value:
     calls: 1
-    bytes: 2524
+    bytes: 2520
   __test$verify_same_tokens:
     calls: 1
     bytes: 2208
   __to_str___m23__AiplTok:
-    calls: 149
+    calls: 146
     bytes: 8660
   __to_str_str:
-    calls: 13
+    calls: 16
     bytes: 300
   __to_str_u64:
     calls: 0
@@ -1753,7 +1756,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_write_bytes:
-    calls: 287
+    calls: 272
     bytes: (external)
   aipl_write_i64:
     calls: 4
@@ -1775,7 +1778,7 @@ functions:
     bytes: 412
   token_value:
     calls: 162
-    bytes: 4956
+    bytes: 1508
   token_values:
     calls: 28
     bytes: 1740

@@ -2409,9 +2409,7 @@ fn lower_item(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let d = as_import(decl, sp)?;
     if (docs.is_some()) {
         return err(ParseError {
-            message: """
-                an import cannot be documented — `# ..` lines attach to a declaration, and this one is above an `import`
-            """,
+            message: "an import cannot be documented — `# ..` lines attach to a declaration, and this one is above an `import`",
             span: node.own_tokens().first().value_or(node.tok_span()),
         });
     };
@@ -2634,17 +2632,13 @@ fn lower_fn_attr(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     if (kids.is_empty()) {
         if (name == "doc") {
             return err(ParseError {
-                message: """
-                    `.doc("..")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants
-                """,
+                message: "`.doc(\"..\")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants",
                 span: name_span,
             });
         };
         if (name == "test") {
             return err(ParseError {
-                message: """
-                    `.test` takes a `{ .. }` block, not a string argument
-                """,
+                message: "`.test` takes a `{ .. }` block, not a string argument",
                 span: name_span,
             });
         };
@@ -3054,9 +3048,9 @@ pub fn lower_aipl_pattern(src: str) -> Pat!ParseError {
         ) == "Match(p, [(1, x) => x, (x, 1) => x, _ => 0])",
     );
     assert(
-        expr_dump("match (p) { (1, x) | (y, 1) => x }") == """
-            error: alternatives of one arm must bind the same names: a tuple pattern binds "x", but a tuple pattern binds "y"
-        """,
+        expr_dump(
+            "match (p) { (1, x) | (y, 1) => x }",
+        ) == `error: alternatives of one arm must bind the same names: a tuple pattern binds "x", but a tuple pattern binds "y"`,
     );
 
     // Literal patterns carry their *value*, so the escape is decoded and the
@@ -3216,14 +3210,14 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     // Alternatives that disagree about what they bind are refused here rather
     // than left to fail as an unbound name somewhere in the shared body.
     assert(
-        expr_dump("match (v) { A(x) | B(y) => x, _ => 0 }") == """
-            error: alternatives of one arm must bind the same names: "A" binds "x", but "B" binds "y"
-        """,
+        expr_dump(
+            "match (v) { A(x) | B(y) => x, _ => 0 }",
+        ) == `error: alternatives of one arm must bind the same names: "A" binds "x", but "B" binds "y"`,
     );
     assert(
-        expr_dump("match (v) { A(x) | B => x, _ => 0 }") == """
-            error: alternatives of one arm must bind the same names: "A" binds "x", but "B" binds nothing
-        """,
+        expr_dump(
+            "match (v) { A(x) | B => x, _ => 0 }",
+        ) == `error: alternatives of one arm must bind the same names: "A" binds "x", but "B" binds nothing`,
     );
 
     // `shim`, whose bindings are a list and whose body is a block.
@@ -3322,17 +3316,17 @@ pub fn lower_aipl_block(src: str) -> Expr!ParseError {
     // bump calls the canonical builtin rather than emitting a `+`: a loop
     // should not oblige the file to import an operator it never wrote.
     assert(
-        block_dump("{ for (let i, x : xs) { f(x); } }") == """
-            Mut(__idx$18: u64, 0, Seq(For(x, xs, Let(i, __idx$18, Seq(Seq(f(x), 0), Assign(__idx$18, __builtin_wrapping_add(__idx$18, 1), ())))), ()))
-        """,
+        block_dump(
+            "{ for (let i, x : xs) { f(x); } }",
+        ) == "Mut(__idx$18: u64, 0, Seq(For(x, xs, Let(i, __idx$18, Seq(Seq(f(x), 0), Assign(__idx$18, __builtin_wrapping_add(__idx$18, 1), ())))), ()))",
     );
 
     // `for (let i, (a, b) : ps)` composes the two: the counter outside, the
     // field reads inside, with `i` bound between them.
     assert(
-        block_dump("{ for (let i, (a, b) : ps) { f(a); } }") == """
-            Mut(__idx$23: u64, 0, Seq(For(__fpat$23, ps, Let(i, __idx$23, Seq(Let(a, __fpat$23._0, Let(b, __fpat$23._1, Seq(f(a), 0))), Assign(__idx$23, __builtin_wrapping_add(__idx$23, 1), ())))), ()))
-        """,
+        block_dump(
+            "{ for (let i, (a, b) : ps) { f(a); } }",
+        ) == "Mut(__idx$23: u64, 0, Seq(For(__fpat$23, ps, Let(i, __idx$23, Seq(Let(a, __fpat$23._0, Let(b, __fpat$23._1, Seq(f(a), 0))), Assign(__idx$23, __builtin_wrapping_add(__idx$23, 1), ())))), ()))",
     );
     assert(
         block_dump(
@@ -3409,14 +3403,14 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     assert(program_dump("fn f(v: i64) -> P { v, }") == "fn f(v: i64) -> P = Construct(P, [v: v])");
     // The shorthand names no type, so the return type has to.
     assert(
-        program_dump("fn f(v: i64) { v, next: none }") == """
-            error: fn "f": a `{ field: value, .. }` body needs a struct return type to name, but this function declares no return type; add `-> Struct`, or give the literal its type
-        """,
+        program_dump(
+            "fn f(v: i64) { v, next: none }",
+        ) == "error: fn \"f\": a `{ field: value, .. }` body needs a struct return type to name, but this function declares no return type; add `-> Struct`, or give the literal its type",
     );
     assert(
-        program_dump("fn f(v: i64) -> i64 { v, next: none }") == """
-            error: fn "f": a `{ field: value, .. }` body needs a struct return type to name, but this function returns i64; give the literal its type, or return a struct
-        """,
+        program_dump(
+            "fn f(v: i64) -> i64 { v, next: none }",
+        ) == "error: fn \"f\": a `{ field: value, .. }` body needs a struct return type to name, but this function returns i64; give the literal its type, or return a struct",
     );
 
     // Declarations.
@@ -3506,9 +3500,9 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     assert(program_dump("# a doc\nfn f() { }") == "doc(a doc) fn f() = ()");
     assert(program_dump("# a doc\nstruct P { x: i64 }") == "doc(a doc) struct P(x: i64)");
     assert(
-        program_dump("# a doc\nimport { x } from builtins;") == """
-            error: an import cannot be documented — `# ..` lines attach to a declaration, and this one is above an `import`
-        """,
+        program_dump(
+            "# a doc\nimport { x } from builtins;",
+        ) == "error: an import cannot be documented — `# ..` lines attach to a declaration, and this one is above an `import`",
     );
 
     // One attribute slot, and only `.test({ .. })` fills it.
@@ -3518,9 +3512,9 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         ) == "error: duplicate `.test` attribute",
     );
     assert(
-        program_dump("fn f() -> i64 { 1 }.doc(\"d\")") == """
-            error: `.doc("..")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants
-        """,
+        program_dump(
+            "fn f() -> i64 { 1 }.doc(\"d\")",
+        ) == "error: `.doc(\"..\")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants",
     );
     assert(
         program_dump(
@@ -3844,9 +3838,9 @@ pub fn aipl_parses(src: str) -> bool {
     // reported — which is the whole value of this, the two being pages apart in
     // the source that actually provokes it.
     assert(
-        why("fn f() {\n    g(1,\n    2") == """
-            expected `)`, `,`, `.`, `?`, `[`, or an operator, found end of input (`(` at line 2 is never closed)
-        """,
+        why(
+            "fn f() {\n    g(1,\n    2",
+        ) == "expected `)`, `,`, `.`, `?`, `[`, or an operator, found end of input (`(` at line 2 is never closed)",
     );
 
     // A bracket that *is* closed is never blamed. Both of these fail with a real
@@ -4306,9 +4300,9 @@ deallocations: 1870306
 reallocations: 245389
 bytes allocated: 319130117
 instructions executed: 482190868
-binary size: 5936928
+binary size: 5936912
   code: 3884692
-  data: 48620
+  data: 48604
   metadata: 2003616
 functions:
   __arr_drop___m11__ParsedParam:

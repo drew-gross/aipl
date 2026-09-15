@@ -16,6 +16,7 @@ fn main() -> i64 {
     let joined = block()
         +++ """
             three
+            four
         """;
     if (eq) { joined.len() } else { 0 }
 }
@@ -36,6 +37,7 @@ fn main() -> i64 {
     // Any operator, not just `==`.
     let joined = block() +++ """
         three
+        four
     """;
     if (eq) { joined.len() } else { 0 }
 }

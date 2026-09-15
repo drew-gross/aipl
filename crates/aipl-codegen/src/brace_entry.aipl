@@ -73,15 +73,11 @@ pub fn brace_literal(entries: BraceEntry[], order: SetOrder, span: Span) -> Expr
 })
 
 fn ordered_pairs_message() -> str {
-    """
-        an ordered "#>{ .. }" / "#<{ .. }" literal is a set, so it holds bare elements — a "key: value" pair belongs in a "#{ .. }" dict
-    """
+    `an ordered "#>\{ .. \}" / "#<\{ .. \}" literal is a set, so it holds bare elements — a "key: value" pair belongs in a "#\{ .. \}" dict`
 }
 
 fn brace_mix_message() -> str {
-    """
-        a "#{ .. }" literal can't mix set elements and "key: value" pairs — use either all bare elements (a set) or all pairs (a dict)
-    """
+    `a "#\{ .. \}" literal can't mix set elements and "key: value" pairs — use either all bare elements (a set) or all pairs (a dict)`
 }
 --- performance ---
 allocations: 76

@@ -103,7 +103,7 @@
           </h3>
           <pre class="signature"><code>fn token_value(kind: AiplTok) -&#62; str</code></pre>
 
-          <div class="doc"><p>A token's value for the preservation check: <code>to_str</code> of its kind, except that a single-line string's delimiter is not part of it — <code>&quot;a&quot;</code> and <code></code> <code>a</code> <code></code> are the same token, and respelling one as the other (the walker's <code>requote</code>) is the one edit the formatter makes inside a literal.</p></div>
+          <div class="doc"><p>A token's value for the preservation check: <code>to_str</code> of its kind, except that a string's delimiter is not part of it — <code>&quot;a&quot;</code>, <code></code> <code>a</code> <code></code> and a <code>&quot;&quot;&quot;</code> block holding <code>a</code> are the same token, and respelling one as another (the walker's <code>requote</code>) is the one edit the formatter makes inside a literal.</p></div>
 
 
         </section>

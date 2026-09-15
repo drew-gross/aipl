@@ -95,6 +95,48 @@
         </section>
 
 
+
+        <section class="item" id="item-unblock">
+          <h3>
+            <a class="anchor" href="#item-unblock">unblock</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn unblock(self: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>A <code>&quot;&quot;&quot;</code>/<code></code><code></code> <code></code><code> </code><code></code><code> block respelled as the single-line literal of its value when that value holds no newline — the block was three lines spent on one line's worth of text — under whichever of </code>&quot;<code> and </code><code> </code> <code></code> needs fewer escapes; a tie keeps the block's own family (<code>&quot;&quot;&quot;</code> to <code>&quot;</code>, <code></code><code></code> <code></code><code> </code><code></code><code> to </code><code> </code> <code></code>). A value with a newline is what the block form is for, and stays.</p><p>Unlike <code>requote</code>'s single-line respelling, which copies the source and only moves the delimiter-specific escapes, this one is spelled from the *value*: a block's content is verbatim (a raw template decodes only <code>\{</code>/<code>\}</code>), so every backslash, tab and delimiter in it gains its escape here.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-value_cost">
+          <h3>
+            <a class="anchor" href="#item-value_cost">value_cost</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn value_cost(value: str, delim: char) -&#62; u64</code></pre>
+
+          <div class="doc"><p>How many escapes <code>value</code> needs under <code>delim</code> when spelled from the value.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-encode">
+          <h3>
+            <a class="anchor" href="#item-encode">encode</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn encode(value: str, delim: char) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>value</code> as the body of a single-line literal delimited by <code>delim</code>: the shared escapes for a backslash, tab and carriage return, and the delimiter's own escapes (<code>needs_escape</code>); everything else verbatim.</p></div>
+
+
+        </section>
+
+
       </section>
 
 

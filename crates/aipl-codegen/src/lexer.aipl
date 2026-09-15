@@ -1466,7 +1466,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: Exact(","), emit: Bare(Punct) },
         TokenRule { matcher: Exact("-"), emit: Bare(Punct) },
     ];
-    let jsrc = """{"pi": 3.14, "n": [1, true]}""";
+    let jsrc = `\{"pi": 3.14, "n": [1, true]\}`;
     let jtoks = [
         tok(jsrc, Punct, 0..1),
         tok(jsrc, Str("pi"), 1..5),

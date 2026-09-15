@@ -2,8 +2,13 @@
 // interpolation-free `` `...` `` literal denote the same value and differ only in
 // which characters they must escape — `"` under the first, `` ` ``/`{`/`}` under
 // the second — so `aipl fmt` spells each literal with whichever delimiter needs
-// fewer escapes. `walker.aipl` applies it to every single-line string token.
+// fewer escapes. A `"""`/```` ``` ```` block whose value has no newline is a
+// single-line literal spread over three lines, so it is respelled as one too,
+// with the same choice of delimiter. `walker.aipl` applies it to every string
+// token.
 import {
+    contains,
+    count_if,
     equal as ==,
     extend,
     first,
@@ -18,6 +23,7 @@ import {
     wrapping_increment as ++,
     wrapping_sub as -,
 } from builtins;
+import { str_lit_value } from "./lex_aipl.aipl";
 
 # Whether `self` must be written escaped inside a single-line literal delimited
 # by `delim`: the delimiter itself, plus `{`/`}` under a backtick, where a bare
@@ -144,7 +150,7 @@ fn redelimit(body: str, delim: char) -> str {
 # is returned unchanged.
 pub fn requote(self: str) -> str {
     if (self.starts_with(`"""`) || self.starts_with("```")) {
-        return self;
+        return self.unblock();
     };
     let delim = self.first().value_or(' ');
     if (delim != '"' && delim != '`') {
@@ -177,22 +183,119 @@ pub fn requote(self: str) -> str {
     assert(requote("`\\{\"`") == "`\\{\"`");
     // Shared escapes ride along unchanged.
     assert(requote(`"a\\n\\"b\\""`) == "`a\\n\"b\"`");
-    // The block forms and any other token are left alone.
-    assert(requote(`"""a "b" c"""`) == `"""a "b" c"""`);
-    assert(requote("```\\{a\\}```") == "```\\{a\\}```");
+
+    // A block whose value is one line becomes a single-line literal, by the
+    // same rule; one whose value spans lines stays a block. Any other token is
+    // left alone.
+    assert(requote(`"""a "b" c"""`) == "`a \"b\" c`");
+    assert(requote("```\\{a\\}```") == `"\{a\}"`);
+    assert(requote(`"""\na\nb\n"""`) == `"""\na\nb\n"""`);
     assert(requote(`'"'`) == `'"'`);
 })
+
+# A `"""`/```` ``` ```` block respelled as the single-line literal of its value
+# when that value holds no newline — the block was three lines spent on one
+# line's worth of text — under whichever of `"` and `` ` `` needs fewer
+# escapes; a tie keeps the block's own family (`"""` to `"`, ```` ``` ```` to
+# `` ` ``). A value with a newline is what the block form is for, and stays.
+#
+# Unlike `requote`'s single-line respelling, which copies the source and only
+# moves the delimiter-specific escapes, this one is spelled from the *value*:
+# a block's content is verbatim (a raw template decodes only `\{`/`\}`), so
+# every backslash, tab and delimiter in it gains its escape here.
+fn unblock(self: str) -> str {
+    let value = str_lit_value(self);
+    if (value.contains('\n')) {
+        return self;
+    };
+    let family = if (self.starts_with(`"""`)) { '"' } else { '`' };
+    let other = if (family == '"') { '`' } else { '"' };
+    let delim = if (value_cost(value, other) < value_cost(value, family)) { other } else { family };
+    `{delim}{encode(value, delim)}{delim}`
+}.test({
+    assert(unblock(`"""hi"""`) == `"hi"`);
+    assert(unblock("```hi```") == "`hi`");
+    // The blank opening and closing lines a block usually has are not content.
+    assert(unblock(`"""\n    hi\n"""`) == `"hi"`);
+    // Delimiters in the value pick the other family when that is cheaper.
+    assert(unblock(`"""say "hi""""`) == "`say \"hi\"`");
+    assert(unblock("```say \"hi\"```") == "`say \"hi\"`");
+    assert(unblock("```a \\{b\\} c```") == `"a \{b\} c"`);
+    // A raw block's backslash is content, and gains its escape.
+    assert(unblock(`"""a\\b"""`) == `"a\\\\b"`);
+    // Trailing content space is kept; a value with a newline stays a block.
+    assert(unblock(`"""x """`) == `"x "`);
+    assert(unblock(`"""\na\nb\n"""`) == `"""\na\nb\n"""`);
+})
+
+# How many escapes `value` needs under `delim` when spelled from the value.
+fn value_cost(value: str, delim: char) -> u64 { value.count_if(|c| c.needs_escape(delim)) }.test({
+    assert(value_cost(`say "hi"`, '"') == 2);
+    assert(value_cost(`say "hi"`, '`') == 0);
+    assert(value_cost("{a}", '`') == 2);
+})
+
+# `value` as the body of a single-line literal delimited by `delim`: the
+# shared escapes for a backslash, tab and carriage return, and the delimiter's
+# own escapes (`needs_escape`); everything else verbatim.
+fn encode(value: str, delim: char) -> str {
+    mut out = "";
+    for (let c : value) {
+        if (c == '\\') {
+            set out.extend("\\\\");
+        } else if (c == '\t') {
+            set out.extend("\\t");
+        } else if (c == '\r') {
+            set out.extend("\\r");
+        } else if (c.needs_escape(delim)) {
+            set out.extend(`\\{c}`);
+        } else {
+            set out.extend(`{c}`);
+        };
+    }
+    out
+}.test({
+    assert(encode("plain", '"') == "plain");
+    assert(encode(`say "hi"`, '"') == `say \\"hi\\"`);
+    assert(encode(`say "hi"`, '`') == `say "hi"`);
+    assert(encode("a{b}`c", '`') == "a\\{b\\}\\`c");
+    assert(encode("a\\b\tc", '"') == "a\\\\b\\tc");
+})
 --- performance ---
-allocations: 50
-deallocations: 50
-reallocations: 0
-bytes allocated: 3469
-instructions executed: 30379
-binary size: 21352
-  code: 10516
-  data: 3275
-  metadata: 7561
+allocations: 120
+deallocations: 120
+reallocations: 6
+bytes allocated: 7556
+instructions executed: 67057
+binary size: 41960
+  code: 24584
+  data: 4489
+  metadata: 12887
 functions:
+  __builtin_all$char$s0$lam$__builtin_is_whitespace:
+    calls: 28
+    bytes: 304
+  __builtin_count_while$char$s0$lam$__m5__dedent$lambda1:
+    calls: 0
+    bytes: 264
+  __builtin_count_while$char$s0$lam$__m5__dedent$lambda2$lambda0:
+    calls: 14
+    bytes: 264
+  __m1__str_lit_value:
+    calls: 12
+    bytes: 2980
+  __m4__process_raw_string:
+    calls: 12
+    bytes: 2764
+  __m8__trim_prefix:
+    calls: 24
+    bytes: 252
+  __m9__trim_suffix:
+    calls: 6
+    bytes: 356
+  __test$encode:
+    calls: 1
+    bytes: 896
   __test$escape_cost:
     calls: 1
     bytes: 1336
@@ -207,19 +310,40 @@ functions:
     bytes: 1756
   __test$requote:
     calls: 1
-    bytes: 2524
+    bytes: 2684
+  __test$unblock:
+    calls: 1
+    bytes: 1588
+  __test$value_cost:
+    calls: 1
+    bytes: 940
+  aipl_array_dec:
+    calls: 36
+    bytes: (external)
+  aipl_array_new:
+    calls: 12
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 14
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 12
+    bytes: (external)
   aipl_assert:
-    calls: 54
+    calls: 72
     bytes: (external)
   aipl_test_begin:
-    calls: 5
+    calls: 8
     bytes: (external)
   aipl_test_end:
-    calls: 5
+    calls: 8
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  encode:
+    calls: 15
+    bytes: 1836
   escape_cost:
     calls: 37
     bytes: 352
@@ -228,13 +352,16 @@ functions:
     bytes: 64
   main:
     calls: 1
-    bytes: 400
+    bytes: 600
   needs_escape:
-    calls: 236
+    calls: 416
     bytes: 64
   redelimit:
     calls: 16
     bytes: 1952
   requote:
-    calls: 15
-    bytes: 1112
+    calls: 16
+    bytes: 1124
+  unblock:
+    calls: 12
+    bytes: 1252

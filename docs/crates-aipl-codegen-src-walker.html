@@ -1958,7 +1958,7 @@
           </h3>
           <pre class="signature"><code>fn str_atom(self: WStr) -&#62; WDoc</code></pre>
 
-          <div class="doc"><p>A <code>&quot;&quot;&quot;...&quot;&quot;&quot;</code> raw string is a <code>RawBlock</code> so its closing delimiter aligns under the opening one; a single-line string is ordinary text, spelled with whichever of <code>&quot;</code> and <code></code> <code> </code><code> needs fewer escapes (</code>requote<code>) — the one edit the formatter makes inside a literal, and a value-preserving one.</code></p></div>
+          <div class="doc"><p>A string token, respelled by <code>requote</code> — whichever of <code>&quot;</code> and <code></code> <code> </code><code> needs fewer escapes, and a block whose value is one line as a single-line literal — the one edit the formatter makes inside a literal, and a value-preserving one. What is still a </code>&quot;&quot;&quot;<code>/</code><code></code><code> </code><code></code> <code></code><code></code> block after that is a <code>RawBlock</code>, so its closing delimiter aligns under the opening one; anything else is ordinary text.</p></div>
 
 
         </section>

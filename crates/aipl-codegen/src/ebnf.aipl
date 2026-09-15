@@ -185,9 +185,7 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     // one thing that cannot show which way it nests.
     let r_pow: Rule<Tok> = Climb(Term(Num), [Prec { power: 3, right: true, ops: ["^"] }]);
     assert(
-        ebnf(g_of([one("pow", r_pow)])) == """
-            pow = Num ("^" Num)* ; (* precedence: "^" (right) *)
-        """,
+        ebnf(g_of([one("pow", r_pow)])) == `pow = Num ("^" Num)* ; (* precedence: "^" (right) *)`,
     );
 
     // Total, and indifferent to linking: an unresolved reference renders as the
@@ -592,19 +590,11 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     // making the sequence nullable, since `atom` after it is not.
     let three: u64 = 3;
     let r: Rule<Tok> = Then([Maybe(Literal("!")), NamedIdx(three)]);
-    assert(
-        rule_first(r, sets)?.show_first() == """
-            Num Name "!" "("
-        """,
-    );
+    assert(rule_first(r, sets)?.show_first() == `Num Name "!" "("`);
 
     // A whole-sequence nullability: every element optional, so the rule is too.
     let r_all_opt: Rule<Tok> = Then([Maybe(Literal("!")), Maybe(Term(Num))]);
-    assert(
-        rule_first(r_all_opt, sets)?.show_first() == """
-            Num "!" <empty>
-        """,
-    );
+    assert(rule_first(r_all_opt, sets)?.show_first() == `Num "!" <empty>`);
 
     // A separated list begins with its item — or, allowing a leading separator,
     // with that too.
@@ -617,11 +607,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         trailing_sep=false,
         leading_sep=true,
     );
-    assert(
-        rule_first(r_led, sets)?.show_first() == """
-            Num "|"
-        """,
-    );
+    assert(rule_first(r_led, sets)?.show_first() == `Num "|"`);
 
     // A reference that cannot be followed, and one that points nowhere.
     let r_named: Rule<Tok> = Named("atom");
@@ -687,11 +673,7 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
 
     // Nullability is not a member of either set, so it renders after both.
     let nullable: First<Tok> = First { ..f, nullable: true };
-    assert(
-        nullable.show_first() == """
-            Num "(" <empty>
-        """,
-    );
+    assert(nullable.show_first() == `Num "(" <empty>`);
 
     // The two degenerate sets are distinguishable: matching only emptiness is
     // not the same as matching nothing at all.
@@ -812,9 +794,9 @@ deallocations: 1883
 reallocations: 312
 bytes allocated: 185926
 instructions executed: 236072
-binary size: 171080
+binary size: 170960
   code: 112340
-  data: 4252
+  data: 4132
   metadata: 54488
 functions:
   __arr_drop_First$Tok:
