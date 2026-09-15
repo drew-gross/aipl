@@ -2705,6 +2705,8 @@ pub mod concrete {
                 t,
                 ConcreteType::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
             )
+            // A `Case<V>` is its tag — one word, compared as an integer.
+            || matches!(t, ConcreteType::Case(_))
     }
 
     pub fn is_dict_key(t: &ConcreteType) -> bool {
@@ -2919,6 +2921,9 @@ pub fn is_set_elem(t: &Type) -> bool {
             t,
             Type::Primitive(Primitive::Bool | Primitive::Char | Primitive::Str)
         )
+        // A `Case<V>` is its tag — one word, compared as an integer — so a set
+        // of cases (`#{Case<Tok>}`, a FIRST set's kinds) is a set of integers.
+        || matches!(t, Type::Case(_))
 }
 
 /// Valid dict *key* types: the same scalar/`str` types a set holds (keys are

@@ -66,34 +66,6 @@
 
 
 
-        <section class="item" id="item-Sym">
-          <h3>
-            <a class="anchor" href="#item-Sym">Sym</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant Sym&#60;K: variant&#62;</code></pre>
-
-          <div class="doc"><p>A terminal a match can begin with: a token *kind*, as <code>Term</code> matches it, or an exact *spelling*, as <code>Literal</code> does. Kept apart because the two tests are different — a kind ignores the token's text, a spelling ignores its kind — so a set holding <code>Kind(Num)</code> and one holding <code>Text(&quot;1&quot;)</code> are not the same set even where they accept the same token.</p></div>
-
-
-          <ul class="cases">
-
-            <li id="item-Kind"><code>Kind(Case&#60;K&#62;)</code>
-
-
-            </li>
-
-            <li id="item-Text"><code>Text(str)</code>
-
-
-            </li>
-
-          </ul>
-
-        </section>
-
-
-
         <section class="item" id="item-First">
           <h3>
             <a class="anchor" href="#item-First">First</a>
@@ -101,7 +73,7 @@
           </h3>
           <pre class="signature"><code>struct First&#60;K: variant&#62;</code></pre>
 
-          <div class="doc"><p>What one production (or one rule) can begin with: the terminal set, and whether it can match nothing at all. <code>nullable</code> is not a property of the set — an empty set with <code>nullable: true</code> is a rule that matches only emptiness, and a non-empty set with it is one that may or may not consume — so both travel together.</p></div>
+          <div class="doc"><p>What one production (or one rule) can begin with: the token *kinds* (as <code>Term</code> matches them) and the exact *spellings* (as <code>Literal</code> does) a match can start on, and whether it can match nothing at all. Kinds and spellings are kept apart because the two tests are different — a kind ignores the token's text, a spelling ignores its kind — so a set holding the kind <code>Num</code> and one holding the spelling <code>&quot;1&quot;</code> are not the same set even where they accept the same token. <code>nullable</code> is not a property of the sets — empty sets with <code>nullable: true</code> are a rule that matches only emptiness, and non-empty ones with it are a rule that may or may not consume — so all three travel together.</p></div>
 
 
         </section>
@@ -157,7 +129,7 @@
           </h3>
           <pre class="signature"><code>pub fn show_first&#60;K: variant&#62;(self: First&#60;K&#62;) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>self</code> as one readable line: each terminal in set order — a kind by its case name, a spelling in double quotes — with <code>&lt;empty&gt;</code> appended when the rule is nullable. A debug rendering, like <code>cst.aipl</code>'s <code>show</code>.</p></div>
+          <div class="doc"><p><code>self</code> as one readable line: the kinds by case name, then the spellings in double quotes, each set in its own order — with <code>&lt;empty&gt;</code> appended when the rule is nullable. A debug rendering, like <code>cst.aipl</code>'s <code>show</code>.</p></div>
 
 
         </section>
@@ -367,6 +339,20 @@
 
 
 
+        <section class="item" id="item-merge">
+          <h3>
+            <a class="anchor" href="#item-merge">merge</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn merge&#60;K: variant&#62;(self: First&#60;K&#62;, other: First&#60;K&#62;) -&#62; First&#60;K&#62;</code></pre>
+
+          <div class="doc"><p>Everything either of <code>self</code> and <code>other</code> can begin with — the union of both sets, nullable when either is: what a choice between the two can begin with, and what a sequence can once its head has been found nullable.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-linked_first_sets">
           <h3>
             <a class="anchor" href="#item-linked_first_sets">linked_first_sets</a>
@@ -375,34 +361,6 @@
           <pre class="signature"><code>fn linked_first_sets&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; First&#60;K&#62;[]!ParseError</code></pre>
 
           <div class="doc"><p>The fixed point itself, over an already-linked grammar. Split out because the loop reads whole productions and <code>link</code> returns a whole grammar, and a <code>let</code> binding that only ever has its fields read is a lint.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-union_syms">
-          <h3>
-            <a class="anchor" href="#item-union_syms">union_syms</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn union_syms&#60;K: variant&#62;(a: Sym&#60;K&#62;[], b: Sym&#60;K&#62;[]) -&#62; Sym&#60;K&#62;[]</code></pre>
-
-          <div class="doc"><p><code>a</code> with everything from <code>b</code> that is not already in it. Sets are a handful of entries and are built once per grammar, so a scan is the whole implementation — the same trade the <code>find_index</code> scan in <code>grammar.aipl</code>'s <code>link</code> makes.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-show_sym">
-          <h3>
-            <a class="anchor" href="#item-show_sym">show_sym</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn show_sym&#60;K: variant&#62;(self: Sym&#60;K&#62;) -&#62; str</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>

@@ -276,15 +276,15 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 6674
-deallocations: 6674
-reallocations: 937
-bytes allocated: 622145
-instructions executed: 1521189
-binary size: 408648
-  code: 268272
+allocations: 6711
+deallocations: 6711
+reallocations: 939
+bytes allocated: 623182
+instructions executed: 1521653
+binary size: 413432
+  code: 271296
   data: 4892
-  metadata: 135484
+  metadata: 137244
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -303,9 +303,6 @@ functions:
     bytes: 116
   __arr_drop___m2__First$SexpKind:
     calls: 4
-    bytes: 116
-  __arr_drop___m2__Sym$SexpKind:
-    calls: 14
     bytes: 140
   __arr_drop___m3__ListStyle:
     calls: 132
@@ -339,9 +336,6 @@ functions:
     bytes: 116
   __arr_retain___m2__First$SexpKind:
     calls: 8
-    bytes: 116
-  __arr_retain___m2__Sym$SexpKind:
-    calls: 10
     bytes: 140
   __arr_retain___m3__ListStyle:
     calls: 44
@@ -444,7 +438,7 @@ functions:
     bytes: 652
   __builtin_try_map$__m3__Production$SexpKind$__m15__Sexp$__m2__First<SexpKind>$__m3__ParseError$lam$__m2__linked_first_sets$SexpKind$__m15__Sexp$lambda2:
     calls: 3
-    bytes: 896
+    bytes: 940
   __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule$SexpKind$__m3__ParseError$lam$__m3__desugar_rule$SexpKind:
     calls: 45
     bytes: 628
@@ -456,16 +450,16 @@ functions:
     bytes: 300
   __eq___m2__First$SexpKind:
     calls: 5
-    bytes: 128
+    bytes: 160
   __eq___m2__First$SexpKind$arr:
     calls: 3
     bytes: 284
-  __eq___m2__Sym$SexpKind:
-    calls: 6
-    bytes: 144
-  __eq___m2__Sym$SexpKind$arr:
+  __eq_set$SexpKind$case:
     calls: 5
-    bytes: 284
+    bytes: 256
+  __eq_set$str:
+    calls: 5
+    bytes: 304
   __m10__trim_end_while$lam$__builtin_is_space:
     calls: 61
     bytes: 392
@@ -549,7 +543,7 @@ functions:
     bytes: 1668
   __m13__match_prod$SexpKind$__m15__Sexp:
     calls: 222
-    bytes: 7536
+    bytes: 7728
   __m13__match_reps$SexpKind$__m15__Sexp:
     calls: 38
     bytes: 4712
@@ -625,9 +619,6 @@ functions:
   __m1__token_text:
     calls: 21
     bytes: 1456
-  __m2__can_start$SexpKind:
-    calls: 0
-    bytes: 600
   __m2__climb_precs$SexpKind:
     calls: 0
     bytes: 32
@@ -645,7 +636,10 @@ functions:
     bytes: 356
   __m2__linked_first_sets$SexpKind$__m15__Sexp:
     calls: 1
-    bytes: 1060
+    bytes: 1208
+  __m2__merge$SexpKind:
+    calls: 9
+    bytes: 436
   __m2__prec_note:
     calls: 2
     bytes: 3236
@@ -657,16 +651,16 @@ functions:
     bytes: 1708
   __m2__rule_first$SexpKind:
     calls: 18
-    bytes: 6428
+    bytes: 7816
   __m2__show_first$SexpKind:
     calls: 2
-    bytes: 2248
+    bytes: 3836
+  __m2__show_first$SexpKind$filter1$own0:
+    calls: 2
+    bytes: 444
   __m2__show_first_sets$SexpKind$__m15__Sexp:
     calls: 1
-    bytes: 2548
-  __m2__union_syms$SexpKind:
-    calls: 9
-    bytes: 736
+    bytes: 2736
   __m3__desugar_opt$SexpKind:
     calls: 45
     bytes: 700
@@ -797,10 +791,10 @@ functions:
     calls: 3216
     bytes: (external)
   aipl_arr_inc:
-    calls: 27455
+    calls: 27542
     bytes: (external)
   aipl_arr_reserve:
-    calls: 4180
+    calls: 4174
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 143
@@ -809,19 +803,19 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 38664
+    calls: 38778
     bytes: (external)
   aipl_array_new:
-    calls: 1541
+    calls: 1537
     bytes: (external)
   aipl_array_push:
     calls: 947
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1230
+    calls: 1239
     bytes: (external)
   aipl_array_with_cap:
-    calls: 104
+    calls: 149
     bytes: (external)
   aipl_assert:
     calls: 30
@@ -840,6 +834,15 @@ functions:
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 1164
+    bytes: (external)
+  aipl_set_contains:
+    calls: 22
+    bytes: (external)
+  aipl_set_insert:
+    calls: 17
+    bytes: (external)
+  aipl_set_union:
+    calls: 18
     bytes: (external)
   aipl_test_begin:
     calls: 4

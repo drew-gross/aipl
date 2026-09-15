@@ -7318,7 +7318,9 @@ fn build_struct_layout(
                     resolve_type_layout(n, decls, layouts, on_stack, rec)?;
                 }
             }
-            ConcreteType::Array(_) => {}
+            // A set or a dict is an array block (see `is_heap`), held and
+            // released exactly as an array field is.
+            ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {}
             // A function value is stored as its 8-byte code address (an i64);
             // it owns nothing, so like a scalar it needs no drop.
             ConcreteType::Fn(_, _) => {}
@@ -7333,7 +7335,7 @@ fn build_struct_layout(
                 {}
             _ => {
                 return Err(Error::msg(format!(
-                    "{}: field {} has type {}, but struct fields must be an integer (i8..i64, u8..u64), bool, char, str, a function, a struct, a variant, an array, or an optional of (an integer, bool, char, str, an array, or a recursive type)",
+                    "{}: field {} has type {}, but struct fields must be an integer (i8..i64, u8..u64), bool, char, str, a function, a struct, a variant, an array, a set, a dict, or an optional of (an integer, bool, char, str, an array, or a recursive type)",
                     // A tuple's struct is the compiler's, so it is named as the
                     // tuple the user wrote.
                     if decl.is_tuple {
@@ -7390,7 +7392,10 @@ fn build_variant_layout(
             let ty = ty;
             let ok = match ty {
                 _ if is_set_elem(ty) => true, // i64/bool/char/str
-                ConcreteType::Array(_) | ConcreteType::Optional(_) => true,
+                ConcreteType::Array(_)
+                | ConcreteType::Set(..)
+                | ConcreteType::Dict(_, _)
+                | ConcreteType::Optional(_) => true,
                 // A function value is an 8-byte code address, stored inline like
                 // a scalar; it owns no heap, so it needs no drop. A `Case<V>` is
                 // the same shape for the same reason — a tag in one word, owning

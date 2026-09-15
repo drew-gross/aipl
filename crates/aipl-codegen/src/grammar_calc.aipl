@@ -227,8 +227,8 @@ pub fn calc_grammar() -> Grammar<CalcTok, Calc> {
     // token alone, so `unary`'s two alternatives are ordered, not disjoint.
     assert(
         show_first_sets(calc_grammar())? == """
-            expr = "-" Num "("
-            unary = "-" Num "("
+            expr = Num "-" "("
+            unary = Num "-" "("
             atom = Num "("
         """,
     );
@@ -466,15 +466,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 12791
-deallocations: 12791
-reallocations: 2074
-bytes allocated: 1218105
-instructions executed: 2709571
-binary size: 427600
-  code: 279564
+allocations: 12870
+deallocations: 12870
+reallocations: 2078
+bytes allocated: 1220011
+instructions executed: 2708771
+binary size: 432608
+  code: 282808
   data: 6044
-  metadata: 141992
+  metadata: 143756
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -493,9 +493,6 @@ functions:
     bytes: 116
   __arr_drop___m2__First$CalcTok:
     calls: 5
-    bytes: 116
-  __arr_drop___m2__Sym$CalcTok:
-    calls: 38
     bytes: 140
   __arr_drop___m3__ListStyle:
     calls: 441
@@ -532,9 +529,6 @@ functions:
     bytes: 116
   __arr_retain___m2__First$CalcTok:
     calls: 15
-    bytes: 116
-  __arr_retain___m2__Sym$CalcTok:
-    calls: 36
     bytes: 140
   __arr_retain___m3__ListStyle:
     calls: 0
@@ -649,7 +643,7 @@ functions:
     bytes: 652
   __builtin_try_map$__m3__Production$CalcTok$Calc$__m2__First<CalcTok>$__m3__ParseError$lam$__m2__linked_first_sets$CalcTok$Calc$lambda2:
     calls: 4
-    bytes: 896
+    bytes: 940
   __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule$CalcTok$__m3__ParseError$lam$__m3__desugar_rule$CalcTok:
     calls: 256
     bytes: 628
@@ -658,16 +652,16 @@ functions:
     bytes: 252
   __eq___m2__First$CalcTok:
     calls: 7
-    bytes: 128
+    bytes: 160
   __eq___m2__First$CalcTok$arr:
     calls: 4
     bytes: 284
-  __eq___m2__Sym$CalcTok:
-    calls: 21
-    bytes: 144
-  __eq___m2__Sym$CalcTok$arr:
+  __eq_set$CalcTok$case:
     calls: 7
-    bytes: 284
+    bytes: 256
+  __eq_set$str:
+    calls: 7
+    bytes: 304
   __m10__trim_end_while$lam$__builtin_is_space:
     calls: 18
     bytes: 392
@@ -751,7 +745,7 @@ functions:
     bytes: 1668
   __m13__match_prod$CalcTok$Calc:
     calls: 417
-    bytes: 6980
+    bytes: 7392
   __m13__match_reps$CalcTok$Calc:
     calls: 0
     bytes: 4712
@@ -827,9 +821,6 @@ functions:
   __m1__token_text:
     calls: 0
     bytes: 1456
-  __m2__can_start$CalcTok:
-    calls: 0
-    bytes: 600
   __m2__climb_precs$CalcTok:
     calls: 0
     bytes: 32
@@ -847,7 +838,10 @@ functions:
     bytes: 356
   __m2__linked_first_sets$CalcTok$Calc:
     calls: 1
-    bytes: 1060
+    bytes: 1208
+  __m2__merge$CalcTok:
+    calls: 24
+    bytes: 436
   __m2__prec_note:
     calls: 3
     bytes: 3236
@@ -859,16 +853,16 @@ functions:
     bytes: 1708
   __m2__rule_first$CalcTok:
     calls: 40
-    bytes: 6428
+    bytes: 7816
   __m2__show_first$CalcTok:
     calls: 3
-    bytes: 2248
+    bytes: 3836
+  __m2__show_first$CalcTok$filter1$own0:
+    calls: 3
+    bytes: 444
   __m2__show_first_sets$CalcTok$Calc:
     calls: 1
-    bytes: 2548
-  __m2__union_syms$CalcTok:
-    calls: 24
-    bytes: 736
+    bytes: 2736
   __m3__desugar_opt$CalcTok:
     calls: 0
     bytes: 700
@@ -1011,10 +1005,10 @@ functions:
     calls: 5244
     bytes: (external)
   aipl_arr_inc:
-    calls: 50014
+    calls: 50180
     bytes: (external)
   aipl_arr_reserve:
-    calls: 7295
+    calls: 7272
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 290
@@ -1026,19 +1020,19 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 69031
+    calls: 69254
     bytes: (external)
   aipl_array_new:
-    calls: 3404
+    calls: 3395
     bytes: (external)
   aipl_array_push:
     calls: 1649
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3312
+    calls: 3332
     bytes: (external)
   aipl_array_with_cap:
-    calls: 786
+    calls: 894
     bytes: (external)
   aipl_assert:
     calls: 51
@@ -1062,13 +1056,13 @@ functions:
     calls: 525
     bytes: (external)
   aipl_set_contains:
-    calls: 19
+    calls: 73
     bytes: (external)
   aipl_set_insert:
-    calls: 22
+    calls: 68
     bytes: (external)
   aipl_set_union:
-    calls: 3
+    calls: 51
     bytes: (external)
   aipl_test_begin:
     calls: 6

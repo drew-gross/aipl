@@ -31,10 +31,10 @@
 //     alternative also has to keep contributing its expectations to `Far` or the
 //     error messages get worse.
 //
-// A terminal here is a `Sym`: a token *kind* (what `Term` matches) or an exact
+// A terminal here is a token *kind* (what `Term` matches) or an exact
 // *spelling* (what `Literal` matches). The two are genuinely different tests —
-// a kind ignores the text and a spelling ignores the kind — so a FIRST set holds
-// both and `can_start` asks both.
+// a kind ignores the text and a spelling ignores the kind — so a FIRST set is
+// two sets, and `can_start` asks both.
 //
 // The computation is a fixed point, because a reference may reach back through
 // the production it started from: every production starts empty and
@@ -44,10 +44,11 @@
 // left-recursive grammar too.
 import {
     case_name,
-    contains,
     equal as ==,
     extend,
+    filter,
     find_if,
+    has,
     is_empty,
     is_nonempty,
     join,
@@ -58,6 +59,7 @@ import {
     to_array,
     to_set,
     try_map,
+    union,
     union_all,
     value_or,
     value_or_err,
@@ -419,19 +421,26 @@ fn level_text(precs: Prec[], power: u64) -> str {
 
 // ---------- FIRST sets ----------
 
-# A terminal a match can begin with: a token *kind*, as `Term` matches it, or an
-# exact *spelling*, as `Literal` does. Kept apart because the two tests are
-# different — a kind ignores the token's text, a spelling ignores its kind — so
-# a set holding `Kind(Num)` and one holding `Text("1")` are not the same set
-# even where they accept the same token.
-variant Sym<K: variant> = Kind(Case<K>) | Text(str)
-
-# What one production (or one rule) can begin with: the terminal set, and
-# whether it can match nothing at all. `nullable` is not a property of the set —
-# an empty set with `nullable: true` is a rule that matches only emptiness, and
-# a non-empty set with it is one that may or may not consume — so both travel
+# What one production (or one rule) can begin with: the token *kinds* (as
+# `Term` matches them) and the exact *spellings* (as `Literal` does) a match
+# can start on, and whether it can match nothing at all. Kinds and spellings
+# are kept apart because the two tests are different — a kind ignores the
+# token's text, a spelling ignores its kind — so a set holding the kind `Num`
+# and one holding the spelling `"1"` are not the same set even where they
+# accept the same token. `nullable` is not a property of the sets — empty sets
+# with `nullable: true` are a rule that matches only emptiness, and non-empty
+# ones with it are a rule that may or may not consume — so all three travel
 # together.
-struct First<K: variant> { syms: Sym<K>[], nullable: bool }
+struct First<K: variant> { kinds: #{Case<K>}, texts: #{str}, nullable: bool }
+
+# Everything either of `self` and `other` can begin with — the union of both
+# sets, nullable when either is: what a choice between the two can begin with,
+# and what a sequence can once its head has been found nullable.
+fn merge<K: variant>(self: First<K>, other: First<K>) -> First<K> {
+    kinds: self.kinds.union(other.kinds),
+    texts: self.texts.union(other.texts),
+    nullable: self.nullable || other.nullable,
+}
 
 # The FIRST set of every production of `g`, in grammar order: the terminals a
 # match of that production can begin with, and whether it can match nothing.
@@ -455,7 +464,7 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
     let fp = g_of([one("a", r_a), one("b", r_b), one("c", r_c)]);
     assert(
         show_first_sets(fp)? == """
-            a = "x" Num
+            a = Num "x"
             b = "x" <empty>
             c = Num
         """,
@@ -477,9 +486,9 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
 # binding that only ever has its fields read is a lint.
 fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError {
     // One empty set per production, and the annotated `[]` is what pins `K`:
-    // nothing in `First { syms: .., nullable: false }` mentions it otherwise.
-    let empty: Sym<K>[] = [];
-    mut sets = g.prods.map(|p| First { syms: empty, nullable: false });
+    // nothing in `First { kinds: .., texts: #{}, nullable: false }` mentions it otherwise.
+    let none_yet: #{Case<K>} = #{};
+    mut sets = g.prods.map(|p| First { kinds: none_yet, texts: #{}, nullable: false });
     mut going = true;
     while (going) {
         // The round is computed against the previous round's sets, not against
@@ -510,44 +519,40 @@ fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseEr
 # is safe here.
 pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseError {
     match (r) {
-        Term(k) => ok(First { syms: [Kind(k)], nullable: false }),
+        Term(k) => ok(First { kinds: #{k}, texts: #{}, nullable: false }),
         Literal(s) => {
-            // `Text` mentions no `K`, so nothing in the constructor pins the
-            // type parameter — the annotated binding is what does, the same
-            // idiom `grammar.aipl` writes its rules with.
-            let sym: Sym<K> = Text(s);
-            ok(First { syms: [sym], nullable: false })
+            // A spelling mentions no `K`, so nothing in the constructor pins
+            // the type parameter — the annotated binding is what does, the
+            // same idiom `grammar.aipl` writes its rules with.
+            let kinds: #{Case<K>} = #{};
+            ok(First { kinds, texts: #{s}, nullable: false })
         },
         // A sequence begins with its first element — and also with its second,
         // when the first can match nothing, and so on. It is nullable only when
         // every element is.
         Then(rs) => {
-            mut acc: Sym<K>[] = [];
-            mut empty_ok = true;
+            mut acc: First<K> = First { kinds: #{}, texts: #{}, nullable: true };
             for (let sub : rs) {
-                if (empty_ok) {
-                    let First { syms, nullable } = rule_first(sub, sets)?;
-                    set acc = union_syms(acc, syms);
-                    set empty_ok = nullable;
+                if (acc.nullable) {
+                    // The element's own nullability replaces the running
+                    // one: the sequence stays nullable only while every
+                    // element so far has been.
+                    let sub_first = rule_first(sub, sets)?;
+                    set acc = First { ..acc.merge(sub_first), nullable: sub_first.nullable };
                 };
             }
-            ok(First { syms: acc, nullable: empty_ok })
+            ok(acc)
         },
         // A choice begins with anything any alternative does, and is nullable
         // when any one is. Order does not matter here even though it matters to
         // the parse: this is what *could* start a match, not which branch takes
         // it.
         OneOf(rs) => {
-            mut acc: Sym<K>[] = [];
-            mut empty_ok = false;
+            mut acc: First<K> = First { kinds: #{}, texts: #{}, nullable: false };
             for (let sub : rs) {
-                let First { syms, nullable } = rule_first(sub, sets)?;
-                set acc = union_syms(acc, syms);
-                if (nullable) {
-                    set empty_ok = true;
-                };
+                set acc = acc.merge(rule_first(sub, sets)?);
             }
-            ok(First { syms: acc, nullable: empty_ok })
+            ok(acc)
         },
         // A separated list begins with its item, and with its separator only
         // when it allows a leading one — then the optional separator in front
@@ -563,14 +568,11 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
                     some(s) => if (leading_sep) { Then([Maybe(s), sub]) } else { sub },
                     none => sub,
                 };
-                let First { syms, nullable } = rule_first(head, sets)?;
-                ok(First { syms, nullable: nullable || min == 0 })
+                let first = rule_first(head, sets)?;
+                ok(First { ..first, nullable: first.nullable || min == 0 })
             },
         },
-        Maybe(sub) => {
-            let First { syms } = rule_first(sub, sets)?;
-            ok(First { syms, nullable: true })
-        },
+        Maybe(sub) => ok(First { ..rule_first(sub, sets)?, nullable: true }),
         // A climb begins with its atom: an operator only ever appears after one.
         Climb(atom, precs) => rule_first(atom, sets),
         NamedIdx(i) => sets[i].value_or_err(ParseError {
@@ -592,7 +594,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     let r: Rule<Tok> = Then([Maybe(Literal("!")), NamedIdx(three)]);
     assert(
         rule_first(r, sets)?.show_first() == """
-            "!" Num Name "("
+            Num Name "!" "("
         """,
     );
 
@@ -600,7 +602,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     let r_all_opt: Rule<Tok> = Then([Maybe(Literal("!")), Maybe(Term(Num))]);
     assert(
         rule_first(r_all_opt, sets)?.show_first() == """
-            "!" Num <empty>
+            Num "!" <empty>
         """,
     );
 
@@ -617,7 +619,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     );
     assert(
         rule_first(r_led, sets)?.show_first() == """
-            "|" Num
+            Num "|"
         """,
     );
 
@@ -629,19 +631,6 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     assert(first_msg(r_far, sets) == "no production at index 9");
 })
 
-# `a` with everything from `b` that is not already in it. Sets are a handful of
-# entries and are built once per grammar, so a scan is the whole implementation
-# — the same trade the `find_index` scan in `grammar.aipl`'s `link` makes.
-fn union_syms<K: variant>(a: Sym<K>[], b: Sym<K>[]) -> Sym<K>[] {
-    mut out = a;
-    for (let s : b) {
-        if (!out.contains(s)) {
-            set out = [..out, s];
-        };
-    }
-    out
-}
-
 # Whether a token of kind `kind` spelled `text` could begin a match of `self` —
 # the test a driver skips an alternative on.
 #
@@ -651,40 +640,15 @@ fn union_syms<K: variant>(a: Sym<K>[], b: Sym<K>[]) -> Sym<K>[] {
 # that matters: it is never false for a token that could in fact start a match,
 # so pruning on it cannot lose a parse.
 pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
-    if (self.nullable) {
-        return true;
-    };
-
-    // One pass, comparing in place. The obvious spelling — `syms.contains(Kind(kind))
-    // || syms.contains(Text(text))` — reads better but *builds* a `Sym` per call
-    // and walks the set twice, and this is asked once per production reference in
-    // a parse. Constructing the needle turned out to cost about what the whole
-    // test saves.
-    for (let s : self.syms) {
-        match (s) {
-            Kind(k) => {
-                if (k == kind) {
-                    return true;
-                };
-            },
-            Text(t) => {
-                if (t == text) {
-                    return true;
-                };
-            },
-        };
-    }
-    false
+    self.nullable || self.kinds.has(kind) || self.texts.has(text)
 }.test({
-    let syms: Sym<Tok>[] = [Kind(Num), Text("(")];
-    let f: First<Tok> = First { syms, nullable: false };
-
     // A kind names itself only where the expected type says `Case<K>`, which a
     // constructor argument gives and a plain argument does not — hence the
     // annotated bindings, the same idiom a `Rule` is written with.
     let num: Case<Tok> = Num;
     let name: Case<Tok> = Name;
     let punct: Case<Tok> = Punct;
+    let f: First<Tok> = First { kinds: #{num}, texts: #{"("}, nullable: false };
 
     // By kind, ignoring the token's text; by spelling, ignoring its kind.
     assert(f.can_start(num, "3"));
@@ -693,20 +657,22 @@ pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
     assert(!f.can_start(name, "x"));
 
     // A nullable rule accepts anything: it need not consume the token at all.
-    let no_syms: Sym<Tok>[] = [];
-    let nullable: First<Tok> = First { syms: no_syms, nullable: true };
+    let no_kinds: #{Case<Tok>} = #{};
+    let nullable: First<Tok> = First { kinds: no_kinds, texts: #{}, nullable: true };
     assert(nullable.can_start(name, "x"));
 
     // A rule that begins with nothing and matches nothing accepts nothing.
-    let dead: First<Tok> = First { syms: no_syms, nullable: false };
+    let dead: First<Tok> = First { kinds: no_kinds, texts: #{}, nullable: false };
     assert(!dead.can_start(name, "x"));
 })
 
-# `self` as one readable line: each terminal in set order — a kind by its case
-# name, a spelling in double quotes — with `<empty>` appended when the rule is
-# nullable. A debug rendering, like `cst.aipl`'s `show`.
+# `self` as one readable line: the kinds by case name, then the spellings in
+# double quotes, each set in its own order — with `<empty>` appended when the
+# rule is nullable. A debug rendering, like `cst.aipl`'s `show`.
 pub fn show_first<K: variant>(self: First<K>) -> str {
-    let syms = self.syms.map(show_sym).join(sep=" ");
+    let kinds = self.kinds.map(case_name).join(sep=" ");
+    let texts = self.texts.map(|t| `"{t}"`).join(sep=" ");
+    let syms = [kinds, texts].filter(is_nonempty).join(sep=" ");
     if (!self.nullable) {
         return syms;
     };
@@ -715,16 +681,16 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
     };
     `{syms} <empty>`
 }.test({
-    let syms: Sym<Tok>[] = [Kind(Num), Text("(")];
-    let f: First<Tok> = First { syms, nullable: false };
+    let num: Case<Tok> = Num;
+    let f: First<Tok> = First { kinds: #{num}, texts: #{"("}, nullable: false };
     assert(
         f.show_first() == """
             Num "("
         """,
     );
 
-    // Nullability is not a member of the set, so it renders after it.
-    let nullable: First<Tok> = First { syms: f.syms, nullable: true };
+    // Nullability is not a member of either set, so it renders after both.
+    let nullable: First<Tok> = First { ..f, nullable: true };
     assert(
         nullable.show_first() == """
             Num "(" <empty>
@@ -733,19 +699,12 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
 
     // The two degenerate sets are distinguishable: matching only emptiness is
     // not the same as matching nothing at all.
-    let no_syms: Sym<Tok>[] = [];
-    let only_empty: First<Tok> = First { syms: no_syms, nullable: true };
+    let no_kinds: #{Case<Tok>} = #{};
+    let only_empty: First<Tok> = First { kinds: no_kinds, texts: #{}, nullable: true };
     assert(only_empty.show_first() == "<empty>");
-    let dead: First<Tok> = First { syms: no_syms, nullable: false };
+    let dead: First<Tok> = First { kinds: no_kinds, texts: #{}, nullable: false };
     assert(dead.show_first() == "");
 })
-
-fn show_sym<K: variant>(self: Sym<K>) -> str {
-    match (self) {
-        Kind(k) => k.case_name(),
-        Text(s) => `"{s}"`,
-    }
-}
 
 # `first_sets` rendered one `name = terminals` line per production, in grammar
 # order, with no trailing newline — the FIRST-set counterpart of `ebnf`, and
@@ -782,7 +741,7 @@ pub fn show_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> str!ParseError {
             stmt = Name
             expr = Num Name "("
             atom = Num Name "("
-            opt = "!" Name
+            opt = Name "!"
         """,
     );
 
@@ -852,21 +811,18 @@ fn fixture() -> Grammar<Tok, Node> {
     }
 }
 --- performance ---
-allocations: 1459
-deallocations: 1459
-reallocations: 292
-bytes allocated: 175680
-instructions executed: 232673
-binary size: 165000
-  code: 108612
+allocations: 1883
+deallocations: 1883
+reallocations: 312
+bytes allocated: 185926
+instructions executed: 236072
+binary size: 171104
+  code: 112340
   data: 4276
-  metadata: 52112
+  metadata: 54488
 functions:
   __arr_drop_First$Tok:
     calls: 23
-    bytes: 116
-  __arr_drop_Sym$Tok:
-    calls: 187
     bytes: 140
   __arr_drop___m1__ListStyle:
     calls: 60
@@ -882,9 +838,6 @@ functions:
     bytes: 116
   __arr_retain_First$Tok:
     calls: 95
-    bytes: 116
-  __arr_retain_Sym$Tok:
-    calls: 142
     bytes: 140
   __arr_retain___m1__ListStyle:
     calls: 0
@@ -918,21 +871,15 @@ functions:
     bytes: 1448
   __builtin_try_map$__m1__Production$Tok$Node$First<Tok>$__m1__ParseError$lam$linked_first_sets$Tok$Node$lambda2:
     calls: 17
-    bytes: 896
+    bytes: 940
   __builtin_try_map$__m1__Rule$Tok$__m1__Rule$Tok$__m1__ParseError$lam$__m1__desugar_rule$Tok:
     calls: 46
     bytes: 628
   __eq_First$Tok:
     calls: 36
-    bytes: 128
+    bytes: 160
   __eq_First$Tok$arr:
     calls: 17
-    bytes: 284
-  __eq_Sym$Tok:
-    calls: 104
-    bytes: 144
-  __eq_Sym$Tok$arr:
-    calls: 36
     bytes: 284
   __eq___builtin_Span:
     calls: 1
@@ -940,6 +887,12 @@ functions:
   __eq___m1__ParseError:
     calls: 1
     bytes: 128
+  __eq_set$Tok$case:
+    calls: 36
+    bytes: 256
+  __eq_set$str:
+    calls: 36
+    bytes: 304
   __m1__desugar_opt$Tok:
     calls: 26
     bytes: 700
@@ -978,7 +931,7 @@ functions:
     bytes: 72
   __test$can_start:
     calls: 1
-    bytes: 832
+    bytes: 1024
   __test$ebnf:
     calls: 1
     bytes: 13520
@@ -987,10 +940,10 @@ functions:
     bytes: 4944
   __test$rule_first:
     calls: 1
-    bytes: 4780
+    bytes: 4984
   __test$show_first:
     calls: 1
-    bytes: 976
+    bytes: 1184
   __test$show_first_sets:
     calls: 1
     bytes: 1840
@@ -1010,28 +963,28 @@ functions:
     calls: 213
     bytes: (external)
   aipl_arr_inc:
-    calls: 2959
+    calls: 4058
     bytes: (external)
   aipl_arr_reserve:
-    calls: 365
+    calls: 293
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 4121
+    calls: 5531
     bytes: (external)
   aipl_array_new:
-    calls: 123
+    calls: 62
     bytes: (external)
   aipl_array_push:
     calls: 96
     bytes: (external)
   aipl_array_push_mut:
-    calls: 566
+    calls: 710
     bytes: (external)
   aipl_array_with_cap:
-    calls: 60
+    calls: 590
     bytes: (external)
   aipl_assert:
     calls: 25
@@ -1052,13 +1005,13 @@ functions:
     calls: 120
     bytes: (external)
   aipl_set_contains:
-    calls: 17
+    calls: 316
     bytes: (external)
   aipl_set_insert:
-    calls: 24
+    calls: 268
     bytes: (external)
   aipl_set_union:
-    calls: 7
+    calls: 209
     bytes: (external)
   aipl_test_begin:
     calls: 6
@@ -1077,7 +1030,7 @@ functions:
     bytes: (external)
   can_start$Tok:
     calls: 5
-    bytes: 600
+    bytes: 256
   climb_precs$Tok:
     calls: 0
     bytes: 32
@@ -1089,7 +1042,7 @@ functions:
     bytes: 3588
   first_msg:
     calls: 2
-    bytes: 556
+    bytes: 596
   first_precs$Tok:
     calls: 0
     bytes: 32
@@ -1107,10 +1060,13 @@ functions:
     bytes: 112
   linked_first_sets$Tok$Node:
     calls: 6
-    bytes: 1060
+    bytes: 1208
   main:
     calls: 1
     bytes: 452
+  merge$Tok:
+    calls: 101
+    bytes: 436
   prec_note:
     calls: 31
     bytes: 3236
@@ -1122,13 +1078,13 @@ functions:
     bytes: 1708
   rule_first$Tok:
     calls: 235
-    bytes: 6428
+    bytes: 7816
   show_first$Tok:
     calls: 27
-    bytes: 2292
+    bytes: 3876
+  show_first$Tok$filter1$own0:
+    calls: 27
+    bytes: 444
   show_first_sets$Tok$Node:
     calls: 5
-    bytes: 2548
-  union_syms$Tok:
-    calls: 101
-    bytes: 736
+    bytes: 2736

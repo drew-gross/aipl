@@ -4301,15 +4301,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1820671
-deallocations: 1820671
-reallocations: 245380
-bytes allocated: 321309845
-instructions executed: 492073740
-binary size: 5935304
-  code: 3883972
+allocations: 1870306
+deallocations: 1870306
+reallocations: 245389
+bytes allocated: 319130117
+instructions executed: 482190868
+binary size: 5936928
+  code: 3884692
   data: 48620
-  metadata: 2002712
+  metadata: 2003616
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4337,9 +4337,6 @@ functions:
     bytes: 184
   __arr_drop___m30__First$__m21__AiplTok:
     calls: 81
-    bytes: 116
-  __arr_drop___m30__Sym$__m21__AiplTok:
-    calls: 39708
     bytes: 140
   __arr_drop___m3__Expr:
     calls: 83
@@ -4427,9 +4424,6 @@ functions:
     bytes: 184
   __arr_retain___m30__First$__m21__AiplTok:
     calls: 4374
-    bytes: 116
-  __arr_retain___m30__Sym$__m21__AiplTok:
-    calls: 46053
     bytes: 140
   __arr_retain___m3__Expr:
     calls: 63
@@ -4676,7 +4670,7 @@ functions:
     bytes: 9464
   __builtin_try_map$__m7__Production$__m21__AiplTok$__m1__Ast$__m30__First<AiplTok>$__m7__ParseError$lam$__m30__linked_first_sets$__m21__AiplTok$__m1__Ast$lambda2:
     calls: 72
-    bytes: 10384
+    bytes: 10416
   __builtin_try_map$__m7__Rule$__m21__AiplTok$__m7__Rule$__m21__AiplTok$__m7__ParseError$lam$__m7__desugar_rule$__m21__AiplTok:
     calls: 58056
     bytes: 628
@@ -4694,15 +4688,9 @@ functions:
     bytes: 284
   __eq___m30__First$__m21__AiplTok:
     calls: 1494
-    bytes: 128
+    bytes: 160
   __eq___m30__First$__m21__AiplTok$arr:
     calls: 72
-    bytes: 284
-  __eq___m30__Sym$__m21__AiplTok:
-    calls: 157554
-    bytes: 144
-  __eq___m30__Sym$__m21__AiplTok$arr:
-    calls: 1494
     bytes: 284
   __eq___m7__ParseError:
     calls: 0
@@ -4710,8 +4698,11 @@ functions:
   __eq___m7__ParseError$opt:
     calls: 1
     bytes: 92
+  __eq_set$__m21__AiplTok$case:
+    calls: 1494
+    bytes: 256
   __eq_set$str:
-    calls: 1314
+    calls: 2808
     bytes: 304
   __eq_set$str$arr:
     calls: 54
@@ -4952,7 +4943,7 @@ functions:
     bytes: 1668
   __m29__match_prod$__m21__AiplTok$__m1__Ast:
     calls: 12531
-    bytes: 67040
+    bytes: 67416
   __m29__match_reps$__m21__AiplTok$__m1__Ast:
     calls: 3093
     bytes: 4712
@@ -4994,7 +4985,7 @@ functions:
     bytes: 36
   __m29__rule_nullable$__m21__AiplTok$tail:
     calls: 7344
-    bytes: 1600
+    bytes: 1680
   __m29__seq_labels$__m21__AiplTok$__m1__Ast:
     calls: 0
     bytes: 44
@@ -5010,21 +5001,18 @@ functions:
   __m2__brace_literal:
     calls: 7
     bytes: 2064
-  __m30__can_start$__m21__AiplTok:
-    calls: 180
-    bytes: 600
   __m30__first_sets$__m21__AiplTok$__m1__Ast:
     calls: 9
     bytes: 356
   __m30__linked_first_sets$__m21__AiplTok$__m1__Ast:
     calls: 9
-    bytes: 7420
+    bytes: 7536
+  __m30__merge$__m21__AiplTok:
+    calls: 21816
+    bytes: 436
   __m30__rule_first$__m21__AiplTok:
     calls: 28296
-    bytes: 6428
-  __m30__union_syms$__m21__AiplTok:
-    calls: 21816
-    bytes: 736
+    bytes: 7816
   __m31__line_at:
     calls: 9
     bytes: 636
@@ -5290,10 +5278,10 @@ functions:
     calls: 1045066
     bytes: (external)
   aipl_arr_inc:
-    calls: 5404182
+    calls: 5482547
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1075137
+    calls: 1046445
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 15870
@@ -5308,19 +5296,19 @@ functions:
     calls: 38
     bytes: (external)
   aipl_array_dec:
-    calls: 8060941
+    calls: 8176863
     bytes: (external)
   aipl_array_new:
-    calls: 189129
+    calls: 178113
     bytes: (external)
   aipl_array_push:
     calls: 124086
     bytes: (external)
   aipl_array_push_mut:
-    calls: 622463
+    calls: 676121
     bytes: (external)
   aipl_array_with_cap:
-    calls: 37621
+    calls: 126964
     bytes: (external)
   aipl_assert:
     calls: 331
@@ -5359,13 +5347,13 @@ functions:
     calls: 351012
     bytes: (external)
   aipl_set_contains:
-    calls: 61911
+    calls: 157851
     bytes: (external)
   aipl_set_insert:
-    calls: 57447
+    calls: 145053
     bytes: (external)
   aipl_set_union:
-    calls: 15174
+    calls: 58806
     bytes: (external)
   aipl_test_begin:
     calls: 14

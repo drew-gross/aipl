@@ -199,10 +199,10 @@ deallocations: 20250
 reallocations: 2930
 bytes allocated: 4068847
 instructions executed: 8615043
-binary size: 6645104
-  code: 4369384
+binary size: 6644816
+  code: 4369160
   data: 10450
-  metadata: 2265270
+  metadata: 2265206
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -854,7 +854,7 @@ functions:
     bytes: 1668
   __m31__match_prod$__m23__AiplTok$__m5__Ast:
     calls: 70
-    bytes: 67040
+    bytes: 67416
   __m31__match_reps$__m23__AiplTok$__m5__Ast:
     calls: 21
     bytes: 4712
@@ -888,9 +888,6 @@ functions:
   __m31__trivia_span$__m23__AiplTok:
     calls: 11
     bytes: 1568
-  __m32__can_start$__m23__AiplTok:
-    calls: 0
-    bytes: 600
   __m33__line_at:
     calls: 0
     bytes: 636

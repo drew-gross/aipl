@@ -368,6 +368,7 @@ nonempty lists:
 abi:
 
 design:
+  determinism is mandatory, it should be impossible to write non-deterministic code in single threaded AIPL (give same host state i.e. if effects have deterministic shims. Also, threading isn't implemented but will obviously have to change this. somehow.)
   don't repeat information in the docs that can be determined form the signature: whether it's callable as a method, and which arguments are generic.
   backwards compatibility is less important the age of AI: you can get claude to migrade all your code (note: changes that cause code that used to compile to stop is fine, change that silently change behaviour of existing code is still 100% banned)
   representation is not introspectable
