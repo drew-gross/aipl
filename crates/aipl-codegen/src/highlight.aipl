@@ -754,11 +754,11 @@ allocations: 991
 deallocations: 991
 reallocations: 33
 bytes allocated: 76968
-instructions executed: 128622
-binary size: 141800
-  code: 91380
+instructions executed: 128504
+binary size: 140880
+  code: 90652
   data: 5520
-  metadata: 44900
+  metadata: 44708
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -837,7 +837,7 @@ functions:
     bytes: 64
   __test$matcher_regex:
     calls: 1
-    bytes: 8712
+    bytes: 7984
   __test$matcher_regex$lambda0:
     calls: 0
     bytes: 64

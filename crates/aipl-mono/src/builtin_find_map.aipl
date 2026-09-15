@@ -44,11 +44,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 32
-instructions executed: 698
-binary size: 4760
-  code: 2076
+instructions executed: 640
+binary size: 4624
+  code: 1944
   data: 664
-  metadata: 2020
+  metadata: 2016
 functions:
   __eq_i64$opt:
     calls: 3
@@ -58,7 +58,7 @@ functions:
     bytes: 576
   __test$nonzero:
     calls: 1
-    bytes: 252
+    bytes: 208
   aipl_arr_slice:
     calls: 1
     bytes: (external)
@@ -82,10 +82,10 @@ functions:
     bytes: 344
   find_map$i64$i64$lam$__test$find_map$lambda0:
     calls: 1
-    bytes: 320
+    bytes: 276
   find_map$i64$i64$lam$nonzero:
     calls: 3
-    bytes: 308
+    bytes: 264
   main:
     calls: 1
     bytes: 176

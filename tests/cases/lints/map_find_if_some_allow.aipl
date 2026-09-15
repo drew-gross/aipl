@@ -20,15 +20,15 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 438
-instructions executed: 638
-binary size: 3992
-  code: 1996
+instructions executed: 614
+binary size: 3952
+  code: 1952
   data: 163
-  metadata: 1833
+  metadata: 1837
 functions:
   __builtin_find_map$i64$i64$lam$nonzero:
     calls: 2
-    bytes: 308
+    bytes: 264
   __builtin_map_find_if$i64$i64?$lam$nonzero$__builtin_is_some:
     calls: 2
     bytes: 312

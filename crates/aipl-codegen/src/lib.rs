@@ -3973,12 +3973,14 @@ fn compile_program<M: Module>(
     // caller before a binding can be moved into one of its arms.
     let program =
         aipl_mono::inline_small_post_mono(&program, inline_max_exprs(), &externally_called);
-    // Push each `?` into the constructor-ending branches under it, so an
-    // inlined `value_or_err`/`map_ok`/… hands its payload straight out instead
-    // of building a result the `?` immediately takes apart. After inlining,
-    // which is what puts the `match` under the `?`; before sinking, so the
-    // error a `none` arm now builds itself is what the sinker moves in.
-    let program = aipl_mono::push_try_post_mono(&program);
+    // Push each `?` and each `match` on an optional/result into the
+    // constructor-ending branches under it, so an inlined
+    // `value_or_err`/`value_or`/`map_ok`/… hands its payload straight out
+    // instead of building a value the eliminator immediately takes apart.
+    // After inlining, which is what puts the constructors under the
+    // eliminator; before sinking, so the error a `none` arm now builds itself
+    // is what the sinker moves in.
+    let program = aipl_mono::eliminate_known_constructors_post_mono(&program, inline_max_exprs());
     // Sink again over the monomorphized program: mono instantiates the
     // AIPL-implemented builtins the pre-mono run could not see, and post-mono
     // inlining folds each lifted lambda and single-use instance into its caller
@@ -20288,13 +20290,23 @@ fn compile_expr_inner<M: Module>(
                         span.clone(),
                     ));
                 }
-                let tag = builder
-                    .ins()
-                    .load(types::I64, MemFlagsData::trusted(), rptr, 0);
                 let some_block = builder.create_block();
                 let none_block = builder.create_block();
-                // tag != 0 = some → continue; tag 0 = none → early return.
-                builder.ins().brif(tag, some_block, &[], none_block, &[]);
+                // `none?` — the literal under the `?`, which is what
+                // `aipl_mono::eliminate_known_constructors_post_mono` leaves at
+                // the leaf of a pushed-through branch. Its tag is the constant
+                // 0, so there is no `some` path: leave through the none block
+                // unconditionally (the mirror of the literal-`err` case below).
+                let literal_none = matches!(inner.kind, ExprKind::None);
+                if literal_none {
+                    builder.ins().jump(none_block, &[]);
+                } else {
+                    let tag = builder
+                        .ins()
+                        .load(types::I64, MemFlagsData::trusted(), rptr, 0);
+                    // tag != 0 = some → continue; tag 0 = none → early return.
+                    builder.ins().brif(tag, some_block, &[], none_block, &[]);
+                }
 
                 // --- none: drop live scopes, then either fail the test or return
                 // a fresh `none`. ---
@@ -20328,6 +20340,10 @@ fn compile_expr_inner<M: Module>(
                 // --- some: unwrap the value and carry on (mirrors the Ok arm). ---
                 builder.switch_to_block(some_block);
                 builder.seal_block(some_block);
+                if literal_none {
+                    // Nothing jumps here; the block is the dead continuation.
+                    return Ok((builder.ins().iconst(types::I64, 0), val_ty));
+                }
                 let owned_temp = move_owned_temp(scopes, scope_len_before, rptr);
                 let val = component(builder, rptr, OPT_VALUE_OFFSET, &val_ty, structs);
                 if needs_drop(&val_ty, structs) {
@@ -20392,8 +20408,8 @@ fn compile_expr_inner<M: Module>(
             let ok_block = builder.create_block();
             let err_block = builder.create_block();
             // `err(e)?` — a literal error construction under the `?`, which is
-            // what `aipl_mono::push_try_post_mono` leaves at the leaf of a
-            // pushed-through branch. Its tag is the constant 0, so there is no
+            // what `aipl_mono::eliminate_known_constructors_post_mono` leaves at
+            // the leaf of a pushed-through branch. Its tag is the constant 0, so there is no
             // Ok path: leave through the Err block unconditionally, and hand the
             // unreachable continuation a placeholder (typed `__none__`, so it
             // merges with whatever a sibling arm yields) instead of emitting a

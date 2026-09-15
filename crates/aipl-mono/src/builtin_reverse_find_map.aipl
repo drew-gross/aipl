@@ -44,18 +44,18 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 71
-instructions executed: 740
-binary size: 5440
-  code: 2268
+instructions executed: 679
+binary size: 5304
+  code: 2136
   data: 824
-  metadata: 2348
+  metadata: 2344
 functions:
   __eq_i64$opt:
     calls: 3
     bytes: 100
   __test$nonzero:
     calls: 1
-    bytes: 252
+    bytes: 208
   __test$reverse_find_map:
     calls: 1
     bytes: 672
@@ -85,7 +85,7 @@ functions:
     bytes: 436
   reverse_find_map$i64$i64$lam$__test$reverse_find_map$lambda0:
     calls: 1
-    bytes: 316
+    bytes: 272
   reverse_find_map$i64$i64$lam$nonzero:
     calls: 4
-    bytes: 304
+    bytes: 260

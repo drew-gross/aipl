@@ -41,8 +41,8 @@ pub use fuse::{effectful_fns, fuse_operations};
 mod sink;
 pub use sink::{sink_bindings, sink_bindings_post_mono};
 
-mod try_push;
-pub use try_push::push_try_post_mono;
+mod known_constructor_elimination;
+pub use known_constructor_elimination::eliminate_known_constructors_post_mono;
 
 mod subst;
 pub use subst::inline_single_use_bindings;
@@ -8452,7 +8452,7 @@ fn mentions_abstract_type(ty: &Type) -> bool {
 /// nodes and a threshold of 2 would admit almost nothing. Counting operations
 /// makes the unit the thing a reader means by "an expression": `a + b` is 1,
 /// `a + b * c` is 2, `f(g(x))` is 2.
-fn body_size(e: &Expr) -> usize {
+pub(crate) fn body_size(e: &Expr) -> usize {
     let leaf = matches!(
         e.kind,
         ExprKind::Num(_)

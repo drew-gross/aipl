@@ -3152,11 +3152,11 @@ allocations: 15944
 deallocations: 15944
 reallocations: 1765
 bytes allocated: 3322001
-instructions executed: 26818880
-binary size: 10105464
-  code: 6385912
+instructions executed: 26818646
+binary size: 10105472
+  code: 6385916
   data: 31204
-  metadata: 3688348
+  metadata: 3688352
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3256,7 +3256,7 @@ functions:
     bytes: 352
   __builtin_int_parse:
     calls: 26
-    bytes: 1112
+    bytes: 1116
   __builtin_int_parse$lambda1:
     calls: 26
     bytes: 140

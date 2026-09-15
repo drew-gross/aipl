@@ -249,11 +249,11 @@ allocations: 20264
 deallocations: 20264
 reallocations: 2930
 bytes allocated: 4070769
-instructions executed: 8619653
-binary size: 5650480
-  code: 3727144
+instructions executed: 8619617
+binary size: 5650488
+  code: 3727148
   data: 10898
-  metadata: 1912438
+  metadata: 1912442
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -518,7 +518,7 @@ functions:
     bytes: 364
   __builtin_int_parse:
     calls: 4
-    bytes: 1112
+    bytes: 1116
   __builtin_int_parse$lambda1:
     calls: 4
     bytes: 140

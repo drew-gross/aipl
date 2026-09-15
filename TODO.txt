@@ -41,6 +41,7 @@ type checker:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 inlining:
+  inline when it would create a known constructor elimination opportunity
   functions where inlining creates large code sinking opportunities should be inlined (or partially inlined i.e. just the branch)
   inline no-arg-no-effect functions into data section
   inline single-use let variables

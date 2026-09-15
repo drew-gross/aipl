@@ -4294,11 +4294,11 @@ allocations: 1918593
 deallocations: 1918593
 reallocations: 252681
 bytes allocated: 321469797
-instructions executed: 484744594
-binary size: 4958672
-  code: 3247480
+instructions executed: 484741762
+binary size: 4958680
+  code: 3247484
   data: 48636
-  metadata: 1662556
+  metadata: 1662560
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4545,7 +4545,7 @@ functions:
     bytes: 364
   __builtin_int_parse:
     calls: 471
-    bytes: 1112
+    bytes: 1116
   __builtin_int_parse$lambda1:
     calls: 439
     bytes: 140

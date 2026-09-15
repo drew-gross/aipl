@@ -59,11 +59,11 @@ allocations: 23
 deallocations: 23
 reallocations: 0
 bytes allocated: 1439
-instructions executed: 2338
-binary size: 8464
-  code: 5476
+instructions executed: 1962
+binary size: 7976
+  code: 5136
   data: 33
-  metadata: 2955
+  metadata: 2807
 functions:
   __arr_drop_R:
     calls: 3
@@ -93,14 +93,14 @@ functions:
     calls: 11
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 57
+    calls: 33
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 46
+    calls: 22
     bytes: (external)
   copy_or:
     calls: 8
-    bytes: 992
+    bytes: 652
   main:
     calls: 1
     bytes: 1088
