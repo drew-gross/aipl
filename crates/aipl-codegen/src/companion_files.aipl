@@ -137,8 +137,8 @@ fn companion_path(header: str) -> str!str {
     if (path == "") {
         err("`file:` section needs a path: `--- file: path/to/it.aipl ---`")
     } else {
-        if (path.contains("\\")) {
-            err(`use "/" (not "\\") in "file:" section paths: {path}`)
+        if (path.contains("""\""")) {
+            err(```use "/" (not "\") in "file:" section paths: {path}```)
         } else {
             ok(path)
         }
@@ -152,7 +152,7 @@ fn companion_path(header: str) -> str!str {
     assert(
         companion_path("file:    ").is_err_and(|e| e.starts_with("`file:` section needs a path")),
     );
-    assert(companion_path("file: a\\b.txt").is_err_and(|e| e.starts_with(`use "/"`)));
+    assert(companion_path("""file: a\b.txt""").is_err_and(|e| e.starts_with(`use "/"`)));
 })
 --- performance ---
 allocations: 70

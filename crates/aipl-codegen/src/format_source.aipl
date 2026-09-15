@@ -19,16 +19,31 @@ import {
     concat as +++,
     equal as ==,
     filter,
+    len,
     logical_and as &&,
     map,
     map_err,
     not_equal as !=,
     sort,
     to_str,
+    value_or,
 } from builtins;
 import { clean_trailing_whitespace } from "./clean_trailing_whitespace.aipl";
 import { aipl_parse_file } from "./grammar_aipl.aipl";
-import { AiplTok, Backtick, Quoted, StrLit, TripleQuoted, lex_aipl } from "./lex_aipl.aipl";
+import {
+    AiplTok,
+    Backtick,
+    Quoted,
+    RawTemplateHead,
+    RawTemplateMid,
+    RawTemplateTail,
+    StrLit,
+    TemplateHead,
+    TemplateMid,
+    TemplateTail,
+    TripleQuoted,
+    lex_aipl,
+} from "./lex_aipl.aipl";
 import { LexResult } from "./lexer.aipl";
 import { split_test_sections } from "./split_test_sections.aipl";
 import { trim_end_while } from "./trim_end_while.aipl";
@@ -128,9 +143,15 @@ fn verify_same_tokens(input: str, output: str) -> !FmtError {
     let after = lex_aipl(output).map_err(
         |e| FmtError { message: `formatter produced unlexable output: {e.message}`, span: e.span },
     )?;
-    if (token_values(before) != token_values(after)) {
+    let was = token_values(before);
+    let now = token_values(after);
+    if (was != now) {
+        // Name the first token that differs — the sorted multisets line up
+        // until the first token one side has and the other lacks — so the bug
+        // report says which literal moved rather than only that one did.
+        let differ = first_difference(was, now);
         return err(FmtError {
-            message: "formatter would not preserve the token stream (formatter bug); no output written",
+            message: `formatter would not preserve the token stream (formatter bug): {differ}; no output written`,
             span: 0..0,
         });
     };
@@ -156,8 +177,8 @@ fn verify_same_tokens(input: str, output: str) -> !FmtError {
     // A `\"\"\"` block re-indented keeps its value.
     assert(verify_same_tokens(`"""\n  x\n  """`, `"""\n    x\n    """`) == ok());
     // A single-line string re-delimited (`requote`) keeps its value.
-    assert(verify_same_tokens(`let s = "say \\"hi\\"";`, "let s = `say \"hi\"`;") == ok());
-    assert(verify_same_tokens("let s = `\\{a\\}`;", "let s = \"{a}\";") == ok());
+    assert(verify_same_tokens("""let s = "say \"hi\"";""", """let s = `say "hi"`;""") == ok());
+    assert(verify_same_tokens("""let s = `\{a\}`;""", """let s = "{a}";""") == ok());
 
     // A lost, changed, or gained token is refused, and so is a lost comment.
     assert(verify_same_tokens("fn f() { 1 }", "fn f() { }") != ok());
@@ -174,11 +195,41 @@ fn token_value(kind: AiplTok) -> str {
     if (let StrLit(v, _) = kind) {
         return `str {to_str(v)}`;
     };
+
+    // A template's pieces likewise: the raw and single-backtick forms of one
+    // segment are one token, and `retemplate` moves between them.
+    if (let RawTemplateHead(v) = kind) {
+        return token_value(TemplateHead(v));
+    };
+    if (let RawTemplateMid(v) = kind) {
+        return token_value(TemplateMid(v));
+    };
+    if (let RawTemplateTail(v) = kind) {
+        return token_value(TemplateTail(v));
+    };
     to_str(kind)
 }.test({
     assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", Backtick)));
     assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", TripleQuoted)));
     assert(token_value(StrLit("a", Quoted)) != token_value(StrLit("b", Quoted)));
+    assert(token_value(TemplateHead("a")) == token_value(RawTemplateHead("a")));
+    assert(token_value(TemplateHead("a")) != token_value(TemplateTail("a")));
+})
+
+# Where two sorted token lists first disagree, as `<before> became <after>`
+# (`nothing` for a side that ran out) — the detail a preservation failure
+# reports.
+fn first_difference(was: str[], now: str[]) -> str {
+    for (let i, w : was) {
+        if (now[i] != some(w)) {
+            return `{w} became {now[i].value_or("nothing")}`;
+        };
+    }
+    `nothing became {now[was.len()].value_or("nothing")}`
+}.test({
+    assert(first_difference(["a", "b"], ["a", "c"]) == "b became c");
+    assert(first_difference(["a"], ["a", "b"]) == "nothing became b");
+    assert(first_difference(["a", "b"], ["a"]) == "b became nothing");
 })
 
 # Every token's value, as a sorted multiset — minus the commas and `|`s that

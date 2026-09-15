@@ -6,7 +6,7 @@ import { print } from builtins;
 // the escapes its value needs, so it is now the backtick spelling of the same
 // text. Both lines print exactly as written.
 fn main() !prints -> i64 {
-    print(`path C:\\dir\\new "quoted" and ""doubled"" end`);
+    print("""path C:\dir\new "quoted" and ""doubled"" end""");
     let multi = """
         line "with" quotes
         and a \backslash

@@ -96,16 +96,16 @@ pub fn aipl_tmlanguage() -> str {
     // The frame.
     assert(json.contains(`"scopeName": "source.aipl"`));
     assert(json.contains(`"fileTypes": ["aipl"]`));
-    assert(json.contains(`\{ "include": "#section-tail" \}`));
+    assert(json.contains("""{ "include": "#section-tail" }"""));
 
     // The keyword and constant runs, merged from their individual `kw` rules in
     // table order — every keyword AIPL has, in one alternation.
-    assert(json.contains("\\\\bfn\\\\b|\\\\blet\\\\b|\\\\bmut\\\\b"));
-    assert(json.contains("\\\\btrue\\\\b|\\\\bfalse\\\\b|\\\\bnone\\\\b"));
+    assert(json.contains("""\\bfn\\b|\\blet\\b|\\bmut\\b"""));
+    assert(json.contains("""\\btrue\\b|\\bfalse\\b|\\bnone\\b"""));
 
     // The operator run stays longest-first, which is what keeps the alternation
     // maximal munch: `+++` ahead of `++`, `==` ahead of `=`.
-    assert(json.contains("\\\\+\\\\+\\\\+|==|!="));
+    assert(json.contains("""\\+\\+\\+|==|!="""));
 
     // The three string forms are regions, and the triple-quoted one is listed
     // before the single — the same ordering the lexer rules carry.
@@ -116,7 +116,7 @@ pub fn aipl_tmlanguage() -> str {
     assert(json.contains(`"name": "string.quoted.single.aipl"`));
 
     // A template interpolation includes the whole language back into itself.
-    assert(json.contains(`\{ "include": "#main" \}`));
+    assert(json.contains("""{ "include": "#main" }"""));
 
     // The block comment is the one self-referential pattern, so the one that
     // needed a name.
@@ -125,7 +125,7 @@ pub fn aipl_tmlanguage() -> str {
     // The contextual declarations, and the post-lexical type names.
     assert(json.contains(`"match": "\\\\b(fn)\\\\s+`));
     assert(json.contains(`"name": "entity.name.function.aipl"`));
-    assert(json.contains("\\\\bi64\\\\b"));
+    assert(json.contains("""\\bi64\\b"""));
 
     // ... and the section tail, which runs to end of file.
     assert(json.contains(`"contentName": "meta.section-content.aipl"`));
@@ -153,7 +153,7 @@ fn builtin_types() -> str[] {
 # out rather than matched as any `!ident`, which would mis-scope the unary `!`
 # in `!true` / `!ready`; they must stay in step with `KNOWN_EFFECTS`.
 fn effect_pat() -> Pat {
-    Caps("(!)(prints)\\b", ["keyword.operator.effect.aipl", "entity.name.tag.effect.aipl"])
+    Caps("""(!)(prints)\b""", ["keyword.operator.effect.aipl", "entity.name.tag.effect.aipl"])
 }
 
 # A test-case file's `--- name ---` markers and everything after the first one.
@@ -162,10 +162,10 @@ fn effect_pat() -> Pat {
 # thing a theme has to "not code". `\z` never matches inside the text, so the
 # region runs to end of file.
 fn section_tail() -> Pat {
-    let marker = "^[ \\t]*---[ \\t]+\\S.*?\\S[ \\t]+---[ \\t]*\\r?$";
+    let marker = """^[ \t]*---[ \t]+\S.*?\S[ \t]+---[ \t]*\r?$""";
     Region(
         marker,
-        "\\z",
+        """\z""",
         [Match(marker, "comment.line.section-marker.aipl")],
         begin_scope="comment.line.section-marker.aipl",
         content_scope="meta.section-content.aipl",

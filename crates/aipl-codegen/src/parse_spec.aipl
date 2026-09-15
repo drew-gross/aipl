@@ -175,8 +175,8 @@ fn companion_path(name: str, prefix: str) -> str!str {
     if (path == "") {
         return err(`"{prefix}" section needs a path: "--- {prefix} path/to/it ---"`);
     };
-    if (path.contains("\\")) {
-        return err(`use "/" (not "\\") in "{prefix}" section paths: "{path}"`);
+    if (path.contains("""\""")) {
+        return err(```use "/" (not "\") in "{prefix}" section paths: "{path}"```);
     };
     ok(path)
 }

@@ -7,8 +7,12 @@
 // with the same choice of delimiter. `walker.aipl` applies it to every string
 // token.
 import {
+    all,
+    any,
+    concat as +++,
     contains,
     count_if,
+    ends_with,
     equal as ==,
     extend,
     first,
@@ -17,6 +21,7 @@ import {
     logical_and as &&,
     logical_not as !,
     logical_or as ||,
+    map,
     not_equal as !=,
     starts_with,
     value_or,
@@ -86,16 +91,16 @@ fn escape_cost(body: str, delim: char) -> u64 {
     assert(escape_cost(`say "hi"`, '"') == 2);
     assert(escape_cost(`say \\"hi\\"`, '`') == 0);
     // Braces and backticks cost under a backtick only.
-    assert(escape_cost("\\{a\\} `b`", '`') == 4);
-    assert(escape_cost("\\{a\\} `b`", '"') == 0);
+    assert(escape_cost("""\{a\} `b`""", '`') == 4);
+    assert(escape_cost("""\{a\} `b`""", '"') == 0);
     // The shared escapes cost nothing under either.
-    assert(escape_cost("a\\nb\\\\c\\t", '"') == 0);
-    assert(escape_cost("a\\nb\\\\c\\t", '`') == 0);
+    assert(escape_cost("""a\nb\\c\t""", '"') == 0);
+    assert(escape_cost("""a\nb\\c\t""", '`') == 0);
     // An escaped backslash's X is not the start of another escape.
     assert(escape_cost(`\\\\"`, '"') == 1);
     // Both kinds present: each delimiter pays for its own.
-    assert(escape_cost("\\\"{", '"') == 1);
-    assert(escape_cost("\\\"{", '`') == 1);
+    assert(escape_cost("""\"{""", '"') == 1);
+    assert(escape_cost("""\"{""", '`') == 1);
 })
 
 # `body` respelled for `delim`: an escape the old delimiter needed and this one
@@ -129,29 +134,136 @@ fn redelimit(body: str, delim: char) -> str {
     // `"` → backtick: quotes shed their backslashes.
     assert(redelimit(`say \\"hi\\"`, '`') == `say "hi"`);
     // backtick → `"`: braces and backticks shed theirs.
-    assert(redelimit("\\{a\\} \\`b\\`", '"') == "{a} `b`");
+    assert(redelimit("""\{a\} \`b\`""", '"') == "{a} `b`");
     // The reverse directions gain them.
-    assert(redelimit("{a} `b`", '`') == "\\{a\\} \\`b\\`");
+    assert(redelimit("{a} `b`", '`') == """\{a\} \`b\`""");
     assert(redelimit(`say "hi"`, '"') == `say \\"hi\\"`);
 
     // Shared escapes copy verbatim under either delimiter — and an escaped
     // backslash is one char, so the quote after it is a bare quote.
-    assert(redelimit("a\\nb\\\\c\\t", '`') == "a\\nb\\\\c\\t");
+    assert(redelimit("""a\nb\\c\t""", '`') == """a\nb\\c\t""");
     assert(redelimit(`\\\\"`, '`') == `\\\\"`);
     // Respelling for the delimiter the body already has changes nothing.
     assert(redelimit(`say \\"hi\\"`, '"') == `say \\"hi\\"`);
-    assert(redelimit("\\{a\\} \\`b\\`", '`') == "\\{a\\} \\`b\\`");
+    assert(redelimit("""\{a\} \`b\`""", '`') == """\{a\} \`b\`""");
 })
 
-# A string token's source text, re-delimited as whichever of `"` and `` ` ``
-# spells its value with fewer escapes. A tie keeps the delimiter it has, so a
-# literal with nothing to escape is never rewritten; a `"""`/```` ``` ```` block
-# (whose two forms are not interchangeable — only the raw template decodes `\{`)
-# is returned unchanged.
+# A string token's source text, respelled as whichever of the four string
+# spellings — `"…"`, `` `…` ``, `"""…"""`, ```` ```…``` ```` — needs the
+# fewest escapes for its value. Ties go to a single-line form over a block
+# (one line rather than three, or one delimiter rather than three), and then to
+# the family the token already has (quotes or backticks), so a literal with
+# nothing to gain is never rewritten. A value holding a newline is what the
+# block forms are for: a block keeps its lines, and a `"…"`/`` `…` `` with
+# `\n` escapes only ever swaps between those two (`reswap`).
 pub fn requote(self: str) -> str {
-    if (self.starts_with(`"""`) || self.starts_with("```")) {
-        return self.unblock();
+    if (!self.starts_with('"') && !self.starts_with('`')) {
+        return self;
     };
+    let value = str_lit_value(self);
+    if (value.contains('\n')) {
+        return if (self.is_block()) { self } else { self.reswap() };
+    };
+    let quoted = self.starts_with(`"`);
+    let block = self.is_block();
+
+    // Every spelling that can hold the value, compared by `better`: the two
+    // single-line forms always can; a block only when its scan and de-denting
+    // leave the value intact, and a raw template only when the value has no
+    // backslash (its one escape, `\{`, is the only backslash it decodes).
+    mut best = Spelling {
+        cost: single_cost(value, '"'),
+        block: false,
+        foreign: !quoted,
+        text: `"{encode(value, '"')}"`,
+    };
+    set best = best.better(Spelling {
+        cost: single_cost(value, '`'),
+        block: false,
+        foreign: quoted,
+        text: "`" +++ encode(value, '`') +++ "`",
+    });
+    if (value.block_ok('"')) {
+        set best = best.better(Spelling {
+            cost: 0,
+            block: true,
+            foreign: !(quoted && block),
+            text: `"""{value}"""`,
+        });
+    };
+    if (value.block_ok('`') && !value.contains('\\')) {
+        set best = best.better(Spelling {
+            cost: value.count_if(|c| c == '{' || c == '}'),
+            block: true,
+            foreign: !(!quoted && block),
+            text: "```" +++ brace_escaped(value) +++ "```",
+        });
+    };
+    best.text
+}.test({
+    // Nothing to escape either way: the literal keeps its delimiter.
+    assert(requote(`"plain"`) == `"plain"`);
+    assert(requote("`plain`") == "`plain`");
+    assert(requote(`""`) == `""`);
+    assert(requote("``") == "``");
+    // A `"` literal that only escapes quotes: a backtick spells them bare.
+    assert(requote(`"say \\"hi\\""`) == """`say "hi"`""");
+
+    // A backtick literal that only escapes braces / backticks: `"` spells them
+    // bare.
+    assert(requote("""`\{a\}`""") == "\"{a}\"");
+    assert(requote("""`\`b\``""") == ```"`b`"```);
+
+    // Mixed content goes to the cheapest spelling. A `"""` block escapes
+    // nothing, but cannot hold a value that starts or ends with a quote (its
+    // scan would close early), so these two stay single-line.
+    assert(requote(`"\\"\\"\{"`) == """`""\{`""");
+    assert(requote("""`\{\}"`""") == `"\{\}\\""`);
+    // A backslash is an escape in both single-line forms and none in a block.
+    assert(requote(`"C:\\\\dir"`) == `"""C:\\dir"""`);
+
+    // A block whose value is one line becomes a single-line literal when that
+    // costs no escape — `"""` to `"` and ```` ``` ```` to `` ` `` on a tie,
+    // and the other family when it saves one.
+    assert(requote(`"""hi"""`) == `"hi"`);
+    assert(requote("```hi```") == "`hi`");
+    assert(requote(`"""say "hi""""`) == """`say "hi"`""");
+    assert(requote("""```a \{b\} c```""") == "\"a {b} c\"");
+
+    // A block that a single-line form could only spell with escapes stays a
+    // block; a raw template with braces to escape goes to the `"` form, where
+    // a brace is bare — or, when the value ends on a quote, to the single-line
+    // form of its own family.
+    assert(requote(`"""a\\b"""`) == `"""a\\b"""`);
+    assert(requote("""```\{a\} b```""") == "\"{a} b\"");
+    assert(requote(`"""a\\ "b" c"""`) == `"""a\\ "b" c"""`);
+    assert(requote("""```\{a\} "b"```""") == """`\{a\} "b"`""");
+
+    // A raw template holds a backtick verbatim, so it is where a value with
+    // both quotes and backticks goes.
+    assert(requote(`"\\"\`b\`\\""`) == "```" +++ ```"`b`"``` +++ "```");
+
+    // A block whose value holds a newline stays as written; so does a
+    // single-line literal with a newline escape, save for the `"`/`` ` `` swap.
+    assert(requote(`"""\na\nb\n"""`) == `"""\na\nb\n"""`);
+    assert(requote(`"a\\n\\"b\\""`) == """`a\n"b"`""");
+    // Any other token is left alone.
+    assert(requote(`'"'`) == `'"'`);
+})
+
+# Whether a token spells a `"""`/```` ```` ```` block.
+fn is_block(self: str) -> bool { self.starts_with(`"""`) || self.starts_with("```") }.test({
+    assert(`"""a"""`.is_block());
+    assert("```a```".is_block());
+    assert(!`"a"`.is_block());
+})
+
+# The `"`/`` ` `` swap for a single-line literal whose value holds a newline —
+# the one case not spelled from the value, because `"a\nb"` and a block are
+# not the same number of lines and the escape is what keeps it on one. Copies
+# the source and moves only the delimiter-specific escapes (`redelimit`); a
+# tie keeps the delimiter it has.
+fn reswap(self: str) -> str {
     let delim = self.first().value_or(' ');
     if (delim != '"' && delim != '`') {
         return self;
@@ -164,75 +276,85 @@ pub fn requote(self: str) -> str {
         self
     }
 }.test({
-    // Nothing to escape either way: the literal keeps its delimiter.
-    assert(requote(`"plain"`) == `"plain"`);
-    assert(requote("`plain`") == "`plain`");
-    assert(requote(`""`) == `""`);
-    assert(requote("``") == "``");
-    // A `"` literal that only escapes quotes: a backtick spells them bare.
-    assert(requote(`"say \\"hi\\""`) == "`say \"hi\"`");
-
-    // A backtick literal that only escapes braces / backticks: `"` spells them
-    // bare.
-    assert(requote("`\\{a\\}`") == "\"{a}\"");
-    assert(requote("`\\`b\\``") == "\"`b`\"");
-    // Mixed content goes to the cheaper side; a tie stays put.
-    assert(requote(`"\\"\\"\{"`) == "`\"\"\\{`");
-    assert(requote("`\\{\\}\"`") == `"\{\}\\""`);
-    assert(requote(`"\\"\{"`) == `"\\"\{"`);
-    assert(requote("`\\{\"`") == "`\\{\"`");
-    // Shared escapes ride along unchanged.
-    assert(requote(`"a\\n\\"b\\""`) == "`a\\n\"b\"`");
-
-    // A block whose value is one line becomes a single-line literal, by the
-    // same rule; one whose value spans lines stays a block. Any other token is
-    // left alone.
-    assert(requote(`"""a "b" c"""`) == "`a \"b\" c`");
-    assert(requote("```\\{a\\}```") == `"\{a\}"`);
-    assert(requote(`"""\na\nb\n"""`) == `"""\na\nb\n"""`);
-    assert(requote(`'"'`) == `'"'`);
+    assert(reswap(`"a\\n\\"b\\""`) == """`a\n"b"`""");
+    assert(reswap("""`a\n\{b\}`""") == "\"a\\n{b}\"");
+    assert(reswap(`"a\\nb"`) == `"a\\nb"`);
 })
 
-# A `"""`/```` ``` ```` block respelled as the single-line literal of its value
-# when that value holds no newline — the block was three lines spent on one
-# line's worth of text — under whichever of `"` and `` ` `` needs fewer
-# escapes; a tie keeps the block's own family (`"""` to `"`, ```` ``` ```` to
-# `` ` ``). A value with a newline is what the block form is for, and stays.
-#
-# Unlike `requote`'s single-line respelling, which copies the source and only
-# moves the delimiter-specific escapes, this one is spelled from the *value*:
-# a block's content is verbatim (a raw template decodes only `\{`/`\}`), so
-# every backslash, tab and delimiter in it gains its escape here.
-fn unblock(self: str) -> str {
-    let value = str_lit_value(self);
-    if (value.contains('\n')) {
-        return self;
-    };
-    let family = if (self.starts_with(`"""`)) { '"' } else { '`' };
-    let other = if (family == '"') { '`' } else { '"' };
-    let delim = if (value_cost(value, other) < value_cost(value, family)) { other } else { family };
-    `{delim}{encode(value, delim)}{delim}`
+# Whether a one-line `value` can be the content of a single-line block opened
+# and closed by three `delim`s: it must not start or end with the delimiter or
+# contain the triple (the block's scan would close early), must not start with
+# a space (de-denting strips it), and must hold no control character (a block
+# has no escapes to spell one with).
+fn block_ok(self: str, delim: char) -> bool {
+    let triple = `{delim}{delim}{delim}`;
+    !self.starts_with(delim) && !self.ends_with(delim) && !self.contains(
+        triple,
+    ) && !self.starts_with(' ') && !self.contains('\t') && !self.contains('\r')
 }.test({
-    assert(unblock(`"""hi"""`) == `"hi"`);
-    assert(unblock("```hi```") == "`hi`");
-    // The blank opening and closing lines a block usually has are not content.
-    assert(unblock(`"""\n    hi\n"""`) == `"hi"`);
-    // Delimiters in the value pick the other family when that is cheaper.
-    assert(unblock(`"""say "hi""""`) == "`say \"hi\"`");
-    assert(unblock("```say \"hi\"```") == "`say \"hi\"`");
-    assert(unblock("```a \\{b\\} c```") == `"a \{b\} c"`);
-    // A raw block's backslash is content, and gains its escape.
-    assert(unblock(`"""a\\b"""`) == `"a\\\\b"`);
-    // Trailing content space is kept; a value with a newline stays a block.
-    assert(unblock(`"""x """`) == `"x "`);
-    assert(unblock(`"""\na\nb\n"""`) == `"""\na\nb\n"""`);
+    assert("say hi".block_ok('"'));
+    assert(!`"hi"`.block_ok('"'));
+    assert(!`say "hi"`.block_ok('"'));
+    assert(!`a"""b`.block_ok('"'));
+    assert(!" lead".block_ok('"'));
+    assert(!"tab\t".block_ok('"'));
+    assert("{a}".block_ok('`'));
+    assert(!"`a`".block_ok('`'));
 })
 
-# How many escapes `value` needs under `delim` when spelled from the value.
-fn value_cost(value: str, delim: char) -> u64 { value.count_if(|c| c.needs_escape(delim)) }.test({
-    assert(value_cost(`say "hi"`, '"') == 2);
-    assert(value_cost(`say "hi"`, '`') == 0);
-    assert(value_cost("{a}", '`') == 2);
+# One way of spelling a value, and what it costs: the escapes it needs, whether
+# it is a block, and whether it changes the token's family (quotes to backticks
+# or back). `text` is the spelling itself.
+struct Spelling { cost: u64, block: bool, foreign: bool, text: str }
+
+# The better of `self` and `other`: fewer escapes, then not a block, then the
+# family the token already has — `self` on a tie, so the caller's order is the
+# last word.
+fn better(self: Spelling, other: Spelling) -> Spelling {
+    let wins = other.cost < self.cost || (other.cost == self.cost && !other.block && self.block) || (other.cost == self.cost && other.block == self.block && !other.foreign && self.foreign);
+    if (wins) { other } else { self }
+}.test({
+    let a = Spelling { cost: 1, block: false, foreign: false, text: "a" };
+    let b = Spelling { cost: 0, block: true, foreign: true, text: "b" };
+    assert(a.better(b).text == "b"); // fewer escapes beats everything
+    let c = Spelling { cost: 0, block: false, foreign: true, text: "c" };
+    assert(b.better(c).text == "c"); // then a single-line form beats a block
+    let d = Spelling { cost: 0, block: false, foreign: false, text: "d" };
+    assert(c.better(d).text == "d"); // then the token's own family
+    assert(d.better(c).text == "d"); // and a tie keeps the first
+})
+
+# `value` as the content of a raw template: verbatim but for its braces, the
+# one escape that form decodes (`unescape_braces`) — a bare one would open an
+# interpolation.
+fn brace_escaped(value: str) -> str {
+    mut out = "";
+    for (let c : value) {
+        if (c == '{' || c == '}') {
+            set out.extend(`\\{c}`);
+        } else {
+            set out.extend(`{c}`);
+        };
+    }
+    out
+}.test({
+    assert(brace_escaped("plain `x`") == "plain `x`");
+    assert(brace_escaped("{a}") == """\{a\}""");
+    assert(brace_escaped("""a\b""") == """a\b""");
+})
+
+# How many escapes `value` needs as a single-line literal under `delim`: the
+# delimiter's own (`needs_escape`) plus the ones every single-line form
+# spells — a backslash, a tab, a carriage return — which a block spells with
+# none.
+fn single_cost(value: str, delim: char) -> u64 {
+    value.count_if(|c| c.needs_escape(delim) || c == '\\' || c == '\t' || c == '\r')
+}.test({
+    assert(single_cost(`say "hi"`, '"') == 2);
+    assert(single_cost(`say "hi"`, '`') == 0);
+    assert(single_cost("{a}", '`') == 2);
+    assert(single_cost("a\\b\tc", '"') == 2);
+    assert(single_cost("a\\b\tc", '`') == 2);
 })
 
 # `value` as the body of a single-line literal delimited by `delim`: the
@@ -242,11 +364,11 @@ fn encode(value: str, delim: char) -> str {
     mut out = "";
     for (let c : value) {
         if (c == '\\') {
-            set out.extend("\\\\");
+            set out.extend("""\\""");
         } else if (c == '\t') {
-            set out.extend("\\t");
+            set out.extend("""\t""");
         } else if (c == '\r') {
-            set out.extend("\\r");
+            set out.extend("""\r""");
         } else if (c.needs_escape(delim)) {
             set out.extend(`\\{c}`);
         } else {
@@ -258,8 +380,169 @@ fn encode(value: str, delim: char) -> str {
     assert(encode("plain", '"') == "plain");
     assert(encode(`say "hi"`, '"') == `say \\"hi\\"`);
     assert(encode(`say "hi"`, '`') == `say "hi"`);
-    assert(encode("a{b}`c", '`') == "a\\{b\\}\\`c");
-    assert(encode("a\\b\tc", '"') == "a\\\\b\\tc");
+    assert(encode("a{b}`c", '`') == """a\{b\}\`c""");
+    assert(encode("a\\b\tc", '"') == """a\\b\tc""");
+})
+
+# An interpolated template respelled between its two forms — `` `…{e}…` ``
+# and ```` ```…{e}…``` ```` — by the same rule as a string: fewest escapes,
+# then the single-backtick form, then the form it has. `segs` are the source
+# texts of the template's literal segments (between the delimiters and the
+# interpolation braces), `interps` the interpolations' source, which is the
+# same in both forms and is copied through; `raw` says which form the source
+# used. A template holding a newline stays as written.
+#
+# The two forms share the brace escapes `\{`/`\}`; a single-backtick segment
+# also escapes `\\`, `` \` `` and the control characters, which a raw segment
+# holds verbatim — so a raw segment can become a single one when it holds no
+# backslash (beyond a brace escape) and no backtick, and a single segment can
+# become a raw one when its only escapes are braces, backslashes and backticks
+# (a control-character escape has no raw spelling), which saves every
+# backslash and backtick escape it has.
+pub fn retemplate(raw: bool, segs: str[], interps: str[]) -> str {
+    let any_newline = segs.any(|s| s.contains('\n')) || interps.any(|s| s.contains('\n'));
+    let want_raw = if (any_newline) {
+        raw
+    } else if (raw) {
+        !segs.all(raw_seg_fits_single)
+    } else {
+        segs.all(single_seg_fits_raw) && segs.any(single_seg_saves)
+    };
+    if (want_raw == raw) {
+        return join_template(raw, segs, interps);
+    };
+    let moved = if (want_raw) { segs.map(single_to_raw) } else { segs };
+    join_template(want_raw, moved, interps)
+}.test({
+    // Escape-free segments: the single form is preferred, from either side.
+    assert(retemplate(true, ["hello ", ""], ["name"]) == "`hello {name}`");
+    assert(retemplate(false, ["hello ", ""], ["name"]) == "`hello {name}`");
+    // Brace escapes are the same in both forms.
+    assert(retemplate(true, ["""\{a\} """, ""], ["x"]) == """`\{a\} {x}`""");
+    // A raw segment with a backslash or backtick would need escapes: stays raw.
+    assert(retemplate(true, ["""C:\dir """, ""], ["x"]) == """```C:\dir {x}```""");
+    assert(retemplate(true, ["`code` ", ""], ["x"]) == "```" +++ "`code` {x}" +++ "```");
+
+    // A single segment whose escapes are all backslashes goes raw and sheds
+    // them; one with a control-character or backtick escape has nowhere to
+    // go, nor does one whose backslash would land against the interpolation.
+    assert(retemplate(false, ["""C:\\dir """, ""], ["x"]) == """```C:\dir {x}```""");
+    assert(retemplate(false, ["""C:\\""", ""], ["x"]) == """`C:\\{x}`""");
+    assert(retemplate(false, ["""a\nb """, ""], ["x"]) == """`a\nb {x}`""");
+    assert(retemplate(false, ["""\`a\` """, ""], ["x"]) == """`\`a\` {x}`""");
+    // A newline anywhere keeps the form as written.
+    assert(retemplate(true, ["a\nb ", ""], ["x"]) == "```a\nb {x}```");
+    // Several interpolations, the middles carried through.
+    assert(retemplate(true, ["", " + ", " = ", ""], ["a", "b", "c"]) == "`{a} + {b} = {c}`");
+})
+
+# Whether a raw template segment's source can be a single-backtick segment
+# as it is: no backtick, no control character, and no backslash but a brace
+# escape's — anything else would need an escape the raw form never wrote.
+fn raw_seg_fits_single(self: str) -> bool {
+    mut escaped = false;
+    for (let c : self) {
+        if (escaped) {
+            if (c != '{' && c != '}') {
+                return false;
+            };
+            set escaped = false;
+        } else if (c == '\\') {
+            set escaped = true;
+        } else if (c == '`' || c == '\t' || c == '\r') {
+            return false;
+        };
+    }
+    !escaped
+}.test({
+    assert("plain ".raw_seg_fits_single());
+    assert("""\{a\}""".raw_seg_fits_single());
+    assert(!"""C:\dir""".raw_seg_fits_single());
+    assert(!"`x`".raw_seg_fits_single());
+    assert(!"tab\t".raw_seg_fits_single());
+    assert(!"""ends\""".raw_seg_fits_single());
+})
+
+# Whether a single-backtick segment's source can be a raw segment: its only
+# escapes are braces and backslashes, and no backslash it spells lands next
+# to a brace — the interpolation's, at the segment's end, or an escaped one
+# within — where the raw form would read the pair as its brace escape. A
+# control-character escape has no raw spelling, and a backtick escape is
+# refused too: a bare backtick next to the closing delimiter would read as
+# part of it.
+fn single_seg_fits_raw(self: str) -> bool {
+    mut escaped = false;
+    mut after_backslash = false;
+    for (let c : self) {
+        if (escaped) {
+            if (c != '{' && c != '}' && c != '\\') {
+                return false;
+            };
+            if (after_backslash && c != '\\') {
+                return false;
+            };
+            set after_backslash = c == '\\';
+            set escaped = false;
+        } else if (c == '\\') {
+            set escaped = true;
+        } else {
+            set after_backslash = false;
+        };
+    }
+    !after_backslash
+}.test({
+    assert("plain".single_seg_fits_raw());
+    assert("""\{a\} C:\\dir """.single_seg_fits_raw());
+    assert(!"""a\nb""".single_seg_fits_raw());
+    assert(!"""\`a\`""".single_seg_fits_raw());
+    // A backslash the raw form would pair with a brace.
+    assert(!"""C:\\""".single_seg_fits_raw());
+    assert(!"""a\\\{b""".single_seg_fits_raw());
+})
+
+# Whether going raw would save a single-backtick segment an escape: it spells
+# a backslash.
+fn single_seg_saves(self: str) -> bool { self.contains("""\\""") }.test({
+    assert("""C:\\dir""".single_seg_saves());
+    assert(!"""\{a\}""".single_seg_saves());
+})
+
+# A single-backtick segment respelled raw: its backslash escapes become the
+# backslash; the brace escapes stay, being the raw form's own.
+fn single_to_raw(self: str) -> str {
+    mut out = "";
+    mut escaped = false;
+    for (let c : self) {
+        if (escaped) {
+            set out.extend(if (c == '\\') { """\""" } else { `\\{c}` });
+            set escaped = false;
+        } else if (c == '\\') {
+            set escaped = true;
+        } else {
+            set out.extend(`{c}`);
+        };
+    }
+    out
+}.test({
+    assert("""C:\\dir \{a\}""".single_to_raw() == """C:\dir \{a\}""");
+    assert("plain".single_to_raw() == "plain");
+})
+
+# The template's source text from its parts: the delimiter, the segments with
+# each interpolation braced between them, the delimiter.
+fn join_template(raw: bool, segs: str[], interps: str[]) -> str {
+    let delim = if (raw) { "```" } else { "`" };
+    mut out = delim;
+    for (let i, seg : segs) {
+        if (0 < i) {
+            set out.extend(`\{{interps[i - 1].value_or("")}\}`);
+        };
+        set out.extend(seg);
+    }
+    out +++ delim
+}.test({
+    assert(join_template(false, ["a", "b"], ["x"]) == "`a{x}b`");
+    assert(join_template(true, ["", ""], ["x"]) == "```{x}```");
 })
 --- performance ---
 allocations: 120

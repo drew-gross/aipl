@@ -343,10 +343,10 @@ pub fn str_lit_value(text: str) -> str {
 
     // A raw template decodes exactly `\{` and `\}`; every other backslash is
     // content. A `"""` string decodes nothing at all.
-    let braced = "```a\\{b\\}\\n```";
-    assert(str_lit_value(braced) == "a{b}\\n");
-    assert(str_lit_value(`"""a\\\{b"""`) == "a\\{b");
-    assert(str_lit_value("`\\{\\}`") == "{}");
+    let braced = """```a\{b\}\n```""";
+    assert(str_lit_value(braced) == """a{b}\n""");
+    assert(str_lit_value(`"""a\\\{b"""`) == """a\{b""");
+    assert(str_lit_value("""`\{\}`""") == "{}");
     assert(
         lex_aipl(raw_tpl)? == LexResult {
             tokens: [
@@ -371,8 +371,8 @@ pub fn char_lit_value(text: str) -> char? {
     }
 }.test({
     assert(char_lit_value("'x'") == some('x'));
-    assert(char_lit_value("'\\n'") == some('\n'));
-    assert(char_lit_value("'\\''") == some('\''));
+    assert(char_lit_value("""'\n'""") == some('\n'));
+    assert(char_lit_value("""'\''""") == some('\''));
     let c = "'q'";
     assert(
         lex_aipl(c)? == LexResult {
@@ -417,8 +417,8 @@ pub fn template_segments(texts: str[]) -> str[] {
 
     // Escapes are decoded in the cooked form and left alone in the raw one,
     // exactly as the two rules' emits do.
-    assert(template_segments(["`a\\nb{", "}c`"]) == ["a\nb", "c"]);
-    assert(template_segments(["```a\\nb{", "}c```"]) == ["a\\nb", "c"]);
+    assert(template_segments(["""`a\nb{""", "}c`"]) == ["a\nb", "c"]);
+    assert(template_segments(["""```a\nb{""", "}c```"]) == ["""a\nb""", "c"]);
 
     // And the answer is the one the lexer itself gives for the same source,
     // which is what makes this a claim rather than a second opinion.
@@ -610,7 +610,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             scope: s_string(),
         },
         TokenRule {
-            matcher: Template("`", "\\`ntr", |segs: str[]| segs),
+            matcher: Template("`", """\`ntr""", |segs: str[]| segs),
             emit: OfSeg(tpl_kind),
             scope: s_string(),
         },
@@ -833,8 +833,11 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // Char literals: an ordinary `'x'` and an escaped `'\n'` (the AIPL source
     // writes the escape as a literal backslash-`n`), each decoded to its byte.
     assert(
-        lex_aipl("'x' '\\n'")? == LexResult {
-            tokens: [atok("'x' '\\n'", CharTok('x'), 0..3), atok("'x' '\\n'", CharTok('\n'), 4..8)],
+        lex_aipl("""'x' '\n'""")? == LexResult {
+            tokens: [
+                atok("""'x' '\n'""", CharTok('x'), 0..3),
+                atok("""'x' '\n'""", CharTok('\n'), 4..8),
+            ],
             trivia: [],
         },
     );

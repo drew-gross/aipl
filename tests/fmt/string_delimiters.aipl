@@ -27,6 +27,15 @@ fn main() !prints {
         two
         lines
     """;
+    // Fewest escapes wins over everything: a value every single-line form must
+    // escape becomes a `"""` block, which escapes nothing — JSON, a path, a
+    // regex — and a raw template whose segments need no escape becomes the
+    // single-backtick template, while one that would need them — or whose
+    // backslash would land against the interpolation's brace — stays as it is.
+    let json = "{\"pi\": 3.14, \"n\": [1, true]}";
+    let path = "C:\\dir\\new";
+    let greet = ```hello {plain}```;
+    let win = `C:\\{plain}`;
     // Literal patterns are respelled exactly like expression literals.
     match (quoted) {
         "\"" => print(`"`),
@@ -64,6 +73,16 @@ fn main() !prints {
         two
         lines
     """;
+
+    // Fewest escapes wins over everything: a value every single-line form must
+    // escape becomes a `"""` block, which escapes nothing — JSON, a path, a
+    // regex — and a raw template whose segments need no escape becomes the
+    // single-backtick template, while one that would need them — or whose
+    // backslash would land against the interpolation's brace — stays as it is.
+    let json = """{"pi": 3.14, "n": [1, true]}""";
+    let path = """C:\dir\new""";
+    let greet = `hello {plain}`;
+    let win = `C:\\{plain}`;
     // Literal patterns are respelled exactly like expression literals.
     match (quoted) {
         `"` => print(`"`),

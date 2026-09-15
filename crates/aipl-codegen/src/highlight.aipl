@@ -125,14 +125,14 @@ struct Tm {
 # literal spelling must escape. `-` is not among them: it is only special
 # *inside* a class (see `class_char`).
 fn re_meta() -> str {
-    let backslash = "\\";
+    let backslash = """\""";
     `{backslash}.^$|?*+()[]{ob()}{cb()}`
 }
 
 # The chars that must be escaped *inside* `[...]`, where the rules are different
 # and much shorter.
 fn class_meta() -> str {
-    let backslash = "\\";
+    let backslash = """\""";
     `{backslash}[]^-`
 }
 
@@ -151,10 +151,10 @@ pub fn re_escape(s: str) -> str {
     out
 }.test({
     assert(re_escape("fn") == "fn");
-    assert(re_escape("+++") == "\\+\\+\\+");
-    assert(re_escape("#[allow]") == "#\\[allow\\]");
-    assert(re_escape("(") == "\\(");
-    assert(re_escape("}") == "\\}");
+    assert(re_escape("+++") == """\+\+\+""");
+    assert(re_escape("#[allow]") == """#\[allow\]""");
+    assert(re_escape("(") == """\(""");
+    assert(re_escape("}") == """\}""");
     // `-` is literal outside a class, so it is left alone.
     assert(re_escape("->") == "->");
     assert(re_escape("") == "");
@@ -179,11 +179,11 @@ fn char_class_body(chars: str) -> str {
     assert(char_class("abc") == "[abc]");
     assert(char_class("0123456789") == "[0123456789]");
     // The four class metacharacters are escaped; nothing else is.
-    assert(char_class("a-z") == "[a\\-z]");
-    assert(char_class("[]") == "[\\[\\]]");
-    assert(char_class("^") == "[\\^]");
+    assert(char_class("a-z") == """[a\-z]""");
+    assert(char_class("[]") == """[\[\]]""");
+    assert(char_class("^") == """[\^]""");
     // Whitespace is spelled with the escapes a JSON string can carry verbatim.
-    assert(char_class(" \t\n\r") == "[ \\t\\n\\r]");
+    assert(char_class(" \t\n\r") == """[ \t\n\r]""");
 })
 
 # One character inside a class: the control characters as their regex escapes
@@ -191,13 +191,13 @@ fn char_class_body(chars: str) -> str {
 # metacharacters backslashed, everything else verbatim.
 fn class_char(ch: char) -> str {
     if (ch == '\n') {
-        return "\\n";
+        return """\n""";
     };
     if (ch == '\t') {
-        return "\\t";
+        return """\t""";
     };
     if (ch == '\r') {
-        return "\\r";
+        return """\r""";
     };
     if (class_meta().contains(ch)) {
         return `\\{ch}`;
@@ -230,7 +230,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
         Exact(s) => Match(re_escape(s), scope),
         // The identifier boundary the rule wants, spelled as `\b` — see the
         // dialect note in the header.
-        Keyword(s, _) => Match(`\\b{re_escape(s)}\\b`, scope),
+        Keyword(s, _) => Match(```\b{re_escape(s)}\b```, scope),
         ToEol(prefix) => Match(`{re_escape(prefix)}.*$`, scope),
         // The blocked leads are a negated class right after the marker, and the
         // marker may also end the line — `(?:[^{[]|$)` says both. Rust's `regex`
@@ -241,7 +241,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
             scope,
         ),
         Int => Match("-?[0-9]+", scope),
-        Float => Match("-?[0-9]+\\.[0-9]+", scope),
+        Float => Match("""-?[0-9]+\.[0-9]+""", scope),
         // An escape-aware scan closed by its own opening delimiter. The escape
         // pattern is not decoration: it is what stops `end` from matching a
         // delimiter the source escaped (`'\''`).
@@ -273,7 +273,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
 }.test({
     let none_scope = "";
     assert(matcher_pat(Exact("=="), "op", none_scope) == Match("==", "op"));
-    assert(matcher_pat(Keyword("fn", "abc"), "kw", none_scope) == Match("\\bfn\\b", "kw"));
+    assert(matcher_pat(Keyword("fn", "abc"), "kw", none_scope) == Match("""\bfn\b""", "kw"));
     // `(` and `)` are literal inside a class, so a class escapes neither.
     assert(matcher_pat(OneChar("()"), "p", none_scope) == Match("[()]", "p"));
     assert(matcher_pat(ToEol("//"), "c", none_scope) == Match("//.*$", "c"));
@@ -285,7 +285,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
     assert(matcher_pat(CharRun("ab1", first="ab"), "r", none_scope) == Match("[ab][ab1]*", "r"));
 
     // A delimited scan closes on its own delimiter and carries its escapes.
-    let esc: Pat = Match("\\\\[nt]", "esc");
+    let esc: Pat = Match("""\\[nt]""", "esc");
     assert(matcher_pat(Delimited(`"`, "nt"), "s", "esc") == Region(`"`, `"`, [esc], scope="s"));
 
     // A verbatim scan has no inner patterns, and may close on a different
@@ -297,8 +297,8 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
     let self_ref: Pat[] = [Include("comment-block")];
     assert(
         matcher_pat(Nested("/*", "*/"), "comment.block.aipl", "esc") == Region(
-            "/\\*",
-            "\\*/",
+            """/\*""",
+            """\*/""",
             self_ref,
             scope="comment.block.aipl",
         ),
@@ -307,12 +307,12 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
     // A template carries its escapes *and* an interpolation that includes the
     // whole language back into itself; a raw one (no escapes) carries only the
     // interpolation.
-    let interp: Pat = Region("\\{", "\\}", [Include("brace-group"), Include("main")]);
+    let interp: Pat = Region("""\{""", """\}""", [Include("brace-group"), Include("main")]);
     assert(
         matcher_pat(Template("`", "nt", |segs: str[]| segs), "s", "esc") == Region(
             "`",
             "`",
-            [Match("\\\\[nt{}]", "esc"), interp],
+            [Match("""\\[nt{}]""", "esc"), interp],
             scope="s",
         ),
     );
@@ -321,7 +321,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
         matcher_pat(Template("```", "", |segs: str[]| segs), "s", "esc") == Region(
             "```",
             "```",
-            [Match("\\\\[{}]", "esc"), interp],
+            [Match("""\\[{}]""", "esc"), interp],
             scope="s",
         ),
     );
@@ -359,7 +359,7 @@ fn escape_pat(escapes: str, scope: str) -> Pat { Match(`\\\\{char_class(escapes)
 # a set literal, a struct — closes itself rather than the interpolation; see
 # `brace_group_entry`.
 fn template_inner(escapes: str, esc_scope: str) -> Pat[] {
-    let interp: Pat = Region("\\{", "\\}", [Include("brace-group"), Include("main")]);
+    let interp: Pat = Region("""\{""", """\}""", [Include("brace-group"), Include("main")]);
     let braces = "{}";
     [escape_pat(`{escapes}{braces}`, esc_scope), interp]
 }
@@ -374,11 +374,15 @@ fn template_inner(escapes: str, esc_scope: str) -> Pat[] {
 # token between them is painted over by `main`'s own patterns.
 pub fn brace_group_entry(punct_scope: str) -> Entry {
     name: "brace-group",
-    pats: [Region("\\{", "\\}", [Include("brace-group"), Include("main")], scope=punct_scope)],
+    pats: [
+        Region("""\{""", """\}""", [Include("brace-group"), Include("main")], scope=punct_scope),
+    ],
 }.test({
     let Entry { name, pats } = brace_group_entry("p");
     assert(name == "brace-group");
-    assert(pats == [Region("\\{", "\\}", [Include("brace-group"), Include("main")], scope="p")]);
+    assert(
+        pats == [Region("""\{""", """\}""", [Include("brace-group"), Include("main")], scope="p")],
+    );
 })
 
 # The repository entry name a scope makes: its parts joined with `-`, without
@@ -444,8 +448,8 @@ pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
     // alternation; `==` still precedes `=`, which is what keeps it maximal munch.
     assert(
         got.pats == [
-            Match("\\bfn\\b|\\blet\\b", "kw"),
-            Match("\\btrue\\b", "const"),
+            Match("""\bfn\b|\blet\b""", "kw"),
+            Match("""\btrue\b""", "const"),
             Match("==|=", "op"),
         ],
     );
@@ -457,13 +461,20 @@ pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
         TokenRule { matcher: Exact("+"), emit: Bare(Punct), scope: "op" },
     ];
     let block = rule_pats(with_block, "esc");
-    assert(block.pats == [Include("comment-block"), Match("\\+", "op")]);
+    assert(block.pats == [Include("comment-block"), Match("""\+""", "op")]);
     assert(block.entries.len() == 1);
     assert(
         block.entries == [
             Entry {
                 name: "comment-block",
-                pats: [Region("/\\*", "\\*/", [Include("comment-block")], scope="comment.block.x")],
+                pats: [
+                    Region(
+                        """/\*""",
+                        """\*/""",
+                        [Include("comment-block")],
+                        scope="comment.block.x",
+                    ),
+                ],
             },
         ],
     );
@@ -581,18 +592,18 @@ fn self_referential(m: Matcher) -> bool {
 # the names a declaration accepts stay the names the lexer accepts. It must
 # contain no capture groups of its own, which a character-class run never does.
 pub fn decl_pat(keyword: str, name_re: str, kw_scope: str, name_scope: str) -> Pat {
-    Caps(`\\b({re_escape(keyword)})\\s+({name_re})`, [kw_scope, name_scope])
+    Caps(```\b({re_escape(keyword)})\s+({name_re})```, [kw_scope, name_scope])
 }.test({
-    assert(decl_pat("fn", "[a-z]+", "kw", "name") == Caps("\\b(fn)\\s+([a-z]+)", ["kw", "name"]));
+    assert(decl_pat("fn", "[a-z]+", "kw", "name") == Caps("""\b(fn)\s+([a-z]+)""", ["kw", "name"]));
 })
 
 # An alternation of whole words, all painted `scope` — for a class the lexer
 # does not distinguish because it is decided after lexing, like the builtin
 # type names that are lexically just identifiers.
 pub fn word_pat(words: str[], scope: str) -> Pat {
-    Match(words.map(|w| `\\b{re_escape(w)}\\b`).join(sep="|"), scope)
+    Match(words.map(|w| ```\b{re_escape(w)}\b```).join(sep="|"), scope)
 }.test({
-    assert(word_pat(["i64", "str"], "type") == Match("\\bi64\\b|\\bstr\\b", "type"));
+    assert(word_pat(["i64", "str"], "type") == Match("""\bi64\b|\bstr\b""", "type"));
 })
 
 // ---------- JSON ----------
@@ -620,7 +631,7 @@ pub fn tm_json(Tm { note, name, scope_name, file_types, top, repo }) -> str {
         scope_name: "source.toy",
         file_types: ["toy"],
         top: [Include("main")],
-        repo: [Entry { name: "main", pats: [Match("\\bfn\\b", "keyword.toy")] }],
+        repo: [Entry { name: "main", pats: [Match("""\bfn\b""", "keyword.toy")] }],
     };
     assert(
         tm_json(g) == """
@@ -740,13 +751,13 @@ pub fn json_str(s: str) -> str {
     assert(json_str("abc") == `"abc"`);
     assert(json_str("") == `""`);
     // A regex's backslashes double, and its quotes escape.
-    assert(json_str("\\bfn\\b") == `"\\\\bfn\\\\b"`);
+    assert(json_str("""\bfn\b""") == `"\\\\bfn\\\\b"`);
     assert(json_str(`say "hi"`) == `"say \\"hi\\""`);
     assert(json_str("a\nb\tc") == `"a\\nb\\tc"`);
 })
 
 fn json_char(ch: char) -> str {
-    let backslash = "\\";
+    let backslash = """\""";
     if (ch == '\\') {
         return `{backslash}{backslash}`;
     };

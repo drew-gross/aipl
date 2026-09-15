@@ -2632,7 +2632,7 @@ fn lower_fn_attr(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     if (kids.is_empty()) {
         if (name == "doc") {
             return err(ParseError {
-                message: "`.doc(\"..\")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants",
+                message: """`.doc("..")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants""",
                 span: name_span,
             });
         };
@@ -3059,7 +3059,7 @@ pub fn lower_aipl_pattern(src: str) -> Pat!ParseError {
     assert(pat_dump(`"s"`) == "Str(s)");
     assert(pat_dump(`"a\\nb"`) == "Str(a\nb)");
     assert(pat_dump("'x'") == "Char(x)");
-    assert(pat_dump("'\\n'") == "Char(\n)");
+    assert(pat_dump("""'\n'""") == "Char(\n)");
 
     // A template with no interpolation lexes as a string literal, so it is one
     // here too.
@@ -3157,7 +3157,7 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     assert(expr_dump("#<{}") == "Set([], Asc)");
     assert(expr_dump("#{1: 2}") == "Dict([1: 2])");
     assert(expr_dump("#{}") == "Set([])");
-    assert(expr_dump("#{1, 2: 3}").starts_with("error: a \"#{ .. }\" literal can't mix"));
+    assert(expr_dump("#{1, 2: 3}").starts_with("""error: a "#{ .. }" literal can't mix"""));
 
     // A template is a concat chain over `__template_interp` of each
     // interpolation, folded from the tail backwards.
@@ -3205,7 +3205,7 @@ pub fn lower_aipl_expr(src: str) -> Expr!ParseError {
     );
     assert(expr_dump("match (v) { A(..) => 1, _ => 0 }") == "Match(v, [A(..) => 1, _ => 0])");
     assert(expr_dump("match (xs) { [a, b] => a, _ => 0 }") == "Match(xs, [[a, b] => a, _ => 0])");
-    assert(expr_dump("match (s) { \"a\" => 1, _ => 0 }") == "Match(s, [Str(a) => 1, _ => 0])");
+    assert(expr_dump("""match (s) { "a" => 1, _ => 0 }""") == "Match(s, [Str(a) => 1, _ => 0])");
 
     // Alternatives that disagree about what they bind are refused here rather
     // than left to fail as an unbound name somewhere in the shared body.
@@ -3405,12 +3405,12 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     assert(
         program_dump(
             "fn f(v: i64) { v, next: none }",
-        ) == "error: fn \"f\": a `{ field: value, .. }` body needs a struct return type to name, but this function declares no return type; add `-> Struct`, or give the literal its type",
+        ) == """error: fn "f": a `{ field: value, .. }` body needs a struct return type to name, but this function declares no return type; add `-> Struct`, or give the literal its type""",
     );
     assert(
         program_dump(
             "fn f(v: i64) -> i64 { v, next: none }",
-        ) == "error: fn \"f\": a `{ field: value, .. }` body needs a struct return type to name, but this function returns i64; give the literal its type, or return a struct",
+        ) == """error: fn "f": a `{ field: value, .. }` body needs a struct return type to name, but this function returns i64; give the literal its type, or return a struct""",
     );
 
     // Declarations.
@@ -3493,7 +3493,7 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
             "import { a, b as c, equal as ==, - } from builtins;",
         ) == "import [a, b as c, equal as ==, -] from builtins",
     );
-    assert(program_dump("import { x } from \"./p.aipl\";") == `import [x] from "./p.aipl"`);
+    assert(program_dump("""import { x } from "./p.aipl";""") == `import [x] from "./p.aipl"`);
 
     // Documentation attaches at `item`, in front of the declaration — and an
     // import brings a name in rather than declaring one, so it takes none.
@@ -3513,13 +3513,13 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     );
     assert(
         program_dump(
-            "fn f() -> i64 { 1 }.doc(\"d\")",
-        ) == "error: `.doc(\"..\")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants",
+            """fn f() -> i64 { 1 }.doc("d")""",
+        ) == """error: `.doc("..")` is no longer a function attribute — write the documentation as `# ..` lines above the declaration, which also documents structs and variants""",
     );
     assert(
         program_dump(
             "fn f() -> i64 { 1 }.bogus({ 1 })",
-        ) == "error: unknown function attribute \"bogus\"; only `.test({ .. })` is supported",
+        ) == """error: unknown function attribute "bogus"; only `.test({ .. })` is supported""",
     );
 
     // And a whole small file, which is the shape everything above is a piece of.
@@ -3886,7 +3886,7 @@ pub fn aipl_parses(src: str) -> bool {
 
     // Items.
     assert(parses("import { map, equal as == } from builtins;"));
-    assert(parses("import { Cst } from \"./cst.aipl\";"));
+    assert(parses("""import { Cst } from "./cst.aipl";"""));
     assert(parses("struct P { x: i64, y: i64 = 0 }"));
     assert(parses("struct B<T: any, U: variant> { v: T, w: U }"));
     assert(parses("variant V = A | B(i64) | C(x: i64, y: i64 = 1)"));
@@ -3921,7 +3921,9 @@ pub fn aipl_parses(src: str) -> bool {
 
     // Patterns, including alternation and the ignored payload.
     assert(parses("fn f(v: V) -> i64 { match (v) { A(x) | B(x) => x, C(..) => 1, _ => 0 } }"));
-    assert(parses("fn f(v: V) -> i64 { match (v) { V.A => 1, V.B(x) => x, \"s\" => 2, _ => 0 } }"));
+    assert(parses(
+        """fn f(v: V) -> i64 { match (v) { V.A => 1, V.B(x) => x, "s" => 2, _ => 0 } }""",
+    ));
     assert(parses("fn f(v: V) { match (v) { none => { g(); }, some(x) => { h(x); } }; }"));
 
     // A parameter destructured in place of being named.
@@ -3932,7 +3934,7 @@ pub fn aipl_parses(src: str) -> bool {
     // Attributes and the struct-literal body shorthand.
     // The string-argument attribute parses; refusing `.doc` by name is the
     // build action's job, not the grammar's.
-    assert(parses("fn f() -> i64 { 1 }.doc(\"d\").test({ assert(f() == 1); })"));
+    assert(parses("""fn f() -> i64 { 1 }.doc("d").test({ assert(f() == 1); })"""));
     assert(parses("fn f(v: i64) -> P { v, next: none }"));
     assert(parses("fn f(v: P) -> P { ..v, x: 1 }"));
     assert(parses("fn f(v: i64) -> P { v, }"));

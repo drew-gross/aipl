@@ -65,9 +65,9 @@ fn apply_both(x: i64, f: (i64) -> i64, g: (i64) -> i64) -> i64 { combine(x, f, g
 // Different *return* types too, so the two specializations don't even agree on
 // shape: `f` yields an i64 that `g` then renders.
 fn render(n: i64, f: (i64) -> i64, g: (i64) -> str) -> str { g(f(n)) }.test({
-    assert(render(3, |x| x + 1, |x| ```n={x}```) == "n=4");
+    assert(render(3, |x| x + 1, |x| `n={x}`) == "n=4");
     let unit = "px";
-    assert(render(3, |x| x * 2, |x| ```{x}{unit}```) == "6px");
+    assert(render(3, |x| x * 2, |x| `{x}{unit}`) == "6px");
 })
 --- performance ---
 allocations: 4

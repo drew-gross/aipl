@@ -27,7 +27,7 @@ pub fn escape_text(self: char) -> str {
     assert(escape_text('t') == "\t");
     assert(escape_text('r') == "\r");
     // Every other escaped char decodes to itself.
-    assert(escape_text('\\') == "\\");
+    assert(escape_text('\\') == """\""");
     assert(escape_text('"') == `"`);
     assert(escape_text('{') == "{");
     assert(escape_text('`') == "`");
@@ -60,28 +60,28 @@ pub fn unescape(self: str) -> str {
 
     // The control-char escapes decode (the AIPL source writes each as a literal
     // backslash-`n`/`t`/`r`; the result carries the actual control char).
-    assert(unescape("\\n") == "\n");
-    assert(unescape("\\t") == "\t");
-    assert(unescape("\\r") == "\r");
+    assert(unescape("""\n""") == "\n");
+    assert(unescape("""\t""") == "\t");
+    assert(unescape("""\r""") == "\r");
     // An escaped backslash / quote / brace / backtick decodes to the bare char.
-    assert(unescape("\\\\") == "\\");
+    assert(unescape("""\\""") == """\""");
     assert(unescape(`\\"`) == `"`);
-    assert(unescape("\\{") == "{");
+    assert(unescape("""\{""") == "{");
     // Runs before, between, and after escapes are all preserved.
-    assert(unescape("a\\nb") == "a\nb");
-    assert(unescape("pre\\npost") == "pre\npost");
-    assert(unescape("x\\ny\\tz") == "x\ny\tz");
+    assert(unescape("""a\nb""") == "a\nb");
+    assert(unescape("""pre\npost""") == "pre\npost");
+    assert(unescape("""x\ny\tz""") == "x\ny\tz");
     // Adjacent escapes with no plain runs between them.
-    assert(unescape("\\n\\t\\r") == "\n\t\r");
+    assert(unescape("""\n\t\r""") == "\n\t\r");
 
     // An escaped backslash is one char: the one after it is plain, not another
     // escape's X.
-    assert(unescape("\\\\n") == "\\n");
+    assert(unescape("""\\n""") == """\n""");
 
     // A lone trailing backslash (which the matcher never lets through) is copied
     // verbatim rather than decoded.
-    assert(unescape("a\\") == "a\\");
-    assert(unescape("\\") == "\\");
+    assert(unescape("""a\""") == """a\""");
+    assert(unescape("""\""") == """\""");
 })
 
 # Decode only `\{` and `\}` — the escapes every template literal has of its
@@ -102,12 +102,12 @@ pub fn unescape_braces(self: str) -> str {
 }.test({
     assert(unescape_braces("") == "");
     assert(unescape_braces("plain") == "plain");
-    assert(unescape_braces("\\{") == "{");
-    assert(unescape_braces("a\\{b\\}c") == "a{b}c");
+    assert(unescape_braces("""\{""") == "{");
+    assert(unescape_braces("""a\{b\}c""") == "a{b}c");
     // Every other backslash is content, an escaped one included.
-    assert(unescape_braces("a\\nb") == "a\\nb");
-    assert(unescape_braces("\\\\{") == "\\{");
-    assert(unescape_braces("end\\") == "end\\");
+    assert(unescape_braces("""a\nb""") == """a\nb""");
+    assert(unescape_braces("""\\{""") == """\{""");
+    assert(unescape_braces("""end\""") == """end\""");
 })
 --- performance ---
 allocations: 6

@@ -3,8 +3,8 @@ import { print } from builtins;
 fn main() !prints {
     let name = "world";
     let n = 42;
-    print(```hello {name}```);
-    print(```value is {n}```);
+    print(`hello {name}`);
+    print(`value is {n}`);
     print(`no interpolation`);
     print(
         ```
@@ -12,7 +12,7 @@ fn main() !prints {
             and {n}
         ```,
     );
-    print(```prefix {name} middle {n} suffix```);
+    print(`prefix {name} middle {n} suffix`);
 }
 --- stdout ---
 hello world

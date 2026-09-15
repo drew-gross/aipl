@@ -63,7 +63,7 @@ import {
 import { is_operator_name } from "./is_operator_name.aipl";
 import { AiplTok, lex_aipl } from "./lex_aipl.aipl";
 import { LexResult } from "./lexer.aipl";
-import { requote } from "./requote.aipl";
+import { requote, retemplate } from "./requote.aipl";
 
 # What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
 # `TokenKind` for an ordinary token, plus the three interpolated-template pieces,
@@ -191,7 +191,7 @@ fn new_walker(src: str, toks: FmtTok[], comments: Span[]) -> W {
     assert(
         end
             .expect("}")
-            .is_err_and(|e| e.message == `formatter: expected "}", found "" (at end of input)`),
+            .is_err_and(|e| e.message == """formatter: expected "}", found "" (at end of input)"""),
     );
 
     // --- source gaps -------------------------------------------------------
@@ -2385,25 +2385,44 @@ fn template_verbatim(self: W) -> WDoc!FmtError {
 fn template_scan(self: W, start: u64, depth0: u64) -> WDoc!FmtError {
     mut w = self;
     mut depth = depth0;
+
+    // The template's own pieces, at depth 1: each literal segment's source
+    // (between the delimiters and the interpolation braces) and each
+    // interpolation's, for `retemplate` to respell between the two forms.
+    // A nested template's pieces sit deeper and ride inside an interpolation.
+    let raw = self.src[start..].starts_with("```");
+    let open_len: u64 = if (raw) { 3 } else { 1 };
+    mut segs: str[] = [];
+    mut interps: str[] = [];
+    mut seg_end: u64 = start;
     while (!w.at_end()) {
         let FmtTok { span, kind } = w.cur_tok();
         let stepped = w.advance(span.end);
         if (kind == TplHead) {
             set depth++;
-        } else {
-            if (kind == TplTail) {
-                if (depth <= 1) {
-                    // A triple-backtick template is a raw block (its closing ```
-                    // aligns under the opening); a single-backtick one has no
-                    // own-line closing delimiter, so `reindent_block` leaves it
-                    // untouched.
-                    return ok(WDoc {
-                        w: stepped.drop_comments_before(span.end),
-                        doc: RawBlock(self.src[start..span.end]),
-                    });
-                };
-                set depth--;
+            if (depth == 1) {
+                set segs.push(self.src[span.start + open_len..span.end - 1]);
+                set seg_end = span.end;
             };
+        } else if (kind == TplMid && depth == 1) {
+            set interps.push(self.src[seg_end..span.start]);
+            set segs.push(self.src[span.start + 1..span.end - 1]);
+            set seg_end = span.end;
+        } else if (kind == TplTail) {
+            if (depth <= 1) {
+                set interps.push(self.src[seg_end..span.start]);
+                set segs.push(self.src[span.start + 1..span.end - open_len]);
+
+                // A triple-backtick template is a raw block (its closing ```
+                // aligns under the opening); a single-backtick one has no
+                // own-line closing delimiter, so `reindent_block` leaves it
+                // untouched.
+                return ok(WDoc {
+                    w: stepped.drop_comments_before(span.end),
+                    doc: RawBlock(retemplate(raw, segs, interps)),
+                });
+            };
+            set depth--;
         };
         set w = stepped;
     }
@@ -2626,10 +2645,10 @@ fn walker_of(src: str) -> W!FmtError {
     // A comment is carried, not dropped.
     assert(format_program("// hi\nfn f() {}", 100)? == "// hi\nfn f() {}\n");
     // A string literal keeps its bytes verbatim, spacing inside untouched.
-    assert(format_program(`fn f() -> str \{ "a  b" }`, 100)? == `fn f() -> str \{ "a  b" }`);
+    assert(format_program("""fn f() -> str { "a  b" }""", 100)? == """fn f() -> str { "a  b" }""");
     // A lex error surfaces as a formatter error rather than a panic.
     assert(
-        format_program("fn f() -> str { \"unterminated }", 100).is_err_and(
+        format_program("""fn f() -> str { "unterminated }""", 100).is_err_and(
             |e| e.message.is_nonempty(),
         ),
     );
@@ -2891,7 +2910,9 @@ fn walker_of(src: str) -> W!FmtError {
     // syntax the parser refuses by name (see `fn_attrs`); the formatter still
     // lays it out so that refusal is what the author sees.
     assert(
-        walker_of(`fn f ( ) \{ } . doc ( "d" )`)?.fn_item().rendered(100)? == `fn f() \{}.doc("d")`,
+        walker_of("""fn f ( ) { } . doc ( "d" )""")?
+            .fn_item()
+            .rendered(100)? == """fn f() {}.doc("d")""",
     );
     assert(
         walker_of("fn f ( ) { } . test ( { g ( ) ; } )")?
@@ -2910,7 +2931,9 @@ fn walker_of(src: str) -> W!FmtError {
     // Imports hoist above the items, builtins before paths, each on its own line
     // and separated from the first item by a blank line.
     assert(
-        walker_of("import { x } from \"./m.aipl\" ; import { b , a } from builtins ; fn f ( ) { }")?
+        walker_of(
+            """import { x } from "./m.aipl" ; import { b , a } from builtins ; fn f ( ) { }""",
+        )?
             .program()
             .rendered(
                 100,
@@ -2971,7 +2994,7 @@ fn walker_of(src: str) -> W!FmtError {
     assert(
         walker_of("import { len from builtins ;")?
             .import_item()
-            .is_err_and(|e| e.message == `formatter: expected "}", found "" (at end of input)`),
+            .is_err_and(|e| e.message == """formatter: expected "}", found "" (at end of input)"""),
     );
     // Truncated right after the brace: an error naming end-of-input, not a hang.
     assert(
@@ -3017,9 +3040,9 @@ fn walker_of(src: str) -> W!FmtError {
     );
     // A path import keeps its quoted source verbatim.
     assert(
-        walker_of(`import \{ x } from "./m.aipl" ;`)?
+        walker_of("""import { x } from "./m.aipl" ;""")?
             .import_item()?.doc
-            .at(100) == `import \{ x } from "./m.aipl";`,
+            .at(100) == """import { x } from "./m.aipl";""",
     );
     // Too wide: one name per line with a trailing comma.
     assert(
@@ -3029,7 +3052,7 @@ fn walker_of(src: str) -> W!FmtError {
     );
     // The hoist key puts builtins ahead of every path.
     assert(walker_of("import { x } from builtins ;")?.import_item()?.source == "builtins");
-    assert(walker_of(`import \{ x } from "./m.aipl" ;`)?.import_item()?.source == `"./m.aipl"`);
+    assert(walker_of("""import { x } from "./m.aipl" ;""")?.import_item()?.source == `"./m.aipl"`);
 
     // --- variant ------------------------------------------------------------
     assert(walker_of("variant V = A")?.variant_item().rendered(100)? == "variant V = A");
