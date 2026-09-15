@@ -1,0 +1,30 @@
+import { greater_than as >, less_than as <, print } from builtins;
+fn sign(n: i64) -> str {
+    // A fitting `else if` tail no longer stays inline after a broken head: the
+    // whole chain is one group, so every branch breaks once any must.
+    let s = if (n < 0) {
+        "negative, and this branch is long enough to break the chain"
+    } else if (n > 0) { "positive" } else { "zero" };
+    // A chain that fits stays on one line.
+    let t = if (n < 0) { "-" } else if (n > 0) { "+" } else { "0" };
+    print(s);
+    t
+}
+--- formatted ---
+import { greater_than as >, less_than as <, print } from builtins;
+
+fn sign(n: i64) -> str {
+    // A fitting `else if` tail no longer stays inline after a broken head: the
+    // whole chain is one group, so every branch breaks once any must.
+    let s = if (n < 0) {
+        "negative, and this branch is long enough to break the chain"
+    } else if (n > 0) {
+        "positive"
+    } else {
+        "zero"
+    };
+    // A chain that fits stays on one line.
+    let t = if (n < 0) { "-" } else if (n > 0) { "+" } else { "0" };
+    print(s);
+    t
+}

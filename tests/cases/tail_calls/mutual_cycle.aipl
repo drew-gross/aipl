@@ -33,13 +33,21 @@ fn fits(budget: u64, work: Work) -> bool {
 fn fits_atom(budget: u64, s: str, rest: Work) -> bool {
     if (s.contains("\n")) {
         false
-    } else if (s.is_empty()) { fits(budget, rest) } else { fits_after(budget, s.len(), rest) }
+    } else if (s.is_empty()) {
+        fits(budget, rest)
+    } else {
+        fits_after(budget, s.len(), rest)
+    }
 }
 
 fn fits_after(budget: u64, n: u64, rest: Work) -> bool {
     if (n > budget) {
         false
-    } else if (n == 0) { fits(budget, rest) } else { fits(budget - n, rest) }
+    } else if (n == 0) {
+        fits(budget, rest)
+    } else {
+        fits(budget - n, rest)
+    }
 }
 
 fn work_of(n: u64, acc: Work) -> Work {

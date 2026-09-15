@@ -343,7 +343,11 @@ fn render_climb<K: variant>(atom: Rule<K>, precs: Prec[], names: str[], ctx: Ctx
     let alts = ops.map(|o| `"{o}"`).join(sep=" | ");
     let op = if (ops.is_empty()) {
         "(* never *)"
-    } else if (ops.len() == 1) { alts } else { `({alts})` };
+    } else if (ops.len() == 1) {
+        alts
+    } else {
+        `({alts})`
+    };
     let body = `{a} ({op} {a})*`;
     match (ctx) {
         Alt | Seq => body,

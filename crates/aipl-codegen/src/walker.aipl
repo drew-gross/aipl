@@ -2053,13 +2053,23 @@ fn struct_field_value(self: W, lead: Doc, fname: str) -> WDoc!FmtError {
 
 // ---------- if / match / lambda / templates ----------
 
+# An `if`/`else if`/`else` chain is one group: either every branch is on one
+# line or every block is broken. `if_chain` lays the chain out ungrouped so a
+# nested `else if` joins the enclosing chain's group rather than opening one of
+# its own — a fitting tail used to stay inline after broken heads, which read
+# as two different constructs.
 fn if_expr(self: W) -> WDoc!FmtError {
+    let WDoc { w, doc } = self.if_chain()?;
+    ok(WDoc { w, doc: group(doc) })
+}
+
+fn if_chain(self: W) -> WDoc!FmtError {
     let opened = self.expect("if")?.w.expect("(")?.w;
 
     // `if (let PATTERN = EXPR) { .. }` — the `let` lookahead (never a valid
     // `expr` lead) is what the grammar itself picks the production on, so the
     // formatter branches the same way, right after `if (`. `else if (let ..)`
-    // reaches this same branch through the recursive `if_expr()` call below, so
+    // reaches this same branch through the recursive `if_chain()` call below, so
     // an if/else-if-let ladder needs nothing extra.
     let lead = if (opened.peek_text() == "let") {
         let clause = opened.bump().w.if_let_clause()?;
@@ -2070,22 +2080,20 @@ fn if_expr(self: W) -> WDoc!FmtError {
         WDoc { w: closed, doc: Concat([Text("if ("), cond.doc, Text(") ")]) }
     };
 
-    // The branches share one group (via the ungrouped `block_layout`), so they
-    // break *together*: an `if`/`else` is either all on one line or both blocks
-    // broken — never one inline and the other split. A trailing `else if` stays
-    // its own group so a fitting tail can remain inline.
+    // The branches share the chain's group (via the ungrouped `block_layout`,
+    // and the ungrouped recursion for an `else if`), so they break *together*.
     let then_b = lead.w.block_layout()?;
     let head = [lead.doc, then_b.doc];
     if (then_b.w.peek_text() != "else") {
-        return ok(WDoc { w: then_b.w, doc: group(Concat(head)) });
+        return ok(WDoc { w: then_b.w, doc: Concat(head) });
     };
     let stepped = then_b.w.bump().w;
     let tail = if (stepped.peek_text() == "if") {
-        stepped.if_expr()?
+        stepped.if_chain()?
     } else {
         stepped.block_layout()?
     };
-    ok(WDoc { w: tail.w, doc: group(Concat([..head, Text(" else "), tail.doc])) })
+    ok(WDoc { w: tail.w, doc: Concat([..head, Text(" else "), tail.doc]) })
 }
 
 # `PATTERN = EXPR)` — entered just past `if (let`; consumes the closing `)`
@@ -3118,11 +3126,11 @@ allocations: 15812
 deallocations: 15812
 reallocations: 1771
 bytes allocated: 3300622
-instructions executed: 26879546
-binary size: 10058416
-  code: 6352284
+instructions executed: 26879930
+binary size: 10059656
+  code: 6353168
   data: 31028
-  metadata: 3675104
+  metadata: 3675460
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3404,7 +3412,7 @@ functions:
     calls: 4783
     bytes: (external)
   aipl_arr_inc:
-    calls: 288943
+    calls: 288955
     bytes: (external)
   aipl_arr_reserve:
     calls: 5030
@@ -3413,7 +3421,7 @@ functions:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 411829
+    calls: 411841
     bytes: (external)
   aipl_array_new:
     calls: 3639
@@ -3434,13 +3442,13 @@ functions:
     calls: 8279
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 56556
+    calls: 56562
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 4964
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 48277
+    calls: 48283
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 4964
@@ -3574,9 +3582,12 @@ functions:
   ident_list:
     calls: 9
     bytes: 1708
+  if_chain:
+    calls: 3
+    bytes: 13632
   if_expr:
     calls: 3
-    bytes: 13892
+    bytes: 1144
   if_let_clause:
     calls: 0
     bytes: 4180

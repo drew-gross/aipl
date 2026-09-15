@@ -199,10 +199,10 @@ deallocations: 20250
 reallocations: 2930
 bytes allocated: 4068847
 instructions executed: 8615043
-binary size: 6643872
-  code: 4368520
+binary size: 6645128
+  code: 4369404
   data: 10450
-  metadata: 2264902
+  metadata: 2265274
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1008,9 +1008,12 @@ functions:
   __m35__ident_list:
     calls: 0
     bytes: 1708
+  __m35__if_chain:
+    calls: 0
+    bytes: 13632
   __m35__if_expr:
     calls: 0
-    bytes: 13892
+    bytes: 1144
   __m35__if_let_clause:
     calls: 0
     bytes: 4180

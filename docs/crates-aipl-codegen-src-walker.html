@@ -2112,6 +2112,20 @@
           </h3>
           <pre class="signature"><code>fn if_expr(self: W) -&#62; WDoc!FmtError</code></pre>
 
+          <div class="doc"><p>An <code>if</code>/<code>else if</code>/<code>else</code> chain is one group: either every branch is on one line or every block is broken. <code>if_chain</code> lays the chain out ungrouped so a nested <code>else if</code> joins the enclosing chain's group rather than opening one of its own — a fitting tail used to stay inline after broken heads, which read as two different constructs.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-if_chain">
+          <h3>
+            <a class="anchor" href="#item-if_chain">if_chain</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn if_chain(self: W) -&#62; WDoc!FmtError</code></pre>
+
           <p class="undocumented">Undocumented.</p>
 
 
