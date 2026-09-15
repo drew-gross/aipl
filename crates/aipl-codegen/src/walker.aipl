@@ -3153,10 +3153,10 @@ deallocations: 15944
 reallocations: 1765
 bytes allocated: 3322001
 instructions executed: 26937901
-binary size: 10201976
-  code: 6445668
+binary size: 10202616
+  code: 6446152
   data: 31204
-  metadata: 3725104
+  metadata: 3725260
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3421,7 +3421,7 @@ functions:
     bytes: 824
   __m9__delimited_len:
     calls: 1410
-    bytes: 1904
+    bytes: 2124
   __m9__finalize_template$__m8__AiplTok:
     calls: 1
     bytes: 8652
@@ -3445,7 +3445,7 @@ functions:
     bytes: 15252
   __m9__template_scan$__m8__AiplTok:
     calls: 1
-    bytes: 3016
+    bytes: 3280
   __m9__template_step$__m8__AiplTok:
     calls: 1400
     bytes: 444

@@ -73,10 +73,10 @@ deallocations: 16689
 reallocations: 2158
 bytes allocated: 1029642
 instructions executed: 5636207
-binary size: 260128
-  code: 170000
+binary size: 260776
+  code: 170484
   data: 1876
-  metadata: 88252
+  metadata: 88416
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -194,7 +194,7 @@ functions:
     bytes: 824
   __m12__delimited_len:
     calls: 0
-    bytes: 1904
+    bytes: 2124
   __m12__finalize_template$__m1__SexpKind:
     calls: 0
     bytes: 4532
@@ -218,7 +218,7 @@ functions:
     bytes: 8404
   __m12__template_scan$__m1__SexpKind:
     calls: 0
-    bytes: 3016
+    bytes: 3280
   __m12__template_step$__m1__SexpKind:
     calls: 0
     bytes: 444

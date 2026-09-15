@@ -14,18 +14,13 @@
 // What proves it is the `--- performance ---` section below: allocations must
 // equal deallocations. Each function is called on the *failing* path, with a
 // heap-allocated value already in place ahead of the `?`.
-import { first, int_parse, print, value_or } from builtins;
+import { first, int_parse, print, value_or, value_or_err } from builtins;
 
 struct S { a: str, n: i64 }
 
 variant V = Pair(str, i64) | Nil
 
-fn parse_it(body: str) -> i64!str {
-    match (body.int_parse()) {
-        some(v) => ok(v),
-        none => err("nope"), #[allow]
-    }
-}
+fn parse_it(body: str) -> i64!str { body.int_parse().value_or_err("nope") }
 
 fn build_struct(a: str, body: str) -> S!str { ok(S { a, n: parse_it(body)? }) }
 

@@ -249,11 +249,11 @@ allocations: 20264
 deallocations: 20264
 reallocations: 2930
 bytes allocated: 4070769
-instructions executed: 8674078
-binary size: 6676592
-  code: 4392680
+instructions executed: 8674104
+binary size: 6677240
+  code: 4393164
   data: 10898
-  metadata: 2273014
+  metadata: 2273178
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -827,7 +827,7 @@ functions:
     bytes: 824
   __m24__delimited_len:
     calls: 238
-    bytes: 1904
+    bytes: 2124
   __m24__finalize_template$__m23__AiplTok:
     calls: 2
     bytes: 8652
@@ -851,7 +851,7 @@ functions:
     bytes: 15252
   __m24__template_scan$__m23__AiplTok:
     calls: 2
-    bytes: 3016
+    bytes: 3280
   __m24__template_step$__m23__AiplTok:
     calls: 232
     bytes: 444

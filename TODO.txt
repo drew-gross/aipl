@@ -76,6 +76,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  first_token and last_token cleanup: use a multi-match in the Group arm, and delete the _of helpers and inline them
+  no_kinds doesn't need to exist; pass a literal
   json_char should be a match, and should just put the backslashes into the str rather than making a var
   in match_expr, let inner = arms.docs.map(|a: Doc| [HardLine, a]).join(); should be an interspere or a join-with-sep include leading or something.
   tm_json test has a multiline literal concatenated with a newline literal which is weird, it should be possible to have a trailing newline in a multiline str literal.
@@ -94,7 +96,7 @@ misc cleanup:
   union_all can be context ordered, like to_set
   make it so builtin .aipl files can contain helper functions
   only should be named one and use a nested_in kwarg (i.e. thinner wrapper over Many)
-  destructuring in for loops should be DRYer with destructuring in let bindings
+  parser rules for destructuring in for loops should be DRYer with destructuring in let bindings
   lex doc comments as one big token, not one per line
   section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
@@ -109,7 +111,6 @@ misc cleanup:
   field_size and elem_size_of are apparently near duplicates that can be DRYed
   token_value in lexer.aipl should leverage more having multiple arms to same value
   use val.method() syntax a _lot_ more. Any time a function could be interpreted as a verb.
-  parser lib should use value_or_err more
   why does quoted use str literals instead of char literals?
   trailing_trivia should be a filter map
   line_at.aipl should use doc comments
@@ -648,6 +649,8 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  hide privates by default so you have to expand a thing to show them
+  file headers in docs
   don't need to say callable as a method for self: it's inferrable from the signature
   add a search of some sort
   make an expression renderer (q: is this just the formatter? a: the formatter works on token streams not asts because the ast desugars) and use it for defaults

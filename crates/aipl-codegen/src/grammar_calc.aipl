@@ -471,10 +471,10 @@ deallocations: 12884
 reallocations: 2085
 bytes allocated: 1220593
 instructions executed: 2710790
-binary size: 433768
-  code: 283432
+binary size: 434416
+  code: 283916
   data: 6044
-  metadata: 144292
+  metadata: 144456
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -673,7 +673,7 @@ functions:
     bytes: 824
   __m11__delimited_len:
     calls: 0
-    bytes: 1904
+    bytes: 2124
   __m11__finalize_template$CalcTok:
     calls: 0
     bytes: 3788
@@ -697,7 +697,7 @@ functions:
     bytes: 6944
   __m11__template_scan$CalcTok:
     calls: 0
-    bytes: 3016
+    bytes: 3280
   __m11__template_step$CalcTok:
     calls: 0
     bytes: 444
