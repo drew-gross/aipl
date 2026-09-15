@@ -525,6 +525,7 @@ case_tests! {
     cases_results_try_operator = "cases/results/try_operator",
     cases_results_variant_payload = "cases/results/variant_payload",
     cases_results_void_ok = "cases/results/void_ok",
+    cases_sets_as_sequence = "cases/sets/as_sequence",
     cases_sets_basic = "cases/sets/basic",
     cases_sets_elem_types = "cases/sets/elem_types",
     cases_sets_err_ordered_elem = "cases/sets/err_ordered_elem",

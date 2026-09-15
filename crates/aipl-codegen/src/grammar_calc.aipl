@@ -466,15 +466,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 12789
-deallocations: 12789
+allocations: 12791
+deallocations: 12791
 reallocations: 2074
-bytes allocated: 1218065
-instructions executed: 2710169
-binary size: 427776
-  code: 279840
+bytes allocated: 1218105
+instructions executed: 2709504
+binary size: 427208
+  code: 279364
   data: 6044
-  metadata: 141892
+  metadata: 141800
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -850,7 +850,7 @@ functions:
     bytes: 3236
   __m2__render_rule$CalcTok:
     calls: 13
-    bytes: 12744
+    bytes: 12268
   __m2__rep_suffix:
     calls: 0
     bytes: 1708
@@ -999,7 +999,7 @@ functions:
     calls: 0
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 52
+    calls: 53
     bytes: (external)
   aipl_arr_elem_ptr:
     calls: 2
@@ -1008,13 +1008,13 @@ functions:
     calls: 5244
     bytes: (external)
   aipl_arr_inc:
-    calls: 50028
+    calls: 50014
     bytes: (external)
   aipl_arr_reserve:
-    calls: 7301
+    calls: 7295
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 287
+    calls: 290
     bytes: (external)
   aipl_arr_reverse:
     calls: 2
@@ -1023,7 +1023,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 69044
+    calls: 69031
     bytes: (external)
   aipl_array_new:
     calls: 3404
@@ -1032,10 +1032,10 @@ functions:
     calls: 1649
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3296
+    calls: 3312
     bytes: (external)
   aipl_array_with_cap:
-    calls: 778
+    calls: 786
     bytes: (external)
   aipl_assert:
     calls: 51
@@ -1058,7 +1058,13 @@ functions:
   aipl_rec_inc_weak:
     calls: 525
     bytes: (external)
+  aipl_set_contains:
+    calls: 19
+    bytes: (external)
   aipl_set_insert:
+    calls: 22
+    bytes: (external)
+  aipl_set_union:
     calls: 3
     bytes: (external)
   aipl_test_begin:

@@ -1,0 +1,94 @@
+import {
+    all,
+    count_if,
+    find_if,
+    greater_than as >,
+    join,
+    map,
+    print,
+    to_set,
+    to_str,
+} from builtins;
+
+// A set is usable wherever a generic takes a `T[]` it only reads: the
+// instance keeps the set's own type and walks it in the set's order — the
+// insertion order of a plain set, the sorted order of an ordered one.
+fn main() !prints {
+    let s = [3, 1, 2, 3].to_set();
+    print(s.map(to_str).join(sep=", "));
+    print(`{s.all(|x| x > 0)} {s.find_if(|x| x > 2)} {s.count_if(|x| x > 1)}`);
+    let asc: #<{i64} = [3, 1, 2].to_set();
+    print(asc.map(to_str).join(sep=" "));
+    let desc: #>{i64} = [3, 1, 2].to_set();
+    print(desc.map(to_str).join(sep=" "));
+}
+--- stdout ---
+3, 1, 2
+true some(3) 2
+1 2 3
+3 2 1
+--- performance ---
+allocations: 22
+deallocations: 22
+reallocations: 0
+bytes allocated: 815
+instructions executed: 2710
+binary size: 8008
+  code: 4672
+  data: 267
+  metadata: 3069
+functions:
+  __builtin_all$i64$k0$lam$main$lambda0:
+    calls: 1
+    bytes: 204
+  __builtin_find_if$i64$k0$lam$main$lambda1:
+    calls: 1
+    bytes: 268
+  __builtin_map_join$i64$char$s2$s3$s4$k0$rs$lam$__builtin_to_str:
+    calls: 3
+    bytes: 1292
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_i64:
+    calls: 9
+    bytes: 204
+  __to_str_i64$opt:
+    calls: 1
+    bytes: 388
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_array_dec:
+    calls: 6
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 9
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 3
+    bytes: (external)
+  aipl_i64_len:
+    calls: 20
+    bytes: (external)
+  aipl_set_contains:
+    calls: 4
+    bytes: (external)
+  aipl_set_insert:
+    calls: 10
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 3
+    bytes: (external)
+  aipl_write_i64:
+    calls: 10
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1880

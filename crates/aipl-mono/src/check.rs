@@ -5394,6 +5394,13 @@ pub(crate) fn collect_var_bindings(
         (Type::Array(p), Type::Primitive(Primitive::Str)) => {
             collect_var_bindings(p, &Type::Primitive(Primitive::Char), vars, map)
         }
+        // A set is usable as a `T[]` too: it shares the array's layout and its
+        // walk, so a generic that only reads its sequence (`all`, `find_if`,
+        // `map_join`) takes one, keeping the set's own type in the instance
+        // (mono's `set_kept`). The element pins `T` exactly as an array's would.
+        (Type::Array(p), Type::Set(a, _)) if !is_none_inner(a) => {
+            collect_var_bindings(p, a, vars, map)
+        }
         (Type::Set(p, _), Type::Set(a, _)) if !is_none_inner(a) => {
             collect_var_bindings(p, a, vars, map)
         }

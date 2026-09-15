@@ -92,7 +92,6 @@ misc cleanup:
   make it so builtin .aipl files can contain helper functions
   only should be named one and use a nested_in kwarg (i.e. thinner wrapper over Many)
   destructuring in for loops should be DRYer with destructuring in let bindings
-  all_ops should also be built on sets
   lex doc comments as one big token, not one per line
   section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
@@ -296,6 +295,7 @@ grammar:
   make an ebnf loader as well as dumper
 
 utilities:
+  map on a set is a bit of a weird operation, I feel like I should come up with a name for it (what if the pred isn't injective?)
   (T, U)[] -> (T[], U[]) function
   generic sum function with int bound
   numeric < vs. lexicographic <. Also maybe a < for map/dict purposes that uses compiler-decided ordering?

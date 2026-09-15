@@ -1501,10 +1501,12 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                         // A `str`-as-`char[]` parameter keeps its `str` type: the body
                         // operates on the str directly, no materialization.
                         let str_kept = inst.specs.params.get(i).is_some_and(|p| p.str_kept);
-                        let ty = if str_kept && ty == chars {
-                            Type::Primitive(Primitive::Str)
-                        } else {
-                            ty
+                        let set_kept = inst.specs.params.get(i).and_then(|p| p.set_kept);
+                        let ty = match (str_kept, set_kept, ty) {
+                            (true, _, t) if t == chars => Type::Primitive(Primitive::Str),
+                            // A set passed as a `T[]` stays the set it is.
+                            (_, Some(order), Type::Array(e)) => Type::Set(e, order),
+                            (_, _, t) => t,
                         };
                         Param {
                             name: p.name.clone(),
@@ -2045,6 +2047,9 @@ pub struct MonoProgram {
 /// - `owned`: the caller moves its sole ref in (`$own{i}`).
 /// - `str_kept`: a `char[]` parameter passed a `str`, kept as `str` — not
 ///   materialized; the body operates on the str directly (`$s{i}`).
+/// - `set_kept`: a `T[]` parameter passed a set, kept as that set type (its
+///   order recorded here) — the body walks and measures the set directly, which
+///   is all a read-only generic does with a sequence (`$k{i}`).
 /// - `concat`: a `str` parameter passed a *concat-str* argument (see
 ///   [`aipl_syntax::CONCAT_STR`]); retyped to the concat sentinel, producing a
 ///   distinct concat-specialized instance (`$c{i}`).
@@ -2058,6 +2063,7 @@ pub struct MonoProgram {
 struct ParamSpec {
     owned: bool,
     str_kept: bool,
+    set_kept: Option<aipl_syntax::ast::SetOrder>,
     concat: bool,
     variadic: VShape,
     /// Nothing pinned this parameter's type but a bare `none` at the call site,
@@ -2619,6 +2625,9 @@ impl Mono<'_> {
         // element type and any lambda are right), but this parameter's concrete
         // type stays `str`. Record which parameters that applies to.
         let mut str_arg = vec![false; sig.params.len()];
+        // Likewise a set passed to a `T[]` parameter keeps its set type (see
+        // `ParamSpec::set_kept`).
+        let mut set_arg: Vec<Option<aipl_syntax::ast::SetOrder>> = vec![None; sig.params.len()];
         // The variables a `str` pinned through a `T[]` position — a parameter
         // above, or a function-typed parameter's result below. A `T[]` *return*
         // in such a variable is then a `str` too: `map_join`'s `U[]` is the
@@ -2644,6 +2653,9 @@ impl Mono<'_> {
             let (ra, aty) = self.infer(arg, env)?;
             self.bind_generic_or(&param.ty, &aty, &var_set, &mut map, gname, span.clone())?;
             str_arg[i] = aty == Type::Primitive(Primitive::Str);
+            if let (Type::Set(_, order), Type::Array(_)) = (&aty, &param.ty) {
+                set_arg[i] = Some(*order);
+            }
             // Any string representation pins it — a template literal's value
             // arrives as the concat-str marker, not the plain `str`.
             if is_str_repr(&aty) {
@@ -2706,10 +2718,10 @@ impl Mono<'_> {
         let mut params: Vec<Param> = Vec::with_capacity(sig.params.len());
         for (i, p) in sig.params.iter().enumerate() {
             let ty = subst_vars(&p.ty, &map);
-            let ty = if str_arg[i] && ty == chars {
-                Type::Primitive(Primitive::Str)
-            } else {
-                ty
+            let ty = match (str_arg[i], set_arg[i], ty) {
+                (true, _, t) if t == chars => Type::Primitive(Primitive::Str),
+                (_, Some(order), Type::Array(e)) => Type::Set(e, order),
+                (_, _, t) => t,
             };
             // Substitution turned a generic-application parameter (`Emit<K>`)
             // into a concrete one (`Emit<Tok>`); resolve it to the synthesized
@@ -2779,6 +2791,11 @@ impl Mono<'_> {
         for (i, is_str) in str_arg.iter().enumerate() {
             if *is_str {
                 base.push_str(&format!("$s{i}"));
+            }
+        }
+        for (i, kept) in set_arg.iter().enumerate() {
+            if kept.is_some() {
+                base.push_str(&format!("$k{i}"));
             }
         }
         if str_ret {
@@ -4236,6 +4253,9 @@ impl Mono<'_> {
         for i in specs.indices(|p| p.str_kept) {
             mangled.push_str(&format!("$s{i}"));
         }
+        for i in specs.indices(|p| p.set_kept.is_some()) {
+            mangled.push_str(&format!("$k{i}"));
+        }
         for i in specs.indices(|p| p.concat) {
             mangled.push_str(&format!("$c{i}"));
         }
@@ -5420,6 +5440,10 @@ impl Mono<'_> {
                 owned: owned.contains(&i),
                 str_kept: atys.get(i) == Some(&Type::Primitive(Primitive::Str))
                     && subst_vars(&p.ty, &tmap) == chars,
+                set_kept: match (atys.get(i), &p.ty) {
+                    (Some(Type::Set(_, order)), Type::Array(_)) => Some(*order),
+                    _ => None,
+                },
                 // A generic function's variadic parameter needs the same
                 // per-shape specialization a concrete one gets; without it
                 // every instance was the sequence form and a bare element was
@@ -6625,6 +6649,11 @@ fn collect_bindings(
                 gname,
                 span.clone(),
             ),
+            // A set is usable as a `T[]` (see `ParamSpec::set_kept`): its
+            // element pins the variable as an array's would.
+            Type::Set(a, _) if !is_none_inner(a) => {
+                collect_bindings(inner, a, vars, map, gname, span.clone())
+            }
             _ => Ok(()),
         },
         Type::Set(inner, _) if ty_contains_var(inner, vars) => match arg_ty {

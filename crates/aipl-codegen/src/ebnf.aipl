@@ -47,7 +47,6 @@ import {
     contains,
     equal as ==,
     extend,
-    first,
     is_empty,
     join,
     len,
@@ -57,6 +56,7 @@ import {
     to_array,
     to_set,
     try_map,
+    union_all,
     value_or,
     value_or_err,
     wrapping_sub as -,
@@ -340,15 +340,10 @@ fn render_list<K: variant>(
 fn render_climb<K: variant>(atom: Rule<K>, precs: Prec[], names: str[], ctx: Ctx) -> str {
     let a = render_rule(atom, names, Seq);
     let ops = all_ops(precs);
-    let op = match (ops.first()) {
-        some(only) => if (ops.len() == 1) {
-            `"{only}"`
-        } else {
-            let alts = ops.map(|o| `"{o}"`).join(sep=" | ");
-            `({alts})`
-        },
-        none => "(* never *)",
-    };
+    let alts = ops.map(|o| `"{o}"`).join(sep=" | ");
+    let op = if (ops.is_empty()) {
+        "(* never *)"
+    } else if (ops.len() == 1) { alts } else { `({alts})` };
     let body = `{a} ({op} {a})*`;
     match (ctx) {
         Alt | Seq => body,
@@ -356,19 +351,8 @@ fn render_climb<K: variant>(atom: Rule<K>, precs: Prec[], names: str[], ctx: Ctx
     }
 }
 
-# Every operator spelling in `precs`, deduped, in the order the levels list
-# them.
-fn all_ops(precs: Prec[]) -> str[] {
-    mut out: str[] = [];
-    for (let pr : precs) {
-        for (let o : pr.ops) {
-            if (!out.contains(o)) {
-                set out = [..out, o];
-            };
-        }
-    }
-    out
-}
+# Every operator spelling in `precs`, each once.
+fn all_ops(precs: Prec[]) -> #{str} { precs.map(|pr: Prec| pr.ops.to_set()).union_all() }
 
 # The precedence levels of the first `Climb` in `r`, or `[]` when it has none.
 # A rule holding two climbs is not a shape any grammar here writes; the first is
@@ -869,15 +853,15 @@ fn fixture() -> Grammar<Tok, Node> {
     }
 }
 --- performance ---
-allocations: 1442
-deallocations: 1442
-reallocations: 291
-bytes allocated: 174919
-instructions executed: 232226
-binary size: 165088
-  code: 108856
+allocations: 1459
+deallocations: 1459
+reallocations: 292
+bytes allocated: 175680
+instructions executed: 232353
+binary size: 164608
+  code: 108396
   data: 4276
-  metadata: 51956
+  metadata: 51936
 functions:
   __arr_drop_First$Tok:
     calls: 23
@@ -1017,17 +1001,23 @@ functions:
   __to_str_u64:
     calls: 4
     bytes: 204
+  aipl_arr_drop_arr:
+    calls: 4
+    bytes: (external)
   aipl_arr_extend:
     calls: 213
     bytes: (external)
   aipl_arr_inc:
-    calls: 2955
+    calls: 2959
     bytes: (external)
   aipl_arr_reserve:
-    calls: 372
+    calls: 365
+    bytes: (external)
+  aipl_arr_retain_ptr:
+    calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 4105
+    calls: 4121
     bytes: (external)
   aipl_array_new:
     calls: 123
@@ -1036,10 +1026,10 @@ functions:
     calls: 96
     bytes: (external)
   aipl_array_push_mut:
-    calls: 549
+    calls: 566
     bytes: (external)
   aipl_array_with_cap:
-    calls: 38
+    calls: 60
     bytes: (external)
   aipl_assert:
     calls: 25
@@ -1059,7 +1049,13 @@ functions:
   aipl_rec_inc_weak:
     calls: 120
     bytes: (external)
+  aipl_set_contains:
+    calls: 17
+    bytes: (external)
   aipl_set_insert:
+    calls: 24
+    bytes: (external)
+  aipl_set_union:
     calls: 7
     bytes: (external)
   aipl_test_begin:
@@ -1118,7 +1114,7 @@ functions:
     bytes: 3236
   render_rule$Tok:
     calls: 101
-    bytes: 12796
+    bytes: 12336
   rep_suffix:
     calls: 14
     bytes: 1708
