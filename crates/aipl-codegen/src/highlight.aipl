@@ -144,11 +144,7 @@ fn cb() -> str { "}" }
 # specially is backslash-escaped. Used for a rule's fixed spelling — an
 # operator, a keyword, a delimiter.
 pub fn re_escape(s: str) -> str {
-    mut out = "";
-    for (let ch : s) {
-        set out = if (re_meta().contains(ch)) { `{out}\\{ch}` } else { `{out}{ch}` };
-    }
-    out
+    s.map(|ch| if (re_meta().contains(ch)) { `\\{ch}` } else { `{ch}` }).join()
 }.test({
     assert(re_escape("fn") == "fn");
     assert(re_escape("+++") == """\+\+\+""");
@@ -169,13 +165,7 @@ pub fn char_class(chars: str) -> str { `[{char_class_body(chars)}]` }
 # order given. Written out literally rather than collapsed into ranges: the
 # class is data, the character set comes from a lexer rule that spells it out
 # too, and a range is only a shorter way to say the same thing.
-fn char_class_body(chars: str) -> str {
-    mut body = "";
-    for (let ch : chars) {
-        set body = `{body}{class_char(ch)}`;
-    }
-    body
-}.test({
+fn char_class_body(chars: str) -> str { chars.map(class_char).join() }.test({
     assert(char_class("abc") == "[abc]");
     assert(char_class("0123456789") == "[0123456789]");
     // The four class metacharacters are escaped; nothing else is.
@@ -741,13 +731,7 @@ fn obj_of(fields: str[]) -> str {
 # escaped, and the three whitespace control characters spelled as `\\n`, `\\t`
 # and `\\r`. Nothing else in a generated grammar needs escaping — the regexes
 # carry backslashes by the handful, which is the case that matters.
-pub fn json_str(s: str) -> str {
-    mut body = "";
-    for (let ch : s) {
-        set body = `{body}{json_char(ch)}`;
-    }
-    `"{body}"`
-}.test({
+pub fn json_str(s: str) -> str { `"{s.map(json_char).join()}"` }.test({
     assert(json_str("abc") == `"abc"`);
     assert(json_str("") == `""`);
     // A regex's backslashes double, and its quotes escape.
@@ -784,15 +768,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 1136
-deallocations: 1136
+allocations: 991
+deallocations: 991
 reallocations: 28
-bytes allocated: 96447
-instructions executed: 98996
-binary size: 140112
-  code: 89680
+bytes allocated: 77264
+instructions executed: 128870
+binary size: 142472
+  code: 91848
   data: 5520
-  metadata: 44912
+  metadata: 45104
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -897,7 +881,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 255
+    calls: 575
     bytes: (external)
   aipl_array_new:
     calls: 55
@@ -940,7 +924,7 @@ functions:
     bytes: 1300
   char_class_body:
     calls: 17
-    bytes: 756
+    bytes: 1468
   class_char:
     calls: 49
     bytes: 996
@@ -958,7 +942,7 @@ functions:
     bytes: 1228
   json_str:
     calls: 21
-    bytes: 864
+    bytes: 1588
   main:
     calls: 1
     bytes: 760
@@ -976,7 +960,7 @@ functions:
     bytes: 4576
   re_escape:
     calls: 42
-    bytes: 1628
+    bytes: 2360
   rule_pats$Kind:
     calls: 2
     bytes: 12356

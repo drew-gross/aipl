@@ -46,6 +46,7 @@ import {
     is_some,
     is_some_and,
     join,
+    left_fold,
     len,
     less_than as <,
     less_than_or_equal as <=,
@@ -765,11 +766,7 @@ fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str,
     if (expect_as.is_nonempty()) {
         return no(far_miss(far, pos, expect_as), pos);
     };
-    mut f = far;
-    for (let l : p.labels[i].value_or(#{})) {
-        set f = far_miss(f, pos, l);
-    }
-    no(f, pos)
+    no(p.labels[i].value_or(#{}).left_fold(far, |f: Far, l: str| far_miss(f, pos, l)), pos)
 }
 
 # The expectation labels each production would record on failing at its own first
@@ -1610,15 +1607,15 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 5717
-deallocations: 5717
-reallocations: 1251
-bytes allocated: 601839
-instructions executed: 1400273
-binary size: 690472
-  code: 418816
+allocations: 5745
+deallocations: 5745
+reallocations: 1283
+bytes allocated: 603407
+instructions executed: 1404381
+binary size: 691424
+  code: 419400
   data: 10484
-  metadata: 261172
+  metadata: 261540
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1627,7 +1624,7 @@ functions:
     calls: 615
     bytes: 116
   __arr_drop___m2__First$Tok:
-    calls: 44
+    calls: 72
     bytes: 140
   __arr_drop___m3__ListStyle:
     calls: 297
@@ -1657,7 +1654,7 @@ functions:
     calls: 620
     bytes: 116
   __arr_retain___m2__First$Tok:
-    calls: 76
+    calls: 136
     bytes: 140
   __arr_retain___m3__ListStyle:
     calls: 18
@@ -1755,6 +1752,9 @@ functions:
   __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam$__m2__linked_first_sets$Tok$Node$lambda2:
     calls: 32
     bytes: 940
+  __builtin_try_map$__m3__Rule$Tok$__m2__First<Tok>$__m3__ParseError$lam$__m2__rule_first$Tok$lambda0:
+    calls: 28
+    bytes: 656
   __builtin_try_map$__m3__Rule$Tok$__m3__Rule$Tok$__m3__ParseError$lam$__m3__desugar_rule$Tok:
     calls: 100
     bytes: 628
@@ -1850,7 +1850,7 @@ functions:
     bytes: 436
   __m2__rule_first$Tok:
     calls: 149
-    bytes: 7816
+    bytes: 7752
   __m3__desugar_opt$Tok:
     calls: 60
     bytes: 700
@@ -1963,7 +1963,7 @@ functions:
     calls: 1851
     bytes: (external)
   aipl_arr_inc:
-    calls: 29814
+    calls: 30082
     bytes: (external)
   aipl_arr_reserve:
     calls: 2041
@@ -1978,16 +1978,16 @@ functions:
     calls: 40
     bytes: (external)
   aipl_array_dec:
-    calls: 38117
+    calls: 38441
     bytes: (external)
   aipl_array_new:
     calls: 742
     bytes: (external)
   aipl_array_push:
-    calls: 700
+    calls: 728
     bytes: (external)
   aipl_array_push_mut:
-    calls: 2026
+    calls: 2086
     bytes: (external)
   aipl_array_with_cap:
     calls: 1017
@@ -2114,7 +2114,7 @@ functions:
     bytes: 2180
   pruned$Tok$Node:
     calls: 11
-    bytes: 1292
+    bytes: 1284
   quoted:
     calls: 107
     bytes: 456

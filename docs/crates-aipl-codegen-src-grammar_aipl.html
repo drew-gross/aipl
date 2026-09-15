@@ -796,6 +796,20 @@
 
 
 
+        <section class="item" id="item-is_spread">
+          <h3>
+            <a class="anchor" href="#item-is_spread">is_spread</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_spread(self: Expr) -&#62; bool</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_arg">
           <h3>
             <a class="anchor" href="#item-lower_arg">lower_arg</a>
@@ -1896,7 +1910,7 @@
           </h3>
           <pre class="signature"><code>fn bind_param_fields(params: ParsedParam[], body: Expr) -&#62; Expr</code></pre>
 
-          <div class="doc"><p><code>Point { x, y }</code> in parameter position: the fields are bound off the synthetic scrutinee at the top of the body — the shape <code>let Point { x, y } = v;</code> produces, minus the <code>let</code>, the value being already bound by being an argument. Both loops run in reverse so the bindings come out in source order.</p></div>
+          <div class="doc"><p><code>Point { x, y }</code> in parameter position: the fields are bound off the synthetic scrutinee at the top of the body — the shape <code>let Point { x, y } = v;</code> produces, minus the <code>let</code>, the value being already bound by being an argument. Both fold from the right so the bindings come out in source order.</p></div>
 
 
         </section>

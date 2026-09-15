@@ -419,25 +419,21 @@ pub fn render_json(self: Json) -> str {
 # *requires* escaping, plus the control characters that have short forms. Enough
 # for the round trip, and for anything this library will parse back.
 fn escape_json(s: str) -> str {
-    mut out = "";
-    for (let c : s) {
-        // An expression `match`, not a statement one: its value is the piece to
-        // append, and the append is the statement. A statement `match` may not
-        // assign to a binding declared outside it.
-        let piece = match (c) {
-            '"' => `\\"`,
-            '\\' => """\\""",
-            '\n' => """\n""",
-            '\t' => """\t""",
-            '\r' => """\r""",
-            // A `char` interpolates as the bare character, so the default arm is
-            // just the character itself — no one-byte slice to route around
-            // `to_str`'s quoting.
-            _ => `{c}`,
-        };
-        set out = `{out}{piece}`;
-    }
-    out
+    s
+        .map(
+            |c| match (c) {
+                '"' => `\\"`,
+                '\\' => """\\""",
+                '\n' => """\n""",
+                '\t' => """\t""",
+                '\r' => """\r""",
+                // A `char` interpolates as the bare character, so the default arm is
+                // just the character itself — no one-byte slice to route around
+                // `to_str`'s quoting.
+                _ => `{c}`,
+            },
+        )
+        .join()
 }.test({
     assert(escape_json("plain") == "plain");
     assert(escape_json(`a"b`) == """a\"b""");
@@ -493,15 +489,15 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
 # braces — is a list breaking or not breaking, which the layouts decide.
 fn json_space(l: str, r: str) -> bool { l == ":" }
 --- performance ---
-allocations: 18637
-deallocations: 18637
-reallocations: 2721
-bytes allocated: 2301950
-instructions executed: 4796716
-binary size: 461096
-  code: 301744
+allocations: 18633
+deallocations: 18633
+reallocations: 2733
+bytes allocated: 2299384
+instructions executed: 4804362
+binary size: 464960
+  code: 304372
   data: 7940
-  metadata: 151412
+  metadata: 152648
 functions:
   __arr_drop_Json:
     calls: 125
@@ -519,10 +515,13 @@ functions:
     calls: 1771
     bytes: 116
   __arr_drop___m2__First$JsonTok:
-    calls: 4
+    calls: 10
     bytes: 140
   __arr_drop___m3__ListStyle:
     calls: 462
+    bytes: 120
+  __arr_drop___m3__Prec:
+    calls: 0
     bytes: 120
   __arr_drop___m3__Production$JsonTok$Json:
     calls: 137
@@ -552,10 +551,13 @@ functions:
     calls: 1433
     bytes: 116
   __arr_retain___m2__First$JsonTok:
-    calls: 32
+    calls: 56
     bytes: 140
   __arr_retain___m3__ListStyle:
     calls: 132
+    bytes: 120
+  __arr_retain___m3__Prec:
+    calls: 0
     bytes: 120
   __arr_retain___m3__Production$JsonTok$Json:
     calls: 528
@@ -575,6 +577,9 @@ functions:
   __builtin_any$__m3__Prec$lam$__m13__climb$JsonTok$Json$lambda0:
     calls: 0
     bytes: 276
+  __builtin_any$__m3__Prec$lam$__m2__prec_note$lambda2$lambda4:
+    calls: 0
+    bytes: 248
   __builtin_any$__m5__Doc$lam$__m5__has_hard:
     calls: 0
     bytes: 32
@@ -647,9 +652,6 @@ functions:
   __builtin_map_join$__m3__Rule$JsonTok$__m3__ListStyle$lam$__m3__group_styles$JsonTok$tail:
     calls: 264
     bytes: 1060
-  __builtin_map_join$str$char$s2$s3$s4$rs$lam$__m2__prec_note$lambda2:
-    calls: 0
-    bytes: 1448
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
     bytes: 440
@@ -659,6 +661,9 @@ functions:
   __builtin_try_map$__m3__Production$JsonTok$Json$__m2__First<JsonTok>$__m3__ParseError$lam$__m2__linked_first_sets$JsonTok$Json$lambda2:
     calls: 3
     bytes: 940
+  __builtin_try_map$__m3__Rule$JsonTok$__m2__First<JsonTok>$__m3__ParseError$lam$__m2__rule_first$JsonTok$lambda0:
+    calls: 6
+    bytes: 656
   __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule$JsonTok$__m3__ParseError$lam$__m3__desugar_rule$JsonTok:
     calls: 268
     bytes: 628
@@ -790,7 +795,7 @@ functions:
     bytes: 7672
   __m13__pruned$JsonTok$Json:
     calls: 0
-    bytes: 1292
+    bytes: 1284
   __m13__quoted:
     calls: 403
     bytes: 456
@@ -862,7 +867,7 @@ functions:
     bytes: 436
   __m2__prec_note:
     calls: 8
-    bytes: 3236
+    bytes: 5508
   __m2__render_rule$JsonTok:
     calls: 30
     bytes: 12380
@@ -871,7 +876,7 @@ functions:
     bytes: 1708
   __m2__rule_first$JsonTok:
     calls: 72
-    bytes: 7816
+    bytes: 7752
   __m2__show_first$JsonTok:
     calls: 8
     bytes: 3916
@@ -1020,7 +1025,7 @@ functions:
     calls: 8170
     bytes: (external)
   aipl_arr_inc:
-    calls: 75114
+    calls: 75216
     bytes: (external)
   aipl_arr_reserve:
     calls: 10433
@@ -1032,16 +1037,16 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 103687
+    calls: 103921
     bytes: (external)
   aipl_array_new:
     calls: 3285
     bytes: (external)
   aipl_array_push:
-    calls: 1829
+    calls: 1835
     bytes: (external)
   aipl_array_push_mut:
-    calls: 4852
+    calls: 4876
     bytes: (external)
   aipl_array_with_cap:
     calls: 341
@@ -1090,7 +1095,7 @@ functions:
     bytes: (external)
   escape_json:
     calls: 30
-    bytes: 1372
+    bytes: 2104
   format_json:
     calls: 13
     bytes: 444

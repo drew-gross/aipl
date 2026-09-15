@@ -2129,11 +2129,7 @@ fn match_expr(self: W) -> WDoc!FmtError {
     // A `match` always lays out one arm per line (hard breaks), never collapsing
     // onto a single line even when it would fit — and those hard breaks force any
     // enclosing group (a `let` value, a call argument) to break around it too.
-    mut inner = [];
-    for (let a : arms.docs) {
-        set inner.push(HardLine);
-        set inner.push(a);
-    }
+    let inner = arms.docs.map(|a: Doc| [HardLine, a]).join();
     ok(WDoc {
         w: closed,
         doc: Concat([head, Text("{"), Indent(Concat(inner)), HardLine, Text("}")]),
@@ -3152,15 +3148,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 15922
-deallocations: 15922
-reallocations: 1772
-bytes allocated: 3321285
-instructions executed: 26933791
-binary size: 10198840
-  code: 6443256
+allocations: 15944
+deallocations: 15944
+reallocations: 1765
+bytes allocated: 3322001
+instructions executed: 26937901
+binary size: 10201976
+  code: 6445668
   data: 31204
-  metadata: 3724380
+  metadata: 3725104
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3175,7 +3171,7 @@ functions:
     calls: 26
     bytes: 140
   __arr_drop___m1__Doc:
-    calls: 1744
+    calls: 1751
     bytes: 116
   __arr_drop___m9__StepResult$__m8__AiplTok:
     calls: 1
@@ -3199,7 +3195,7 @@ functions:
     calls: 36
     bytes: 140
   __arr_retain___m1__Doc:
-    calls: 1775
+    calls: 1768
     bytes: 116
   __arr_retain___m9__StepResult$__m8__AiplTok:
     calls: 1
@@ -3308,7 +3304,7 @@ functions:
     bytes: 804
   __m16__encode:
     calls: 10
-    bytes: 1836
+    bytes: 2060
   __m16__escape_cost:
     calls: 0
     bytes: 352
@@ -3323,7 +3319,7 @@ functions:
     bytes: 396
   __m16__requote:
     calls: 6
-    bytes: 3496
+    bytes: 4256
   __m16__reswap:
     calls: 0
     bytes: 2800
@@ -3487,28 +3483,28 @@ functions:
     calls: 0
     bytes: 836
   aipl_arr_extend:
-    calls: 4785
+    calls: 4795
     bytes: (external)
   aipl_arr_inc:
-    calls: 289168
+    calls: 289177
     bytes: (external)
   aipl_arr_reserve:
-    calls: 5033
+    calls: 5047
     bytes: (external)
   aipl_arr_slice:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 412141
+    calls: 412220
     bytes: (external)
   aipl_array_new:
-    calls: 3647
+    calls: 3654
     bytes: (external)
   aipl_array_push:
-    calls: 2127
+    calls: 2123
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1962
+    calls: 1948
     bytes: (external)
   aipl_array_with_cap:
     calls: 383
@@ -3520,13 +3516,13 @@ functions:
     calls: 8286
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 56607
+    calls: 56614
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 4967
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 48321
+    calls: 48328
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 4967
@@ -3704,7 +3700,7 @@ functions:
     bytes: 8432
   match_expr:
     calls: 4
-    bytes: 11992
+    bytes: 13420
   more_before:
     calls: 227
     bytes: 200

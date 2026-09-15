@@ -76,6 +76,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  json_char should be a match, and should just put the backslashes into the str rather than making a var
+  in match_expr, let inner = arms.docs.map(|a: Doc| [HardLine, a]).join(); should be an interspere or a join-with-sep include leading or something.
   tm_json test has a multiline literal concatenated with a newline literal which is weird, it should be possible to have a trailing newline in a multiline str literal.
   use variants for errors
   grammar_of should do something like enumerate->map (which should fuse)
@@ -648,6 +650,8 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  don't need to say callable as a method for self: it's inferrable from the signature
+  add a search of some sort
   make an expression renderer (q: is this just the formatter? a: the formatter works on token streams not asts because the ast desugars) and use it for defaults
   docs should do highlighting! And allow you to change color scheme. We have this cool highlighter tech lets use it.
   add concept of examples

@@ -249,11 +249,11 @@ allocations: 20280
 deallocations: 20280
 reallocations: 2930
 bytes allocated: 4071105
-instructions executed: 8675132
-binary size: 6672416
-  code: 4389548
+instructions executed: 8675134
+binary size: 6677080
+  code: 4393040
   data: 10898
-  metadata: 2271970
+  metadata: 2273142
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -498,6 +498,9 @@ functions:
   __builtin_find_if$__m11__Prec$lam$__m31__find_prec$lambda0:
     calls: 0
     bytes: 688
+  __builtin_find_if$__m7__Expr$lam$__m4__is_spread:
+    calls: 0
+    bytes: 3064
   __builtin_find_index$str$lam$__m11__link$__m23__AiplTok$__m5__Ast$lambda0:
     calls: 216
     bytes: 400
@@ -944,7 +947,7 @@ functions:
     bytes: 8992
   __m31__pruned$__m23__AiplTok$__m5__Ast:
     calls: 0
-    bytes: 1292
+    bytes: 1284
   __m31__quoted:
     calls: 113
     bytes: 456
@@ -1112,7 +1115,7 @@ functions:
     bytes: 8432
   __m35__match_expr:
     calls: 0
-    bytes: 11992
+    bytes: 13420
   __m35__more_before:
     calls: 5
     bytes: 200
@@ -1289,7 +1292,7 @@ functions:
     bytes: 804
   __m37__encode:
     calls: 0
-    bytes: 1836
+    bytes: 2060
   __m37__escape_cost:
     calls: 0
     bytes: 352
@@ -1304,7 +1307,7 @@ functions:
     bytes: 396
   __m37__requote:
     calls: 0
-    bytes: 3496
+    bytes: 4256
   __m37__reswap:
     calls: 0
     bytes: 2800
@@ -1460,7 +1463,7 @@ functions:
     bytes: 218556
   __m4__lower_base_ty:
     calls: 0
-    bytes: 24244
+    bytes: 24268
   __m4__lower_binding:
     calls: 0
     bytes: 66124
@@ -1514,7 +1517,7 @@ functions:
     bytes: 47004
   __m4__lower_function:
     calls: 2
-    bytes: 58296
+    bytes: 59052
   __m4__lower_if:
     calls: 0
     bytes: 22944
@@ -1628,7 +1631,7 @@ functions:
     bytes: 1128
   __m4__no_spread:
     calls: 0
-    bytes: 3328
+    bytes: 572
   __m4__op_import_span:
     calls: 0
     bytes: 864

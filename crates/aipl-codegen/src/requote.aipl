@@ -16,6 +16,7 @@ import {
     equal as ==,
     extend,
     first,
+    join,
     len,
     less_than as <,
     logical_and as &&,
@@ -328,15 +329,7 @@ fn better(self: Spelling, other: Spelling) -> Spelling {
 # one escape that form decodes (`unescape_braces`) — a bare one would open an
 # interpolation.
 fn brace_escaped(value: str) -> str {
-    mut out = "";
-    for (let c : value) {
-        if (c == '{' || c == '}') {
-            set out.extend(`\\{c}`);
-        } else {
-            set out.extend(`{c}`);
-        };
-    }
-    out
+    value.map(|c| if (c == '{' || c == '}') { `\\{c}` } else { `{c}` }).join()
 }.test({
     assert(brace_escaped("plain `x`") == "plain `x`");
     assert(brace_escaped("{a}") == """\{a\}""");
@@ -361,21 +354,21 @@ fn single_cost(value: str, delim: char) -> u64 {
 # shared escapes for a backslash, tab and carriage return, and the delimiter's
 # own escapes (`needs_escape`); everything else verbatim.
 fn encode(value: str, delim: char) -> str {
-    mut out = "";
-    for (let c : value) {
-        if (c == '\\') {
-            set out.extend("""\\""");
-        } else if (c == '\t') {
-            set out.extend("""\t""");
-        } else if (c == '\r') {
-            set out.extend("""\r""");
-        } else if (c.needs_escape(delim)) {
-            set out.extend(`\\{c}`);
-        } else {
-            set out.extend(`{c}`);
-        };
-    }
-    out
+    value
+        .map(
+            |c| if (c == '\\') {
+                """\\"""
+            } else if (c == '\t') {
+                """\t"""
+            } else if (c == '\r') {
+                """\r"""
+            } else if (c.needs_escape(delim)) {
+                `\\{c}`
+            } else {
+                `{c}`
+            },
+        )
+        .join()
 }.test({
     assert(encode("plain", '"') == "plain");
     assert(encode(`say "hi"`, '"') == `say \\"hi\\"`);
@@ -545,15 +538,15 @@ fn join_template(raw: bool, segs: str[], interps: str[]) -> str {
     assert(join_template(true, ["", ""], ["x"]) == "```{x}```");
 })
 --- performance ---
-allocations: 565
-deallocations: 565
+allocations: 626
+deallocations: 626
 reallocations: 8
-bytes allocated: 39066
-instructions executed: 135391
-binary size: 78944
-  code: 46604
+bytes allocated: 40594
+instructions executed: 166437
+binary size: 80392
+  code: 47576
   data: 7993
-  metadata: 24347
+  metadata: 24823
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 20
@@ -649,7 +642,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 58
+    calls: 302
     bytes: (external)
   aipl_array_new:
     calls: 35
@@ -683,10 +676,10 @@ functions:
     bytes: 804
   brace_escaped:
     calls: 18
-    bytes: 1132
+    bytes: 1880
   encode:
     calls: 43
-    bytes: 1836
+    bytes: 2060
   escape_cost:
     calls: 21
     bytes: 352
