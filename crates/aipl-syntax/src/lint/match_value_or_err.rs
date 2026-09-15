@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind, Pattern};
+use crate::ast::{Callee, Expr, ExprKind, Pattern};
 use crate::Error;
 
 /// Whether the optimizer will sink `e` into the branch that uses it, rather than
@@ -34,7 +34,7 @@ fn sinkable(e: &Expr, pure_fn: bool) -> bool {
             | ExprKind::For(..) | ExprKind::While(..)
         )
             // `assert` aborts, and that is its whole purpose.
-            || matches!(&e.kind, ExprKind::Call(n, _, _) if n == "assert" || n == "__assert")
+            || matches!(&e.kind, ExprKind::Call(n, _, _) if n == "assert" || *n == Callee::Assert)
             || crate::children(e).iter().any(|c| blocks(c))
     }
     pure_fn && !blocks(e)
@@ -104,7 +104,7 @@ pub(super) fn match_value_or_err(e: &Expr, src: &str, pure_fn: bool, hits: &mut 
     let [error] = &none_args[..] else {
         return;
     };
-    if none_name != "err" {
+    if *none_name != Callee::Err {
         return;
     }
     if !sinkable(error, pure_fn) {
@@ -114,7 +114,7 @@ pub(super) fn match_value_or_err(e: &Expr, src: &str, pure_fn: bool, hits: &mut 
     // to a bare `value_or_err`, with no `?` and nothing left around it.
     let passes_through = match &some_arm.body.kind {
         ExprKind::Call(name, args, _) => match &args[..] {
-            [arg] => name == "ok" && matches!(&arg.kind, ExprKind::Ident(v) if v == binder),
+            [arg] => *name == Callee::Ok && matches!(&arg.kind, ExprKind::Ident(v) if v == binder),
             _ => false,
         },
         _ => false,

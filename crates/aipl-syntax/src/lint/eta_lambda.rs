@@ -15,10 +15,10 @@ pub(super) fn eta_lambda(e: &Expr, hits: &mut Vec<Error>) {
     // an obviously better one, and this lint's job is the case where the lambda
     // adds *nothing* — `|x| to_str(x)` against `to_str`. Deciding the operator
     // question belongs to whoever wants to decide it, corpus-wide, on purpose.
-    if !crate::operator_named_forms(name).is_empty() {
+    if !crate::operator_named_forms(name.name()).is_empty() {
         return;
     }
-    if args.len() != params.len() || params.iter().any(|p| &p.name == name) {
+    if args.len() != params.len() || params.iter().any(|p| p.name == *name) {
         return;
     }
     for (arg, param) in args.iter().zip(params) {

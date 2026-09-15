@@ -94,7 +94,7 @@ pub(super) fn len_gt_zero(e: &Expr, src: &str, cmp: &LenZeroCmp, hits: &mut Vec<
             let Some(len) = cmp.len.as_deref() else {
                 return;
             };
-            let recv = match op.as_str() {
+            let recv = match op.name() {
                 "<" if cmp.lt && is_zero(l) => len_receiver(r, len),
                 ">" if cmp.gt && is_zero(r) => len_receiver(l, len),
                 _ => None,

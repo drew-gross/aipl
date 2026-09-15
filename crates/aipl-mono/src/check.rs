@@ -24,8 +24,8 @@ use std::collections::{HashMap, HashSet};
 use aipl_syntax::ast;
 use aipl_syntax::ast::Bound;
 use aipl_syntax::ast::{
-    BinOp, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Pattern, Primitive,
-    Program, Signature, StructDecl, Type, VariantDecl,
+    BinOp, Callee, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Pattern,
+    Primitive, Program, Signature, StructDecl, Type, VariantDecl,
 };
 use aipl_syntax::{
     binop_spelling, is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr,
@@ -2860,12 +2860,8 @@ impl Cx<'_> {
                 // the returned value in an expression). A non-mutating method
                 // called for effect (`x.print()`) is unaffected.
                 if let ExprKind::Call(name, cargs, true) = &first.kind {
-                    if self
-                        .sigs
-                        .get(name.as_str())
-                        .is_some_and(|s| s.is_mutating())
-                    {
-                        let method = display(name);
+                    if self.sigs.get(name.name()).is_some_and(|s| s.is_mutating()) {
+                        let method = name.display_name();
                         let recv = match cargs.first().map(|a| &a.kind) {
                             Some(ExprKind::Ident(v)) => v.clone(),
                             _ => "recv".to_string(),
@@ -3437,12 +3433,12 @@ impl Cx<'_> {
                     // does — that's enforced by the `Assign` check ("cannot assign
                     // to immutable binding"), which fires on the target directly.
                     // A user function called as a method must declare a `self` receiver.
-                    if let Some(s) = self.sigs.get(name.as_str()) {
+                    if let Some(s) = self.sigs.get(name.name()) {
                         if !s.is_method() {
                             return Err(Error::at(
                                 format!(
                                     "fn {:?} cannot be called as a method (its first parameter must be named \"self\")",
-                                    display(name)
+                                    name.display_name()
                                 ),
                                 recv.span.clone(),
                             ));
@@ -3662,7 +3658,7 @@ impl Cx<'_> {
 
     fn check_call(
         &self,
-        name: &str,
+        callee: &Callee,
         args: &[Expr],
         env: &Env,
         effects: &[String],
@@ -3670,6 +3666,9 @@ impl Cx<'_> {
         // Identity of the call expression, for `Cx::lock_node`.
         node: usize,
     ) -> Result<Type, Error> {
+        // The canonical name is what the signature and constructor tables are
+        // keyed by; the arms below are the callees the compiler types by hand.
+        let name = callee.name();
         // A variant constructor `Ctor(a, b, ...)` (unless shadowed by a local
         // function-typed binding, handled below): check each argument against
         // the case's payload type; the result is the variant type.
@@ -3727,9 +3726,9 @@ impl Cx<'_> {
         // pins one side from its argument; the other side is `__none__`, left
         // for the expected result type to resolve by coercion (e.g. `ok(5)` is
         // `i64!__none__`, coercing to a declared `i64!str`).
-        if !env.contains_key(name) && (name == "ok" || name == "err") {
+        if matches!(callee, Callee::Ok | Callee::Err) {
             // `ok()` with no argument is the void success of a `!E` result.
-            if name == "ok" && args.is_empty() {
+            if *callee == Callee::Ok && args.is_empty() {
                 return Ok(Type::Result(
                     Box::new(Type::Unit),
                     Box::new(Type::NoneInner),
@@ -3743,7 +3742,7 @@ impl Cx<'_> {
             }
             let t = self.check_expr(&args[0], env, effects)?;
             let none = || Box::new(Type::NoneInner);
-            return Ok(if name == "ok" {
+            return Ok(if *callee == Callee::Ok {
                 Type::Result(Box::new(t), none())
             } else {
                 Type::Result(none(), Box::new(t))
@@ -3758,7 +3757,7 @@ impl Cx<'_> {
         // `to_set` builds whichever set the use site wants: its order is the
         // placeholder until `lock` records the expected type on the call (see
         // `needs_lock`), and a plain `#{T}` where nothing does.
-        if name == "__builtin_to_set" && args.len() == 1 {
+        if *callee == Callee::ToSet && args.len() == 1 {
             let t = self.check_expr(&args[0], env, effects)?;
             // Arrays only: a `str` is a char sequence to `T[]` signatures, but
             // its bytes are not laid out as array elements, so it is refused
@@ -3788,7 +3787,7 @@ impl Cx<'_> {
         }
         // `to_array` reads a set's elements *in order*, so only an ordered set
         // has one to give; the signature's `#{T}` would accept any.
-        if name == "__builtin_to_array" && args.len() == 1 {
+        if *callee == Callee::ToArray && args.len() == 1 {
             let t = self.check_expr(&args[0], env, effects)?;
             if let Type::Set(inner, order) = &t {
                 if order.is_ordered() || is_typevar(inner) {
@@ -3804,10 +3803,10 @@ impl Cx<'_> {
                 ));
             }
         }
-        if matches!(name, "__builtin_len" | "__builtin_is_nonempty") && args.len() == 1 {
+        if matches!(callee, Callee::Len | Callee::IsNonempty) && args.len() == 1 {
             let t = self.check_expr(&args[0], env, effects)?;
             if matches!(t, Type::Set(..) | Type::Dict(_, _)) || is_str_repr(&t) {
-                return Ok(if name == "__builtin_len" {
+                return Ok(if *callee == Callee::Len {
                     Type::Primitive(Primitive::U64)
                 } else {
                     Type::Primitive(Primitive::Bool)
@@ -3821,7 +3820,7 @@ impl Cx<'_> {
         // operator's too — a bare integer literal takes the other operand's
         // width, and a constructor reference is recorded so mono does not
         // re-derive it (`k == Str`). Reserved names, not imported.
-        if name == "__builtin_logical_not" {
+        if *callee == Callee::LogicalNot {
             if let [x] = args {
                 let t = self.check_expr(x, env, effects)?;
                 expect(
@@ -3833,7 +3832,7 @@ impl Cx<'_> {
                 return Ok(Type::Primitive(Primitive::Bool));
             }
         }
-        if let Some(op) = aipl_syntax::binop_for_builtin(name) {
+        if let Some(op) = aipl_syntax::binop_for_builtin(callee) {
             if args.len() == 2 {
                 let lt = self.check_expr(&args[0], env, effects)?;
                 let rt = self.check_expr(&args[1], env, effects)?;
@@ -3856,10 +3855,10 @@ impl Cx<'_> {
         // Each is integer arithmetic (the flavors differ only in overflow codegen),
         // typed here exactly like the primitive Binop: same-width integers, with a
         // bare literal operand flexing to the other's width. Reserved, not imported.
-        if let Some(op) = match name {
-            "__builtin_wrapping_add" | "__builtin_saturating_add" => Some("+"),
-            "__builtin_wrapping_sub" | "__builtin_saturating_sub" => Some("-"),
-            "__builtin_wrapping_mul" => Some("*"),
+        if let Some(op) = match callee {
+            Callee::WrappingAdd | Callee::SaturatingAdd => Some("+"),
+            Callee::WrappingSub | Callee::SaturatingSub => Some("-"),
+            Callee::WrappingMul => Some("*"),
             _ => None,
         } {
             if args.len() == 2 {
@@ -3884,15 +3883,8 @@ impl Cx<'_> {
         // `T?`). Fully dispatched here rather than through the generic
         // signature. `starts_with_at` carries one extra argument, the offset to
         // match at — a slice bound in every respect, so it is checked as one.
-        let at_arity = usize::from(name == "__builtin_starts_with_at");
-        if matches!(
-            name,
-            "__builtin_starts_with"
-                | "__builtin_ends_with"
-                | "__builtin_contains"
-                | "__builtin_starts_with_at"
-        ) && args.len() == 2 + at_arity
-        {
+        let at_arity = usize::from(matches!(callee, Callee::StartsWithAt(_)));
+        if callee.seq_shape().is_some() && args.len() == 2 + at_arity {
             let recv = self.check_expr(&args[0], env, effects)?;
             let pat = self.check_expr(&args[1], env, effects)?;
             // The variadic sequence type per receiver: `str` for a string,
@@ -3913,7 +3905,7 @@ impl Cx<'_> {
                     return Err(Error::at(
                         format!(
                             "{:?} pattern expects {}, {}, or {}?, got {}",
-                            display(name),
+                            callee.display_name(),
                             tyname(&seq),
                             tyname(&elem),
                             tyname(&elem),
@@ -3933,7 +3925,7 @@ impl Cx<'_> {
             }
             // Set membership is its own builtin — point at it rather than
             // reporting a confusing mismatch against the `T[]` signature.
-            if name == "__builtin_contains" && matches!(recv, Type::Set(..)) {
+            if matches!(callee, Callee::Contains(_)) && matches!(recv, Type::Set(..)) {
                 return Err(Error::at(
                     "\"contains\" takes an array or str receiver; for set membership use \"has\"",
                     args[0].span.clone(),
@@ -4026,7 +4018,7 @@ impl Cx<'_> {
                 }
             }
             let mut msg = format!("call to undefined fn {:?}", display(name));
-            if aipl_syntax::IMPORTABLE_BUILTINS.contains(&name) {
+            if Callee::importable(name).is_some() {
                 msg.push_str(&format!(
                     " — \"{name}\" is a builtin; import it with `import {{ {name} }} from builtins;`"
                 ));
@@ -4838,7 +4830,7 @@ fn needs_lock(k: &ExprKind) -> bool {
         ExprKind::DictLit(v) => v.is_empty(),
         // `to_set` leaves its *order* to context (see `SetOrder::Context`).
         ExprKind::Call(n, _, _) => {
-            n == "ok" || n == "err" || n == "some" || n == "__builtin_to_set"
+            matches!(n, Callee::Ok | Callee::Err | Callee::Some | Callee::ToSet)
         }
         _ => false,
     }

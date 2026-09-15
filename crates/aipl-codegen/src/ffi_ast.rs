@@ -361,7 +361,7 @@ fn expr_kind(v: &FfiValue) -> R<ast::ExprKind> {
         "Char" => K::Char(byte(at(payload, 0, case)?)?),
         "Ident" => K::Ident(name(0)?),
         "Call" => K::Call(
-            name(0)?,
+            ast::Callee::resolve(name(0)?),
             each(at(payload, 1, case)?, expr)?,
             flag(at(payload, 2, case)?)?,
         ),

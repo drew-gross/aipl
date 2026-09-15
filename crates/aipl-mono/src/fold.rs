@@ -26,7 +26,8 @@
 use std::collections::HashMap;
 
 use aipl_syntax::ast::{
-    BinOp, Expr, ExprKind, FieldDecl, FieldInit, Item, MatchArm, Pattern, Primitive, Program, Type,
+    BinOp, Callee, Expr, ExprKind, FieldDecl, FieldInit, Item, MatchArm, Pattern, Primitive,
+    Program, Type,
 };
 
 /// Fold constant subexpressions throughout `program`: every function body and
@@ -264,7 +265,7 @@ fn try_fold(kind: &ExprKind) -> Option<ExprKind> {
         // names: an operator aliased to a user function is an ordinary call.
         ExprKind::Call(name, args, _) => {
             // `!` resolved to its canonical impl folds like the node it replaced.
-            if name == "__builtin_logical_not" {
+            if *name == Callee::LogicalNot {
                 let [x] = args.as_slice() else {
                     return None;
                 };
@@ -287,12 +288,12 @@ fn try_fold(kind: &ExprKind) -> Option<ExprKind> {
             let (ExprKind::Num(a), ExprKind::Num(b)) = (&a.kind, &b.kind) else {
                 return None;
             };
-            let n = match name.as_str() {
-                "__builtin_wrapping_add" => a.wrapping_add(*b),
-                "__builtin_saturating_add" => a.saturating_add(*b),
-                "__builtin_wrapping_sub" => a.wrapping_sub(*b),
-                "__builtin_saturating_sub" => a.saturating_sub(*b),
-                "__builtin_wrapping_mul" => a.wrapping_mul(*b),
+            let n = match name {
+                Callee::WrappingAdd => a.wrapping_add(*b),
+                Callee::SaturatingAdd => a.saturating_add(*b),
+                Callee::WrappingSub => a.wrapping_sub(*b),
+                Callee::SaturatingSub => a.saturating_sub(*b),
+                Callee::WrappingMul => a.wrapping_mul(*b),
                 _ => return None,
             };
             Some(ExprKind::Num(n))

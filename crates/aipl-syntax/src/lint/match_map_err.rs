@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind, Pattern};
+use crate::ast::{Callee, Expr, ExprKind, Pattern};
 use crate::Error;
 
 /// `match (r) { ok(v) => ok(v), err(e) => err(g) }` — a result whose error
@@ -54,7 +54,7 @@ pub(super) fn match_map_err(e: &Expr, hits: &mut Vec<Error>) {
     let [ok_arg] = &ok_args[..] else {
         return;
     };
-    if ok_name != "ok" || !matches!(&ok_arg.kind, ExprKind::Ident(v) if v == ok_binder) {
+    if *ok_name != Callee::Ok || !matches!(&ok_arg.kind, ExprKind::Ident(v) if v == ok_binder) {
         return;
     }
     // The error arm must rebuild an `err`; anything else is a `match` that
@@ -65,7 +65,7 @@ pub(super) fn match_map_err(e: &Expr, hits: &mut Vec<Error>) {
     let [err_arg] = &err_args[..] else {
         return;
     };
-    if err_name != "err" {
+    if *err_name != Callee::Err {
         return;
     }
     // `err(e) => err(e)` — see the doc comment: a no-op, left alone.

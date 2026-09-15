@@ -102,7 +102,6 @@ misc cleanup:
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
   DRY up operator name lists (is_binop, is_operator_name), maybe make a struct to describe each op?
   what is `walker.aipl`'s space-splitting test tokenizer? Can it be removed?
-  use an enum for the builtins
   made logical not more like the rest of the operators (lower it to a call immediately)
   rename saturating_remainter to total_remainder (maybe also do total_divide?)
   BinOp should be lowered to a call much earlier in the pipeline, it's currently too easy to inspect a binop and assume it corresponds to a call other than the one it actually does
@@ -319,6 +318,7 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
+  self[end].value_or(' ') == '.' should be self[end] == some('.')
   for (let x : xs) { if (p(x)) { set out.push(f(x)) } } should lint to a filter->map
   lint against char/str literals directly in templates e.g. `a: {'a'}` or `aa: {"aa"}`
   lint against set literals that contain duplicates
@@ -533,12 +533,8 @@ tests:
   make tests unable to write files, using shimming
   make tests leverage better parallelism and caching by using more files
   make ? in tests a _desugaring_ that happens earlier than codegen, then this inlining restriction can also be lifted
-
-find a more natural way of testing builtins
-find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
-
-warn/err on:
-  - self[end].value_or(' ') == '.' should be self[end] == some('.')
+  find a more natural way of testing builtins
+  find a way to make sure the code still works even after optimizations (and the tests are testing the right thing)
 
 integers:
   type conversions: should return none when out of range. Remove automatic conversion.

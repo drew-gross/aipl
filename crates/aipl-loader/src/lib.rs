@@ -20,11 +20,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use aipl_parser::parse_with_allows;
+use aipl_syntax::ast::Callee;
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldInit, Function, ImportDecl, ImportName, ImportSource, Item, LambdaParam,
     MatchArm, Param, Pattern, Program, Signature, StructDecl, Type, TypeParam,
 };
-use aipl_syntax::{builtin_canonical, DebugOptions, Error, Span};
+use aipl_syntax::{DebugOptions, Error, Span};
 
 /// Parse `root`, recursively resolve every `import`, and return a single
 /// merged [`Program`] ready for codegen.
@@ -560,10 +561,10 @@ impl Loader {
                             ));
                         }
                         n.name.clone()
-                    } else if let Some(canonical) = builtin_canonical(&n.name) {
+                    } else if let Some(builtin) = Callee::importable(&n.name) {
                         // Reserved for the builtins' own implementations until
                         // it is decided whether programs get it.
-                        if aipl_syntax::is_internal_builtin(&n.name)
+                        if aipl_syntax::is_internal_builtin(&builtin)
                             && !(self.builtin_impl || is_builtin_impl_path(path))
                         {
                             return Err(Error::at(
@@ -575,7 +576,7 @@ impl Loader {
                                 n.span.clone(),
                             ));
                         }
-                        canonical
+                        builtin.name().to_string()
                     } else if let Some(canonical) = aipl_syntax::builtin_type_canonical(&n.name) {
                         canonical
                     } else {
@@ -712,7 +713,11 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
                 check_operators(c, view)?;
             }
         }
-        ExprKind::Call(name, args, _) => {
+        ExprKind::Call(callee, args, _) => {
+            // Before resolution every source-spelled callee is a `User`; the
+            // compiler's own arms (`some`, the template intrinsics) name no
+            // operator and take no import.
+            let name = callee.user().unwrap_or_default();
             // An operator use is a call named for the spelling written, so the
             // gate is one membership test on the callee. This replaces a `Binop`
             // arm and a `Not` arm that asked the same question of their own node
@@ -726,7 +731,11 @@ fn check_operators(e: &Expr, view: &HashMap<String, String>) -> Result<(), Error
             // intrinsified rather than emitted), so a miscount has to be rejected
             // here rather than surfacing as a call to a function that does not
             // exist.
-            if let Some(arity) = view.get(name).and_then(|t| aipl_syntax::operator_arity(t)) {
+            if let Some(arity) = view
+                .get(name)
+                .and_then(|t| Callee::from_canonical(t))
+                .and_then(|c| aipl_syntax::operator_arity(&c))
+            {
                 if args.len() != arity {
                     return Err(Error::at(
                         format!(
@@ -1118,7 +1127,19 @@ fn rewrite_expr(
             Some(mangled) if !locals.contains(name) => ExprKind::Ident(mangled.clone()),
             _ => e.kind.clone(),
         },
-        ExprKind::Call(name, args, method_style) => {
+        // A callee the compiler already knows (`some`, a template intrinsic)
+        // has no name to resolve; only its arguments are rewritten.
+        ExprKind::Call(callee, args, method_style) if callee.user().is_none() => ExprKind::Call(
+            callee.clone(),
+            args.iter()
+                .map(|a| rewrite_expr(a, view, sc, locals))
+                .collect(),
+            *method_style,
+        ),
+        ExprKind::Call(callee, args, method_style) => {
+            let Callee::User(name) = callee else {
+                unreachable!("a known callee takes the arm above")
+            };
             // `V.A(args)` — a variant-qualified constructor call. It parses as a
             // method call whose receiver is the variant *type* name `V`; detect a
             // non-local `V` the view resolves to a variant with a case `name`, and
@@ -1137,7 +1158,7 @@ fn rewrite_expr(
             };
             match qualified {
                 Some(vglobal) => ExprKind::Call(
-                    format!("{name}@{vglobal}"),
+                    Callee::User(format!("{name}@{vglobal}")),
                     args[1..]
                         .iter()
                         .map(|a| rewrite_expr(a, view, sc, locals))
@@ -1152,7 +1173,7 @@ fn rewrite_expr(
                 // the call had to be lowered back into the primitive node the
                 // operator produced.)
                 None => ExprKind::Call(
-                    view.get(name).cloned().unwrap_or_else(|| name.clone()),
+                    Callee::resolve(view.get(name).cloned().unwrap_or_else(|| name.clone())),
                     args.iter()
                         .map(|a| rewrite_expr(a, view, sc, locals))
                         .collect(),

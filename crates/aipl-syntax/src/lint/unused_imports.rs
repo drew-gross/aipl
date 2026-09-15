@@ -81,8 +81,11 @@ fn referenced_names(program: &Program) -> HashSet<String> {
     // `each_expr` already reaches every nested expression, so each node only
     // needs inspecting at its own level.
     each_expr(program, &mut |e| match &e.kind {
-        ExprKind::Ident(n) | ExprKind::Call(n, _, _) | ExprKind::Construct(n, _) => {
+        ExprKind::Ident(n) | ExprKind::Construct(n, _) => {
             out.insert(n.clone());
+        }
+        ExprKind::Call(n, _, _) => {
+            out.insert(n.name().to_string());
         }
         // No arm for operators: an operator use is a `Call` whose callee is the
         // spelling, so the arm above already records `+`, `==`, `!` and the rest

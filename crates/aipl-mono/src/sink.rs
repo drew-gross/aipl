@@ -54,7 +54,7 @@
 
 use std::collections::HashSet;
 
-use aipl_syntax::ast::{Expr, ExprKind, Item, MatchArm, Program};
+use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, MatchArm, Program};
 
 use crate::{ConcreteFn, MonoProgram};
 
@@ -66,7 +66,7 @@ use crate::{ConcreteFn, MonoProgram};
 /// `i64::MIN / -1` answer `MAX` and, for `%`, the dividend and 0 — so either can
 /// be deferred like any other arithmetic. Nothing else in the language aborts,
 /// which is why this list is down to one entry.
-const ABORTING_BUILTINS: &[&str] = &["__assert"];
+const ABORTING_BUILTINS: &[Callee] = &[Callee::Assert];
 
 /// Sink every binding in `program` that only one branch of the following
 /// `if`/`match` uses. `effectful` is the set of functions whose signature
@@ -116,7 +116,7 @@ pub(crate) fn undeferrable_fns(program: &Program, effectful: &HashSet<String>) -
 /// caller has — source items before monomorphization, concrete instances after.
 fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> HashSet<String> {
     let mut blocked: HashSet<String> = effectful.clone();
-    blocked.extend(ABORTING_BUILTINS.iter().map(|s| (*s).to_string()));
+    blocked.extend(ABORTING_BUILTINS.iter().map(|c| c.name().to_string()));
     // A fixpoint rather than one pass: `a` calling `b` calling a divider makes
     // `a` undeferrable too, and the items are in no particular order.
     loop {
@@ -141,7 +141,7 @@ fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> Ha
 /// no longer pins a binding in place at all.
 fn reaches_blocked(e: &Expr, blocked: &HashSet<String>) -> bool {
     let here = match &e.kind {
-        ExprKind::Call(name, _, _) => blocked.contains(name),
+        ExprKind::Call(name, _, _) => blocked.contains(name.name()),
         ExprKind::Shim(..) => true,
         _ => false,
     };

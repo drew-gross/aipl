@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind, Pattern};
+use crate::ast::{Callee, Expr, ExprKind, Pattern};
 use crate::Error;
 
 /// `match (r) { ok(v) => ok(g), err(e) => err(e) }` — a result whose value
@@ -53,7 +53,7 @@ pub(super) fn match_map_ok(e: &Expr, hits: &mut Vec<Error>) {
     let [err_arg] = &err_args[..] else {
         return;
     };
-    if err_name != "err" || !matches!(&err_arg.kind, ExprKind::Ident(v) if v == err_binder) {
+    if *err_name != Callee::Err || !matches!(&err_arg.kind, ExprKind::Ident(v) if v == err_binder) {
         return;
     }
     // The value arm must rebuild an `ok`; anything else is a `match` that
@@ -64,7 +64,7 @@ pub(super) fn match_map_ok(e: &Expr, hits: &mut Vec<Error>) {
     let [ok_arg] = &ok_args[..] else {
         return;
     };
-    if ok_name != "ok" {
+    if *ok_name != Callee::Ok {
         return;
     }
     // `ok(v) => ok(v)` — see the doc comment: with both arms identity the

@@ -63,8 +63,6 @@ mod comparison_fusions;
 mod loop_fusions;
 mod slice_fusions;
 
-pub use loop_fusions::REVERSE_ITER;
-
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Expr, ExprKind, Item, Program};
@@ -152,7 +150,7 @@ fn try_fuse(e: &Expr, guards: &Guards) -> Option<Expr> {
 /// would silently disable the pass rather than announce itself.
 fn has_effect(e: &Expr, effectful: &HashSet<String>) -> bool {
     let here = match &e.kind {
-        ExprKind::Call(name, _, _) => effectful.contains(name),
+        ExprKind::Call(name, _, _) => effectful.contains(name.name()),
         // A shim installs handlers for an effect; that is the effect happening.
         ExprKind::Shim(..) => true,
         _ => false,

@@ -36,7 +36,7 @@ pub use fold::fold_constants;
 mod ctor_eq;
 mod fuse;
 pub use ctor_eq::unwrap_ctor_eq;
-pub use fuse::{effectful_fns, fuse_operations, REVERSE_ITER};
+pub use fuse::{effectful_fns, fuse_operations};
 
 mod sink;
 pub use sink::{sink_bindings, sink_bindings_post_mono};
@@ -47,10 +47,10 @@ pub use subst::inline_single_use_bindings;
 use aipl_syntax::{
     ast,
     ast::{
-        is_unit, BinOp, Bound, CaseParam, ConcreteFieldDecl, ConcreteStructDecl, ConcreteType,
-        ConcreteVariantCase, ConcreteVariantDecl, Expr, ExprKind, FieldDecl, FieldInit, Function,
-        Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program, Signature, StructDecl,
-        Type, TypeParam, VariantCase, VariantDecl,
+        is_unit, BinOp, Bound, Callee, CaseParam, ConcreteFieldDecl, ConcreteStructDecl,
+        ConcreteType, ConcreteVariantCase, ConcreteVariantDecl, Expr, ExprKind, FieldDecl,
+        FieldInit, Function, Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program,
+        SeqShape, Signature, StructDecl, Type, TypeParam, VariantCase, VariantDecl,
     },
     concat_str_ty, is_concat_str, is_empty_array_arg, is_error, is_none_inner, is_none_literal_arg,
     is_str_repr, type_name, DebugOptions, Error, Span, BUILTIN_SIGNATURES,
@@ -209,7 +209,10 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
             let args: Vec<Expr> = (0..payload.len())
                 .map(|i| Expr::new(K::Ident(format!("__ctor{i}")), e.span.clone()))
                 .collect();
-            let body = Expr::new(K::Call(name.clone(), args, false), e.span.clone());
+            let body = Expr::new(
+                K::Call(Callee::User(name.clone()), args, false),
+                e.span.clone(),
+            );
             rw(K::Lambda(params, Box::new(body)))
         }
         K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::None | K::Unit => e.clone(),
@@ -633,8 +636,8 @@ fn lt_ty(
 /// arithmetic and length comparisons are spelled this way because there is only
 /// one shape to spell them in — the operator has no node of its own, so nothing
 /// downstream needs an alternative form to understand.
-fn op_call(canonical: &str, args: Vec<Expr>, span: Span) -> Expr {
-    Expr::new(ExprKind::Call(canonical.to_string(), args, false), span)
+fn op_call(canonical: Callee, args: Vec<Expr>, span: Span) -> Expr {
+    Expr::new(ExprKind::Call(canonical, args, false), span)
 }
 
 /// Walk an expression, lowering any `Type::Tuple` that appears in lambda-param
@@ -1712,14 +1715,9 @@ pub(crate) fn settled(ty: &Type, what: &str) -> ConcreteType {
 /// The shape a variadic (`T*`) argument takes at a call site: the sequence
 /// itself, a single element, or an optional element. Each maps to a distinct
 /// specialization. `Seq` (the default) is the plain instance; a non-variadic
-/// parameter is always `Seq`.
-#[derive(Clone, Copy, PartialEq, Default)]
-enum VShape {
-    #[default]
-    Seq,
-    Elem,
-    Opt,
-}
+/// parameter is always `Seq`. The same enum a shape-variadic builtin callee
+/// carries once mono has classified its pattern.
+type VShape = SeqShape;
 
 /// Classify a variadic argument of type `arg_ty` against the parameter's
 /// sequence type `seq_ty`. An optional is always the optional shape; otherwise
@@ -1796,7 +1794,7 @@ fn specialize_variadic(
             let pv_id = Expr::new(ExprKind::Ident(pv.clone()), span.clone());
             let convert = if is_char {
                 Expr::new(
-                    ExprKind::Call("__char_to_str".into(), vec![pv_id], false),
+                    ExprKind::Call(Callee::CharToStr, vec![pv_id], false),
                     span.clone(),
                 )
             } else {
@@ -1811,7 +1809,7 @@ fn specialize_variadic(
             let x_id = Expr::new(ExprKind::Ident(xn.clone()), span.clone());
             let some_body = if is_char {
                 Expr::new(
-                    ExprKind::Call("__char_to_str".into(), vec![x_id], false),
+                    ExprKind::Call(Callee::CharToStr, vec![x_id], false),
                     span.clone(),
                 )
             } else {
@@ -2223,7 +2221,7 @@ struct Mono<'a> {
 /// desugar) and yields unit (an empty `else`/`none` arm matches it).
 fn set_push(out: Expr, val: Expr, span: Span) -> Expr {
     let call = Expr::new(
-        ExprKind::Call("__builtin_push".to_string(), vec![out.clone(), val], true),
+        ExprKind::Call(Callee::Push, vec![out.clone(), val], true),
         span.clone(),
     );
     Expr::new(
@@ -2493,7 +2491,10 @@ impl Mono<'_> {
         if let Some(spec) = self.spec_memo.get(&key).cloned() {
             let mangled = instance(self, &spec);
             return Ok((
-                Expr::new(ExprKind::Call(mangled, new_args, false), span.clone()),
+                Expr::new(
+                    ExprKind::Call(Callee::User(mangled), new_args, false),
+                    span.clone(),
+                ),
                 ret,
             ));
         }
@@ -2552,7 +2553,10 @@ impl Mono<'_> {
         self.spec_memo.insert(key, spec_name.clone());
         let mangled = instance(self, &spec_name);
         Ok((
-            Expr::new(ExprKind::Call(mangled, new_args, false), span.clone()),
+            Expr::new(
+                ExprKind::Call(Callee::User(mangled), new_args, false),
+                span.clone(),
+            ),
             ret,
         ))
     }
@@ -3046,10 +3050,16 @@ impl Mono<'_> {
         let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
         let mut pred_args = vec![id("$e")];
         pred_args.extend(pred_caps);
-        let cond = Expr::new(ExprKind::Call(pred_fn, pred_args, false), span.clone());
+        let cond = Expr::new(
+            ExprKind::Call(Callee::resolve(pred_fn), pred_args, false),
+            span.clone(),
+        );
         let mut map_args = vec![id("$e")];
         map_args.extend(map_caps);
-        let mapped = Expr::new(ExprKind::Call(map_fn, map_args, false), span.clone());
+        let mapped = Expr::new(
+            ExprKind::Call(Callee::resolve(map_fn), map_args, false),
+            span.clone(),
+        );
 
         let incr = |name: &str| {
             Expr::new(
@@ -3057,7 +3067,7 @@ impl Mono<'_> {
                     Box::new(id(name)),
                     Box::new(Expr::new(
                         op_call(
-                            "__builtin_wrapping_add",
+                            Callee::WrappingAdd,
                             vec![id(name), Expr::new(ExprKind::Num(1), span.clone())],
                             span.clone(),
                         )
@@ -3085,7 +3095,7 @@ impl Mono<'_> {
             // to `$w` has to come after the loop.
             let set = Expr::new(
                 ExprKind::Call(
-                    "__map_set".to_string(),
+                    Callee::MapSet,
                     vec![id("$a"), id("$w"), mapped, id("$e")],
                     false,
                 ),
@@ -3096,7 +3106,7 @@ impl Mono<'_> {
                 span.clone(),
             );
             let drop_e = Expr::new(
-                ExprKind::Call("__filter_drop".to_string(), vec![id("$e")], false),
+                ExprKind::Call(Callee::FilterDrop, vec![id("$e")], false),
                 span.clone(),
             );
             let guarded = Expr::new(
@@ -3108,17 +3118,13 @@ impl Mono<'_> {
                 span.clone(),
             );
             let trunc = Expr::new(
-                ExprKind::Call(
-                    "__filter_truncate".to_string(),
-                    vec![id("$a"), id("$w")],
-                    false,
-                ),
+                ExprKind::Call(Callee::FilterTruncate, vec![id("$a"), id("$w")], false),
                 span.clone(),
             );
             // The reused buffer now holds `U` elements while `$a`'s static type
             // is still `T[]`; `__map_result` re-types it (a runtime no-op).
             let result = Expr::new(
-                ExprKind::Call("__map_result".to_string(), vec![id("$a")], false),
+                ExprKind::Call(Callee::MapResult, vec![id("$a")], false),
                 span.clone(),
             );
             let after = Expr::new(
@@ -3177,9 +3183,9 @@ impl Mono<'_> {
             } else {
                 Expr::new(
                     ExprKind::Call(
-                        "__builtin_with_capacity".to_string(),
+                        Callee::WithCapacity,
                         vec![Expr::new(
-                            ExprKind::Call("__builtin_len".to_string(), vec![id("$arr")], false),
+                            ExprKind::Call(Callee::Len, vec![id("$arr")], false),
                             span.clone(),
                         )],
                         false,
@@ -3222,7 +3228,10 @@ impl Mono<'_> {
             fm_name
         };
         Ok((
-            Expr::new(ExprKind::Call(mangled, call_args, false), span.clone()),
+            Expr::new(
+                ExprKind::Call(Callee::User(mangled), call_args, false),
+                span.clone(),
+            ),
             ret,
         ))
     }
@@ -3332,7 +3341,10 @@ impl Mono<'_> {
         let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
         let mut lam_args = vec![id("$e")];
         lam_args.extend(cap_idents);
-        let call = Expr::new(ExprKind::Call(map_fn, lam_args, false), span.clone());
+        let call = Expr::new(
+            ExprKind::Call(Callee::resolve(map_fn), lam_args, false),
+            span.clone(),
+        );
 
         let map_body = if in_place {
             // In-place: overwrite each slot with its mapped value and reuse the
@@ -3347,7 +3359,7 @@ impl Mono<'_> {
             // patches the array's stored element drop-fn to `U`'s (it was `T`'s).
             let map_set = Expr::new(
                 ExprKind::Call(
-                    "__map_set".to_string(),
+                    Callee::MapSet,
                     vec![id("$a"), id("$i"), call, id("$e")],
                     false,
                 ),
@@ -3358,7 +3370,7 @@ impl Mono<'_> {
                     Box::new(id("$i")),
                     Box::new(Expr::new(
                         op_call(
-                            "__builtin_wrapping_add",
+                            Callee::WrappingAdd,
                             vec![id("$i"), Expr::new(ExprKind::Num(1), span.clone())],
                             span.clone(),
                         )
@@ -3381,7 +3393,7 @@ impl Mono<'_> {
             // `T[]`. `__map_result` hands it back reinterpreted as the function's
             // declared return type (`U[]`) — a no-op at runtime (same pointer).
             let result = Expr::new(
-                ExprKind::Call("__map_result".to_string(), vec![id("$a")], false),
+                ExprKind::Call(Callee::MapResult, vec![id("$a")], false),
                 span.clone(),
             );
             let inner = Expr::new(
@@ -3426,9 +3438,9 @@ impl Mono<'_> {
             } else {
                 Expr::new(
                     ExprKind::Call(
-                        "__builtin_with_capacity".to_string(),
+                        Callee::WithCapacity,
                         vec![Expr::new(
-                            ExprKind::Call("__builtin_len".to_string(), vec![id("$arr")], false),
+                            ExprKind::Call(Callee::Len, vec![id("$arr")], false),
                             span.clone(),
                         )],
                         false,
@@ -3470,7 +3482,10 @@ impl Mono<'_> {
             map_name
         };
         Ok((
-            Expr::new(ExprKind::Call(mangled, call_args, false), span.clone()),
+            Expr::new(
+                ExprKind::Call(Callee::User(mangled), call_args, false),
+                span.clone(),
+            ),
             ret,
         ))
     }
@@ -3645,7 +3660,10 @@ impl Mono<'_> {
         // `$b`-element, whichever of the two arrays the loop iterates.
         let mut lam_args = vec![id("$e"), id("$v")];
         lam_args.extend(cap_idents);
-        let call = Expr::new(ExprKind::Call(zip_fn, lam_args, false), span.clone());
+        let call = Expr::new(
+            ExprKind::Call(Callee::resolve(zip_fn), lam_args, false),
+            span.clone(),
+        );
         // set <n> = <n> + 1;
         let incr = |n: &str| {
             Expr::new(
@@ -3653,7 +3671,7 @@ impl Mono<'_> {
                     Box::new(id(n)),
                     Box::new(Expr::new(
                         op_call(
-                            "__builtin_wrapping_add",
+                            Callee::WrappingAdd,
                             vec![id(n), Expr::new(ExprKind::Num(1), span.clone())],
                             span.clone(),
                         )
@@ -3700,7 +3718,7 @@ impl Mono<'_> {
             };
             let map_set = Expr::new(
                 ExprKind::Call(
-                    "__map_set".to_string(),
+                    Callee::MapSet,
                     vec![id("$z"), id("$i"), call, id(reused_el)],
                     false,
                 ),
@@ -3711,7 +3729,7 @@ impl Mono<'_> {
                 span.clone(),
             );
             let none_body = Expr::new(
-                ExprKind::Call("__filter_drop".to_string(), vec![id(reused_el)], false),
+                ExprKind::Call(Callee::FilterDrop, vec![id(reused_el)], false),
                 span.clone(),
             );
             let index = Expr::new(
@@ -3757,15 +3775,11 @@ impl Mono<'_> {
                 span.clone(),
             );
             let trunc = Expr::new(
-                ExprKind::Call(
-                    "__filter_truncate".to_string(),
-                    vec![id("$z"), id("$w")],
-                    false,
-                ),
+                ExprKind::Call(Callee::FilterTruncate, vec![id("$z"), id("$w")], false),
                 span.clone(),
             );
             let result = Expr::new(
-                ExprKind::Call("__map_result".to_string(), vec![id("$z")], false),
+                ExprKind::Call(Callee::MapResult, vec![id("$z")], false),
                 span.clone(),
             );
             let mut after = Expr::new(
@@ -3776,7 +3790,7 @@ impl Mono<'_> {
                 // Both inputs were moved in: release the one not reused (its
                 // elements were only borrowed by `f`).
                 let drop_o = Expr::new(
-                    ExprKind::Call("__filter_drop".to_string(), vec![id(other)], false),
+                    ExprKind::Call(Callee::FilterDrop, vec![id(other)], false),
                     span.clone(),
                 );
                 after = Expr::new(
@@ -3824,12 +3838,12 @@ impl Mono<'_> {
             // one preserves the larger capacity, and the shorter is freed.
             let len_of = |n: &str| {
                 Expr::new(
-                    ExprKind::Call("__builtin_len".to_string(), vec![id(n)], false),
+                    ExprKind::Call(Callee::Len, vec![id(n)], false),
                     span.clone(),
                 )
             };
             let cond = op_call(
-                "__builtin_less_than",
+                Callee::LessThan,
                 vec![len_of("$a"), len_of("$b")],
                 span.clone(),
             );
@@ -3944,7 +3958,10 @@ impl Mono<'_> {
             self.enqueue(&zip_name, &[], &owned)
         };
         Ok((
-            Expr::new(ExprKind::Call(mangled, call_args, false), span.clone()),
+            Expr::new(
+                ExprKind::Call(Callee::User(mangled), call_args, false),
+                span.clone(),
+            ),
             ret,
         ))
     }
@@ -4033,7 +4050,10 @@ impl Mono<'_> {
         let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
         let mut pred_args = vec![id("$e")];
         pred_args.extend(cap_idents);
-        let cond = Expr::new(ExprKind::Call(pred_fn, pred_args, false), span.clone());
+        let cond = Expr::new(
+            ExprKind::Call(Callee::resolve(pred_fn), pred_args, false),
+            span.clone(),
+        );
 
         let filter_body = if in_place {
             // body: `mut $a = $arr;
@@ -4053,7 +4073,7 @@ impl Mono<'_> {
             // are never clobbered.
             let keep = Expr::new(
                 ExprKind::Call(
-                    "__filter_keep".to_string(),
+                    Callee::FilterKeep,
                     vec![id("$a"), id("$w"), id("$e")],
                     false,
                 ),
@@ -4064,7 +4084,7 @@ impl Mono<'_> {
                     Box::new(id("$w")),
                     Box::new(Expr::new(
                         op_call(
-                            "__builtin_wrapping_add",
+                            Callee::WrappingAdd,
                             vec![id("$w"), Expr::new(ExprKind::Num(1), span.clone())],
                             span.clone(),
                         )
@@ -4078,7 +4098,7 @@ impl Mono<'_> {
             let then_branch =
                 Expr::new(ExprKind::Seq(Box::new(keep), Box::new(incr)), span.clone());
             let drop_e = Expr::new(
-                ExprKind::Call("__filter_drop".to_string(), vec![id("$e")], false),
+                ExprKind::Call(Callee::FilterDrop, vec![id("$e")], false),
                 span.clone(),
             );
             let guarded = Expr::new(
@@ -4090,11 +4110,7 @@ impl Mono<'_> {
                 span.clone(),
             );
             let trunc = Expr::new(
-                ExprKind::Call(
-                    "__filter_truncate".to_string(),
-                    vec![id("$a"), id("$w")],
-                    false,
-                ),
+                ExprKind::Call(Callee::FilterTruncate, vec![id("$a"), id("$w")], false),
                 span.clone(),
             );
             let after = Expr::new(
@@ -4153,9 +4169,9 @@ impl Mono<'_> {
             } else {
                 Expr::new(
                     ExprKind::Call(
-                        "__builtin_with_capacity".to_string(),
+                        Callee::WithCapacity,
                         vec![Expr::new(
-                            ExprKind::Call("__builtin_len".to_string(), vec![id("$arr")], false),
+                            ExprKind::Call(Callee::Len, vec![id("$arr")], false),
                             span.clone(),
                         )],
                         false,
@@ -4198,7 +4214,10 @@ impl Mono<'_> {
             filter_name
         };
         Ok((
-            Expr::new(ExprKind::Call(mangled, call_args, false), span.clone()),
+            Expr::new(
+                ExprKind::Call(Callee::User(mangled), call_args, false),
+                span.clone(),
+            ),
             ret,
         ))
     }
@@ -4615,10 +4634,11 @@ impl Mono<'_> {
     /// Resolve the concrete return type of a non-generic call (builtin or user
     /// fn). Permissive: an unknown callee falls back to Unit — codegen issues
     /// the real "undefined fn"/missing-import diagnostic.
-    fn call_return(&self, name: &str, arg_tys: &[Type]) -> Type {
-        if let Some(t) = builtin_return(name, arg_tys) {
+    fn call_return(&self, callee: &Callee, arg_tys: &[Type]) -> Type {
+        if let Some(t) = builtin_return(callee, arg_tys) {
             return t;
         }
+        let name = callee.name();
         // A variant constructor `Ctor(..)` yields its variant type.
         if let Some(vn) = self.ctors.get(name) {
             return Type::Named(vn.clone());
@@ -5261,7 +5281,10 @@ impl Mono<'_> {
         let inst = self.instantiate_generic(&base, &type_args)?;
         let qualified = format!("{bare}@{inst}");
         Ok((
-            Expr::new(ExprKind::Call(qualified, rargs, false), span.clone()),
+            Expr::new(
+                ExprKind::Call(Callee::User(qualified), rargs, false),
+                span.clone(),
+            ),
             Type::Named(inst),
         ))
     }
@@ -5368,7 +5391,7 @@ impl Mono<'_> {
         !env.contains_key(name)
             && (self.concrete.contains_key(name)
                 || self.generics.contains_key(name)
-                || name.starts_with("__builtin_"))
+                || Callee::from_canonical(name).is_some_and(|c| c.is_builtin()))
     }
 
     /// `name` used as a function *value* — `xs.map(f)`, or `f` handed to a
@@ -5469,7 +5492,7 @@ impl Mono<'_> {
         self.concrete
             .get(name)
             .and_then(|f| f.return_ty.clone())
-            .or_else(|| builtin_return(name, arg_tys))
+            .or_else(|| builtin_return(&Callee::resolve(name.to_string()), arg_tys))
             .unwrap_or(Type::Unit)
     }
 
@@ -5954,7 +5977,7 @@ impl Mono<'_> {
                 if matches!(
                     (&val.kind, &lhs.kind),
                     (ExprKind::Call(f, cargs, true), ExprKind::Ident(name))
-                        if self.mutating.contains(f)
+                        if self.mutating.contains(f.name())
                             && matches!(cargs.first().map(|a| &a.kind), Some(ExprKind::Ident(t)) if t == name)
                 ) {
                     self.skip_mut_desugar = true;
@@ -6194,8 +6217,12 @@ impl Mono<'_> {
                     Type::Named(name.clone()),
                 )
             }
-            ExprKind::Call(name, args, method_style) => {
+            ExprKind::Call(callee, args, method_style) => {
                 let method_style = *method_style;
+                // The canonical name keys every table a callee is looked up in
+                // (`concrete`, `generics`, `mutating`, the env); the arms the
+                // monomorphizer lowers itself are matched on the callee.
+                let name = callee.name();
                 // A constructor of a generic variant (`OfInt(f)`): infer the
                 // instance from the argument types and rewrite to the instance-
                 // qualified constructor (`OfInt@Emit$Tok`) so codegen resolves the
@@ -6206,7 +6233,7 @@ impl Mono<'_> {
                 }
                 // Builtin `map`/`filter`: `map(arr, f)` and `arr.map(f)` fold to
                 // the same arg list `[arr, f]`, so one path serves both forms.
-                if name == "__builtin_map" {
+                if *callee == Callee::Map {
                     if args.len() != 2 {
                         return Err(Error::at(
                             format!(
@@ -6218,7 +6245,7 @@ impl Mono<'_> {
                     }
                     return self.expand_map(&args[0], &args[1], env, span.clone());
                 }
-                if name == "__builtin_filter" {
+                if *callee == Callee::Filter {
                     if args.len() != 2 {
                         return Err(Error::at(
                             format!(
@@ -6230,7 +6257,7 @@ impl Mono<'_> {
                     }
                     return self.expand_filter(&args[0], &args[1], env, span.clone());
                 }
-                if name == "__builtin_filter_map" {
+                if *callee == Callee::FilterMap {
                     if args.len() != 3 {
                         return Err(Error::at(
                             format!(
@@ -6243,7 +6270,7 @@ impl Mono<'_> {
                     }
                     return self.expand_filter_map(&args[0], &args[1], &args[2], env, span.clone());
                 }
-                if name == "__builtin_zip_with" {
+                if *callee == Callee::ZipWith {
                     if args.len() != 3 {
                         return Err(Error::at(
                             format!(
@@ -6274,7 +6301,10 @@ impl Mono<'_> {
                         // all three. (Captures aren't part of the builtin's args.)
                         let ret = self.ref_return(&lb.fn_name, &atys);
                         rargs.extend(lb.captures);
-                        return Ok((node(ExprKind::Call(lb.fn_name, rargs, false)), ret));
+                        return Ok((
+                            node(ExprKind::Call(Callee::resolve(lb.fn_name), rargs, false)),
+                            ret,
+                        ));
                     }
                     // A call through a *runtime function value* held in a local
                     // (`let f = inc; f(5)`): the callee isn't known here (unlike
@@ -6287,7 +6317,7 @@ impl Mono<'_> {
                             .iter()
                             .map(|a| self.infer(a, env).map(|(ra, _)| ra))
                             .collect::<Result<Vec<_>, _>>()?;
-                        return Ok((node(ExprKind::Call(name.clone(), rargs, false)), *ret));
+                        return Ok((node(ExprKind::Call(callee.clone(), rargs, false)), *ret));
                     }
                 }
                 // A mutating call used as a *value* (not the RHS of an in-place
@@ -6314,7 +6344,7 @@ impl Mono<'_> {
                         let mut margs = Vec::with_capacity(args.len());
                         margs.push(recv());
                         margs.extend(args[1..].iter().cloned());
-                        let method = node(ExprKind::Call(name.clone(), margs, true));
+                        let method = node(ExprKind::Call(callee.clone(), margs, true));
                         // `set __mut_copy$k.foo(rest..); __mut_copy$k`
                         let set = node(ExprKind::Assign(
                             Box::new(node(ExprKind::Ident(tmp.clone()))),
@@ -6417,7 +6447,10 @@ impl Mono<'_> {
                         return Ok((node(ExprKind::Num(v)), ret));
                     }
                     let mangled = self.enqueue_full(name, ParamSpecs { type_args, params });
-                    (node(ExprKind::Call(mangled, rargs, method_style)), ret)
+                    (
+                        node(ExprKind::Call(Callee::User(mangled), rargs, method_style)),
+                        ret,
+                    )
                 } else if self.concrete.contains_key(name) {
                     // A function-typed parameter must be supplied with a lambda,
                     // a named function, or a forwarded function parameter (all of
@@ -6486,15 +6519,18 @@ impl Mono<'_> {
                             params,
                         },
                     );
-                    let ret = self.call_return(name, &atys);
-                    (node(ExprKind::Call(mangled, rargs, method_style)), ret)
+                    let ret = self.call_return(callee, &atys);
+                    (
+                        node(ExprKind::Call(Callee::User(mangled), rargs, method_style)),
+                        ret,
+                    )
                 } else if matches!(
-                    name.as_str(),
-                    "__builtin_wrapping_add"
-                        | "__builtin_saturating_add"
-                        | "__builtin_wrapping_sub"
-                        | "__builtin_saturating_sub"
-                        | "__builtin_wrapping_mul"
+                    callee,
+                    Callee::WrappingAdd
+                        | Callee::SaturatingAdd
+                        | Callee::WrappingSub
+                        | Callee::SaturatingSub
+                        | Callee::WrappingMul
                 ) && atys.len() == 2
                 {
                     // `+`/`-` resolved to an integer arithmetic builtin
@@ -6510,9 +6546,12 @@ impl Mono<'_> {
                     } else {
                         Type::Primitive(Primitive::I64)
                     };
-                    (node(ExprKind::Call(name.clone(), rargs, method_style)), ret)
+                    (
+                        node(ExprKind::Call(callee.clone(), rargs, method_style)),
+                        ret,
+                    )
                 } else if let Some(op) =
-                    aipl_syntax::binop_for_builtin(name).filter(|_| atys.len() == 2)
+                    aipl_syntax::binop_for_builtin(callee).filter(|_| atys.len() == 2)
                 {
                     // The rest of the operators, resolved to their canonical impl.
                     // The result type is the operator's, so this mirrors the
@@ -6530,12 +6569,15 @@ impl Mono<'_> {
                         BinOp::Div | BinOp::Rem => Type::Primitive(Primitive::I64),
                         _ => Type::Primitive(Primitive::Bool),
                     };
-                    (node(ExprKind::Call(name.clone(), rargs, method_style)), ret)
+                    (
+                        node(ExprKind::Call(callee.clone(), rargs, method_style)),
+                        ret,
+                    )
                 } else if (matches!(
-                    name.as_str(),
-                    "__builtin_starts_with" | "__builtin_ends_with" | "__builtin_contains"
+                    callee,
+                    Callee::StartsWith(_) | Callee::EndsWith(_) | Callee::Contains(_)
                 ) && atys.len() == 2)
-                    || (name.as_str() == "__builtin_starts_with_at" && atys.len() == 3)
+                    || (matches!(callee, Callee::StartsWithAt(_)) && atys.len() == 3)
                 {
                     // The variadic pattern of
                     // `starts_with`/`starts_with_at`/`ends_with`/`contains` is
@@ -6549,14 +6591,10 @@ impl Mono<'_> {
                     } else {
                         atys[0].clone()
                     };
-                    let resolved = match variadic_shape(&atys[1], &seq_ty) {
-                        VShape::Seq => name.clone(),
-                        VShape::Elem => format!("{name}$ve"),
-                        VShape::Opt => format!("{name}$vo"),
-                    };
-                    let ret = self.call_return(name, &atys);
+                    let resolved = callee.with_seq_shape(variadic_shape(&atys[1], &seq_ty));
+                    let ret = self.call_return(callee, &atys);
                     (node(ExprKind::Call(resolved, rargs, method_style)), ret)
-                } else if !name.starts_with("__builtin_")
+                } else if !callee.is_builtin()
                     && atys
                         .first()
                         .and_then(|t| self.fn_field_ret(t, name))
@@ -6580,8 +6618,8 @@ impl Mono<'_> {
                     let mut it = rargs.into_iter();
                     let recv = it.next().expect("call through a field has a receiver");
                     let rest: Vec<Expr> = it.collect();
-                    let field = node(ExprKind::Field(Box::new(recv), name.clone()));
-                    let call = node(ExprKind::Call(tmp.clone(), rest, false));
+                    let field = node(ExprKind::Field(Box::new(recv), name.to_string()));
+                    let call = node(ExprKind::Call(Callee::User(tmp.clone()), rest, false));
                     (
                         node(ExprKind::Let(tmp, None, Box::new(field), Box::new(call))),
                         ret,
@@ -6589,8 +6627,11 @@ impl Mono<'_> {
                 } else {
                     // Builtin (`push`, `len`, …) or undefined (codegen reports
                     // the latter).
-                    let ret = self.call_return(name, &atys);
-                    (node(ExprKind::Call(name.clone(), rargs, method_style)), ret)
+                    let ret = self.call_return(callee, &atys);
+                    (
+                        node(ExprKind::Call(callee.clone(), rargs, method_style)),
+                        ret,
+                    )
                 }
             }
         };
@@ -6803,69 +6844,51 @@ fn pseudo_marker(param_ty: &Type, arg_ty: &Type, v: &str) -> Option<Type> {
 /// otherwise rebuilds the workspace once per file.
 const BUILTIN_SRC_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
 
-const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
-    ("__builtin_all", "builtin_all.aipl"),
-    ("__builtin_sort_by", "builtin_sort_by.aipl"),
-    ("__builtin_any", "builtin_any.aipl"),
-    ("__builtin_left_fold", "builtin_left_fold.aipl"),
-    ("__builtin_right_fold", "builtin_right_fold.aipl"),
-    ("__builtin_opt_left_fold", "builtin_opt_left_fold.aipl"),
-    ("__builtin_opt_right_fold", "builtin_opt_right_fold.aipl"),
-    ("__builtin_count", "builtin_count.aipl"),
-    ("__builtin_count_while", "builtin_count_while.aipl"),
-    ("__builtin_count_if", "builtin_count_if.aipl"),
-    ("__builtin_find_if", "builtin_find_if.aipl"),
-    ("__builtin_map_find_if", "builtin_map_find_if.aipl"),
-    ("__builtin_map_join", "builtin_map_join.aipl"),
-    ("__builtin_find_map", "builtin_find_map.aipl"),
+const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
+    (Callee::All, "builtin_all.aipl"),
+    (Callee::SortBy, "builtin_sort_by.aipl"),
+    (Callee::Any, "builtin_any.aipl"),
+    (Callee::LeftFold, "builtin_left_fold.aipl"),
+    (Callee::RightFold, "builtin_right_fold.aipl"),
+    (Callee::OptLeftFold, "builtin_opt_left_fold.aipl"),
+    (Callee::OptRightFold, "builtin_opt_right_fold.aipl"),
+    (Callee::Count, "builtin_count.aipl"),
+    (Callee::CountWhile, "builtin_count_while.aipl"),
+    (Callee::CountIf, "builtin_count_if.aipl"),
+    (Callee::FindIf, "builtin_find_if.aipl"),
+    (Callee::MapFindIf, "builtin_map_find_if.aipl"),
+    (Callee::MapJoin, "builtin_map_join.aipl"),
+    (Callee::FindMap, "builtin_find_map.aipl"),
+    (Callee::ReverseFindMap, "builtin_reverse_find_map.aipl"),
+    (Callee::FindIndex, "builtin_find_index.aipl"),
+    (Callee::UnionAll, "builtin_union_all.aipl"),
+    (Callee::IsAllWhitespace, "builtin_is_all_whitespace.aipl"),
+    (Callee::IsErrAnd, "builtin_is_err_and.aipl"),
+    (Callee::IsSomeAnd, "builtin_is_some_and.aipl"),
+    (Callee::Intersperse, "builtin_intersperse.aipl"),
+    (Callee::TupleWindows, "builtin_tuple_windows.aipl"),
+    (Callee::CountIsLessThan, "builtin_count_is_less_than.aipl"),
+    (Callee::CountIsAtMost, "builtin_count_is_at_most.aipl"),
     (
-        "__builtin_reverse_find_map",
-        "builtin_reverse_find_map.aipl",
-    ),
-    ("__builtin_find_index", "builtin_find_index.aipl"),
-    ("__builtin_union_all", "builtin_union_all.aipl"),
-    (
-        "__builtin_is_all_whitespace",
-        "builtin_is_all_whitespace.aipl",
-    ),
-    ("__builtin_is_err_and", "builtin_is_err_and.aipl"),
-    ("__builtin_is_some_and", "builtin_is_some_and.aipl"),
-    ("__builtin_intersperse", "builtin_intersperse.aipl"),
-    ("__builtin_tuple_windows", "builtin_tuple_windows.aipl"),
-    (
-        "__builtin_count_is_less_than",
-        "builtin_count_is_less_than.aipl",
-    ),
-    (
-        "__builtin_count_is_at_most",
-        "builtin_count_is_at_most.aipl",
-    ),
-    (
-        "__builtin_count_is_greater_than",
+        Callee::CountIsGreaterThan,
         "builtin_count_is_greater_than.aipl",
     ),
-    (
-        "__builtin_count_is_at_least",
-        "builtin_count_is_at_least.aipl",
-    ),
-    ("__builtin_count_is_equal", "builtin_count_is_equal.aipl"),
-    (
-        "__builtin_count_is_not_equal",
-        "builtin_count_is_not_equal.aipl",
-    ),
-    ("__builtin_first", "builtin_first.aipl"),
-    ("__builtin_last", "builtin_last.aipl"),
-    ("__builtin_drop_first", "builtin_drop_first.aipl"),
-    ("__builtin_drop_last", "builtin_drop_last.aipl"),
-    ("__builtin_drop_n", "builtin_drop_n.aipl"),
-    ("__builtin_drop_last_n", "builtin_drop_last_n.aipl"),
-    ("__builtin_map_err", "builtin_map_err.aipl"),
-    ("__builtin_map_ok", "builtin_map_ok.aipl"),
-    ("__builtin_try_map", "builtin_try_map.aipl"),
-    ("__builtin_int_parse", "builtin_int_parse.aipl"),
-    ("__builtin_trim_while", "builtin_trim_while.aipl"),
-    ("__builtin_value_or", "builtin_value_or.aipl"),
-    ("__builtin_value_or_err", "builtin_value_or_err.aipl"),
+    (Callee::CountIsAtLeast, "builtin_count_is_at_least.aipl"),
+    (Callee::CountIsEqual, "builtin_count_is_equal.aipl"),
+    (Callee::CountIsNotEqual, "builtin_count_is_not_equal.aipl"),
+    (Callee::First, "builtin_first.aipl"),
+    (Callee::Last, "builtin_last.aipl"),
+    (Callee::DropFirst, "builtin_drop_first.aipl"),
+    (Callee::DropLast, "builtin_drop_last.aipl"),
+    (Callee::DropN, "builtin_drop_n.aipl"),
+    (Callee::DropLastN, "builtin_drop_last_n.aipl"),
+    (Callee::MapErr, "builtin_map_err.aipl"),
+    (Callee::MapOk, "builtin_map_ok.aipl"),
+    (Callee::TryMap, "builtin_try_map.aipl"),
+    (Callee::IntParse, "builtin_int_parse.aipl"),
+    (Callee::TrimWhile, "builtin_trim_while.aipl"),
+    (Callee::ValueOr, "builtin_value_or.aipl"),
+    (Callee::ValueOrErr, "builtin_value_or_err.aipl"),
 ];
 
 /// One [`AIPL_BUILTIN_SOURCES`] entry's `pub fn`, loaded through the real
@@ -6925,7 +6948,7 @@ fn aipl_builtin_slots() -> &'static HashMap<&'static str, (&'static str, OnceLoc
     SLOTS.get_or_init(|| {
         AIPL_BUILTIN_SOURCES
             .iter()
-            .map(|(canonical, src)| (*canonical, (*src, OnceLock::new())))
+            .map(|(canonical, src)| (canonical.name(), (*src, OnceLock::new())))
             .collect()
     })
 }
@@ -6971,10 +6994,11 @@ pub fn aipl_builtin_demand(program: &Program) -> BTreeSet<&'static str> {
     /// collects the newly-seen ones, whose own bodies still need scanning.
     fn discover(e: &Expr, needed: &mut BTreeSet<&'static str>, pending: &mut Vec<&'static str>) {
         let name = match &e.kind {
-            ExprKind::Call(name, _, _) | ExprKind::Ident(name) => name,
+            ExprKind::Call(name, _, _) => name.name(),
+            ExprKind::Ident(name) => name,
             _ => return,
         };
-        if let Some((canonical, _)) = aipl_builtin_slots().get_key_value(name.as_str()) {
+        if let Some((canonical, _)) = aipl_builtin_slots().get_key_value(name) {
             if needed.insert(canonical) {
                 pending.push(canonical);
             }
@@ -7190,32 +7214,28 @@ fn declared_builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
     })
 }
 
-/// Return type of a builtin call, or `None` if `name` isn't a builtin. Most
+/// Return type of a builtin call, or `None` if `callee` isn't a builtin. Most
 /// builtins substitute directly from their [`aipl_syntax::BUILTIN_SIGNATURES`]
 /// declaration via [`declared_builtin_return`]; the cases here are the ones
 /// where mono's own inference genuinely diverges from that signature (a
-/// different result than the declared one, or a synthetic/internal name not
+/// different result than the declared one, or a synthetic/internal callee not
 /// declared there at all).
-fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
-    // Integer conversion builtins `i8(x)`/`u32(x)`/… yield the named width.
-    if let Some(p) = Primitive::from_name(name).filter(|p| p.is_int()) {
-        return Some(Type::Primitive(p));
-    }
-    match name {
+fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
+    match callee {
         // Internal: an empty array reserved to a given capacity (`map`'s output).
         // Untyped element (`__none__`) like `[]`; refined by the first `push`.
-        "__builtin_with_capacity" => return Some(Type::Array(Box::new(Type::NoneInner))),
+        Callee::WithCapacity => return Some(Type::Array(Box::new(Type::NoneInner))),
         // Declared void (it's a statement); mono needs an `i64` value for the
         // expression it emits (see the `expr`-position uses of `print`).
-        "__builtin_print" => return Some(Type::Primitive(Primitive::I64)),
+        Callee::Print => return Some(Type::Primitive(Primitive::I64)),
         // Internal: a single `char` to a one-char `str`, emitted by variadic
         // `char*` specialization (see `specialize_variadic`).
-        "__char_to_str" => return Some(Type::Primitive(Primitive::Str)),
+        Callee::CharToStr => return Some(Type::Primitive(Primitive::Str)),
         // `xs.reverse() -> T[]` / `s.reverse() -> str` — same type as the input.
         // The declared signature is `T[] -> T[]`; a `str` receiver (which
         // `collect_bindings`-style unification would bind as `char[]`) instead
         // dispatches to a `str` result, so this stays hand-written.
-        "__builtin_reverse" => {
+        Callee::Reverse => {
             return Some(match arg_tys.first() {
                 Some(t) if is_str_repr(t) => Type::Primitive(Primitive::Str),
                 Some(Type::Array(inner)) => Type::Array(inner.clone()),
@@ -7225,7 +7245,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         // some(x) wraps the value's type. Not expressible via plain signature
         // substitution: a concat-str argument must decay to plain `str` before
         // it's wrapped (see `decay_concat`).
-        "some" => {
+        Callee::Some => {
             return Some(Type::Optional(Box::new(decay_concat(
                 arg_tys
                     .first()
@@ -7238,13 +7258,13 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         // With an arg, `ok(x)` pins the Ok type to `x`; with none, `ok()` is the
         // void success of a `!E` result (Ok side is unit). Not declared in
         // `BUILTIN_SIGNATURES` (the checker special-cases them the same way).
-        "ok" => {
+        Callee::Ok => {
             return Some(Type::Result(
                 Box::new(decay_concat(arg_tys.first().cloned().unwrap_or(Type::Unit))),
                 Box::new(Type::NoneInner),
             ))
         }
-        "err" => {
+        Callee::Err => {
             return Some(Type::Result(
                 Box::new(Type::NoneInner),
                 Box::new(decay_concat(
@@ -7257,7 +7277,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         }
         // `xs.to_set()`: the set whose order the use site decides (see
         // `SetOrder::Context`), of the array's element type.
-        "__builtin_to_set" => {
+        Callee::ToSet => {
             return Some(match arg_tys.first() {
                 Some(Type::Array(inner)) => {
                     Type::Set(inner.clone(), aipl_syntax::ast::SetOrder::Context)
@@ -7270,7 +7290,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         }
         // `for (let v : xs.reverse())`'s iterable after fusion: `xs` itself,
         // walked backwards by codegen — so its type is `xs`'s.
-        REVERSE_ITER => {
+        Callee::ReverseIter => {
             return Some(
                 arg_tys
                     .first()
@@ -7280,7 +7300,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         }
         // Internal: the moved-in array as a writable block (see `writable`) —
         // the same array, typed as itself.
-        "__arr_writable" => {
+        Callee::ArrWritable => {
             return Some(
                 arg_tys
                     .first()
@@ -7289,13 +7309,15 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
             )
         }
         // Internal in-place-filter intrinsics (statements; see `expand_filter`).
-        "__filter_keep" | "__filter_drop" | "__filter_truncate" => return Some(Type::Unit),
+        Callee::FilterKeep | Callee::FilterDrop | Callee::FilterTruncate => {
+            return Some(Type::Unit)
+        }
         // Internal in-place-map intrinsic (a statement; see `expand_map`).
-        "__map_set" => return Some(Type::Unit),
+        Callee::MapSet => return Some(Type::Unit),
         // Internal: reinterpret the reused buffer as the result element type.
         // Its real result type is fixed by codegen (the enclosing fn's return);
         // here it just borrows the input array type so mono inference proceeds.
-        "__map_result" => {
+        Callee::MapResult => {
             return Some(
                 arg_tys
                     .first()
@@ -7305,7 +7327,7 @@ fn builtin_return(name: &str, arg_tys: &[Type]) -> Option<Type> {
         }
         _ => {}
     }
-    declared_builtin_return(name, arg_tys)
+    declared_builtin_return(callee.name(), arg_tys)
 }
 
 /// Merge two branch/arm types, applying the same `none`/empty-array coercions
@@ -8068,8 +8090,8 @@ fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String
             }
         }
         ExprKind::Call(name, args, _) => {
-            if !bound.contains(name) {
-                *counts.entry(name.clone()).or_insert(0) += 1;
+            if !bound.contains(name.name()) {
+                *counts.entry(name.name().to_string()).or_insert(0) += 1;
             }
             for a in args {
                 count_uses(a, bound, counts);
@@ -8916,13 +8938,13 @@ fn contains_early_exit(e: &Expr) -> bool {
 fn contains_inplace_hof_intrinsic(e: &Expr) -> bool {
     if let ExprKind::Call(name, _, _) = &e.kind {
         if matches!(
-            name.as_str(),
-            "__arr_writable"
-                | "__map_set"
-                | "__map_result"
-                | "__filter_drop"
-                | "__filter_keep"
-                | "__filter_truncate"
+            name,
+            Callee::ArrWritable
+                | Callee::MapSet
+                | Callee::MapResult
+                | Callee::FilterDrop
+                | Callee::FilterKeep
+                | Callee::FilterTruncate
         ) {
             return true;
         }
@@ -9234,8 +9256,14 @@ pub(crate) fn rename_params(e: &Expr, map: &HashMap<String, String>) -> Expr {
             Box::new(rename_params(body, map)),
         ),
         ExprKind::Ident(n) => ExprKind::Ident(sub(n)),
+        // Only a name can be a renamed parameter: a call through one is a
+        // `User` callee, and every other arm names a function the compiler
+        // knows, which no parameter can shadow.
         ExprKind::Call(name, args, m) => ExprKind::Call(
-            sub(name),
+            match name {
+                Callee::User(n) => Callee::User(sub(n)),
+                known => known.clone(),
+            },
             args.iter().map(|a| rename_params(a, map)).collect(),
             *m,
         ),
@@ -9401,7 +9429,7 @@ fn is_heap_concrete(t: &ConcreteType) -> bool {
 fn writable(param: &str, span: &Span) -> Expr {
     Expr::new(
         ExprKind::Call(
-            "__arr_writable".to_string(),
+            Callee::ArrWritable,
             vec![Expr::new(ExprKind::Ident(param.to_string()), span.clone())],
             false,
         ),
@@ -9637,7 +9665,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
             // `__map_result($a)` hands the (reused) array back as the function
             // result — in tail position that's a move-out, exactly like a bare
             // trailing `$a`, so it doesn't alias the binding.
-            if fname == "__map_result" {
+            if *fname == Callee::MapResult {
                 return args.iter().any(|a| if is_n(a) { !tail } else { rec(a) });
             }
             // An operator, resolved to its canonical impl. Its operands are read,
@@ -9648,7 +9676,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
             // every comparison against an exclusive binding would look like the
             // binding escaping into a call, silently switching `push` off its
             // in-place path.
-            if aipl_syntax::binop_for_builtin(fname).is_some() || fname == "__builtin_logical_not" {
+            if aipl_syntax::binop_for_builtin(fname).is_some() || *fname == Callee::LogicalNot {
                 return args.iter().any(|a| !is_n(a) && rec(a));
             }
             if *method_style {
@@ -9657,15 +9685,12 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                 // method, or any *non-receiver* arg that is `name`, aliases it.
                 let recv = &args[0];
                 let recv_bad = if is_n(recv) {
-                    match fname.as_str() {
+                    match fname {
                         // A mutating builtin updates its receiver in place
                         // rather than aliasing it — safe unless we're iterating
                         // that very binding.
-                        f if builtin_is_mutating(f) => iterating,
-                        "__builtin_len"
-                        | "__builtin_is_nonempty"
-                        | "__builtin_to_str"
-                        | "__builtin_trim" => false,
+                        f if builtin_is_mutating(f.name()) => iterating,
+                        Callee::Len | Callee::IsNonempty | Callee::ToStr | Callee::Trim => false,
                         _ => !tail,
                     }
                 } else {
@@ -9677,19 +9702,19 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                         .any(|a| if is_n(a) { !tail } else { rec_tail(a) })
             } else {
                 let consuming = matches!(
-                    fname.as_str(),
-                    "__builtin_len"
-                        | "__builtin_is_nonempty"
-                        | "__builtin_to_str"
-                        | "__builtin_print"
-                        | "__builtin_trim"
+                    fname,
+                    Callee::Len
+                        | Callee::IsNonempty
+                        | Callee::ToStr
+                        | Callee::Print
+                        | Callee::Trim
                         // In-place-filter/map intrinsics mutate the array in place
                         // without aliasing it (see `expand_filter`/`expand_map`/
                         // `expand_filter_map`), so they don't disqualify the array
                         // binding from being exclusive.
-                        | "__filter_keep"
-                        | "__filter_truncate"
-                        | "__map_set"
+                        | Callee::FilterKeep
+                        | Callee::FilterTruncate
+                        | Callee::MapSet
                 );
                 args.iter().any(|a| {
                     if is_n(a) {
@@ -9748,9 +9773,8 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     }
                     // `set a = a.trim()` / `set a = trim(a)` both fold to the
                     // same arg list `[a]`, so one pattern covers both forms.
-                    ExprKind::Call(f, cargs, _)
-                        if f == "__builtin_trim"
-                            && cargs.len() == 1
+                    ExprKind::Call(Callee::Trim, cargs, _)
+                        if cargs.len() == 1
                             && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name) =>
                     {
                         iterating
@@ -9759,9 +9783,8 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     // allocation in place — safe unless we're iterating `a`, or
                     // the other operand aliases `a` (it's read while `a` grows).
                     // Both forms fold to `[a, b]`.
-                    ExprKind::Call(f, cargs, _)
-                        if f == "__builtin_union"
-                            && cargs.len() == 2
+                    ExprKind::Call(Callee::Union, cargs, _)
+                        if cargs.len() == 2
                             && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name) =>
                     {
                         iterating || rec(&cargs[1])
@@ -9773,7 +9796,7 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     // mutation through the in-place path (a per-iteration copy in
                     // a loop would free the live buffer — see `set self = out`).
                     ExprKind::Call(f, cargs, _)
-                        if builtin_is_mutating(f)
+                        if builtin_is_mutating(f.name())
                             && !cargs.is_empty()
                             && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name) =>
                     {
@@ -10125,7 +10148,7 @@ impl MatchTree<'_, '_> {
                         _ => unreachable!("only literals are collected"),
                     };
                     let test = op_call(
-                        "__builtin_equal",
+                        Callee::Equal,
                         vec![self.ident(&var), Expr::new(value, self.span.clone())],
                         self.span.clone(),
                     );

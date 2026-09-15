@@ -17,7 +17,7 @@
 
 use std::path::Path;
 
-use aipl_syntax::ast::{Expr, ExprKind, Item, Program};
+use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, Program};
 use aipl_syntax::{Error, Span};
 
 /// The delimiter a [`LexedTokenKind::StrLit`] was written with — the mirror of
@@ -673,7 +673,7 @@ fn bake_asserts(e: &mut Expr, src: &str) {
                 ExprKind::Str(assert_loc(src, cond.span.clone())),
                 cond.span.clone(),
             );
-            e.kind = ExprKind::Call("__assert".to_string(), vec![cond, loc], false);
+            e.kind = ExprKind::Call(Callee::Assert, vec![cond, loc], false);
             return;
         }
     }

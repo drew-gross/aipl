@@ -39,8 +39,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
 use aipl_syntax::ast::{
-    Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Param, Program, Signature,
-    Type, VariantCase, VariantDecl,
+    Callee, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Param, Program,
+    Signature, Type, VariantCase, VariantDecl,
 };
 use aipl_syntax::{Error, Span};
 
@@ -606,25 +606,18 @@ impl Expander {
                 continue;
             };
             let len = Expr::new(
-                ExprKind::Call("__builtin_len".to_string(), vec![(**inner).clone()], true),
+                ExprKind::Call(Callee::Len, vec![(**inner).clone()], true),
                 elem.span.clone(),
             );
             extra = Expr::new(
-                ExprKind::Call(
-                    "__builtin_wrapping_add".to_string(),
-                    vec![extra, len],
-                    false,
-                ),
+                ExprKind::Call(Callee::WrappingAdd, vec![extra, len], false),
                 elem.span.clone(),
             );
         }
 
         // `set <acc> = <intrinsic>(<acc>, <arg>);` then `rest`.
-        let step = |f: &str, arg: Expr, rest: Expr, span: &Span| {
-            let call = Expr::new(
-                ExprKind::Call(f.to_string(), vec![acc_ref(), arg], false),
-                span.clone(),
-            );
+        let step = |f: Callee, arg: Expr, rest: Expr, span: &Span| {
+            let call = Expr::new(ExprKind::Call(f, vec![acc_ref(), arg], false), span.clone());
             Expr::new(
                 ExprKind::Assign(Box::new(acc_ref()), Box::new(call), Box::new(rest)),
                 span.clone(),
@@ -635,14 +628,12 @@ impl Expander {
         let body = rest.iter().rev().fold(acc_ref(), |rest, elem| {
             let espan = &elem.span;
             match &elem.kind {
-                ExprKind::Spread(inner) => {
-                    step("__aipl_arr_concat", (**inner).clone(), rest, espan)
-                }
-                _ => step("__aipl_arr_append", elem.clone(), rest, espan),
+                ExprKind::Spread(inner) => step(Callee::ArrConcat, (**inner).clone(), rest, espan),
+                _ => step(Callee::ArrAppend, elem.clone(), rest, espan),
             }
         });
         let reserved = Expr::new(
-            ExprKind::Call("__aipl_arr_reserve".to_string(), vec![seed, extra], false),
+            ExprKind::Call(Callee::ArrReserve, vec![seed, extra], false),
             span.clone(),
         );
         ExprKind::LetMut(acc, None, Box::new(reserved), Box::new(body))
@@ -672,8 +663,9 @@ impl Expander {
     /// An AIPL-implemented builtin is looked up through
     /// [`AIPL_BUILTIN_SIG_HOOK`] on first sight and remembered — including a
     /// miss, so the hook runs once per name.
-    fn info(&mut self, name: &str) -> Result<Option<&FnKwInfo>, Error> {
-        if !self.fns.contains_key(name) && name.starts_with("__builtin_") {
+    fn info(&mut self, callee: &Callee) -> Result<Option<&FnKwInfo>, Error> {
+        let name = callee.name();
+        if !self.fns.contains_key(name) && callee.is_builtin() {
             if let Some(sig) = AIPL_BUILTIN_SIG_HOOK.get().and_then(|hook| hook(name)) {
                 let info = FnKwInfo::from_sig(name, &sig)?;
                 self.fns.insert(name.to_string(), info);
@@ -740,10 +732,11 @@ impl Expander {
     /// unless a spliced default reads a parameter.
     fn expand_call_args(
         &mut self,
-        name: &str,
+        callee: &Callee,
         args: Vec<Expr>,
         span: &Span,
     ) -> Result<(Vec<Expr>, Vec<(String, Option<Type>, Expr)>), Error> {
+        let name = callee.name();
         // Split the positional prefix from the keyword tail, rejecting a
         // positional argument after a keyword one.
         let mut positional: Vec<Expr> = Vec::new();
@@ -764,7 +757,7 @@ impl Expander {
         // A callee without keyword parameters (including builtins, variant
         // constructors, and anything else not resolvable to a user function)
         // takes no keyword arguments; leave its (all-positional) call alone.
-        let info = match self.info(name)? {
+        let info = match self.info(callee)? {
             Some(info) if !info.kw.is_empty() => info,
             found => {
                 if let Some((k, _, kspan, _)) = by_kw.first() {
@@ -882,7 +875,7 @@ impl Expander {
                 }
                 // The mistake a reader of the old spelling makes. Left alone it
                 // wraps to `T??` and reports a type nobody wrote.
-                if matches!(&v.kind, ExprKind::Call(f, a, _) if f == "some" && a.len() == 1) {
+                if matches!(&v.kind, ExprKind::Call(Callee::Some, a, _) if a.len() == 1) {
                     return Err(Error::at(
                         format!(
                             "{}: keyword argument {k:?} takes the value itself, not an \
@@ -893,7 +886,7 @@ impl Expander {
                     ));
                 }
                 let span = v.span.clone();
-                Expr::new(ExprKind::Call("some".to_string(), vec![v], false), span)
+                Expr::new(ExprKind::Call(Callee::Some, vec![v], false), span)
             } else {
                 v
             });
@@ -1022,7 +1015,9 @@ impl Expander {
             // function type has no keyword parameters, so reject it.
             ExprKind::Ident(name) => {
                 if !locals.contains(name)
-                    && self.info(name)?.is_some_and(|info| !info.kw.is_empty())
+                    && self
+                        .info(&Callee::resolve(name.clone()))?
+                        .is_some_and(|info| !info.kw.is_empty())
                 {
                     return Err(Error::at(
                         format!(
@@ -1059,14 +1054,15 @@ impl Expander {
                         _ => self.expand_expr(a, locals),
                     })
                     .collect::<Result<_, _>>()?;
-                if locals.contains(name) {
+                if name.user().is_some_and(|n| locals.contains(n)) {
                     // A call through a function-typed local: function types
                     // have no keyword parameters.
                     if let Some(kw) = args.iter().find(|a| matches!(a.kind, ExprKind::KwArg(..))) {
                         return Err(Error::at(
                             format!(
-                                "{name:?} is a function value, and a function value takes no \
-                                 keyword arguments"
+                                "{:?} is a function value, and a function value takes no \
+                                 keyword arguments",
+                                name.name()
                             ),
                             kw.span.clone(),
                         ));

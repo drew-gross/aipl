@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind};
+use crate::ast::{Callee, Expr, ExprKind};
 use crate::Error;
 
 use super::{imported_as, lone_stmt, spans_its_text};
@@ -68,7 +68,7 @@ pub(super) fn return_loop_find_if(
     let ExprKind::Call(some, args, _) = &value.kind else {
         return;
     };
-    if some != "some" || args.len() != 1 {
+    if *some != Callee::Some || args.len() != 1 {
         return;
     }
     if !matches!(&args[0].kind, ExprKind::Ident(n) if n == var) {

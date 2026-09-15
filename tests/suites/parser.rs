@@ -1,8 +1,8 @@
 //! Integration tests for the parser.
 
 use aipl::ast::{
-    BinOp, Bound, Expr, ExprKind, FieldDecl, FieldInit, ImportSource, Item, MatchArm, Param,
-    Primitive, Program, StructDecl, Type, TypeParam,
+    BinOp, Bound, Callee, Expr, ExprKind, FieldDecl, FieldInit, ImportSource, Item, MatchArm,
+    Param, Primitive, Program, StructDecl, Type, TypeParam,
 };
 /// Parse, first installing the (idempotent) parser hooks the dogfooded
 /// section-header / raw-string helpers require — there's no native fallback.
@@ -45,7 +45,7 @@ fn ident(s: &str) -> Expr {
 /// spelling, and the operands are the arguments.
 fn binop(l: Expr, op: BinOp, r: Expr) -> Expr {
     dummy(ExprKind::Call(
-        aipl_syntax::binop_spelling(op).into(),
+        Callee::User(aipl_syntax::binop_spelling(op).into()),
         vec![l, r],
         false,
     ))
@@ -56,11 +56,14 @@ fn neg(e: Expr) -> Expr {
 }
 
 fn not(e: Expr) -> Expr {
-    dummy(ExprKind::Call("!".into(), vec![e], false))
+    dummy(ExprKind::Call(Callee::User("!".into()), vec![e], false))
 }
 
+/// A call as the parser builds it: every source-spelled callee is a `User`
+/// until the loader resolves it (`some` and the template intrinsics are the
+/// exceptions, and are resolved by `Callee::resolve` at decode).
 fn call(name: &str, args: Vec<Expr>) -> Expr {
-    dummy(ExprKind::Call(name.into(), args, false))
+    dummy(ExprKind::Call(Callee::resolve(name.into()), args, false))
 }
 
 fn construct(name: &str, fields: Vec<FieldInit>) -> Expr {

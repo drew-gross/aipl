@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{Callee, Expr, ExprKind, ImportSource, Item, Program};
 use crate::Error;
 
 /// A step of one written the long way — `set x = x + 1;`, `set x += 1;`, and
@@ -33,7 +33,7 @@ pub(super) fn step_by_one(e: &Expr, steps: &Steps, hits: &mut Vec<Error>) {
     let [l, r] = args.as_slice() else {
         return;
     };
-    let Some(step) = steps.get(written) else {
+    let Some(step) = steps.get(written.name()) else {
         return;
     };
     let is_one = |e: &Expr| matches!(e.kind, ExprKind::Num(1));
@@ -127,7 +127,7 @@ pub(super) fn matching_steps(program: &Program) -> Steps {
     // What each operator spelling's import resolves to: `None` for unbound, and
     // `Some(None)` for a binding that isn't an operator builtin at all (a user
     // function), which no step flavor can match.
-    let mut bound: Vec<(&str, Option<&'static str>)> = Vec::new();
+    let mut bound: Vec<(&str, Option<&'static Callee>)> = Vec::new();
     for item in &program.items {
         let Item::Import(decl) = item else {
             continue;

@@ -67,21 +67,16 @@
 
 use std::collections::{HashMap, HashSet};
 
-use aipl_syntax::ast::{Expr, ExprKind, MatchArm, Pattern};
+use aipl_syntax::ast::{Callee, Expr, ExprKind, MatchArm, Pattern};
 
 use crate::sink::can_defer;
 use crate::subst::{assigned_names, read_names};
-
-/// The iterable a `for` over `xs.reverse()` is rewritten to: `xs`, marked for
-/// codegen to walk backwards. An internal name (no user identifier can spell
-/// it) that appears only as a `for`'s iterable.
-pub const REVERSE_ITER: &str = "__reverse_iter";
 
 /// One fusable loop shape: a `for` over a call to `over` becomes a `for` over
 /// that call's receiver, with the call's arguments — a predicate, a mapping, or
 /// both — applied per element instead.
 struct LoopFusion {
-    over: &'static str,
+    over: Callee,
     /// Which of the call's remaining arguments are a `(T) -> bool` predicate
     /// and a `(T) -> U` mapping: `(keep, map)` as argument positions after the
     /// receiver.
@@ -92,17 +87,17 @@ struct LoopFusion {
 /// Every loop shape the pass knows. See the module docs for how to add one.
 const LOOP_FUSIONS: &[LoopFusion] = &[
     LoopFusion {
-        over: "__builtin_map",
+        over: Callee::Map,
         keep: None,
         map: Some(0),
     },
     LoopFusion {
-        over: "__builtin_filter",
+        over: Callee::Filter,
         keep: Some(0),
         map: None,
     },
     LoopFusion {
-        over: "__builtin_filter_map",
+        over: Callee::FilterMap,
         keep: Some(0),
         map: Some(1),
     },
@@ -120,23 +115,23 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
     let ExprKind::Call(name, args, _) = &iterable.kind else {
         return None;
     };
-    if name == "__builtin_tuple_windows" {
+    if *name == Callee::TupleWindows {
         let [recv] = args.as_slice() else {
             return None;
         };
         return Some(build_windows(whole, var, recv, body));
     }
-    if name == "__builtin_reverse" {
+    if *name == Callee::Reverse {
         // `for (let v : xs.reverse())`: the walk runs backwards instead of a
         // reversed view being built — a codegen matter, so the iterable is only
-        // relabelled here (see `REVERSE_ITER`). Nothing observable changes:
+        // relabelled here (see `Callee::ReverseIter`). Nothing observable changes:
         // `xs` is evaluated once either way, and the elements reach the body
         // in the same order.
         let [recv] = args.as_slice() else {
             return None;
         };
         let wrapped = Expr::rebuilt(
-            ExprKind::Call(REVERSE_ITER.to_string(), vec![recv.clone()], false),
+            ExprKind::Call(Callee::ReverseIter, vec![recv.clone()], false),
             iterable,
         );
         return Some(Expr::rebuilt(
@@ -144,7 +139,7 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
             whole,
         ));
     }
-    let f = LOOP_FUSIONS.iter().find(|f| f.over == name)?;
+    let f = LOOP_FUSIONS.iter().find(|f| f.over == *name)?;
     let (recv, fns) = args.split_first()?;
     // Wrong arity is mono's error to report, not a shape to rewrite.
     if fns.len() != f.keep.is_some() as usize + f.map.is_some() as usize {
@@ -328,7 +323,7 @@ fn apply(func: &Expr, arg: Expr) -> Option<Expr> {
             Some(crate::rename_params(body, &map))
         }
         ExprKind::Ident(g) => Some(Expr::new(
-            ExprKind::Call(g.clone(), vec![arg], false),
+            ExprKind::Call(Callee::resolve(g.clone()), vec![arg], false),
             func.span.clone(),
         )),
         _ => None,

@@ -53,7 +53,7 @@ fn constant_default(e: &Expr) -> bool {
         // operators became calls. Keying on the operator names rather than on
         // "is a call" is what keeps the old meaning exactly: an *ordinary* call
         // can do anything, including fail, so it is still not a constant.
-        ExprKind::Call(name, args, _) if !crate::operator_named_forms(name).is_empty() => {
+        ExprKind::Call(name, args, _) if !crate::operator_named_forms(name.name()).is_empty() => {
             args.iter().all(constant_default)
         }
         _ => false,

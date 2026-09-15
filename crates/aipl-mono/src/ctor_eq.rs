@@ -49,16 +49,16 @@
 //! nothing, and the extra `let` would only be something for a later pass to
 //! undo.
 
-use aipl_syntax::ast::{Expr, ExprKind, Item, MatchArm, Pattern, Program};
+use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, MatchArm, Pattern, Program};
 
 /// The single-payload constructors this rewrites, each with the arm that
 /// answers for the *other* case. A result has two cases, so which one carries
 /// the payload decides which arm gets the comparison.
-fn other_case(ctor: &str) -> Option<&'static str> {
+fn other_case(ctor: &Callee) -> Option<&'static str> {
     match ctor {
-        "some" => Some("none"),
-        "ok" => Some("err"),
-        "err" => Some("ok"),
+        Callee::Some => Some("none"),
+        Callee::Ok => Some("err"),
+        Callee::Err => Some("ok"),
         _ => None,
     }
 }
@@ -102,9 +102,9 @@ fn rewrite_here(e: Expr, n: &mut usize) -> Expr {
     let ExprKind::Call(cmp, args, method) = &e.kind else {
         return e;
     };
-    let eq = match cmp.as_str() {
-        "__builtin_equal" => true,
-        "__builtin_not_equal" => false,
+    let eq = match cmp {
+        Callee::Equal => true,
+        Callee::NotEqual => false,
         _ => return e,
     };
     if args.len() != 2 {
@@ -157,7 +157,7 @@ fn rewrite_here(e: Expr, n: &mut usize) -> Expr {
 
     let hit_arm = MatchArm {
         pattern: Pattern::Ctor {
-            name: ctor.to_string(),
+            name: ctor.name().to_string(),
             bindings: vec![payload_var],
             ignore_payload: false,
         },
@@ -176,7 +176,7 @@ fn rewrite_here(e: Expr, n: &mut usize) -> Expr {
     };
     // Arm order follows the scrutinee's cases, so a result reads `ok` then
     // `err` whichever side carried the payload.
-    let arms = if ctor == "err" {
+    let arms = if *ctor == Callee::Err {
         vec![miss_arm, hit_arm]
     } else {
         vec![hit_arm, miss_arm]
@@ -193,12 +193,12 @@ fn rewrite_here(e: Expr, n: &mut usize) -> Expr {
 
 /// `e` as a single-payload constructor call — `some(x)`, `ok(x)`, `err(x)` —
 /// with the constructor's name and what it wraps.
-fn ctor_payload(e: &Expr) -> Option<(&str, &Expr)> {
+fn ctor_payload(e: &Expr) -> Option<(&Callee, &Expr)> {
     let ExprKind::Call(name, args, _) = &e.kind else {
         return None;
     };
     if args.len() != 1 || other_case(name).is_none() {
         return None;
     }
-    Some((name.as_str(), &args[0]))
+    Some((name, &args[0]))
 }

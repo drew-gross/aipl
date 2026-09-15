@@ -4,7 +4,7 @@
 //! source is uniquely owned and the element sizing allows, into the source's own
 //! buffer.
 
-use aipl_syntax::ast::{Expr, ExprKind};
+use aipl_syntax::ast::{Callee, Expr, ExprKind};
 
 /// One fusable chain shape: a call to `outer` whose receiver is a call to
 /// `inner` becomes a single call to `into`, taking the inner call's arguments
@@ -14,24 +14,24 @@ use aipl_syntax::ast::{Expr, ExprKind};
 /// `map(filter(xs, p), f)` fold to the same argument lists, so a row does not
 /// have to say which was written.
 struct ChainFusion {
-    inner: &'static str,
-    outer: &'static str,
-    into: &'static str,
+    inner: Callee,
+    outer: Callee,
+    into: Callee,
 }
 
 /// Every chain shape the pass knows. See the module docs for how to add one.
 const CHAIN_FUSIONS: &[ChainFusion] = &[
     ChainFusion {
-        inner: "__builtin_filter",
-        outer: "__builtin_map",
-        into: "__builtin_filter_map",
+        inner: Callee::Filter,
+        outer: Callee::Map,
+        into: Callee::FilterMap,
     },
     // `xs.map(f).find_if(p)`: the answer may be the first element, and `map`
     // would have applied `f` to every one and built the array first.
     ChainFusion {
-        inner: "__builtin_map",
-        outer: "__builtin_find_if",
-        into: "__builtin_map_find_if",
+        inner: Callee::Map,
+        outer: Callee::FindIf,
+        into: Callee::MapFindIf,
     },
     // `xs.map(f).join(sep=s)`: `map` builds an array of every piece and `join`
     // then measures and copies them into a second buffer; `map_join` appends
@@ -39,9 +39,9 @@ const CHAIN_FUSIONS: &[ChainFusion] = &[
     // separators (the loader has filled the omitted ones) follow `f`, which is
     // `map_join`'s parameter order.
     ChainFusion {
-        inner: "__builtin_map",
-        outer: "__builtin_join",
-        into: "__builtin_map_join",
+        inner: Callee::Map,
+        outer: Callee::Join,
+        into: Callee::MapJoin,
     },
 ];
 
@@ -60,13 +60,13 @@ pub(super) fn build(whole: &Expr) -> Option<Expr> {
     };
     let f = CHAIN_FUSIONS
         .iter()
-        .find(|f| f.outer == name && f.inner == inner_name)?;
+        .find(|f| f.outer == *name && f.inner == *inner_name)?;
     let mut fused = inner_args.clone();
     fused.extend(rest.iter().cloned());
     // Spanned as the whole chain: that is the source the user wrote, and what
     // any later diagnostic should point at.
     Some(Expr::rebuilt(
-        ExprKind::Call(f.into.to_string(), fused, *method_style),
+        ExprKind::Call(f.into.clone(), fused, *method_style),
         whole,
     ))
 }

@@ -1,5 +1,5 @@
 use super::step_by_one::Steps;
-use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
+use crate::ast::{Callee, Expr, ExprKind, ImportSource, Item, Program};
 use crate::Error;
 
 /// `set x = x + e;` — an accumulate written the long way; `set x += e;` is the
@@ -37,7 +37,7 @@ pub(super) fn compound_assign(e: &Expr, ops: &CompoundOps, steps: &Steps, hits: 
     let [l, r] = args.as_slice() else {
         return;
     };
-    let Some((spelling, import)) = ops.get(written) else {
+    let Some((spelling, import)) = ops.get(written.name()) else {
         return;
     };
     let is_target = |e: &Expr| matches!(&e.kind, ExprKind::Ident(n) if n == name);
@@ -46,13 +46,13 @@ pub(super) fn compound_assign(e: &Expr, ops: &CompoundOps, steps: &Steps, hits: 
     // accumulations of `x` at all.
     let operand = if is_target(l) {
         r
-    } else if is_target(r) && matches!(written.as_str(), "+" | "*") {
+    } else if is_target(r) && matches!(written.name(), "+" | "*") {
         l
     } else {
         return;
     };
     // `set x = x ± 1;` is the step lint's when that lint can fire here.
-    if matches!(operand.kind, ExprKind::Num(1)) && steps.get(written).is_some() {
+    if matches!(operand.kind, ExprKind::Num(1)) && steps.get(written.name()).is_some() {
         return;
     }
     // Name the import too when it's missing: no compound operator has a bare
@@ -115,7 +115,7 @@ pub(super) fn matching_compound(program: &Program) -> CompoundOps {
     // What each operator spelling's import resolves to: `None` for unbound, and
     // `Some(None)` for a binding that is not an operator builtin at all (a user
     // function), which no compound flavor can match.
-    let mut bound: Vec<(&str, Option<&'static str>)> = Vec::new();
+    let mut bound: Vec<(&str, Option<&'static Callee>)> = Vec::new();
     for item in &program.items {
         let Item::Import(decl) = item else {
             continue;

@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind, Program};
+use crate::ast::{Callee, Expr, ExprKind, Program};
 use crate::Error;
 
 /// `` `..{to_str(x)}..` `` — a `to_str` inside a template interpolation. The
@@ -16,7 +16,7 @@ pub(super) fn interp_to_str(e: &Expr, src: &str, to_str: &str, hits: &mut Vec<Er
     let ExprKind::Call(name, args, _) = &e.kind else {
         return;
     };
-    if name != "__template_interp" {
+    if *name != Callee::TemplateInterp {
         return;
     }
     let [inner] = args.as_slice() else {

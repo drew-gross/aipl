@@ -73,6 +73,7 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use aipl_syntax::{
     ast::{
         BinOp,
+        Callee,
         ConcreteType,
         Expr,
         ExprKind,
@@ -83,6 +84,7 @@ use aipl_syntax::{
         Pattern,
         Primitive,
         Program,
+        SeqShape,
         Signature as AstSignature,
         StructDecl,
         // The abstract representation, for the pre-monomorphization plumbing
@@ -95,7 +97,6 @@ use aipl_syntax::{
         error_ty, flex_int_ty, is_array_elem, is_dict_key, is_error, is_int_ty, is_none_inner,
         is_set_elem, is_str_repr, is_unit, type_name,
     },
-    IMPORTABLE_BUILTINS,
 };
 use aipl_syntax::{DebugOptions, Error, Span};
 
@@ -2105,11 +2106,6 @@ unsafe fn shift_last_to(a: *const u8, at: usize, elem_size: i64) {
     }
 }
 
-/// The iterable of a `for` that walks its array backwards: what the fusion
-/// pass wraps `xs.reverse()` in when it is only ever iterated (see
-/// `aipl_mono::REVERSE_ITER`). Only the `For` arm ever sees it.
-const REVERSE_ITER: &str = aipl_mono::REVERSE_ITER;
-
 /// The address to hand `aipl_set_insert` for element `i` of `src`, and a
 /// one-word scratch backing it.
 ///
@@ -2723,8 +2719,8 @@ fn builtin_struct_decls() -> Vec<StructDecl> {
 /// `Compilation::new(&that).run_0("__test_main")` runs the suite.
 pub fn build_test_program(program: &Program) -> Program {
     let span: Span = 0..0;
-    let call = |name: &str, args: Vec<Expr>| {
-        Expr::new(ExprKind::Call(name.to_string(), args, false), span.clone())
+    let call = |callee: Callee, args: Vec<Expr>| {
+        Expr::new(ExprKind::Call(callee, args, false), span.clone())
     };
     let seq = |first: Expr, rest: Expr| {
         Expr::new(ExprKind::Seq(Box::new(first), Box::new(rest)), span.clone())
@@ -2772,12 +2768,12 @@ pub fn build_test_program(program: &Program) -> Program {
     }
     // Fold the driver body from the tail: `__test_summary()` is the result, with
     // each test's begin/run/end prepended (so they execute in source order).
-    let mut body = call("__test_summary", Vec::new());
+    let mut body = call(Callee::TestSummary, Vec::new());
     for (name, test_fn) in tests.iter().rev() {
-        body = seq(call("__test_end", Vec::new()), body);
-        body = seq(call(test_fn, Vec::new()), body);
+        body = seq(call(Callee::TestEnd, Vec::new()), body);
+        body = seq(call(Callee::User(test_fn.clone()), Vec::new()), body);
         let name_lit = Expr::new(ExprKind::Str(name.clone()), span.clone());
-        body = seq(call("__test_begin", vec![name_lit]), body);
+        body = seq(call(Callee::TestBegin, vec![name_lit]), body);
     }
     items.push(Item::Fn(AstFn {
         name: "__test_main".to_string(),
@@ -6598,7 +6594,7 @@ fn tail_callees(body: &Expr) -> Vec<String> {
         match &e.kind {
             ExprKind::Call(name, args, _) => {
                 if tail {
-                    out.push(name.clone());
+                    out.push(name.name().to_string());
                 }
                 for a in args {
                     walk(a, false, out);
@@ -7917,27 +7913,25 @@ fn register_builtins(
         .collect();
     // (canonical builtin name, runtime symbol). Every entry point borrows its
     // arguments — see `borrowed_param` — so there is nothing else to record.
-    const SIG_REGS: &[(&str, &str)] = &[
-        ("__builtin_print", "aipl_print"),
-        ("__builtin_split", "aipl_str_split"),
-        ("__builtin_read_file_to_string", "aipl_read_file_to_string"),
-        (
-            "__builtin_write_string_to_file",
-            "aipl_write_string_to_file",
-        ),
-        ("__builtin_list_files", "aipl_list_files"),
-        ("__builtin_now_nanos", "aipl_now_nanos"),
-        ("__builtin_monotonic_now", "aipl_monotonic_now"),
-        ("__builtin_execute_program", "aipl_execute_program"),
-        ("__builtin_trim", "aipl_trim"),
-        ("__builtin_repeat", "aipl_str_repeat"),
+    const SIG_REGS: &[(Callee, &str)] = &[
+        (Callee::Print, "aipl_print"),
+        (Callee::Split, "aipl_str_split"),
+        (Callee::ReadFileToString, "aipl_read_file_to_string"),
+        (Callee::WriteStringToFile, "aipl_write_string_to_file"),
+        (Callee::ListFiles, "aipl_list_files"),
+        (Callee::NowNanos, "aipl_now_nanos"),
+        (Callee::MonotonicNow, "aipl_monotonic_now"),
+        (Callee::ExecuteProgram, "aipl_execute_program"),
+        (Callee::Trim, "aipl_trim"),
+        (Callee::Repeat, "aipl_str_repeat"),
         // Test-runner hooks (used only by the `check` driver / `assert` lowering).
-        ("__assert", "aipl_assert"),
-        ("__test_begin", "aipl_test_begin"),
-        ("__test_end", "aipl_test_end"),
-        ("__test_summary", "aipl_test_summary"),
+        (Callee::Assert, "aipl_assert"),
+        (Callee::TestBegin, "aipl_test_begin"),
+        (Callee::TestEnd, "aipl_test_end"),
+        (Callee::TestSummary, "aipl_test_summary"),
     ];
-    for &(name, sym) in SIG_REGS {
+    for (callee, sym) in SIG_REGS {
+        let name = callee.name();
         let f = sig
             .get(name)
             .unwrap_or_else(|| panic!("no BUILTIN_SIGNATURES entry for {name:?}"));
@@ -7964,7 +7958,7 @@ fn register_builtins(
     // chosen at the call site. Not user builtins, so not in BUILTIN_SIGNATURES.
     reg(
         funcs,
-        "__aipl_concat",
+        Callee::TemplateConcat.name(),
         "aipl_concat",
         vec![
             borrowed_param(ConcreteType::Primitive(Primitive::Str)),
@@ -10967,12 +10961,12 @@ enum CtorShape {
 fn ctor_shape(cx: Cx, e: &Expr) -> Option<CtorShape> {
     match &e.kind {
         ExprKind::Call(name, _, _) => {
-            if name == "ok" || name == "err" {
+            if matches!(name, Callee::Ok | Callee::Err) {
                 return Some(CtorShape::Result {
-                    is_ok: name == "ok",
+                    is_ok: *name == Callee::Ok,
                 });
             }
-            let (_, tag, fields) = variant_ctor(cx.structs, name)?;
+            let (_, tag, fields) = variant_ctor(cx.structs, name.name())?;
             Some(CtorShape::Variant { tag, fields })
         }
         ExprKind::Ident(name) if !cx.env.contains_key(name) => {
@@ -14238,15 +14232,10 @@ fn compile_variant<M: Module>(
 }
 
 /// A fresh, empty `T[]` (len 0). Used to normalize a `none` variadic argument.
-/// The shape a `starts_with`/`ends_with` pattern was monomorphized to (encoded
-/// in the call-name suffix by mono): the sequence, a single element, or an
-/// optional element.
-#[derive(Clone, Copy, PartialEq)]
-enum SeShape {
-    Seq,
-    Elem,
-    Opt,
-}
+/// The shape a `starts_with`/`ends_with` pattern was monomorphized to (carried
+/// on the callee by mono): the sequence, a single element, or an optional
+/// element.
+type SeShape = SeqShape;
 
 /// Which end a `starts_with`/`ends_with`/`starts_with_at` call matches against,
 /// and whether it carries an explicit offset. `Starts` and `At` are the same
@@ -14270,39 +14259,15 @@ impl SeEnd {
     }
 }
 
-/// Parse a (possibly shape-suffixed) `starts_with`/`starts_with_at`/`ends_with`
-/// builtin name into `(end, shape)`, or `None` if it isn't one. Mono appends
-/// `$ve`/`$vo` for the element/optional monomorphizations; the bare name is the
-/// sequence form.
-fn starts_ends_variant(name: &str) -> Option<(SeEnd, SeShape)> {
-    let (base, shape) = if let Some(b) = name.strip_suffix("$ve") {
-        (b, SeShape::Elem)
-    } else if let Some(b) = name.strip_suffix("$vo") {
-        (b, SeShape::Opt)
-    } else {
-        (name, SeShape::Seq)
-    };
-    match base {
-        "__builtin_starts_with" => Some((SeEnd::Starts, shape)),
-        "__builtin_starts_with_at" => Some((SeEnd::At, shape)),
-        "__builtin_ends_with" => Some((SeEnd::Ends, shape)),
+/// A `starts_with`/`starts_with_at`/`ends_with` callee as `(end, shape)`, or
+/// `None` if it isn't one. The shape is the one mono resolved the pattern to.
+fn starts_ends_variant(callee: &Callee) -> Option<(SeEnd, SeShape)> {
+    match callee {
+        Callee::StartsWith(shape) => Some((SeEnd::Starts, *shape)),
+        Callee::StartsWithAt(shape) => Some((SeEnd::At, *shape)),
+        Callee::EndsWith(shape) => Some((SeEnd::Ends, *shape)),
         _ => None,
     }
-}
-
-/// Parse a (possibly shape-suffixed) `contains` builtin name into its needle
-/// shape, or `None` if it isn't one. Same suffix encoding as
-/// [`starts_ends_variant`]: mono appends `$ve`/`$vo` for the element/optional
-/// monomorphizations; the bare name is the sequence form.
-fn contains_shape(name: &str) -> Option<SeShape> {
-    let (base, shape) = if let Some(b) = name.strip_suffix("$ve") {
-        (b, SeShape::Elem)
-    } else if let Some(b) = name.strip_suffix("$vo") {
-        (b, SeShape::Opt)
-    } else {
-        (name, SeShape::Seq)
-    };
-    (base == "__builtin_contains").then_some(shape)
 }
 
 /// Build a one-char inline `str` value from a `char` register value `c`: the
@@ -14322,7 +14287,7 @@ fn emit_char_to_str<M: Module>(
 }
 
 /// `arr.starts_with(x)` / `arr.starts_with_at(x, at)` / `arr.ends_with(x)` for a
-/// single element `x` of type `elem` — the `$ve` (element) monomorphization.
+/// single element `x` of type `elem` — the `SeqShape::Elem` monomorphization.
 /// True iff the element `end` selects — the first, the one at `at`, or the last
 /// — exists and structurally equals `x`, with no intermediate array built.
 /// Borrows `arr`; `emit_eq` balances its own per-element refs.
@@ -14376,8 +14341,8 @@ fn emit_arr_starts_ends_elem<M: Module>(
     Ok(builder.ins().stack_load(types::I64, types::I64, res, 0))
 }
 
-/// `arr.contains(x)` for a single element `x` of type `elem` — the `$ve`
-/// (element) monomorphization. True iff any element of `arr` structurally
+/// `arr.contains(x)` for a single element `x` of type `elem` — the
+/// `SeqShape::Elem` monomorphization. True iff any element of `arr` structurally
 /// equals `x`, scanning forward with early exit. Borrows `arr`; `emit_eq`
 /// balances its own per-element refs.
 fn emit_arr_contains_elem<M: Module>(
@@ -14827,10 +14792,10 @@ fn compile_call<M: Module>(
     Ok((ret_v, info.return_ty.clone()))
 }
 
-/// Compile a call expression, dispatched on the callee `name` — the
+/// Compile a call expression, dispatched on the `callee` — the
 /// `ExprKind::Call` handling extracted from [`compile_expr`] so expression
 /// dispatch stays readable. `args`/`style` are the call's arguments and method-
-/// call flag; `span` is the call site. Reserved builtin / intrinsic names are
+/// call flag; `span` is the call site. The builtin and intrinsic arms are
 /// matched first; the wildcard arm compiles an ordinary (monomorphized) user or
 /// builtin call via [`compile_call`].
 fn compile_call_expr<M: Module>(
@@ -14838,12 +14803,16 @@ fn compile_call_expr<M: Module>(
     builder: &mut FunctionBuilder,
     cx: Cx,
     scopes: &mut Vec<Vec<Tracked>>,
-    name: &str,
+    callee: &Callee,
     args: &[Expr],
     style: bool,
     span: Span,
     locked: Option<ConcreteType>,
 ) -> Result<(Value, ConcreteType), Error> {
+    // The canonical name keys the function tables and names the callee in
+    // diagnostics; the builtins and intrinsics codegen lowers itself are matched
+    // on the callee below.
+    let name = callee.name();
     let Cx {
         env,
         funcs,
@@ -14883,7 +14852,7 @@ fn compile_call_expr<M: Module>(
     // with one operation each map straight to an opcode; the arithmetic ones fall
     // through to the arm below, where the wrapping/saturating flavor is part of
     // the name and so cannot be recovered from an opcode alone.
-    if name == "__builtin_logical_not" {
+    if *callee == Callee::LogicalNot {
         let [x] = args else {
             return Err(Error::at(
                 format!("{name:?} expects 1 argument, got {}", args.len()),
@@ -14902,7 +14871,7 @@ fn compile_call_expr<M: Module>(
             ConcreteType::Primitive(Primitive::Bool),
         ));
     }
-    if let Some(op) = aipl_syntax::binop_for_builtin(name) {
+    if let Some(op) = aipl_syntax::binop_for_builtin(callee) {
         if args.len() != 2 {
             return Err(Error::at(
                 format!("{name:?} expects 2 arguments, got {}", args.len()),
@@ -14912,12 +14881,12 @@ fn compile_call_expr<M: Module>(
         return compile_binop(module, builder, cx, scopes, &args[0], op, &args[1], &span);
     }
 
-    Ok(match name {
-        "__builtin_wrapping_add"
-        | "__builtin_saturating_add"
-        | "__builtin_wrapping_sub"
-        | "__builtin_saturating_sub"
-        | "__builtin_wrapping_mul" => {
+    Ok(match callee {
+        Callee::WrappingAdd
+        | Callee::SaturatingAdd
+        | Callee::WrappingSub
+        | Callee::SaturatingSub
+        | Callee::WrappingMul => {
             // `a + b` / `a - b` / `a * b` resolved (in the loader) to their bound
             // integer arithmetic builtin. Both operands are the same integer type
             // (checker-verified); a bare literal flexes to the other's width. The
@@ -14963,12 +14932,12 @@ fn compile_call_expr<M: Module>(
                 canon_int(builder, raw, p)
             } else {
                 let sub = name.ends_with("_sub");
-                let saturating = name.starts_with("__builtin_saturating_");
+                let saturating = matches!(callee, Callee::SaturatingAdd | Callee::SaturatingSub);
                 emit_int_addsub(builder, lv, rv, p, sub, saturating)
             };
             (out, ConcreteType::Primitive(p))
         }
-        "__builtin_to_str" | "__template_interp" => {
+        Callee::ToStr | Callee::TemplateInterp => {
             // Generic `to_str(x)`, and a template literal's `{x}`, which is the
             // same thing: a `str` is its own text, a `char` is the one-char
             // `str` holding it, and anything else renders by its static type.
@@ -14995,7 +14964,7 @@ fn compile_call_expr<M: Module>(
             };
             (s, ConcreteType::Primitive(Primitive::Str))
         }
-        "__builtin_hash" => {
+        Callee::Hash => {
             // Generic `hash(x) -> i64`: structural hash by the argument's static
             // type. Borrows the argument (no consume), so its scope-track is
             // untouched.
@@ -15009,7 +14978,7 @@ fn compile_call_expr<M: Module>(
             let h = emit_hash(module, builder, cx.builtins, cx.structs, v, &t)?;
             (h, ConcreteType::Primitive(Primitive::I64))
         }
-        "__builtin_minimum" | "__builtin_maximum" => {
+        Callee::Minimum | Callee::Maximum => {
             // `arr.minimum()` / `arr.maximum()`: smallest / largest element as
             // `T?` (`none` if empty). Elements are comparable scalars (the checker
             // restricts to integers/char), so the optional owns no heap. Walks
@@ -15024,7 +14993,7 @@ fn compile_call_expr<M: Module>(
                     span.clone(),
                 ));
             }
-            let is_min = name == "__builtin_minimum";
+            let is_min = *callee == Callee::Minimum;
             let (arr_ptr, arr_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let elem = match &arr_ty {
                 ConcreteType::Array(e) => (**e).clone(),
@@ -15118,7 +15087,7 @@ fn compile_call_expr<M: Module>(
             builder.seal_block(done);
             (result_ptr, opt_ty)
         }
-        "__builtin_min" | "__builtin_max" => {
+        Callee::Min | Callee::Max => {
             // `min(a, b)` / `max(a, b)` over any `ord` type — every integer
             // width, `char`, or `str` — comparing and selecting the smaller or
             // larger. Scalars compare with `icmp` under the operand type's own
@@ -15137,11 +15106,7 @@ fn compile_call_expr<M: Module>(
             // `n.max(1)` needs no conversion on the `1` whatever `n` is.
             let at = flex_int_ty(&args[0], &at, &bt);
             let bt = flex_int_ty(&args[1], &bt, &at);
-            let want = if name == "__builtin_min" {
-                "min"
-            } else {
-                "max"
-            };
+            let want = if *callee == Callee::Min { "min" } else { "max" };
             let is_str = is_str_repr(&at) && is_str_repr(&bt);
             if !is_str {
                 if at != bt {
@@ -15166,7 +15131,7 @@ fn compile_call_expr<M: Module>(
                 }
             }
             // `min`: keep `a` when `a < b`; `max`: keep `a` when `a > b`.
-            let want_min = name == "__builtin_min";
+            let want_min = *callee == Callee::Min;
             let cond = if is_str {
                 // `aipl_str_cmp` returns a sign; test it against zero.
                 let c = builtins.call(module, builder, "aipl_str_cmp", &[a, b]);
@@ -15204,7 +15169,7 @@ fn compile_call_expr<M: Module>(
             }
             (r, result_ty)
         }
-        "__builtin_split" => {
+        Callee::Split => {
             // `split(s, sep) -> str[]`: the runtime builds the array of parts
             // (views of `s` for long parts, copies for short). It consumes both
             // str refs, so inc each first (our scope-tracked refs must survive),
@@ -15238,7 +15203,7 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(result, &ty));
             (result, ty)
         }
-        "__builtin_read_file_to_string" => {
+        Callee::ReadFileToString => {
             // `(str) -> str!str`: ok(contents) on success, err(message) on any
             // failure. The runtime returns the contents pointer or null; codegen
             // wraps it into the Result with a static error message. The
@@ -15295,13 +15260,13 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(ptr, &result_ty));
             (ptr, result_ty)
         }
-        "__builtin_now_nanos" | "__builtin_monotonic_now" => {
+        Callee::NowNanos | Callee::MonotonicNow => {
             // `() -> u64`: the runtime reads a clock (wall or monotonic) and
             // returns the nanosecond count on the shared i64 ABI. Nothing is
             // allocated or consumed, so there is no refcount traffic and nothing
             // to track for scope release. The `!clock` effect is
             // checker-enforced.
-            let (sym, pretty) = if name == "__builtin_now_nanos" {
+            let (sym, pretty) = if *callee == Callee::NowNanos {
                 ("aipl_now_nanos", "now_nanos")
             } else {
                 ("aipl_monotonic_now", "monotonic_now")
@@ -15317,7 +15282,7 @@ fn compile_call_expr<M: Module>(
             let v = emit_shimmable_call(module, builder, builtins, pretty, sym);
             (v, ConcreteType::Primitive(Primitive::U64))
         }
-        "__builtin_list_files" => {
+        Callee::ListFiles => {
             // `(str) -> str[]!str`: ok(paths) on success, err(message) on any
             // failure. The runtime returns a fresh array pointer or null (an
             // empty listing is still a real, non-null array block, so it reads
@@ -15366,7 +15331,7 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(ptr, &result_ty));
             (ptr, result_ty)
         }
-        "__builtin_write_string_to_file" => {
+        Callee::WriteStringToFile => {
             // `(str, str) -> !str`: ok() on success, err(message) on failure. The
             // runtime returns 1/0; codegen wraps it into the void-Ok Result with a
             // static error message. The `!write_files` effect is checker-enforced.
@@ -15405,7 +15370,7 @@ fn compile_call_expr<M: Module>(
             // so no scope tracking is required.
             (ptr, result_ty)
         }
-        "__builtin_is_some" => {
+        Callee::IsSome => {
             // `is_some(opt: T?) -> bool` — true when the optional is present.
             if args.len() != 1 {
                 return Err(Error::at(
@@ -15432,7 +15397,7 @@ fn compile_call_expr<M: Module>(
             let b = builder.ins().uextend(types::I64, nz);
             (b, ConcreteType::Primitive(Primitive::Bool))
         }
-        "__builtin_case_of" => {
+        Callee::CaseOf => {
             // `v.case_of()`: which case `v` is, as a `Case<V>`. A variant value
             // leads with its tag and a `Case<V>` *is* that tag, so this is one
             // load and no payload is touched — the same read `same_case` and
@@ -15473,7 +15438,7 @@ fn compile_call_expr<M: Module>(
                 .load(types::I64, MemFlagsData::trusted(), v, 0);
             (tag, ConcreteType::Case(vname.clone()))
         }
-        "__builtin_same_case" => {
+        Callee::SameCase => {
             // `a.same_case(b)`: do these share a constructor, payloads ignored?
             //
             // The `variant` bound guarantees both are named variants, and a
@@ -15518,7 +15483,7 @@ fn compile_call_expr<M: Module>(
             let out = builder.ins().uextend(types::I64, eq);
             (out, ConcreteType::Primitive(Primitive::Bool))
         }
-        "__builtin_case_name" => {
+        Callee::CaseName => {
             // `v.case_name()`: the name of the case `v` was built with, as a
             // `str`. Like `same_case`, this reads only the tag — the leading
             // `i64` of a variant value, the same field `emit_render_variant`
@@ -15611,7 +15576,7 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(out, &ConcreteType::Primitive(Primitive::Str)));
             (out, ConcreteType::Primitive(Primitive::Str))
         }
-        "__builtin_is_space" => {
+        Callee::IsSpace => {
             // `c.is_space() -> bool` — true when c is ASCII whitespace.
             if args.len() != 1 {
                 return Err(Error::at(
@@ -15640,7 +15605,7 @@ fn compile_call_expr<M: Module>(
             let b = builder.ins().uextend(types::I64, result);
             (b, ConcreteType::Primitive(Primitive::Bool))
         }
-        "__builtin_is_whitespace" => {
+        Callee::IsWhitespace => {
             // `c.is_whitespace() -> bool` — the *full* ASCII whitespace set:
             // `is_space`'s four plus vertical tab (11) and form feed (12).
             //
@@ -15673,7 +15638,7 @@ fn compile_call_expr<M: Module>(
             let b = builder.ins().uextend(types::I64, acc);
             (b, ConcreteType::Primitive(Primitive::Bool))
         }
-        "__builtin_is_digit" => {
+        Callee::IsDigit => {
             // `c.is_digit() -> bool` — true when c is '0'..'9'.
             if args.len() != 1 {
                 return Err(Error::at(
@@ -15702,7 +15667,7 @@ fn compile_call_expr<M: Module>(
             let b = builder.ins().uextend(types::I64, result);
             (b, ConcreteType::Primitive(Primitive::Bool))
         }
-        "__builtin_to_digit" => {
+        Callee::ToDigit => {
             // `c.to_digit() -> i64?` — an ASCII digit '0'..'9' to its 0..9
             // value (`c - '0'`), `none` for any other char.
             if args.len() != 1 {
@@ -15747,14 +15712,14 @@ fn compile_call_expr<M: Module>(
                 .store(MemFlagsData::trusted(), value, ptr, OPT_VALUE_OFFSET as i32);
             (ptr, opt_ty)
         }
-        "__builtin_len" | "__builtin_is_nonempty" | "__builtin_is_empty" => {
+        Callee::Len | Callee::IsNonempty | Callee::IsEmpty => {
             // `len(a) -> u64` — element/byte count — and the two `bool` questions
             // about it, `is_nonempty(a)` and `is_empty(a)`. One arm because all
             // three take the same receivers and read them the same way: none
             // consumes `a` (it stays live in the caller's scope), so no inc/dec.
-            let what = match name {
-                "__builtin_len" => "len",
-                "__builtin_is_nonempty" => "is_nonempty",
+            let what = match callee {
+                Callee::Len => "len",
+                Callee::IsNonempty => "is_nonempty",
                 _ => "is_empty",
             };
             if args.len() != 1 {
@@ -15785,13 +15750,13 @@ fn compile_call_expr<M: Module>(
                     args[0].span.clone(),
                 ));
             };
-            if name == "__builtin_len" {
+            if *callee == Callee::Len {
                 (len, ConcreteType::Primitive(Primitive::U64))
             } else {
                 // `bool` is an i64 0/1 here like every other AIPL bool, so the
                 // comparison result is extended rather than kept 1-bit. The two
                 // predicates are the same compare with opposite conditions.
-                let cc = if name == "__builtin_is_empty" {
+                let cc = if *callee == Callee::IsEmpty {
                     IntCC::Equal
                 } else {
                     IntCC::NotEqual
@@ -15801,7 +15766,7 @@ fn compile_call_expr<M: Module>(
                 (out, ConcreteType::Primitive(Primitive::Bool))
             }
         }
-        "__builtin_sort" => {
+        Callee::Sort => {
             // `xs.sort() -> T[]` — a fresh array, elements ascending. Consumes
             // `self` (callers pre-inc). The `ord` bound has already restricted the
             // element type to an integer, `char`, or `str`; which of those decides
@@ -15892,7 +15857,7 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(out, &arr_ty));
             (out, arr_ty)
         }
-        "__builtin_join" => {
+        Callee::Join => {
             // `parts.join(sep=s) -> T[]` — the parts flattened with `s` between
             // consecutive ones. Generic in the element type `T`, so the receiver
             // is a `T[][]`; for `T = char` that is a `str[]` and the whole thing
@@ -16083,7 +16048,7 @@ fn compile_call_expr<M: Module>(
                 (out, out_ty)
             }
         }
-        "__builtin_to_set" => {
+        Callee::ToSet => {
             // `xs.to_set()`: the array's distinct elements as a set — the set the
             // use site asked for. The checker locked the expected type onto the
             // call (`SetOrder::Context`, see `needs_lock`); with none, the plain
@@ -16170,7 +16135,7 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(ptr, &set_ty));
             (ptr, set_ty)
         }
-        "__builtin_to_array" => {
+        Callee::ToArray => {
             // `s.to_array() -> T[]` on an ordered set: the elements in the set's
             // order. A set *is* an array block kept sorted, so the result is the
             // same block, retained, seen as an array — no copy. The checker has
@@ -16209,7 +16174,7 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(ptr, &arr_ty));
             (ptr, arr_ty)
         }
-        "__builtin_reverse" => {
+        Callee::Reverse => {
             // `xs.reverse() -> T[]` / `s.reverse() -> str` — new sequence with
             // elements (or bytes) in reverse order. Consumes `self` (callers pre-inc).
             if args.len() != 1 {
@@ -16274,16 +16239,16 @@ fn compile_call_expr<M: Module>(
                 ));
             }
         }
-        _ if starts_ends_variant(name).is_some() => {
+        Callee::StartsWith(_) | Callee::StartsWithAt(_) | Callee::EndsWith(_) => {
             // `s.starts_with(p)` / `s.starts_with_at(p, i)` / `s.ends_with(p)
             // -> bool` over a `str` (byte compare) or `T[]` (element-wise
             // structural compare). The pattern is variadic; monomorphization has
-            // already resolved its shape into the name suffix (`$ve` element,
-            // `$vo` optional, none = the sequence), so each shape is implemented
-            // directly here — its own monomorphization. The empty pattern always
+            // already resolved its shape onto the callee (`SeqShape`: element,
+            // optional, or the sequence), so each shape is implemented directly
+            // here — its own monomorphization. The empty pattern always
             // matches; a pattern longer than what remains from the offset never
             // does.
-            let (end, shape) = starts_ends_variant(name).unwrap();
+            let (end, shape) = starts_ends_variant(callee).expect("matched above");
             if args.len() != end.arity() {
                 return Err(Error::at(
                     format!(
@@ -16425,16 +16390,16 @@ fn compile_call_expr<M: Module>(
             };
             (result, ConcreteType::Primitive(Primitive::Bool))
         }
-        _ if contains_shape(name).is_some() => {
+        Callee::Contains(shape) => {
             // `s.contains(n) -> bool` over a `str` (byte window compare) or
             // `T[]` (element-wise structural compare). The needle is variadic;
-            // monomorphization has already resolved its shape into the name
-            // suffix (`$ve` element, `$vo` optional, none = the sequence), so
-            // each shape is implemented directly here. The empty needle always
+            // monomorphization has already resolved its shape onto the callee
+            // (`SeqShape`: element, optional, or the sequence), so each shape
+            // is implemented directly here. The empty needle always
             // matches; a `none` needle is nothing to find, so it never does
             // (unlike `starts_with`/`ends_with`, whose `none` is the
             // always-matching empty pattern).
-            let shape = contains_shape(name).unwrap();
+            let shape = *shape;
             if args.len() != 2 {
                 return Err(Error::at(
                     format!("\"contains\" expects 2 args, got {}", args.len()),
@@ -16550,7 +16515,7 @@ fn compile_call_expr<M: Module>(
             };
             (result, ConcreteType::Primitive(Primitive::Bool))
         }
-        "__char_to_str" => {
+        Callee::CharToStr => {
             // Internal: a single `char` to a one-char inline `str`. Emitted by
             // variadic `char*` specialization (see mono's `specialize_variadic`).
             if args.len() != 1 {
@@ -16565,7 +16530,7 @@ fn compile_call_expr<M: Module>(
                 ConcreteType::Primitive(Primitive::Str),
             )
         }
-        "__builtin_has" => {
+        Callee::Has => {
             // `has(s: T{}, x: T) -> bool` — set membership. Borrows the set
             // (it stays live in the caller's scope), so no inc/dec.
             if args.len() != 2 {
@@ -16620,7 +16585,7 @@ fn compile_call_expr<M: Module>(
                 (found, ConcreteType::Primitive(Primitive::Bool))
             }
         }
-        "__builtin_union" => {
+        Callee::Union => {
             // `union(a: T{}, b: T{}) -> T{}` — a fresh set of all distinct
             // elements of both. (The in-place `set a = a.union(b)` reuse for an
             // exclusive `a` is handled in the Assign arm.) `aipl_set_union`
@@ -16673,7 +16638,7 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(res, &result_ty));
             (res, result_ty)
         }
-        "__builtin_get" => {
+        Callee::Get => {
             // `get(d: #{K: V}, key: K) -> V?` — the bound value, else `none`.
             // Borrows the dict (no inc/dec); the matched value is retained into
             // the `some` result, so it outlives the dict.
@@ -16760,7 +16725,7 @@ fn compile_call_expr<M: Module>(
                 (sbase, result_ty)
             }
         }
-        "__builtin_contains_key" => {
+        Callee::ContainsKey => {
             // `contains_key(d: #{K: V}, key: K) -> bool`. Borrows the dict.
             if args.len() != 2 {
                 return Err(Error::at(
@@ -16805,7 +16770,7 @@ fn compile_call_expr<M: Module>(
                 (found, ConcreteType::Primitive(Primitive::Bool))
             }
         }
-        "__filter_keep" => {
+        Callee::FilterKeep => {
             // Internal (in-place `filter`): `__filter_keep(arr, w, e)` stores
             // element `e` at slot `w` with a raw pointer copy — no refcount
             // change, since ownership relocates from `e`'s read slot to slot `w`.
@@ -16823,7 +16788,7 @@ fn compile_call_expr<M: Module>(
             store_array_elem(builder, addr, e, &ety, structs);
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
-        "__filter_drop" => {
+        Callee::FilterDrop => {
             // Internal (in-place `filter`): release a filtered-out element. The
             // surrounding `for` loop retains/releases `e` each iteration (a
             // no-op net), so this single drop removes the array's ownership of
@@ -16832,7 +16797,7 @@ fn compile_call_expr<M: Module>(
             emit_drop(builder, module, builtins, structs, e, &ety);
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
-        "__filter_truncate" => {
+        Callee::FilterTruncate => {
             // Internal (in-place `filter`): set the array's length to `w`. The
             // dead tail `[w, old_len)` holds relocated/stale pointers and is
             // never released (the block is later freed by its capacity).
@@ -16843,7 +16808,7 @@ fn compile_call_expr<M: Module>(
                 .store(MemFlagsData::trusted(), w, a_ptr, ARR_LEN_OFFSET as i32);
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
-        "__map_set" => {
+        Callee::MapSet => {
             // Internal (in-place `map`): `__map_set(arr, i, new, old)` overwrites
             // slot `i` with the mapped value `new` (a `U`), then releases the
             // `old` element it replaced (a `T`). `new` is a fresh result tracked
@@ -16887,7 +16852,7 @@ fn compile_call_expr<M: Module>(
             );
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
-        "__arr_writable" => {
+        Callee::ArrWritable => {
             // Internal (in-place `map`/`filter`/`zip_with`): the moved-in array
             // parameter as a block the body may write element slots into. The
             // in-place bodies overwrite slots with plain stores (`__map_set`,
@@ -16938,7 +16903,7 @@ fn compile_call_expr<M: Module>(
                 .push(Tracked::new(owned, &arr_ty));
             (owned, arr_ty)
         }
-        "__map_result" => {
+        Callee::MapResult => {
             // Internal (in-place `map`): hand the reused buffer back reinterpreted
             // as the enclosing function's declared return type (`U[]`). `$a`'s
             // static type is still `T[]`, but the elements are now `U` and the
@@ -16947,7 +16912,7 @@ fn compile_call_expr<M: Module>(
             let (a_ptr, _) = compile_expr(module, builder, cx, scopes, &args[0])?;
             (a_ptr, cx.ret_ty.clone())
         }
-        "__builtin_with_capacity" => {
+        Callee::WithCapacity => {
             // Internal (emitted by `map`): allocate an empty array reserved to
             // the given capacity. Element type is unknown (`__none__`) like an
             // empty `[]`; it's refined and its drop-fn set by the first `push`.
@@ -16989,7 +16954,7 @@ fn compile_call_expr<M: Module>(
         // ordinary push lowering, which `arr_reserve` degrades to by handing
         // its argument straight back (see the `is_char_array`/`is_bit_packed`
         // guards below).
-        "__aipl_arr_reserve" | "__aipl_arr_append" | "__aipl_arr_concat" => {
+        Callee::ArrReserve | Callee::ArrAppend | Callee::ArrConcat => {
             let before = scope_depth(scopes);
             let (arr_ptr, arr_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
             let arr_owned = owned_temp_since(scopes, before, arr_ptr);
@@ -17003,14 +16968,14 @@ fn compile_call_expr<M: Module>(
             // bit-packed; neither pre-sizes, so `reserve` hands the array back
             // untouched and their appends stay on the existing lowering.
             if is_char_array(&arr_ty) {
-                if name == "__aipl_arr_reserve" {
+                if *callee == Callee::ArrReserve {
                     return Ok((arr_ptr, arr_ty));
                 }
                 // `str` has no in-place growable form: build a fresh buffer of
                 // the combined length and copy both sides in. `aipl_str_len` /
                 // `aipl_str_data` only *borrow*, so neither side is retained.
                 let old_len = emit_str_len(builder, arr_ptr);
-                let (tail, add_len) = if name == "__aipl_arr_concat" {
+                let (tail, add_len) = if *callee == Callee::ArrConcat {
                     let (src, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
                     let src_len = emit_str_len(builder, src);
                     (Some(src), src_len)
@@ -17053,7 +17018,7 @@ fn compile_call_expr<M: Module>(
                 return Ok((buf, arr_ty));
             }
             let packed = is_bit_packed(&elem);
-            if packed && name == "__aipl_arr_reserve" {
+            if packed && *callee == Callee::ArrReserve {
                 return Ok((arr_ptr, arr_ty));
             }
             // All three consume their array argument. A borrowed one needs a
@@ -17071,7 +17036,7 @@ fn compile_call_expr<M: Module>(
             let esz = builder
                 .ins()
                 .iconst(types::I64, runtime_elem_size(&elem, structs));
-            let out = if name == "__aipl_arr_reserve" {
+            let out = if *callee == Callee::ArrReserve {
                 let (extra, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
                 builtins.call(
                     module,
@@ -17079,7 +17044,7 @@ fn compile_call_expr<M: Module>(
                     "aipl_arr_reserve",
                     &[arr_ptr, extra, drop_fn, retain_fn, esz],
                 )
-            } else if name == "__aipl_arr_concat" {
+            } else if *callee == Callee::ArrConcat {
                 let mark = scope_depth(scopes);
                 let (src, src_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
                 if owned_temp_since(scopes, mark, src) {
@@ -17128,7 +17093,7 @@ fn compile_call_expr<M: Module>(
             scope.push(Tracked::new(out, &arr_ty));
             (out, arr_ty)
         }
-        "__builtin_push" => {
+        Callee::Push => {
             // The in-place writeback form: the receiver is `args[0]`, a mutable
             // array variable, and the grown array is stored back into its slot.
             // Value semantics are kept — a possibly-shared array is copied
@@ -17306,7 +17271,7 @@ fn compile_call_expr<M: Module>(
             // `push` mutates; it produces no value.
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
-        "__builtin_reserve" => {
+        Callee::Reserve => {
             // `set xs.reserve(n)`: room for `n` more elements, in the same
             // in-place writeback form as `push`/`extend` — receiver in
             // `args[0]`, count in `args[1]`, the grown value stored back into
@@ -17400,7 +17365,7 @@ fn compile_call_expr<M: Module>(
             }
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
-        "__builtin_extend" => {
+        Callee::Extend => {
             // `push` for a whole array, and the same in-place writeback form:
             // receiver in `args[0]`, source array in `args[1]`, result stored
             // back into the receiver's slot. Every other call position was
@@ -17595,7 +17560,7 @@ fn compile_call_expr<M: Module>(
         // typed binding (`let n: u8 = x;`), which is where `canon_int` now runs.
         // The checker rejects these first with the same advice; this mirrors it
         // so a direct codegen entry point can't fall through to "unknown call".
-        _ if Primitive::from_name(name).is_some_and(Primitive::is_int) => {
+        Callee::User(n) if Primitive::from_name(n).is_some_and(Primitive::is_int) => {
             return Err(Error::at(
                 format!(
                     "{name}(..) conversions were removed — bind with the type instead \
@@ -17605,10 +17570,10 @@ fn compile_call_expr<M: Module>(
                 span.clone(),
             ));
         }
-        "ok" | "err" => {
+        Callee::Ok | Callee::Err => {
             // A Result `{ tag, value }` (tag 1 = ok, 0 = err). The unbound side is
             // `__none__`, resolved by coercion at the use site (like bare `none`).
-            let is_ok = name == "ok";
+            let is_ok = *callee == Callee::Ok;
             // `ok()` with no argument is the void success of a `!E` result: tag 1
             // with an unused (zeroed) value region, Ok side `unit`.
             if is_ok && args.is_empty() {
@@ -17690,7 +17655,7 @@ fn compile_call_expr<M: Module>(
             }
             (ptr, res_ty)
         }
-        "some" => {
+        Callee::Some => {
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("fn \"some\" expects 1 arg, got {}", args.len()),
@@ -18861,7 +18826,10 @@ fn compile_expr_inner<M: Module>(
                 // one after that grows the copy in place.
                 ConcreteType::Array(_) => {
                     matches!(&value.kind, ExprKind::ArrayLit(_))
-                        || matches!(&value.kind, ExprKind::Call(n, _, _) if n == "__builtin_with_capacity" || n == "__arr_writable")
+                        || matches!(
+                            &value.kind,
+                            ExprKind::Call(Callee::WithCapacity | Callee::ArrWritable, _, _)
+                        )
                 }
                 ConcreteType::Primitive(Primitive::Str) => matches!(&value.kind, ExprKind::Str(_)),
                 _ => false,
@@ -19013,8 +18981,8 @@ fn compile_expr_inner<M: Module>(
                 ExprKind::Call(f, cargs, true)
                     if !cargs.is_empty()
                         && matches!(&cargs[0].kind, ExprKind::Ident(recv) if recv == name)
-                        && (aipl_mono::builtin_is_mutating(f)
-                            || funcs.get(f).is_some_and(|i| i.is_mutating))
+                        && (aipl_mono::builtin_is_mutating(f.name())
+                            || funcs.get(f.name()).is_some_and(|i| i.is_mutating))
             );
             if is_writeback_call {
                 compile_expr(module, builder, cx, scopes, value)?;
@@ -19070,9 +19038,8 @@ fn compile_expr_inner<M: Module>(
                 // Both forms fold to the call `trim(s)` with args `[s]`.
                 let trims_self = matches!(
                     &value.kind,
-                    ExprKind::Call(f, cargs, _)
-                        if f == "__builtin_trim"
-                            && cargs.len() == 1
+                    ExprKind::Call(Callee::Trim, cargs, _)
+                        if cargs.len() == 1
                             && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name)
                 );
                 if trims_self {
@@ -19116,9 +19083,8 @@ fn compile_expr_inner<M: Module>(
                     // `set a = a.union(b)` / `set a = union(a, b)` both fold to
                     // the call `union(a, b)` with args `[a, b]`.
                     let other = match &value.kind {
-                        ExprKind::Call(f, cargs, _)
-                            if f == "__builtin_union"
-                                && cargs.len() == 2
+                        ExprKind::Call(Callee::Union, cargs, _)
+                            if cargs.len() == 2
                                 && matches!(&cargs[0].kind, ExprKind::Ident(n) if n == name) =>
                         {
                             Some(&cargs[1])
@@ -19296,9 +19262,10 @@ fn compile_expr_inner<M: Module>(
             // streams one way), so there the reversed string is built and
             // walked forwards, as `xs.reverse()` itself would.
             let (iterable, reverse) = match &iterable.kind {
-                ExprKind::Call(f, args, _) if f == REVERSE_ITER && args.len() == 1 => {
-                    (&args[0], true)
-                }
+                // The iterable of a `for` that walks its array backwards: what
+                // the fusion pass wraps `xs.reverse()` in when it is only ever
+                // iterated. Only this arm ever sees it.
+                ExprKind::Call(Callee::ReverseIter, args, _) if args.len() == 1 => (&args[0], true),
                 _ => (&**iterable, false),
             };
             let (it_ptr, it_ty) = compile_expr(module, builder, cx, scopes, iterable)?;
@@ -20736,7 +20703,7 @@ fn display_name(name: &str) -> &str {
 /// importable builtin, nudge the user toward the missing import rather
 /// than leaving them puzzled.
 fn undefined_fn(name: &str, span: Span) -> Error {
-    if IMPORTABLE_BUILTINS.contains(&name) {
+    if Callee::importable(name).is_some() {
         Error::at(
             format!(
                 "\"{name}\" is a builtin; import it with \"import {{ {name} }} from builtins;\""

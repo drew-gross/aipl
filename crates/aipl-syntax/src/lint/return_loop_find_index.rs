@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind};
+use crate::ast::{Callee, Expr, ExprKind};
 use crate::Error;
 
 use super::{imported_as, lone_stmt, spans_its_text};
@@ -98,7 +98,7 @@ pub(super) fn return_loop_find_index(
     let ExprKind::Call(some, args, _) = &value.kind else {
         return;
     };
-    if some != "some" || args.len() != 1 {
+    if *some != Callee::Some || args.len() != 1 {
         return;
     }
     if !matches!(&args[0].kind, ExprKind::Ident(n) if n == index) {
@@ -163,7 +163,7 @@ fn is_counter_bump(e: &Expr, tmp: &str) -> bool {
     let ExprKind::Call(add, args, _) = &value.kind else {
         return false;
     };
-    add == "__builtin_wrapping_add"
+    *add == Callee::WrappingAdd
         && args.len() == 2
         && matches!(&args[0].kind, ExprKind::Ident(n) if n == tmp)
         && matches!(args[1].kind, ExprKind::Num(1))

@@ -223,7 +223,11 @@ pub fn set_caret_block_hook(f: fn(&str, Span, &str) -> String) {
     let _ = CARET_BLOCK_HOOK.set(f);
 }
 
+pub mod callee;
+
 pub mod ast {
+    pub use crate::callee::{Callee, SeqShape};
+
     use crate::Span;
 
     /// One source file behind a merged program: the label diagnostics name it
@@ -1283,7 +1287,13 @@ pub mod ast {
         /// expression position yield a fresh array and leave `xs` alone.
         /// Non-mutating calls are indifferent to the flag
         /// (`x.to_str()` ≡ `to_str(x)`).
-        Call(String, Vec<Expr>, bool),
+        ///
+        /// The callee is a [`Callee`]: an arm per function the compiler
+        /// knows (builtins, operator impls, `some`/`ok`/`err`, the
+        /// intrinsics passes synthesize) and [`Callee::User`] for a name from
+        /// source. Before the loader resolves imports every source-spelled
+        /// callee is a `User` — `map`, `+`, or whatever alias the file wrote.
+        Call(Callee, Vec<Expr>, bool),
         Neg(Box<Expr>),
         If(Box<Expr>, Box<Expr>, Box<Expr>),
         Construct(String, Vec<FieldInit>),
@@ -1690,7 +1700,7 @@ pub mod ast {
     }
 }
 
-use ast::{BinOp, Primitive, Type};
+use ast::{BinOp, Callee, Primitive, Type};
 
 // ---------- Shared AST-level `Type` helpers ----------
 //
@@ -1912,7 +1922,7 @@ pub fn flex_fit(
         },
         // `some(x)` — the optional's payload flexes to the core type.
         Type::Optional(inner) => match &e.kind {
-            K::Call(name, args, _) if name == "some" && args.len() == 1 => {
+            K::Call(Callee::Some, args, _) if args.len() == 1 => {
                 Ok(flex_fit(&args[0], &Type::Unit, inner)?.map(|_| target.clone()))
             }
             _ => Ok(None),
@@ -1928,8 +1938,8 @@ pub fn flex_fit(
         // than a local shadowing them. A shadowing binding would only cost the
         // flex, since the ordinary check still runs afterwards.
         Type::Result(ok, err) => match &e.kind {
-            K::Call(name, args, _) if args.len() == 1 && matches!(&**name, "ok" | "err") => {
-                let side = if name == "ok" { ok } else { err };
+            K::Call(name @ (Callee::Ok | Callee::Err), args, _) if args.len() == 1 => {
+                let side = if *name == Callee::Ok { ok } else { err };
                 Ok(flex_fit(&args[0], &Type::Unit, side)?.map(|_| target.clone()))
             }
             _ => Ok(None),
@@ -1989,16 +1999,16 @@ pub fn flex_int_ty(e: &ast::Expr, ety: &Type, other: &Type) -> Type {
 ///
 /// This table is the single place operator builtins are declared — extend it
 /// (not per-operator special-cases) to add flavors.
-const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
-    ("wrapping_add", "+", "__builtin_wrapping_add"),
-    ("saturating_add", "+", "__builtin_saturating_add"),
-    ("wrapping_sub", "-", "__builtin_wrapping_sub"),
-    ("saturating_sub", "-", "__builtin_saturating_sub"),
-    ("wrapping_mul", "*", "__builtin_wrapping_mul"),
-    ("wrapping_increment", "++", "__builtin_wrapping_add"),
-    ("saturating_increment", "++", "__builtin_saturating_add"),
-    ("wrapping_decrement", "--", "__builtin_wrapping_sub"),
-    ("saturating_decrement", "--", "__builtin_saturating_sub"),
+const OPERATOR_BUILTINS: &[(&str, &str, Callee)] = &[
+    ("wrapping_add", "+", Callee::WrappingAdd),
+    ("saturating_add", "+", Callee::SaturatingAdd),
+    ("wrapping_sub", "-", Callee::WrappingSub),
+    ("saturating_sub", "-", Callee::SaturatingSub),
+    ("wrapping_mul", "*", Callee::WrappingMul),
+    ("wrapping_increment", "++", Callee::WrappingAdd),
+    ("saturating_increment", "++", Callee::SaturatingAdd),
+    ("wrapping_decrement", "--", Callee::WrappingSub),
+    ("saturating_decrement", "--", Callee::SaturatingSub),
     // The compound assignments, `set n += e;`. Each is its own named builtin
     // rather than a second alias of the plain one, exactly as `++` is
     // `wrapping_increment` and not `wrapping_add`: a name maps to one operator
@@ -2010,16 +2020,12 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
     // `/=` has nothing to share — `saturating_divide`'s canonical is the marker
     // `/` — so its own spelling is the marker, and the loader collapses the
     // variant to `BinOp::Div` after gating.
-    ("wrapping_add_assign", "+=", "__builtin_wrapping_add"),
-    ("saturating_add_assign", "+=", "__builtin_saturating_add"),
-    ("wrapping_sub_assign", "-=", "__builtin_wrapping_sub"),
-    ("saturating_sub_assign", "-=", "__builtin_saturating_sub"),
-    ("wrapping_mul_assign", "*=", "__builtin_wrapping_mul"),
-    (
-        "saturating_divide_assign",
-        "/=",
-        "__builtin_saturating_divide",
-    ),
+    ("wrapping_add_assign", "+=", Callee::WrappingAdd),
+    ("saturating_add_assign", "+=", Callee::SaturatingAdd),
+    ("wrapping_sub_assign", "-=", Callee::WrappingSub),
+    ("saturating_sub_assign", "-=", Callee::SaturatingSub),
+    ("wrapping_mul_assign", "*=", Callee::WrappingMul),
+    ("saturating_divide_assign", "/=", Callee::SaturatingDivide),
     // The operators with a single semantics. They are listed here so that *every*
     // operator is imported the same way when it is imported *as an operator*:
     // `name as op`. Reading an import list then tells you which operators a file
@@ -2036,26 +2042,18 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
     // primitive node so the call and the operator stayed one program. With a real
     // canonical both spellings simply resolve to the same callee and that special
     // case is gone.
-    ("equal", "==", "__builtin_equal"),
-    ("not_equal", "!=", "__builtin_not_equal"),
-    ("less_than", "<", "__builtin_less_than"),
-    ("greater_than", ">", "__builtin_greater_than"),
-    ("less_than_or_equal", "<=", "__builtin_less_than_or_equal"),
-    (
-        "greater_than_or_equal",
-        ">=",
-        "__builtin_greater_than_or_equal",
-    ),
-    ("logical_and", "&&", "__builtin_logical_and"),
-    ("logical_or", "||", "__builtin_logical_or"),
-    ("logical_not", "!", "__builtin_logical_not"),
-    ("concat", "+++", "__builtin_concat"),
-    ("saturating_divide", "/", "__builtin_saturating_divide"),
-    (
-        "saturating_remainder",
-        "%",
-        "__builtin_saturating_remainder",
-    ),
+    ("equal", "==", Callee::Equal),
+    ("not_equal", "!=", Callee::NotEqual),
+    ("less_than", "<", Callee::LessThan),
+    ("greater_than", ">", Callee::GreaterThan),
+    ("less_than_or_equal", "<=", Callee::LessThanOrEqual),
+    ("greater_than_or_equal", ">=", Callee::GreaterThanOrEqual),
+    ("logical_and", "&&", Callee::LogicalAnd),
+    ("logical_or", "||", Callee::LogicalOr),
+    ("logical_not", "!", Callee::LogicalNot),
+    ("concat", "+++", Callee::Concat),
+    ("saturating_divide", "/", Callee::SaturatingDivide),
+    ("saturating_remainder", "%", Callee::SaturatingRemainder),
 ];
 
 /// The single [`BinOp`] a canonical `__builtin_*` impl performs, for the
@@ -2070,19 +2068,19 @@ const OPERATOR_BUILTINS: &[(&str, &str, &str)] = &[
 /// dispatch (in mono and codegen), keyed on the canonical name.
 ///
 /// `None` for `__builtin_logical_not`, which is unary.
-pub fn binop_for_builtin(canonical: &str) -> Option<BinOp> {
+pub fn binop_for_builtin(canonical: &Callee) -> Option<BinOp> {
     Some(match canonical {
-        "__builtin_equal" => BinOp::Eq,
-        "__builtin_not_equal" => BinOp::Ne,
-        "__builtin_less_than" => BinOp::Lt,
-        "__builtin_greater_than" => BinOp::Gt,
-        "__builtin_less_than_or_equal" => BinOp::Le,
-        "__builtin_greater_than_or_equal" => BinOp::Ge,
-        "__builtin_logical_and" => BinOp::And,
-        "__builtin_logical_or" => BinOp::Or,
-        "__builtin_concat" => BinOp::Concat,
-        "__builtin_saturating_divide" => BinOp::Div,
-        "__builtin_saturating_remainder" => BinOp::Rem,
+        Callee::Equal => BinOp::Eq,
+        Callee::NotEqual => BinOp::Ne,
+        Callee::LessThan => BinOp::Lt,
+        Callee::GreaterThan => BinOp::Gt,
+        Callee::LessThanOrEqual => BinOp::Le,
+        Callee::GreaterThanOrEqual => BinOp::Ge,
+        Callee::LogicalAnd => BinOp::And,
+        Callee::LogicalOr => BinOp::Or,
+        Callee::Concat => BinOp::Concat,
+        Callee::SaturatingDivide => BinOp::Div,
+        Callee::SaturatingRemainder => BinOp::Rem,
         _ => return None,
     })
 }
@@ -2139,14 +2137,14 @@ pub fn self_append<'a>(value: &'a ast::Expr, name: &str) -> Option<&'a ast::Expr
 /// `None` when the name is not one. Used to check the arity of a bare
 /// operator-builtin *call* (`concat(a, b)`), which no signature covers because
 /// these are intrinsified rather than emitted.
-pub fn operator_arity(canonical: &str) -> Option<usize> {
+pub fn operator_arity(canonical: &Callee) -> Option<usize> {
     match canonical {
-        "__builtin_logical_not" => Some(1),
-        "__builtin_wrapping_add"
-        | "__builtin_saturating_add"
-        | "__builtin_wrapping_sub"
-        | "__builtin_saturating_sub"
-        | "__builtin_wrapping_mul" => Some(2),
+        Callee::LogicalNot => Some(1),
+        Callee::WrappingAdd
+        | Callee::SaturatingAdd
+        | Callee::WrappingSub
+        | Callee::SaturatingSub
+        | Callee::WrappingMul => Some(2),
         _ => binop_for_builtin(canonical).map(|_| 2),
     }
 }
@@ -2165,21 +2163,21 @@ pub fn operator_named_forms(op: &str) -> Vec<&'static str> {
 
 /// If `name` is a named operator builtin, the `(operator, canonical impl)` it
 /// provides — see [`OPERATOR_BUILTINS`].
-pub fn operator_builtin(name: &str) -> Option<(&'static str, &'static str)> {
+pub fn operator_builtin(name: &str) -> Option<(&'static str, &'static Callee)> {
     OPERATOR_BUILTINS
         .iter()
         .find(|(n, _, _)| *n == name)
-        .map(|(_, op, canonical)| (*op, *canonical))
+        .map(|(_, op, canonical)| (*op, canonical))
 }
 
 /// The operator builtin providing `op` with the semantics of `canonical_impl` —
 /// the inverse of [`operator_builtin`], for naming the import that pairs with
 /// one a file already has (`__builtin_saturating_add` + `"++"` →
 /// `saturating_increment`).
-pub fn operator_builtin_named(op: &str, canonical_impl: &str) -> Option<&'static str> {
+pub fn operator_builtin_named(op: &str, canonical_impl: &Callee) -> Option<&'static str> {
     OPERATOR_BUILTINS
         .iter()
-        .find(|(_, o, c)| *o == op && *c == canonical_impl)
+        .find(|(_, o, c)| *o == op && c == canonical_impl)
         .map(|(name, _, _)| *name)
 }
 
@@ -2300,8 +2298,8 @@ pub fn collect_operators(e: &ast::Expr, out: &mut std::collections::HashSet<Stri
         // answers "is this an operator" without the `is_operator_name` hook,
         // which this (loader-independent) tooling has no reason to install.
         K::Call(name, args, _) => {
-            if !operator_named_forms(name).is_empty() {
-                out.insert(name.clone());
+            if !operator_named_forms(name.name()).is_empty() {
+                out.insert(name.name().to_string());
             }
             for a in args {
                 collect_operators(a, out);
@@ -2950,124 +2948,17 @@ pub fn is_none_literal_arg(t: &Type) -> bool {
 
 // ---------- Builtin registry ----------
 
-/// Built-in idents that must be brought into scope with
-/// `import { .. } from builtins;` before use. These are the by-name
-/// callable builtins; `some`/`none`/`match` and operators (`+`, `==`)
-/// are language syntax, not importable idents.
-pub const IMPORTABLE_BUILTINS: &[&str] = &[
-    "print",
-    "split",
-    "join",
-    "intersperse",
-    "tuple_windows",
-    "same_case",
-    "case_name",
-    "case_of",
-    "count_is_less_than",
-    "count_is_at_most",
-    "count_is_greater_than",
-    "count_is_at_least",
-    "count_is_equal",
-    "count_is_not_equal",
-    "first",
-    "last",
-    "drop_first",
-    "drop_last",
-    "drop_n",
-    "drop_last_n",
-    "to_str",
-    "map",
-    "try_map",
-    "filter",
-    "filter_map",
-    "all",
-    "any",
-    "left_fold",
-    "right_fold",
-    "opt_left_fold",
-    "opt_right_fold",
-    "zip_with",
-    "trim",
-    "is_all_whitespace",
-    "starts_with",
-    "starts_with_at",
-    "ends_with",
-    "len",
-    "is_nonempty",
-    "is_empty",
-    "push",
-    "extend",
-    "reserve",
-    "is_some",
-    "is_some_and",
-    "is_err_and",
-    "map_err",
-    "map_ok",
-    "int_parse",
-    "is_space",
-    "is_whitespace",
-    "is_digit",
-    "to_digit",
-    "trim_while",
-    "count",
-    "count_while",
-    "count_if",
-    "find_if",
-    "map_find_if",
-    "map_join",
-    "find_map",
-    "reverse_find_map",
-    "find_index",
-    "value_or",
-    "value_or_err",
-    "contains",
-    "has",
-    "to_array",
-    "to_set",
-    "read_file_to_string",
-    "write_string_to_file",
-    "list_files",
-    "now_nanos",
-    "monotonic_now",
-    "execute_program",
-    "union",
-    "union_all",
-    "get",
-    "contains_key",
-    "hash",
-    "min",
-    "max",
-    "minimum",
-    "maximum",
-    "reverse",
-    "sort",
-    "sort_by",
-    "repeat",
-];
-
 /// Builtins that only the AIPL-implemented builtins (`aipl-mono`'s
 /// `builtin_*.aipl`) may import — declared and lowered like any other, but
 /// not yet decided as part of the language a program can reach. `reserve` is
 /// what `map_join` sizes its buffer with; whether a user should size their
 /// own is an open question, and until it is answered the loader refuses the
 /// import anywhere else ([`is_internal_builtin`]).
-pub const INTERNAL_BUILTINS: &[&str] = &["reserve"];
+pub const INTERNAL_BUILTINS: &[Callee] = &[Callee::Reserve];
 
-/// Whether `name` is one of [`INTERNAL_BUILTINS`].
-pub fn is_internal_builtin(name: &str) -> bool {
-    INTERNAL_BUILTINS.contains(&name)
-}
-
-/// Canonical internal name for an importable builtin, or `None` if `name`
-/// isn't one. The loader rewrites imported builtin references to this
-/// reserved name (which users can't write directly), so a user ident can
-/// never collide with — or silently shadow — a builtin.
-pub fn builtin_canonical(name: &str) -> Option<String> {
-    if IMPORTABLE_BUILTINS.contains(&name) {
-        Some(format!("__builtin_{name}"))
-    } else {
-        None
-    }
+/// Whether `callee` is one of [`INTERNAL_BUILTINS`].
+pub fn is_internal_builtin(callee: &Callee) -> bool {
+    INTERNAL_BUILTINS.contains(callee)
 }
 
 /// The *operations* of each shimmable effect: the builtins through which that
@@ -3430,7 +3321,7 @@ fn collect_free(
     match &e.kind {
         K::Ident(n) => read(n, bound, out),
         K::Call(n, args, _) => {
-            read(n, bound, out);
+            read(n.name(), bound, out);
             for a in args {
                 collect_free(a, bound, out);
             }
@@ -3623,7 +3514,7 @@ pub fn ctor_ref_case(e: &ast::Expr) -> Option<(&str, &str)> {
             if !shaped {
                 return None;
             }
-            name.as_str()
+            name.name()
         }
         _ => return None,
     };
