@@ -26,7 +26,35 @@
           </h3>
           <pre class="signature"><code>pub fn requote(self: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>A string token's source text, re-delimited as whichever of <code>&quot;</code> and <code></code> <code> </code><code> spells its value with fewer escapes. A tie keeps the delimiter it has, so a literal with nothing to escape is never rewritten; a </code>&quot;&quot;&quot;<code>/</code><code></code><code> </code><code></code> <code></code><code></code> block (whose two forms are not interchangeable — only the raw template decodes <code>\{</code>) is returned unchanged.</p></div>
+          <div class="doc"><p>A string token's source text, respelled as whichever of the four string spellings — <code>&quot;…&quot;</code>, <code></code> <code>…</code> <code></code>, <code>&quot;&quot;&quot;…&quot;&quot;&quot;</code>, <code></code><code></code> <code></code><code>…</code><code></code> <code></code><code></code> — needs the fewest escapes for its value. Ties go to a single-line form over a block (one line rather than three, or one delimiter rather than three), and then to the family the token already has (quotes or backticks), so a literal with nothing to gain is never rewritten. A value holding a newline is what the block forms are for: a block keeps its lines, and a <code>&quot;…&quot;</code>/<code></code> <code>…</code> <code></code> with <code>\n</code> escapes only ever swaps between those two (<code>reswap</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Spelling">
+          <h3>
+            <a class="anchor" href="#item-Spelling">Spelling</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Spelling</code></pre>
+
+          <div class="doc"><p>One way of spelling a value, and what it costs: the escapes it needs, whether it is a block, and whether it changes the token's family (quotes to backticks or back). <code>text</code> is the spelling itself.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-retemplate">
+          <h3>
+            <a class="anchor" href="#item-retemplate">retemplate</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn retemplate(raw: bool, segs: str[], interps: str[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>An interpolated template respelled between its two forms — <code></code> <code>…{e}…</code> <code></code> and <code></code><code></code> <code></code><code>…{e}…</code><code></code> <code></code><code></code> — by the same rule as a string: fewest escapes, then the single-backtick form, then the form it has. <code>segs</code> are the source texts of the template's literal segments (between the delimiters and the interpolation braces), <code>interps</code> the interpolations' source, which is the same in both forms and is copied through; <code>raw</code> says which form the source used. A template holding a newline stays as written.</p><p>The two forms share the brace escapes <code>\{</code>/<code>\}</code>; a single-backtick segment also escapes <code>\\</code>, <code></code> \<code> </code><code> and the control characters, which a raw segment holds verbatim — so a raw segment can become a single one when it holds no backslash (beyond a brace escape) and no backtick, and a single segment can become a raw one when its only escapes are braces, backslashes and backticks (a control-character escape has no raw spelling), which saves every backslash and backtick escape it has.</code></p></div>
 
 
         </section>
@@ -96,28 +124,84 @@
 
 
 
-        <section class="item" id="item-unblock">
+        <section class="item" id="item-is_block">
           <h3>
-            <a class="anchor" href="#item-unblock">unblock</a>
+            <a class="anchor" href="#item-is_block">is_block</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn unblock(self: str) -&#62; str</code></pre>
+          <pre class="signature"><code>fn is_block(self: str) -&#62; bool</code></pre>
 
-          <div class="doc"><p>A <code>&quot;&quot;&quot;</code>/<code></code><code></code> <code></code><code> </code><code></code><code> block respelled as the single-line literal of its value when that value holds no newline — the block was three lines spent on one line's worth of text — under whichever of </code>&quot;<code> and </code><code> </code> <code></code> needs fewer escapes; a tie keeps the block's own family (<code>&quot;&quot;&quot;</code> to <code>&quot;</code>, <code></code><code></code> <code></code><code> </code><code></code><code> to </code><code> </code> <code></code>). A value with a newline is what the block form is for, and stays.</p><p>Unlike <code>requote</code>'s single-line respelling, which copies the source and only moves the delimiter-specific escapes, this one is spelled from the *value*: a block's content is verbatim (a raw template decodes only <code>\{</code>/<code>\}</code>), so every backslash, tab and delimiter in it gains its escape here.</p></div>
+          <div class="doc"><p>Whether a token spells a <code>&quot;&quot;&quot;</code>/<code></code><code></code> <code></code><code></code> <code></code><code></code> block.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-value_cost">
+        <section class="item" id="item-reswap">
           <h3>
-            <a class="anchor" href="#item-value_cost">value_cost</a>
+            <a class="anchor" href="#item-reswap">reswap</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn value_cost(value: str, delim: char) -&#62; u64</code></pre>
+          <pre class="signature"><code>fn reswap(self: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>How many escapes <code>value</code> needs under <code>delim</code> when spelled from the value.</p></div>
+          <div class="doc"><p>The <code>&quot;</code>/<code></code> <code> </code><code> swap for a single-line literal whose value holds a newline — the one case not spelled from the value, because </code>&quot;a\nb&quot;<code> and a block are not the same number of lines and the escape is what keeps it on one. Copies the source and moves only the delimiter-specific escapes (</code>redelimit<code>); a tie keeps the delimiter it has.</code></p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-block_ok">
+          <h3>
+            <a class="anchor" href="#item-block_ok">block_ok</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn block_ok(self: str, delim: char) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a one-line <code>value</code> can be the content of a single-line block opened and closed by three <code>delim</code>s: it must not start or end with the delimiter or contain the triple (the block's scan would close early), must not start with a space (de-denting strips it), and must hold no control character (a block has no escapes to spell one with).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-better">
+          <h3>
+            <a class="anchor" href="#item-better">better</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn better(self: Spelling, other: Spelling) -&#62; Spelling</code></pre>
+
+          <div class="doc"><p>The better of <code>self</code> and <code>other</code>: fewer escapes, then not a block, then the family the token already has — <code>self</code> on a tie, so the caller's order is the last word.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-brace_escaped">
+          <h3>
+            <a class="anchor" href="#item-brace_escaped">brace_escaped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn brace_escaped(value: str) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>value</code> as the content of a raw template: verbatim but for its braces, the one escape that form decodes (<code>unescape_braces</code>) — a bare one would open an interpolation.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-single_cost">
+          <h3>
+            <a class="anchor" href="#item-single_cost">single_cost</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn single_cost(value: str, delim: char) -&#62; u64</code></pre>
+
+          <div class="doc"><p>How many escapes <code>value</code> needs as a single-line literal under <code>delim</code>: the delimiter's own (<code>needs_escape</code>) plus the ones every single-line form spells — a backslash, a tab, a carriage return — which a block spells with none.</p></div>
 
 
         </section>
@@ -132,6 +216,76 @@
           <pre class="signature"><code>fn encode(value: str, delim: char) -&#62; str</code></pre>
 
           <div class="doc"><p><code>value</code> as the body of a single-line literal delimited by <code>delim</code>: the shared escapes for a backslash, tab and carriage return, and the delimiter's own escapes (<code>needs_escape</code>); everything else verbatim.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-raw_seg_fits_single">
+          <h3>
+            <a class="anchor" href="#item-raw_seg_fits_single">raw_seg_fits_single</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn raw_seg_fits_single(self: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a raw template segment's source can be a single-backtick segment as it is: no backtick, no control character, and no backslash but a brace escape's — anything else would need an escape the raw form never wrote.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-single_seg_fits_raw">
+          <h3>
+            <a class="anchor" href="#item-single_seg_fits_raw">single_seg_fits_raw</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn single_seg_fits_raw(self: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a single-backtick segment's source can be a raw segment: its only escapes are braces and backslashes, and no backslash it spells lands next to a brace — the interpolation's, at the segment's end, or an escaped one within — where the raw form would read the pair as its brace escape. A control-character escape has no raw spelling, and a backtick escape is refused too: a bare backtick next to the closing delimiter would read as part of it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-single_seg_saves">
+          <h3>
+            <a class="anchor" href="#item-single_seg_saves">single_seg_saves</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn single_seg_saves(self: str) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether going raw would save a single-backtick segment an escape: it spells a backslash.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-single_to_raw">
+          <h3>
+            <a class="anchor" href="#item-single_to_raw">single_to_raw</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn single_to_raw(self: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>A single-backtick segment respelled raw: its backslash escapes become the backslash; the brace escapes stay, being the raw form's own.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-join_template">
+          <h3>
+            <a class="anchor" href="#item-join_template">join_template</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn join_template(raw: bool, segs: str[], interps: str[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>The template's source text from its parts: the delimiter, the segments with each interpolation braced between them, the delimiter.</p></div>
 
 
         </section>

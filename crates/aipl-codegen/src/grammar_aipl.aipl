@@ -4302,9 +4302,9 @@ deallocations: 1870306
 reallocations: 245389
 bytes allocated: 319130117
 instructions executed: 482190868
-binary size: 5936912
+binary size: 5936944
   code: 3884692
-  data: 48604
+  data: 48636
   metadata: 2003616
 functions:
   __arr_drop___m11__ParsedParam:

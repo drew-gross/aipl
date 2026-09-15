@@ -77,8 +77,8 @@ bytes allocated: 210
 instructions executed: 421
 binary size: 5576
   code: 2188
-  data: 893
-  metadata: 2495
+  data: 889
+  metadata: 2499
 functions:
   __test$apply_both:
     calls: 1

@@ -1529,9 +1529,9 @@ deallocations: 434
 reallocations: 71
 bytes allocated: 67520
 instructions executed: 387168
-binary size: 2547208
+binary size: 2547296
   code: 1704844
-  data: 11700
+  data: 11788
   metadata: 830664
 functions:
   __arr_drop_StepResult$Kind:

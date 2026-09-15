@@ -545,106 +545,184 @@ fn join_template(raw: bool, segs: str[], interps: str[]) -> str {
     assert(join_template(true, ["", ""], ["x"]) == "```{x}```");
 })
 --- performance ---
-allocations: 120
-deallocations: 120
-reallocations: 6
-bytes allocated: 7556
-instructions executed: 67057
-binary size: 41960
-  code: 24584
-  data: 4489
-  metadata: 12887
+allocations: 565
+deallocations: 565
+reallocations: 8
+bytes allocated: 39066
+instructions executed: 135391
+binary size: 78944
+  code: 46604
+  data: 7993
+  metadata: 24347
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
-    calls: 28
+    calls: 20
     bytes: 304
+  __builtin_all$str$lam$raw_seg_fits_single:
+    calls: 5
+    bytes: 292
+  __builtin_all$str$lam$single_seg_fits_raw:
+    calls: 5
+    bytes: 292
+  __builtin_any$str$lam$retemplate$lambda0:
+    calls: 11
+    bytes: 324
+  __builtin_any$str$lam$retemplate$lambda1:
+    calls: 11
+    bytes: 324
+  __builtin_any$str$lam$single_seg_saves:
+    calls: 5
+    bytes: 324
   __builtin_count_while$char$s0$lam$__m5__dedent$lambda1:
     calls: 0
     bytes: 264
   __builtin_count_while$char$s0$lam$__m5__dedent$lambda2$lambda0:
-    calls: 14
+    calls: 10
     bytes: 264
   __m1__str_lit_value:
-    calls: 12
+    calls: 21
     bytes: 2980
   __m4__process_raw_string:
-    calls: 12
+    calls: 9
     bytes: 2764
   __m8__trim_prefix:
-    calls: 24
+    calls: 18
     bytes: 252
   __m9__trim_suffix:
-    calls: 6
+    calls: 2
     bytes: 356
+  __test$better:
+    calls: 1
+    bytes: 1148
+  __test$block_ok:
+    calls: 1
+    bytes: 744
+  __test$brace_escaped:
+    calls: 1
+    bytes: 520
   __test$encode:
     calls: 1
     bytes: 896
   __test$escape_cost:
     calls: 1
     bytes: 1336
+  __test$is_block:
+    calls: 1
+    bytes: 616
   __test$is_shared_escape:
     calls: 1
     bytes: 404
+  __test$join_template:
+    calls: 1
+    bytes: 1024
   __test$needs_escape:
     calls: 1
     bytes: 552
+  __test$raw_seg_fits_single:
+    calls: 1
+    bytes: 540
   __test$redelimit:
     calls: 1
     bytes: 1756
   __test$requote:
     calls: 1
-    bytes: 2684
-  __test$unblock:
+    bytes: 3896
+  __test$reswap:
     calls: 1
-    bytes: 1588
-  __test$value_cost:
+    bytes: 540
+  __test$retemplate:
     calls: 1
-    bytes: 940
+    bytes: 6084
+  __test$single_cost:
+    calls: 1
+    bytes: 532
+  __test$single_seg_fits_raw:
+    calls: 1
+    bytes: 552
+  __test$single_seg_saves:
+    calls: 1
+    bytes: 276
+  __test$single_to_raw:
+    calls: 1
+    bytes: 376
+  aipl_arr_inc:
+    calls: 4
+    bytes: (external)
   aipl_array_dec:
-    calls: 36
+    calls: 58
     bytes: (external)
   aipl_array_new:
-    calls: 12
+    calls: 35
     bytes: (external)
   aipl_array_push_mut:
-    calls: 14
-    bytes: (external)
-  aipl_array_with_cap:
     calls: 12
     bytes: (external)
+  aipl_array_with_cap:
+    calls: 10
+    bytes: (external)
   aipl_assert:
-    calls: 72
+    calls: 121
     bytes: (external)
   aipl_test_begin:
-    calls: 8
+    calls: 18
     bytes: (external)
   aipl_test_end:
-    calls: 8
+    calls: 18
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  aipl_write_bytes:
+    calls: 86
+    bytes: (external)
+  better:
+    calls: 51
+    bytes: 272
+  block_ok:
+    calls: 46
+    bytes: 804
+  brace_escaped:
+    calls: 18
+    bytes: 1132
   encode:
-    calls: 15
+    calls: 43
     bytes: 1836
   escape_cost:
-    calls: 37
+    calls: 21
     bytes: 352
   is_shared_escape:
-    calls: 36
+    calls: 32
     bytes: 64
+  join_template:
+    calls: 13
+    bytes: 1728
   main:
     calls: 1
-    bytes: 600
+    bytes: 1352
   needs_escape:
-    calls: 416
+    calls: 569
     bytes: 64
-  redelimit:
+  raw_seg_fits_single:
     calls: 16
+    bytes: 396
+  redelimit:
+    calls: 13
     bytes: 1952
   requote:
-    calls: 16
-    bytes: 1124
-  unblock:
-    calls: 12
-    bytes: 1252
+    calls: 22
+    bytes: 2484
+  reswap:
+    calls: 4
+    bytes: 932
+  retemplate:
+    calls: 11
+    bytes: 704
+  single_cost:
+    calls: 43
+    bytes: 312
+  single_seg_fits_raw:
+    calls: 13
+    bytes: 428
+  single_to_raw:
+    calls: 4
+    bytes: 1260

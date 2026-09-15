@@ -177,9 +177,9 @@ deallocations: 8447
 reallocations: 289
 bytes allocated: 910003
 instructions executed: 1155640
-binary size: 242088
+binary size: 242064
   code: 176728
-  data: 3360
+  data: 3336
   metadata: 62000
 functions:
   __arr_drop___m1__Entry:

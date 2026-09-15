@@ -3152,15 +3152,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 15845
-deallocations: 15845
+allocations: 15922
+deallocations: 15922
 reallocations: 1772
-bytes allocated: 3315274
-instructions executed: 26923482
-binary size: 10183792
-  code: 6432580
-  data: 31124
-  metadata: 3720088
+bytes allocated: 3321285
+instructions executed: 26933791
+binary size: 10198840
+  code: 6443256
+  data: 31204
+  metadata: 3724380
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3213,11 +3213,26 @@ functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 18
     bytes: 304
+  __builtin_all$str$lam$__m16__raw_seg_fits_single:
+    calls: 0
+    bytes: 292
+  __builtin_all$str$lam$__m16__single_seg_fits_raw:
+    calls: 1
+    bytes: 292
   __builtin_any$__m1__Doc$lam$__m1__has_hard:
     calls: 0
     bytes: 32
   __builtin_any$__m1__Doc$lam$__m1__has_hard$tail:
     calls: 675
+    bytes: 324
+  __builtin_any$str$lam$__m16__retemplate$lambda0:
+    calls: 1
+    bytes: 324
+  __builtin_any$str$lam$__m16__retemplate$lambda1:
+    calls: 1
+    bytes: 324
+  __builtin_any$str$lam$__m16__single_seg_saves:
+    calls: 1
     bytes: 324
   __builtin_count_is_at_least$char$s0:
     calls: 54
@@ -3271,7 +3286,7 @@ functions:
     calls: 6
     bytes: 300
   __m10__unescape:
-    calls: 10
+    calls: 14
     bytes: 1612
   __m10__unescape_braces:
     calls: 0
@@ -3285,18 +3300,42 @@ functions:
   __m13__trim_suffix:
     calls: 8
     bytes: 356
+  __m16__better:
+    calls: 15
+    bytes: 272
+  __m16__block_ok:
+    calls: 10
+    bytes: 804
+  __m16__encode:
+    calls: 10
+    bytes: 1836
   __m16__escape_cost:
-    calls: 8
+    calls: 0
     bytes: 352
+  __m16__join_template:
+    calls: 1
+    bytes: 1728
   __m16__needs_escape:
-    calls: 21
+    calls: 40
     bytes: 64
+  __m16__raw_seg_fits_single:
+    calls: 0
+    bytes: 396
   __m16__requote:
     calls: 6
-    bytes: 2988
-  __m16__unblock:
+    bytes: 3496
+  __m16__reswap:
+    calls: 0
+    bytes: 2800
+  __m16__retemplate:
+    calls: 1
+    bytes: 1836
+  __m16__single_cost:
+    calls: 10
+    bytes: 312
+  __m16__single_seg_fits_raw:
     calls: 2
-    bytes: 2952
+    bytes: 428
   __m1__col_after:
     calls: 1125
     bytes: 628
@@ -3376,7 +3415,7 @@ functions:
     calls: 0
     bytes: 2608
   __m8__str_lit_value:
-    calls: 2
+    calls: 6
     bytes: 576
   __m8__tpl_kind:
     calls: 2
@@ -3451,7 +3490,7 @@ functions:
     calls: 4785
     bytes: (external)
   aipl_arr_inc:
-    calls: 289165
+    calls: 289168
     bytes: (external)
   aipl_arr_reserve:
     calls: 5033
@@ -3460,13 +3499,13 @@ functions:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 412133
+    calls: 412141
     bytes: (external)
   aipl_array_new:
     calls: 3647
     bytes: (external)
   aipl_array_push:
-    calls: 2124
+    calls: 2127
     bytes: (external)
   aipl_array_push_mut:
     calls: 1962
@@ -3502,7 +3541,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_write_bytes:
-    calls: 4
+    calls: 10
     bytes: (external)
   array_atom:
     calls: 3
@@ -3785,7 +3824,7 @@ functions:
     bytes: 256
   template_scan:
     calls: 1
-    bytes: 2556
+    bytes: 3708
   template_verbatim:
     calls: 1
     bytes: 988
