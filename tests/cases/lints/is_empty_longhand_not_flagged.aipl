@@ -1,6 +1,5 @@
 import {
     equal as ==,
-    is_empty,
     is_nonempty,
     len,
     less_than as <,
@@ -30,8 +29,9 @@ fn main() !prints {
     // The predicate un-negated: that is `is_nonempty`'s own job.
     print(`{xs.is_nonempty()}`);
 
-    // A negation of some other question.
-    print(`{!xs.is_empty()}`);
+    // A negation of some other question. (`!xs.is_empty()` is not it: that is
+    // `is_nonempty` asked the long way, and `len_gt_zero`'s to flag.)
+    print(`{!(xs.len() == 2)}`);
 
     // Zero compared against something that is not a length.
     let n = 0;
@@ -42,13 +42,13 @@ true
 false
 true
 true
-true
+false
 true
 --- performance ---
 allocations: 6
 deallocations: 6
 reallocations: 0
-bytes allocated: 121
+bytes allocated: 122
 instructions executed: 377
 binary size: 3200
   code: 1548

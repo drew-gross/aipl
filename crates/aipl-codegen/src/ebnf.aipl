@@ -48,6 +48,7 @@ import {
     equal as ==,
     extend,
     is_empty,
+    is_nonempty,
     join,
     len,
     logical_not as !,
@@ -380,7 +381,7 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
 fn first_precs<K: variant>(rs: Rule<K>[]) -> Prec[] {
     for (let sub : rs) {
         let ps = climb_precs(sub);
-        if (!ps.is_empty()) {
+        if (ps.is_nonempty()) {
             return ps;
         };
     }
@@ -859,9 +860,9 @@ allocations: 1459
 deallocations: 1459
 reallocations: 292
 bytes allocated: 175680
-instructions executed: 232341
-binary size: 164600
-  code: 108388
+instructions executed: 232255
+binary size: 164584
+  code: 108372
   data: 4276
   metadata: 51936
 functions:
@@ -1095,7 +1096,7 @@ functions:
     bytes: 32
   first_precs$Tok$tail:
     calls: 19
-    bytes: 404
+    bytes: 388
   first_sets$Tok$Node:
     calls: 7
     bytes: 356

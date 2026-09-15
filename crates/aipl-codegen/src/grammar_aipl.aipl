@@ -4305,11 +4305,11 @@ allocations: 1820671
 deallocations: 1820671
 reallocations: 245380
 bytes allocated: 321309845
-instructions executed: 492073880
-binary size: 5935320
-  code: 3883992
+instructions executed: 492073740
+binary size: 5935304
+  code: 3883972
   data: 48620
-  metadata: 2002708
+  metadata: 2002712
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4979,7 +4979,7 @@ functions:
     bytes: 14804
   __m29__pruned$__m21__AiplTok$__m1__Ast:
     calls: 70
-    bytes: 1312
+    bytes: 1292
   __m29__quoted:
     calls: 33249
     bytes: 456

@@ -1,33 +1,48 @@
-import { greater_than as >, len, less_than as <, print, to_str } from builtins;
+import {
+    greater_than as >,
+    is_empty,
+    is_nonempty,
+    len,
+    less_than as <,
+    logical_not as !,
+    print,
+    to_str,
+} from builtins;
 
-// `#[allow]` at the end of the line keeps a length comparison as written — the
-// program compiles and runs. Both operand orders are squelched the same way,
-// since the marker matches on the line the hit's span starts on.
+// `#[allow]` at the end of the line keeps a length comparison, or a negated
+// emptiness test, as written — the program compiles and runs. Both operand
+// orders are squelched the same way, since the marker matches on the line the
+// hit's span starts on. The rewrite sits beside them, so the two spellings are
+// proven to agree.
 fn main() !prints {
     let xs = [1, 2, 3];
     print(to_str(0 < xs.len())); #[allow]
     print(to_str(xs.len() > 0)); #[allow]
+    print(to_str(!xs.is_empty())); #[allow]
+    print(to_str(xs.is_nonempty()));
 }
 --- stdout ---
 true
 true
+true
+true
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 4
+deallocations: 4
 reallocations: 0
-bytes allocated: 40
-instructions executed: 90
-binary size: 1520
-  code: 428
+bytes allocated: 80
+instructions executed: 176
+binary size: 1736
+  code: 568
   data: 103
-  metadata: 989
+  metadata: 1065
 functions:
   __to_str_bool:
-    calls: 2
+    calls: 4
     bytes: 232
   aipl_write_bytes:
-    calls: 2
+    calls: 4
     bytes: (external)
   main:
     calls: 1
-    bytes: 196
+    bytes: 336

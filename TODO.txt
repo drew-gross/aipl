@@ -76,6 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  tm_json test has a multiline literal concatenated with a newline literal which is weird, it should be possible to have a trailing newline in a multiline str literal.
   first_precs should be a map->find chain
   use variants for errors
   grammar_of should do something like enumerate->map (which should fuse)
@@ -317,7 +318,7 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
-  lint against value_or(none), that's silly
+  items_of looks like it should be a filter_map
   lint against set literals that contain duplicates
   set out = [..out, o]; should lint to set out.push(a);
   we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway
@@ -326,7 +327,6 @@ lint:
   xs.fold(0, +) should be sum probably? I guess with wrapping and saturating variants
   any lint that works on bare assignment should work on field assignment (e.g. lint to use --)
   lint to use if let instead of match with empty none case
-  lint !v.is_empty() to v.is_nonempty()
   linter should apply after import resolution so that it doesn't rely on function names as selected by the user (i.e. import as can't interfere with a lint)
   recommend a destructuring with rename when names would be ambiguous
   declared mut but never mutated

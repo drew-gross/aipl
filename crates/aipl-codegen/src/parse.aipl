@@ -762,7 +762,7 @@ fn can_reach<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64) -> bool {
 # difference and it is confined to the expected-set of an error reported at this
 # exact position; see `label_sets` in `ebnf.aipl` for the exact version.
 fn pruned<K: variant, A: any>(p: Parser<K, A>, i: u64, pos: u64, expect_as: str, far: Far) -> Step {
-    if (!expect_as.is_empty()) {
+    if (expect_as.is_nonempty()) {
         return no(far_miss(far, pos, expect_as), pos);
     };
     mut f = far;
@@ -1614,11 +1614,11 @@ allocations: 5431
 deallocations: 5431
 reallocations: 1243
 bytes allocated: 596031
-instructions executed: 1405356
-binary size: 688896
-  code: 418188
+instructions executed: 1405334
+binary size: 688872
+  code: 418168
   data: 10484
-  metadata: 260224
+  metadata: 260220
 functions:
   __arr_drop_Node:
     calls: 16
@@ -2126,7 +2126,7 @@ functions:
     bytes: 2180
   pruned$Tok$Node:
     calls: 11
-    bytes: 1312
+    bytes: 1292
   quoted:
     calls: 107
     bytes: 456

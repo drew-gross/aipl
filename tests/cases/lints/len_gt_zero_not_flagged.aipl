@@ -1,16 +1,19 @@
 import {
     greater_than as >,
     greater_than_or_equal as >=,
+    is_empty,
     is_nonempty,
     len,
     less_than as <,
+    logical_not as !,
     not_equal as !=,
     print,
     to_str,
 } from builtins;
 
 // The shapes the length-against-zero lint must leave alone. It flags exactly
-// two idioms — `0 < x.len()` and `x.len() > 0` — so everything here compiles.
+// three idioms — `0 < x.len()`, `x.len() > 0` and `!x.is_empty()` — so
+// everything here compiles.
 
 // A different bound is a different question.
 fn at_least_two(xs: i64[]) -> bool { 1 < xs.len() }
@@ -31,6 +34,12 @@ fn positive(n: u64) -> bool { 0 < n }
 // The spelling the lint asks for, which must not then flag itself.
 fn any_items(xs: i64[]) -> bool { xs.is_nonempty() }
 
+// An un-negated `is_empty` is the other question, and a negation of anything
+// but `is_empty` is not this idiom.
+fn no_items(xs: i64[]) -> bool { xs.is_empty() }
+
+fn not_positive(n: u64) -> bool { !(0 < n) }
+
 fn main() !prints {
     let xs = [1, 2];
     print(to_str(at_least_two(xs)));
@@ -39,6 +48,8 @@ fn main() !prints {
     print(to_str(not_zero(xs)));
     print(to_str(positive(1)));
     print(to_str(any_items(xs)));
+    print(to_str(no_items(xs)));
+    print(to_str(not_positive(0)));
 }
 --- stdout ---
 true
@@ -47,23 +58,25 @@ true
 true
 true
 true
+false
+true
 --- performance ---
-allocations: 6
-deallocations: 6
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 120
-instructions executed: 258
-binary size: 1944
-  code: 700
+bytes allocated: 161
+instructions executed: 342
+binary size: 2160
+  code: 836
   data: 95
-  metadata: 1149
+  metadata: 1229
 functions:
   __to_str_bool:
-    calls: 6
+    calls: 8
     bytes: 232
   aipl_write_bytes:
-    calls: 6
+    calls: 8
     bytes: (external)
   main:
     calls: 1
-    bytes: 468
+    bytes: 604

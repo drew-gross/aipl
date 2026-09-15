@@ -499,11 +499,11 @@ allocations: 18508
 deallocations: 18508
 reallocations: 2718
 bytes allocated: 2300286
-instructions executed: 4799216
-binary size: 457448
-  code: 299552
+instructions executed: 4799182
+binary size: 457416
+  code: 299516
   data: 7932
-  metadata: 149964
+  metadata: 149968
 functions:
   __arr_drop_Json:
     calls: 125
@@ -795,7 +795,7 @@ functions:
     bytes: 7672
   __m13__pruned$JsonTok$Json:
     calls: 0
-    bytes: 1312
+    bytes: 1292
   __m13__quoted:
     calls: 403
     bytes: 456
@@ -858,7 +858,7 @@ functions:
     bytes: 32
   __m2__first_precs$JsonTok$tail:
     calls: 6
-    bytes: 404
+    bytes: 388
   __m2__first_sets$JsonTok$Json:
     calls: 1
     bytes: 356

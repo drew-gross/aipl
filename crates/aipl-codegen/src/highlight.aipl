@@ -41,6 +41,7 @@ import {
     drop_last,
     equal as ==,
     is_empty,
+    is_nonempty,
     join,
     len,
     less_than as <,
@@ -471,7 +472,7 @@ pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
 fn items_of<K>(rules: TokenRule<K>[], esc_scope: str) -> Item[] {
     mut out: Item[] = [];
     for (let r : rules) {
-        if (!r.scope.is_empty()) {
+        if (r.scope.is_nonempty()) {
             let named = self_referential(r.matcher);
             let item = match (matcher_pat(r.matcher, r.scope, esc_scope)) {
                 Match(re, _) => Item {
@@ -601,7 +602,7 @@ pub fn word_pat(words: str[], scope: str) -> Pat {
 # layout is fixed and deterministic rather than minified.
 pub fn tm_json(Tm { note, name, scope_name, file_types, top, repo }) -> str {
     mut fields = [fld("$schema", json_str(SCHEMA()))];
-    if (!note.is_empty()) {
+    if (note.is_nonempty()) {
         set fields = [..fields, fld("comment", json_str(note))];
     };
     set fields = [
@@ -655,7 +656,7 @@ fn pat_json(p: Pat) -> str {
         Include(name) => `{ob()} "include": "#{name}" {cb()}`,
         Match(re, scope) => {
             mut fields = [fld("match", json_str(re))];
-            if (!scope.is_empty()) {
+            if (scope.is_nonempty()) {
                 set fields = [..fields, fld("name", json_str(scope))];
             };
             obj_of(fields)
@@ -663,16 +664,16 @@ fn pat_json(p: Pat) -> str {
         Caps(re, scopes) => obj_of([fld("match", json_str(re)), caps_fld("captures", scopes, 1)]),
         Region(begin, end, inner, scope, begin_scope, content_scope) => {
             mut fields = [fld("begin", json_str(begin)), fld("end", json_str(end))];
-            if (!scope.is_empty()) {
+            if (scope.is_nonempty()) {
                 set fields = [..fields, fld("name", json_str(scope))];
             };
-            if (!begin_scope.is_empty()) {
+            if (begin_scope.is_nonempty()) {
                 set fields = [..fields, caps_fld("beginCaptures", [begin_scope], 0)];
             };
-            if (!content_scope.is_empty()) {
+            if (content_scope.is_nonempty()) {
                 set fields = [..fields, fld("contentName", json_str(content_scope))];
             };
-            if (!inner.is_empty()) {
+            if (inner.is_nonempty()) {
                 set fields = [..fields, arr_fld("patterns", inner.map(pat_json))];
             };
             obj_of(fields)
@@ -776,11 +777,11 @@ allocations: 1136
 deallocations: 1136
 reallocations: 28
 bytes allocated: 96447
-instructions executed: 99016
-binary size: 140032
-  code: 89788
+instructions executed: 98996
+binary size: 139920
+  code: 89680
   data: 5328
-  metadata: 44916
+  metadata: 44912
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -868,7 +869,7 @@ functions:
     bytes: 7844
   __test$tm_json:
     calls: 1
-    bytes: 5904
+    bytes: 5888
   __test$word_pat:
     calls: 1
     bytes: 2112
@@ -961,13 +962,13 @@ functions:
     bytes: 1796
   pat_json:
     calls: 2
-    bytes: 4656
+    bytes: 4576
   re_escape:
     calls: 42
     bytes: 1628
   rule_pats$Kind:
     calls: 2
-    bytes: 12368
+    bytes: 12356
   run_len:
     calls: 5
     bytes: 1340
