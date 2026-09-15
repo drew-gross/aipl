@@ -470,11 +470,11 @@ allocations: 12791
 deallocations: 12791
 reallocations: 2074
 bytes allocated: 1218105
-instructions executed: 2709483
-binary size: 427168
-  code: 279324
+instructions executed: 2709571
+binary size: 427600
+  code: 279564
   data: 6044
-  metadata: 141800
+  metadata: 141992
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -611,6 +611,9 @@ functions:
   __builtin_intersperse$__m5__Doc:
     calls: 0
     bytes: 404
+  __builtin_map_find_if$__m3__Rule$CalcTok$__m3__Prec[]$lam$__m2__climb_precs$CalcTok$__builtin_is_nonempty:
+    calls: 4
+    bytes: 436
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves:
     calls: 0
     bytes: 44
@@ -838,7 +841,7 @@ functions:
     bytes: 32
   __m2__first_precs$CalcTok$tail:
     calls: 4
-    bytes: 388
+    bytes: 192
   __m2__first_sets$CalcTok$Calc:
     calls: 1
     bytes: 356

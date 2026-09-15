@@ -280,11 +280,11 @@ allocations: 6674
 deallocations: 6674
 reallocations: 937
 bytes allocated: 622145
-instructions executed: 1521145
-binary size: 408208
-  code: 268032
+instructions executed: 1521189
+binary size: 408648
+  code: 268272
   data: 4892
-  metadata: 135284
+  metadata: 135484
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -406,6 +406,9 @@ functions:
   __builtin_intersperse$__m5__Doc:
     calls: 34
     bytes: 404
+  __builtin_map_find_if$__m3__Rule$SexpKind$__m3__Prec[]$lam$__m2__climb_precs$SexpKind$__builtin_is_nonempty:
+    calls: 2
+    bytes: 436
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves:
     calls: 0
     bytes: 44
@@ -636,7 +639,7 @@ functions:
     bytes: 32
   __m2__first_precs$SexpKind$tail:
     calls: 2
-    bytes: 388
+    bytes: 192
   __m2__first_sets$SexpKind$__m15__Sexp:
     calls: 1
     bytes: 356

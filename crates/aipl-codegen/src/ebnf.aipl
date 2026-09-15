@@ -47,6 +47,7 @@ import {
     contains,
     equal as ==,
     extend,
+    find_if,
     is_empty,
     is_nonempty,
     join,
@@ -378,14 +379,9 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
     }
 }
 
+# The levels of the first rule in `rs` that holds a climb, or `[]`.
 fn first_precs<K: variant>(rs: Rule<K>[]) -> Prec[] {
-    for (let sub : rs) {
-        let ps = climb_precs(sub);
-        if (ps.is_nonempty()) {
-            return ps;
-        };
-    }
-    []
+    rs.map(climb_precs).find_if(is_nonempty).value_or([])
 }
 
 # `(* precedence: "*" > "+" "-" *)` — the levels loosest-last, each one its
@@ -860,11 +856,11 @@ allocations: 1459
 deallocations: 1459
 reallocations: 292
 bytes allocated: 175680
-instructions executed: 232255
-binary size: 164584
-  code: 108372
+instructions executed: 232673
+binary size: 165000
+  code: 108612
   data: 4276
-  metadata: 51936
+  metadata: 52112
 functions:
   __arr_drop_First$Tok:
     calls: 23
@@ -908,6 +904,9 @@ functions:
   __builtin_find_index$str$lam$__m1__link_rule$Tok$lambda0:
     calls: 24
     bytes: 400
+  __builtin_map_find_if$__m1__Rule$Tok$__m1__Prec[]$lam$climb_precs$Tok$__builtin_is_nonempty:
+    calls: 19
+    bytes: 436
   __builtin_map_join$__m1__Rule$Tok$__m1__ListStyle$lam$__m1__group_styles$Tok:
     calls: 0
     bytes: 44
@@ -1096,7 +1095,7 @@ functions:
     bytes: 32
   first_precs$Tok$tail:
     calls: 19
-    bytes: 388
+    bytes: 192
   first_sets$Tok$Node:
     calls: 7
     bytes: 356

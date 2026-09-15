@@ -499,11 +499,11 @@ allocations: 18508
 deallocations: 18508
 reallocations: 2718
 bytes allocated: 2300286
-instructions executed: 4799182
-binary size: 457416
-  code: 299516
+instructions executed: 4799314
+binary size: 457856
+  code: 299756
   data: 7932
-  metadata: 149968
+  metadata: 150168
 functions:
   __arr_drop_Json:
     calls: 125
@@ -625,6 +625,9 @@ functions:
   __builtin_intersperse$__m5__Doc:
     calls: 34
     bytes: 404
+  __builtin_map_find_if$__m3__Rule$JsonTok$__m3__Prec[]$lam$__m2__climb_precs$JsonTok$__builtin_is_nonempty:
+    calls: 6
+    bytes: 436
   __builtin_map_join$Json$char$s2$s3$s4$rs$lam$render_json:
     calls: 14
     bytes: 1328
@@ -858,7 +861,7 @@ functions:
     bytes: 32
   __m2__first_precs$JsonTok$tail:
     calls: 6
-    bytes: 388
+    bytes: 192
   __m2__first_sets$JsonTok$Json:
     calls: 1
     bytes: 356

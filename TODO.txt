@@ -77,7 +77,6 @@ highlighter:
 
 misc cleanup:
   tm_json test has a multiline literal concatenated with a newline literal which is weird, it should be possible to have a trailing newline in a multiline str literal.
-  first_precs should be a map->find chain
   use variants for errors
   grammar_of should do something like enumerate->map (which should fuse)
   nested_len should maybe use an all_suffixes type utility
