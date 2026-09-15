@@ -747,7 +747,7 @@
           </h3>
           <pre class="signature"><code>fn interp_call(e: Expr) -&#62; Expr</code></pre>
 
-          <div class="doc"><p><code>__template_interp</code> passes a <code>str</code> through unchanged and widens a <code>char</code> to its one-character <code>str</code>, so neither picks up the quotes <code>to_str</code> renders around a text scalar; anything else it converts.</p></div>
+          <div class="doc"><p><code>__template_interp</code> is <code>to_str</code> under another name — a <code>str</code> passes through unchanged, a <code>char</code> widens to its one-character <code>str</code>, anything else renders by its type — kept distinct so a lowered template is recognizable as one.</p></div>
 
 
         </section>

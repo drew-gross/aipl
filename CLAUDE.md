@@ -476,12 +476,13 @@ reaching that builtin dies. One such lint took out 66 cases at once.
 
 ## Two literal gotchas when building strings
 
-- **A `char` interpolates bare, but `to_str` still quotes it.** `` `{c}` `` on a
-  `char` renders `x`, exactly as a `str` interpolates without its double quotes —
-  but `to_str('x')` is still the *literal* `'x'`, and so is a char nested in a
-  rendered array or struct (`['a', 'b']`). Note `s[i]` is a `char?`, not a
-  `char`, so it gets neither treatment — it renders `some('x')`. Indexing a
-  `str`'s bytes for text still wants the one-byte **slice** `s[i..i + 1]`.
+- **A text scalar renders bare at the top level, quoted when nested.**
+  `to_str(v)` is exactly what `` `{v}` `` interpolates: a `char` renders `x` and
+  a `str` renders its text, with no quotes. Only a char or str *nested* in a
+  rendered array, struct or optional keeps its literal form (`['a', 'b']`,
+  `some("s")`), where the quotes tell it apart from the structure around it.
+  Note `s[i]` is a `char?`, not a `char`, so it renders `some('x')`. Indexing
+  a `str`'s bytes for text still wants the one-byte **slice** `s[i..i + 1]`.
 - **A `"""` block is raw *and* dedented.** No escape processing, and the common
   leading indent is stripped — so on a single-line block a leading space is
   removed while a trailing one is kept (`""" x """` is `"x "`). It is the right

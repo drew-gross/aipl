@@ -1,15 +1,19 @@
 import { concat as +++, print, to_str, wrapping_add as + } from builtins;
 
-// The generic `to_str` renders any value by its static type. Scalars: i64 as
-// decimal, bool as true/false, char as 'c', str as "s" (Debug-style quoting).
+// The generic `to_str` renders any value by its static type — exactly what a
+// template's `{v}` interpolates. Scalars: i64 as decimal, bool as true/false,
+// and the text scalars as their text: a char is the one-char string, a str is
+// itself. (Only *nested* in a rendered container or constructor is text
+// quoted, where the quotes tell it apart from the structure around it.)
 // Callable as a function or a method.
 fn main() !prints {
     print(to_str(42)); // 42
     print(to_str(-7)); // -7
     print(to_str(true)); // true
     print(to_str(false)); // false
-    print(to_str('c')); // 'c'
-    print(to_str("hi")); // "hi"
+    print(to_str('c')); // c
+    print(to_str("hi")); // hi
+    print(`{to_str(["a", "b"])} {to_str(some('c'))}`); // ["a", "b"] some('c')
     print((1 + 2).to_str()); // 3 (method form)
     print("x = " +++ to_str(5)); // x = 5
 }
@@ -18,42 +22,49 @@ fn main() !prints {
 -7
 true
 false
-'c'
-"hi"
+c
+hi
+["a", "b"] some('c')
 3
 x = 5
 --- performance ---
-allocations: 9
-deallocations: 9
+allocations: 12
+deallocations: 12
 reallocations: 0
-bytes allocated: 238
-instructions executed: 309
-binary size: 3184
-  code: 1500
-  data: 47
-  metadata: 1637
+bytes allocated: 506
+instructions executed: 735
+binary size: 5416
+  code: 2732
+  data: 187
+  metadata: 2497
 functions:
   __to_str_bool:
     calls: 2
     bytes: 232
-  __to_str_char:
+  __to_str_char$opt:
     calls: 1
-    bytes: 204
+    bytes: 380
   __to_str_i64:
     calls: 4
     bytes: 204
-  __to_str_str:
+  __to_str_str$arr:
     calls: 1
-    bytes: 300
+    bytes: 828
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
   aipl_i64_len:
     calls: 8
     bytes: (external)
   aipl_write_bytes:
-    calls: 3
+    calls: 9
     bytes: (external)
   aipl_write_i64:
     calls: 4
     bytes: (external)
   main:
     calls: 1
-    bytes: 560
+    bytes: 1088

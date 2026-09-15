@@ -1,17 +1,14 @@
 import { print, to_str } from builtins;
 
 // A `char` interpolates as the bare character, mirroring how a `str` does —
-// `to_str` renders a text scalar Debug-style (`'c'`, `"s"`), and an
-// interpolation wants the text, not its literal form. The quoting is unchanged
-// everywhere else: `to_str` on the char itself, and a char nested inside a
-// rendered container, both still show the literal.
+// and `to_str` is the same rendering, so `to_str(c)` is the bare character
+// too. Only a char nested inside a rendered container still shows its literal
+// form, where the quotes tell it apart from the structure around it.
 fn main() !prints {
     let c = 'b';
     print(`bare: {c}`); // bare: b
     print(`built: {'x'}{'y'}{'z'}`); // built: xyz
-
-    // `to_str` is untouched — still the quoted literal, at every nesting level.
-    print(`to_str: {to_str(c)}`); // to_str: 'b'
+    print(`to_str: {to_str(c)}`); // to_str: b
     print(`nested: {['a', 'b']}`); // nested: ['a', 'b']
 
     // Indexing a `str` yields a `char?`, not a `char`, so it gets neither
@@ -25,24 +22,21 @@ fn main() !prints {
 --- stdout ---
 bare: b
 built: xyz
-to_str: 'b'
+to_str: b
 nested: ['a', 'b']
 opt: some('h')
 str: hi
 --- performance ---
-allocations: 11
-deallocations: 11
+allocations: 10
+deallocations: 10
 reallocations: 0
-bytes allocated: 774
-instructions executed: 709
-binary size: 5368
-  code: 2948
+bytes allocated: 755
+instructions executed: 671
+binary size: 5064
+  code: 2732
   data: 139
-  metadata: 2281
+  metadata: 2193
 functions:
-  __to_str_char:
-    calls: 1
-    bytes: 204
   __to_str_char$arr:
     calls: 1
     bytes: 768
@@ -54,4 +48,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1596
+    bytes: 1584

@@ -245,15 +245,15 @@ fn token_values(lexed: LexResult<AiplTok>) -> str[] {
 # only — as a sorted multiset.
 fn comment_texts(lexed: LexResult<AiplTok>) -> str[] { lexed.trivia.map(|t| t.text.text).sort() }
 --- performance ---
-allocations: 20280
-deallocations: 20280
+allocations: 20264
+deallocations: 20264
 reallocations: 2930
-bytes allocated: 4071105
-instructions executed: 8675134
-binary size: 6677080
-  code: 4393040
+bytes allocated: 4070769
+instructions executed: 8674078
+binary size: 6676592
+  code: 4392680
   data: 10898
-  metadata: 2273142
+  metadata: 2273014
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1776,9 +1776,6 @@ functions:
   __to_str___m23__AiplTok:
     calls: 150
     bytes: 8660
-  __to_str_str:
-    calls: 16
-    bytes: 300
   __to_str_u64:
     calls: 0
     bytes: 204
@@ -1852,7 +1849,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_write_bytes:
-    calls: 288
+    calls: 272
     bytes: (external)
   aipl_write_i64:
     calls: 4
@@ -1877,7 +1874,7 @@ functions:
     bytes: 492
   token_value:
     calls: 167
-    bytes: 6256
+    bytes: 6196
   token_values:
     calls: 28
     bytes: 1740

@@ -1460,9 +1460,9 @@ fn seg_at(self: str[], i: u64) -> str { self[i].value_or("") }
 
 fn expr_at(self: Expr[], i: u64, sp: Span) -> Expr { self[i].value_or(at(Unit, sp)) }
 
-# `__template_interp` passes a `str` through unchanged and widens a `char` to
-# its one-character `str`, so neither picks up the quotes `to_str` renders
-# around a text scalar; anything else it converts.
+# `__template_interp` is `to_str` under another name — a `str` passes through
+# unchanged, a `char` widens to its one-character `str`, anything else renders
+# by its type — kept distinct so a lowered template is recognizable as one.
 fn interp_call(e: Expr) -> Expr {
     let span = e.span;
     at(Call("__template_interp", [e], false), span)

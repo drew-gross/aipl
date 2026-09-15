@@ -65,23 +65,20 @@ fn main() !prints {
 --- stdout ---
 ["a", "b", "c"]
 6
-["'x'", "'y'"]
+["x", "y"]
 11
 0
 --- performance ---
-allocations: 16
-deallocations: 16
+allocations: 14
+deallocations: 14
 reallocations: 3
-bytes allocated: 760
-instructions executed: 1744
-binary size: 6552
-  code: 3656
+bytes allocated: 718
+instructions executed: 1668
+binary size: 6288
+  code: 3444
   data: 99
-  metadata: 2797
+  metadata: 2745
 functions:
-  __to_str_char:
-    calls: 2
-    bytes: 204
   __to_str_i64:
     calls: 3
     bytes: 204
@@ -123,7 +120,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2236
+    bytes: 2228
   total:
     calls: 2
     bytes: 184

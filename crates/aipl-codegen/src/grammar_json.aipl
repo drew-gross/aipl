@@ -427,9 +427,7 @@ fn escape_json(s: str) -> str {
                 '\n' => """\n""",
                 '\t' => """\t""",
                 '\r' => """\r""",
-                // A `char` interpolates as the bare character, so the default arm is
-                // just the character itself — no one-byte slice to route around
-                // `to_str`'s quoting.
+                // A `char` interpolates as the bare character.
                 _ => `{c}`,
             },
         )

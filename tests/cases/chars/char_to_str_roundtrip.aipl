@@ -1,26 +1,24 @@
 import { equal as ==, print, to_str } from builtins;
 
-// `to_str` on a char yields its Debug-style quoted form, `'X'`.
+// `to_str` on a char yields the one-char string holding it, `X` — the text,
+// not a quoted literal — the same as `{c}` interpolates.
 fn main() !prints {
     let s = to_str('X');
-    print(to_str(if (s == "'X'") { 1 } else { 0 })); // 1
+    print(to_str(if (s == "X") { 1 } else { 0 })); // 1
 }
 --- stdout ---
 1
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 36
-instructions executed: 80
-binary size: 1608
-  code: 600
+bytes allocated: 17
+instructions executed: 42
+binary size: 1336
+  code: 384
   data: 1
-  metadata: 1007
+  metadata: 951
 functions:
-  __to_str_char:
-    calls: 1
-    bytes: 204
   __to_str_i64:
     calls: 1
     bytes: 204
@@ -32,4 +30,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 192
+    bytes: 180

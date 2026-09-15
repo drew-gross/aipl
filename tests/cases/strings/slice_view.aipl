@@ -9,7 +9,7 @@ fn main() !prints {
     let s = "hello, world!"; // 13 bytes (heap)
     let v = s[1..11]; // "ello, worl" (10 bytes -> a view sharing s)
     print(v); // ello, worl
-    print(to_str(v)); // "ello, worl"
+    print(to_str(v)); // ello, worl
     mut n = 0;
     for (let c : v) {
         set n++;
@@ -21,21 +21,21 @@ fn main() !prints {
 }
 --- stdout ---
 ello, worl
-"ello, worl"
+ello, worl
 10
 ello, worl!
 true
 lo
 --- performance ---
-allocations: 4
-deallocations: 4
+allocations: 3
+deallocations: 3
 reallocations: 0
-bytes allocated: 154
-instructions executed: 702
-binary size: 3144
-  code: 1444
+bytes allocated: 126
+instructions executed: 636
+binary size: 2640
+  code: 1104
   data: 47
-  metadata: 1653
+  metadata: 1489
 functions:
   __to_str_bool:
     calls: 1
@@ -43,18 +43,15 @@ functions:
   __to_str_i64:
     calls: 1
     bytes: 204
-  __to_str_str:
-    calls: 1
-    bytes: 300
   aipl_i64_len:
     calls: 2
     bytes: (external)
   aipl_write_bytes:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_write_i64:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 708
+    bytes: 668

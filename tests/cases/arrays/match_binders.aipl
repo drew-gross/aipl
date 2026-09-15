@@ -44,28 +44,25 @@ fn main() !prints {
 --- stdout ---
 greeting
 empty
-one 'q'
-neg '5'
-two 'a''b'
+one q
+neg 5
+two ab
 many
 0
 7
 7
 -1
 --- performance ---
-allocations: 12
-deallocations: 12
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 497
-instructions executed: 809
-binary size: 5928
-  code: 3452
+bytes allocated: 421
+instructions executed: 653
+binary size: 5488
+  code: 3144
   data: 177
-  metadata: 2299
+  metadata: 2167
 functions:
-  __to_str_char:
-    calls: 4
-    bytes: 204
   __to_str_i64:
     calls: 4
     bytes: 204
@@ -77,7 +74,7 @@ functions:
     bytes: (external)
   classify:
     calls: 6
-    bytes: 1124
+    bytes: 1020
   main:
     calls: 1
     bytes: 1920

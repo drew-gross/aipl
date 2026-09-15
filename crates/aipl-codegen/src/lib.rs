@@ -14968,30 +14968,18 @@ fn compile_call_expr<M: Module>(
             };
             (out, ConcreteType::Primitive(p))
         }
-        "__builtin_to_str" => {
-            // Generic `to_str(x)`: render by the argument's static type.
+        "__builtin_to_str" | "__template_interp" => {
+            // Generic `to_str(x)`, and a template literal's `{x}`, which is the
+            // same thing: a `str` is its own text, a `char` is the one-char
+            // `str` holding it, and anything else renders by its static type.
+            // A text scalar is *not* quoted at the top level — `to_str("s")` is
+            // `s`, exactly as `{s}` interpolates — while one nested in a
+            // rendered container or constructor still is (`["a", "b"]`,
+            // `some('c')`), where the quotes are what tells a string apart
+            // from the structure around it.
             if args.len() != 1 {
                 return Err(Error::at(
                     format!("\"to_str\" expects 1 argument, got {}", args.len()),
-                    span.clone(),
-                ));
-            }
-            let (v, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let s = emit_to_str(module, builder, cx, scopes, v, &t)?;
-            (s, ConcreteType::Primitive(Primitive::Str))
-        }
-        "__template_interp" => {
-            // Template-literal interpolation: pass `str` through as-is, widen a
-            // `char` to the one-char `str` holding it, and convert any other
-            // type via `to_str`. Both special cases exist for the same reason —
-            // `to_str` renders a text scalar Debug-style (`"s"`, `'c'`), and an
-            // interpolation wants the text, not its literal form.
-            if args.len() != 1 {
-                return Err(Error::at(
-                    format!(
-                        "\"__template_interp\" expects 1 argument, got {}",
-                        args.len()
-                    ),
                     span.clone(),
                 ));
             }

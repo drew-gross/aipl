@@ -23,23 +23,20 @@ zero
 one
 2
 two
-00'a'
-01'b'
-10'c'
+00a
+01b
+10c
 --- performance ---
-allocations: 20
-deallocations: 20
+allocations: 17
+deallocations: 17
 reallocations: 0
-bytes allocated: 922
-instructions executed: 1080
-binary size: 3984
-  code: 2188
+bytes allocated: 865
+instructions executed: 966
+binary size: 3704
+  code: 1964
   data: 1
-  metadata: 1795
+  metadata: 1739
 functions:
-  __to_str_char:
-    calls: 3
-    bytes: 204
   __to_str_u64:
     calls: 9
     bytes: 204
@@ -57,4 +54,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1780
+    bytes: 1760
