@@ -470,11 +470,11 @@ allocations: 12884
 deallocations: 12884
 reallocations: 2085
 bytes allocated: 1220593
-instructions executed: 2710790
-binary size: 434416
-  code: 283916
+instructions executed: 2596167
+binary size: 410184
+  code: 267988
   data: 6044
-  metadata: 144456
+  metadata: 136152
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -640,16 +640,16 @@ functions:
     bytes: 440
   __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam$__m13__lower_node$CalcTok$Calc$lambda0:
     calls: 447
-    bytes: 652
+    bytes: 532
   __builtin_try_map$__m3__Production$CalcTok$Calc$__m2__First<CalcTok>$__m3__ParseError$lam$__m2__linked_first_sets$CalcTok$Calc$lambda2:
     calls: 4
-    bytes: 940
+    bytes: 832
   __builtin_try_map$__m3__Rule$CalcTok$__m2__First<CalcTok>$__m3__ParseError$lam$__m2__rule_first$CalcTok$lambda0:
     calls: 8
-    bytes: 656
+    bytes: 536
   __builtin_try_map$__m3__Rule$CalcTok$__m3__Rule$CalcTok$__m3__ParseError$lam$__m3__desugar_rule$CalcTok:
     calls: 256
-    bytes: 628
+    bytes: 504
   __eq_Calc:
     calls: 37
     bytes: 252
@@ -673,31 +673,31 @@ functions:
     bytes: 824
   __m11__delimited_len:
     calls: 0
-    bytes: 2124
+    bytes: 1908
   __m11__finalize_template$CalcTok:
     calls: 0
-    bytes: 3788
+    bytes: 3508
   __m11__float_len:
     calls: 0
     bytes: 832
   __m11__interp_scan$CalcTok:
     calls: 0
-    bytes: 2016
+    bytes: 1880
   __m11__lex$CalcTok:
     calls: 54
-    bytes: 1320
+    bytes: 1184
   __m11__lex_step$CalcTok:
     calls: 444
-    bytes: 23488
+    bytes: 21556
   __m11__nested_len:
     calls: 0
     bytes: 1136
   __m11__step_result$CalcTok:
     calls: 870
-    bytes: 6944
+    bytes: 7444
   __m11__template_scan$CalcTok:
     calls: 0
-    bytes: 3280
+    bytes: 2908
   __m11__template_step$CalcTok:
     calls: 0
     bytes: 444
@@ -712,7 +712,7 @@ functions:
     bytes: 368
   __m13__climb$CalcTok$Calc:
     calls: 160
-    bytes: 3388
+    bytes: 2992
   __m13__error_at$CalcTok$Calc:
     calls: 4
     bytes: 2780
@@ -730,28 +730,28 @@ functions:
     bytes: 364
   __m13__lower_node$CalcTok$Calc:
     calls: 447
-    bytes: 5476
+    bytes: 4604
   __m13__match_group$CalcTok$Calc:
     calls: 0
-    bytes: 5712
+    bytes: 5112
   __m13__match_leading_sep$CalcTok$Calc:
     calls: 0
-    bytes: 1276
+    bytes: 1096
   __m13__match_many$CalcTok$Calc:
     calls: 0
-    bytes: 1444
+    bytes: 1160
   __m13__match_maybe$CalcTok$Calc:
     calls: 0
-    bytes: 1040
+    bytes: 856
   __m13__match_one_of$CalcTok$Calc:
     calls: 342
-    bytes: 1668
+    bytes: 1488
   __m13__match_prod$CalcTok$Calc:
     calls: 417
-    bytes: 7392
+    bytes: 6200
   __m13__match_reps$CalcTok$Calc:
     calls: 0
-    bytes: 4712
+    bytes: 4136
   __m13__match_rule$CalcTok$Calc:
     calls: 1375
     bytes: 5792
@@ -760,16 +760,16 @@ functions:
     bytes: 952
   __m13__match_then$CalcTok$Calc:
     calls: 206
-    bytes: 2012
+    bytes: 1820
   __m13__parse$CalcTok$Calc:
     calls: 42
-    bytes: 380
+    bytes: 284
   __m13__parse_cst$CalcTok$Calc:
     calls: 53
-    bytes: 492
+    bytes: 364
   __m13__parse_prepared$CalcTok$Calc:
     calls: 53
-    bytes: 7408
+    bytes: 6660
   __m13__pruned$CalcTok$Calc:
     calls: 0
     bytes: 1284
@@ -838,10 +838,10 @@ functions:
     bytes: 192
   __m2__first_sets$CalcTok$Calc:
     calls: 1
-    bytes: 356
+    bytes: 236
   __m2__linked_first_sets$CalcTok$Calc:
     calls: 1
-    bytes: 1208
+    bytes: 1096
   __m2__merge$CalcTok:
     calls: 24
     bytes: 436
@@ -856,7 +856,7 @@ functions:
     bytes: 1708
   __m2__rule_first$CalcTok:
     calls: 40
-    bytes: 7752
+    bytes: 7216
   __m2__show_first$CalcTok:
     calls: 3
     bytes: 3836
@@ -865,16 +865,16 @@ functions:
     bytes: 444
   __m2__show_first_sets$CalcTok$Calc:
     calls: 1
-    bytes: 540
+    bytes: 412
   __m2__show_first_sets$CalcTok$Calc$zip1$own0:
     calls: 1
     bytes: 1164
   __m3__desugar_opt$CalcTok:
     calls: 0
-    bytes: 700
+    bytes: 580
   __m3__desugar_rule$CalcTok:
     calls: 832
-    bytes: 11964
+    bytes: 11144
   __m3__failure_message:
     calls: 7
     bytes: 488
@@ -886,16 +886,16 @@ functions:
     bytes: 3460
   __m3__link$CalcTok$Calc:
     calls: 63
-    bytes: 2736
+    bytes: 2488
   __m3__link_opt$CalcTok:
     calls: 0
-    bytes: 716
+    bytes: 596
   __m3__link_rule$CalcTok:
     calls: 819
-    bytes: 8200
+    bytes: 6864
   __m3__link_rules$CalcTok:
     calls: 252
-    bytes: 716
+    bytes: 600
   __m3__prod_names$CalcTok$Calc:
     calls: 119
     bytes: 548
@@ -904,25 +904,25 @@ functions:
     bytes: 464
   __m4__fmt_node$CalcTok$Calc$s1$lam$calc_space:
     calls: 99
-    bytes: 5276
+    bytes: 4428
   __m4__format_cst$CalcTok$Calc$s1$lam$calc_space:
     calls: 9
-    bytes: 384
+    bytes: 264
   __m4__gap_wanted$lam$calc_space:
     calls: 103
     bytes: 192
   __m4__group_doc$CalcTok$Calc$s1$lam$calc_space:
     calls: 0
-    bytes: 2420
+    bytes: 1716
   __m4__inline_doc$lam$calc_space:
     calls: 67
     bytes: 2416
   __m4__pieces$CalcTok$Calc$s1$lam$calc_space:
     calls: 99
-    bytes: 3424
+    bytes: 3220
   __m4__render_cst$CalcTok$Calc$s1$lam$calc_space:
     calls: 9
-    bytes: 4504
+    bytes: 4380
   __m4__wrapped$lam$calc_space:
     calls: 0
     bytes: 4096
@@ -1050,13 +1050,13 @@ functions:
     calls: 4129
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 34411
+    calls: 33083
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 525
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 30282
+    calls: 28954
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 525
@@ -1087,7 +1087,7 @@ functions:
     bytes: (external)
   calc_cst:
     calls: 11
-    bytes: 460
+    bytes: 332
   calc_grammar:
     calls: 65
     bytes: 3632
@@ -1096,10 +1096,10 @@ functions:
     bytes: 288
   depth_of:
     calls: 2
-    bytes: 344
+    bytes: 260
   eval:
     calls: 12
-    bytes: 324
+    bytes: 228
   eval_calc:
     calls: 0
     bytes: 32
@@ -1108,7 +1108,7 @@ functions:
     bytes: 1036
   format_calc:
     calls: 9
-    bytes: 444
+    bytes: 336
   is_calc_op:
     calls: 206
     bytes: 332
@@ -1117,19 +1117,19 @@ functions:
     bytes: 2508
   lower_atom:
     calls: 121
-    bytes: 1452
+    bytes: 1212
   lower_expr:
     calls: 186
-    bytes: 1908
+    bytes: 1560
   lower_unary:
     calls: 135
-    bytes: 1452
+    bytes: 1100
   main:
     calls: 1
     bytes: 460
   parse_calc:
     calls: 43
-    bytes: 460
+    bytes: 332
   pow:
     calls: 0
     bytes: 36
@@ -1141,4 +1141,4 @@ functions:
     bytes: 1008
   shown:
     calls: 1
-    bytes: 508
+    bytes: 392

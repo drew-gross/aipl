@@ -36,11 +36,11 @@ allocations: 18
 deallocations: 18
 reallocations: 3
 bytes allocated: 1064
-instructions executed: 1754
-binary size: 10776
-  code: 6000
+instructions executed: 1732
+binary size: 10624
+  code: 5912
   data: 585
-  metadata: 4191
+  metadata: 4127
 functions:
   __eq_str$arr:
     calls: 6
@@ -86,7 +86,7 @@ functions:
     bytes: (external)
   find_files:
     calls: 1
-    bytes: 848
+    bytes: 760
   main:
     calls: 1
     bytes: 184

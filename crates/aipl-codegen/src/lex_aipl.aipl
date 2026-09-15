@@ -966,11 +966,11 @@ allocations: 281
 deallocations: 281
 reallocations: 57
 bytes allocated: 402213
-instructions executed: 1482026
-binary size: 586584
-  code: 398844
+instructions executed: 1475226
+binary size: 577968
+  code: 392984
   data: 10500
-  metadata: 177240
+  metadata: 174484
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -1061,31 +1061,31 @@ functions:
     bytes: 824
   __m1__delimited_len:
     calls: 66
-    bytes: 2124
+    bytes: 1908
   __m1__finalize_template$AiplTok:
     calls: 6
-    bytes: 8652
+    bytes: 7232
   __m1__float_len:
     calls: 0
     bytes: 832
   __m1__interp_scan$AiplTok:
     calls: 2
-    bytes: 2016
+    bytes: 1880
   __m1__lex$AiplTok:
     calls: 30
-    bytes: 1320
+    bytes: 1184
   __m1__lex_step$AiplTok:
     calls: 106
-    bytes: 29336
+    bytes: 27352
   __m1__nested_len:
     calls: 71
     bytes: 1136
   __m1__step_result$AiplTok:
     calls: 2436
-    bytes: 15252
+    bytes: 14264
   __m1__template_scan$AiplTok:
     calls: 6
-    bytes: 3280
+    bytes: 2908
   __m1__template_step$AiplTok:
     calls: 52
     bytes: 444
@@ -1220,13 +1220,13 @@ functions:
     bytes: 196
   int_lit:
     calls: 4
-    bytes: 1364
+    bytes: 896
   lex_aipl:
     calls: 0
     bytes: 144
   lex_aipl_tokens:
     calls: 2
-    bytes: 488
+    bytes: 348
   main:
     calls: 1
     bytes: 584

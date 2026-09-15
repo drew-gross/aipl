@@ -88,18 +88,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2805
-binary size: 21520
-  code: 12352
+instructions executed: 2749
+binary size: 21136
+  code: 12048
   data: 1639
-  metadata: 7529
+  metadata: 7449
 functions:
   __test$lex:
     calls: 1
     bytes: 564
   __test$map_err:
     calls: 1
-    bytes: 8596
+    bytes: 8292
   __test$to_fmt:
     calls: 1
     bytes: 592

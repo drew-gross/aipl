@@ -3973,6 +3973,12 @@ fn compile_program<M: Module>(
     // caller before a binding can be moved into one of its arms.
     let program =
         aipl_mono::inline_small_post_mono(&program, inline_max_exprs(), &externally_called);
+    // Push each `?` into the constructor-ending branches under it, so an
+    // inlined `value_or_err`/`map_ok`/… hands its payload straight out instead
+    // of building a result the `?` immediately takes apart. After inlining,
+    // which is what puts the `match` under the `?`; before sinking, so the
+    // error a `none` arm now builds itself is what the sinker moves in.
+    let program = aipl_mono::push_try_post_mono(&program);
     // Sink again over the monomorphized program: mono instantiates the
     // AIPL-implemented builtins the pre-mono run could not see, and post-mono
     // inlining folds each lifted lambda and single-use instance into its caller
@@ -20383,13 +20389,39 @@ fn compile_expr_inner<M: Module>(
             }
             let ok_ty = (**ok_in).clone();
             let err_in_ty = (**err_in).clone();
-            let tag = builder
-                .ins()
-                .load(types::I64, MemFlagsData::trusted(), rptr, 0);
             let ok_block = builder.create_block();
             let err_block = builder.create_block();
-            // tag 1 = ok → continue; tag 0 = err → early return.
-            builder.ins().brif(tag, ok_block, &[], err_block, &[]);
+            // `err(e)?` — a literal error construction under the `?`, which is
+            // what `aipl_mono::push_try_post_mono` leaves at the leaf of a
+            // pushed-through branch. Its tag is the constant 0, so there is no
+            // Ok path: leave through the Err block unconditionally, and hand the
+            // unreachable continuation a placeholder (typed `__none__`, so it
+            // merges with whatever a sibling arm yields) instead of emitting a
+            // load and a branch that could never be taken.
+            let literal_err = matches!(&inner.kind, ExprKind::Call(Callee::Err, _, _));
+            // A fresh temporary the scrutinee produced is moved rather than
+            // co-owned, on *both* paths: the Err path hands its reference to the
+            // caller inside the returned result, the Ok path to the unwrapped
+            // payload. Decided once, here, so the Err block (emitted first) and
+            // the Ok block agree — an entry consumed while emitting one of them
+            // would leave the other retaining a payload nothing releases.
+            // Only the plain early return moves it, though: the test and
+            // `!Error`-main paths read the payload and then drop every live
+            // scope, which is what frees the husk there.
+            let owned_temp = if cx.in_test || cx.error_main {
+                false
+            } else {
+                move_owned_temp(scopes, scope_len_before, rptr)
+            };
+            if literal_err {
+                builder.ins().jump(err_block, &[]);
+            } else {
+                let tag = builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::trusted(), rptr, 0);
+                // tag 1 = ok → continue; tag 0 = err → early return.
+                builder.ins().brif(tag, ok_block, &[], err_block, &[]);
+            }
 
             // --- Err: early return. ---
             builder.switch_to_block(err_block);
@@ -20434,9 +20466,12 @@ fn compile_expr_inner<M: Module>(
                 // The result repr is layout-identical across Ok sides (16-byte
                 // `{tag, value@8}`, scalar/str payload), so the scrutinee — already
                 // tag 0 with the err payload at offset 8 — *is* the enclosing
-                // Err-result. Co-own its (possibly heap) payload for the caller,
-                // then release every live scope before leaving the function.
-                emit_retain(builder, module, builtins, structs, rptr, cx.ret_ty);
+                // Err-result. Co-own its (possibly heap) payload for the caller
+                // (a moved temporary already carries the one reference), then
+                // release every live scope before leaving the function.
+                if !owned_temp {
+                    emit_retain(builder, module, builtins, structs, rptr, cx.ret_ty);
+                }
                 for scope in scopes.iter() {
                     for t in scope {
                         let v = match t.owned {
@@ -20454,15 +20489,21 @@ fn compile_expr_inner<M: Module>(
             // --- Ok: unwrap the value and carry on. ---
             builder.switch_to_block(ok_block);
             builder.seal_block(ok_block);
+            if literal_err {
+                // Nothing jumps here; the block is the dead continuation.
+                return Ok((builder.ins().iconst(types::I64, 0), ok_ty));
+            }
             // Consuming: when the scrutinee is a fresh temporary we own, move it —
-            // drop its tracking here rather than leaving it to be re-dropped
+            // drop its tracking rather than leaving it to be re-dropped
             // (conditionally, on tag) at every later early-return and at scope exit,
             // the source of the quadratic drop-code growth with chained `?`. On the
             // Ok path its Err side is absent and its Ok payload moves into `val`, so
             // there's nothing left to free (the husk is a function-lifetime stack
-            // slot). The Err block, emitted above while the entry was still tracked,
-            // still drops it on that path.
-            let owned_temp = move_owned_temp(scopes, scope_len_before, rptr);
+            // slot). The test and `!Error`-main paths keep it tracked (see
+            // `owned_temp` above), so their Err blocks still drop it.
+            let owned_temp = owned_temp
+                || ((cx.in_test || cx.error_main)
+                    && move_owned_temp(scopes, scope_len_before, rptr));
             // A void-Ok (`!E`) unwraps to unit — there's no payload to read.
             if is_unit(&ok_ty) {
                 return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));

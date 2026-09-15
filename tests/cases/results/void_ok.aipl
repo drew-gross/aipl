@@ -45,11 +45,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 108
-instructions executed: 251
-binary size: 3888
-  code: 2152
+instructions executed: 196
+binary size: 3472
+  code: 1864
   data: 67
-  metadata: 1669
+  metadata: 1541
 functions:
   __to_str_unit$err$str:
     calls: 1
@@ -62,4 +62,4 @@ functions:
     bytes: 988
   validate:
     calls: 2
-    bytes: 692
+    bytes: 404

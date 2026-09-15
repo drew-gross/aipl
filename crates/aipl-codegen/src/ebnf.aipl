@@ -777,11 +777,11 @@ allocations: 1896
 deallocations: 1896
 reallocations: 338
 bytes allocated: 185463
-instructions executed: 239934
-binary size: 172088
-  code: 112972
+instructions executed: 239502
+binary size: 165808
+  code: 108964
   data: 4132
-  metadata: 54984
+  metadata: 52712
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -833,13 +833,13 @@ functions:
     bytes: 1060
   __builtin_try_map$__m1__Production$Tok$Node$First<Tok>$__m1__ParseError$lam$linked_first_sets$Tok$Node$lambda2:
     calls: 17
-    bytes: 940
+    bytes: 832
   __builtin_try_map$__m1__Rule$Tok$First<Tok>$__m1__ParseError$lam$rule_first$Tok$lambda0:
     calls: 14
-    bytes: 656
+    bytes: 536
   __builtin_try_map$__m1__Rule$Tok$__m1__Rule$Tok$__m1__ParseError$lam$__m1__desugar_rule$Tok:
     calls: 46
-    bytes: 628
+    bytes: 504
   __eq_First$Tok:
     calls: 36
     bytes: 160
@@ -860,10 +860,10 @@ functions:
     bytes: 304
   __m1__desugar_opt$Tok:
     calls: 26
-    bytes: 700
+    bytes: 580
   __m1__desugar_rule$Tok:
     calls: 240
-    bytes: 11964
+    bytes: 11144
   __m1__group_styles$Tok:
     calls: 0
     bytes: 32
@@ -872,16 +872,16 @@ functions:
     bytes: 3460
   __m1__link$Tok$Node:
     calls: 9
-    bytes: 2736
+    bytes: 2488
   __m1__link_opt$Tok:
     calls: 12
-    bytes: 716
+    bytes: 596
   __m1__link_rule$Tok:
     calls: 139
-    bytes: 8200
+    bytes: 6864
   __m1__link_rules$Tok:
     calls: 27
-    bytes: 716
+    bytes: 600
   __m1__prod_names$Tok$Node:
     calls: 20
     bytes: 548
@@ -1019,7 +1019,7 @@ functions:
     bytes: 192
   first_sets$Tok$Node:
     calls: 7
-    bytes: 356
+    bytes: 236
   fixture:
     calls: 2
     bytes: 5316
@@ -1028,7 +1028,7 @@ functions:
     bytes: 112
   linked_first_sets$Tok$Node:
     calls: 6
-    bytes: 1208
+    bytes: 1096
   main:
     calls: 1
     bytes: 452
@@ -1046,7 +1046,7 @@ functions:
     bytes: 1708
   rule_first$Tok:
     calls: 235
-    bytes: 7752
+    bytes: 7216
   show_first$Tok:
     calls: 27
     bytes: 3876
@@ -1055,7 +1055,7 @@ functions:
     bytes: 444
   show_first_sets$Tok$Node:
     calls: 5
-    bytes: 540
+    bytes: 412
   show_first_sets$Tok$Node$zip1$own0:
     calls: 5
     bytes: 1164

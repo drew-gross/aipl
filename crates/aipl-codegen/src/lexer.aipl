@@ -1521,11 +1521,11 @@ allocations: 434
 deallocations: 434
 reallocations: 71
 bytes allocated: 67520
-instructions executed: 387339
-binary size: 2547936
-  code: 1705328
+instructions executed: 374092
+binary size: 2538504
+  code: 1699000
   data: 11788
-  metadata: 830820
+  metadata: 827716
 functions:
   __arr_drop_StepResult$Kind:
     calls: 9
@@ -1727,31 +1727,31 @@ functions:
     bytes: 1780
   delimited_len:
     calls: 28
-    bytes: 2124
+    bytes: 1908
   esc_str:
     calls: 2
     bytes: 140
   finalize_template$Kind:
     calls: 16
-    bytes: 10124
+    bytes: 8388
   float_len:
     calls: 14
     bytes: 832
   int_tok:
     calls: 13
-    bytes: 1580
+    bytes: 1048
   interp_scan$Kind:
     calls: 10
-    bytes: 2016
+    bytes: 1880
   keep_skipped$Kind:
     calls: 3
     bytes: 5956
   lex$Kind:
     calls: 78
-    bytes: 1320
+    bytes: 1184
   lex_step$Kind:
     calls: 178
-    bytes: 31048
+    bytes: 29168
   main:
     calls: 1
     bytes: 240
@@ -1766,10 +1766,10 @@ functions:
     bytes: 4116
   step_result$Kind:
     calls: 477
-    bytes: 17612
+    bytes: 16292
   template_scan$Kind:
     calls: 20
-    bytes: 3280
+    bytes: 2908
   template_step$Kind:
     calls: 32
     bytes: 444

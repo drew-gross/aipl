@@ -177,10 +177,10 @@ deallocations: 5934
 reallocations: 293
 bytes allocated: 553131
 instructions executed: 1433281
-binary size: 243832
-  code: 178496
+binary size: 243160
+  code: 178028
   data: 3336
-  metadata: 62000
+  metadata: 61796
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -319,7 +319,7 @@ functions:
     bytes: 196
   __m6__int_lit:
     calls: 0
-    bytes: 1364
+    bytes: 896
   __m6__raw_tpl_kind:
     calls: 0
     bytes: 3492

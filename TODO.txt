@@ -316,6 +316,14 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
+  match_value_or_err quotes an empty receiver when the scrutinee isn't a bare name:
+    `match (s[i + 1]) { .. }` gets "write "let e = .value_or_err(..)?;"" — the advice
+    splices `receiver` (crates/aipl-syntax/src/lint/match_value_or_err.rs, the
+    `ExprKind::Ident` check) and falls back to "" for anything else, because a
+    call/index scrutinee's span stops before its closing paren/bracket so quoting it
+    would print advice that doesn't parse. Fix is either a placeholder ("<the
+    optional>.value_or_err(..)") or widening `spans_its_text` (lint.rs) to the shapes
+    whose spans are exact. Predates the return-form arm; both arms have it.
   self[end].value_or(' ') == '.' should be self[end] == some('.')
   for (let x : xs) { if (p(x)) { set out.push(f(x)) } } should lint to a filter->map
   lint against char/str literals directly in templates e.g. `a: {'a'}` or `aa: {"aa"}`
@@ -378,6 +386,7 @@ design:
   apis should express intent
 
 optimizations:
+  generalize try_push for opts, strings, structs?
   output array length prediction that propagates and allows for really good pre-reserving
   constant folding optimization pass
   dead store elimination optimization pass
@@ -518,8 +527,9 @@ allocator:
 perfmon:
   show regression and improvements
   improve it in some way that it allows you to prove that an optimzation did or did not happen
-  add tests that specifically exersize perf
+  add tests that specifically exercise perf
   functions in external libs don't get size instrumented
+  split out binary size changes due to tests
 
 check:
   check should error on lint failures, but still run tests and report results

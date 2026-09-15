@@ -96,11 +96,11 @@ allocations: 40
 deallocations: 40
 reallocations: 2
 bytes allocated: 2853
-instructions executed: 2488
-binary size: 72904
-  code: 48220
+instructions executed: 2273
+binary size: 72288
+  code: 47796
   data: 1268
-  metadata: 23416
+  metadata: 23224
 functions:
   __arr_drop___m1__Expr:
     calls: 0
@@ -196,13 +196,13 @@ functions:
     calls: 13
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 41
+    calls: 38
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 5
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 28
+    calls: 25
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 5
@@ -221,10 +221,10 @@ functions:
     bytes: (external)
   construct_ty_name:
     calls: 4
-    bytes: 3128
+    bytes: 2792
   main:
     calls: 1
     bytes: 112
   resolve_body:
     calls: 5
-    bytes: 912
+    bytes: 824

@@ -41,6 +41,9 @@ pub use fuse::{effectful_fns, fuse_operations};
 mod sink;
 pub use sink::{sink_bindings, sink_bindings_post_mono};
 
+mod try_push;
+pub use try_push::push_try_post_mono;
+
 mod subst;
 pub use subst::inline_single_use_bindings;
 

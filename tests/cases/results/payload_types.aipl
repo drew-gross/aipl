@@ -91,11 +91,11 @@ allocations: 25
 deallocations: 25
 reallocations: 0
 bytes allocated: 1037
-instructions executed: 3624
-binary size: 26528
-  code: 14560
+instructions executed: 3605
+binary size: 26280
+  code: 14408
   data: 1755
-  metadata: 10213
+  metadata: 10117
 functions:
   __dict_drop_str$i64:
     calls: 2
@@ -189,13 +189,13 @@ functions:
     bytes: (external)
   count_evens:
     calls: 2
-    bytes: 284
+    bytes: 208
   evens:
     calls: 7
     bytes: 560
   first_of_pair:
     calls: 1
-    bytes: 284
+    bytes: 208
   main:
     calls: 1
     bytes: 2888

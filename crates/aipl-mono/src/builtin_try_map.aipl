@@ -81,11 +81,11 @@ allocations: 45
 deallocations: 45
 reallocations: 6
 bytes allocated: 2485
-instructions executed: 4580
-binary size: 21712
-  code: 12180
+instructions executed: 4406
+binary size: 20392
+  code: 11344
   data: 1485
-  metadata: 8047
+  metadata: 7563
 functions:
   __eq_i64$arr:
     calls: 1
@@ -104,10 +104,10 @@ functions:
     bytes: 4384
   __test$try_map$lambda3:
     calls: 2
-    bytes: 340
+    bytes: 244
   __test$try_map$lambda4:
     calls: 2
-    bytes: 340
+    bytes: 244
   __test$width:
     calls: 1
     bytes: 276
@@ -167,19 +167,19 @@ functions:
     bytes: 236
   try_map$i64$i64$str$lam$__test$try_map$lambda6:
     calls: 1
-    bytes: 644
+    bytes: 484
   try_map$i64$i64$str$lam$__test$try_map$lambda7:
     calls: 1
-    bytes: 644
+    bytes: 484
   try_map$i64$str$str$lam$__test$try_map$lambda3:
     calls: 1
-    bytes: 544
+    bytes: 436
   try_map$i64$str$str$lam$__test$try_map$lambda4:
     calls: 1
-    bytes: 544
+    bytes: 436
   try_map$i64$str$str$lam$label:
     calls: 6
-    bytes: 544
+    bytes: 436
   try_map$str$u64$char$lam$width:
     calls: 1
     bytes: 504

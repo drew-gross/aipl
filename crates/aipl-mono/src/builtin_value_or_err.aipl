@@ -94,11 +94,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1466
-binary size: 11448
-  code: 6904
+instructions executed: 1253
+binary size: 10928
+  code: 6512
   data: 1066
-  metadata: 3478
+  metadata: 3350
 functions:
   __test$digit_of:
     calls: 1
@@ -120,7 +120,7 @@ functions:
     bytes: (external)
   digit_of:
     calls: 5
-    bytes: 896
+    bytes: 504
   main:
     calls: 1
     bytes: 180

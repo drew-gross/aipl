@@ -47,11 +47,11 @@ allocations: 16
 deallocations: 16
 reallocations: 2
 bytes allocated: 670
-instructions executed: 3366
-binary size: 15320
-  code: 8828
+instructions executed: 3348
+binary size: 15128
+  code: 8684
   data: 707
-  metadata: 5785
+  metadata: 5737
 functions:
   __arr_drop___tuple$i64$str:
     calls: 1
@@ -61,7 +61,7 @@ functions:
     bytes: 120
   __builtin_try_map$i64$i64$str$lam$checked$i64:
     calls: 1
-    bytes: 448
+    bytes: 304
   __to_str___tuple$i64$str$arr:
     calls: 1
     bytes: 968

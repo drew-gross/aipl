@@ -884,11 +884,11 @@ allocations: 372
 deallocations: 372
 reallocations: 54
 bytes allocated: 57258
-instructions executed: 60067
-binary size: 137408
-  code: 86988
+instructions executed: 59074
+binary size: 132984
+  code: 84104
   data: 3516
-  metadata: 46904
+  metadata: 45364
 functions:
   __arr_drop_ListStyle:
     calls: 41
@@ -934,7 +934,7 @@ functions:
     bytes: 1060
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
     calls: 4
-    bytes: 628
+    bytes: 504
   __eq_ListStyle:
     calls: 14
     bytes: 200
@@ -1060,10 +1060,10 @@ functions:
     bytes: (external)
   desugar_opt$Kind:
     calls: 17
-    bytes: 700
+    bytes: 580
   desugar_rule$Kind:
     calls: 78
-    bytes: 11964
+    bytes: 11144
   failure_message:
     calls: 2
     bytes: 488
@@ -1078,16 +1078,16 @@ functions:
     bytes: 112
   link$Kind$Node:
     calls: 14
-    bytes: 2736
+    bytes: 2488
   link_opt$Kind:
     calls: 16
-    bytes: 716
+    bytes: 596
   link_rule$Kind:
     calls: 76
-    bytes: 8200
+    bytes: 6864
   link_rules$Kind:
     calls: 4
-    bytes: 716
+    bytes: 600
   main:
     calls: 1
     bytes: 180

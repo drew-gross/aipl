@@ -38,15 +38,15 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 528
-instructions executed: 325
-binary size: 3008
-  code: 1692
+instructions executed: 247
+binary size: 2608
+  code: 1420
   data: 1
-  metadata: 1315
+  metadata: 1187
 functions:
   greet:
     calls: 2
-    bytes: 816
+    bytes: 544
   main:
     calls: 1
     bytes: 336
