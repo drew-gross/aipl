@@ -53,6 +53,13 @@ fn sinkable(e: &Expr, pure_fn: bool) -> bool {
 /// early return the `none` arm was doing by hand. The advice says which of the
 /// two it is, since the second reads quite differently from the first.
 ///
+/// The `none` arm may also *leave* with the error — a block holding nothing
+/// but `return err(e);` — which is the statement form of the same bridge: the
+/// `match` runs for effect, the `some` arm's block is the rest of the function,
+/// and the `return` stands in for the `?`. That one rewrites to
+/// `let v = o.value_or_err(e)?;` followed by the `some` arm's body, with `v`
+/// the arm's binder, and the advice spells it that way.
+///
 /// A *computed* error is fine, and that is the point of [`sinkable`]. Written
 /// out, `value_or_err`'s error is an ordinary call argument and so looks eager —
 /// but the optimizer inlines the builtin and sinks the argument into the `none`
@@ -96,17 +103,12 @@ pub(super) fn match_value_or_err(e: &Expr, src: &str, pure_fn: bool, hits: &mut 
     if !none_binds.is_empty() {
         return;
     }
-    // The `none` arm must build an `err` from one value. Anything else is a
-    // `match` that does something this rule has no rewrite for.
-    let ExprKind::Call(none_name, none_args, _) = &none_arm.body.kind else {
+    // The `none` arm must build an `err` from one value — as its value, or
+    // as what it returns. Anything else is a `match` that does something this
+    // rule has no rewrite for.
+    let Some((error, leaves)) = none_err(&none_arm.body) else {
         return;
     };
-    let [error] = &none_args[..] else {
-        return;
-    };
-    if *none_name != Callee::Err {
-        return;
-    }
     if !sinkable(error, pure_fn) {
         return;
     }
@@ -143,6 +145,19 @@ pub(super) fn match_value_or_err(e: &Expr, src: &str, pure_fn: bool, hits: &mut 
     .then(|| src.get(error.span.start..error.span.end))
     .flatten();
     let advice = match (passes_through, quoted) {
+        // The statement form: the `some` arm's block continues with the
+        // payload bound, so the rewrite is a `let` ahead of that block.
+        _ if leaves.is_some() => match quoted {
+            Some(q) => format!(
+                "write \"let {binder} = {receiver}.value_or_err({q})?;\" and continue with the \
+                 `some` arm's body — `?` does the early return this arm is doing by hand"
+            ),
+            None => format!(
+                "write it as \"let {binder} = {receiver}.value_or_err(..)?;\" with that arm's \
+                 error and continue with the `some` arm's body — `?` does the early return \
+                 this arm is doing by hand"
+            ),
+        },
         (true, Some(q)) => format!("write \"{receiver}.value_or_err({q})\" instead"),
         (true, None) => {
             format!("write it as \"{receiver}.value_or_err(..)\" with that arm's error")
@@ -161,12 +176,42 @@ pub(super) fn match_value_or_err(e: &Expr, src: &str, pure_fn: bool, hits: &mut 
     // `match` could never be squelched. This arm is the one that identifies the
     // shape — the `some` arm varies — and its `err` call always starts on the
     // arm's own line, which therefore takes a trailing marker and keeps it
-    // through `aipl fmt`.
+    // through `aipl fmt`. For the block form that line is the `return`'s: a
+    // marker after the arm's `{` would not survive formatting.
+    let at = leaves.unwrap_or(&none_arm.body);
     hits.push(Error::at(
         format!(
             "this `match` turns an optional into a result — {advice} \
              (or append #[allow] to this line to keep it)"
         ),
-        none_arm.body.span.clone(),
+        at.span.clone(),
     ));
+}
+
+/// The error a `none` arm's `body` builds, and — when the arm leaves the
+/// function with it rather than yielding it — the `return` doing so, which is
+/// where the hit is reported. `None` for a body of any other shape.
+///
+/// Two spellings: `err(e)`, and a block holding nothing but `return err(e);`
+/// (a bare `return` is not an arm body — an arm takes an expression or a
+/// block). A block with anything else in it is an arm that does more than
+/// build the error, which `value_or_err` has nowhere to put.
+fn none_err(body: &Expr) -> Option<(&Expr, Option<&Expr>)> {
+    fn err_payload(e: &Expr) -> Option<&Expr> {
+        match &e.kind {
+            ExprKind::Call(Callee::Err, args, _) => match &args[..] {
+                [error] => Some(error),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+    if let Some(error) = err_payload(body) {
+        return Some((error, None));
+    }
+    let stmt = super::lone_stmt(body)?;
+    let ExprKind::Return(value) = &stmt.kind else {
+        return None;
+    };
+    Some((err_payload(value)?, Some(stmt)))
 }

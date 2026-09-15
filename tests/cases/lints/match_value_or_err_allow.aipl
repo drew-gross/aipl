@@ -1,4 +1,4 @@
-import { equal as ==, print, value_or_err } from builtins;
+import { equal as ==, logical_and as &&, print, value_or_err } from builtins;
 
 // `#[allow]` keeps the long form — the escape hatch every lint carries.
 // `value_or_err`'s own definition needs exactly this, since it cannot be
@@ -22,6 +22,23 @@ fn need(o: i64?) -> i64!str {
 // and proven to agree.
 fn need_short(o: i64?) -> i64!str { o.value_or_err("missing") }
 
+// The statement form points at the `return` itself, not the arm's `{`: a marker
+// after the brace would not survive `aipl fmt`, while the `return` line takes
+// one like any other statement.
+fn need_returning(o: i64?) -> i64!str {
+    match (o) {
+        some(v) => {
+            if (v == 0) {
+                return err("zero");
+            };
+        },
+        none => {
+            return err("missing"); #[allow]
+        },
+    };
+    ok(1)
+}
+
 fn unwrap(r: i64!str) -> i64 {
     match (r) {
         ok(v) => v,
@@ -36,21 +53,28 @@ fn main() !prints {
     if (unwrap(need(none)) == unwrap(need_short(none))) {
         print("agree on none");
     };
+    if (unwrap(need_returning(some(0))) == -1 && unwrap(need_returning(some(2))) == 1) {
+        print("returning form kept");
+    };
 }
 --- stdout ---
 agree on some
 agree on none
+returning form kept
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 245
-binary size: 2248
-  code: 1404
+instructions executed: 382
+binary size: 3096
+  code: 2104
   data: 1
-  metadata: 843
+  metadata: 991
 functions:
   main:
     calls: 1
-    bytes: 1404
+    bytes: 1692
+  need_returning:
+    calls: 2
+    bytes: 412

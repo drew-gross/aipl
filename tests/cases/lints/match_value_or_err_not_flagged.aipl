@@ -34,6 +34,21 @@ fn need_loud(o: i64?) !prints -> i64!str {
     }
 }
 
+// The same, leaving with the error: a `return` after other statements is an
+// arm that does more than build the error, exactly as above.
+fn need_loud_return(o: i64?) !prints -> i64!str {
+    match (o) {
+        some(v) => {
+            print(`have {v}`);
+        },
+        none => {
+            print("about to fail");
+            return err("missing");
+        },
+    };
+    ok(0)
+}
+
 // The enclosing function declares an effect, so the lint cannot tell whether
 // building the error is the part that has it — and an effect hoisted onto the
 // success path would happen on every call. AIPL requires a caller to declare at
@@ -70,6 +85,7 @@ fn faulted(r: i64!Fault) -> i64 {
 fn main() !prints {
     print(or_zero(none).to_str());
     print(unwrap(need_loud(none)).to_str());
+    print(unwrap(need_loud_return(none)).to_str());
     print(unwrap(need_effectful(some(4), "r")).to_str());
     // The rewrite itself must not flag.
     print(unwrap(some(3).value_or_err("missing")).to_str());
@@ -78,28 +94,33 @@ fn main() !prints {
 0
 about to fail
 -1
+about to fail
+-1
 4
 3
 --- performance ---
-allocations: 4
-deallocations: 4
+allocations: 5
+deallocations: 5
 reallocations: 0
-bytes allocated: 69
-instructions executed: 259
-binary size: 2960
-  code: 1644
+bytes allocated: 87
+instructions executed: 353
+binary size: 3888
+  code: 2316
   data: 1
-  metadata: 1315
+  metadata: 1571
 functions:
   __to_str_i64:
-    calls: 4
+    calls: 5
     bytes: 204
   aipl_i64_len:
-    calls: 8
+    calls: 10
     bytes: (external)
   aipl_write_i64:
-    calls: 4
+    calls: 5
     bytes: (external)
   main:
     calls: 1
-    bytes: 1440
+    bytes: 1564
+  need_loud_return:
+    calls: 1
+    bytes: 548

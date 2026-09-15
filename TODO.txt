@@ -12,9 +12,6 @@ projects:
   make some projects in AIPL, probably organized where it's a folder in this repo that would otherwise work standalone (i.e. aipl bin is copied in)
   Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
 
-type system:
-  apparently push and extend report type errors from codegen which is bad because it means unreachable code doesn't get fully typechecked
-
 vscode extension:
   LSP
   go to definition
@@ -86,7 +83,6 @@ misc cleanup:
   nested_len should maybe use an all_suffixes type utility
   rename Pat to Pattern (file and variant)
   unterminated error messages can be DRYer
-  union_syms should just be actual set union
   why does rule_first need three as a variable?
   fmt_node can only fail due to bad internal index; see if we can fix that, maybe with a LinkedGrammar type?
   breaks_after can be take_while->starts_with I think?
@@ -226,6 +222,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  none.value_or_err doesn't type check. Maybe it should? Unclear.
   We need to improve how functions are passed as parameter. I want to inline first_token_of into it's call sites since it's so simple, but that will require recursion by predicate.
   self.syms.map(|s| show_sym(s)) -> self.syms.map(show_sym) should work
   (Rule<K>, Rule<K>)?!ParseError doesn't parse
@@ -662,11 +659,6 @@ docs:
   doc comments for struct fields
   make the types and etc. into links
   the docs are showing a mangled name for tm_json, please fix
-
-cache the compiled module on disk instead of using clif ir (expensive to parse)
-
-none.value_or_err doesn't type check. Maybe it should? Unclear.
-Known limitation recorded in #7: cross-iteration struct aliases still see the newer value, since the per-set buffer is a reused stack slot. <--- fix this
 
 optional:
   value_or can't unwrap struct optionals — needs match. <--- fix this

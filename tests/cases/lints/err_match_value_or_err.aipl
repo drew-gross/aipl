@@ -34,6 +34,22 @@ fn tokenize(o: i64?) -> Tok!str {
     }
 }
 
+// The `none` arm may *leave* with the error instead of yielding it: the
+// statement form, where the `match` runs for effect and the `some` arm's block
+// is the rest of the function. A `return` there is a `?` written by hand, so
+// the advice is the `let` that binds the payload ahead of that block.
+fn scale(o: i64?, k: i64) -> i64!str {
+    match (o) {
+        some(v) => {
+            print(`scaling {v}`);
+        },
+        none => {
+            return err("missing");
+        },
+    };
+    ok(k)
+}
+
 struct Fault { code: i64 }
 
 fn describe(tag: str) -> str { `no rule named "{tag}"` }
@@ -97,14 +113,20 @@ error: this `match` turns an optional into a result — write "o.value_or_err("i
 33 |         none => err("integer literal overflows i64"),
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or_err.aipl:49:17
+error: this `match` turns an optional into a result — write "let v = o.value_or_err("missing")?;" and continue with the `some` arm's body — `?` does the early return this arm is doing by hand (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:47:20
    |
-49 |         none => err(describe(tag)),
+47 |             return err("missing");
+   |                    ^^^^^^^^^^^^^^
+
+error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:65:17
+   |
+65 |         none => err(describe(tag)),
    |                 ^^^^^^^^^^^^^^^^^^
 
 error: this `match` turns an optional into a result — write it as "o.value_or_err(..)" with that arm's error (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_match_value_or_err.aipl:59:17
+  --> ./tests/cases/lints/err_match_value_or_err.aipl:75:17
    |
-59 |         none => err(Fault { code: 7 }),
+75 |         none => err(Fault { code: 7 }),
    |                 ^^^^^^^^^^^^^^^^^^^^^^
