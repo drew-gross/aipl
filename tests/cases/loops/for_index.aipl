@@ -12,7 +12,7 @@ fn main() !prints {
     // Nested: the inner index restarts each time the inner loop is entered.
     for (let outer, w : ["ab", "c"]) {
         for (let inner, c : w) {
-            print(`{to_str(outer)}{to_str(inner)}{to_str(c)}`);
+            print(`{outer}{inner}{c}`);
         }
     }
 }

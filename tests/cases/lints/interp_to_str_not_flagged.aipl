@@ -1,0 +1,45 @@
+import { concat as +++, print, to_str } from builtins;
+
+// The shapes the interpolated-`to_str` lint must leave alone: a `to_str`
+// outside any interpolation, one that is only part of the interpolated
+// expression, and a call to some other function.
+fn main() !prints {
+    let n = 42;
+    // Not in a template at all.
+    print(to_str(n));
+    print("n = " +++ to_str(n));
+    // The call is an operand, not the whole interpolation.
+    print(`n = {to_str(n) +++ "!"}`);
+    // A different function.
+    print(`n = {shown(n)}`);
+}
+
+fn shown(n: i64) -> str { to_str(n) }
+--- stdout ---
+42
+n = 42
+n = 42!
+n = 42
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 424
+instructions executed: 167
+binary size: 2104
+  code: 904
+  data: 1
+  metadata: 1199
+functions:
+  __to_str_i64:
+    calls: 4
+    bytes: 204
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 700

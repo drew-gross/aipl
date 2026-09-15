@@ -13,7 +13,8 @@ fn main() !prints {
     print(to_str(false)); // false
     print(to_str('c')); // c
     print(to_str("hi")); // hi
-    print(`{to_str(["a", "b"])} {to_str(some('c'))}`); // ["a", "b"] some('c')
+    print(to_str(["a", "b"])); // ["a", "b"]
+    print(to_str(some('c'))); // some('c')
     print((1 + 2).to_str()); // 3 (method form)
     print("x = " +++ to_str(5)); // x = 5
 }
@@ -24,19 +25,20 @@ true
 false
 c
 hi
-["a", "b"] some('c')
+["a", "b"]
+some('c')
 3
 x = 5
 --- performance ---
-allocations: 12
-deallocations: 12
+allocations: 10
+deallocations: 10
 reallocations: 0
-bytes allocated: 506
-instructions executed: 735
-binary size: 5416
-  code: 2732
+bytes allocated: 330
+instructions executed: 704
+binary size: 5064
+  code: 2492
   data: 187
-  metadata: 2497
+  metadata: 2385
 functions:
   __to_str_bool:
     calls: 2
@@ -67,4 +69,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1088
+    bytes: 848

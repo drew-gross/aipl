@@ -31,7 +31,7 @@ fn main() !prints {
     print(first(("a", "b")));
 
     let s = swap((1, "one"));
-    print(`{s.0} {s.1.to_str()}`);
+    print(`{s.0} {s.1}`);
 
     print(unbox((Box { v: 7 }, Box { v: 8 })).to_str());
 

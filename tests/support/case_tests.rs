@@ -392,6 +392,8 @@ case_tests! {
     cases_lints_incr_flavor_mismatch = "cases/lints/incr_flavor_mismatch",
     cases_lints_incr_shapes_not_flagged = "cases/lints/incr_shapes_not_flagged",
     cases_lints_incr_user_plus = "cases/lints/incr_user_plus",
+    cases_lints_interp_to_str_allow = "cases/lints/interp_to_str_allow",
+    cases_lints_interp_to_str_not_flagged = "cases/lints/interp_to_str_not_flagged",
     cases_lints_is_empty_longhand_allow = "cases/lints/is_empty_longhand_allow",
     cases_lints_is_empty_longhand_not_flagged = "cases/lints/is_empty_longhand_not_flagged",
     cases_lints_is_empty_longhand_user_len = "cases/lints/is_empty_longhand_user_len",

@@ -1,4 +1,4 @@
-import { equal as ==, print, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
+import { equal as ==, print, wrapping_add as +, wrapping_sub as - } from builtins;
 
 // A keyword parameter's default may read the parameters declared before it —
 // positional ones and earlier keyword ones alike. `span` below defaults its
@@ -8,9 +8,7 @@ import { equal as ==, print, to_str, wrapping_add as +, wrapping_sub as - } from
 // The fill happens at the call site, so only *earlier* parameters are readable:
 // by the time `hi`'s default is spliced in, `lo` has an argument and `step`
 // does not (see `err_default_forward_ref`).
-fn span(lo: i64, hi: i64 = lo + 10, step: i64 = hi - lo) -> str {
-    `{to_str(lo)}..{to_str(hi)} by {to_str(step)}`
-}.test({
+fn span(lo: i64, hi: i64 = lo + 10, step: i64 = hi - lo) -> str { `{lo}..{hi} by {step}` }.test({
     assert(span(1) == "1..11 by 10");
     assert(span(1, hi=4) == "1..4 by 3");
     assert(span(1, hi=4, step=100) == "1..4 by 100");

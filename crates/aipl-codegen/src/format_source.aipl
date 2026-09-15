@@ -193,7 +193,7 @@ fn verify_same_tokens(input: str, output: str) -> !FmtError {
 # `requote`) is the one edit the formatter makes inside a literal.
 fn token_value(kind: AiplTok) -> str {
     if (let StrLit(v, _) = kind) {
-        return `str {to_str(v)}`;
+        return `str {v}`;
     };
 
     // A template's pieces likewise: the raw and single-backtick forms of one

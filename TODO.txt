@@ -319,7 +319,7 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
-  lint against to_str() in a template literal, since it's redundant
+  lint against char/str literals directly in templates e.g. `a: {'a'}` or `aa: {"aa"}`
   items_of looks like it should be a filter_map
   lint against set literals that contain duplicates
   set out = [..out, o]; should lint to set out.push(a);

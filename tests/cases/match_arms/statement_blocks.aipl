@@ -45,14 +45,14 @@ fn classify(s: str) -> str {
         "" => "empty",
         "a" => {
             let n = s.len();
-            `single {n.to_str()}`
+            `single {n}`
         },
         _ => {
             mut count = 0;
             for (let c : s) {
                 set count++;
             }
-            `many {count.to_str()}`
+            `many {count}`
         },
     }
 }

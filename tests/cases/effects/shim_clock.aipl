@@ -44,7 +44,7 @@ fn nested() -> str {
     shim clock { now_nanos = fixed_wall, monotonic_now = fixed_mono } {
         let inner = shim clock { now_nanos = inner_wall, monotonic_now = inner_mono } { depth1() };
         let outer_again = depth1();
-        `{to_str(inner)} then {to_str(outer_again)}`
+        `{inner} then {outer_again}`
     }
 }
 

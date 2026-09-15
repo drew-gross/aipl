@@ -50,7 +50,7 @@ fn main() !prints {
 
     // Elements come back out intact, not as freed blocks.
     match (sets[0]) {
-        some(s) => print(`{has_a(s).to_str()} {set_size(s).to_str()}`),
+        some(s) => print(`{has_a(s)} {set_size(s)}`),
         none => print("missing"),
     };
 

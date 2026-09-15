@@ -21,7 +21,7 @@ fn main() !prints {
             },
             Reset(n) => {
                 set count = n;
-                set log.push(`reset {n.to_str()}`);
+                set log.push(`reset {n}`);
             },
         };
     }

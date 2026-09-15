@@ -22,7 +22,7 @@ fn label(e: Ev) -> str {
             let loud = "TOCK";
             loud
         },
-        Reset(n) => `reset {n.to_str()}`,
+        Reset(n) => `reset {n}`,
     }
 }
 
@@ -79,11 +79,11 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 236
-instructions executed: 701
-binary size: 3536
-  code: 1936
+instructions executed: 674
+binary size: 4448
+  code: 2628
   data: 1
-  metadata: 1599
+  metadata: 1819
 functions:
   __to_str_u64:
     calls: 3
@@ -100,9 +100,6 @@ functions:
   aipl_write_u64:
     calls: 3
     bytes: (external)
-  label:
-    calls: 3
-    bytes: 476
   main:
     calls: 1
-    bytes: 1256
+    bytes: 2424

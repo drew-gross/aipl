@@ -10,7 +10,7 @@ fn lookup(want: bool) -> (i64, str)? { if (want) { some((7, "seven")) } else { n
 // rather than a `base_ty` that more suffixes could attach to.
 fn describe(p: (i64, str)?) -> str {
     match (p) {
-        some(pair) => `{pair.0.to_str()}={pair.1}`,
+        some(pair) => `{pair.0}={pair.1}`,
         none => "nothing",
     }
 }

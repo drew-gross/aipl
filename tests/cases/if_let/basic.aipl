@@ -1,10 +1,10 @@
-import { equal as ==, print, to_str } from builtins;
+import { equal as ==, print } from builtins;
 
 // `if (let PATTERN = EXPR) { THEN }` binds `PATTERN`'s payload from `EXPR` and
 // runs `THEN` if it matches — the one case this site cares about. Every other
 // case (here, `none`) silently falls through with no arm to write, unlike a
 // `match`, which would require one.
-fn describe(x: i64?) -> str { if (let some(v) = x) { `got {to_str(v)}` } else { "nothing" } }.test({
+fn describe(x: i64?) -> str { if (let some(v) = x) { `got {v}` } else { "nothing" } }.test({
     assert(describe(some(5)) == "got 5");
     assert(describe(none) == "nothing");
 })
@@ -21,11 +21,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 105
-instructions executed: 111
-binary size: 1872
-  code: 772
+instructions executed: 93
+binary size: 2168
+  code: 996
   data: 1
-  metadata: 1099
+  metadata: 1171
 functions:
   __to_str_i64:
     calls: 1
@@ -36,9 +36,6 @@ functions:
   aipl_write_i64:
     calls: 1
     bytes: (external)
-  describe:
-    calls: 2
-    bytes: 396
   main:
     calls: 1
-    bytes: 172
+    bytes: 792

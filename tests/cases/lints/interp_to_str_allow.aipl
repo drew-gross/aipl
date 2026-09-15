@@ -1,0 +1,35 @@
+import { print, to_str } from builtins;
+
+// `#[allow]` at the end of the line keeps a `to_str` inside an interpolation
+// as written; the plain interpolation beside it renders the same text.
+fn main() !prints {
+    let n = 42;
+    print(`n = {to_str(n)}`); #[allow]
+    print(`n = {n}`);
+}
+--- stdout ---
+n = 42
+n = 42
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 212
+instructions executed: 95
+binary size: 1712
+  code: 656
+  data: 1
+  metadata: 1055
+functions:
+  __to_str_i64:
+    calls: 2
+    bytes: 204
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 452

@@ -1,4 +1,4 @@
-import { print, to_str, tuple_windows, wrapping_add as + } from builtins;
+import { print, tuple_windows, wrapping_add as + } from builtins;
 
 // `for (let i, (a, b) : xs)` — the indexed loop and the tuple pattern
 // composed: `i` counts iterations from 0, and each element is destructured
@@ -15,7 +15,7 @@ fn main() !prints {
     // Nested: each loop has its own counter.
     for (let i, (a, b) : [(1, 2), (3, 4)]) {
         for (let j, (c, d) : [(5, 6)]) {
-            print(`{i}{j} {to_str(a + b + c + d)}`);
+            print(`{i}{j} {a + b + c + d}`);
         }
     }
 }

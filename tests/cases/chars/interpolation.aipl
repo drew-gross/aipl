@@ -1,4 +1,4 @@
-import { print, to_str } from builtins;
+import { concat as +++, print, to_str } from builtins;
 
 // A `char` interpolates as the bare character, mirroring how a `str` does —
 // and `to_str` is the same rendering, so `to_str(c)` is the bare character
@@ -8,7 +8,7 @@ fn main() !prints {
     let c = 'b';
     print(`bare: {c}`); // bare: b
     print(`built: {'x'}{'y'}{'z'}`); // built: xyz
-    print(`to_str: {to_str(c)}`); // to_str: b
+    print("to_str: " +++ to_str(c)); // to_str: b
     print(`nested: {['a', 'b']}`); // nested: ['a', 'b']
 
     // Indexing a `str` yields a `char?`, not a `char`, so it gets neither
@@ -31,11 +31,11 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 755
-instructions executed: 671
-binary size: 5064
-  code: 2732
+instructions executed: 661
+binary size: 4960
+  code: 2660
   data: 139
-  metadata: 2193
+  metadata: 2161
 functions:
   __to_str_char$arr:
     calls: 1
@@ -48,4 +48,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1584
+    bytes: 1512
