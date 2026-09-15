@@ -76,6 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  first_precs should be a map->find chain
   use variants for errors
   grammar_of should do something like enumerate->map (which should fuse)
   nested_len should maybe use an all_suffixes type utility

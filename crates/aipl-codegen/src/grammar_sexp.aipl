@@ -282,9 +282,9 @@ reallocations: 937
 bytes allocated: 622145
 instructions executed: 1521153
 binary size: 408248
-  code: 268072
+  code: 268068
   data: 4892
-  metadata: 135284
+  metadata: 135288
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -648,7 +648,7 @@ functions:
     bytes: 3236
   __m2__render_rule$SexpKind:
     calls: 7
-    bytes: 12268
+    bytes: 12264
   __m2__rep_suffix:
     calls: 1
     bytes: 1708

@@ -470,11 +470,11 @@ allocations: 12791
 deallocations: 12791
 reallocations: 2074
 bytes allocated: 1218105
-instructions executed: 2709504
-binary size: 427208
-  code: 279364
+instructions executed: 2709501
+binary size: 427200
+  code: 279360
   data: 6044
-  metadata: 141800
+  metadata: 141796
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -850,7 +850,7 @@ functions:
     bytes: 3236
   __m2__render_rule$CalcTok:
     calls: 13
-    bytes: 12268
+    bytes: 12264
   __m2__rep_suffix:
     calls: 0
     bytes: 1708

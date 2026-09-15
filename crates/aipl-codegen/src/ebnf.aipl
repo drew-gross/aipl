@@ -341,12 +341,10 @@ fn render_climb<K: variant>(atom: Rule<K>, precs: Prec[], names: str[], ctx: Ctx
     let a = render_rule(atom, names, Seq);
     let ops = all_ops(precs);
     let alts = ops.map(|o| `"{o}"`).join(sep=" | ");
-    let op = if (ops.is_empty()) {
-        "(* never *)"
-    } else if (ops.len() == 1) {
-        alts
-    } else {
-        `({alts})`
+    let op = match (ops.len()) {
+        0 => "(* never *)",
+        1 => alts,
+        _ => `({alts})`,
     };
     let body = `{a} ({op} {a})*`;
     match (ctx) {
@@ -861,9 +859,9 @@ allocations: 1459
 deallocations: 1459
 reallocations: 292
 bytes allocated: 175680
-instructions executed: 232353
-binary size: 164608
-  code: 108396
+instructions executed: 232341
+binary size: 164600
+  code: 108388
   data: 4276
   metadata: 51936
 functions:
@@ -1118,7 +1116,7 @@ functions:
     bytes: 3236
   render_rule$Tok:
     calls: 101
-    bytes: 12336
+    bytes: 12328
   rep_suffix:
     calls: 14
     bytes: 1708
