@@ -108,9 +108,9 @@ allocations: 11
 deallocations: 11
 reallocations: 15
 bytes allocated: 361
-instructions executed: 42491
-binary size: 7792
-  code: 4420
+instructions executed: 42508
+binary size: 7976
+  code: 4604
   data: 235
   metadata: 3137
 functions:
@@ -149,7 +149,7 @@ functions:
     bytes: (external)
   doubled_at:
     calls: 2
-    bytes: 896
+    bytes: 1080
   first_drop:
     calls: 4
     bytes: 504

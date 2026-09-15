@@ -3121,15 +3121,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 15810
-deallocations: 15810
-reallocations: 1777
-bytes allocated: 3300526
-instructions executed: 25374146
-binary size: 10054552
-  code: 6347496
+allocations: 15808
+deallocations: 15808
+reallocations: 1775
+bytes allocated: 3300382
+instructions executed: 26879310
+binary size: 10057200
+  code: 6351388
   data: 31028
-  metadata: 3676028
+  metadata: 3674784
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3214,7 +3214,7 @@ functions:
     bytes: 352
   __builtin_int_parse:
     calls: 26
-    bytes: 1104
+    bytes: 1112
   __builtin_int_parse$lambda1:
     calls: 26
     bytes: 140
@@ -3241,16 +3241,16 @@ functions:
     bytes: 300
   __m10__unescape:
     calls: 10
-    bytes: 1264
+    bytes: 1612
   __m11__process_raw_string:
     calls: 1
     bytes: 656
   __m12__trim_prefix:
     calls: 24
-    bytes: 260
+    bytes: 252
   __m13__trim_suffix:
     calls: 2
-    bytes: 340
+    bytes: 356
   __m16__escape_cost:
     calls: 8
     bytes: 352
@@ -3259,22 +3259,22 @@ functions:
     bytes: 64
   __m16__requote:
     calls: 4
-    bytes: 2296
+    bytes: 2980
   __m1__col_after:
     calls: 1124
-    bytes: 596
+    bytes: 628
   __m1__fits:
     calls: 0
     bytes: 36
   __m1__fits$tail:
     calls: 1765
-    bytes: 2684
+    bytes: 2700
   __m1__fits_atom:
     calls: 0
     bytes: 52
   __m1__fits_atom$tail:
     calls: 596
-    bytes: 312
+    bytes: 328
   __m1__has_hard:
     calls: 0
     bytes: 32
@@ -3283,16 +3283,16 @@ functions:
     bytes: 688
   __m1__print:
     calls: 165
-    bytes: 4180
+    bytes: 4192
   __m1__print$map2$own0:
     calls: 165
     bytes: 464
   __m2__reindent_block:
     calls: 2
-    bytes: 3536
+    bytes: 4452
   __m3__dedent:
     calls: 2
-    bytes: 1276
+    bytes: 2208
   __m6__trim_end_while$lam$__builtin_is_space:
     calls: 461
     bytes: 392
@@ -3325,7 +3325,7 @@ functions:
     bytes: 64
   __m8__char_lit_emit:
     calls: 1
-    bytes: 1772
+    bytes: 1784
   __m8__dedent_segments:
     calls: 0
     bytes: 288
@@ -3337,40 +3337,40 @@ functions:
     bytes: 1364
   __m8__raw_tpl_kind:
     calls: 0
-    bytes: 3308
+    bytes: 3492
   __m8__tpl_kind:
     calls: 2
     bytes: 2608
   __m9__between_len:
     calls: 710
-    bytes: 752
+    bytes: 824
   __m9__delimited_len:
     calls: 1410
-    bytes: 1856
+    bytes: 1904
   __m9__finalize_template$__m8__AiplTok:
     calls: 1
     bytes: 8652
   __m9__float_len:
     calls: 0
-    bytes: 816
+    bytes: 832
   __m9__interp_scan$__m8__AiplTok:
     calls: 1
-    bytes: 1996
+    bytes: 2016
   __m9__lex$__m8__AiplTok:
     calls: 163
-    bytes: 1292
+    bytes: 1320
   __m9__lex_step$__m8__AiplTok:
     calls: 2250
-    bytes: 29164
+    bytes: 29336
   __m9__nested_len:
     calls: 1235
-    bytes: 1028
+    bytes: 1136
   __m9__step_result$__m8__AiplTok:
     calls: 56387
-    bytes: 15164
+    bytes: 15252
   __m9__template_scan$__m8__AiplTok:
     calls: 1
-    bytes: 2912
+    bytes: 3016
   __m9__template_step$__m8__AiplTok:
     calls: 1400
     bytes: 444
@@ -3379,7 +3379,7 @@ functions:
     bytes: 52
   __m9__to_eol_len$tail:
     calls: 2472
-    bytes: 252
+    bytes: 268
   __m9__to_eol_unless_len:
     calls: 1235
     bytes: 368
@@ -3400,13 +3400,13 @@ functions:
     bytes: 2188
   __test$walker_of:
     calls: 1
-    bytes: 5669780
+    bytes: 5669860
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
   __to_str_FmtError:
     calls: 0
-    bytes: 824
+    bytes: 836
   aipl_arr_extend:
     calls: 4777
     bytes: (external)
@@ -3429,10 +3429,10 @@ functions:
     calls: 2125
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1966
+    calls: 1963
     bytes: (external)
   aipl_array_with_cap:
-    calls: 381
+    calls: 378
     bytes: (external)
   aipl_assert:
     calls: 209
@@ -3538,7 +3538,7 @@ functions:
     bytes: 912
   err_here:
     calls: 5
-    bytes: 848
+    bytes: 864
   expect:
     calls: 523
     bytes: 1228
@@ -3610,7 +3610,7 @@ functions:
     bytes: 3412
   lead:
     calls: 358
-    bytes: 1868
+    bytes: 1844
   let_stmt:
     calls: 3
     bytes: 14052
@@ -3637,7 +3637,7 @@ functions:
     bytes: 4092
   next_start:
     calls: 54
-    bytes: 532
+    bytes: 508
   one_param:
     calls: 12
     bytes: 13968
@@ -3742,7 +3742,7 @@ functions:
     bytes: 256
   template_scan:
     calls: 1
-    bytes: 2540
+    bytes: 2556
   template_verbatim:
     calls: 1
     bytes: 988
@@ -3751,7 +3751,7 @@ functions:
     bytes: 508
   trailing_comment:
     calls: 99
-    bytes: 2308
+    bytes: 2284
   trim_last_break:
     calls: 0
     bytes: 32

@@ -46,14 +46,14 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 108
 instructions executed: 251
-binary size: 3928
-  code: 2136
+binary size: 3888
+  code: 2152
   data: 67
-  metadata: 1725
+  metadata: 1669
 functions:
   __to_str_unit$err$str:
     calls: 1
-    bytes: 456
+    bytes: 472
   aipl_write_bytes:
     calls: 1
     bytes: (external)

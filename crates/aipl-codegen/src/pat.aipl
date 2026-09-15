@@ -244,15 +244,15 @@ pub fn binder_list(self: str[]) -> str {
 
 fn quoted(self: str) -> str { `"{self}"` }
 --- performance ---
-allocations: 149
-deallocations: 149
-reallocations: 16
-bytes allocated: 10521
-instructions executed: 7781
-binary size: 91784
-  code: 56788
+allocations: 142
+deallocations: 142
+reallocations: 6
+bytes allocated: 10177
+instructions executed: 9733
+binary size: 101560
+  code: 65516
   data: 2731
-  metadata: 32265
+  metadata: 33313
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -269,6 +269,12 @@ functions:
   __builtin_all$Pat$lam$is_plain_binder:
     calls: 4
     bytes: 264
+  __builtin_map_join$Pat$str$lam$nested_bindings:
+    calls: 0
+    bytes: 44
+  __builtin_map_join$Pat$str$lam$nested_bindings$tail:
+    calls: 3
+    bytes: 1060
   __eq_str$arr:
     calls: 7
     bytes: 364
@@ -283,19 +289,19 @@ functions:
     bytes: 1560
   __m1__show_expr:
     calls: 2
-    bytes: 17376
+    bytes: 21964
   __m1__show_exprs:
     calls: 1
-    bytes: 460
+    bytes: 1388
   __m1__show_field_init:
     calls: 0
-    bytes: 620
+    bytes: 628
   __m3__show_ty:
     calls: 0
     bytes: 5064
   __m3__show_tys:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __rec_drop_Pat:
     calls: 42
     bytes: 204
@@ -326,29 +332,26 @@ functions:
   __to_str_i64:
     calls: 4
     bytes: 204
-  aipl_arr_drop_arr:
-    calls: 3
+  aipl_arr_extend:
+    calls: 7
     bytes: (external)
   aipl_arr_inc:
-    calls: 63
+    calls: 55
     bytes: (external)
-  aipl_arr_join:
-    calls: 3
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 5
+  aipl_arr_reserve:
+    calls: 10
     bytes: (external)
   aipl_array_dec:
-    calls: 128
+    calls: 120
     bytes: (external)
   aipl_array_new:
     calls: 23
     bytes: (external)
   aipl_array_push_mut:
-    calls: 22
+    calls: 4
     bytes: (external)
   aipl_array_with_cap:
-    calls: 14
+    calls: 3
     bytes: (external)
   aipl_assert:
     calls: 35
@@ -385,7 +388,7 @@ functions:
     bytes: (external)
   binder_list:
     calls: 3
-    bytes: 740
+    bytes: 1664
   binder_name:
     calls: 2
     bytes: 488
@@ -418,7 +421,7 @@ functions:
     bytes: 32
   pat_bindings$tail:
     calls: 9
-    bytes: 1724
+    bytes: 1044
   pat_label:
     calls: 6
     bytes: 1296
@@ -427,4 +430,4 @@ functions:
     bytes: 2548
   show_pats:
     calls: 5
-    bytes: 460
+    bytes: 1388

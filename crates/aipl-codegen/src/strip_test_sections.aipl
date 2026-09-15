@@ -48,11 +48,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 9229
-binary size: 7024
-  code: 3268
+instructions executed: 9394
+binary size: 6960
+  code: 3276
   data: 870
-  metadata: 2886
+  metadata: 2814
 functions:
   __eq_str$opt:
     calls: 17
@@ -80,4 +80,4 @@ functions:
     bytes: 128
   strip_test_sections:
     calls: 9
-    bytes: 780
+    bytes: 788

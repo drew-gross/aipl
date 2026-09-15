@@ -948,15 +948,15 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     );
 })
 --- performance ---
-allocations: 284
-deallocations: 284
-reallocations: 58
-bytes allocated: 389794
-instructions executed: 1383044
-binary size: 561792
-  code: 381272
+allocations: 273
+deallocations: 273
+reallocations: 57
+bytes allocated: 389123
+instructions executed: 1453876
+binary size: 562864
+  code: 383528
   data: 10252
-  metadata: 170268
+  metadata: 169084
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -1002,7 +1002,7 @@ functions:
     bytes: 264
   __builtin_int_parse:
     calls: 4
-    bytes: 1104
+    bytes: 1112
   __builtin_int_parse$lambda1:
     calls: 5
     bytes: 140
@@ -1044,34 +1044,34 @@ functions:
     bytes: 744
   __m1__between_len:
     calls: 36
-    bytes: 752
+    bytes: 824
   __m1__delimited_len:
     calls: 66
-    bytes: 1856
+    bytes: 1904
   __m1__finalize_template$AiplTok:
     calls: 6
     bytes: 8652
   __m1__float_len:
     calls: 0
-    bytes: 816
+    bytes: 832
   __m1__interp_scan$AiplTok:
     calls: 2
-    bytes: 1996
+    bytes: 2016
   __m1__lex$AiplTok:
     calls: 29
-    bytes: 1292
+    bytes: 1320
   __m1__lex_step$AiplTok:
     calls: 105
-    bytes: 29164
+    bytes: 29336
   __m1__nested_len:
     calls: 70
-    bytes: 1028
+    bytes: 1136
   __m1__step_result$AiplTok:
     calls: 2407
-    bytes: 15164
+    bytes: 15252
   __m1__template_scan$AiplTok:
     calls: 6
-    bytes: 2912
+    bytes: 3016
   __m1__template_step$AiplTok:
     calls: 52
     bytes: 444
@@ -1080,31 +1080,31 @@ functions:
     bytes: 52
   __m1__to_eol_len$tail:
     calls: 139
-    bytes: 252
+    bytes: 268
   __m1__to_eol_unless_len:
     calls: 67
     bytes: 368
   __m2__unescape:
     calls: 34
-    bytes: 1264
+    bytes: 1612
   __m2__unescape_braces:
     calls: 5
-    bytes: 792
+    bytes: 972
   __m3__process_raw_string:
     calls: 11
-    bytes: 1828
+    bytes: 2764
   __m7__trim_prefix:
     calls: 34
-    bytes: 260
+    bytes: 252
   __m8__trim_suffix:
     calls: 0
-    bytes: 340
+    bytes: 356
   __m9__strip_test_sections:
     calls: 2
-    bytes: 780
+    bytes: 788
   __test$char_lit_value:
     calls: 1
-    bytes: 1836
+    bytes: 1848
   __test$doc_line_value:
     calls: 1
     bytes: 2244
@@ -1119,7 +1119,7 @@ functions:
     bytes: 5024
   __test$str_lit_value:
     calls: 1
-    bytes: 8388
+    bytes: 8432
   __test$template_segments:
     calls: 1
     bytes: 6476
@@ -1128,7 +1128,7 @@ functions:
     bytes: 84
   __to_str___m1__LexError:
     calls: 0
-    bytes: 824
+    bytes: 836
   aipl_arr_extend:
     calls: 216
     bytes: (external)
@@ -1148,10 +1148,10 @@ functions:
     calls: 35
     bytes: (external)
   aipl_array_push_mut:
-    calls: 39
+    calls: 28
     bytes: (external)
   aipl_array_with_cap:
-    calls: 26
+    calls: 15
     bytes: (external)
   aipl_assert:
     calls: 50
@@ -1194,10 +1194,10 @@ functions:
     bytes: (external)
   char_lit_emit:
     calls: 5
-    bytes: 1772
+    bytes: 1784
   char_lit_value:
     calls: 6
-    bytes: 300
+    bytes: 304
   dedent_segments:
     calls: 2
     bytes: 288
@@ -1221,10 +1221,10 @@ functions:
     bytes: 2608
   str_lit_value:
     calls: 12
-    bytes: 568
+    bytes: 576
   template_segments:
     calls: 5
-    bytes: 1604
+    bytes: 1608
   tpl_kind:
     calls: 6
     bytes: 2608

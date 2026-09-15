@@ -2583,7 +2583,7 @@ fn __builtin_drop_first<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_last<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
 fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
-// NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`,
+// NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
 // `reverse_find_map`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
 // `tuple_windows`, `union_all`, `value_or`, and `value_or_err` are
@@ -2601,6 +2601,14 @@ fn __builtin_push<T: any>(mut self: T[], x: T) {}
 // the elements move as one `memcpy` plus one retain pass. The `extend_longhand`
 // lint sends the rebuild spelling, `set s = s +++ t;`, here.
 fn __builtin_extend<T: any>(mut self: T[], other: T[]) {}
+// Make room in `self` for `additional` more elements (bytes, for a `str`)
+// without changing its contents, so that many appends fit in one allocation
+// — `set out.reserve(n)` ahead of a loop of `push`/`extend`, where the loop
+// knows how much it will add and the appends would otherwise grow the buffer
+// by doubling. Exact rather than doubled: the caller has said what it needs. A
+// `str` receiver keeps its representation (an inline value that still fits
+// stays inline).
+fn __builtin_reserve<T: any>(mut self: T[], additional: u64) {}
 // Reverse the elements of an array or the bytes of a string.
 fn __builtin_reverse<T: any>(self: T[]) -> T[] { [] }
 // Ascending sort. `ord` restricts `T` to comparable elements (integer, char, or
@@ -2984,6 +2992,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "is_empty",
     "push",
     "extend",
+    "reserve",
     "is_some",
     "is_some_and",
     "is_err_and",
@@ -3000,6 +3009,7 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "count_if",
     "find_if",
     "map_find_if",
+    "map_join",
     "find_map",
     "reverse_find_map",
     "find_index",

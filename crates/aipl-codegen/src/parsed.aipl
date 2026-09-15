@@ -95,12 +95,12 @@ fn construct_ty_name(name: str, return_ty: Ty?, span: Span) -> str!ParseError {
 allocations: 40
 deallocations: 40
 reallocations: 2
-bytes allocated: 2897
-instructions executed: 2158
-binary size: 64864
-  code: 40828
-  data: 1236
-  metadata: 22800
+bytes allocated: 2853
+instructions executed: 2488
+binary size: 72904
+  code: 48220
+  data: 1268
+  metadata: 23416
 functions:
   __arr_drop___m1__Expr:
     calls: 0
@@ -134,25 +134,25 @@ functions:
     bytes: 1560
   __m1__show_expr:
     calls: 5
-    bytes: 17376
+    bytes: 21964
   __m1__show_exprs:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __m1__show_field_init:
     calls: 2
-    bytes: 620
+    bytes: 628
   __m2__show_pat:
     calls: 0
     bytes: 2548
   __m2__show_pats:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __m4__show_ty:
     calls: 1
     bytes: 5064
   __m4__show_tys:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __rec_drop___m1__Expr:
     calls: 4
     bytes: 36
@@ -173,7 +173,7 @@ functions:
     bytes: 84
   __to_str___m5__ParseError:
     calls: 0
-    bytes: 824
+    bytes: 836
   __to_str_i64:
     calls: 3
     bytes: 204
@@ -184,12 +184,6 @@ functions:
     calls: 14
     bytes: (external)
   aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2
-    bytes: (external)
-  aipl_array_with_cap:
     calls: 2
     bytes: (external)
   aipl_assert:

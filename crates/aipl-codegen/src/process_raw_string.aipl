@@ -50,15 +50,15 @@ pub fn process_raw_string(s: str) -> str {
     assert(process_raw_string("") == "");
 })
 --- performance ---
-allocations: 28
-deallocations: 28
-reallocations: 10
-bytes allocated: 1385
-instructions executed: 15495
-binary size: 8384
-  code: 4576
-  data: 503
-  metadata: 3305
+allocations: 21
+deallocations: 21
+reallocations: 0
+bytes allocated: 938
+instructions executed: 17279
+binary size: 9368
+  code: 5520
+  data: 537
+  metadata: 3311
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 22
@@ -71,10 +71,10 @@ functions:
     bytes: 264
   __m4__trim_prefix:
     calls: 14
-    bytes: 260
+    bytes: 252
   __m5__trim_suffix:
     calls: 8
-    bytes: 340
+    bytes: 356
   __test$process_raw_string:
     calls: 1
     bytes: 1192
@@ -85,10 +85,10 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_push_mut:
-    calls: 20
+    calls: 9
     bytes: (external)
   aipl_array_with_cap:
-    calls: 14
+    calls: 7
     bytes: (external)
   aipl_assert:
     calls: 7
@@ -107,4 +107,4 @@ functions:
     bytes: 124
   process_raw_string:
     calls: 7
-    bytes: 1828
+    bytes: 2764

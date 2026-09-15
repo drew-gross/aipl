@@ -39,11 +39,11 @@ allocations: 23
 deallocations: 23
 reallocations: 0
 bytes allocated: 808
-instructions executed: 1163
-binary size: 5208
-  code: 2236
+instructions executed: 1317
+binary size: 5136
+  code: 2260
   data: 214
-  metadata: 2758
+  metadata: 2662
 functions:
   __rec_drop_S:
     calls: 3
@@ -53,10 +53,10 @@ functions:
     bytes: 44
   __to_str_S:
     calls: 5
-    bytes: 580
+    bytes: 600
   __to_str_V:
     calls: 10
-    bytes: 576
+    bytes: 580
   __to_str_i64:
     calls: 2
     bytes: 204

@@ -95,11 +95,11 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 296
-instructions executed: 662
-binary size: 4464
-  code: 2452
+instructions executed: 673
+binary size: 4424
+  code: 2456
   data: 1
-  metadata: 2011
+  metadata: 1967
 functions:
   __to_str_i64:
     calls: 1
@@ -124,7 +124,7 @@ functions:
     bytes: 56
   classify:
     calls: 3
-    bytes: 928
+    bytes: 932
   main:
     calls: 1
     bytes: 1060

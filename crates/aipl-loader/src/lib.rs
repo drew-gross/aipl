@@ -13,6 +13,7 @@
 //! to find an unmangled `main`.
 
 mod kwargs;
+pub use kwargs::set_aipl_builtin_sig_hook;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;

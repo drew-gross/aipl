@@ -421,21 +421,21 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 447
-deallocations: 447
-reallocations: 39
-bytes allocated: 24366
-instructions executed: 29637
-binary size: 59368
-  code: 35432
+allocations: 359
+deallocations: 359
+reallocations: 33
+bytes allocated: 21382
+instructions executed: 43516
+binary size: 57536
+  code: 34728
   data: 2549
-  metadata: 21387
+  metadata: 20259
 functions:
   __arr_drop_Cst:
     calls: 138
     bytes: 116
   __arr_retain_Cst:
-    calls: 63
+    calls: 88
     bytes: 116
   __builtin_find_map$Cst$__builtin_Span$lam$first_leaf:
     calls: 6
@@ -443,6 +443,24 @@ functions:
   __builtin_find_map$Cst$__builtin_Span$lam$first_token:
     calls: 3
     bytes: 364
+  __builtin_map_join$Cst$Cst$lam$splice:
+    calls: 0
+    bytes: 44
+  __builtin_map_join$Cst$Cst$lam$splice$tail:
+    calls: 46
+    bytes: 1556
+  __builtin_map_join$Cst$__builtin_Span$lam$leaves:
+    calls: 0
+    bytes: 44
+  __builtin_map_join$Cst$__builtin_Span$lam$leaves$tail:
+    calls: 20
+    bytes: 1028
+  __builtin_map_join$Cst$__builtin_Span$lam$token_leaves:
+    calls: 0
+    bytes: 44
+  __builtin_map_join$Cst$__builtin_Span$lam$token_leaves$tail:
+    calls: 12
+    bytes: 1028
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_leaf:
     calls: 6
     bytes: 440
@@ -469,42 +487,33 @@ functions:
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 13424
-  aipl_arr_drop_arr:
-    calls: 76
-    bytes: (external)
+    bytes: 13460
   aipl_arr_elem_ptr:
     calls: 9
     bytes: (external)
   aipl_arr_extend:
-    calls: 22
+    calls: 236
     bytes: (external)
   aipl_arr_inc:
-    calls: 873
-    bytes: (external)
-  aipl_arr_join:
-    calls: 78
+    calls: 775
     bytes: (external)
   aipl_arr_reserve:
-    calls: 18
-    bytes: (external)
-  aipl_arr_retain_ptr:
-    calls: 145
+    calls: 318
     bytes: (external)
   aipl_arr_reverse:
     calls: 8
     bytes: (external)
   aipl_array_dec:
-    calls: 1466
+    calls: 1398
     bytes: (external)
   aipl_array_new:
     calls: 149
     bytes: (external)
   aipl_array_push_mut:
-    calls: 214
+    calls: 34
     bytes: (external)
   aipl_array_with_cap:
-    calls: 104
+    calls: 16
     bytes: (external)
   aipl_assert:
     calls: 40
@@ -513,10 +522,10 @@ functions:
     calls: 61
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 558
+    calls: 573
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 497
+    calls: 512
     bytes: (external)
   aipl_test_begin:
     calls: 1
@@ -538,7 +547,7 @@ functions:
     bytes: 32
   flat_kids$tail:
     calls: 20
-    bytes: 3220
+    bytes: 1104
   last_leaf:
     calls: 12
     bytes: 696
@@ -546,8 +555,11 @@ functions:
     calls: 5
     bytes: 660
   leaves:
+    calls: 0
+    bytes: 32
+  leaves$tail:
     calls: 48
-    bytes: 3156
+    bytes: 1232
   main:
     calls: 1
     bytes: 100
@@ -563,21 +575,18 @@ functions:
   span:
     calls: 7
     bytes: 236
-  splice:
-    calls: 0
-    bytes: 32
-  splice$tail:
-    calls: 71
-    bytes: 612
   text:
     calls: 5
-    bytes: 428
+    bytes: 1456
   token_leaves:
+    calls: 0
+    bytes: 32
+  token_leaves$tail:
     calls: 38
-    bytes: 3076
+    bytes: 1156
   token_span:
     calls: 3
     bytes: 288
   token_text:
     calls: 5
-    bytes: 428
+    bytes: 1456

@@ -3797,6 +3797,7 @@ pub fn install_parser_hooks() {
     aipl_syntax::set_caret_block_hook(caret_block);
     aipl_syntax::set_int_fits_hook(int_fits);
     aipl_syntax::set_is_operator_name_hook(is_operator_name);
+    aipl_loader::set_aipl_builtin_sig_hook(aipl_mono::aipl_builtin_sig);
 }
 
 /// Compile every function in `program` into `module`. When `main_export_name`
@@ -4332,6 +4333,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_str_grew", str24::aipl_str_grew as *const u8);
     jit_builder.symbol("aipl_str_push_byte", str24::aipl_str_push_byte as *const u8);
     jit_builder.symbol("aipl_str_append", str24::aipl_str_append as *const u8);
+    jit_builder.symbol("aipl_str_reserve", str24::aipl_str_reserve as *const u8);
     jit_builder.symbol("aipl_str_iter_init", str24::aipl_str_iter_init as *const u8);
     jit_builder.symbol("aipl_str_iter_next", str24::aipl_str_iter_next as *const u8);
     jit_builder.symbol(
@@ -7677,6 +7679,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_str_grew"
         | "aipl_str_push_byte"
         | "aipl_str_append"
+        | "aipl_str_reserve"
         | "aipl_arr_drop_str"
         | "aipl_arr_drop_arr"
         | "aipl_arr_retain_ptr"
@@ -9416,9 +9419,9 @@ fn coerce_empty_to_char_array<M: Module>(
     if is_char_array(expected) && is_empty_placeholder {
         builtins.call_void(module, builder, "aipl_array_dec", &[v]);
         // The empty `[]` was a freshly allocated, tracked temporary; we've just
-        // consumed (dec'd) it in favor of the inline empty-char sentinel, so drop
-        // its tracking entry — otherwise scope exit decs it a second time, a
-        // double-free once its now-freed block is reused.
+        // consumed (dec'd) it in favor of the empty str, so drop its tracking
+        // entry — otherwise scope exit decs it a second time, a double-free
+        // once its now-freed block is reused.
         if let Some(scope) = scopes.last_mut() {
             if let Some(pos) = scope
                 .iter()
@@ -9427,10 +9430,146 @@ fn coerce_empty_to_char_array<M: Module>(
                 scope.remove(pos);
             }
         }
-        builder.ins().iconst(types::I64, 1) // pack_inline(&[]): tag (0 << 2) | 1
+        // The empty `str` is the zeroed 24-byte value (`str24::Str::empty`),
+        // addressed like every wide value. It used to be the tagged ABI's
+        // inline sentinel word, which the wide runtime dereferenced as a
+        // pointer — reached only when the literal arrived unlocked, as it does
+        // in a generic instance whose `mut out: U[] = []` became `char[]`.
+        let slot = builder.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            str24::STR_SIZE as u32,
+            3,
+        ));
+        let addr = builder.ins().stack_addr(types::I64, slot, 0);
+        let zero = builder.ins().iconst(types::I64, 0);
+        for i in 0..(str24::STR_SIZE / 8) {
+            builder
+                .ins()
+                .store(MemFlagsData::trusted(), zero, addr, (i * 8) as i32);
+        }
+        addr
     } else {
         v
     }
+}
+
+/// The byte length of the `str` value at `ptr`, computed in IR — the runtime's
+/// `Str::len` is a tag test and a mask on `w2` (an inline value keeps its
+/// length in one byte of the word, every other representation in the low 56
+/// bits), which is not worth a call. `len` on a `str` is what every scanning
+/// loop's bound is, so this is on the hot path of the lexer and every builder.
+fn emit_str_len(builder: &mut FunctionBuilder, ptr: Value) -> Value {
+    let w2 = builder.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        ptr,
+        str24::STR_W2_OFFSET as i32,
+    );
+    let tag = builder.ins().ushr_imm_u(w2, str24::TAG_SHIFT as i64);
+    let is_inline = builder
+        .ins()
+        .icmp_imm_s(IntCC::Equal, tag, str24::TAG_INLINE as i64);
+    let long_len = builder.ins().band_imm_u(w2, str24::LEN_MASK as i64);
+    let inl_len = builder.ins().ushr_imm_u(w2, str24::INLINE_LEN_SHIFT as i64);
+    let inl_len = builder.ins().band_imm_u(inl_len, 0xFF);
+    builder.ins().select(is_inline, inl_len, long_len)
+}
+
+/// Append the `str` at `src` to the one in the binding at `dst`, in place —
+/// `aipl_str_append` (whose ownership contract this inherits: the caller has
+/// established that the binding owns its value), with its commonest case
+/// inlined: an *inline* source onto a *buffer* the value owns alone, with room
+/// to spare. That is what a builder loop appends — a rendered number, a token,
+/// a separator, each 22 bytes or fewer — onto the output it is growing, and
+/// after a `reserve` it is every append the loop makes. Everything else (a
+/// long source, a shared or static buffer, an inline or rope destination, a
+/// buffer out of room) takes the call as before.
+///
+/// The fast path copies the source's three words whole rather than its
+/// `len` bytes: an inline value's content is its leading bytes in memory, so
+/// the copy lands the content and, past it, the value's length and tag bytes —
+/// which fall in spare capacity beyond the new length and mean nothing there.
+/// The room test asks for the whole 24 bytes for that reason. Three word
+/// moves and no length-dependent loop or call; the new length is the only
+/// bookkeeping (a buffer's tag byte is zero, so the length is the word).
+///
+/// The refcount and capacity live in the header before `base`, so they are
+/// read only once the tag test has proved there is a buffer to read them from
+/// — the zeroed empty value is a buffer with a null base.
+fn emit_str_append<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    builtins: &Builtins,
+    dst: Value,
+    src: Value,
+) {
+    let flags = MemFlagsData::trusted();
+    let w2_off = str24::STR_W2_OFFSET as i32;
+    let dst_w2 = builder.ins().load(types::I64, flags, dst, w2_off);
+    let src_w2 = builder.ins().load(types::I64, flags, src, w2_off);
+    let dst_tag = builder.ins().ushr_imm_u(dst_w2, str24::TAG_SHIFT as i64);
+    let src_tag = builder.ins().ushr_imm_u(src_w2, str24::TAG_SHIFT as i64);
+    let dst_is_buf = builder
+        .ins()
+        .icmp_imm_s(IntCC::Equal, dst_tag, str24::TAG_BUFFER as i64);
+    let src_is_inl = builder
+        .ins()
+        .icmp_imm_s(IntCC::Equal, src_tag, str24::TAG_INLINE as i64);
+    let shapes_fit = builder.ins().band(dst_is_buf, src_is_inl);
+    let base = builder.ins().load(types::I64, flags, dst, 0);
+    let has_block = builder.ins().icmp_imm_s(IntCC::NotEqual, base, 0);
+    let candidate = builder.ins().band(shapes_fit, has_block);
+
+    let header = builder.create_block();
+    let fast = builder.create_block();
+    let slow = builder.create_block();
+    let merge = builder.create_block();
+    builder.ins().brif(candidate, header, &[], slow, &[]);
+
+    // A buffer with a block: now its header can be read.
+    builder.switch_to_block(header);
+    builder.seal_block(header);
+    let rc = builder
+        .ins()
+        .load(types::I64, flags, base, -(str24::BUF_REFCOUNT_BACK as i32));
+    let cap = builder
+        .ins()
+        .load(types::I64, flags, base, -(str24::BUF_HEADER as i32));
+    let unique = builder.ins().icmp_imm_s(IntCC::Equal, rc, 1);
+    let data = builder
+        .ins()
+        .load(types::I64, flags, dst, str24::STR_W1_OFFSET as i32);
+    let dst_len = builder.ins().band_imm_u(dst_w2, str24::LEN_MASK as i64);
+    let write_at = builder.ins().iadd(data, dst_len);
+    let write_end = builder.ins().iadd_imm_s(write_at, str24::STR_SIZE as i64);
+    let block_end = builder.ins().iadd(base, cap);
+    let room = builder
+        .ins()
+        .icmp(IntCC::UnsignedLessThanOrEqual, write_end, block_end);
+    let take_fast = builder.ins().band(unique, room);
+    builder.ins().brif(take_fast, fast, &[], slow, &[]);
+
+    builder.switch_to_block(fast);
+    builder.seal_block(fast);
+    for i in 0..(str24::STR_SIZE / 8) {
+        let word = builder.ins().load(types::I64, flags, src, (i * 8) as i32);
+        builder.ins().store(flags, word, write_at, (i * 8) as i32);
+    }
+    let add_len = builder
+        .ins()
+        .ushr_imm_u(src_w2, str24::INLINE_LEN_SHIFT as i64);
+    let add_len = builder.ins().band_imm_u(add_len, 0xFF);
+    let new_len = builder.ins().iadd(dst_len, add_len);
+    builder.ins().store(flags, new_len, dst, w2_off);
+    builder.ins().jump(merge, &[]);
+
+    builder.switch_to_block(slow);
+    builder.seal_block(slow);
+    builtins.call_void(module, builder, "aipl_str_append", &[dst, src]);
+    builder.ins().jump(merge, &[]);
+
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
 }
 
 /// Advance a `str` cursor and return its next byte as `0..=255`, or `-1` at the
@@ -9764,15 +9903,9 @@ fn load_char_array_byte<M: Module>(
 /// real array/set/dict — the common "how many elements" query. Dispatches on
 /// `ty` (not the runtime value), since `char[]` stays str-shaped
 /// unconditionally.
-fn seq_len<M: Module>(
-    module: &mut M,
-    builder: &mut FunctionBuilder,
-    builtins: &Builtins,
-    ptr: Value,
-    ty: &ConcreteType,
-) -> Value {
+fn seq_len(builder: &mut FunctionBuilder, ptr: Value, ty: &ConcreteType) -> Value {
     if is_char_array(ty) {
-        builtins.call(module, builder, "aipl_str_len", &[ptr])
+        emit_str_len(builder, ptr)
     } else {
         load_arr_len(builder, ptr)
     }
@@ -12156,7 +12289,7 @@ fn emit_render<M: Module>(
         // `str` (and `Error`) renders as its content in double quotes.
         _ if is_str_repr(ty) => {
             // "s" — the content (no escaping) wrapped in double quotes.
-            let content = { b.call(module, builder, "aipl_str_len", &[value]) };
+            let content = { emit_str_len(builder, value) };
             if let Sink::Write(_) = sink {
                 let quote = builder.ins().iconst(types::I64, b'"' as i64);
                 sink_byte(builder, sink, quote);
@@ -12253,7 +12386,7 @@ fn emit_render_boxed<M: Module>(
         builder.ins().call(fref, &[out, value]);
         out
     };
-    let len = { b.call(module, builder, "aipl_str_len", &[s]) };
+    let len = { emit_str_len(builder, s) };
     if let Sink::Write(_) = sink {
         let src = str_bytes_ptr(module, builder, cx, s);
         sink_bytes(module, builder, cx, sink, src, len);
@@ -14917,7 +15050,7 @@ fn compile_call_expr<M: Module>(
                 3,
             ));
             let result_ptr = builder.ins().stack_addr(types::I64, rslot, 0);
-            let len = seq_len(module, builder, builtins, arr_ptr, &arr_ty);
+            let len = seq_len(builder, arr_ptr, &arr_ty);
             let zero = builder.ins().iconst(types::I64, 0);
             let is_empty = builder.ins().icmp(IntCC::Equal, len, zero);
             let empty_b = builder.create_block();
@@ -15642,7 +15775,7 @@ fn compile_call_expr<M: Module>(
                 // A `str` (or a str-shaped `char[]`, see `is_str_shaped`) stores
                 // no length field (it can be inline/owned/view); `aipl_str_len`
                 // computes the byte length for any representation.
-                builtins.call(module, builder, "aipl_str_len", &[ptr])
+                emit_str_len(builder, ptr)
             } else if matches!(
                 t,
                 ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _)
@@ -16883,10 +17016,10 @@ fn compile_call_expr<M: Module>(
                 // `str` has no in-place growable form: build a fresh buffer of
                 // the combined length and copy both sides in. `aipl_str_len` /
                 // `aipl_str_data` only *borrow*, so neither side is retained.
-                let old_len = builtins.call(module, builder, "aipl_str_len", &[arr_ptr]);
+                let old_len = emit_str_len(builder, arr_ptr);
                 let (tail, add_len) = if name == "__aipl_arr_concat" {
                     let (src, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
-                    let src_len = builtins.call(module, builder, "aipl_str_len", &[src]);
+                    let src_len = emit_str_len(builder, src);
                     (Some(src), src_len)
                 } else {
                     let (x_v, _) = compile_expr(module, builder, cx, scopes, &args[1])?;
@@ -17118,7 +17251,7 @@ fn compile_call_expr<M: Module>(
                     *ty_cell.borrow_mut() = new_arr_ty;
                     return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
                 }
-                let old_len = builtins.call(module, builder, "aipl_str_len", &[arr_ptr]);
+                let old_len = emit_str_len(builder, arr_ptr);
                 let new_len = builder.ins().iadd_imm_s(old_len, 1);
                 let (buf, dst) = emit_str_alloc(module, builder, cx, new_len);
                 let src = str_bytes_ptr(module, builder, cx, arr_ptr);
@@ -17178,6 +17311,100 @@ fn compile_call_expr<M: Module>(
             // Refine the binding's element type (e.g. `mut a = []` → `i64[]`).
             *ty_cell.borrow_mut() = new_arr_ty;
             // `push` mutates; it produces no value.
+            (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
+        }
+        "__builtin_reserve" => {
+            // `set xs.reserve(n)`: room for `n` more elements, in the same
+            // in-place writeback form as `push`/`extend` — receiver in
+            // `args[0]`, count in `args[1]`, the grown value stored back into
+            // the receiver's slot. The contents are untouched, so the binding's
+            // type is untouched too: an untyped empty literal stays untyped, and
+            // there is no element to pin it with. Sizing is the whole point —
+            // the appends that follow then fit without growing (see
+            // `aipl_arr_reserve`, which sizes exactly; the `str` runtime's
+            // `aipl_str_reserve` does the same for bytes).
+            if args.len() != 2 {
+                return Err(Error::at(
+                    format!("\"reserve\" expects 1 argument, got {}", args.len() - 1),
+                    span.clone(),
+                ));
+            }
+            let receiver = &args[0];
+            let (extra, extra_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
+            // A count is a length: either width reads as the same scalar, and
+            // a bare literal arrives as an `i64`.
+            expect_len_operand(&extra_ty, "reserve count", args[1].span.clone())?;
+            let (slot, ty_cell, exclusive, elem_ty) = match mut_str_receiver(env, receiver) {
+                Some((slot, cell, exclusive)) => (
+                    slot,
+                    cell,
+                    exclusive,
+                    ConcreteType::Primitive(Primitive::Char),
+                ),
+                None => mut_array_receiver(env, receiver, "reserve")?,
+            };
+            let arr_ty = ConcreteType::Array(Box::new(elem_ty.clone()));
+            if is_char_array(&arr_ty) {
+                let s_ptr = load_binding_str(builder, slot);
+                if exclusive {
+                    // In place, under `append_owned`'s contract, exactly as
+                    // `extend`'s char path.
+                    builtins.call_void(module, builder, "aipl_str_reserve", &[s_ptr, extra]);
+                    return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
+                }
+                // Possibly shared: build a buffer of the reserved capacity
+                // holding the current bytes, and hand it to the binding the way
+                // a rebuilding `push` does.
+                let old_len = emit_str_len(builder, s_ptr);
+                let cap = builder.ins().iadd(old_len, extra);
+                let (buf, dst) = emit_str_alloc(module, builder, cx, cap);
+                let src = str_bytes_ptr(module, builder, cx, s_ptr);
+                let _ = builtins.call(module, builder, "aipl_write_bytes", &[dst, src, old_len]);
+                emit_str_grew(module, builder, cx, buf, old_len);
+                let binding_ty = ty_cell.borrow().clone();
+                replace_str_binding(
+                    builder,
+                    module,
+                    builtins,
+                    structs,
+                    scopes,
+                    cx,
+                    slot,
+                    s_ptr,
+                    buf,
+                    &binding_ty,
+                );
+                return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
+            }
+            // A bit-packed `bool[]` has no pre-sized form (the runtime measures
+            // in whole elements); a `reserve` on one is a no-op, and its pushes
+            // grow it as they always have.
+            if is_bit_packed(&elem_ty) {
+                return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
+            }
+            let arr_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
+            let drop_fn = array_drop_fn_addr(builder, module, cx, &elem_ty);
+            let retain_fn = array_retain_fn_addr(builder, module, cx, &elem_ty);
+            let esz = builder
+                .ins()
+                .iconst(types::I64, runtime_elem_size(&elem_ty, structs));
+            // `aipl_arr_reserve` consumes the slot's reference and hands back
+            // one owned reference — `push`'s contract, so the bookkeeping is
+            // `extend`'s.
+            let new_ptr = builtins.call(
+                module,
+                builder,
+                "aipl_arr_reserve",
+                &[arr_ptr, extra, drop_fn, retain_fn, esz],
+            );
+            builder.ins().stack_store(types::I64, new_ptr, slot, 0);
+            if !exclusive {
+                emit_retain(builder, module, builtins, structs, new_ptr, &arr_ty);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(new_ptr, &arr_ty));
+            }
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
         }
         "__builtin_extend" => {
@@ -17281,12 +17508,12 @@ fn compile_call_expr<M: Module>(
                     // that *is* this receiver (`cs.extend(cs)`) is handled inside
                     // the runtime, which takes the copy path rather than reading
                     // bytes out of a block it is about to grow.
-                    builtins.call_void(module, builder, "aipl_str_append", &[arr_ptr, src_ptr]);
+                    emit_str_append(module, builder, builtins, arr_ptr, src_ptr);
                     *ty_cell.borrow_mut() = binding_ty;
                     return Ok((builder.ins().iconst(types::I64, 0), ConcreteType::Unit));
                 }
-                let old_len = builtins.call(module, builder, "aipl_str_len", &[arr_ptr]);
-                let add_len = builtins.call(module, builder, "aipl_str_len", &[src_ptr]);
+                let old_len = emit_str_len(builder, arr_ptr);
+                let add_len = emit_str_len(builder, src_ptr);
                 let new_len = builder.ins().iadd(old_len, add_len);
                 let (buf, dst) = emit_str_alloc(module, builder, cx, new_len);
                 let src0 = str_bytes_ptr(module, builder, cx, arr_ptr);
@@ -17662,7 +17889,7 @@ fn emit_slice<M: Module>(
     if *recv_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(recv_ty) {
         let b_v = match b_v {
             Some(b) => b,
-            None => builtins.call(module, builder, "aipl_str_len", &[recv_v]),
+            None => emit_str_len(builder, recv_v),
         };
         let result = builtins.call(module, builder, "aipl_str_slice", &[recv_v, a_v, b_v]);
         scopes
@@ -18842,7 +19069,7 @@ fn compile_expr_inner<M: Module>(
                     // slot — so there is no inc, no dec and no new value-track:
                     // `r`'s own track still releases it, and the binding's
                     // slot-track already owns whatever the slot now names.
-                    builtins.call_void(module, builder, "aipl_str_append", &[s_ptr, rv]);
+                    emit_str_append(module, builder, builtins, s_ptr, rv);
                     return compile_expr(module, builder, Cx { tail, ..cx }, scopes, body);
                 }
                 // In-place trim: `set s = trim(s)` / `set s = s.trim()` shifts and
@@ -19385,7 +19612,7 @@ fn compile_expr_inner<M: Module>(
                 // string-literal match (no array arms) skips it, so it compiles
                 // exactly as before this path was unified.
                 let scrut_len = if arms.iter().any(|a| matches!(a.pattern, Pattern::Array(_))) {
-                    Some(seq_len(module, builder, builtins, ptr, &seq_ty))
+                    Some(seq_len(builder, ptr, &seq_ty))
                 } else {
                     None
                 };

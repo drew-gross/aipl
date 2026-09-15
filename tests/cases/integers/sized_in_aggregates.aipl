@@ -103,11 +103,11 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 291
-instructions executed: 664
-binary size: 6120
-  code: 2608
+instructions executed: 686
+binary size: 6064
+  code: 2620
   data: 475
-  metadata: 3037
+  metadata: 2969
 functions:
   __rec_drop_W:
     calls: 2
@@ -117,7 +117,7 @@ functions:
     bytes: 624
   __to_str_W:
     calls: 3
-    bytes: 844
+    bytes: 856
   __to_str_u32$arr:
     calls: 1
     bytes: 708

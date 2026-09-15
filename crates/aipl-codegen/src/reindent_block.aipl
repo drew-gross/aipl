@@ -103,15 +103,15 @@ pub fn reindent_block(self: str, base: u64) -> str {
     assert(`"""hi\n  x\n      """`.reindent_block(2) == `"""hi\n  x\n  """`);
 })
 --- performance ---
-allocations: 109
-deallocations: 109
-reallocations: 14
-bytes allocated: 6657
-instructions executed: 11619
-binary size: 12936
-  code: 7360
-  data: 748
-  metadata: 4828
+allocations: 106
+deallocations: 106
+reallocations: 5
+bytes allocated: 6290
+instructions executed: 14123
+binary size: 15016
+  code: 9244
+  data: 785
+  metadata: 4987
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 24
@@ -138,10 +138,10 @@ functions:
     calls: 19
     bytes: (external)
   aipl_array_push_mut:
-    calls: 23
+    calls: 7
     bytes: (external)
   aipl_array_with_cap:
-    calls: 15
+    calls: 5
     bytes: (external)
   aipl_assert:
     calls: 9
@@ -163,4 +163,4 @@ functions:
     bytes: 116
   reindent_block:
     calls: 9
-    bytes: 4652
+    bytes: 6536

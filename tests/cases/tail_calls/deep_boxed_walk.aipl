@@ -34,11 +34,11 @@ allocations: 200002
 deallocations: 200002
 reallocations: 0
 bytes allocated: 14400094
-instructions executed: 10600052
-binary size: 2624
-  code: 1048
+instructions executed: 12800052
+binary size: 2608
+  code: 1076
   data: 1
-  metadata: 1575
+  metadata: 1531
 functions:
   __rec_drop_List:
     calls: 200001
@@ -81,4 +81,4 @@ functions:
     bytes: 36
   total$tail:
     calls: 200001
-    bytes: 232
+    bytes: 260

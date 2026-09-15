@@ -50,6 +50,11 @@ Rules that bite:
 - **Operators must be imported, always aliased** (`equal as ==`), including in
   this file. Bounds are `<T: any>` / `<T: ord>` / `<T: variant>` only.
 - **`char` has no `<`/`>` yet** (TODO.txt item 1) — write char tests with `==`.
+- **Keyword and variadic parameters work** (`sep: U* = [], final_sep: U* = sep`,
+  as `builtin_map_join.aipl` declares): the loader learns an AIPL builtin's
+  signature through `aipl_loader::set_aipl_builtin_sig_hook` (installed with
+  the parser hooks), reading the file on first call. A default may read an
+  earlier parameter, as a user function's may.
 - Prefer a **void `main`** and, in predicates, the `fn is_x(self: T) -> bool`
   method form.
 

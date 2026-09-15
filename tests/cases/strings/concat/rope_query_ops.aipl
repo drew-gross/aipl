@@ -25,11 +25,11 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 246
-instructions executed: 275
-binary size: 2864
-  code: 1224
+instructions executed: 286
+binary size: 2832
+  code: 1232
   data: 47
-  metadata: 1593
+  metadata: 1553
 functions:
   __to_str_bool:
     calls: 5
@@ -48,4 +48,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 788
+    bytes: 796

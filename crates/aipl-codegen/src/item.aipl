@@ -187,12 +187,12 @@ fn show_import_source(self: ImportSource) -> str {
 allocations: 18
 deallocations: 18
 reallocations: 2
-bytes allocated: 1382
-instructions executed: 1128
-binary size: 77912
-  code: 51492
+bytes allocated: 1338
+instructions executed: 1436
+binary size: 93104
+  code: 65472
   data: 238
-  metadata: 26182
+  metadata: 27394
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -223,25 +223,25 @@ functions:
     bytes: 1560
   __m2__show_expr:
     calls: 0
-    bytes: 17376
+    bytes: 21964
   __m2__show_exprs:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __m2__show_field_init:
     calls: 0
-    bytes: 620
+    bytes: 628
   __m3__show_pat:
     calls: 0
     bytes: 2548
   __m3__show_pats:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __m5__show_ty:
     calls: 1
     bytes: 5064
   __m5__show_tys:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __rec_drop___m5__Ty:
     calls: 1
     bytes: 408
@@ -258,12 +258,6 @@ functions:
     calls: 11
     bytes: (external)
   aipl_array_new:
-    calls: 2
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 2
-    bytes: (external)
-  aipl_array_with_cap:
     calls: 2
     bytes: (external)
   aipl_assert:
@@ -295,13 +289,13 @@ functions:
     bytes: 188
   show_case:
     calls: 0
-    bytes: 3600
+    bytes: 4532
   show_default:
     calls: 1
     bytes: 420
   show_item:
     calls: 2
-    bytes: 12512
+    bytes: 17296
   show_type_params:
     calls: 1
-    bytes: 1272
+    bytes: 2156

@@ -328,15 +328,15 @@ fn cleanup(out: str) -> str {
     assert(raw.print(100) == `x = """\n    hi\n"""\n`);
 })
 --- performance ---
-allocations: 314
-deallocations: 314
-reallocations: 2
-bytes allocated: 21728
-instructions executed: 33211
-binary size: 36224
-  code: 21784
+allocations: 313
+deallocations: 313
+reallocations: 1
+bytes allocated: 21645
+instructions executed: 34042
+binary size: 38224
+  code: 23744
   data: 881
-  metadata: 13559
+  metadata: 13599
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -361,7 +361,7 @@ functions:
     bytes: 264
   __m1__reindent_block:
     calls: 1
-    bytes: 4652
+    bytes: 6536
   __m5__trim_end_while$lam$__builtin_is_space:
     calls: 34
     bytes: 392
@@ -393,10 +393,10 @@ functions:
     calls: 40
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_array_with_cap:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 11
@@ -430,19 +430,19 @@ functions:
     bytes: (external)
   col_after:
     calls: 28
-    bytes: 596
+    bytes: 628
   fits:
     calls: 0
     bytes: 36
   fits$tail:
     calls: 42
-    bytes: 2684
+    bytes: 2700
   fits_atom:
     calls: 0
     bytes: 52
   fits_atom$tail:
     calls: 16
-    bytes: 312
+    bytes: 328
   has_hard:
     calls: 0
     bytes: 32
@@ -454,7 +454,7 @@ functions:
     bytes: 108
   print:
     calls: 11
-    bytes: 4180
+    bytes: 4192
   print$map2$own0:
     calls: 11
     bytes: 464

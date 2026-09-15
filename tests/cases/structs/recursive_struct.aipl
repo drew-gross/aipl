@@ -58,17 +58,17 @@ deallocations: 8
 reallocations: 0
 bytes allocated: 453
 instructions executed: 611
-binary size: 6384
-  code: 2960
+binary size: 6312
+  code: 2984
   data: 308
-  metadata: 3116
+  metadata: 3020
 functions:
   __rec_drop_Tree:
     calls: 5
     bytes: 104
   __to_str_Tree:
     calls: 1
-    bytes: 1132
+    bytes: 1156
   __to_str_i64:
     calls: 2
     bytes: 204

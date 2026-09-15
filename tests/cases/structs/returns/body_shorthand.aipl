@@ -73,15 +73,15 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 203
-instructions executed: 692
-binary size: 4632
-  code: 1848
+instructions executed: 714
+binary size: 4592
+  code: 1860
   data: 364
-  metadata: 2420
+  metadata: 2368
 functions:
   __to_str_Named:
     calls: 1
-    bytes: 824
+    bytes: 836
   __to_str_Vec2:
     calls: 4
     bytes: 484

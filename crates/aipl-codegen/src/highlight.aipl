@@ -772,15 +772,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 1113
-deallocations: 1113
-reallocations: 33
-bytes allocated: 96953
-instructions executed: 91219
-binary size: 134144
-  code: 84392
+allocations: 1136
+deallocations: 1136
+reallocations: 28
+bytes allocated: 96447
+instructions executed: 99016
+binary size: 140032
+  code: 89788
   data: 5328
-  metadata: 44424
+  metadata: 44916
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -829,7 +829,7 @@ functions:
     bytes: 100
   __m1__indent:
     calls: 12
-    bytes: 724
+    bytes: 1652
   __rec_drop_Pat:
     calls: 77
     bytes: 268
@@ -868,10 +868,10 @@ functions:
     bytes: 7844
   __test$tm_json:
     calls: 1
-    bytes: 5888
+    bytes: 5904
   __test$word_pat:
     calls: 1
-    bytes: 1196
+    bytes: 2112
   __to_str_u64:
     calls: 0
     bytes: 204
@@ -894,10 +894,10 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_push_mut:
-    calls: 82
+    calls: 27
     bytes: (external)
   aipl_array_with_cap:
-    calls: 24
+    calls: 4
     bytes: (external)
   aipl_assert:
     calls: 46
@@ -922,7 +922,7 @@ functions:
     bytes: (external)
   arr_fld:
     calls: 2
-    bytes: 1036
+    bytes: 1892
   caps_fld:
     calls: 0
     bytes: 1300
@@ -955,19 +955,19 @@ functions:
     bytes: 6684
   obj_fld:
     calls: 1
-    bytes: 1576
+    bytes: 2448
   obj_of:
     calls: 2
-    bytes: 928
+    bytes: 1796
   pat_json:
     calls: 2
-    bytes: 4600
+    bytes: 4656
   re_escape:
     calls: 42
     bytes: 1628
   rule_pats$Kind:
     calls: 2
-    bytes: 11484
+    bytes: 12368
   run_len:
     calls: 5
     bytes: 1340

@@ -1578,6 +1578,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         );
         let out = mono.process(
             &inst.mangled,
+            &inst.template,
             &params,
             &effects,
             &return_ty,
@@ -2257,6 +2258,7 @@ impl Mono<'_> {
     fn process(
         &mut self,
         name: &str,
+        template: &str,
         params: &[Param],
         effects: &[String],
         return_ty: &Option<Type>,
@@ -2323,8 +2325,9 @@ impl Mono<'_> {
         self.cur_effects = effects.to_vec();
         self.cur_ret = return_ty.clone().unwrap_or(Type::Unit);
         // A lambda-specialized callee carries its function-typed parameters'
-        // bindings; an ordinary function has none.
-        self.cur_lenv = self.lambda_envs.get(name).cloned().unwrap_or_default();
+        // bindings; an ordinary function has none. Keyed by the template: its
+        // per-shape instances (`$ve2`, a variadic passed one element) share it.
+        self.cur_lenv = self.lambda_envs.get(template).cloned().unwrap_or_default();
         let (body, _) = self.infer(body, &env)?;
         Ok(ConcreteFn {
             name: name.to_string(),
@@ -2370,22 +2373,30 @@ impl Mono<'_> {
     /// reuse-memo key (the original callee for a concrete fn, or its type-args
     /// instance for a generic one); `template` is the concrete (already
     /// type-substituted, if generic) function and `ret` its concrete return type.
-    /// `inferred` optionally supplies the rewritten form of a non-function
-    /// argument the caller already inferred (indexed like `args`), so it isn't
-    /// inferred twice — a second pass over e.g. a chained `xs.filter(..)`
-    /// receiver would synthesize (and emit) a duplicate instance of it.
+    /// `inferred` optionally supplies the rewritten form and type of a
+    /// non-function argument the caller already inferred (indexed like `args`),
+    /// so it isn't inferred twice — a second pass over e.g. a chained
+    /// `xs.filter(..)` receiver would synthesize (and emit) a duplicate instance
+    /// of it.
     fn specialize_call_with(
         &mut self,
         base_name: &str,
         template: &ConcreteTemplate,
         ret: Type,
         args: &[Expr],
-        inferred: &[Option<Expr>],
+        inferred: &[Option<(Expr, Type)>],
         env: &Env,
         span: Span,
     ) -> Result<(Expr, Type), Error> {
         let name = base_name;
         let effects = self.cur_effects.clone();
+        // The shape each forwarded argument gives its parameter: a variadic
+        // (`sep: U*`) passed one element or an optional takes the instance that
+        // rebuilds the sequence (see `specialize_variadic`), exactly as an
+        // ordinary generic call would give it — a specialized callee used to
+        // keep every variadic in its sequence form, so `xs.map_join(f, sep=0)`
+        // bound the bare `0` to a `U[]`.
+        let mut shapes: Vec<VShape> = Vec::new();
 
         // Pass 1: per argument, build the forwarded call argument(s); for a
         // function-typed parameter, also resolve which synthesized function it
@@ -2430,17 +2441,40 @@ impl Mono<'_> {
                     let (fr, ft) = self.infer(&fe, env)?;
                     cap_types.push(ft);
                     new_args.push(fr);
+                    shapes.push(VShape::Seq);
                 }
                 targets.push(Some((fn_name, cap_types)));
             } else {
-                let ra = match inferred.get(i).and_then(|p| p.clone()) {
-                    Some(ra) => ra,
-                    None => self.infer(arg, env)?.0,
+                let (ra, aty) = match inferred.get(i).and_then(|p| p.clone()) {
+                    Some(known) => known,
+                    None => self.infer(arg, env)?,
                 };
+                shapes.push(if param.variadic {
+                    variadic_shape(&aty, &param.ty)
+                } else {
+                    VShape::Seq
+                });
                 new_args.push(ra);
                 targets.push(None);
             }
         }
+        // The specialized callee is one template per (callee, functions); its
+        // per-shape instances hang off that, as they do for any function.
+        let instance = |m: &mut Self, spec: &str| {
+            m.enqueue_full(
+                spec,
+                ParamSpecs {
+                    type_args: Vec::new(),
+                    params: shapes
+                        .iter()
+                        .map(|v| ParamSpec {
+                            variadic: *v,
+                            ..ParamSpec::default()
+                        })
+                        .collect(),
+                },
+            )
+        };
 
         // Reuse an existing specialization for the same (callee, functions).
         let key = (
@@ -2450,9 +2484,10 @@ impl Mono<'_> {
                 .filter_map(|t| t.as_ref().map(|(f, _)| f.clone()))
                 .collect::<Vec<_>>(),
         );
-        if let Some(spec) = self.spec_memo.get(&key) {
+        if let Some(spec) = self.spec_memo.get(&key).cloned() {
+            let mangled = instance(self, &spec);
             return Ok((
-                Expr::new(ExprKind::Call(spec.clone(), new_args, false), span.clone()),
+                Expr::new(ExprKind::Call(mangled, new_args, false), span.clone()),
                 ret,
             ));
         }
@@ -2509,9 +2544,9 @@ impl Mono<'_> {
         );
         self.lambda_envs.insert(spec_name.clone(), lenv);
         self.spec_memo.insert(key, spec_name.clone());
-        self.enqueue_concrete(&spec_name);
+        let mangled = instance(self, &spec_name);
         Ok((
-            Expr::new(ExprKind::Call(spec_name, new_args, false), span.clone()),
+            Expr::new(ExprKind::Call(mangled, new_args, false), span.clone()),
             ret,
         ))
     }
@@ -2584,10 +2619,24 @@ impl Mono<'_> {
         // element type and any lambda are right), but this parameter's concrete
         // type stays `str`. Record which parameters that applies to.
         let mut str_arg = vec![false; sig.params.len()];
+        // The variables a `str` pinned through a `T[]` position — a parameter
+        // above, or a function-typed parameter's result below. A `T[]` *return*
+        // in such a variable is then a `str` too: `map_join`'s `U[]` is the
+        // string join when its pieces and separators are strings, and a
+        // `char[]` result would render as a list of chars where the `join` it
+        // fused from rendered text.
+        let mut str_pinned: HashSet<String> = HashSet::new();
+        let str_var_of = |t: &Type| match t {
+            Type::Array(e) => match &**e {
+                Type::TypeVar(v) => Some(v.clone()),
+                _ => None,
+            },
+            _ => None,
+        };
         // Keep each rewritten argument for `specialize_call_with`, so inferring
         // it here (which may synthesize instances — e.g. a chained
         // `xs.filter(..)` receiver) isn't repeated there.
-        let mut inferred: Vec<Option<Expr>> = vec![None; sig.params.len()];
+        let mut inferred: Vec<Option<(Expr, Type)>> = vec![None; sig.params.len()];
         for (i, (param, arg)) in sig.params.iter().zip(args).enumerate() {
             if matches!(param.ty, Type::Fn(_, _)) {
                 continue;
@@ -2595,7 +2644,12 @@ impl Mono<'_> {
             let (ra, aty) = self.infer(arg, env)?;
             self.bind_generic_or(&param.ty, &aty, &var_set, &mut map, gname, span.clone())?;
             str_arg[i] = aty == Type::Primitive(Primitive::Str);
-            inferred[i] = Some(ra);
+            // Any string representation pins it — a template literal's value
+            // arrives as the concat-str marker, not the plain `str`.
+            if is_str_repr(&aty) {
+                str_pinned.extend(str_var_of(&param.ty));
+            }
+            inferred[i] = Some((ra, aty));
         }
         // A variable no ordinary argument pinned may still appear as a
         // function-typed parameter's *result* — `map_err`'s `F` in `(E) -> F`.
@@ -2624,6 +2678,9 @@ impl Mono<'_> {
                 let ptys: Vec<Type> = ptys.iter().map(|t| subst_vars(t, &map)).collect();
                 if let Some(rty) = self.fn_arg_return(arg, &ptys, env)? {
                     self.bind_generic_or(ret, &rty, &var_set, &mut map, gname, span.clone())?;
+                    if is_str_repr(&rty) {
+                        str_pinned.extend(str_var_of(ret));
+                    }
                 }
             }
         }
@@ -2667,17 +2724,48 @@ impl Mono<'_> {
                 implicit_some: p.implicit_some,
             });
         }
+        // A `T[]` return whose `T` a `str` pinned is the `str` itself (see
+        // `str_pinned`); the instance is marked so it never collides with the
+        // one a real `char[]` would reach.
+        let str_ret = sig
+            .return_ty
+            .as_ref()
+            .and_then(|t| str_var_of(t))
+            .is_some_and(|v| str_pinned.contains(&v));
         let ret = match &sig.return_ty {
+            Some(_) if str_ret => Type::Primitive(Primitive::Str),
             Some(t) => self.resolve_generic_ty(&subst_vars(t, &map))?,
             None => Type::Unit,
+        };
+        // As in the instance-emitting path: the body's own `let x: T` /
+        // `|a: T|` annotations need the same substitution as the signature.
+        let body = subst_expr_tys(&body, &map);
+        // A str-returning instance says so *in its body* too — `{ let $ret: str
+        // = <body>; $ret }` — because the body computes a `char[]` (the same
+        // bytes, but rendered as a list of chars), and an inlined call takes
+        // its type from the body rather than from the signature.
+        let body = if str_ret {
+            let bspan = body.span.clone();
+            Expr::new(
+                ExprKind::Let(
+                    "$ret".to_string(),
+                    Some(Type::Primitive(Primitive::Str)),
+                    Box::new(body),
+                    Box::new(Expr::new(
+                        ExprKind::Ident("$ret".to_string()),
+                        bspan.clone(),
+                    )),
+                ),
+                bspan,
+            )
+        } else {
+            body
         };
         let template = ConcreteTemplate {
             params,
             effects: sig.effects.clone(),
             return_ty: Some(ret.clone()),
-            // As in the instance-emitting path: the body's own `let x: T` /
-            // `|a: T|` annotations need the same substitution as the signature.
-            body: subst_expr_tys(&body, &map),
+            body,
         };
         // Name the instance by its type args so different `T`s don't collide in
         // the specialization memo; a `str`-specialized parameter is marked too, so
@@ -2692,6 +2780,9 @@ impl Mono<'_> {
             if *is_str {
                 base.push_str(&format!("$s{i}"));
             }
+        }
+        if str_ret {
+            base.push_str("$rs");
         }
         self.specialize_call_with(&base, &template, ret, args, &inferred, env, span.clone())
     }
@@ -6696,6 +6787,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
     ("__builtin_count_if", "builtin_count_if.aipl"),
     ("__builtin_find_if", "builtin_find_if.aipl"),
     ("__builtin_map_find_if", "builtin_map_find_if.aipl"),
+    ("__builtin_map_join", "builtin_map_join.aipl"),
     ("__builtin_find_map", "builtin_find_map.aipl"),
     (
         "__builtin_reverse_find_map",
@@ -6883,6 +6975,20 @@ pub fn aipl_builtin_demand(program: &Program) -> BTreeSet<&'static str> {
 /// body is kept (it type-checks — operators are native AST nodes, and calls to
 /// other builtins are already rewritten to their canonical names by the loader)
 /// so the decl is a complete, checkable function.
+/// The signature of the AIPL-implemented builtin `canonical`
+/// (`__builtin_map_join`), or `None` for any other name — the loader's keyword-
+/// argument pass asks this (through `aipl_loader::set_aipl_builtin_sig_hook`)
+/// for a `__builtin_*` callee `BUILTIN_SIGNATURES` does not declare, so a
+/// builtin written in AIPL can take keyword parameters like one written in
+/// Rust. Loads the builtin's source on first ask, as any demand does.
+pub fn aipl_builtin_sig(canonical: &str) -> Option<Signature> {
+    let b = aipl_builtin(canonical)?;
+    match &b.decl {
+        Item::Fn(f) => Some(f.sig.clone()),
+        _ => None,
+    }
+}
+
 pub fn aipl_builtin_sig_decls(needed: &BTreeSet<&'static str>) -> Vec<Item> {
     let mut out = Vec::new();
     let mut seen_templates: HashSet<String> = HashSet::new();

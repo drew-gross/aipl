@@ -53,11 +53,11 @@ allocations: 59
 deallocations: 59
 reallocations: 0
 bytes allocated: 1843
-instructions executed: 3543
-binary size: 9616
-  code: 4748
+instructions executed: 4027
+binary size: 9472
+  code: 4800
   data: 389
-  metadata: 4479
+  metadata: 4283
 functions:
   __arr_drop_List:
     calls: 1
@@ -70,16 +70,16 @@ functions:
     bytes: 44
   __to_str_Holder:
     calls: 1
-    bytes: 656
+    bytes: 680
   __to_str_List:
     calls: 42
     bytes: 708
   __to_str_List$arr:
     calls: 1
-    bytes: 768
+    bytes: 780
   __to_str_List$opt:
     calls: 1
-    bytes: 476
+    bytes: 492
   __to_str_i64:
     calls: 1
     bytes: 204

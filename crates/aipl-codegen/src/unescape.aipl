@@ -114,11 +114,11 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 528
-instructions executed: 9733
-binary size: 17528
-  code: 9844
+instructions executed: 10519
+binary size: 18000
+  code: 10372
   data: 1679
-  metadata: 6005
+  metadata: 5949
 functions:
   __test$escape_text:
     calls: 1
@@ -146,7 +146,7 @@ functions:
     bytes: 260
   unescape:
     calls: 15
-    bytes: 1264
+    bytes: 1612
   unescape_braces:
     calls: 7
-    bytes: 792
+    bytes: 972

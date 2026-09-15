@@ -67,15 +67,15 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 608
-instructions executed: 1947
-binary size: 8256
-  code: 4496
+instructions executed: 1958
+binary size: 8224
+  code: 4512
   data: 806
-  metadata: 2954
+  metadata: 2906
 functions:
   __test$right_fold:
     calls: 1
-    bytes: 3552
+    bytes: 3568
   __test$right_fold$filter2$own0:
     calls: 1
     bytes: 300

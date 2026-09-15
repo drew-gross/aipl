@@ -182,6 +182,7 @@ HOF:
 math:
 
 syntax:
+  I haven't decided whether I want reserve to be user-accessible so for now please make it an error if it's used outside the implementation of a builtin.
   forwarding omittables
   more match power: earlier matches in a multi-match can be used in later matches
   generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
@@ -379,6 +380,7 @@ design:
   apis should express intent
 
 optimizations:
+  output array length prediction that propagates and allows for really good pre-reserving
   constant folding optimization pass
   dead store elimination optimization pass
   Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
@@ -439,7 +441,6 @@ optimizations:
     count fusions should apply to count_if also
     vec.filter().count() should fuse to not materialize the filtered array
     add a test to ensure that if an operator is imported with the "wrong" name fusion doens't fuse incorrectly (e.g. import { less_than as > } from builtins)
-    a.map(...).join() fuses to flat_map
     a.extend(v.map(...)) fuses to map_extend
     also fuse x.extend(y.filter().map())
     pretty much all chains of array operations can be fused actually... maybe we need a more generic fuser?

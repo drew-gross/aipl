@@ -51,11 +51,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1451
-binary size: 7488
+instructions executed: 1616
+binary size: 7424
   code: 3464
   data: 1104
-  metadata: 2920
+  metadata: 2856
 functions:
   __eq_str$opt:
     calls: 8

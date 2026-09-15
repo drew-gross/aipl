@@ -185,11 +185,11 @@ allocations: 106
 deallocations: 106
 reallocations: 0
 bytes allocated: 4489
-instructions executed: 35734
-binary size: 92600
-  code: 62536
+instructions executed: 37868
+binary size: 92448
+  code: 62628
   data: 1894
-  metadata: 28170
+  metadata: 27926
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -202,7 +202,7 @@ functions:
     bytes: 264
   __builtin_int_parse:
     calls: 3
-    bytes: 1104
+    bytes: 1112
   __builtin_int_parse$lambda1:
     calls: 3
     bytes: 140
@@ -223,7 +223,7 @@ functions:
     bytes: 84
   __to_str_str:
     calls: 0
-    bytes: 276
+    bytes: 300
   aipl_arr_inc:
     calls: 228
     bytes: (external)
@@ -253,7 +253,7 @@ functions:
     bytes: (external)
   companion_path:
     calls: 4
-    bytes: 1284
+    bytes: 1300
   finalize:
     calls: 25
     bytes: 22852
@@ -262,4 +262,4 @@ functions:
     bytes: 108
   parse_spec:
     calls: 13
-    bytes: 5424
+    bytes: 5468

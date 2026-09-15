@@ -67,6 +67,10 @@ pub(crate) const TAG_ROPE: u8 = 0b10;
 /// `[cap][refcount]` — the prefix before a buffer's content. Same 16 bytes as
 /// today's `[len][refcount]`, with the first word's meaning changed.
 pub(crate) const BUF_HEADER: usize = 16;
+/// How far back from `base` the refcount word sits (`refcount_of`); the
+/// capacity is the word before it, `BUF_HEADER` back. Codegen's inlined append
+/// reads both.
+pub(crate) const BUF_REFCOUNT_BACK: usize = 8;
 /// A static buffer's refcount, which `retain`/`release` never touch.
 pub(crate) const STATIC_REFCOUNT: i64 = i64::MAX;
 
@@ -312,7 +316,7 @@ pub(crate) fn with_capacity(cap: usize, init: &[u8]) -> Str {
 }
 
 unsafe fn refcount_of(owner: *const u8) -> *mut i64 {
-    unsafe { owner.sub(8) as *mut i64 }
+    unsafe { owner.sub(BUF_REFCOUNT_BACK) as *mut i64 }
 }
 
 fn buffer_cap(base: *const u8) -> usize {
@@ -1316,6 +1320,48 @@ pub(crate) extern "C" fn aipl_str_grew(s: *mut Str, n: i64) {
     }
 }
 
+/// Give the value in `s` room for `extra` more bytes, so the appends that
+/// follow are plain writes — the `reserve` builtin, and what a builder loop
+/// calls once before appending a known number of pieces. Inherits
+/// [`append_owned`]'s ownership contract: the caller has established static
+/// ownership, and `is_unique` only refines it.
+///
+/// Nothing happens when the room is already there — an inline value whose
+/// final length still fits, or a sole-owner buffer with the spare capacity. A
+/// sole-owner buffer whose window starts at its base grows under itself, as
+/// an append does; anything else is copied once into a buffer of exactly the
+/// requested size, which is the point: exact rather than doubled, because the
+/// caller has said how much it needs.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_reserve(s: *mut Str, extra: i64) {
+    let v = unsafe { read(s) };
+    let len = v.len();
+    let need = len + extra.max(0) as usize;
+    if v.tag() == TAG_INLINE && need <= INLINE_CAP {
+        return;
+    }
+    if v.tag() == TAG_BUFFER && v.is_unique() {
+        if v.spare_capacity() >= need - len {
+            return;
+        }
+        if v.w0 == v.w1 {
+            let base = unsafe { grow_buffer(v.w0 as *const u8, need) };
+            unsafe {
+                *s = Str {
+                    w0: base as u64,
+                    w1: base as u64,
+                    w2: meta(len, TAG_BUFFER),
+                }
+            };
+            return;
+        }
+    }
+    let mut scratch = [0u8; INLINE_CAP];
+    let grown = with_capacity(need, v.bytes(&mut scratch));
+    v.release();
+    unsafe { *s = grown };
+}
+
 /// Append one byte to the value in `s`, in place where it can be — the `push`
 /// half of [`append_owned`], whose ownership contract this inherits.
 #[no_mangle]
@@ -1937,6 +1983,36 @@ mod tests {
         let long = from_bytes(b"a buffer, longer than the inline capacity");
         assert_eq!(long.tag(), TAG_BUFFER);
         assert_eq!(unsafe { *(long.w1 as *const u8).add(3) }, b'u');
+    }
+
+    /// `reserve` makes room without touching the content, and the appends
+    /// after it then fit without allocating: an inline value stays inline
+    /// while its final length fits, a sole-owner buffer keeps its block, and a
+    /// shared value is copied out into one of exactly the requested size.
+    #[test]
+    fn reserve_makes_room_once() {
+        let mut s = from_bytes(b"short");
+        aipl_str_reserve(&mut s, 10);
+        assert_eq!(s.tag(), TAG_INLINE, "still fits inline");
+        aipl_str_reserve(&mut s, 40);
+        assert_eq!(s.tag(), TAG_BUFFER);
+        assert_eq!(s.len(), 5);
+        assert!(s.spare_capacity() >= 40);
+        let base = s.w1;
+        for _ in 0..8 {
+            aipl_str_append(&mut s, &from_bytes(b"12345"));
+        }
+        assert_eq!(s.w1, base, "eight appends fit in the reserved block");
+        assert_eq!(s.len(), 45);
+        // Shared: the other holder keeps the old block, the reserved one is new.
+        let other = s;
+        other.retain();
+        aipl_str_reserve(&mut s, 100);
+        assert_ne!(s.w1, other.w1);
+        assert_eq!(cmp(s, other), 0);
+        assert!(s.is_unique() && s.spare_capacity() >= 100);
+        other.release();
+        s.release();
     }
 
     #[test]

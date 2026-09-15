@@ -35,11 +35,11 @@ allocations: 10
 deallocations: 10
 reallocations: 0
 bytes allocated: 370
-instructions executed: 2012
-binary size: 20824
-  code: 9972
+instructions executed: 2056
+binary size: 20760
+  code: 10032
   data: 2139
-  metadata: 8713
+  metadata: 8589
 functions:
   __arr_drop_V:
     calls: 1
@@ -49,13 +49,13 @@ functions:
     bytes: 172
   __to_str_V:
     calls: 7
-    bytes: 2436
+    bytes: 2448
   __to_str_V$arr:
     calls: 1
-    bytes: 2828
+    bytes: 2860
   __to_str_V$opt:
     calls: 1
-    bytes: 2628
+    bytes: 2644
   aipl_array_dec:
     calls: 2
     bytes: (external)

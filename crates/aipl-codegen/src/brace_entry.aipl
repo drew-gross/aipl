@@ -84,15 +84,15 @@ fn brace_mix_message() -> str {
     """
 }
 --- performance ---
-allocations: 80
-deallocations: 80
-reallocations: 5
-bytes allocated: 5425
-instructions executed: 4075
-binary size: 65816
-  code: 41000
+allocations: 76
+deallocations: 76
+reallocations: 1
+bytes allocated: 5163
+instructions executed: 4775
+binary size: 73792
+  code: 48392
   data: 1436
-  metadata: 23380
+  metadata: 23964
 functions:
   __arr_drop_BraceEntry:
     calls: 5
@@ -123,25 +123,25 @@ functions:
     bytes: 1560
   __m1__show_expr:
     calls: 11
-    bytes: 17376
+    bytes: 21964
   __m1__show_exprs:
     calls: 4
-    bytes: 460
+    bytes: 1388
   __m1__show_field_init:
     calls: 0
-    bytes: 620
+    bytes: 628
   __m2__show_pat:
     calls: 0
     bytes: 2548
   __m2__show_pats:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __m4__show_ty:
     calls: 0
     bytes: 5064
   __m4__show_tys:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __rec_drop___m1__Expr:
     calls: 16
     bytes: 36
@@ -159,7 +159,7 @@ functions:
     bytes: 84
   __to_str___m5__ParseError:
     calls: 0
-    bytes: 824
+    bytes: 836
   __to_str_i64:
     calls: 6
     bytes: 204
@@ -174,12 +174,6 @@ functions:
     bytes: (external)
   aipl_array_push:
     calls: 8
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 5
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 5
     bytes: (external)
   aipl_assert:
     calls: 7

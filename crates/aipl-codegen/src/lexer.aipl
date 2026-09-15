@@ -1518,11 +1518,11 @@ allocations: 434
 deallocations: 434
 reallocations: 71
 bytes allocated: 67520
-instructions executed: 371321
-binary size: 2547096
-  code: 1703648
+instructions executed: 387168
+binary size: 2547208
+  code: 1704844
   data: 11700
-  metadata: 831748
+  metadata: 830664
 functions:
   __arr_drop_StepResult$Kind:
     calls: 9
@@ -1559,7 +1559,7 @@ functions:
     bytes: 352
   __builtin_int_parse:
     calls: 13
-    bytes: 1104
+    bytes: 1112
   __builtin_int_parse$lambda1:
     calls: 67
     bytes: 140
@@ -1586,7 +1586,7 @@ functions:
     bytes: 104
   __m1__unescape:
     calls: 24
-    bytes: 1264
+    bytes: 1612
   __test$keep_skipped:
     calls: 1
     bytes: 25276
@@ -1679,7 +1679,7 @@ functions:
     bytes: 84
   __to_str_LexError:
     calls: 0
-    bytes: 824
+    bytes: 836
   aipl_arr_extend:
     calls: 366
     bytes: (external)
@@ -1718,13 +1718,13 @@ functions:
     bytes: (external)
   between_len:
     calls: 3
-    bytes: 752
+    bytes: 824
   checked_seg:
     calls: 2
     bytes: 1780
   delimited_len:
     calls: 28
-    bytes: 1856
+    bytes: 1904
   esc_str:
     calls: 2
     bytes: 140
@@ -1733,40 +1733,40 @@ functions:
     bytes: 10124
   float_len:
     calls: 14
-    bytes: 816
+    bytes: 832
   int_tok:
     calls: 13
     bytes: 1580
   interp_scan$Kind:
     calls: 10
-    bytes: 1996
+    bytes: 2016
   keep_skipped$Kind:
     calls: 3
     bytes: 5956
   lex$Kind:
     calls: 78
-    bytes: 1292
+    bytes: 1320
   lex_step$Kind:
     calls: 178
-    bytes: 30928
+    bytes: 31048
   main:
     calls: 1
     bytes: 240
   nested_len:
     calls: 3
-    bytes: 1028
+    bytes: 1136
   nonempty_str:
     calls: 2
-    bytes: 1824
+    bytes: 1836
   rawtpl_kind:
     calls: 4
-    bytes: 3928
+    bytes: 4116
   step_result$Kind:
     calls: 477
-    bytes: 17516
+    bytes: 17612
   template_scan$Kind:
     calls: 20
-    bytes: 2912
+    bytes: 3016
   template_step$Kind:
     calls: 32
     bytes: 444
@@ -1775,7 +1775,7 @@ functions:
     bytes: 52
   to_eol_len$tail:
     calls: 27
-    bytes: 252
+    bytes: 268
   to_eol_unless_len:
     calls: 8
     bytes: 368

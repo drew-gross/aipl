@@ -36,15 +36,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 142
-instructions executed: 421
-binary size: 4320
-  code: 2096
+instructions executed: 443
+binary size: 4288
+  code: 2120
   data: 220
-  metadata: 2004
+  metadata: 1948
 functions:
   __to_str_Person:
     calls: 1
-    bytes: 812
+    bytes: 836
   aipl_i64_len:
     calls: 2
     bytes: (external)

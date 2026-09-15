@@ -33,6 +33,16 @@ const CHAIN_FUSIONS: &[ChainFusion] = &[
         outer: "__builtin_find_if",
         into: "__builtin_map_find_if",
     },
+    // `xs.map(f).join(sep=s)`: `map` builds an array of every piece and `join`
+    // then measures and copies them into a second buffer; `map_join` appends
+    // each piece into one buffer as it is produced. The outer's three
+    // separators (the loader has filled the omitted ones) follow `f`, which is
+    // `map_join`'s parameter order.
+    ChainFusion {
+        inner: "__builtin_map",
+        outer: "__builtin_join",
+        into: "__builtin_map_join",
+    },
 ];
 
 /// `inner(recv, ..).outer(..)` as a single call to the [`CHAIN_FUSIONS`] row's

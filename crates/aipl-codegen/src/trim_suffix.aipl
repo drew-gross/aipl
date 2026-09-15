@@ -16,11 +16,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 263
-binary size: 2816
-  code: 1112
+instructions executed: 351
+binary size: 2752
+  code: 1128
   data: 241
-  metadata: 1463
+  metadata: 1383
 functions:
   __test$trim_suffix:
     calls: 1
@@ -42,4 +42,4 @@ functions:
     bytes: 112
   trim_suffix:
     calls: 4
-    bytes: 340
+    bytes: 356

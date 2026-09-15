@@ -57,11 +57,11 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 497
-instructions executed: 743
-binary size: 5976
+instructions executed: 809
+binary size: 5928
   code: 3452
   data: 177
-  metadata: 2347
+  metadata: 2299
 functions:
   __to_str_char:
     calls: 4

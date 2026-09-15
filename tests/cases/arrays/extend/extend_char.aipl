@@ -28,15 +28,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 18
-instructions executed: 116
-binary size: 1856
-  code: 740
+instructions executed: 155
+binary size: 1968
+  code: 916
   data: 1
-  metadata: 1115
+  metadata: 1051
 functions:
   aipl_write_bytes:
     calls: 2
     bytes: (external)
   main:
     calls: 1
-    bytes: 740
+    bytes: 916

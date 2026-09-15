@@ -187,11 +187,11 @@ allocations: 50
 deallocations: 50
 reallocations: 0
 bytes allocated: 3469
-instructions executed: 28836
-binary size: 20712
-  code: 9828
+instructions executed: 30379
+binary size: 21352
+  code: 10516
   data: 3275
-  metadata: 7609
+  metadata: 7561
 functions:
   __test$escape_cost:
     calls: 1
@@ -234,7 +234,7 @@ functions:
     bytes: 64
   redelimit:
     calls: 16
-    bytes: 1272
+    bytes: 1952
   requote:
     calls: 15
-    bytes: 1104
+    bytes: 1112

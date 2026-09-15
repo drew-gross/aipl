@@ -39,15 +39,15 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 345
-instructions executed: 1174
-binary size: 8768
-  code: 4460
+instructions executed: 1262
+binary size: 8680
+  code: 4496
   data: 635
-  metadata: 3673
+  metadata: 3549
 functions:
   __test$joined:
     calls: 1
-    bytes: 2204
+    bytes: 2228
   __test$sum:
     calls: 1
     bytes: 692
@@ -77,7 +77,7 @@ functions:
     bytes: (external)
   joined$vo1:
     calls: 2
-    bytes: 908
+    bytes: 920
   main:
     calls: 1
     bytes: 164

@@ -1,0 +1,173 @@
+import {
+    equal as ==,
+    extend,
+    len,
+    less_than as <,
+    reserve,
+    saturating_divide as /,
+    saturating_sub as -,
+    starts_with,
+    to_str,
+    wrapping_add as +,
+    wrapping_mul as *,
+} from builtins;
+
+// The AIPL implementation of the `map_join` builtin. Monomorphization registers
+// this function under the canonical name `__builtin_map_join` (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.map_join(f, sep=s)`
+// resolves through the ordinary generic / higher-order machinery — the in-file
+// name is only for this file's own tests, which read exactly like user code.
+//
+// It is what `xs.map(f).join(sep=s)` means, in one pass and one buffer: `map`
+// would build an array of every `f(x)` and `join` would then measure and copy
+// them into a second allocation. Written by the compiler's operation-fusion
+// pass for that chain (see `chain_fusions` in aipl-mono); also callable
+// directly.
+//
+// The single buffer is the point, and its size is the problem: the pieces'
+// lengths are not known until `f` has run, and running it twice to measure
+// would double the work (and the corpus's callers are recursive renderers,
+// where that compounds per level). So the buffer is *reserved* from a guess
+// and *re-sized* from what the input has taught so far:
+//
+//   - reserved up front for the separators, plus two elements per piece;
+//   - on the first piece that does not fit, and on every later one, re-sized to
+//     the bytes written so far scaled by the share of the input they came from
+//     — pieces through the eighth of eighty elements are an eighth of the
+//     total, so the buffer grows to ten times what those took.
+//
+// Every re-size is exact (`reserve`), so a join whose pieces are all of a
+// size settles on the second allocation at the latest, and the appends between
+// are plain writes. Nothing here is load-bearing for correctness: an append
+// that outgrows the reservation grows the buffer the way any `extend` does.
+//
+// No lint steers a hand-written loop here: `push_loop_pipeline` already sends
+// a building loop to `map`, from where the chain fuses.
+# `self.map(f).join(sep=sep, final_sep=final_sep, only_sep=only_sep)` — every
+# `f(x)` flattened into one sequence with the separators between — computed in
+# a single pass into a single buffer. The three separators are `join`'s (`sep`
+# between consecutive pieces, `final_sep` in the last gap, `only_sep` in the
+# sole gap of a two-piece join), all defaulting to empty. Generic in both the
+# element and what `f` maps it to; for a `str`-valued `f` the result is the
+# string join. Callable as a method; a `str` receiver iterates its chars.
+pub fn map_join<T: any, U: any>(
+    self: T[],
+    f: (T) -> U[],
+    sep: U* = [],
+    final_sep: U* = sep,
+    only_sep: U* = sep,
+) -> U[] {
+    let n = self.len();
+    mut out: U[] = [];
+    // The guess: the separators, plus two per piece.
+    mut cap = (n - 1) * sep.len() + 2 * n;
+    set out.reserve(cap);
+    for (let i, x : self) {
+        if (0 < i) {
+            set out.extend(
+                if (n == 2) { only_sep } else if (i == n - 1) { final_sep } else { sep },
+            );
+        };
+        let piece = f(x);
+        let need = out.len() + piece.len();
+        if (cap < need) {
+            // What this many pieces took, over the share of the input they are.
+            set cap = need * n / (i + 1);
+            set out.reserve(cap - out.len());
+        };
+        set out.extend(piece);
+    }
+    out
+}.test({
+    assert([1, 2, 3].map_join(to_str, sep=", ") == "1, 2, 3");
+    assert([1].map_join(to_str, sep=", ") == "1");
+    assert([1, 2][..0].map_join(to_str, sep=", ") == "");
+    // No separator: a plain concatenation.
+    assert(["a", "b"].map_join(same) == "ab");
+    // The English-list separators, exactly as `join` places them.
+    let words = ["a", "b", "c"];
+    assert(words.map_join(same, sep=", ", final_sep=", or ", only_sep=" or ") == "a, b, or c");
+    assert(words[..2].map_join(same, sep=", ", final_sep=", or ", only_sep=" or ") == "a or b");
+
+    // Pieces far longer than the guess, so the buffer is re-sized from what the
+    // first pieces taught — the result is the same either way.
+    let long = [1, 2, 3, 4].map_join(|x| "0123456789abcdefghijklmnopqrstuvwxyz", sep="|");
+    assert(long.len() == 147);
+    assert(long.starts_with("0123456789"));
+    // A `str` receiver iterates its chars; a captured binding is fine.
+    let dash = "-";
+    assert("abc".map_join(|c| `{c}{dash}`) == "a-b-c-");
+    // Free-call form.
+    assert(map_join([1, 2], to_str, sep="+") == "1+2");
+    // Non-string elements: arrays of numbers joined with a number.
+    assert([1, 2].map_join(|x| [x, x], sep=0) == [1, 1, 0, 2, 2]);
+})
+
+fn same(self: str) -> str { self }.test({
+    assert(same("x") == "x");
+})
+--- performance ---
+allocations: 31
+deallocations: 31
+reallocations: 2
+bytes allocated: 1265
+instructions executed: 5181
+binary size: 17832
+  code: 11092
+  data: 1249
+  metadata: 5491
+functions:
+  __eq_i64$arr:
+    calls: 1
+    bytes: 296
+  __test$map_join:
+    calls: 1
+    bytes: 7700
+  __to_str_i64:
+    calls: 6
+    bytes: 204
+  aipl_arr_extend:
+    calls: 3
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 3
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 4
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 29
+    bytes: (external)
+  aipl_array_new:
+    calls: 7
+    bytes: (external)
+  aipl_assert:
+    calls: 12
+    bytes: (external)
+  aipl_i64_len:
+    calls: 12
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 6
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 276
+  map_join$i64$char$s2$s3$s4$rs$lam$__builtin_to_str:
+    calls: 4
+    bytes: 1292
+  map_join$str$char$s2$s3$s4$rs$lam$same:
+    calls: 2
+    bytes: 1324

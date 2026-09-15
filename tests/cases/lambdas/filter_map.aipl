@@ -86,11 +86,11 @@ allocations: 33
 deallocations: 33
 reallocations: 1
 bytes allocated: 2218
-instructions executed: 5953
-binary size: 15144
-  code: 7500
+instructions executed: 6052
+binary size: 15096
+  code: 7504
   data: 1563
-  metadata: 6081
+  metadata: 6029
 functions:
   __eq_i64$arr:
     calls: 12
@@ -175,7 +175,7 @@ functions:
     bytes: 36
   labels$filter_map2$own0$tail:
     calls: 3
-    bytes: 584
+    bytes: 588
   labels$tail:
     calls: 3
     bytes: 336

@@ -70,11 +70,11 @@ allocations: 37
 deallocations: 37
 reallocations: 0
 bytes allocated: 1819
-instructions executed: 4658
-binary size: 18696
-  code: 11376
+instructions executed: 4790
+binary size: 18640
+  code: 11408
   data: 547
-  metadata: 6773
+  metadata: 6685
 functions:
   __eq_setdesc$i64:
     calls: 1
@@ -96,7 +96,7 @@ functions:
     bytes: 708
   __to_str_setasc$str:
     calls: 1
-    bytes: 812
+    bytes: 828
   __to_str_setasc$u64:
     calls: 1
     bytes: 708
@@ -105,7 +105,7 @@ functions:
     bytes: 708
   __to_str_str$arr:
     calls: 1
-    bytes: 812
+    bytes: 828
   __to_str_u64:
     calls: 1
     bytes: 204

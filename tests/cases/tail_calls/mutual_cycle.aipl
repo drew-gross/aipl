@@ -69,11 +69,11 @@ allocations: 150007
 deallocations: 150007
 reallocations: 0
 bytes allocated: 10800297
-instructions executed: 24900263
-binary size: 4816
-  code: 2344
+instructions executed: 31500285
+binary size: 4776
+  code: 2364
   data: 47
-  metadata: 2425
+  metadata: 2365
 functions:
   __rec_drop_Work:
     calls: 150003
@@ -116,7 +116,7 @@ functions:
     bytes: 48
   fits_atom$tail:
     calls: 300001
-    bytes: 368
+    bytes: 388
   main:
     calls: 1
     bytes: 576

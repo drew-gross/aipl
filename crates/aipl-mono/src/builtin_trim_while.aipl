@@ -26,11 +26,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1303
-binary size: 6536
-  code: 3408
+instructions executed: 1380
+binary size: 6416
+  code: 3428
   data: 473
-  metadata: 2655
+  metadata: 2515
 functions:
   __builtin_count_while$char$s0$lam$__test$trim_while$lambda0:
     calls: 1
@@ -55,7 +55,7 @@ functions:
     bytes: 264
   __test$trim_while:
     calls: 1
-    bytes: 1452
+    bytes: 1472
   aipl_assert:
     calls: 7
     bytes: (external)

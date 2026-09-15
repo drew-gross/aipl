@@ -36,6 +36,7 @@
 //! [`flatten`]: super::Loader::flatten
 
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 
 use aipl_syntax::ast::{
     Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Param, Program, Signature,
@@ -329,11 +330,29 @@ fn case_params(c: &VariantCase) -> Vec<Param> {
         .collect()
 }
 
+/// The signature of an AIPL-implemented builtin (`aipl-mono`'s
+/// `builtin_*.aipl`), by canonical `__builtin_*` name — installed by the
+/// compiler via [`set_aipl_builtin_sig_hook`]. Those builtins are not in
+/// `BUILTIN_SIGNATURES`; their `.aipl` file is the single source of their
+/// signature, and it lives in a crate downstream of this one, so the loader
+/// reaches it through a hook the same way the parser reaches the dogfooded
+/// lexer. Consulted lazily, per called name, so a program pays for reading a
+/// builtin's source only when it calls that builtin. No fallback: an
+/// uninstalled hook means such a builtin's calls take no keyword arguments —
+/// which is exactly what a `.aipl` file with no keyword parameters gets anyway.
+static AIPL_BUILTIN_SIG_HOOK: OnceLock<fn(&str) -> Option<Signature>> = OnceLock::new();
+
+/// Install the AIPL-implemented-builtin signature lookup. First install wins.
+pub fn set_aipl_builtin_sig_hook(f: fn(&str) -> Option<Signature>) {
+    let _ = AIPL_BUILTIN_SIG_HOOK.set(f);
+}
+
 /// Keyword-parameter info for every builtin that declares one, keyed by the
 /// canonical `__builtin_*` name its calls carry after loader rewriting. Parsed
 /// from `BUILTIN_SIGNATURES` so a builtin gains a keyword parameter simply by
 /// declaring a default there — no second list to keep in sync. Builtins with no
-/// defaulted parameter are skipped (an all-positional call needs no info).
+/// defaulted parameter are skipped (an all-positional call needs no info). The
+/// AIPL-implemented builtins are not here; see [`Expander::info`].
 fn builtin_kw_infos() -> Result<HashMap<String, FnKwInfo>, Error> {
     let program = aipl_parser::parse(aipl_syntax::BUILTIN_SIGNATURES)
         .expect("builtin signatures are valid AIPL");
@@ -378,6 +397,12 @@ struct Expander {
 /// Whether `e` can be written into the call more than once for free: a name or
 /// a literal has no side effect and no evaluation cost worth a binding, so a
 /// default that reads it can mention it directly. Anything else is hoisted.
+///
+/// A lambda is a literal too — a value, with nothing to evaluate — and must
+/// not be hoisted for a second reason: a `let`-bound lambda has no expected
+/// type, so its untyped parameters have nothing to take a type from and the
+/// checker rejects it, where the call position it was written in would have
+/// typed them. (No default reads a function-typed parameter anyway.)
 fn mentionable(e: &Expr) -> bool {
     matches!(
         e.kind,
@@ -388,6 +413,7 @@ fn mentionable(e: &Expr) -> bool {
             | ExprKind::Char(_)
             | ExprKind::Unit
             | ExprKind::None
+            | ExprKind::Lambda(..)
     )
 }
 
@@ -641,6 +667,21 @@ impl Expander {
         }
     }
 
+    /// The keyword info of callee `name`, or `None` for a callee this pass
+    /// knows nothing about (a Rust builtin with no defaults, a local binding).
+    /// An AIPL-implemented builtin is looked up through
+    /// [`AIPL_BUILTIN_SIG_HOOK`] on first sight and remembered — including a
+    /// miss, so the hook runs once per name.
+    fn info(&mut self, name: &str) -> Result<Option<&FnKwInfo>, Error> {
+        if !self.fns.contains_key(name) && name.starts_with("__builtin_") {
+            if let Some(sig) = AIPL_BUILTIN_SIG_HOOK.get().and_then(|hook| hook(name)) {
+                let info = FnKwInfo::from_sig(name, &sig)?;
+                self.fns.insert(name.to_string(), info);
+            }
+        }
+        Ok(self.fns.get(name))
+    }
+
     /// The expanded default expressions of `name`'s keyword parameters, in
     /// declaration order. Memoized; errors on a cycle of defaults.
     fn expanded_defaults(&mut self, name: &str) -> Result<Vec<Expr>, Error> {
@@ -723,7 +764,7 @@ impl Expander {
         // A callee without keyword parameters (including builtins, variant
         // constructors, and anything else not resolvable to a user function)
         // takes no keyword arguments; leave its (all-positional) call alone.
-        let info = match self.fns.get(name) {
+        let info = match self.info(name)? {
             Some(info) if !info.kw.is_empty() => info,
             found => {
                 if let Some((k, _, kspan, _)) = by_kw.first() {
@@ -981,7 +1022,7 @@ impl Expander {
             // function type has no keyword parameters, so reject it.
             ExprKind::Ident(name) => {
                 if !locals.contains(name)
-                    && self.fns.get(name).is_some_and(|info| !info.kw.is_empty())
+                    && self.info(name)?.is_some_and(|info| !info.kw.is_empty())
                 {
                     return Err(Error::at(
                         format!(

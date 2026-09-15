@@ -5162,6 +5162,17 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     {
         return Ok(());
     }
+    // The same alias against a `T[]` whose element is still open — a type
+    // variable, or the `__unknown__` a generic call's expected type carries
+    // for one not yet pinned: a `str` is the `char[]` that pins `T = char`
+    // (`collect_var_bindings`), so it fits before the binding is made too.
+    // `map_join`'s `f: (T) -> U[]` meets a `str`-valued `f` this way.
+    let open_elem_array = |t: &Type| matches!(t, Type::Array(e) if is_typevar(e) || is_unknown(e));
+    if (*actual == Type::Primitive(Primitive::Str) && open_elem_array(expected))
+        || (open_elem_array(actual) && *expected == Type::Primitive(Primitive::Str))
+    {
+        return Ok(());
+    }
     // `#{}` is the empty literal for *both* a set and a dict, and which one it
     // is comes from the use site — the same way `[]`, `none` and a bare integer
     // take their type from context. The checker types it as `#{__none__}`

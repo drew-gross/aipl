@@ -80,15 +80,15 @@ computing
 after
 2
 --- performance ---
-allocations: 8
-deallocations: 8
-reallocations: 2
-bytes allocated: 232
-instructions executed: 547
-binary size: 2984
-  code: 1308
-  data: 105
-  metadata: 1571
+allocations: 7
+deallocations: 7
+reallocations: 0
+bytes allocated: 166
+instructions executed: 771
+binary size: 4024
+  code: 2204
+  data: 137
+  metadata: 1683
 functions:
   __to_str_i64:
     calls: 5
@@ -97,10 +97,10 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_push_mut:
-    calls: 4
+    calls: 2
     bytes: (external)
   aipl_array_with_cap:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_i64_len:
     calls: 10
@@ -110,4 +110,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1104
+    bytes: 2000

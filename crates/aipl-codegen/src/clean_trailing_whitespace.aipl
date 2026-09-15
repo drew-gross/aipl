@@ -49,19 +49,16 @@ pub fn clean_trailing_whitespace(src: str) -> str {
     assert(clean_trailing_whitespace("a\r\n") == "a\r\n");
 })
 --- performance ---
-allocations: 48
-deallocations: 48
-reallocations: 25
-bytes allocated: 2640
-instructions executed: 10511
-binary size: 8720
-  code: 3980
-  data: 1312
-  metadata: 3428
+allocations: 32
+deallocations: 32
+reallocations: 6
+bytes allocated: 1589
+instructions executed: 14745
+binary size: 9200
+  code: 4516
+  data: 1345
+  metadata: 3339
 functions:
-  __m2__trim_end_while$lam$clean_trailing_whitespace$lambda0:
-    calls: 0
-    bytes: 372
   __test$clean_trailing_whitespace:
     calls: 1
     bytes: 2656
@@ -69,12 +66,6 @@ functions:
     calls: 32
     bytes: (external)
   aipl_array_new:
-    calls: 16
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 31
-    bytes: (external)
-  aipl_array_with_cap:
     calls: 16
     bytes: (external)
   aipl_assert:
@@ -91,7 +82,7 @@ functions:
     bytes: (external)
   clean_trailing_whitespace:
     calls: 16
-    bytes: 852
+    bytes: 1760
   main:
     calls: 1
     bytes: 100

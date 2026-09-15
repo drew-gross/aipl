@@ -98,15 +98,15 @@ fn two_values(self: FieldInit[]) -> (Expr, Expr)? {
     }
 }
 --- performance ---
-allocations: 78
-deallocations: 78
-reallocations: 2
-bytes allocated: 5870
-instructions executed: 3627
-binary size: 68296
-  code: 43484
-  data: 646
-  metadata: 24166
+allocations: 77
+deallocations: 77
+reallocations: 1
+bytes allocated: 5809
+instructions executed: 3742
+binary size: 76368
+  code: 50864
+  data: 681
+  metadata: 24823
 functions:
   __arr_drop___m1__Expr:
     calls: 3
@@ -131,25 +131,25 @@ functions:
     bytes: 1560
   __m1__show_expr:
     calls: 21
-    bytes: 17376
+    bytes: 21964
   __m1__show_exprs:
     calls: 1
-    bytes: 460
+    bytes: 1388
   __m1__show_field_init:
     calls: 0
-    bytes: 620
+    bytes: 628
   __m2__show_pat:
     calls: 0
     bytes: 2548
   __m2__show_pats:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __m4__show_ty:
     calls: 0
     bytes: 5064
   __m4__show_tys:
     calls: 0
-    bytes: 460
+    bytes: 1388
   __rec_drop___m1__Expr:
     calls: 16
     bytes: 36
@@ -185,12 +185,6 @@ functions:
     bytes: (external)
   aipl_array_new:
     calls: 3
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 1
-    bytes: (external)
-  aipl_array_with_cap:
-    calls: 1
     bytes: (external)
   aipl_assert:
     calls: 7

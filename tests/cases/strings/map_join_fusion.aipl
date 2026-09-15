@@ -1,0 +1,82 @@
+import { join, map, print, to_str } from builtins;
+
+// `xs.map(f).join(sep=s)` fuses into one pass over `xs` that appends every
+// piece into a single buffer (`map_join`), so the pieces are never gathered
+// into an array first. The three separators are `join`'s.
+fn main() !prints {
+    print([1, 2, 3].map(to_str).join(sep=", "));
+    print([1, 2, 3].map(to_str).join(sep=", ", final_sep=", or ", only_sep=" or "));
+    print([1, 2].map(to_str).join(sep=", ", final_sep=", or ", only_sep=" or "));
+    print([7].map(to_str).join(sep=", "));
+    print(`[{[1, 2][..0].map(to_str).join(sep=", ")}]`);
+    // No separator: a plain concatenation of the pieces.
+    print([1, 2, 3].map(|x| `<{x}>`).join());
+
+    // Pieces longer than the inline form, so the buffer is re-sized from what
+    // the first pieces taught rather than from the guess.
+    let long = [1, 2, 3].map(|x| `{x}: 0123456789abcdefghijklmnopqrstuvwxyz`).join(sep="\n");
+    print(long);
+    // Any element type joins the same way; a bare element is a separator too.
+    print(`{[1, 2].map(|x| [x, x]).join(sep=0)}`);
+}
+--- stdout ---
+1, 2, 3
+1, 2, or 3
+1 or 2
+7
+[]
+<1><2><3>
+1: 0123456789abcdefghijklmnopqrstuvwxyz
+2: 0123456789abcdefghijklmnopqrstuvwxyz
+3: 0123456789abcdefghijklmnopqrstuvwxyz
+[1, 1, 0, 2, 2]
+--- performance ---
+allocations: 46
+deallocations: 46
+reallocations: 3
+bytes allocated: 1922
+instructions executed: 4315
+binary size: 11232
+  code: 7260
+  data: 299
+  metadata: 3673
+functions:
+  __builtin_map_join$i64$char$s2$s3$s4$rs$lam$__builtin_to_str:
+    calls: 5
+    bytes: 1292
+  __to_str_i64:
+    calls: 15
+    bytes: 204
+  __to_str_i64$arr:
+    calls: 1
+    bytes: 708
+  aipl_arr_extend:
+    calls: 3
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 3
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 4
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 21
+    bytes: (external)
+  aipl_array_new:
+    calls: 5
+    bytes: (external)
+  aipl_i64_len:
+    calls: 40
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 20
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 5056

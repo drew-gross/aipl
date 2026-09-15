@@ -1,0 +1,99 @@
+import {
+    extend,
+    len,
+    less_than as <,
+    print,
+    push,
+    reserve,
+    wrapping_increment as ++,
+} from builtins;
+
+// `set xs.reserve(n)` makes room for `n` more elements — bytes, for a `str` —
+// without changing the contents, so a loop that knows how much it will append
+// pays for one allocation instead of growing by doubling.
+fn main() !prints {
+    mut xs: i64[] = [1];
+    set xs.reserve(4);
+    set xs.push(2);
+    set xs.push(3);
+    print(`{xs} {xs.len()}`);
+
+    mut s = "";
+    set s.reserve(50);
+    mut i: u64 = 0;
+    while (i < 5) {
+        set s.extend("abcdefghij");
+        set i++;
+    }
+    print(s);
+
+    // An inline `str` that still fits stays inline; one that won't is moved to
+    // a buffer with the room, contents intact.
+    mut inl = "abc";
+    set inl.reserve(2);
+    set inl.extend("de");
+    print(inl);
+    set inl.reserve(40);
+    set inl.extend("fghij");
+    print(inl);
+
+    // Nothing to reserve, and an empty receiver, are both fine.
+    mut e: i64[] = [];
+    set e.reserve(0);
+    set e.reserve(3);
+    set e.push(9);
+    print(`{e}`);
+}
+--- stdout ---
+[1, 2, 3] 3
+abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij
+abcde
+abcdefghij
+[9]
+--- performance ---
+allocations: 13
+deallocations: 13
+reallocations: 0
+bytes allocated: 676
+instructions executed: 1207
+binary size: 5696
+  code: 3076
+  data: 139
+  metadata: 2481
+functions:
+  __to_str_i64$arr:
+    calls: 2
+    bytes: 708
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_arr_inc:
+    calls: 6
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 3
+    bytes: (external)
+  aipl_array_dec:
+    calls: 14
+    bytes: (external)
+  aipl_array_push:
+    calls: 3
+    bytes: (external)
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2164
