@@ -47,8 +47,20 @@ pub fn load_program(root: &Path, dbg: DebugOptions) -> Result<Program, Vec<Error
 /// (used by the embedding FFI). Any `from "..."` path imports resolve relative
 /// to the current directory; `from builtins` works as usual.
 pub fn load_program_str(source: &str, dbg: DebugOptions) -> Result<Program, Vec<Error>> {
+    load_str(source, dbg, false)
+}
+
+/// [`load_program_str`] for the source of an AIPL-implemented builtin
+/// (`aipl-mono`'s `builtin_*.aipl`), which may import the builtins reserved
+/// for that use ([`aipl_syntax::INTERNAL_BUILTINS`]).
+pub fn load_builtin_impl_str(source: &str, dbg: DebugOptions) -> Result<Program, Vec<Error>> {
+    load_str(source, dbg, true)
+}
+
+fn load_str(source: &str, dbg: DebugOptions, builtin_impl: bool) -> Result<Program, Vec<Error>> {
     let mut loader = Loader {
         dbg,
+        builtin_impl,
         ..Loader::default()
     };
     // A synthetic root under the current dir: it need not exist on disk, but
@@ -147,6 +159,26 @@ struct Loader {
     /// *any other* file are tagged with the source they index — see
     /// `tag_origin`.
     entry: Option<PathBuf>,
+    /// Whether this load is of an AIPL-implemented builtin's own source — the
+    /// one place [`aipl_syntax::INTERNAL_BUILTINS`] may be imported. Set by
+    /// [`load_builtin_impl_str`]; a file on disk qualifies by where it lives
+    /// (`is_builtin_impl_path`), so `aipl check` over `crates/` reaches the same
+    /// sources the same way.
+    builtin_impl: bool,
+}
+
+/// Whether `path` is an AIPL-implemented builtin's source —
+/// `crates/aipl-mono/src/builtin_<name>.aipl` — which may import
+/// [`aipl_syntax::INTERNAL_BUILTINS`].
+fn is_builtin_impl_path(path: &Path) -> bool {
+    let named_like_one = path
+        .file_name()
+        .and_then(|f| f.to_str())
+        .is_some_and(|f| f.starts_with("builtin_") && f.ends_with(".aipl"));
+    let in_mono_src = path
+        .parent()
+        .is_some_and(|d| d.ends_with(Path::new("aipl-mono").join("src")));
+    named_like_one && in_mono_src
 }
 
 struct LoadedFile {
@@ -529,6 +561,20 @@ impl Loader {
                         }
                         n.name.clone()
                     } else if let Some(canonical) = builtin_canonical(&n.name) {
+                        // Reserved for the builtins' own implementations until
+                        // it is decided whether programs get it.
+                        if aipl_syntax::is_internal_builtin(&n.name)
+                            && !(self.builtin_impl || is_builtin_impl_path(path))
+                        {
+                            return Err(Error::at(
+                                format!(
+                                    "\"{}\" is internal to the builtins' implementation and not \
+                                     available to programs",
+                                    n.name
+                                ),
+                                n.span.clone(),
+                            ));
+                        }
                         canonical
                     } else if let Some(canonical) = aipl_syntax::builtin_type_canonical(&n.name) {
                         canonical

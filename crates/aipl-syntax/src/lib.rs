@@ -3040,6 +3040,19 @@ pub const IMPORTABLE_BUILTINS: &[&str] = &[
     "repeat",
 ];
 
+/// Builtins that only the AIPL-implemented builtins (`aipl-mono`'s
+/// `builtin_*.aipl`) may import — declared and lowered like any other, but
+/// not yet decided as part of the language a program can reach. `reserve` is
+/// what `map_join` sizes its buffer with; whether a user should size their
+/// own is an open question, and until it is answered the loader refuses the
+/// import anywhere else ([`is_internal_builtin`]).
+pub const INTERNAL_BUILTINS: &[&str] = &["reserve"];
+
+/// Whether `name` is one of [`INTERNAL_BUILTINS`].
+pub fn is_internal_builtin(name: &str) -> bool {
+    INTERNAL_BUILTINS.contains(&name)
+}
+
 /// Canonical internal name for an importable builtin, or `None` if `name`
 /// isn't one. The loader rewrites imported builtin references to this
 /// reserved name (which users can't write directly), so a user ident can

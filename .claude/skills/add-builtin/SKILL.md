@@ -50,6 +50,9 @@ Rules that bite:
 - **Operators must be imported, always aliased** (`equal as ==`), including in
   this file. Bounds are `<T: any>` / `<T: ord>` / `<T: variant>` only.
 - **`char` has no `<`/`>` yet** (TODO.txt item 1) — write char tests with `==`.
+- **A builtin can be internal** — usable by `builtin_*.aipl` sources only —
+  by listing it in `INTERNAL_BUILTINS` (`aipl-syntax`); the loader refuses the
+  import anywhere else. `reserve` is one, pending a decision on exposing it.
 - **Keyword and variadic parameters work** (`sep: U* = [], final_sep: U* = sep`,
   as `builtin_map_join.aipl` declares): the loader learns an AIPL builtin's
   signature through `aipl_loader::set_aipl_builtin_sig_hook` (installed with

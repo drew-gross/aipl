@@ -6847,7 +6847,7 @@ const AIPL_BUILTIN_SOURCES: &[(&str, &str)] = &[
 /// parser hooks installed, like any in-process parse — which every caller
 /// already satisfies, having parsed the program it operates on.
 fn load_aipl_builtin_fn(src: &str) -> (Function, Vec<StructDecl>) {
-    let program = aipl_loader::load_program_str(src, DebugOptions::default())
+    let program = aipl_loader::load_builtin_impl_str(src, DebugOptions::default())
         .expect("AIPL-implemented builtin sources are valid AIPL");
     // The same type lowering the user's program gets before mono sees it: a
     // tuple in the signature (`tuple_windows` returns `(T, T)[]`) becomes the

@@ -1,0 +1,15 @@
+import { reserve } from builtins;
+
+// `reserve` exists for the builtins' own implementations (`map_join` sizes its
+// buffer with it); whether a program may size its own is undecided, so the
+// import is refused outside `crates/aipl-mono/src/builtin_*.aipl`.
+fn main() {
+    mut xs: i64[] = [];
+    set xs.reserve(4);
+}
+--- errors ---
+error: "reserve" is internal to the builtins' implementation and not available to programs
+ --> ./tests/cases/imports/err_internal_builtin.aipl:1:10
+  |
+1 | import { reserve } from builtins;
+  |          ^^^^^^^
