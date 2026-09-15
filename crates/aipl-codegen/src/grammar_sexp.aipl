@@ -276,15 +276,15 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 6711
-deallocations: 6711
+allocations: 6709
+deallocations: 6709
 reallocations: 939
-bytes allocated: 623182
-instructions executed: 1521653
-binary size: 413432
-  code: 271296
+bytes allocated: 623046
+instructions executed: 1521525
+binary size: 411896
+  code: 270264
   data: 4892
-  metadata: 137244
+  metadata: 136740
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -660,7 +660,10 @@ functions:
     bytes: 444
   __m2__show_first_sets$SexpKind$__m15__Sexp:
     calls: 1
-    bytes: 2736
+    bytes: 540
+  __m2__show_first_sets$SexpKind$__m15__Sexp$zip1$own0:
+    calls: 1
+    bytes: 1164
   __m3__desugar_opt$SexpKind:
     calls: 45
     bytes: 700
@@ -791,10 +794,10 @@ functions:
     calls: 3216
     bytes: (external)
   aipl_arr_inc:
-    calls: 27542
+    calls: 27525
     bytes: (external)
   aipl_arr_reserve:
-    calls: 4174
+    calls: 4173
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 143
@@ -803,7 +806,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 38778
+    calls: 38758
     bytes: (external)
   aipl_array_new:
     calls: 1537
@@ -812,7 +815,7 @@ functions:
     calls: 947
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1239
+    calls: 1237
     bytes: (external)
   aipl_array_with_cap:
     calls: 149

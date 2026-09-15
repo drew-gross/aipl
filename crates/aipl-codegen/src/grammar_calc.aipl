@@ -466,15 +466,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 12870
-deallocations: 12870
+allocations: 12867
+deallocations: 12867
 reallocations: 2078
-bytes allocated: 1220011
-instructions executed: 2708771
-binary size: 432608
-  code: 282808
+bytes allocated: 1219771
+instructions executed: 2708571
+binary size: 431064
+  code: 281776
   data: 6044
-  metadata: 143756
+  metadata: 143244
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -862,7 +862,10 @@ functions:
     bytes: 444
   __m2__show_first_sets$CalcTok$Calc:
     calls: 1
-    bytes: 2736
+    bytes: 540
+  __m2__show_first_sets$CalcTok$Calc$zip1$own0:
+    calls: 1
+    bytes: 1164
   __m3__desugar_opt$CalcTok:
     calls: 0
     bytes: 700
@@ -1005,10 +1008,10 @@ functions:
     calls: 5244
     bytes: (external)
   aipl_arr_inc:
-    calls: 50180
+    calls: 50154
     bytes: (external)
   aipl_arr_reserve:
-    calls: 7272
+    calls: 7270
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 290
@@ -1020,7 +1023,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 69254
+    calls: 69224
     bytes: (external)
   aipl_array_new:
     calls: 3395
@@ -1029,7 +1032,7 @@ functions:
     calls: 1649
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3332
+    calls: 3329
     bytes: (external)
   aipl_array_with_cap:
     calls: 894

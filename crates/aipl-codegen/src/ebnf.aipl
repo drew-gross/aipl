@@ -64,6 +64,7 @@ import {
     value_or,
     value_or_err,
     wrapping_sub as -,
+    zip_with,
 } from builtins;
 import {
     Climb,
@@ -688,17 +689,10 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
 # order, with no trailing newline — the FIRST-set counterpart of `ebnf`, and
 # what makes a whole grammar's sets one readable assertion.
 pub fn show_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> str!ParseError {
+    // One set per production, in production order — `first_sets` and
+    // `prod_names` both map over `g.prods` — so the two zip.
     let sets = first_sets(g)?;
-    let names = prod_names(g);
-    mut lines: str[] = [];
-    for (let i, n : names) {
-        let f = sets[i].value_or_err(ParseError {
-            message: `no first set at index {i}`,
-            span: 0..0,
-        })?;
-        set lines = [..lines, `{n} = {f.show_first()}`];
-    }
-    ok(lines.join(sep="\n"))
+    ok(zip_with(prod_names(g), sets, |n: str, f: First<K>| `{n} = {f.show_first()}`).join(sep="\n"))
 }.test({
     // The fixture grammar, dumped both ways. Between them the two dumps say
     // everything this file computes, over every `Rule` arm the grammar uses.
@@ -789,15 +783,15 @@ fn fixture() -> Grammar<Tok, Node> {
     }
 }
 --- performance ---
-allocations: 1883
-deallocations: 1883
+allocations: 1864
+deallocations: 1864
 reallocations: 312
-bytes allocated: 185926
-instructions executed: 236072
-binary size: 170960
-  code: 112340
+bytes allocated: 184070
+instructions executed: 234784
+binary size: 169400
+  code: 111308
   data: 4132
-  metadata: 54488
+  metadata: 53960
 functions:
   __arr_drop_First$Tok:
     calls: 23
@@ -941,16 +935,16 @@ functions:
     calls: 213
     bytes: (external)
   aipl_arr_inc:
-    calls: 4058
+    calls: 3892
     bytes: (external)
   aipl_arr_reserve:
-    calls: 293
+    calls: 279
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 5531
+    calls: 5341
     bytes: (external)
   aipl_array_new:
     calls: 62
@@ -959,7 +953,7 @@ functions:
     calls: 96
     bytes: (external)
   aipl_array_push_mut:
-    calls: 710
+    calls: 691
     bytes: (external)
   aipl_array_with_cap:
     calls: 590
@@ -1065,4 +1059,7 @@ functions:
     bytes: 444
   show_first_sets$Tok$Node:
     calls: 5
-    bytes: 2736
+    bytes: 540
+  show_first_sets$Tok$Node$zip1$own0:
+    calls: 5
+    bytes: 1164

@@ -493,15 +493,15 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
 # braces — is a list breaking or not breaking, which the layouts decide.
 fn json_space(l: str, r: str) -> bool { l == ":" }
 --- performance ---
-allocations: 18645
-deallocations: 18645
+allocations: 18637
+deallocations: 18637
 reallocations: 2721
-bytes allocated: 2303070
-instructions executed: 4797276
-binary size: 462648
-  code: 302776
+bytes allocated: 2301950
+instructions executed: 4796716
+binary size: 461096
+  code: 301744
   data: 7940
-  metadata: 151932
+  metadata: 151412
 functions:
   __arr_drop_Json:
     calls: 125
@@ -880,7 +880,10 @@ functions:
     bytes: 444
   __m2__show_first_sets$JsonTok$Json:
     calls: 1
-    bytes: 2736
+    bytes: 540
+  __m2__show_first_sets$JsonTok$Json$zip1$own0:
+    calls: 1
+    bytes: 1164
   __m3__desugar_opt$JsonTok:
     calls: 134
     bytes: 700
@@ -1017,10 +1020,10 @@ functions:
     calls: 8170
     bytes: (external)
   aipl_arr_inc:
-    calls: 75185
+    calls: 75114
     bytes: (external)
   aipl_arr_reserve:
-    calls: 10440
+    calls: 10433
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 337
@@ -1029,7 +1032,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 103767
+    calls: 103687
     bytes: (external)
   aipl_array_new:
     calls: 3285
@@ -1038,7 +1041,7 @@ functions:
     calls: 1829
     bytes: (external)
   aipl_array_push_mut:
-    calls: 4860
+    calls: 4852
     bytes: (external)
   aipl_array_with_cap:
     calls: 341
