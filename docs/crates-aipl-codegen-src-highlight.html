@@ -230,7 +230,7 @@
             <a class="anchor" href="#item-tm_json">tm_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn tm_json(__spat$24508: Tm) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn tm_json(__spat$24060: Tm) -&#62; str</code></pre>
 
           <div class="doc"><p><code>g</code> as the <code>.tmLanguage.json</code> text an editor extension ships: two-space indented, one trailing newline. Generated files are read in diffs, so the layout is fixed and deterministic rather than minified.</p></div>
 
@@ -456,9 +456,9 @@
             <a class="anchor" href="#item-run_len">run_len</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn run_len(items: Item[], i: u64) -&#62; u64</code></pre>
+          <pre class="signature"><code>fn run_len(items: Item[]) -&#62; u64</code></pre>
 
-          <div class="doc"><p>How many items starting at <code>i</code> merge into one: 1 unless the item is a plain <code>Match</code> and the items after it are too and share its scope.</p></div>
+          <div class="doc"><p>How many of the items at the front of <code>items</code> merge into one: 1 unless the first is a plain <code>Match</code> and the items after it are too and share its scope (and 0 for no items at all).</p></div>
 
 
         </section>
@@ -512,7 +512,7 @@
             <a class="anchor" href="#item-entry_json">entry_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn entry_json(__spat$27289: Entry) -&#62; str</code></pre>
+          <pre class="signature"><code>fn entry_json(__spat$26841: Entry) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

@@ -38,21 +38,21 @@
 import {
     concat as +++,
     contains,
+    count_while,
     drop_last,
     equal as ==,
     filter,
+    first,
     is_empty,
     is_nonempty,
     join,
     len,
     less_than as <,
     logical_and as &&,
-    logical_not as !,
     map,
     split,
     wrapping_add as +,
     wrapping_add_assign as +=,
-    wrapping_increment as ++,
 } from builtins;
 import { indent } from "./indent.aipl";
 import {
@@ -501,13 +501,14 @@ fn merge_runs(items: Item[]) -> Item[] {
     mut out: Item[] = [];
     mut i: u64 = 0;
     while (i < items.len()) {
-        let n = run_len(items, i);
-        match (items[i]) {
+        let rest = items[i..];
+        let n = run_len(rest);
+        match (rest.first()) {
             some(it) => {
                 if (n == 1) {
                     set out = [..out, it];
                 } else {
-                    let re = items[i..i + n].map(|x| x.re).join(sep="|");
+                    let re = rest[..n].map(|x| x.re).join(sep="|");
                     set out = [..out, Item { ..it, re, pat: Match(re, it.scope) }];
                 };
             },
@@ -518,33 +519,17 @@ fn merge_runs(items: Item[]) -> Item[] {
     out
 }
 
-# How many items starting at `i` merge into one: 1 unless the item is a plain
-# `Match` and the items after it are too and share its scope.
-fn run_len(items: Item[], i: u64) -> u64 {
-    match (items[i]) {
-        some(it) => {
-            if (!it.plain) {
-                return 1;
-            };
-            mut n: u64 = 1;
-            mut going = true;
-            while (going) {
-                match (items[i + n]) {
-                    some(next) => {
-                        if (next.plain && next.scope == it.scope) {
-                            set n++;
-                        } else {
-                            set going = false;
-                        };
-                    },
-                    none => {
-                        set going = false;
-                    },
-                };
-            }
-            n
+# How many of the items at the front of `items` merge into one: 1 unless the
+# first is a plain `Match` and the items after it are too and share its scope
+# (and 0 for no items at all).
+fn run_len(items: Item[]) -> u64 {
+    match (items.first()) {
+        some(it) => if (it.plain) {
+            items.count_while(|x: Item| x.plain && x.scope == it.scope)
+        } else {
+            1
         },
-        none => 1,
+        none => 0,
     }
 }
 
@@ -765,21 +750,21 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 986
-deallocations: 986
+allocations: 991
+deallocations: 991
 reallocations: 33
-bytes allocated: 75872
-instructions executed: 128672
-binary size: 142040
-  code: 91624
+bytes allocated: 76968
+instructions executed: 128622
+binary size: 141800
+  code: 91380
   data: 5520
-  metadata: 44896
+  metadata: 44900
 functions:
   __arr_drop_Entry:
     calls: 3
     bytes: 148
   __arr_drop_Item:
-    calls: 9
+    calls: 14
     bytes: 172
   __arr_drop_Pat:
     calls: 33
@@ -791,7 +776,7 @@ functions:
     calls: 1
     bytes: 148
   __arr_retain_Item:
-    calls: 17
+    calls: 22
     bytes: 172
   __arr_retain_Pat:
     calls: 8
@@ -802,6 +787,9 @@ functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 38
     bytes: 304
+  __builtin_count_while$Item$lam$rule_pats$Kind$lambda0:
+    calls: 4
+    bytes: 524
   __eq_Entry:
     calls: 1
     bytes: 128
@@ -875,10 +863,10 @@ functions:
     calls: 13
     bytes: (external)
   aipl_arr_slice:
-    calls: 7
+    calls: 12
     bytes: (external)
   aipl_array_dec:
-    calls: 533
+    calls: 538
     bytes: (external)
   aipl_array_new:
     calls: 55
@@ -899,10 +887,10 @@ functions:
     calls: 77
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 189
+    calls: 202
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 112
+    calls: 125
     bytes: (external)
   aipl_test_begin:
     calls: 10
@@ -960,7 +948,4 @@ functions:
     bytes: 2360
   rule_pats$Kind:
     calls: 2
-    bytes: 12132
-  run_len:
-    calls: 5
-    bytes: 1340
+    bytes: 12704

@@ -319,7 +319,6 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
-  run_len looks like it can be a count_while
   for (let x : xs) { if (p(x)) { set out.push(f(x)) } } should lint to a filter->map
   lint against char/str literals directly in templates e.g. `a: {'a'}` or `aa: {"aa"}`
   lint against set literals that contain duplicates
@@ -569,6 +568,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  can handoff leverage event streaming to start filling sections while discovery is still ongoing?
   have handoff print started at and elapsed until now per stage so I can see where we are at easier
   seems like a lot of features have required 2 handoffs recently. Lets improve the handoff script to just do both things.
   Make the new-syntax bootstrap faster (maybe by doing just the regen without the full corpus?)
