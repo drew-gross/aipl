@@ -40,6 +40,7 @@ import {
     contains,
     drop_last,
     equal as ==,
+    filter,
     is_empty,
     is_nonempty,
     join,
@@ -471,30 +472,26 @@ pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
 })
 
 fn items_of<K>(rules: TokenRule<K>[], esc_scope: str) -> Item[] {
-    mut out: Item[] = [];
-    for (let r : rules) {
-        if (r.scope.is_nonempty()) {
-            let named = self_referential(r.matcher);
-            let item = match (matcher_pat(r.matcher, r.scope, esc_scope)) {
-                Match(re, _) => Item {
-                    scope: r.scope,
-                    re,
-                    pat: Match(re, r.scope),
-                    plain: true,
-                    named,
-                },
-                Caps(..) | Region(..) | Include(..) => Item {
-                    scope: r.scope,
-                    re: "",
-                    pat: matcher_pat(r.matcher, r.scope, esc_scope),
-                    plain: false,
-                    named,
-                },
-            };
-            set out = [..out, item];
-        };
+    rules
+        .filter(|r: TokenRule<K>| r.scope.is_nonempty())
+        .map(|r: TokenRule<K>| item_of(r, esc_scope))
+}
+
+# One scoped rule as an `Item`: a plain regex match keeps its pattern text
+# beside it (so a run of them can be merged into one alternation); any other
+# pattern is carried whole.
+fn item_of<K>(r: TokenRule<K>, esc_scope: str) -> Item {
+    let named = self_referential(r.matcher);
+    match (matcher_pat(r.matcher, r.scope, esc_scope)) {
+        Match(re, _) => Item { scope: r.scope, re, pat: Match(re, r.scope), plain: true, named },
+        Caps(..) | Region(..) | Include(..) => Item {
+            scope: r.scope,
+            re: "",
+            pat: matcher_pat(r.matcher, r.scope, esc_scope),
+            plain: false,
+            named,
+        },
     }
-    out
 }
 
 # `items` with each maximal run of consecutive plain items sharing a scope
@@ -768,21 +765,21 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 991
-deallocations: 991
-reallocations: 28
-bytes allocated: 77264
-instructions executed: 128870
-binary size: 142472
-  code: 91848
+allocations: 986
+deallocations: 986
+reallocations: 33
+bytes allocated: 75872
+instructions executed: 128672
+binary size: 142040
+  code: 91624
   data: 5520
-  metadata: 45104
+  metadata: 44896
 functions:
   __arr_drop_Entry:
     calls: 3
     bytes: 148
   __arr_drop_Item:
-    calls: 14
+    calls: 9
     bytes: 172
   __arr_drop_Pat:
     calls: 33
@@ -794,7 +791,7 @@ functions:
     calls: 1
     bytes: 148
   __arr_retain_Item:
-    calls: 22
+    calls: 17
     bytes: 172
   __arr_retain_Pat:
     calls: 8
@@ -872,16 +869,16 @@ functions:
     calls: 0
     bytes: 204
   aipl_arr_inc:
-    calls: 138
+    calls: 103
     bytes: (external)
   aipl_arr_reserve:
-    calls: 20
+    calls: 13
     bytes: (external)
   aipl_arr_slice:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 575
+    calls: 533
     bytes: (external)
   aipl_array_new:
     calls: 55
@@ -893,7 +890,7 @@ functions:
     calls: 27
     bytes: (external)
   aipl_array_with_cap:
-    calls: 4
+    calls: 6
     bytes: (external)
   aipl_assert:
     calls: 46
@@ -902,10 +899,10 @@ functions:
     calls: 77
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 200
+    calls: 189
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 123
+    calls: 112
     bytes: (external)
   aipl_test_begin:
     calls: 10
@@ -963,7 +960,7 @@ functions:
     bytes: 2360
   rule_pats$Kind:
     calls: 2
-    bytes: 12356
+    bytes: 12132
   run_len:
     calls: 5
     bytes: 1340

@@ -319,8 +319,9 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
+  run_len looks like it can be a count_while
+  for (let x : xs) { if (p(x)) { set out.push(f(x)) } } should lint to a filter->map
   lint against char/str literals directly in templates e.g. `a: {'a'}` or `aa: {"aa"}`
-  items_of looks like it should be a filter_map
   lint against set literals that contain duplicates
   set out = [..out, o]; should lint to set out.push(a);
   we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway
