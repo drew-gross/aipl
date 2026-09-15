@@ -683,11 +683,7 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
 }.test({
     let num: Case<Tok> = Num;
     let f: First<Tok> = First { kinds: #{num}, texts: #{"("}, nullable: false };
-    assert(
-        f.show_first() == """
-            Num "("
-        """,
-    );
+    assert(f.show_first() == `Num "("`);
 
     // Nullability is not a member of either set, so it renders after both.
     let nullable: First<Tok> = First { ..f, nullable: true };
@@ -816,9 +812,9 @@ deallocations: 1883
 reallocations: 312
 bytes allocated: 185926
 instructions executed: 236072
-binary size: 171104
+binary size: 171080
   code: 112340
-  data: 4276
+  data: 4252
   metadata: 54488
 functions:
   __arr_drop_First$Tok:
