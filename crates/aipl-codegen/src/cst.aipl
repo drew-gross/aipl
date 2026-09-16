@@ -95,7 +95,7 @@ pub fn token_leaves(self: Cst) -> Span[] {
 # Found by descending to the leftmost and rightmost token rather than by
 # collecting every token under `self` and taking the ends: `token_leaves` walks
 # the whole subtree, and asking it at every node in a tree is quadratic in the
-# tree. These two stop at the first token they reach.
+# tree. These two descend one edge at a time and stop at the first token.
 pub fn token_span(self: Cst) -> Span? {
     match (self.first_token(), self.last_token()) {
         (some(f), some(l)) => some(f.start..l.end),
@@ -103,44 +103,43 @@ pub fn token_span(self: Cst) -> Span? {
     }
 }
 
-# The leftmost token span under `self`, or `none` if it holds none.
+# The leftmost token span under `self`, or `none` if it holds none. A group's
+# three parts are asked left to right; the first that holds a token answers.
 fn first_token(self: Cst) -> Span? {
     match (self) {
         Leaf(sp) => some(sp),
         Trivia(..) => none,
-        Tree(_, kids) => first_token_of(kids),
-        Group(_, open, body, close) => match (first_token_of(open)) {
-            some(sp) => some(sp),
-            none => match (first_token_of(body)) {
-                some(sp) => some(sp),
-                none => first_token_of(close),
-            },
+        Tree(_, kids) => kids.find_map(first_token),
+        Group(_, open, body, close) => {
+            let in_open = open.find_map(first_token);
+            let in_body = body.find_map(first_token);
+            let in_close = close.find_map(first_token);
+            match (in_open, in_body, in_close) {
+                (some(sp), _, _) | (_, some(sp), _) | (_, _, some(sp)) => some(sp),
+                _ => none,
+            }
         },
     }
 }
 
-# The rightmost token span under `self`, or `none` if it holds none.
+# The rightmost token span under `self`, or `none` if it holds none — the
+# mirror of `first_token`: a group's parts are asked right to left.
 fn last_token(self: Cst) -> Span? {
     match (self) {
         Leaf(sp) => some(sp),
         Trivia(..) => none,
-        Tree(_, kids) => last_token_of(kids),
-        Group(_, open, body, close) => match (last_token_of(close)) {
-            some(sp) => some(sp),
-            none => match (last_token_of(body)) {
-                some(sp) => some(sp),
-                none => last_token_of(open),
-            },
+        Tree(_, kids) => kids.reverse_find_map(last_token),
+        Group(_, open, body, close) => {
+            let in_open = open.reverse_find_map(last_token);
+            let in_body = body.reverse_find_map(last_token);
+            let in_close = close.reverse_find_map(last_token);
+            match (in_open, in_body, in_close) {
+                (_, _, some(sp)) | (_, some(sp), _) | (some(sp), _, _) => some(sp),
+                _ => none,
+            }
         },
     }
 }
-
-# The first of `ks` that holds a token, and its leftmost one. Stops there rather
-# than walking the rest.
-fn first_token_of(ks: Cst[]) -> Span? { ks.find_map(first_token) }
-
-# `first_token_of` from the other end.
-fn last_token_of(ks: Cst[]) -> Span? { ks.reverse_find_map(last_token) }
 
 # The text of the tokens under `self`, trivia dropped and nothing inserted
 # between them — what a production's `build` reads a matched token's spelling
@@ -426,8 +425,8 @@ deallocations: 359
 reallocations: 33
 bytes allocated: 21382
 instructions executed: 43498
-binary size: 57400
-  code: 34644
+binary size: 57608
+  code: 34852
   data: 2549
   metadata: 20207
 functions:
@@ -538,7 +537,7 @@ functions:
     bytes: 696
   first_token:
     calls: 7
-    bytes: 660
+    bytes: 760
   flat_kids:
     calls: 0
     bytes: 32
@@ -550,7 +549,7 @@ functions:
     bytes: 696
   last_token:
     calls: 5
-    bytes: 660
+    bytes: 768
   leaves:
     calls: 0
     bytes: 32

@@ -74,7 +74,6 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  first_token and last_token cleanup: use a multi-match in the Group arm, and delete the _of helpers and inline them
   no_kinds doesn't need to exist; pass a literal
   json_char should be a match, and should just put the backslashes into the str rather than making a var
   in match_expr, let inner = arms.docs.map(|a: Doc| [HardLine, a]).join(); should be an interspere or a join-with-sep include leading or something.
@@ -387,6 +386,7 @@ design:
   apis should express intent
 
 optimizations:
+  code sinking should sink into potentially-unused match arms
   generalize try_push for opts, strings, structs?
   output array length prediction that propagates and allows for really good pre-reserving
   constant folding optimization pass

@@ -4290,13 +4290,13 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1918593
-deallocations: 1918593
+allocations: 1919977
+deallocations: 1919977
 reallocations: 252681
-bytes allocated: 321469797
-instructions executed: 484736812
-binary size: 4958208
-  code: 3247200
+bytes allocated: 321536229
+instructions executed: 484852164
+binary size: 4958416
+  code: 3247408
   data: 48636
   metadata: 1662372
 functions:
@@ -4589,7 +4589,7 @@ functions:
     calls: 5955
     bytes: 440
   __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam$__m8__last_token:
-    calls: 9040
+    calls: 10424
     bytes: 440
   __builtin_try_map$__m1__Ast$__m2__BraceEntry$__m7__ParseError$lam$lower_brace_body$lambda0:
     calls: 7
@@ -5106,7 +5106,7 @@ functions:
     bytes: 696
   __m8__first_token:
     calls: 17888
-    bytes: 660
+    bytes: 760
   __m8__flat_kids:
     calls: 0
     bytes: 32
@@ -5117,8 +5117,8 @@ functions:
     calls: 8056
     bytes: 696
   __m8__last_token:
-    calls: 13738
-    bytes: 660
+    calls: 15058
+    bytes: 768
   __m8__leaves:
     calls: 0
     bytes: 32
@@ -5261,13 +5261,13 @@ functions:
     calls: 2222
     bytes: (external)
   aipl_arr_elem_ptr:
-    calls: 14995
+    calls: 16315
     bytes: (external)
   aipl_arr_extend:
     calls: 1071932
     bytes: (external)
   aipl_arr_inc:
-    calls: 5664175
+    calls: 5666497
     bytes: (external)
   aipl_arr_reserve:
     calls: 1100431
@@ -5276,7 +5276,7 @@ functions:
     calls: 15870
     bytes: (external)
   aipl_arr_reverse:
-    calls: 14995
+    calls: 16379
     bytes: (external)
   aipl_arr_slice:
     calls: 310
@@ -5285,7 +5285,7 @@ functions:
     calls: 38
     bytes: (external)
   aipl_array_dec:
-    calls: 8452383
+    calls: 8456089
     bytes: (external)
   aipl_array_new:
     calls: 195406
@@ -5324,13 +5324,13 @@ functions:
     calls: 1187395
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 6244707
+    calls: 6246027
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 351012
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5057312
+    calls: 5058632
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 351012

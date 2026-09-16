@@ -250,8 +250,8 @@ deallocations: 20264
 reallocations: 2930
 bytes allocated: 4070769
 instructions executed: 8619300
-binary size: 5649968
-  code: 3726932
+binary size: 5650176
+  code: 3727140
   data: 10898
   metadata: 1912138
 functions:
@@ -680,7 +680,7 @@ functions:
     bytes: 696
   __m12__first_token:
     calls: 0
-    bytes: 660
+    bytes: 760
   __m12__flat_kids:
     calls: 0
     bytes: 32
@@ -692,7 +692,7 @@ functions:
     bytes: 696
   __m12__last_token:
     calls: 0
-    bytes: 660
+    bytes: 768
   __m12__nodes$filter1$own0:
     calls: 15
     bytes: 368
