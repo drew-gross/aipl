@@ -425,11 +425,11 @@ allocations: 359
 deallocations: 359
 reallocations: 33
 bytes allocated: 21382
-instructions executed: 43516
-binary size: 57536
-  code: 34728
+instructions executed: 43498
+binary size: 57400
+  code: 34644
   data: 2549
-  metadata: 20259
+  metadata: 20207
 functions:
   __arr_drop_Cst:
     calls: 138
@@ -479,15 +479,12 @@ functions:
   __eq___builtin_Span$arr:
     calls: 4
     bytes: 284
-  __eq___builtin_Span$opt:
-    calls: 1
-    bytes: 92
   __rec_drop_Cst:
     calls: 61
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 13460
+    bytes: 13468
   aipl_arr_elem_ptr:
     calls: 9
     bytes: (external)

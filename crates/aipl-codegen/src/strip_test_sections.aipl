@@ -48,15 +48,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 9394
-binary size: 6960
-  code: 3276
+instructions executed: 9099
+binary size: 6784
+  code: 3168
   data: 870
-  metadata: 2814
+  metadata: 2746
 functions:
-  __eq_str$opt:
-    calls: 17
-    bytes: 100
   __m1__parse_test_section_header:
     calls: 17
     bytes: 744
@@ -80,4 +77,4 @@ functions:
     bytes: 128
   strip_test_sections:
     calls: 9
-    bytes: 788
+    bytes: 780

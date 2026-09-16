@@ -42,25 +42,22 @@ fn to_list_keeps_order() -> List { to_list([1, 2]) }.test({
     assert([1, 2].right_fold(0, |x, acc| x + acc + bump) == 23); // a capture
 })
 --- performance ---
-allocations: 22
-deallocations: 22
+allocations: 17
+deallocations: 17
 reallocations: 0
-bytes allocated: 1568
-instructions executed: 2245
-binary size: 10832
-  code: 6032
+bytes allocated: 1288
+instructions executed: 2098
+binary size: 10480
+  code: 5856
   data: 798
-  metadata: 4002
+  metadata: 3826
 functions:
-  __eq_List:
-    calls: 5
-    bytes: 124
   __rec_drop_List:
-    calls: 13
+    calls: 8
     bytes: 44
   __test$to_list_keeps_order:
     calls: 1
-    bytes: 5736
+    bytes: 5684
   aipl_array_dec:
     calls: 3
     bytes: (external)
@@ -71,19 +68,19 @@ functions:
     calls: 8
     bytes: (external)
   aipl_rec_alloc:
-    calls: 13
+    calls: 8
     bytes: (external)
   aipl_rec_dec_strong:
     calls: 26
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 8
+    calls: 5
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 13
+    calls: 18
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 8
+    calls: 5
     bytes: (external)
   aipl_test_begin:
     calls: 1

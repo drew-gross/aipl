@@ -3930,12 +3930,6 @@ fn compile_program<M: Module>(
     let inlined =
         aipl_mono::fuse_operations(&inlined, &aipl_mono::effectful_fns(&check_program.items));
 
-    // Optimization: compare against `some(e)`/`ok(e)`/`err(e)` by asking the
-    // tag instead of building the value to compare with. Before folding, so a
-    // constant operand it leaves behind still folds, and before sinking, which
-    // is what decides whether that operand may move into the arm.
-    let inlined = aipl_mono::unwrap_ctor_eq(&inlined);
-
     // Optimization: fold constant subexpressions (`2 + 3` → `5`). Runs after
     // `check` so diagnostics always report against the unfolded source, and
     // after inlining so bodies folded here are the ones actually emitted.
@@ -3977,10 +3971,13 @@ fn compile_program<M: Module>(
     // field access on a struct into the constructor-ending branches under it,
     // so an inlined `value_or_err`/`value_or`/`map_ok`/… — or a small function
     // that builds what its caller immediately takes apart — hands its payload
-    // straight out instead of building a value the eliminator undoes. After
-    // inlining, which is what puts the constructors under the eliminator;
-    // before sinking, so the error a `none` arm now builds itself is what the
-    // sinker moves in.
+    // straight out instead of building a value the eliminator undoes; and turn
+    // `x == some(e)` (any constructor, either side) into a `match` that asks
+    // the tag instead of building the value to compare with. After inlining,
+    // which is what puts the constructors under the eliminator; before
+    // sinking, so the error a `none` arm now builds itself — and the operand
+    // an unwrapped comparison binds ahead of its `match` — is what the sinker
+    // moves in.
     let program = aipl_mono::eliminate_known_constructors_post_mono(
         &program,
         inline_max_exprs(),
@@ -10952,188 +10949,6 @@ fn emit_eq_body<M: Module>(
     })
 }
 
-/// The tag (and, for a variant, the field layout) a literal `ok(..)`/`err(..)`/
-/// named-variant-case call would build, resolved without building it.
-enum CtorShape {
-    /// Result's `ok`/`err`: the payload type isn't known from the call alone
-    /// (`Result` isn't in `structs`) — it's resolved from the other side's
-    /// concrete `Result(ok_ty, err_ty)` once that side is compiled.
-    Result { is_ok: bool },
-    /// A user-defined variant case, resolved statically via `variant_ctor`.
-    Variant {
-        tag: usize,
-        fields: Vec<(u32, ConcreteType)>,
-    },
-}
-
-/// Recognizes `e` as a literal `ok(..)`/`err(..)`/named-variant-case
-/// constructor — either call syntax (`Circle(1)`) or, for a nullary case, a
-/// bare unshadowed identifier (`Empty`, mirroring how `ExprKind::Ident`
-/// codegen itself resolves one) — purely from its AST shape, no codegen.
-/// `None` if it's neither.
-fn ctor_shape(cx: Cx, e: &Expr) -> Option<CtorShape> {
-    match &e.kind {
-        ExprKind::Call(name, _, _) => {
-            if matches!(name, Callee::Ok | Callee::Err) {
-                return Some(CtorShape::Result {
-                    is_ok: *name == Callee::Ok,
-                });
-            }
-            let (_, tag, fields) = variant_ctor(cx.structs, name.name())?;
-            Some(CtorShape::Variant { tag, fields })
-        }
-        ExprKind::Ident(name) if !cx.env.contains_key(name) => {
-            let (_, tag, fields) = variant_ctor(cx.structs, name)?;
-            Some(CtorShape::Variant { tag, fields })
-        }
-        _ => None,
-    }
-}
-
-/// Fast path for `x == Ctor(..)` (either order, and `!=` too), where `Ctor` is
-/// `ok`/`err` or any user-defined variant case: compare the *other* side's tag
-/// directly against the constructor's known tag, and only compile/compare its
-/// fields (directly, never wrapped in the constructor) when the tags match —
-/// instead of materializing a synthetic value for the constructor side just to
-/// have `emit_eq` immediately load its tag back out and walk it apart. Returns
-/// `None` when neither/both sides are such a literal, decided purely from the
-/// AST shape before anything is compiled, so the caller can fall back to the
-/// generic path with no risk of double-compiling an operand; once it commits
-/// past that check it always returns `Some(..)` or a genuine `Err`.
-fn compile_ctor_eq<M: Module>(
-    module: &mut M,
-    builder: &mut FunctionBuilder,
-    cx: Cx,
-    scopes: &mut Vec<Vec<Tracked>>,
-    op: BinOp,
-    l: &Expr,
-    r: &Expr,
-) -> Result<Option<(Value, ConcreteType)>, Error> {
-    let structs = cx.structs;
-    let builtins = cx.builtins;
-    let (other, ctor_expr, shape) = match (ctor_shape(cx, l), ctor_shape(cx, r)) {
-        (Some(shape), None) => (r, l, shape),
-        (None, Some(shape)) => (l, r, shape),
-        _ => return Ok(None),
-    };
-    // A bare nullary-case identifier (`Empty`) takes no arguments, mirroring
-    // how its own `ExprKind::Ident` codegen constructs it with `&[]`.
-    let ctor_args: &[Expr] = match &ctor_expr.kind {
-        ExprKind::Call(_, args, _) => args.as_slice(),
-        ExprKind::Ident(_) => &[],
-        _ => unreachable!("ctor_shape only matches Call/Ident expressions"),
-    };
-    let opn = binop_spelling(op);
-    let (ov, ot) = compile_expr(module, builder, cx, scopes, other)?;
-    let (expect_tag, fields) = match shape {
-        CtorShape::Result { is_ok } => {
-            let ConcreteType::Result(ok_ty, err_ty) = &ot else {
-                return Err(Error::at(
-                    format!(
-                        "\"{opn}\" between a result and {}: both sides must be the same type",
-                        type_name(&ot)
-                    ),
-                    other.span.clone(),
-                ));
-            };
-            let payload_ty = if is_ok {
-                (**ok_ty).clone()
-            } else {
-                (**err_ty).clone()
-            };
-            // A trivial payload (void `ok()`, or an unconstructible `__none__`
-            // side) carries nothing to compare — matching tags alone means equal.
-            let fields = if is_unit(&payload_ty) || is_none_inner(&payload_ty) {
-                vec![]
-            } else {
-                vec![(OPT_VALUE_OFFSET, payload_ty)]
-            };
-            (i64::from(is_ok), fields)
-        }
-        CtorShape::Variant { tag, fields } => {
-            if !matches!(&ot, ConcreteType::Named(n) if structs.get(n).and_then(TypeDef::as_variant).is_some())
-            {
-                return Err(Error::at(
-                    format!(
-                        "\"{opn}\" between a variant and {}: both sides must be the same type",
-                        type_name(&ot)
-                    ),
-                    other.span.clone(),
-                ));
-            }
-            if fields.len() != ctor_args.len() {
-                return Err(Error::at(
-                    format!(
-                        "variant constructor takes {} argument(s), got {}",
-                        fields.len(),
-                        ctor_args.len()
-                    ),
-                    ctor_expr.span.clone(),
-                ));
-            }
-            (tag as i64, fields)
-        }
-    };
-    let tag = builder
-        .ins()
-        .load(types::I64, MemFlagsData::trusted(), ov, 0);
-    let tag_matches = builder.ins().icmp_imm_s(IntCC::Equal, tag, expect_tag);
-    // A tagless match (void `ok()`, or a nullary variant case) carries nothing
-    // to compare — matching tags alone means equal.
-    let eq = if fields.is_empty() {
-        builder.ins().uextend(types::I64, tag_matches)
-    } else {
-        let res = i64_slot(builder);
-        let zero = builder.ins().iconst(types::I64, 0);
-        builder.ins().stack_store(types::I64, zero, res, 0);
-        let cmp_b = builder.create_block();
-        let merge = builder.create_block();
-        builder.ins().brif(tag_matches, cmp_b, &[], merge, &[]);
-        // Only reached when tags match: compile each field expression
-        // directly (never wrapped in the constructor) and AND-fold its
-        // equality against the other side's corresponding field, borrowed
-        // in place. Chained directly in SSA (not through the `res` slot) so a
-        // single-field case (every `ok`/`err`, and most variant cases) costs
-        // no more than a bare comparison.
-        builder.switch_to_block(cmp_b);
-        builder.seal_block(cmp_b);
-        scopes.push(Vec::new());
-        let mut fields_eq = None;
-        for ((offset, fty), arg) in fields.iter().zip(ctor_args.iter()) {
-            let other_field = component(builder, ov, *offset, fty, structs);
-            let (cv, _) = compile_expr(module, builder, cx, scopes, arg)?;
-            let feq = emit_eq(module, builder, cx, other_field, cv, fty)?;
-            fields_eq = Some(match fields_eq {
-                None => feq,
-                Some(acc) => builder.ins().band(acc, feq),
-            });
-        }
-        drop_scope(
-            builder,
-            module,
-            builtins,
-            structs,
-            scopes.pop().expect("ctor-eq fields scope"),
-        );
-        builder.ins().stack_store(
-            types::I64,
-            fields_eq.expect("fields is non-empty in this branch"),
-            res,
-            0,
-        );
-        builder.ins().jump(merge, &[]);
-        builder.switch_to_block(merge);
-        builder.seal_block(merge);
-        builder.ins().stack_load(types::I64, types::I64, res, 0)
-    };
-    let result = if op == BinOp::Ne {
-        builder.ins().bxor_imm_u(eq, 1)
-    } else {
-        eq
-    };
-    Ok(Some((result, ConcreteType::Primitive(Primitive::Bool))))
-}
-
 /// splitmix64 finalizer: a strong avalanche mix of an i64. Used to hash scalars
 /// and to fold lengths/tags into a hash. Cheap — a few shifts/xors/multiplies —
 /// and diffuses low bits well, so sequential keys (1, 2, 3) don't cluster in a
@@ -14009,7 +13824,19 @@ fn plan_match(
             let mut arm_tags = Vec::with_capacity(arms.len());
             let mut payloads = Vec::with_capacity(arms.len());
             let mut seen = HashSet::new();
-            for arm in arms {
+            // A trailing `_` arm covers every case not named before it: the
+            // dispatch chain falls through to the last arm, so that is where a
+            // catch-all can sit. The checker never admits one on a variant (a
+            // source `match` lists its cases); it is what
+            // `aipl_mono::eliminate_known_constructors_post_mono` synthesizes
+            // for `x == Case(..)`, whose answer for every other case is the same.
+            let catch_all = matches!(arms.last().map(|a| &a.pattern), Some(Pattern::Wildcard));
+            for (i, arm) in arms.iter().enumerate() {
+                if catch_all && i == arms.len() - 1 {
+                    arm_tags.push(usize::MAX);
+                    payloads.push(Vec::new());
+                    continue;
+                }
                 // A pattern constructor may be variant-qualified (`Case@Variant`);
                 // the scrutinee's type fixes the variant, so match on the bare case.
                 let name = arm
@@ -14036,7 +13863,7 @@ fn plan_match(
                         .collect(),
                 );
             }
-            if seen.len() != vl.cases.len() {
+            if !catch_all && seen.len() != vl.cases.len() {
                 let missing: Vec<&str> = vl
                     .cases
                     .iter()
@@ -14097,7 +13924,13 @@ fn bind_match_arm(
             } else {
                 component(builder, ptr, OPT_VALUE_OFFSET, inner, structs)
             };
-            vec![(arm.pattern.bindings()[0].clone(), value, inner.clone())]
+            // A `some` arm with no binder (one a pass synthesized to answer
+            // "is this `some`" and nothing more) binds nothing — and so
+            // retains nothing for a payload it never reads.
+            match arm.pattern.bindings().first() {
+                Some(name) => vec![(name.clone(), value, inner.clone())],
+                None => Vec::new(),
+            }
         }
         MatchPlan::Variant { payloads, .. } => arm
             .pattern
@@ -17926,11 +17759,6 @@ fn compile_binop<M: Module>(
 ) -> Result<(Value, ConcreteType), Error> {
     let builtins = cx.builtins;
     Ok({
-        if matches!(op, BinOp::Eq | BinOp::Ne) {
-            if let Some(result) = compile_ctor_eq(module, builder, cx, scopes, op, l, r)? {
-                return Ok(result);
-            }
-        }
         let (lv, lt) = compile_expr(module, builder, cx, scopes, l)?;
         let (rv, rt) = compile_expr(module, builder, cx, scopes, r)?;
         // A bare literal operand flexes to the other's integer type — its

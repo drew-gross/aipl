@@ -67,24 +67,21 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 32
-instructions executed: 1049
-binary size: 7152
-  code: 3388
+instructions executed: 974
+binary size: 7000
+  code: 3304
   data: 944
-  metadata: 2820
+  metadata: 2752
 functions:
-  __eq_i64$opt:
-    calls: 4
-    bytes: 100
   __test$is_big:
     calls: 1
     bytes: 180
   __test$map_find_if:
     calls: 1
-    bytes: 796
+    bytes: 804
   __test$nonzero:
     calls: 1
-    bytes: 208
+    bytes: 216
   aipl_arr_slice:
     calls: 1
     bytes: (external)

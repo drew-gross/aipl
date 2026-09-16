@@ -750,15 +750,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 991
-deallocations: 991
+allocations: 989
+deallocations: 989
 reallocations: 33
-bytes allocated: 76968
-instructions executed: 128504
-binary size: 140880
-  code: 90652
+bytes allocated: 76632
+instructions executed: 128366
+binary size: 143680
+  code: 92224
   data: 5520
-  metadata: 44708
+  metadata: 45936
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -805,14 +805,11 @@ functions:
   __eq_str$arr:
     calls: 1
     bytes: 364
-  __eq_str$opt:
-    calls: 4
-    bytes: 100
   __m1__indent:
     calls: 12
     bytes: 1652
   __rec_drop_Pat:
-    calls: 77
+    calls: 75
     bytes: 268
   __test$brace_group_entry:
     calls: 1
@@ -822,13 +819,13 @@ functions:
     bytes: 1852
   __test$decl_pat:
     calls: 1
-    bytes: 1084
+    bytes: 992
   __test$json_str:
     calls: 1
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 12256
+    bytes: 14124
   __test$matcher_pat$lambda0:
     calls: 0
     bytes: 64
@@ -837,7 +834,7 @@ functions:
     bytes: 64
   __test$matcher_regex:
     calls: 1
-    bytes: 7984
+    bytes: 8044
   __test$matcher_regex$lambda0:
     calls: 0
     bytes: 64
@@ -852,12 +849,12 @@ functions:
     bytes: 5888
   __test$word_pat:
     calls: 1
-    bytes: 2112
+    bytes: 1948
   __to_str_u64:
     calls: 0
     bytes: 204
   aipl_arr_inc:
-    calls: 103
+    calls: 108
     bytes: (external)
   aipl_arr_reserve:
     calls: 13
@@ -866,7 +863,7 @@ functions:
     calls: 12
     bytes: (external)
   aipl_array_dec:
-    calls: 538
+    calls: 543
     bytes: (external)
   aipl_array_new:
     calls: 55
@@ -884,10 +881,10 @@ functions:
     calls: 46
     bytes: (external)
   aipl_rec_alloc:
-    calls: 77
+    calls: 75
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 202
+    calls: 200
     bytes: (external)
   aipl_rec_inc_strong:
     calls: 125

@@ -6,7 +6,8 @@ import { equal as ==, is_nonempty, not_equal as !=, print, to_str } from builtin
 // an optional was materialized out of `y` — a stack slot, a tag store, a payload
 // store, and for a heap payload a retain — then compared field by field against
 // `x`. The constructed value died the moment the comparison ended, and half of
-// it was a tag the comparison already knew. So the pass rewrites it to a match
+// it was a tag the comparison already knew. So known-constructor elimination
+// (`aipl_mono::eliminate_known_constructors_post_mono`) rewrites it to a match
 // on `x` that compares payloads directly, which is what the comparison did
 // anyway, minus the value it had to be handed.
 //
@@ -27,6 +28,20 @@ fn failed_with(r: i64!str, m: str) -> bool { r == err(m) }
 fn long() -> str { "a string long past the inline limit, so it lives on the heap" }
 
 fn is_long(x: str?) -> bool { x == some(long()) }
+
+// The payload-less constructors ask the tag and nothing else.
+fn is_absent(x: i64?) -> bool { x == none }
+
+fn succeeded(r: !str) -> bool { r == ok() }
+
+// A variant case, with several payload slots and a nested constructor: every
+// slot is compared in the case's arm, a catch-all answers for the other
+// cases, and the nested `Cons` is unwrapped in turn rather than built.
+variant List = Cons(i64, List) | Nil
+
+fn starts_one_two(l: List) -> bool { l == Cons(1, Cons(2, Nil)) }
+
+fn nonempty(l: List) -> bool { l != Nil }
 
 fn main() !prints {
     // The optionals come from a call rather than a literal so constant folding
@@ -51,6 +66,17 @@ fn main() !prints {
     // its result.
     print(is_long(none).to_str());
     print(is_long(some(long())).to_str());
+
+    print(is_absent(absent).to_str());
+    print(is_absent(three).to_str());
+    let done: !str = if ("x".is_nonempty()) { ok() } else { err("no") };
+    print(succeeded(done).to_str());
+
+    let l = Cons(1, Cons(2, Nil));
+    print(starts_one_two(l).to_str());
+    print(starts_one_two(Cons(1, Nil)).to_str());
+    print(nonempty(l).to_str());
+    print(nonempty(Nil).to_str());
 }
 --- stdout ---
 true
@@ -63,23 +89,48 @@ false
 false
 false
 true
+true
+false
+true
+true
+false
+true
+false
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 23
+deallocations: 23
 reallocations: 0
-bytes allocated: 206
-instructions executed: 572
-binary size: 3632
-  code: 1868
+bytes allocated: 685
+instructions executed: 997
+binary size: 6160
+  code: 3364
   data: 127
-  metadata: 1637
+  metadata: 2669
 functions:
+  __rec_drop_List:
+    calls: 6
+    bytes: 44
   __to_str_bool:
-    calls: 10
+    calls: 17
     bytes: 232
+  aipl_rec_alloc:
+    calls: 6
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 9
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 3
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 3
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 3
+    bytes: (external)
   aipl_write_bytes:
-    calls: 10
+    calls: 17
     bytes: (external)
   main:
     calls: 1
-    bytes: 1636
+    bytes: 3088

@@ -71,18 +71,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 686
-binary size: 7520
-  code: 3304
+instructions executed: 690
+binary size: 7536
+  code: 3316
   data: 1365
-  metadata: 2851
+  metadata: 2855
 functions:
   __eq_Point:
     calls: 1
     bytes: 104
   __test$value_or:
     calls: 1
-    bytes: 3092
+    bytes: 3104
   aipl_arr_inc:
     calls: 3
     bytes: (external)

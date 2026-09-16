@@ -3152,11 +3152,11 @@ allocations: 15944
 deallocations: 15944
 reallocations: 1765
 bytes allocated: 3322001
-instructions executed: 26818646
-binary size: 10105472
-  code: 6385916
+instructions executed: 26818619
+binary size: 10105584
+  code: 6385932
   data: 31204
-  metadata: 3688352
+  metadata: 3688448
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3266,12 +3266,6 @@ functions:
   __eq_FmtKind:
     calls: 1184
     bytes: 64
-  __eq_FmtTok:
-    calls: 0
-    bytes: 120
-  __eq_FmtTok$opt:
-    calls: 1
-    bytes: 92
   __eq___builtin_Span:
     calls: 1
     bytes: 104
@@ -3469,7 +3463,7 @@ functions:
     bytes: 7868
   __test$new_walker:
     calls: 1
-    bytes: 12152
+    bytes: 12340
   __test$struct_pattern:
     calls: 1
     bytes: 2188
@@ -3486,7 +3480,7 @@ functions:
     calls: 4795
     bytes: (external)
   aipl_arr_inc:
-    calls: 288809
+    calls: 288815
     bytes: (external)
   aipl_arr_reserve:
     calls: 5047
@@ -3495,7 +3489,7 @@ functions:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 411852
+    calls: 411858
     bytes: (external)
   aipl_array_new:
     calls: 3654
@@ -3820,7 +3814,7 @@ functions:
     bytes: 256
   template_scan:
     calls: 1
-    bytes: 3708
+    bytes: 3748
   template_verbatim:
     calls: 1
     bytes: 668

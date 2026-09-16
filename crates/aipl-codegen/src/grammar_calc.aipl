@@ -466,15 +466,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 12884
-deallocations: 12884
+allocations: 12869
+deallocations: 12869
 reallocations: 2085
-bytes allocated: 1220593
-instructions executed: 2595231
-binary size: 410184
-  code: 267992
+bytes allocated: 1219393
+instructions executed: 2594725
+binary size: 409872
+  code: 267924
   data: 6044
-  metadata: 136148
+  metadata: 135904
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -651,7 +651,7 @@ functions:
     calls: 256
     bytes: 504
   __eq_Calc:
-    calls: 37
+    calls: 22
     bytes: 252
   __eq___m2__First$CalcTok:
     calls: 7
@@ -954,7 +954,7 @@ functions:
     calls: 0
     bytes: 6536
   __rec_drop_Calc:
-    calls: 205
+    calls: 190
     bytes: 132
   __rec_drop___m1__Cst:
     calls: 1069
@@ -985,10 +985,10 @@ functions:
     bytes: 4112
   __test$parse_calc:
     calls: 1
-    bytes: 8884
+    bytes: 8848
   __test$render_calc:
     calls: 1
-    bytes: 5404
+    bytes: 5372
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -1047,19 +1047,19 @@ functions:
     calls: 62
     bytes: (external)
   aipl_rec_alloc:
-    calls: 4129
+    calls: 4114
     bytes: (external)
   aipl_rec_dec_strong:
     calls: 33083
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 525
+    calls: 519
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 28954
+    calls: 28969
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 525
+    calls: 519
     bytes: (external)
   aipl_set_contains:
     calls: 73

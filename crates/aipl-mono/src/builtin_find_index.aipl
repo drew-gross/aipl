@@ -67,15 +67,12 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 128
-instructions executed: 1704
-binary size: 10424
-  code: 5572
+instructions executed: 1650
+binary size: 10264
+  code: 5472
   data: 1193
-  metadata: 3659
+  metadata: 3599
 functions:
-  __eq_u64$opt:
-    calls: 3
-    bytes: 100
   __test$find_index:
     calls: 1
     bytes: 1372

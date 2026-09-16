@@ -70,18 +70,15 @@ allocations: 21
 deallocations: 21
 reallocations: 0
 bytes allocated: 535
-instructions executed: 610
-binary size: 4728
-  code: 2472
+instructions executed: 592
+binary size: 4600
+  code: 2372
   data: 47
-  metadata: 2209
+  metadata: 2181
 functions:
   __eq_dict$str$i64:
     calls: 1
     bytes: 276
-  __eq_i64$opt:
-    calls: 1
-    bytes: 100
   __to_str_bool:
     calls: 9
     bytes: 232

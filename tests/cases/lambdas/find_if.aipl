@@ -34,11 +34,11 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1151
-binary size: 7832
-  code: 3876
+instructions executed: 1115
+binary size: 7688
+  code: 3776
   data: 994
-  metadata: 2962
+  metadata: 2918
 functions:
   __builtin_find_if$char$lam$__test$first_big$lambda4:
     calls: 1
@@ -67,9 +67,6 @@ functions:
   __builtin_find_if$i64$lam$is_neg:
     calls: 1
     bytes: 268
-  __eq_i64$opt:
-    calls: 2
-    bytes: 100
   __test$first_big:
     calls: 1
     bytes: 920

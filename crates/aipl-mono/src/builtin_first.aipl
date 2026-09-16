@@ -20,18 +20,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 112
-instructions executed: 306
-binary size: 3608
-  code: 1568
+instructions executed: 288
+binary size: 3472
+  code: 1472
   data: 358
-  metadata: 1682
+  metadata: 1642
 functions:
-  __eq_i64$opt:
-    calls: 1
-    bytes: 100
   __test$first:
     calls: 1
-    bytes: 1364
+    bytes: 1368
   aipl_arr_slice:
     calls: 1
     bytes: (external)

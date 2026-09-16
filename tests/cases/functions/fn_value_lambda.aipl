@@ -44,9 +44,9 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 144
-instructions executed: 545
-binary size: 4112
-  code: 1672
+instructions executed: 538
+binary size: 4104
+  code: 1664
   data: 369
   metadata: 2071
 functions:
@@ -61,7 +61,7 @@ functions:
     bytes: 132
   __test$probe:
     calls: 1
-    bytes: 424
+    bytes: 416
   __test$probe$lambda0:
     calls: 1
     bytes: 8

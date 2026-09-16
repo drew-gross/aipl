@@ -4294,11 +4294,11 @@ allocations: 1918593
 deallocations: 1918593
 reallocations: 252681
 bytes allocated: 321469797
-instructions executed: 484741762
-binary size: 4958680
-  code: 3247484
+instructions executed: 484736812
+binary size: 4958208
+  code: 3247200
   data: 48636
-  metadata: 1662560
+  metadata: 1662372
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4690,12 +4690,6 @@ functions:
   __eq___m30__First$__m21__AiplTok$arr:
     calls: 72
     bytes: 284
-  __eq___m7__ParseError:
-    calls: 0
-    bytes: 128
-  __eq___m7__ParseError$opt:
-    calls: 1
-    bytes: 92
   __eq_set$__m21__AiplTok$case:
     calls: 1494
     bytes: 256
@@ -4708,9 +4702,6 @@ functions:
   __eq_str$arr:
     calls: 21
     bytes: 364
-  __eq_str$opt:
-    calls: 251
-    bytes: 100
   __m11__construct_ty_name:
     calls: 5
     bytes: 2792
@@ -4899,7 +4890,7 @@ functions:
     bytes: 356
   __m27__strip_test_sections:
     calls: 146
-    bytes: 788
+    bytes: 780
   __m28__parse_test_section_header:
     calls: 251
     bytes: 744
@@ -5325,7 +5316,7 @@ functions:
     bytes: 384
   aipl_parse_file:
     calls: 3
-    bytes: 9108
+    bytes: 9124
   aipl_parse_report:
     calls: 8
     bytes: 748
@@ -5769,7 +5760,7 @@ functions:
     bytes: 28928
   variadic_seq_ty:
     calls: 2
-    bytes: 924
+    bytes: 952
   why_prepared:
     calls: 9
     bytes: 1760

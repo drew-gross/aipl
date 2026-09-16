@@ -59,21 +59,15 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 128
-instructions executed: 1590
-binary size: 10496
-  code: 5616
+instructions executed: 1536
+binary size: 10216
+  code: 5412
   data: 1174
-  metadata: 3706
+  metadata: 3630
 functions:
-  __eq_char$opt:
-    calls: 1
-    bytes: 100
-  __eq_i64$opt:
-    calls: 2
-    bytes: 100
   __test$find_if:
     calls: 1
-    bytes: 1488
+    bytes: 1484
   __test$find_if$filter9$own0:
     calls: 1
     bytes: 300

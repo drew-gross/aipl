@@ -45,11 +45,11 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 1072
-instructions executed: 1607
+instructions executed: 1568
 binary size: 12752
-  code: 7448
+  code: 7464
   data: 781
-  metadata: 4523
+  metadata: 4507
 functions:
   __dict_drop_bool$str:
     calls: 1
@@ -91,7 +91,7 @@ functions:
     calls: 3
     bytes: 296
   __eq_i64$opt:
-    calls: 4
+    calls: 2
     bytes: 100
   __test$array_values:
     calls: 1
@@ -104,7 +104,7 @@ functions:
     bytes: 1176
   __test$optional_values:
     calls: 1
-    bytes: 860
+    bytes: 876
   __test$struct_values:
     calls: 1
     bytes: 676

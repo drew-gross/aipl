@@ -261,18 +261,15 @@ allocations: 36
 deallocations: 36
 reallocations: 0
 bytes allocated: 3228
-instructions executed: 14811
-binary size: 14072
-  code: 7340
+instructions executed: 14622
+binary size: 13904
+  code: 7236
   data: 2704
-  metadata: 4028
+  metadata: 3964
 functions:
   __builtin_any$str$lam$fill_or_add_section$lambda0:
     calls: 10
     bytes: 468
-  __eq_str$opt:
-    calls: 14
-    bytes: 100
   __m2__parse_test_section_header:
     calls: 32
     bytes: 744
@@ -299,7 +296,7 @@ functions:
     bytes: (external)
   fill_or_add_section:
     calls: 10
-    bytes: 3512
+    bytes: 3508
   main:
     calls: 1
     bytes: 128

@@ -41,18 +41,15 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 280
-instructions executed: 2480
-binary size: 7256
-  code: 3800
+instructions executed: 2426
+binary size: 7120
+  code: 3716
   data: 904
-  metadata: 2552
+  metadata: 2500
 functions:
-  __eq_i64$opt:
-    calls: 3
-    bytes: 100
   __test$parses_a_digit_run:
     calls: 1
-    bytes: 3072
+    bytes: 3088
   aipl_array_dec:
     calls: 1
     bytes: (external)

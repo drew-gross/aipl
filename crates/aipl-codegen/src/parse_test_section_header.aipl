@@ -51,15 +51,12 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1616
-binary size: 7424
-  code: 3464
+instructions executed: 1472
+binary size: 7216
+  code: 3364
   data: 1104
-  metadata: 2856
+  metadata: 2748
 functions:
-  __eq_str$opt:
-    calls: 8
-    bytes: 100
   __test$parse_test_section_header:
     calls: 1
     bytes: 2520

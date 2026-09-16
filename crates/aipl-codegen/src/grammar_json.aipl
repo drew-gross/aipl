@@ -491,11 +491,11 @@ allocations: 18633
 deallocations: 18633
 reallocations: 2733
 bytes allocated: 2299384
-instructions executed: 4664979
-binary size: 441528
-  code: 288988
+instructions executed: 4664887
+binary size: 442512
+  code: 289460
   data: 7940
-  metadata: 144600
+  metadata: 145112
 functions:
   __arr_drop_Json:
     calls: 125
@@ -1003,7 +1003,7 @@ functions:
     bytes: 4040
   __test$parse_json:
     calls: 1
-    bytes: 16512
+    bytes: 16984
   __test$render_json:
     calls: 1
     bytes: 2892
@@ -1023,7 +1023,7 @@ functions:
     calls: 8170
     bytes: (external)
   aipl_arr_inc:
-    calls: 75216
+    calls: 75224
     bytes: (external)
   aipl_arr_reserve:
     calls: 10433
@@ -1035,7 +1035,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 103921
+    calls: 103929
     bytes: (external)
   aipl_array_new:
     calls: 3285

@@ -1611,11 +1611,11 @@ allocations: 5745
 deallocations: 5745
 reallocations: 1283
 bytes allocated: 603407
-instructions executed: 1364089
-binary size: 670368
-  code: 405704
+instructions executed: 1364068
+binary size: 670520
+  code: 405756
   data: 10484
-  metadata: 254180
+  metadata: 254280
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1943,7 +1943,7 @@ functions:
     bytes: 3292
   __test$parse:
     calls: 1
-    bytes: 211532
+    bytes: 211584
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -1963,7 +1963,7 @@ functions:
     calls: 1851
     bytes: (external)
   aipl_arr_inc:
-    calls: 30082
+    calls: 30086
     bytes: (external)
   aipl_arr_reserve:
     calls: 2041
@@ -1978,7 +1978,7 @@ functions:
     calls: 40
     bytes: (external)
   aipl_array_dec:
-    calls: 38441
+    calls: 38445
     bytes: (external)
   aipl_array_new:
     calls: 742

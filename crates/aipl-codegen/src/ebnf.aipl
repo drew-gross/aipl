@@ -777,11 +777,11 @@ allocations: 1896
 deallocations: 1896
 reallocations: 338
 bytes allocated: 185463
-instructions executed: 239502
-binary size: 165808
-  code: 108964
+instructions executed: 239501
+binary size: 165736
+  code: 108924
   data: 4132
-  metadata: 52712
+  metadata: 52680
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -902,7 +902,7 @@ functions:
     bytes: 13520
   __test$first_sets:
     calls: 1
-    bytes: 4944
+    bytes: 4904
   __test$rule_first:
     calls: 1
     bytes: 4984

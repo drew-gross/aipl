@@ -21,18 +21,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 933
-binary size: 5840
-  code: 3048
+instructions executed: 915
+binary size: 5696
+  code: 2944
   data: 675
-  metadata: 2117
+  metadata: 2077
 functions:
-  __eq_i64$opt:
-    calls: 1
-    bytes: 100
   __test$smallest:
     calls: 1
-    bytes: 2540
+    bytes: 2536
   __test$smallest$filter1$own0:
     calls: 1
     bytes: 300

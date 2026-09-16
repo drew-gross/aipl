@@ -22,21 +22,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 88
-instructions executed: 331
-binary size: 3360
-  code: 1540
+instructions executed: 277
+binary size: 3056
+  code: 1332
   data: 286
-  metadata: 1534
+  metadata: 1438
 functions:
-  __eq_i64$opt:
-    calls: 2
-    bytes: 100
-  __eq_str$opt:
-    calls: 1
-    bytes: 100
   __test$add2:
     calls: 1
-    bytes: 824
+    bytes: 816
   add2:
     calls: 3
     bytes: 128

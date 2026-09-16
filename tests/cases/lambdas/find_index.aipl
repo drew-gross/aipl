@@ -60,11 +60,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 152
-instructions executed: 2191
-binary size: 12520
-  code: 6756
+instructions executed: 2137
+binary size: 12224
+  code: 6552
   data: 1501
-  metadata: 4263
+  metadata: 4171
 functions:
   __builtin_find_index$char$lam$__test$first_big$lambda4:
     calls: 1
@@ -105,15 +105,9 @@ functions:
   __builtin_find_index$str$lam$value_for$lambda0:
     calls: 2
     bytes: 400
-  __eq_i64$opt:
-    calls: 1
-    bytes: 100
-  __eq_u64$opt:
-    calls: 2
-    bytes: 100
   __test$first_big:
     calls: 1
-    bytes: 2172
+    bytes: 2168
   __test$first_big$filter7$own0:
     calls: 1
     bytes: 300

@@ -280,11 +280,11 @@ allocations: 6712
 deallocations: 6712
 reallocations: 942
 bytes allocated: 623214
-instructions executed: 1471121
-binary size: 392304
-  code: 257348
+instructions executed: 1471086
+binary size: 392712
+  code: 257532
   data: 4892
-  metadata: 130064
+  metadata: 130288
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -780,7 +780,7 @@ functions:
     bytes: 4680
   __test$parse_sexp:
     calls: 1
-    bytes: 8044
+    bytes: 8228
   __test$sexp_cst:
     calls: 1
     bytes: 3276
@@ -803,7 +803,7 @@ functions:
     calls: 3216
     bytes: (external)
   aipl_arr_inc:
-    calls: 27552
+    calls: 27558
     bytes: (external)
   aipl_arr_reserve:
     calls: 4173
@@ -815,7 +815,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 38791
+    calls: 38797
     bytes: (external)
   aipl_array_new:
     calls: 1537

@@ -62,21 +62,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1148
-binary size: 11088
-  code: 7540
+instructions executed: 1102
+binary size: 10856
+  code: 7400
   data: 609
-  metadata: 2939
+  metadata: 2847
 functions:
-  __eq_Prim:
-    calls: 0
-    bytes: 64
-  __eq_Prim$opt:
-    calls: 3
-    bytes: 92
   __test$prim_from_name:
     calls: 1
-    bytes: 2740
+    bytes: 2756
   __test$prim_name:
     calls: 1
     bytes: 3232

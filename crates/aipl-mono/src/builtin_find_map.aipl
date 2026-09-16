@@ -44,21 +44,18 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 32
-instructions executed: 640
-binary size: 4624
-  code: 1944
+instructions executed: 586
+binary size: 4480
+  code: 1852
   data: 664
-  metadata: 2016
+  metadata: 1964
 functions:
-  __eq_i64$opt:
-    calls: 3
-    bytes: 100
   __test$find_map:
     calls: 1
     bytes: 576
   __test$nonzero:
     calls: 1
-    bytes: 208
+    bytes: 216
   aipl_arr_slice:
     calls: 1
     bytes: (external)
