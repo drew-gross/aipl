@@ -318,11 +318,6 @@ fn with_trailing<K: variant, A: any>(p: Parser<K, A>, root: Cst) -> Cst {
     }
 }
 
-fn quoted(s: str) -> str {
-    let q = "`";
-    `{q}{s}{q}`
-}
-
 // ---------- the rules ----------
 
 # Match `r` at `pos`. `cur` is the index of the production being matched, which
@@ -381,7 +376,7 @@ fn match_spelling<K: variant, A: any>(p: Parser<K, A>, s: str, pos: u64, far: Fa
     if (pos < p.toks.len() && tok_text(p, pos) == s) {
         Step { hit: true, pos: pos + 1, kids: leaf_at(p, pos), far }
     } else {
-        miss(far, pos, quoted(s))
+        miss(far, pos, `{"`"}{s}{"`"}`)
     }
 }
 
@@ -812,7 +807,7 @@ fn rule_labels<K: variant, A: any>(
 ) -> #{str} {
     match (r) {
         Term(k) => #{k.case_name()},
-        Literal(s) => #{quoted(s)},
+        Literal(s) => #{`{"`"}{s}{"`"}`},
         // A sequence is tried from its front, and past every element that can
         // match nothing — the same walk `rule_first` makes over terminals.
         Then(rs) => seq_labels(rs, prods, firsts, labels),
@@ -978,7 +973,7 @@ fn climb<K: variant, A: any>(
 # of the source), which is what `caret_block.aipl` renders the underline from.
 fn error_at<K: variant, A: any>(p: Parser<K, A>, src: str, far: Far) -> ParseError {
     let found = if (far.pos < p.toks.len()) {
-        quoted(tok_text(p, far.pos))
+        `{"`"}{tok_text(p, far.pos)}{"`"}`
     } else {
         "end of input"
     };
@@ -1022,7 +1017,7 @@ fn unclosed_hint(src: str, open: Span[]) -> str {
     match (open.first()) {
         some(sp) => {
             let line = line_at(src, sp.start).line + 1;
-            ` ({quoted(src[sp])} at line {line} is never closed)`
+            ` ({"`"}{src[sp]}{"`"} at line {line} is never closed)`
         },
         none => "",
     }
@@ -1611,11 +1606,11 @@ allocations: 5745
 deallocations: 5745
 reallocations: 1283
 bytes allocated: 603407
-instructions executed: 1364068
-binary size: 670728
-  code: 405964
+instructions executed: 1363754
+binary size: 672096
+  code: 406924
   data: 10484
-  metadata: 254280
+  metadata: 254688
 functions:
   __arr_drop_Node:
     calls: 16
@@ -2045,7 +2040,7 @@ functions:
     bytes: 2992
   error_at$Tok$Node:
     calls: 40
-    bytes: 3108
+    bytes: 3764
   far_miss:
     calls: 142
     bytes: 1080
@@ -2090,7 +2085,7 @@ functions:
     bytes: 4136
   match_rule$Tok$Node:
     calls: 620
-    bytes: 6236
+    bytes: 6620
   match_sep$Tok$Node:
     calls: 89
     bytes: 952
@@ -2115,9 +2110,6 @@ functions:
   pruned$Tok$Node:
     calls: 11
     bytes: 1284
-  quoted:
-    calls: 107
-    bytes: 456
   refuse:
     calls: 1
     bytes: 348
@@ -2126,7 +2118,7 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 130
-    bytes: 4812
+    bytes: 5188
   rule_nullable$Tok:
     calls: 0
     bytes: 36

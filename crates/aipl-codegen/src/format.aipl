@@ -312,9 +312,8 @@ fn starts_item(self: Piece) -> bool {
 # A comment still ends its line where the author ended theirs — that is not
 # spacing, it is what the comment means.
 fn tight(ps: Piece[]) -> Doc { Concat(ps.map(piece_doc)) }.test({
-    let nothing: Piece[] = [];
     assert(tight([Tok("-"), Tok("2")]).at(80) == "-2");
-    assert(tight(nothing).at(80) == "");
+    assert(tight([]).at(80) == "");
     assert(tight([Tok("a"), Note("/* c */", false), Tok("b")]).at(80) == "a/* c */b");
     assert(tight([Tok("a"), Note("// c", true), Tok("b")]).at(80) == "a// c\nb\n");
 })
@@ -370,9 +369,8 @@ fn inline_doc(ps: Piece[], space: (str, str) -> bool) -> Doc {
     }
     Concat(out)
 }.test({
-    let nothing: Piece[] = [];
     assert(inline_doc([Tok("a"), Tok(":"), Tok("1")], colon_space).at(80) == "a: 1");
-    assert(inline_doc(nothing, colon_space).at(80) == "");
+    assert(inline_doc([], colon_space).at(80) == "");
 
     // A child contributes its edges, not its whole text: the rule is asked about
     // `:` and `x`, never about the child's interior.
@@ -478,10 +476,9 @@ fn wrapped(
     assert(wrapped(lp, three, rp, parens, never_space).at(5) == "(\n    a,\n    b,\n    c,\n)\n");
 
     // An empty list is its brackets and nothing else — no space to break at.
-    let nothing: Piece[] = [];
-    assert(wrapped(lp, nothing, rp, parens, never_space).at(80) == "()");
+    assert(wrapped(lp, [], rp, parens, never_space).at(80) == "()");
     let braces = ListStyle { spaced: true };
-    assert(wrapped([Tok("{")], nothing, [Tok("}")], braces, never_space).at(80) == "{}");
+    assert(wrapped([Tok("{")], [], [Tok("}")], braces, never_space).at(80) == "{}");
 
     // A bracket spelled as two tokens is one bracket: the group said so, and
     // nothing here counts token runs to find out.
@@ -572,12 +569,11 @@ fn list_items(mid: Piece[], ListStyle { sep }, space: (str, str) -> bool) -> Doc
     };
     items
 }.test({
-    let nothing: Piece[] = [];
     let a = Node(Text("a"), "a", "a");
     let b = Node(Text("b"), "b", "b");
 
     assert(texts(list_items([a, Tok(","), b], ListStyle {}, never_space)) == ["a", "b"]);
-    assert(list_items(nothing, ListStyle {}, never_space).is_empty());
+    assert(list_items([], ListStyle {}, never_space).is_empty());
     // A trailing separator in the source leaves no empty item behind it.
     assert(texts(list_items([a, Tok(","), b, Tok(",")], ListStyle {}, never_space)) == ["a", "b"]);
     // Juxtaposed: every child is its own item.
@@ -675,11 +671,11 @@ allocations: 2090
 deallocations: 2090
 reallocations: 181
 bytes allocated: 167907
-instructions executed: 263209
+instructions executed: 263212
 binary size: 221560
-  code: 142196
-  data: 5052
-  metadata: 74312
+  code: 142192
+  data: 5044
+  metadata: 74324
 functions:
   __arr_drop_Piece:
     calls: 95
@@ -866,10 +862,10 @@ functions:
     bytes: 4116
   __test$inline_doc:
     calls: 1
-    bytes: 4176
+    bytes: 4172
   __test$list_items:
     calls: 1
-    bytes: 6808
+    bytes: 6804
   __test$render_cst:
     calls: 1
     bytes: 1180
@@ -878,7 +874,7 @@ functions:
     bytes: 4316
   __test$wrapped:
     calls: 1
-    bytes: 10464
+    bytes: 10468
   __test_try_fail___m8__ParseError:
     calls: 0
     bytes: 84

@@ -579,8 +579,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
     // An arbitrary rule against the grammar's sets — what a driver would prune
     // one alternative with. The optional `!` contributes its spelling without
     // making the sequence nullable, since `atom` after it is not.
-    let three: u64 = 3;
-    let r: Rule<Tok> = Then([Maybe(Literal("!")), NamedIdx(three)]);
+    let r: Rule<Tok> = Then([Maybe(Literal("!")), NamedIdx(3)]);
     assert(rule_first(r, sets)?.show_first() == `Num Name "!" "("`);
 
     // A whole-sequence nullability: every element optional, so the rule is too.

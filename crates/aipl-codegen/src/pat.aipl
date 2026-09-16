@@ -234,15 +234,13 @@ pub fn binder_list(self: str[]) -> str {
     if (self.is_empty()) {
         return "nothing";
     };
-    self.map(quoted).join(sep=", ")
+    self.map(|x| `"{x}"`).join(sep=", ")
 }.test({
     let none_bound: str[] = [];
     assert(none_bound.binder_list() == "nothing");
     assert(["v"].binder_list() == `"v"`);
     assert(["a", "b"].binder_list() == `"a", "b"`);
 })
-
-fn quoted(self: str) -> str { `"{self}"` }
 --- performance ---
 allocations: 142
 deallocations: 142

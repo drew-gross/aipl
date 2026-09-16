@@ -470,11 +470,11 @@ allocations: 12869
 deallocations: 12869
 reallocations: 2085
 bytes allocated: 1219393
-instructions executed: 2594725
-binary size: 410080
-  code: 268132
+instructions executed: 2594397
+binary size: 410928
+  code: 268748
   data: 6044
-  metadata: 135904
+  metadata: 136136
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -715,7 +715,7 @@ functions:
     bytes: 2992
   __m13__error_at$CalcTok$Calc:
     calls: 4
-    bytes: 2780
+    bytes: 3484
   __m13__far_miss:
     calls: 349
     bytes: 1080
@@ -754,7 +754,7 @@ functions:
     bytes: 4136
   __m13__match_rule$CalcTok$Calc:
     calls: 1375
-    bytes: 5792
+    bytes: 6160
   __m13__match_sep$CalcTok$Calc:
     calls: 0
     bytes: 952
@@ -773,9 +773,6 @@ functions:
   __m13__pruned$CalcTok$Calc:
     calls: 0
     bytes: 1284
-  __m13__quoted:
-    calls: 164
-    bytes: 456
   __m13__tok_text$CalcTok$Calc:
     calls: 470
     bytes: 636

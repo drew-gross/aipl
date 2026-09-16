@@ -83,11 +83,9 @@ misc cleanup:
   nested_len should maybe use an all_suffixes type utility
   rename Pat to Pattern (file and variant)
   unterminated error messages can be DRYer
-  why does rule_first need three as a variable?
   fmt_node can only fail due to bad internal index; see if we can fix that, maybe with a LinkedGrammar type?
   breaks_after can be take_while->starts_with I think?
   Remove need for Member JSON arm. Should be dict probably?
-  nothing in format.aipl should be able to be passed as a literal
   unescape + unescape_braces can probably be DRYed up
   union_all can be context ordered, like to_set
   make it so builtin .aipl files can contain helper functions
@@ -105,9 +103,7 @@ misc cleanup:
   BinOp should be lowered to a call much earlier in the pipeline, it's currently too easy to inspect a binop and assume it corresponds to a call other than the one it actually does
   unify operators with regular functions even more
   field_size and elem_size_of are apparently near duplicates that can be DRYed
-  token_value in lexer.aipl should leverage more having multiple arms to same value
   use val.method() syntax a _lot_ more. Any time a function could be interpreted as a verb.
-  why does quoted use str literals instead of char literals?
   trailing_trivia should be a filter map
   line_at.aipl should use doc comments
   caret_block.aipl should use doc comments
@@ -251,7 +247,6 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
-  formatter can rewrite single line triple quote strings to one line
   my new pattern walker laid out a constructor's payload with comma_list_docs, which breaks long lists across lines with a trailing comma — and the pattern grammar takes no trailing comma, so aipl fmt rewrote three compiler sources (Let(\n name,\n …,\n) =>) into something that no longer parsed. <--- the formatter should decide whether to output a trailing comma based on the grammer definition. Why isn't it doing that?
   variant_case_docs.aipl is weird: having the leading | should force splitting each onto own line
   wrap comments
