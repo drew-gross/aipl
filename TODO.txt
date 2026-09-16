@@ -321,7 +321,6 @@ lint:
     whose spans are exact. Predates the return-form arm; both arms have it.
   self[end].value_or(' ') == '.' should be self[end] == some('.')
   for (let x : xs) { if (p(x)) { set out.push(f(x)) } } should lint to a filter->map
-  lint against char/str literals directly in templates e.g. `a: {'a'}` or `aa: {"aa"}`
   lint against set literals that contain duplicates
   set out = [..out, o]; should lint to set out.push(a);
   we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway

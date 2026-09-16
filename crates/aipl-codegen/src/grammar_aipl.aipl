@@ -4290,15 +4290,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1923403
-deallocations: 1923403
+allocations: 1923385
+deallocations: 1923385
 reallocations: 252681
-bytes allocated: 321700677
-instructions executed: 485073783
-binary size: 4960056
-  code: 3248644
+bytes allocated: 321699093
+instructions executed: 483743823
+binary size: 4958360
+  code: 3247460
   data: 48636
-  metadata: 1662776
+  metadata: 1662264
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -4899,7 +4899,7 @@ functions:
     bytes: 2992
   __m29__error_at$__m21__AiplTok$__m1__Ast:
     calls: 38
-    bytes: 4784
+    bytes: 4180
   __m29__far_miss:
     calls: 31591
     bytes: 1080
@@ -4938,7 +4938,7 @@ functions:
     bytes: 4136
   __m29__match_rule$__m21__AiplTok$__m1__Ast:
     calls: 98444
-    bytes: 14824
+    bytes: 14516
   __m29__match_sep$__m21__AiplTok$__m1__Ast:
     calls: 842
     bytes: 952
@@ -4965,7 +4965,7 @@ functions:
     bytes: 44
   __m29__rule_labels$__m21__AiplTok$__m1__Ast$tail:
     calls: 20034
-    bytes: 21388
+    bytes: 21116
   __m29__rule_nullable$__m21__AiplTok:
     calls: 0
     bytes: 36

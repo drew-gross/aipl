@@ -276,15 +276,15 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 6712
-deallocations: 6712
+allocations: 6710
+deallocations: 6710
 reallocations: 942
-bytes allocated: 623214
-instructions executed: 1470978
-binary size: 393728
-  code: 258312
+bytes allocated: 623038
+instructions executed: 1469218
+binary size: 392496
+  code: 257464
   data: 4892
-  metadata: 130524
+  metadata: 130140
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -519,7 +519,7 @@ functions:
     bytes: 2992
   __m13__error_at$SexpKind$__m15__Sexp:
     calls: 4
-    bytes: 3624
+    bytes: 3048
   __m13__far_miss:
     calls: 160
     bytes: 1080
@@ -558,7 +558,7 @@ functions:
     bytes: 4136
   __m13__match_rule$SexpKind$__m15__Sexp:
     calls: 673
-    bytes: 6360
+    bytes: 6088
   __m13__match_sep$SexpKind$__m15__Sexp:
     calls: 75
     bytes: 952

@@ -607,6 +607,7 @@ case_tests! {
     cases_strings_str_as_param = "cases/strings/str_as_param",
     cases_strings_str_can_be_returned = "cases/strings/str_can_be_returned",
     cases_strings_str_passes_through_multiple_calls = "cases/strings/str_passes_through_multiple_calls",
+    cases_strings_template_escapes = "cases/strings/template_escapes",
     cases_strings_template_lit = "cases/strings/template_lit",
     cases_strings_template_triple_lit = "cases/strings/template_triple_lit",
     cases_strings_to_str_scalars = "cases/strings/to_str_scalars",

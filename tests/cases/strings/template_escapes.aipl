@@ -1,0 +1,37 @@
+import { print } from builtins;
+
+// A single-backtick template decodes the same escapes a `"..."` string does,
+// plus its own delimiter and braces: `` \` `` is a backtick in the text, and
+// `\{` / `\}` are braces that open no interpolation. So a template can quote
+// its interpolation in backticks — `` `\`{s}\`` `` — without leaving the form.
+//
+// The raw ```` ```...``` ```` form decodes only the braces: a lone backtick is
+// content there anyway (only a triple closes it), and a backslash is content
+// too, so `` \` `` reads back as written.
+fn main() !prints {
+    let s = "abc";
+    print(`\`{s}\``);
+    print(`\{{s}\}`);
+    print(`a \\ b \n c`);
+    print(```\`{s}\` and \{raw\}```);
+}
+--- stdout ---
+`abc`
+{abc}
+a \ b 
+ c
+\`abc\` and \
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 528
+instructions executed: 85
+binary size: 1432
+  code: 620
+  data: 1
+  metadata: 811
+functions:
+  main:
+    calls: 1
+    bytes: 620
