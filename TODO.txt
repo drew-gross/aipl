@@ -74,6 +74,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  Span through should be a builtin
   no_kinds doesn't need to exist; pass a literal
   json_char should be a match, and should just put the backslashes into the str rather than making a var
   in match_expr, let inner = arms.docs.map(|a: Doc| [HardLine, a]).join(); should be an interspere or a join-with-sep include leading or something.
@@ -441,7 +442,6 @@ optimizations:
     fuse sequential extends
     map(f).map(g) should fuse to map(f(g))
     map(f).to_set() should fuse
-    map/join should fuse to map_join
     filter/find.
     depth in grammar_sexp can be xs.map(depth).maximum() + 1 and fuse to map_max
     fusions should work if there are unrelated operations in between (use a dep graph?)

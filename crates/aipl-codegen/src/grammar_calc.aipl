@@ -471,8 +471,8 @@ deallocations: 12869
 reallocations: 2085
 bytes allocated: 1219393
 instructions executed: 2594725
-binary size: 409872
-  code: 267924
+binary size: 410080
+  code: 268132
   data: 6044
   metadata: 135904
 functions:
@@ -787,7 +787,7 @@ functions:
     bytes: 636
   __m1__first_leaf:
     calls: 4
-    bytes: 696
+    bytes: 788
   __m1__flat_kids:
     calls: 0
     bytes: 32
@@ -796,7 +796,7 @@ functions:
     bytes: 1104
   __m1__last_leaf:
     calls: 4
-    bytes: 696
+    bytes: 796
   __m1__leaves:
     calls: 0
     bytes: 32
@@ -814,7 +814,7 @@ functions:
     bytes: 2968
   __m1__span:
     calls: 2
-    bytes: 236
+    bytes: 252
   __m1__token_leaves:
     calls: 0
     bytes: 32

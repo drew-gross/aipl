@@ -98,10 +98,21 @@ pub fn token_leaves(self: Cst) -> Span[] {
 # tree. These two descend one edge at a time and stop at the first token.
 pub fn token_span(self: Cst) -> Span? {
     match (self.first_token(), self.last_token()) {
-        (some(f), some(l)) => some(f.start..l.end),
+        (some(f), some(l)) => some(f.through(l)),
         _ => none,
     }
 }
+
+# The span from `self`'s start through the other span's end — what two ends
+# of a node, a first leaf and a last, cover between them. Nothing is checked
+# about the order: a second span that ends before `self` starts gives a span
+# that ends before it starts, exactly as `a.start..b.end` spelled out would.
+fn through(self: Span, Span { end }) -> Span { self.start..end }.test({
+    assert((1..3).through(5..9) == 1..9);
+    // The ends are all that matter: overlapping or nested spans read the same way.
+    assert((1..8).through(2..4) == 1..4);
+    assert((2..2).through(2..2) == 2..2);
+})
 
 # The leftmost token span under `self`, or `none` if it holds none. A group's
 # three parts are asked left to right; the first that holds a token answers.
@@ -159,50 +170,48 @@ pub fn token_text(self: Cst, src: str) -> str { self.token_leaves().map(|sp| src
 # per statement, so on the largest compiler sources that was most of the
 # lowering's time.
 pub fn span(self: Cst) -> Span {
-    match (self.first_leaf()) {
-        some(f) => match (self.last_leaf()) {
-            some(l) => f.start..l.end,
-            none => f,
-        },
-        none => 0..0,
+    match (self.first_leaf(), self.last_leaf()) {
+        (some(f), some(l)) => f.through(l),
+        _ => 0..0,
     }
 }
 
-# The leftmost leaf span under `self` — a token or trivia — or `none`.
+# The leftmost leaf span under `self` — a token or trivia — or `none`. Laid
+# out like `first_token`: a group's three parts are asked left to right.
 fn first_leaf(self: Cst) -> Span? {
     match (self) {
         Leaf(sp) | Trivia(sp) => some(sp),
-        Tree(_, kids) => first_leaf_of(kids),
-        Group(_, open, body, close) => match (first_leaf_of(open)) {
-            some(sp) => some(sp),
-            none => match (first_leaf_of(body)) {
-                some(sp) => some(sp),
-                none => first_leaf_of(close),
-            },
+        Tree(_, kids) => kids.find_map(first_leaf),
+        Group(_, open, body, close) => {
+            let in_open = open.find_map(first_leaf);
+            let in_body = body.find_map(first_leaf);
+            let in_close = close.find_map(first_leaf);
+            match (in_open, in_body, in_close) {
+                (some(sp), _, _) | (_, some(sp), _) | (_, _, some(sp)) => some(sp),
+                _ => none,
+            }
         },
     }
 }
 
+# The mirror of `first_leaf`. `reverse_find_map` walks by index rather than
+# reversing the list: this runs once per level of a descent, and a reversed
+# view per level would be an allocation per level on the way down.
 fn last_leaf(self: Cst) -> Span? {
     match (self) {
         Leaf(sp) | Trivia(sp) => some(sp),
-        Tree(_, kids) => last_leaf_of(kids),
-        Group(_, open, body, close) => match (last_leaf_of(close)) {
-            some(sp) => some(sp),
-            none => match (last_leaf_of(body)) {
-                some(sp) => some(sp),
-                none => last_leaf_of(open),
-            },
+        Tree(_, kids) => kids.reverse_find_map(last_leaf),
+        Group(_, open, body, close) => {
+            let in_open = open.reverse_find_map(last_leaf);
+            let in_body = body.reverse_find_map(last_leaf);
+            let in_close = close.reverse_find_map(last_leaf);
+            match (in_open, in_body, in_close) {
+                (_, _, some(sp)) | (_, some(sp), _) | (some(sp), _, _) => some(sp),
+                _ => none,
+            }
         },
     }
 }
-
-fn first_leaf_of(ks: Cst[]) -> Span? { ks.find_map(first_leaf) }
-
-# From the other end. `reverse_find_map` walks by index rather than reversing
-# the list: this runs once per level of a descent, and a reversed view per
-# level would be an allocation per level on the way down.
-fn last_leaf_of(ks: Cst[]) -> Span? { ks.reverse_find_map(last_leaf) }
 
 # The interior children of `self` — its kids with the leaves dropped. This is
 # the child list a production's `build` is lowered against, so its order and
@@ -420,15 +429,15 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 359
-deallocations: 359
+allocations: 362
+deallocations: 362
 reallocations: 33
-bytes allocated: 21382
-instructions executed: 43498
-binary size: 57608
-  code: 34852
-  data: 2549
-  metadata: 20207
+bytes allocated: 21526
+instructions executed: 43959
+binary size: 58752
+  code: 35516
+  data: 2717
+  metadata: 20519
 functions:
   __arr_drop_Cst:
     calls: 138
@@ -461,7 +470,7 @@ functions:
     calls: 12
     bytes: 1028
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_leaf:
-    calls: 6
+    calls: 9
     bytes: 440
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_token:
     calls: 2
@@ -473,7 +482,7 @@ functions:
     calls: 11
     bytes: 300
   __eq___builtin_Span:
-    calls: 34
+    calls: 37
     bytes: 104
   __eq___builtin_Span$arr:
     calls: 4
@@ -484,23 +493,26 @@ functions:
   __test$show:
     calls: 1
     bytes: 13468
+  __test$through:
+    calls: 1
+    bytes: 388
   aipl_arr_elem_ptr:
-    calls: 9
+    calls: 12
     bytes: (external)
   aipl_arr_extend:
     calls: 236
     bytes: (external)
   aipl_arr_inc:
-    calls: 775
+    calls: 779
     bytes: (external)
   aipl_arr_reserve:
     calls: 318
     bytes: (external)
   aipl_arr_reverse:
-    calls: 8
+    calls: 11
     bytes: (external)
   aipl_array_dec:
-    calls: 1398
+    calls: 1405
     bytes: (external)
   aipl_array_new:
     calls: 149
@@ -512,29 +524,29 @@ functions:
     calls: 16
     bytes: (external)
   aipl_assert:
-    calls: 40
+    calls: 43
     bytes: (external)
   aipl_rec_alloc:
     calls: 61
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 573
+    calls: 576
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 512
+    calls: 515
     bytes: (external)
   aipl_test_begin:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_end:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   first_leaf:
     calls: 12
-    bytes: 696
+    bytes: 788
   first_token:
     calls: 7
     bytes: 760
@@ -545,8 +557,8 @@ functions:
     calls: 20
     bytes: 1104
   last_leaf:
-    calls: 12
-    bytes: 696
+    calls: 15
+    bytes: 796
   last_token:
     calls: 5
     bytes: 768
@@ -558,7 +570,7 @@ functions:
     bytes: 1232
   main:
     calls: 1
-    bytes: 100
+    bytes: 168
   nodes$filter1$own0:
     calls: 7
     bytes: 368
@@ -570,7 +582,7 @@ functions:
     bytes: 2968
   span:
     calls: 7
-    bytes: 236
+    bytes: 252
   text:
     calls: 5
     bytes: 1456

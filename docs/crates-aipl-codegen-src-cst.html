@@ -218,6 +218,20 @@
         <p class="note">Not importable from another file.</p>
 
 
+        <section class="item" id="item-through">
+          <h3>
+            <a class="anchor" href="#item-through">through</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn through(self: Span, __spat$5016: Span) -&#62; Span</code></pre>
+
+          <div class="doc"><p>The span from <code>self</code>'s start through the other span's end — what two ends of a node, a first leaf and a last, cover between them. Nothing is checked about the order: a second span that ends before <code>self</code> starts gives a span that ends before it starts, exactly as <code>a.start..b.end</code> spelled out would.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-first_token">
           <h3>
             <a class="anchor" href="#item-first_token">first_token</a>
@@ -253,7 +267,7 @@
           </h3>
           <pre class="signature"><code>fn first_leaf(self: Cst) -&#62; Span?</code></pre>
 
-          <div class="doc"><p>The leftmost leaf span under <code>self</code> — a token or trivia — or <code>none</code>.</p></div>
+          <div class="doc"><p>The leftmost leaf span under <code>self</code> — a token or trivia — or <code>none</code>. Laid out like <code>first_token</code>: a group's three parts are asked left to right.</p></div>
 
 
         </section>
@@ -267,35 +281,7 @@
           </h3>
           <pre class="signature"><code>fn last_leaf(self: Cst) -&#62; Span?</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-first_leaf_of">
-          <h3>
-            <a class="anchor" href="#item-first_leaf_of">first_leaf_of</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn first_leaf_of(ks: Cst[]) -&#62; Span?</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-last_leaf_of">
-          <h3>
-            <a class="anchor" href="#item-last_leaf_of">last_leaf_of</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn last_leaf_of(ks: Cst[]) -&#62; Span?</code></pre>
-
-          <div class="doc"><p>From the other end. <code>reverse_find_map</code> walks by index rather than reversing the list: this runs once per level of a descent, and a reversed view per level would be an allocation per level on the way down.</p></div>
+          <div class="doc"><p>The mirror of <code>first_leaf</code>. <code>reverse_find_map</code> walks by index rather than reversing the list: this runs once per level of a descent, and a reversed view per level would be an allocation per level on the way down.</p></div>
 
 
         </section>
