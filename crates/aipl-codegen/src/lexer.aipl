@@ -1521,11 +1521,11 @@ allocations: 434
 deallocations: 434
 reallocations: 71
 bytes allocated: 67520
-instructions executed: 373975
-binary size: 2538512
-  code: 1699004
+instructions executed: 373661
+binary size: 2537288
+  code: 1698100
   data: 11788
-  metadata: 827720
+  metadata: 827400
 functions:
   __arr_drop_StepResult$Kind:
     calls: 9
@@ -1676,7 +1676,7 @@ functions:
     bytes: 96
   __test$span_str:
     calls: 1
-    bytes: 3152
+    bytes: 2248
   __test_try_fail_LexError:
     calls: 0
     bytes: 84

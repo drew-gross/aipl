@@ -3973,14 +3973,19 @@ fn compile_program<M: Module>(
     // caller before a binding can be moved into one of its arms.
     let program =
         aipl_mono::inline_small_post_mono(&program, inline_max_exprs(), &externally_called);
-    // Push each `?` and each `match` on an optional/result into the
-    // constructor-ending branches under it, so an inlined
-    // `value_or_err`/`value_or`/`map_ok`/… hands its payload straight out
-    // instead of building a value the eliminator immediately takes apart.
-    // After inlining, which is what puts the constructors under the
-    // eliminator; before sinking, so the error a `none` arm now builds itself
-    // is what the sinker moves in.
-    let program = aipl_mono::eliminate_known_constructors_post_mono(&program, inline_max_exprs());
+    // Push each `?`, each `match` on an optional/result/variant, and each
+    // field access on a struct into the constructor-ending branches under it,
+    // so an inlined `value_or_err`/`value_or`/`map_ok`/… — or a small function
+    // that builds what its caller immediately takes apart — hands its payload
+    // straight out instead of building a value the eliminator undoes. After
+    // inlining, which is what puts the constructors under the eliminator;
+    // before sinking, so the error a `none` arm now builds itself is what the
+    // sinker moves in.
+    let program = aipl_mono::eliminate_known_constructors_post_mono(
+        &program,
+        inline_max_exprs(),
+        &aipl_mono::effectful_fns(&check_program.items),
+    );
     // Sink again over the monomorphized program: mono instantiates the
     // AIPL-implemented builtins the pre-mono run could not see, and post-mono
     // inlining folds each lifted lambda and single-use instance into its caller

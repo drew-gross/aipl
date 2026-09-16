@@ -45,18 +45,18 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 88
-instructions executed: 205
-binary size: 2824
-  code: 1012
+instructions executed: 191
+binary size: 2752
+  code: 972
   data: 272
-  metadata: 1540
+  metadata: 1508
 functions:
   __test$heap_field:
     calls: 1
-    bytes: 240
+    bytes: 220
   __test$scalar_field:
     calls: 1
-    bytes: 444
+    bytes: 424
   aipl_assert:
     calls: 5
     bytes: (external)

@@ -44,11 +44,11 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 144
-instructions executed: 552
-binary size: 4152
-  code: 1692
+instructions executed: 545
+binary size: 4112
+  code: 1672
   data: 369
-  metadata: 2091
+  metadata: 2071
 functions:
   __eq_i64$arr:
     calls: 1
@@ -61,7 +61,7 @@ functions:
     bytes: 132
   __test$probe:
     calls: 1
-    bytes: 444
+    bytes: 424
   __test$probe$lambda0:
     calls: 1
     bytes: 8

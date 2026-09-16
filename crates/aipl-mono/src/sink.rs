@@ -112,6 +112,29 @@ pub(crate) fn undeferrable_fns(program: &Program, effectful: &HashSet<String>) -
     close_over_calls(&bodies, effectful)
 }
 
+/// [`undeferrable_fns`] over a monomorphized program: the same closure, seeded
+/// with `builtin_effects` (the declarations under their pre-mono names — see
+/// [`sink_bindings_post_mono`]) plus every instance that declares an effect.
+pub(crate) fn undeferrable_fns_post_mono(
+    program: &MonoProgram,
+    builtin_effects: &HashSet<String>,
+) -> HashSet<String> {
+    let mut effectful = builtin_effects.clone();
+    effectful.extend(
+        program
+            .fns
+            .iter()
+            .filter(|f| !f.effects.is_empty())
+            .map(|f| f.name.clone()),
+    );
+    let bodies: Vec<(&str, &Expr)> = program
+        .fns
+        .iter()
+        .map(|f| (f.name.as_str(), &f.body))
+        .collect();
+    close_over_calls(&bodies, &effectful)
+}
+
 /// [`undeferrable_fns`]'s fixpoint, over whichever `(name, body)` pairs the
 /// caller has — source items before monomorphization, concrete instances after.
 fn close_over_calls(bodies: &[(&str, &Expr)], effectful: &HashSet<String>) -> HashSet<String> {
@@ -313,20 +336,7 @@ pub fn sink_bindings_post_mono(
     program: &MonoProgram,
     builtin_effects: &HashSet<String>,
 ) -> MonoProgram {
-    let mut effectful = builtin_effects.clone();
-    effectful.extend(
-        program
-            .fns
-            .iter()
-            .filter(|f| !f.effects.is_empty())
-            .map(|f| f.name.clone()),
-    );
-    let bodies: Vec<(&str, &Expr)> = program
-        .fns
-        .iter()
-        .map(|f| (f.name.as_str(), &f.body))
-        .collect();
-    let blocked = close_over_calls(&bodies, &effectful);
+    let blocked = undeferrable_fns_post_mono(program, builtin_effects);
     MonoProgram {
         fns: program
             .fns
