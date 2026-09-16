@@ -75,7 +75,6 @@ highlighter:
 
 misc cleanup:
   Span through should be a builtin
-  no_kinds doesn't need to exist; pass a literal
   json_char should be a match, and should just put the backslashes into the str rather than making a var
   in match_expr, let inner = arms.docs.map(|a: Doc| [HardLine, a]).join(); should be an interspere or a join-with-sep include leading or something.
   tm_json test has a multiline literal concatenated with a newline literal which is weird, it should be possible to have a trailing newline in a multiline str literal.
