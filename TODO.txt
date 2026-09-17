@@ -519,6 +519,11 @@ optimizations:
 effects:
   all effects should be shimmable actually
 
+array/str unification:
+  turn arrays into fat values
+  allocator seam (rt_alloc/rt_free vs std::alloc) is abstracted the way str24 already does it.
+  Both allocation-and-traffic layers (JIT lib.rs, AOT aipl_runtime.rs) still mirror each other by hand function-for-function
+
 to_str:
   accept some keyword args for things like indent, max witdth, ultimately forward to walker
 

@@ -356,6 +356,13 @@ mod str24 {
     include!("../../aipl-codegen/src/str24.rs");
 }
 
+// The array layout — block, representation tags, view blocks — shared the
+// same way and for the same reason; see the file's own header.
+mod array_layout {
+    include!("../../aipl-codegen/src/array_layout.rs");
+}
+use array_layout::*;
+
 #[inline]
 unsafe fn rt_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     // Tallied separately from alloc/free: an in-place grow reuses an existing
@@ -1870,62 +1877,12 @@ const ITER_SCRATCH: usize = 48;
 
 // ---------- Refcounted array runtime ----------
 //
-// Layout mirrors the JIT runtime in `src/codegen.rs`:
-//   [refcount: i64][len: i64][cap: i64][drop_fn: ptr][elem0: i64]...
-// The data pointer points at the `len` field; element i is at
-// `ptr + ARR_ELEMS_OFFSET + i*8`. `cap` is the number of element slots the
-// block was allocated for (>= len); spare capacity lets `aipl_array_push_mut`
-// append without reallocating. `drop_fn` is null for scalar elements; for heap
-// elements (`str`, nested arrays) it releases each element at refcount zero and
-// marks the elements as heap pointers for `push`.
+// The block, the representation tags and the view blocks are `array_layout`
+// (shared verbatim with the JIT runtime); this is the AOT side's allocation,
+// accounting and element traffic over that layout, mirroring the JIT
+// runtime's function for function.
 
 type ArrDropFn = extern "C" fn(*const u8, i64);
-
-const ARR_CAP_OFFSET: usize = 8; // capacity of the element region, in *bytes*
-const ARR_DROPFN_OFFSET: usize = 16; // element drop-fn pointer (null = scalars)
-const ARR_ELEMS_OFFSET: usize = 24; // first element, relative to data ptr
-
-// Array representation tag bits (stored in the low 2 bits of the data pointer,
-// which are free since arrays are 8-byte aligned). Mirrors the JIT runtime:
-// `0b00` a heap block, `0b01` a reversed view, `0b10` a slice view — a window
-// into an inner array, the array's counterpart of a `str`'s buffer window.
-const ARR_TAG_MASK: usize = 0b11;
-const ARR_HEAP_TAG: usize = 0b00;
-const ARR_REV_TAG: usize = 0b01;
-const ARR_SLICE_TAG: usize = 0b10;
-
-// View block layout (relative to the data pointer, after HEADER_SIZE). A
-// reversed view is `REV_BLOCK_DATA_SIZE` bytes and a slice view
-// `SLICE_BLOCK_DATA_SIZE` (one more word, the window's start); each is tagged
-// with its own tag.
-const REV_LEN_OFFSET: usize = 0; // mirrors ARR_LEN_OFFSET; len of the view
-const REV_INNER_OFFSET: usize = 8; // pointer to the inner (any repr) array
-const REV_DROP_OFFSET: usize = 16; // element drop_fn (i64)
-const REV_RETAIN_OFFSET: usize = 24; // element retain_fn (i64)
-const REV_ELEMSIZE_OFFSET: usize = 32; // element stride (i64); 0 = bit-packed
-const SLICE_START_OFFSET: usize = 40; // slice view only: first element's index in inner
-const REV_BLOCK_DATA_SIZE: usize = 40;
-const SLICE_BLOCK_DATA_SIZE: usize = 48;
-
-#[derive(Clone, Copy)]
-enum ArrRepr {
-    Heap,
-    Reversed,
-    Sliced,
-}
-
-fn arr_repr(ptr: *const u8) -> ArrRepr {
-    match ptr as usize & ARR_TAG_MASK {
-        ARR_HEAP_TAG => ArrRepr::Heap,
-        ARR_REV_TAG => ArrRepr::Reversed,
-        ARR_SLICE_TAG => ArrRepr::Sliced,
-        tag => panic!("unknown array repr tag {tag}"),
-    }
-}
-
-fn arr_untag(ptr: *const u8) -> *const u8 {
-    (ptr as usize & !ARR_TAG_MASK) as *const u8
-}
 
 /// Allocate a reversed-view block.  Transfers ownership of `inner` into
 /// the view (no drop, no retain on `inner`).  Returns data_ptr | ARR_REV_TAG.
@@ -1943,7 +1900,7 @@ unsafe fn alloc_reversed_view(
         }
         *(raw as *mut i64) = 1; // refcount
         let data = raw.add(HEADER_SIZE);
-        *(data.add(REV_LEN_OFFSET) as *mut i64) = len as i64;
+        *(data.add(ARR_LEN_OFFSET) as *mut i64) = len as i64;
         *(data.add(REV_INNER_OFFSET) as *mut *const u8) = inner;
         *(data.add(REV_DROP_OFFSET) as *mut i64) = drop_fn;
         *(data.add(REV_RETAIN_OFFSET) as *mut i64) = retain_fn;
@@ -1970,7 +1927,7 @@ unsafe fn alloc_slice_view(
         }
         *(raw as *mut i64) = 1; // refcount
         let data = raw.add(HEADER_SIZE);
-        *(data.add(REV_LEN_OFFSET) as *mut i64) = len as i64;
+        *(data.add(ARR_LEN_OFFSET) as *mut i64) = len as i64;
         *(data.add(REV_INNER_OFFSET) as *mut *const u8) = inner;
         *(data.add(REV_DROP_OFFSET) as *mut i64) = drop_fn;
         *(data.add(REV_RETAIN_OFFSET) as *mut i64) = retain_fn;
@@ -2091,7 +2048,7 @@ fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
                     *(u.add(REV_RETAIN_OFFSET) as *const i64),
                     *(u.add(REV_ELEMSIZE_OFFSET) as *const i64),
                     *(u.add(SLICE_START_OFFSET) as *const i64) as usize,
-                    *(u.add(REV_LEN_OFFSET) as *const i64) as usize,
+                    *(u.add(ARR_LEN_OFFSET) as *const i64) as usize,
                 )
             };
             let heap = unsafe { do_arr_slice_copy(inner, start, len, drop_fn, retain_fn, elem_size) };
@@ -2163,21 +2120,6 @@ unsafe fn elem_rc(fn_ptr: i64, at: *const u8, count: usize) {
     if fn_ptr != 0 {
         let f: ArrDropFn = unsafe { core::mem::transmute(fn_ptr) };
         f(at, count as i64);
-    }
-}
-
-// `bool[]` is bit-packed (8 elements per byte). Codegen signals it with an
-// `elem_size` of 0; `len` still counts elements, `cap` (bytes) is `ceil(len/8)`.
-const ELEM_BITPACKED: i64 = 0;
-
-/// Bytes to hold `count` elements: `ceil(count/8)` bit-packed, else
-/// `count * elem_size` (8-byte floor).
-fn cap_bytes_for(elem_size: i64, count: usize) -> usize {
-    if elem_size == ELEM_BITPACKED {
-        (count + 7) / 8
-    } else {
-        let es = if elem_size < 8 { 8 } else { elem_size as usize };
-        count * es
     }
 }
 

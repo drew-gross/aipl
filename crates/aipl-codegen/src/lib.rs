@@ -25,6 +25,10 @@ pub mod ffi_ast;
 mod str24;
 mod str24_host;
 
+// The array layout — block, representation tags, view blocks — shared with
+// the AOT runtime the same way; see the file's own header.
+mod array_layout;
+
 /// Allocation for the shared `str` layout. Each runtime supplies its own, so
 /// each keeps its own accounting: this side forwards to libc, and the AOT copy
 /// tallies counts and bytes for `--- performance ---` under
@@ -841,27 +845,17 @@ fn iter_state_size() -> u32 {
 
 // ---------- Refcounted array runtime ----------
 //
-// An array is a refcounted heap block laid out as:
-//   [refcount: i64][len: i64][drop_fn: ptr][elem0: i64][elem1: i64]...
-// The pointer the language holds points at the `len` field (so `ptr - 8`
-// is the refcount, sharing the inc/dec protocol with strings). Elements are
-// 8 bytes each (a scalar, or a heap pointer for `str`/array elements);
-// element i lives at `ptr + ARR_ELEMS_OFFSET + i*8`. Arrays are never
-// static, so refcounts always start at 1.
-//
-// `drop_fn` is null for arrays of plain scalars (i64/bool/char). For arrays
-// whose elements are themselves heap-managed (`str`, or a nested array) it
-// points at a runtime helper (`aipl_arr_drop_str` / `aipl_arr_drop_arr`)
-// that releases each element before the block is freed. A non-null `drop_fn`
-// also marks the elements as heap pointers, so `push` knows to retain the
-// copies it makes.
+// The block, the representation tags and the view blocks are `array_layout`
+// (shared verbatim with the AOT runtime); this is the JIT side's allocation,
+// accounting and element traffic over that layout. Elements are 8 bytes each
+// (a scalar, or a heap pointer for `str`/array elements) unless the element
+// type is composite or bit-packed; element i of a heap block lives at
+// `ptr + ARR_ELEMS_OFFSET + i*stride`. The drop helpers a block records are
+// `aipl_arr_drop_str` / `aipl_arr_drop_arr` and friends below.
+
+use array_layout::*;
 
 type ArrDropFn = extern "C" fn(*const u8, i64);
-
-const ARR_LEN_OFFSET: usize = 0; // length, in elements
-const ARR_CAP_OFFSET: usize = 8; // capacity of the element region, in *bytes*
-const ARR_DROPFN_OFFSET: usize = 16; // element drop-fn pointer (null = scalars)
-const ARR_ELEMS_OFFSET: usize = 24; // first element, relative to data pointer
 
 // Element size is *not* stored in the header — it's known at compile time, so
 // codegen passes it to the array runtime fns as a constant. The header keeps the
@@ -872,69 +866,6 @@ const ARR_ELEMS_OFFSET: usize = 24; // first element, relative to data pointer
 
 fn array_block_size(cap_bytes: usize) -> usize {
     HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes
-}
-
-// ---------- Array representation tags ----------
-//
-// Arrays are 8-byte aligned, so the two low bits of every array pointer are
-// always 0 for a heap array.  We steal those bits (exactly as the string system
-// does) to encode the runtime representation:
-//
-//   0b00  Heap   — the existing heap-allocated array block
-//   0b01  Rev    — a thin reversed-view wrapper around an inner array
-//   0b10  Slice  — a window `[offset, offset + len)` into an inner array
-//
-// Every place that uses an array pointer as a memory base must strip the tag
-// first (`arr_untag`).  The classify-once / match-everywhere pattern mirrors
-// `str_repr` / `StrRepr` in the string system — and the slice view is the
-// array's counterpart of a `str`'s buffer window: `xs[a..b]` shares the
-// source's elements instead of copying them, exactly as `s[a..b]` shares the
-// source's bytes, and is materialized to a block of its own only when
-// something needs to write into it (`aipl_arr_ensure_heap`, which every
-// mutating entry point goes through).
-const ARR_TAG_MASK: usize = 0b11;
-const ARR_HEAP_TAG: usize = 0b00;
-const ARR_REV_TAG: usize = 0b01;
-const ARR_SLICE_TAG: usize = 0b10;
-
-// View block layout (data ptr is the block base + HEADER_SIZE, tagged with the
-// view's tag).  Stores everything needed to iterate and to materialize:
-//   [ARR_LEN_OFFSET  = 0] len       — element count (same field as heap array)
-//   [REV_INNER_OFFSET= 8] inner_ptr — tagged pointer to the wrapped inner array
-//   [REV_DROP_OFFSET =16] drop_fn   — element drop fn (for materialization)
-//   [REV_RETAIN_OFFSET=24] retain_fn — element retain fn
-//   [REV_ELEMSIZE_OFFSET=32] elem_size — runtime elem size
-//   [SLICE_START_OFFSET=40] start   — slice view only: the window's first
-//                                     element, as an index into `inner`
-// A reversed view is HEADER_SIZE + 40 bytes; a slice view HEADER_SIZE + 48.
-const REV_INNER_OFFSET: usize = 8;
-const REV_DROP_OFFSET: usize = 16;
-const REV_RETAIN_OFFSET: usize = 24;
-const REV_ELEMSIZE_OFFSET: usize = 32;
-const SLICE_START_OFFSET: usize = 40;
-const REV_BLOCK_DATA_SIZE: usize = 40; // bytes after the refcount header
-const SLICE_BLOCK_DATA_SIZE: usize = 48;
-
-#[derive(Clone, Copy)]
-enum ArrRepr {
-    Heap,
-    Reversed,
-    Sliced,
-}
-
-fn arr_repr(ptr: *const u8) -> ArrRepr {
-    match ptr as usize & ARR_TAG_MASK {
-        ARR_HEAP_TAG => ArrRepr::Heap,
-        ARR_REV_TAG => ArrRepr::Reversed,
-        ARR_SLICE_TAG => ArrRepr::Sliced,
-        tag => unreachable!("unknown array repr tag {tag}"),
-    }
-}
-
-/// Strip the representation tag from an array pointer, returning the actual
-/// block base address.
-fn arr_untag(ptr: *const u8) -> *const u8 {
-    (ptr as usize & !ARR_TAG_MASK) as *const u8
 }
 
 /// Allocate a reversed-view block wrapping `inner` (tagged).  Steals the
@@ -1177,23 +1108,6 @@ unsafe fn arr_load_bit(a: *const u8, idx: usize) -> bool {
             let start = unsafe { std::ptr::read(u.add(SLICE_START_OFFSET) as *const i64) as usize };
             unsafe { arr_load_bit(inner, start + idx) }
         }
-    }
-}
-
-// `bool[]` is bit-packed (8 elements per byte, like `std::vector<bool>` but with
-// the ordinary array interface). It's signalled by an `elem_size` of 0 passed
-// from codegen — the one sentinel that means "bit-packed" rather than a byte
-// stride. `len` still counts elements; `cap` (bytes) holds `ceil(len/8)`. Bits
-// past `len` are never read, so they need not be cleared.
-const ELEM_BITPACKED: i64 = 0;
-
-/// Bytes needed to hold `count` elements: `ceil(count/8)` when bit-packed
-/// (`elem_size == 0`), else `count * elem_size` (with the historic 8-byte floor).
-fn cap_bytes_for(elem_size: i64, count: usize) -> usize {
-    if elem_size == ELEM_BITPACKED {
-        count.div_ceil(8)
-    } else {
-        count * (elem_size.max(8) as usize)
     }
 }
 

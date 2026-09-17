@@ -10,6 +10,7 @@ fn main() {
     println!("cargo:rerun-if-changed=runtime/aipl_runtime.rs");
     // The runtime includes the shared `str` layout verbatim (see `str24`).
     println!("cargo:rerun-if-changed=../aipl-codegen/src/str24.rs");
+    println!("cargo:rerun-if-changed=../aipl-codegen/src/array_layout.rs");
     println!("cargo:rerun-if-changed=build.rs");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
