@@ -1,0 +1,61 @@
+import { print, to_str, wrapping_add as + } from builtins;
+
+// The two struct-literal lints, reported in one run. Lints are ordinary errors
+// — they fail the compile — but unlike a type error they are *independent
+// findings*: nothing has to be recovered from to keep looking, so the pass
+// collects them all and reports the set, which is what lets one file show
+// several at once.
+
+struct Point { x: i64, y: i64 }
+
+// `x: x` — a field initialized with the identifier of the same name has the
+// shorthand spelling `Point { x }`. The body also names `Point` twice, so this
+// one line trips two lints at once.
+fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+
+struct Tag { id: i64 }
+
+// `fn f() -> T { T { .. } }` — a body that is a literal of the function's own
+// return type spells that type twice; the body shorthand drops the repeat.
+fn tag(id: i64) -> Tag { Tag { id: id + 0 } }
+
+// The lone-*shorthand*-field case earns its own message, since the replacement
+// is `{ id, }` and that trailing comma is what keeps the body a struct literal
+// instead of a block whose value is `id`.
+fn tag_short(id: i64) -> Tag { Tag { id } }
+
+fn main() !prints {
+    print(make(1, 2).x.to_str());
+    print(tag(1).id.to_str());
+    print(tag_short(2).id.to_str());
+}
+--- errors ---
+error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_struct_literals.aipl:14:47
+   |
+14 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+   |                                               ^
+
+error: field "y" is set to the identifier of the same name — use the shorthand "y" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_struct_literals.aipl:14:53
+   |
+14 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+   |                                                     ^
+
+error: fn "make" returns "Point" and its body is a "Point" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_struct_literals.aipl:14:36
+   |
+14 | fn make(x: i64, y: i64) -> Point { Point { x: x, y: y } }
+   |                                    ^^^^^^^^^^^^^^^^^^^^
+
+error: fn "tag" returns "Tag" and its body is a "Tag" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_struct_literals.aipl:20:26
+   |
+20 | fn tag(id: i64) -> Tag { Tag { id: id + 0 } }
+   |                          ^^^^^^^^^^^^^^^^^^
+
+error: fn "tag_short" returns "Tag" and its body is a "Tag" literal, naming the type twice — write the field directly as the body, "{ id, }" — the trailing comma is what keeps it a struct literal rather than a block (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_struct_literals.aipl:25:32
+   |
+25 | fn tag_short(id: i64) -> Tag { Tag { id } }
+   |                                ^^^^^^^^^^

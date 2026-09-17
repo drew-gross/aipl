@@ -1,7 +1,7 @@
 import { equal as == } from builtins;
 
 // `#[allow]` squelches the body-shorthand lint on its line, so this function
-// keeps naming `Point` twice (see err_lints.aipl for the lint itself).
+// keeps naming `Point` twice (see err_struct_literals.aipl for the lint itself).
 struct Point { x: i64, y: i64 }
 
 fn make(a: i64, b: i64) -> Point {

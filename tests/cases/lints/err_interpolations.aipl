@@ -1,0 +1,43 @@
+import { print, to_str } from builtins;
+
+// The two interpolation lints: what a template's `{..}` renders is already
+// text, so wrapping a value in `to_str` or writing a literal there says
+// nothing the template could not say itself.
+
+// `{to_str(n)}` — a `to_str` inside an interpolation, which already renders
+// its value the same way; `{n}` says the same thing. The method spelling is
+// the same call.
+fn labelled(n: i64) -> str { `n = {to_str(n)} ({n.to_str()})` }
+
+// `{'a'}` / `{"aa"}` — a literal as the whole interpolation renders as its
+// text, which the template could have said in place: `` `a: a, aa: aa` ``.
+fn spelled() -> str { `a: {'a'}, aa: {"aa"}` }
+
+fn main() !prints {
+    print(labelled(1));
+    print(spelled());
+}
+--- errors ---
+error: "to_str" inside an interpolation is redundant — the interpolation already renders its value, so write "{n}" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_interpolations.aipl:10:36
+   |
+10 | fn labelled(n: i64) -> str { `n = {to_str(n)} ({n.to_str()})` }
+   |                                    ^^^^^^^^^
+
+error: "to_str" inside an interpolation is redundant — the interpolation already renders its value, so write "{n}" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_interpolations.aipl:10:49
+   |
+10 | fn labelled(n: i64) -> str { `n = {to_str(n)} ({n.to_str()})` }
+   |                                                 ^^^^^^^^^^
+
+error: a char literal interpolated into a template is just its text — write it into the template directly (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_interpolations.aipl:14:28
+   |
+14 | fn spelled() -> str { `a: {'a'}, aa: {"aa"}` }
+   |                            ^^^
+
+error: a string literal interpolated into a template is just its text — write it into the template directly (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_interpolations.aipl:14:39
+   |
+14 | fn spelled() -> str { `a: {'a'}, aa: {"aa"}` }
+   |                                       ^^^^

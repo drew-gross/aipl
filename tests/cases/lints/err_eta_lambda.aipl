@@ -1,0 +1,16 @@
+import { len, map, print, to_str } from builtins;
+
+// `|x| to_str(x)` — a lambda that only forwards its argument to a single call
+// is redundant; pass `to_str` itself. The method form `|x| x.to_str()` is
+// stored as the same free call, so it is covered too.
+fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
+
+fn main() !prints {
+    print(stringify([1]).len().to_str());
+}
+--- errors ---
+error: lambda only forwards its argument(s) to "to_str" — pass "to_str" directly (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_eta_lambda.aipl:6:43
+  |
+6 | fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
+  |                                           ^^^^^^^^^^^^^

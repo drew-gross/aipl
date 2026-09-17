@@ -1,0 +1,35 @@
+import { print, to_str, wrapping_add as +, wrapping_sub as - } from builtins;
+
+// `set x = x + 1;` — an increment written the long way; `set x++;` is the form
+// for it (either operand order counts, so `1 + n` is flagged too).
+fn bump(start: i64) -> i64 {
+    mut n = start;
+    set n = n + 1;
+    n
+}
+
+// The same lint the other way round: `set x--;` is the form for `set x = x - 1;`.
+// Only the receiver-on-the-left order counts here — `1 - n` subtracts `n` from
+// one, which is no decrement at all.
+fn drop_one(start: i64) -> i64 {
+    mut n = start;
+    set n = n - 1;
+    n
+}
+
+fn main() !prints {
+    print(bump(1).to_str());
+    print(drop_one(1).to_str());
+}
+--- errors ---
+error: adding 1 to "n" — use the increment form "set n++;", importing `wrapping_increment as ++` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_step_by_one.aipl:7:9
+  |
+7 |     set n = n + 1;
+  |         ^^^^^^^^^
+
+error: subtracting 1 from "n" — use the decrement form "set n--;", importing `wrapping_decrement as --` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_step_by_one.aipl:16:9
+   |
+16 |     set n = n - 1;
+   |         ^^^^^^^^^

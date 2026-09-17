@@ -1,0 +1,48 @@
+import {
+    greater_than as >,
+    is_empty,
+    len,
+    less_than as <,
+    logical_not as !,
+    print,
+    to_str,
+} from builtins;
+
+// The emptiness lints: a length compared against zero, or an emptiness test
+// negated, is `is_nonempty` — the test named after what it means.
+
+// `0 < xs.len()` / `xs.len() > 0` — a length computed only to be compared
+// against zero; both operand orders are the same idiom.
+fn any_items(xs: i64[]) -> bool { 0 < xs.len() }
+
+// The free-call spelling can't be spliced into the advice (a call-shaped span
+// stops before its parens), so it names the builtin instead of the receiver.
+fn also_any(xs: i64[]) -> bool { len(xs) > 0 }
+
+// `!xs.is_empty()` is the same question through a negation, and goes to the
+// same `is_nonempty`.
+fn not_empty(xs: i64[]) -> bool { !xs.is_empty() }
+
+fn main() !prints {
+    print(any_items([1]).to_str());
+    print(also_any([1]).to_str());
+    print(not_empty([1]).to_str());
+}
+--- errors ---
+error: a length compared against 0 — use "xs.is_nonempty()", importing `is_nonempty` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_emptiness_tests.aipl:16:35
+   |
+16 | fn any_items(xs: i64[]) -> bool { 0 < xs.len() }
+   |                                   ^^^^^^^^^^^^
+
+error: a length compared against 0 — use "is_nonempty" on the receiver, importing `is_nonempty` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_emptiness_tests.aipl:20:34
+   |
+20 | fn also_any(xs: i64[]) -> bool { len(xs) > 0 }
+   |                                  ^^^^^^^^^^^
+
+error: a negated emptiness test — use "xs.is_nonempty()", importing `is_nonempty` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_emptiness_tests.aipl:24:35
+   |
+24 | fn not_empty(xs: i64[]) -> bool { !xs.is_empty() }
+   |                                   ^^^^^^^^^^^^^^

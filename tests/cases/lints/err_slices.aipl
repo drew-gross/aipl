@@ -1,0 +1,64 @@
+import { len, print } from builtins;
+
+// The three slice lints — a bound that says only what the open-ended form
+// already means — and the marker's scope.
+fn main() !prints {
+    let s = "hello, world";
+
+    // `x[y..x.len()]` — the end bound is the receiver's own length, which the
+    // open-ended form already means.
+    print(s[3..s.len()]);
+
+    // The three whole-receiver spellings. Each is `s` already, so each gets the
+    // same one-step advice rather than a rewrite into another slice: the
+    // open-end form with a zero start, the open-start form (whose `0` is
+    // synthesized), and the fully-written one.
+    print(s[0..]);
+    print(s[..s.len()]);
+    print(s[0..s.len()]);
+
+    // `x[0..y]` — the mirror: a literal `0` start is what the open-ended form
+    // already means.
+    print(s[0..2]);
+
+    // `#[allow]` is line-scoped, so a marker on the *neighbouring* line
+    // squelches nothing.
+    #[allow]
+    print(s[4..s.len()]);
+}
+--- errors ---
+error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_slices.aipl:16:13
+   |
+16 |     print(s[0..]);
+   |             ^
+
+error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_slices.aipl:17:15
+   |
+17 |     print(s[..s.len()]);
+   |               ^^^^^^^
+
+error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_slices.aipl:18:13
+   |
+18 |     print(s[0..s.len()]);
+   |             ^
+
+error: slice end is the receiver's whole length — use the open-ended "s[3..]" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_slices.aipl:10:16
+   |
+10 |     print(s[3..s.len()]);
+   |                ^^^^^^^
+
+error: slice end is the receiver's whole length — use the open-ended "s[4..]" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_slices.aipl:27:16
+   |
+27 |     print(s[4..s.len()]);
+   |                ^^^^^^^
+
+error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_slices.aipl:22:13
+   |
+22 |     print(s[0..2]);
+   |             ^

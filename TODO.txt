@@ -325,7 +325,6 @@ lint:
   lint against set literals that contain duplicates
   set out = [..out, o]; should lint to set out.push(a);
   we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway
-  err_lints being all one big file is kinda annoying, lets group by kind
   for (let sub : rs) { if (cond(sub)) return true } else return false => lint require this to return any
   xs.fold(0, +) should be sum probably? I guess with wrapping and saturating variants
   any lint that works on bare assignment should work on field assignment (e.g. lint to use --)
