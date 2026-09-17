@@ -154,12 +154,11 @@ impl Engine {
     /// Verified by `doc_example_call_values` in `tests/ffi.rs`.
     ///
     /// ```ignore
-    /// let src = "import { wrapping_add as +, ==, && } from builtins;\n\
+    /// let src = "import { wrapping_add as +, equal as ==, logical_and as &&, map, value_or } from builtins;\n\
+    ///            fn both_spaces(a: str, b: str, i: i64) -> bool {\n\
+    ///              a[i].map(|x| b[i].map(|y| x == ' ' && y == ' ').value_or(false)).value_or(false) }\n\
     ///            fn go(a: str, b: str, i: i64) -> i64 {\n\
-    ///              match (a[i]) {\n\
-    ///                some(x) => match (b[i]) {\n\
-    ///                  some(y) => if (x == ' ' && y == ' ') { go(a, b, i + 1) } else { i }, none => i },\n\
-    ///                none => i } }\n\
+    ///              if (both_spaces(a, b, i)) { go(a, b, i + 1) } else { i } }\n\
     ///            pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
     /// let engine = aipl::Engine::compile(src)?;
     /// use aipl::FfiValue;

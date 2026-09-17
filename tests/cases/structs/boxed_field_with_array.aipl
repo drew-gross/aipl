@@ -1,9 +1,11 @@
 import {
     equal as ==,
     less_than as <,
+    map,
     not_equal as !=,
     print,
     to_str,
+    value_or,
     wrapping_add as +,
     wrapping_add_assign as +=,
     wrapping_increment as ++,
@@ -45,10 +47,7 @@ fn total(self: Node) -> i64 {
     for (let k : self.kids) {
         set s += k.total();
     }
-    match (self.next) {
-        some(n) => s + n.total(),
-        none => s,
-    }
+    self.next.map(|n| s + n.total()).value_or(s)
 }
 
 fn spine(n: i64) -> Both {

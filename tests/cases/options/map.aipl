@@ -5,12 +5,7 @@ import { equal as ==, map, print, to_str, value_or, wrapping_add as + } from bui
 // the lambda's type. The same `map` as an array's, dispatched on the receiver.
 fn double(n: i64) -> i64 { n + n }
 
-fn describe(o: i64?) -> str {
-    match (o) {
-        some(v) => `some({v})`,
-        none => "none",
-    }
-}
+fn describe(o: i64?) -> str { o.map(|v| `some({v})`).value_or("none") }
 
 fn main() !prints {
     let three: i64? = some(3);
@@ -47,11 +42,11 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 723
-instructions executed: 536
-binary size: 6056
-  code: 3796
+instructions executed: 759
+binary size: 5216
+  code: 3196
   data: 47
-  metadata: 2213
+  metadata: 1973
 functions:
   __to_str_bool:
     calls: 1
@@ -68,6 +63,9 @@ functions:
   aipl_write_i64:
     calls: 5
     bytes: (external)
+  describe:
+    calls: 4
+    bytes: 616
   main:
     calls: 1
-    bytes: 3360
+    bytes: 2144

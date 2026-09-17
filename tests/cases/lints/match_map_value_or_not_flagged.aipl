@@ -1,0 +1,94 @@
+import {
+    greater_than as >,
+    is_some_and,
+    map,
+    print,
+    to_str,
+    value_or,
+    wrapping_add as +,
+} from builtins;
+
+// Shapes that look close but belong to another lint, or to no rewrite.
+
+// The identity arm is `match_value_or`'s shape, not a map of anything —
+// squelched so this case stays about which lint does *not* fire.
+fn or_zero(o: i64?) -> i64 {
+    match (o) {
+        some(v) => v, #[allow]
+        none => 0,
+    }
+}
+
+// A `bool` answered with `none => false` is `match_is_some_and`'s shape.
+fn is_big(o: i64?) -> bool {
+    match (o) {
+        some(v) => v > 3,
+        none => false, #[allow]
+    }
+}
+
+// The default does work — a call — which `value_or` would run whether or not
+// the optional is empty, so the rewrite is not advised.
+fn fallback() -> i64 { 7 }
+
+fn or_computed(o: i64?) -> i64 {
+    match (o) {
+        some(v) => v + 1,
+        none => fallback(),
+    }
+}
+
+// A `none` arm that does nothing: a `match` run for effect, not a value with
+// a fallback.
+fn say(o: i64?) !prints {
+    match (o) {
+        some(v) => print(v.to_str()),
+        none => {},
+    };
+}
+
+fn main() !prints {
+    print(or_zero(none).to_str());
+    print(is_big(some(4)).to_str());
+    print(or_computed(none).to_str());
+    say(some(5));
+    // The rewrites themselves must not flag.
+    print(some(1).map(|v| v + 1).value_or(0).to_str());
+    print(some(4).is_some_and(|v| v > 3).to_str());
+}
+--- stdout ---
+0
+true
+7
+5
+2
+true
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 108
+instructions executed: 259
+binary size: 2416
+  code: 1092
+  data: 47
+  metadata: 1277
+functions:
+  __to_str_bool:
+    calls: 2
+    bytes: 232
+  __to_str_i64:
+    calls: 4
+    bytes: 204
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 656

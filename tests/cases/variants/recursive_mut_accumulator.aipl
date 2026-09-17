@@ -1,4 +1,4 @@
-import { equal as ==, print, to_str, wrapping_add as + } from builtins;
+import { equal as ==, map, print, to_str, value_or, wrapping_add as + } from builtins;
 
 // Reassigning a `mut` binding of a *boxed* (recursive) type from inside a
 // nested scope — the classic `set acc = Cons(x, acc)` fold in a `for` body.
@@ -32,12 +32,7 @@ fn sum(self: List) -> i64 {
     }
 }
 
-fn chain(self: Node) -> i64 {
-    match (self.next) {
-        some(n) => 1 + n.chain(),
-        none => 1,
-    }
-}
+fn chain(self: Node) -> i64 { self.next.map(|n| 1 + n.chain()).value_or(1) }
 
 // The fold that motivated this: each iteration wraps the previous accumulator.
 fn reversed(xs: i64[]) -> List {

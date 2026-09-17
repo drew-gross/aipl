@@ -1,11 +1,6 @@
-import { equal as == } from builtins;
+import { equal as ==, map, value_or } from builtins;
 
-fn second_is_e() -> i64 {
-    match ("hello"[1]) {
-        some(c) => if (c == 'e') { 101 } else { 0 },
-        none => 0,
-    }
-}.test({
+fn second_is_e() -> i64 { "hello"[1].map(|c| if (c == 'e') { 101 } else { 0 }).value_or(0) }.test({
     assert(second_is_e() == 101);
     assert("hello"[1] == some('e'));
 })
@@ -14,15 +9,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 91
-binary size: 1464
-  code: 464
-  data: 98
-  metadata: 902
+instructions executed: 106
+binary size: 1544
+  code: 544
+  data: 97
+  metadata: 903
 functions:
   __test$second_is_e:
     calls: 1
-    bytes: 352
+    bytes: 432
   aipl_assert:
     calls: 2
     bytes: (external)

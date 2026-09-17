@@ -491,11 +491,11 @@ allocations: 18631
 deallocations: 18631
 reallocations: 2733
 bytes allocated: 2299208
-instructions executed: 4647941
-binary size: 442296
-  code: 289396
+instructions executed: 4738130
+binary size: 446088
+  code: 292308
   data: 7940
-  metadata: 144960
+  metadata: 145840
 functions:
   __arr_drop_Json:
     calls: 125
@@ -665,6 +665,9 @@ functions:
   __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule$JsonTok$__m3__ParseError$lam$__m3__desugar_rule$JsonTok:
     calls: 268
     bytes: 504
+  __builtin_value_or$bool:
+    calls: 687
+    bytes: 24
   __eq_Json:
     calls: 46
     bytes: 404
@@ -731,12 +734,15 @@ functions:
   __m12__unescape:
     calls: 35
     bytes: 1612
+  __m13__can_reach$JsonTok$Json$map1:
+    calls: 0
+    bytes: 384
   __m13__climb$JsonTok$Json:
     calls: 0
     bytes: 2992
   __m13__error_at$JsonTok$Json:
     calls: 7
-    bytes: 3048
+    bytes: 3424
   __m13__far_miss:
     calls: 524
     bytes: 1080
@@ -754,7 +760,7 @@ functions:
     bytes: 4604
   __m13__match_group$JsonTok$Json:
     calls: 265
-    bytes: 5112
+    bytes: 5360
   __m13__match_leading_sep$JsonTok$Json:
     calls: 0
     bytes: 1096
@@ -769,7 +775,7 @@ functions:
     bytes: 1488
   __m13__match_prod$JsonTok$Json:
     calls: 694
-    bytes: 6576
+    bytes: 6556
   __m13__match_reps$JsonTok$Json:
     calls: 55
     bytes: 4136
@@ -796,10 +802,10 @@ functions:
     bytes: 1284
   __m13__tok_text$JsonTok$Json:
     calls: 622
-    bytes: 792
+    bytes: 1016
   __m13__trivia_span$JsonTok:
     calls: 99
-    bytes: 648
+    bytes: 736
   __m14__line_at:
     calls: 1
     bytes: 636
@@ -839,6 +845,9 @@ functions:
   __m1__token_text:
     calls: 37
     bytes: 1456
+  __m2__can_start$JsonTok:
+    calls: 0
+    bytes: 256
   __m2__climb_precs$JsonTok:
     calls: 0
     bytes: 32
@@ -865,13 +874,13 @@ functions:
     bytes: 5508
   __m2__render_rule$JsonTok:
     calls: 30
-    bytes: 12380
+    bytes: 12584
   __m2__rep_suffix:
     calls: 2
     bytes: 1708
   __m2__rule_first$JsonTok:
     calls: 72
-    bytes: 7216
+    bytes: 7480
   __m2__show_first$JsonTok:
     calls: 8
     bytes: 3916
@@ -898,7 +907,7 @@ functions:
     bytes: 32
   __m3__group_styles$JsonTok$tail:
     calls: 3828
-    bytes: 3460
+    bytes: 3004
   __m3__link$JsonTok$Json:
     calls: 66
     bytes: 2488
@@ -907,10 +916,13 @@ functions:
     bytes: 596
   __m3__link_rule$JsonTok:
     calls: 1980
-    bytes: 6864
+    bytes: 6748
   __m3__link_rules$JsonTok:
     calls: 264
     bytes: 600
+  __m3__opt_group_styles$JsonTok:
+    calls: 396
+    bytes: 408
   __m3__prod_names$JsonTok$Json:
     calls: 124
     bytes: 548
@@ -934,7 +946,7 @@ functions:
     bytes: 2416
   __m4__pieces$JsonTok$Json$s1$lam$json_space:
     calls: 169
-    bytes: 3220
+    bytes: 4248
   __m4__render_cst$JsonTok$Json$s1$lam$json_space:
     calls: 13
     bytes: 4380
@@ -1020,7 +1032,7 @@ functions:
     calls: 8170
     bytes: (external)
   aipl_arr_inc:
-    calls: 75224
+    calls: 76415
     bytes: (external)
   aipl_arr_reserve:
     calls: 10433
@@ -1032,7 +1044,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 103929
+    calls: 105120
     bytes: (external)
   aipl_array_new:
     calls: 3285

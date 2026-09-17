@@ -2,7 +2,7 @@
 // variants, imports, and the program that holds them — with the source-like
 // dump the item lowering's tests assert against. One of the files the AST is
 // declared across; see `ast.aipl`.
-import { Span, equal as ==, is_empty, join, map } from builtins;
+import { Span, equal as ==, is_empty, join, map, value_or } from builtins;
 import { Bound, show_bound } from "./bound.aipl";
 import { Expr, FieldInit, show_expr } from "./expr.aipl";
 import { I64 } from "./prim.aipl";
@@ -99,26 +99,15 @@ pub fn show_item(self: Item) -> str {
 fn show_fn(self: Function) -> str {
     let vis = if (self.is_pub) { "pub " } else { "" };
     let sig = self.sig;
-    let ret = match (sig.return_ty) {
-        some(t) => ` -> {t.show_ty()}`,
-        none => "",
-    };
+    let ret = sig.return_ty.map(|t| ` -> {t.show_ty()}`).value_or("");
     let effects = sig.effects.map(effect_marker).join();
-    let test = match (self.test_body) {
-        some(b) => ` .test({b.show_expr()})`,
-        none => "",
-    };
+    let test = self.test_body.map(|b| ` .test({b.show_expr()})`).value_or("");
     `{show_doc(self.doc)}{vis}fn {self.name}{show_type_params(sig.type_vars)}({sig.params.map(show_param).join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}`
 }
 
 fn effect_marker(self: str) -> str { ` !{self}` }
 
-fn show_doc(self: str?) -> str {
-    match (self) {
-        some(d) => `doc({d}) `,
-        none => "",
-    }
-}
+fn show_doc(self: str?) -> str { self.map(|d| `doc({d}) `).value_or("") }
 
 fn show_type_params(self: TypeParam[]) -> str {
     if (self.is_empty()) {
@@ -136,12 +125,7 @@ fn show_param(self: Param) -> str {
     `{prefix}{self.name}{opt}: {self.ty.show_ty()}{star}{show_default(self.default)}`
 }
 
-fn show_default(self: Expr?) -> str {
-    match (self) {
-        some(e) => ` = {e.show_expr()}`,
-        none => "",
-    }
-}
+fn show_default(self: Expr?) -> str { self.map(|e| ` = {e.show_expr()}`).value_or("") }
 
 fn show_field_decl(self: FieldDecl) -> str {
     `{self.name}: {self.ty.show_ty()}{show_default(self.default)}`
@@ -171,10 +155,7 @@ fn opt_marker(self: bool) -> str {
 }
 
 fn show_import_name(self: ImportName) -> str {
-    match (self.alias) {
-        some(a) => `{self.name} as {a}`,
-        none => self.name,
-    }
+    self.alias.map(|a| `{self.name} as {a}`).value_or(self.name)
 }
 
 fn show_import_source(self: ImportSource) -> str {
@@ -188,11 +169,11 @@ allocations: 18
 deallocations: 18
 reallocations: 2
 bytes allocated: 1338
-instructions executed: 1436
-binary size: 93104
-  code: 65472
+instructions executed: 1534
+binary size: 93552
+  code: 65916
   data: 238
-  metadata: 27394
+  metadata: 27398
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -214,7 +195,7 @@ functions:
     bytes: 116
   __m2__show_ann:
     calls: 0
-    bytes: 416
+    bytes: 648
   __m2__show_arm:
     calls: 0
     bytes: 476
@@ -223,7 +204,7 @@ functions:
     bytes: 1560
   __m2__show_expr:
     calls: 0
-    bytes: 21964
+    bytes: 22200
   __m2__show_exprs:
     calls: 0
     bytes: 1388
@@ -289,13 +270,16 @@ functions:
     bytes: 188
   show_case:
     calls: 0
-    bytes: 4532
+    bytes: 3912
   show_default:
     calls: 1
-    bytes: 420
+    bytes: 652
+  show_doc:
+    calls: 1
+    bytes: 608
   show_item:
     calls: 2
-    bytes: 17296
+    bytes: 17052
   show_type_params:
     calls: 1
     bytes: 2156

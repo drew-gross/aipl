@@ -529,10 +529,7 @@ fn to_eol_unless_len(self: str, marker: str, blocked: str) -> u64 {
     if (len == 0) {
         return 0;
     };
-    match (self[marker.len()..].first()) {
-        some(c) => if (blocked.contains(c)) { 0 } else { len },
-        none => len,
-    }
+    if (self[marker.len()..].first().is_some_and(|c| blocked.contains(c))) { 0 } else { len }
 }
 
 # The end of the number whose integer part ends at `int_end`: extends past a

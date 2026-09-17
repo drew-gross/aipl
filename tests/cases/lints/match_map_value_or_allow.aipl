@@ -1,0 +1,48 @@
+import { map, print, to_str, value_or, wrapping_add as + } from builtins;
+
+// `#[allow]` on the `none` arm — where this lint points, since the default is
+// the one part of the shape that is reliably a single line — keeps the long
+// form. The rewrite beside it computes the same thing.
+fn plus_one_or_zero(o: i64?) -> i64 {
+    match (o) {
+        some(v) => v + 1,
+        none => 0, #[allow]
+    }
+}
+
+fn plus_one_or_zero_short(o: i64?) -> i64 { o.map(|v| v + 1).value_or(0) }
+
+fn main() !prints {
+    print(plus_one_or_zero(some(1)).to_str());
+    print(plus_one_or_zero_short(some(1)).to_str());
+    print(plus_one_or_zero(none).to_str());
+    print(plus_one_or_zero_short(none).to_str());
+}
+--- stdout ---
+2
+2
+0
+0
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 68
+instructions executed: 172
+binary size: 1728
+  code: 752
+  data: 1
+  metadata: 975
+functions:
+  __to_str_i64:
+    calls: 4
+    bytes: 204
+  aipl_i64_len:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 4
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 548

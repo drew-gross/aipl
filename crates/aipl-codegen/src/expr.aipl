@@ -1,7 +1,7 @@
 // `aipl_syntax::ast::Expr` and `ExprKind` as AIPL declares them, with the
 // structural dump the lowering's tests assert against. One of the files the
 // AST is declared across; see `ast.aipl`.
-import { Span, equal as ==, first, is_empty, join, logical_not as !, map } from builtins;
+import { Span, equal as ==, first, is_empty, join, logical_not as !, map, value_or } from builtins;
 import { Ctor, Pat, show_pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";
 import { Desc, Primitive, SetOrder, Ty, Unordered, show_order, show_ty } from "./ty.aipl";
@@ -214,21 +214,11 @@ fn show_call(name: str, args: Expr[], method_style: bool) -> str {
 
 pub fn show_exprs(self: Expr[]) -> str { self.map(show_expr).join(sep=", ") }
 
-fn show_opt_expr(self: Expr?) -> str {
-    match (self) {
-        some(e) => e.show_expr(),
-        none => "",
-    }
-}
+fn show_opt_expr(self: Expr?) -> str { self.map(show_expr).value_or("") }
 
 # `: T` when a binding or a lambda parameter was annotated, and nothing when it
 # was not — so the dump reads like the source did.
-fn show_ann(self: Ty?) -> str {
-    match (self) {
-        some(t) => `: {t.show_ty()}`,
-        none => "",
-    }
-}
+fn show_ann(self: Ty?) -> str { self.map(|t| `: {t.show_ty()}`).value_or("") }
 
 fn show_lambda_param(self: LambdaParam) -> str { `{self.name}{show_ann(self.ty)}` }
 
@@ -251,11 +241,11 @@ allocations: 219
 deallocations: 219
 reallocations: 4
 bytes allocated: 15912
-instructions executed: 11416
-binary size: 85296
-  code: 55332
+instructions executed: 11635
+binary size: 85888
+  code: 55800
   data: 2529
-  metadata: 27435
+  metadata: 27559
 functions:
   __arr_drop_Expr:
     calls: 9
@@ -373,7 +363,7 @@ functions:
     bytes: 108
   show_ann:
     calls: 4
-    bytes: 416
+    bytes: 648
   show_arm:
     calls: 1
     bytes: 476
@@ -382,7 +372,7 @@ functions:
     bytes: 1560
   show_expr:
     calls: 56
-    bytes: 21964
+    bytes: 22200
   show_exprs:
     calls: 7
     bytes: 1388

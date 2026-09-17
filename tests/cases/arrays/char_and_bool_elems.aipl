@@ -1,4 +1,4 @@
-import { equal as ==, wrapping_add as + } from builtins;
+import { equal as ==, map, value_or, wrapping_add as + } from builtins;
 
 // char[] iteration and bool[] indexing.
 fn count_h(cs: char[]) -> i64 {
@@ -12,12 +12,7 @@ fn count_h(cs: char[]) -> i64 {
     assert(count_h([]) == 0);
 })
 
-fn first_true(bs: bool[]) -> i64 {
-    match (bs[0]) {
-        some(v) => if (v) { 1 } else { 0 },
-        none => -1,
-    }
-}.test({
+fn first_true(bs: bool[]) -> i64 { bs[0].map(|v| if (v) { 1 } else { 0 }).value_or(-1) }.test({
     assert(first_true([true, false]) == 1);
     assert(first_true([false, true]) == 0);
     assert(first_true([]) == -1);
@@ -27,18 +22,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 581
-binary size: 3288
-  code: 1360
+instructions executed: 629
+binary size: 3088
+  code: 1144
   data: 391
-  metadata: 1537
+  metadata: 1553
 functions:
   __test$count_h:
     calls: 1
     bytes: 196
   __test$first_true:
     calls: 1
-    bytes: 748
+    bytes: 248
   aipl_assert:
     calls: 5
     bytes: (external)
@@ -54,6 +49,9 @@ functions:
   count_h:
     calls: 2
     bytes: 240
+  first_true:
+    calls: 3
+    bytes: 284
   main:
     calls: 1
     bytes: 176

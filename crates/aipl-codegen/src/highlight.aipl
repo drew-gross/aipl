@@ -51,6 +51,7 @@ import {
     logical_and as &&,
     map,
     split,
+    value_or,
     wrapping_add as +,
     wrapping_add_assign as +=,
 } from builtins;
@@ -523,14 +524,16 @@ fn merge_runs(items: Item[]) -> Item[] {
 # first is a plain `Match` and the items after it are too and share its scope
 # (and 0 for no items at all).
 fn run_len(items: Item[]) -> u64 {
-    match (items.first()) {
-        some(it) => if (it.plain) {
-            items.count_while(|x: Item| x.plain && x.scope == it.scope)
-        } else {
-            1
-        },
-        none => 0,
-    }
+    items
+        .first()
+        .map(
+            |it| if (it.plain) {
+                items.count_while(|x: Item| x.plain && x.scope == it.scope)
+            } else {
+                1
+            },
+        )
+        .value_or(0)
 }
 
 # Whether a matcher's pattern has to refer to itself — a depth-tracked region,
@@ -754,11 +757,11 @@ allocations: 989
 deallocations: 989
 reallocations: 33
 bytes allocated: 76632
-instructions executed: 128366
-binary size: 143680
-  code: 92224
+instructions executed: 128441
+binary size: 144632
+  code: 92820
   data: 5520
-  metadata: 45936
+  metadata: 46292
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -788,6 +791,9 @@ functions:
     calls: 38
     bytes: 304
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda0:
+    calls: 0
+    bytes: 524
+  __builtin_count_while$Item$lam$rule_pats$Kind$lambda1$lambda0:
     calls: 4
     bytes: 524
   __eq_Entry:
@@ -945,4 +951,4 @@ functions:
     bytes: 2360
   rule_pats$Kind:
     calls: 2
-    bytes: 12704
+    bytes: 12776

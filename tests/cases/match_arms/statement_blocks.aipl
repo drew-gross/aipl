@@ -34,7 +34,7 @@ fn opt(v: u64?) -> u64 {
             let m = n + 1;
             m
         },
-        none => 0,
+        none => 0, #[allow]
     }
 }
 

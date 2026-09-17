@@ -1,12 +1,9 @@
-import { equal as ==, wrapping_add as + } from builtins;
+import { equal as ==, map, value_or, wrapping_add as + } from builtins;
 
 // Count 'a's by walking with `s[i]`; stop when indexing returns none
 // (past end of string).
 fn count_a(s: str, i: i64) -> i64 {
-    match (s[i]) {
-        some(c) => if (c == 'a') { 1 + count_a(s, i + 1) } else { count_a(s, i + 1) },
-        none => 0,
-    }
+    s[i].map(|c| if (c == 'a') { 1 + count_a(s, i + 1) } else { count_a(s, i + 1) }).value_or(0)
 }.test({
     assert(count_a("banana", 0) == 3);
 })
@@ -15,11 +12,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 236
-binary size: 1536
-  code: 532
-  data: 52
-  metadata: 952
+instructions executed: 290
+binary size: 1296
+  code: 424
+  data: 51
+  metadata: 821
 functions:
   aipl_assert:
     calls: 1
@@ -34,11 +31,8 @@ functions:
     calls: 1
     bytes: (external)
   count_a:
-    calls: 0
-    bytes: 44
-  count_a$tail:
     calls: 7
-    bytes: 248
+    bytes: 220
   main:
     calls: 1
-    bytes: 240
+    bytes: 204

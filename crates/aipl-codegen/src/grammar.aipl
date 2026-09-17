@@ -368,13 +368,8 @@ fn group_styles<K: variant>(r: Rule<K>) -> ListStyle[] {
     }
 }
 
-# `group_styles` reaching inside an optional, which `map` cannot.
-fn opt_group_styles<K: variant>(r: Rule<K>?) -> ListStyle[] {
-    match (r) {
-        some(sub) => group_styles(sub),
-        none => [],
-    }
-}
+# `group_styles` reaching inside an optional.
+fn opt_group_styles<K: variant>(r: Rule<K>?) -> ListStyle[] { r.map(group_styles).value_or([]) }
 
 # How many groups `r` holds — the amount `base` advances past it.
 fn group_count<K: variant>(r: Rule<K>) -> u64 { group_styles(r).len() }
@@ -874,21 +869,18 @@ fn rule_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> Rule<K> {
 }
 
 fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
-    match (g.prods[i]) {
-        some(p) => p.expect_as,
-        none => "",
-    }
+    g.prods[i].map(|p| p.expect_as).value_or("")
 }
 --- performance ---
 allocations: 366
 deallocations: 366
 reallocations: 54
 bytes allocated: 56058
-instructions executed: 58411
-binary size: 133504
-  code: 84672
+instructions executed: 59711
+binary size: 133904
+  code: 85144
   data: 3516
-  metadata: 45316
+  metadata: 45244
 functions:
   __arr_drop_ListStyle:
     calls: 41
@@ -991,7 +983,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 46900
+    bytes: 47536
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -1005,13 +997,13 @@ functions:
     calls: 111
     bytes: (external)
   aipl_arr_inc:
-    calls: 393
+    calls: 408
     bytes: (external)
   aipl_arr_reserve:
     calls: 61
     bytes: (external)
   aipl_array_dec:
-    calls: 766
+    calls: 781
     bytes: (external)
   aipl_array_new:
     calls: 44
@@ -1072,7 +1064,7 @@ functions:
     bytes: 32
   group_styles$Kind$tail:
     calls: 188
-    bytes: 3460
+    bytes: 3004
   keep:
     calls: 0
     bytes: 112
@@ -1084,13 +1076,16 @@ functions:
     bytes: 596
   link_rule$Kind:
     calls: 76
-    bytes: 6864
+    bytes: 6748
   link_rules$Kind:
     calls: 4
     bytes: 600
   main:
     calls: 1
     bytes: 180
+  opt_group_styles$Kind:
+    calls: 61
+    bytes: 408
   prod_names$Kind$Node:
     calls: 18
     bytes: 548

@@ -258,18 +258,19 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
                     `{body}{rep_suffix(min, max)}`
                 },
             };
-            match (nested_in) {
-                none => reps,
-                some(brackets) => {
-                    let o = render_rule(brackets.0, names, Item);
-                    let c = render_rule(brackets.1, names, Item);
-                    let seq = `{o} {reps} {c}`;
-                    match (ctx) {
-                        Alt | Seq => seq,
-                        Item => `({seq})`,
-                    }
-                },
-            }
+            nested_in
+                .map(
+                    |brackets| {
+                        let o = render_rule(brackets.0, names, Item);
+                        let c = render_rule(brackets.1, names, Item);
+                        let seq = `{o} {reps} {c}`;
+                        match (ctx) {
+                            Alt | Seq => seq,
+                            Item => `({seq})`,
+                        }
+                    },
+                )
+                .value_or(reps)
         },
         Maybe(sub) => `{render_rule(sub, names, Item)}?`,
         Climb(atom, precs) => render_climb(atom, precs, names, ctx),
@@ -322,10 +323,7 @@ fn render_list<K: variant>(
     // One `sep item` pair is already spelled by the leading item, so the
     // repetition carries one fewer than the minimum — and one fewer than the
     // maximum, for the same reason.
-    let inner_max = match (max) {
-        some(m) => some(m - 1),
-        none => none,
-    };
+    let inner_max = max.map(|m| m - 1);
     let pairs = if (min == 0) {
         rep_suffix(min, inner_max)
     } else {
@@ -553,10 +551,9 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         Many(sub, min, _, sep, _, leading_sep, nested_in, _, _, _) => match (nested_in) {
             some(brackets) => rule_first(Then([brackets.0, sub, brackets.1]), sets),
             none => {
-                let head = match (sep) {
-                    some(s) => if (leading_sep) { Then([Maybe(s), sub]) } else { sub },
-                    none => sub,
-                };
+                let head = sep
+                    .map(|s| if (leading_sep) { Then([Maybe(s), sub]) } else { sub })
+                    .value_or(sub);
                 let first = rule_first(head, sets)?;
                 ok(First { ..first, nullable: first.nullable || min == 0 })
             },
@@ -774,11 +771,11 @@ allocations: 1898
 deallocations: 1898
 reallocations: 338
 bytes allocated: 185527
-instructions executed: 239509
-binary size: 165624
-  code: 108876
+instructions executed: 241551
+binary size: 165880
+  code: 109188
   data: 4132
-  metadata: 52616
+  metadata: 52560
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -866,7 +863,7 @@ functions:
     bytes: 32
   __m1__group_styles$Tok$tail:
     calls: 262
-    bytes: 3460
+    bytes: 3004
   __m1__link$Tok$Node:
     calls: 9
     bytes: 2488
@@ -875,10 +872,13 @@ functions:
     bytes: 596
   __m1__link_rule$Tok:
     calls: 139
-    bytes: 6864
+    bytes: 6748
   __m1__link_rules$Tok:
     calls: 27
     bytes: 600
+  __m1__opt_group_styles$Tok:
+    calls: 36
+    bytes: 408
   __m1__prod_names$Tok$Node:
     calls: 20
     bytes: 548
@@ -925,7 +925,7 @@ functions:
     calls: 213
     bytes: (external)
   aipl_arr_inc:
-    calls: 4083
+    calls: 4119
     bytes: (external)
   aipl_arr_reserve:
     calls: 286
@@ -934,7 +934,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 5569
+    calls: 5605
     bytes: (external)
   aipl_array_new:
     calls: 62
@@ -955,13 +955,13 @@ functions:
     calls: 490
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 3325
+    calls: 3367
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 120
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 2835
+    calls: 2877
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 120
@@ -1037,13 +1037,13 @@ functions:
     bytes: 5508
   render_rule$Tok:
     calls: 101
-    bytes: 12328
+    bytes: 12540
   rep_suffix:
     calls: 14
     bytes: 1708
   rule_first$Tok:
     calls: 235
-    bytes: 7216
+    bytes: 7480
   show_first$Tok:
     calls: 27
     bytes: 3876

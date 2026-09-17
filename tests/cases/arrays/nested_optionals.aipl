@@ -12,7 +12,7 @@ fn unwrap2(x: i64??) -> i64 {
             some(v) => v, #[allow]
             none => -1,
         },
-        none => -2,
+        none => -2, #[allow]
     }
 }
 

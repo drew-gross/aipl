@@ -25,6 +25,7 @@ mod map_find_if_some;
 mod match_is_some_and;
 mod match_map_err;
 mod match_map_ok;
+mod match_map_value_or;
 mod match_value_or;
 mod match_value_or_err;
 mod push_array_literal;
@@ -58,6 +59,7 @@ use self::map_find_if_some::{find_map_names, map_find_if_some};
 use self::match_is_some_and::match_is_some_and;
 use self::match_map_err::match_map_err;
 use self::match_map_ok::match_map_ok;
+use self::match_map_value_or::match_map_value_or;
 use self::match_value_or::match_value_or;
 use self::match_value_or_err::match_value_or_err;
 use self::push_array_literal::push_array_literal;
@@ -101,6 +103,7 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     each_expr(program, &mut |e| map_find_if_some(e, &find_map, &mut hits));
     each_expr(program, &mut |e| match_is_some_and(e, &mut hits));
     each_expr(program, &mut |e| match_value_or(e, src, &mut hits));
+    each_expr(program, &mut |e| match_map_value_or(e, src, &mut hits));
     // Not `each_expr`: this lint needs to know whether the *enclosing* function
     // declares any effects. AIPL requires a caller to declare at least the
     // effects of everything it calls, so "declares none" is a sound local proof

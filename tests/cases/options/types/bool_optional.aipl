@@ -1,11 +1,6 @@
-import { equal as == } from builtins;
+import { equal as ==, map, value_or } from builtins;
 
-fn flag(b: bool?) -> i64 {
-    match (b) {
-        some(v) => if (v) { 1 } else { 0 },
-        none => 0,
-    }
-}.test({
+fn flag(b: bool?) -> i64 { b.map(|v| if (v) { 1 } else { 0 }).value_or(0) }.test({
     assert(flag(some(true)) == 1);
     assert(flag(some(false)) == 0);
     assert(flag(none) == 0);
@@ -15,15 +10,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 92
-binary size: 1496
-  code: 452
-  data: 138
-  metadata: 906
+instructions executed: 134
+binary size: 1736
+  code: 692
+  data: 137
+  metadata: 907
 functions:
   __test$flag:
     calls: 1
-    bytes: 352
+    bytes: 592
   aipl_assert:
     calls: 3
     bytes: (external)

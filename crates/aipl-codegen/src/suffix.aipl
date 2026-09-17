@@ -1,6 +1,6 @@
 // One postfix step of AIPL's syntax tree and what applying it to a receiver
 // means. One of the files the AST is declared across; see `ast.aipl`.
-import { Span, equal as ==, first, last, len, not_equal as != } from builtins;
+import { Span, equal as == } from builtins;
 import {
     Call,
     Construct,
@@ -86,15 +86,9 @@ fn range_bounds(self: Expr) -> (Expr, Expr)? {
 }
 
 fn two_values(self: FieldInit[]) -> (Expr, Expr)? {
-    if (self.len() != 2) {
-        return none;
-    };
-    match (self.first()) {
-        some(a) => match (self.last()) {
-            some(b) => some((a.value, b.value)),
-            none => none,
-        },
-        none => none,
+    match (self) {
+        [a, b] => some((a.value, b.value)),
+        _ => none,
     }
 }
 --- performance ---
@@ -102,11 +96,11 @@ allocations: 77
 deallocations: 77
 reallocations: 1
 bytes allocated: 5809
-instructions executed: 3742
-binary size: 76368
-  code: 50864
+instructions executed: 3774
+binary size: 76256
+  code: 50772
   data: 681
-  metadata: 24823
+  metadata: 24803
 functions:
   __arr_drop___m1__Expr:
     calls: 3
@@ -122,7 +116,7 @@ functions:
     bytes: 116
   __m1__show_ann:
     calls: 0
-    bytes: 416
+    bytes: 648
   __m1__show_arm:
     calls: 0
     bytes: 476
@@ -131,7 +125,7 @@ functions:
     bytes: 1560
   __m1__show_expr:
     calls: 21
-    bytes: 21964
+    bytes: 22200
   __m1__show_exprs:
     calls: 1
     bytes: 1388
@@ -196,13 +190,13 @@ functions:
     calls: 35
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 105
+    calls: 102
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 32
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 70
+    calls: 67
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 32
@@ -227,7 +221,4 @@ functions:
     bytes: 112
   range_bounds:
     calls: 2
-    bytes: 2960
-  two_values:
-    calls: 1
-    bytes: 1124
+    bytes: 3524

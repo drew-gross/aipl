@@ -1,4 +1,4 @@
-import { equal as == } from builtins;
+import { equal as ==, map, value_or } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -9,10 +9,7 @@ fn wrap(p: Point) -> Point? { some(p) }.test({
     // Construct and match-unwrap a struct optional.
     let op = some(Point { x: 7, y: 8 });
     assert(op == some(Point { x: 7, y: 8 }));
-    let x = match (op) {
-        some(p) => p.x,
-        none => -1,
-    };
+    let x = op.map(|p| p.x).value_or(-1);
     assert(x == 7);
 
     // As a function return (sret), round-tripped.
@@ -21,10 +18,7 @@ fn wrap(p: Point) -> Point? { some(p) }.test({
     // Optional of a heap-field struct (alloc balance through some/match).
     let on = some(Named { id: 9, label: "z" });
     assert(on == some(Named { id: 9, label: "z" }));
-    let lbl = match (on) {
-        some(n) => n.label,
-        none => "?",
-    };
+    let lbl = on.map(|n| n.label).value_or("?");
     assert(lbl == "z");
 })
 --- performance ---
@@ -32,11 +26,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 316
-binary size: 3040
-  code: 1448
+instructions executed: 388
+binary size: 3400
+  code: 1744
   data: 218
-  metadata: 1374
+  metadata: 1438
 functions:
   __eq_Named:
     calls: 1
@@ -46,7 +40,7 @@ functions:
     bytes: 104
   __test$wrap:
     calls: 1
-    bytes: 1140
+    bytes: 1436
   aipl_assert:
     calls: 5
     bytes: (external)

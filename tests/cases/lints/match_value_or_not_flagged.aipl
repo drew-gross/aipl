@@ -2,11 +2,13 @@ import { print, to_str, value_or, wrapping_add as + } from builtins;
 
 // Shapes that look close but are deliberately left alone.
 
-// The `some` arm transforms the payload, so this is a `map`, not a `value_or`.
+// The `some` arm transforms the payload, so this is a `map`, not a `value_or`
+// — which is `match_map_value_or`'s shape, squelched here so this case stays
+// about which lint does *not* fire.
 fn plus_one(o: i64?) -> i64 {
     match (o) {
         some(v) => v + 1,
-        none => 0,
+        none => 0, #[allow]
     }
 }
 

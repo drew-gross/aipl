@@ -85,10 +85,10 @@ deallocations: 76
 reallocations: 1
 bytes allocated: 5163
 instructions executed: 4775
-binary size: 73792
-  code: 48392
+binary size: 74392
+  code: 48860
   data: 1436
-  metadata: 23964
+  metadata: 24096
 functions:
   __arr_drop_BraceEntry:
     calls: 5
@@ -110,7 +110,7 @@ functions:
     bytes: 116
   __m1__show_ann:
     calls: 0
-    bytes: 416
+    bytes: 648
   __m1__show_arm:
     calls: 0
     bytes: 476
@@ -119,7 +119,7 @@ functions:
     bytes: 1560
   __m1__show_expr:
     calls: 11
-    bytes: 21964
+    bytes: 22200
   __m1__show_exprs:
     calls: 4
     bytes: 1388

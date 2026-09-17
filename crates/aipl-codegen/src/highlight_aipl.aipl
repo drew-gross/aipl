@@ -176,11 +176,11 @@ allocations: 5934
 deallocations: 5934
 reallocations: 293
 bytes allocated: 553131
-instructions executed: 1433281
-binary size: 243160
-  code: 178032
+instructions executed: 1433536
+binary size: 244208
+  code: 178700
   data: 3336
-  metadata: 61792
+  metadata: 62172
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -210,6 +210,9 @@ functions:
     calls: 908
     bytes: 304
   __builtin_count_while$__m1__Item$lam$__m1__rule_pats$__m6__AiplTok$lambda0:
+    calls: 0
+    bytes: 524
+  __builtin_count_while$__m1__Item$lam$__m1__rule_pats$__m6__AiplTok$lambda1$lambda0:
     calls: 11
     bytes: 524
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
@@ -334,7 +337,7 @@ functions:
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 127012
+    bytes: 127156
   __to_str_u64:
     calls: 7
     bytes: 204

@@ -1,11 +1,6 @@
-import { equal as == } from builtins;
+import { equal as ==, map, value_or } from builtins;
 
-fn code(c: char?) -> i64 {
-    match (c) {
-        some(v) => if (v == 'A') { 65 } else { 0 },
-        none => 0,
-    }
-}.test({
+fn code(c: char?) -> i64 { c.map(|v| if (v == 'A') { 65 } else { 0 }).value_or(0) }.test({
     assert(code(some('A')) == 65);
     assert(code(some('B')) == 0);
     assert(code(none) == 0);
@@ -15,15 +10,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 98
-binary size: 1504
-  code: 464
-  data: 138
-  metadata: 902
+instructions executed: 146
+binary size: 1600
+  code: 508
+  data: 137
+  metadata: 955
 functions:
   __test$code:
     calls: 1
-    bytes: 364
+    bytes: 260
   aipl_assert:
     calls: 3
     bytes: (external)
@@ -36,6 +31,9 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  code:
+    calls: 3
+    bytes: 148
   main:
     calls: 1
     bytes: 100

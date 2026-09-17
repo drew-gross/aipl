@@ -20,21 +20,21 @@ fn main() !prints {
             some(v) => v, #[allow]
             none => -1,
         },
-        none => -2,
+        none => -2, #[allow]
     };
     let n1 = match (xs[1]) {
         some(inner) => match (inner) {
             some(v) => v, #[allow]
             none => -1,
         },
-        none => -2,
+        none => -2, #[allow]
     };
     let n9 = match (xs[9]) {
         some(inner) => match (inner) {
             some(v) => v, #[allow]
             none => -1,
         },
-        none => -2,
+        none => -2, #[allow]
     };
     print(to_str(n0)); // 1
     print(to_str(n1)); // -1   (present, inner none)

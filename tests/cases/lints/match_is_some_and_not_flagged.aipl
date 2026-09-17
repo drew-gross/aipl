@@ -9,16 +9,19 @@ import { equal as ==, print, to_str } from builtins;
 fn missing_or_five(o: i64?) -> bool {
     match (o) {
         some(v) => v == 5,
-        none => true,
+        // `match_map_value_or`'s shape (`o.map(|v| v == 5).value_or(true)`),
+        // squelched so this case stays about which lint does *not* fire.
+        none => true, #[allow]
     }
 }
 
 // A computed `none` arm still has to run: `is_some_and` hard-codes `false`
-// there, so this has no short spelling.
+// there, so this has no `is_some_and` spelling (it does have a
+// `match_map_value_or` one, squelched here for the same reason as above).
 fn five_or_flag(o: i64?, flag: bool) -> bool {
     match (o) {
         some(v) => v == 5,
-        none => flag,
+        none => flag, #[allow]
     }
 }
 

@@ -1,4 +1,4 @@
-import { len, print, to_str, wrapping_add as + } from builtins;
+import { len, map, print, to_str, value_or, wrapping_add as + } from builtins;
 
 // An array of structs that each hold a boxed recursive field.
 //
@@ -32,12 +32,7 @@ fn main() !prints {
     print(hs.len().to_str());
     // Copying one out and reading it must not disturb the array's own reference.
     let first = hs[0];
-    print(
-        match (first) {
-            some(h) => h.tree.total(),
-            none => 0,
-        }.to_str(),
-    );
+    print(first.map(|h| h.tree.total()).value_or(0).to_str());
     print(sum_holders(hs).to_str());
 }
 --- stdout ---
@@ -51,11 +46,11 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 359
-instructions executed: 545
-binary size: 4320
-  code: 2116
+instructions executed: 560
+binary size: 4400
+  code: 2192
   data: 1
-  metadata: 2203
+  metadata: 2207
 functions:
   __arr_drop_Holder:
     calls: 1
@@ -107,7 +102,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 948
+    bytes: 1024
   sum_holders:
     calls: 2
     bytes: 276

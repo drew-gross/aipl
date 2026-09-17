@@ -39,7 +39,7 @@ fn main() !prints {
                 some(v) => v, #[allow]
                 none => -1,
             },
-            none => -2,
+            none => -2, #[allow]
         },
     )); // -2
     print(to_str(
@@ -48,7 +48,7 @@ fn main() !prints {
                 some(v) => v, #[allow]
                 none => -1,
             },
-            none => -2,
+            none => -2, #[allow]
         },
     )); // -1
     print(to_str(
@@ -57,7 +57,7 @@ fn main() !prints {
                 some(v) => v, #[allow]
                 none => -1,
             },
-            none => -2,
+            none => -2, #[allow]
         },
     )); // 5
 

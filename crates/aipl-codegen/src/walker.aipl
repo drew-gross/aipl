@@ -271,16 +271,18 @@ fn more_before(self: W, end: str) -> bool { !self.at_end() && self.peek_text() !
 # dispatched on it; comments before it must have been drained (else the final
 # not-carried check in the driver fails).
 fn bump(self: W) -> WStr {
-    match (self.peek()) {
-        some(t) => WStr {
-            w: W { ..self, pos: self.pos + 1, last_end: t.span.end },
-            text: self.src[t.span],
-        },
-        // Past the end there is nothing to consume: the cursor stays put and the
-        // text is empty, matching `peek_text`. The Rust version indexes and would
-        // panic; every caller dispatches on `peek_text` first, so neither runs.
-        none => WStr { w: self, text: "" },
-    }
+    // Past the end there is nothing to consume: the cursor stays put and the
+    // text is empty, matching `peek_text`. The Rust version indexes and would
+    // panic; every caller dispatches on `peek_text` first, so neither runs.
+    self
+        .peek()
+        .map(
+            |t| WStr {
+                w: W { ..self, pos: self.pos + 1, last_end: t.span.end },
+                text: self.src[t.span],
+            },
+        )
+        .value_or(WStr { w: self, text: "" })
 }
 
 # Consume the next token, which must read exactly `want`.
@@ -310,14 +312,8 @@ fn err_here(self: W, msg: str) -> FmtError {
 # Where the next syntactic entity begins: the next comment or token, whichever
 # comes first. Past both, the end of the source.
 fn next_start(self: W) -> u64 {
-    let tok = match (self.peek()) {
-        some(t) => t.span.start,
-        none => self.src.len(),
-    };
-    match (self.comments[self.cpos]) {
-        some(c) => min(c.start, tok),
-        none => tok,
-    }
+    let tok = self.peek().map(|t| t.span.start).value_or(self.src.len());
+    self.comments[self.cpos].map(|c| min(c.start, tok)).value_or(tok)
 }
 
 # Whether the source across a span holds a blank line (two newlines).
@@ -527,12 +523,7 @@ fn is_int_type_name(self: str) -> bool {
 // ---------- small shared helpers ----------
 
 # Source text of token `i`; `""` past the end.
-fn tok_text(self: W, i: u64) -> str {
-    match (self.toks[i]) {
-        some(t) => self.src[t.span],
-        none => "",
-    }
-}
+fn tok_text(self: W, i: u64) -> str { self.toks[i].map(|t| self.src[t.span]).value_or("") }
 
 # Whether the token at the cursor has kind `k`.
 fn peek_is(self: W, k: FmtKind) -> bool { self.peek_is_n(0, k) }
@@ -3152,11 +3143,11 @@ allocations: 15944
 deallocations: 15944
 reallocations: 1765
 bytes allocated: 3322001
-instructions executed: 26818619
-binary size: 10105584
-  code: 6385932
+instructions executed: 27232129
+binary size: 10107240
+  code: 6387144
   data: 31204
-  metadata: 3688448
+  metadata: 3688892
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3480,7 +3471,7 @@ functions:
     calls: 4795
     bytes: (external)
   aipl_arr_inc:
-    calls: 288815
+    calls: 296363
     bytes: (external)
   aipl_arr_reserve:
     calls: 5047
@@ -3489,7 +3480,7 @@ functions:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 411858
+    calls: 419406
     bytes: (external)
   aipl_array_new:
     calls: 3654
@@ -3565,7 +3556,7 @@ functions:
     bytes: 4428
   bump:
     calls: 1259
-    bytes: 1284
+    bytes: 2088
   call_arg:
     calls: 17
     bytes: 7200
@@ -3709,7 +3700,7 @@ functions:
     bytes: 3600
   next_start:
     calls: 54
-    bytes: 508
+    bytes: 684
   one_param:
     calls: 12
     bytes: 12976
@@ -3820,7 +3811,7 @@ functions:
     bytes: 668
   tok_text:
     calls: 4072
-    bytes: 508
+    bytes: 740
   trailing_comment:
     calls: 99
     bytes: 2284

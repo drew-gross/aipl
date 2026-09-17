@@ -37,6 +37,7 @@ import {
     map,
     not_equal as !=,
     push,
+    value_or,
     value_or_err,
     wrapping_add as +,
     wrapping_increment as ++,
@@ -277,12 +278,7 @@ fn breaks_after(src: str, at: u64) -> bool {
 })
 
 # The text of a token span, or `""` for a child that matched no tokens.
-fn edge(src: str, sp: Span?) -> str {
-    match (sp) {
-        some(s) => src[s],
-        none => "",
-    }
-}.test({
+fn edge(src: str, sp: Span?) -> str { sp.map(|s| src[s]).value_or("") }.test({
     assert(edge("abc", some(1..2)) == "b");
     assert(edge("abc", none) == "");
 })
@@ -671,11 +667,11 @@ allocations: 2090
 deallocations: 2090
 reallocations: 181
 bytes allocated: 167907
-instructions executed: 263212
-binary size: 221560
-  code: 142192
+instructions executed: 264909
+binary size: 221520
+  code: 142296
   data: 5044
-  metadata: 74324
+  metadata: 74180
 functions:
   __arr_drop_Piece:
     calls: 95
@@ -823,7 +819,7 @@ functions:
     bytes: 32
   __m8__group_styles$FKind$tail:
     calls: 74
-    bytes: 3460
+    bytes: 3004
   __m8__link$FKind$str:
     calls: 8
     bytes: 3048
@@ -832,10 +828,13 @@ functions:
     bytes: 596
   __m8__link_rule$FKind:
     calls: 44
-    bytes: 6864
+    bytes: 6748
   __m8__link_rules$FKind:
     calls: 0
     bytes: 600
+  __m8__opt_group_styles$FKind:
+    calls: 18
+    bytes: 408
   __rec_drop___m1__Cst:
     calls: 27
     bytes: 132
@@ -949,7 +948,7 @@ functions:
     bytes: 464
   edge:
     calls: 24
-    bytes: 236
+    bytes: 504
   fmt_node$FKind$str$s1$lam$always_space:
     calls: 1
     bytes: 3736

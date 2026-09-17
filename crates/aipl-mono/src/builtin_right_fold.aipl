@@ -32,9 +32,12 @@ pub fn right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A) -> A {
     mut i = self.len();
     while (i > 0) {
         set i--;
+
+        // `i` is in bounds by construction, so the `none` arm never runs; a
+        // `map` here would lift a lambda per fold to say the same thing.
         set acc = match (self[i]) {
             some(x) => f(x, acc),
-            none => acc,
+            none => acc, #[allow]
         };
     }
     acc

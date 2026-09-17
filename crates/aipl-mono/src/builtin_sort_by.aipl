@@ -49,9 +49,12 @@ pub fn sort_by<T: any>(self: T[], less: (T, T) -> bool) -> T[] {
         mut k: u64 = 0;
         mut placed = false;
         while (!placed && k < out.len()) {
+            // `k` is in bounds by construction, so the `none` arm never runs;
+            // a `map` here would lift a lambda per comparison to say the same
+            // thing.
             let step = match (out[k]) {
                 some(y) => less(x, y),
-                none => true,
+                none => true, #[allow]
             };
             if (step) {
                 set placed = true;

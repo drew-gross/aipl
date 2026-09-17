@@ -22,11 +22,11 @@ fn main() !prints {
                     some(x4) => x4, #[allow]
                     none => -1,
                 },
-                none => -2,
+                none => -2, #[allow]
             },
-            none => -3,
+            none => -3, #[allow]
         },
-        none => -4,
+        none => -4, #[allow]
     };
     print(to_str(v)); // 42
 

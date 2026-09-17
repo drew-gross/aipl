@@ -1,4 +1,4 @@
-import { equal as ==, print, to_str } from builtins;
+import { equal as ==, map, print, to_str, value_or } from builtins;
 
 // `(A, B)?` — an optional tuple. A tuple type is not a `base_ty`, so it does not
 // inherit `base_ty`'s chained `?`/`[]` suffixes; each `(`-led form is its own
@@ -8,12 +8,7 @@ fn lookup(want: bool) -> (i64, str)? { if (want) { some((7, "seven")) } else { n
 // It works as a parameter too. It does *not* chain into further suffixes:
 // `(A, B)?[]` is a parse error, because the `?` production yields a whole type
 // rather than a `base_ty` that more suffixes could attach to.
-fn describe(p: (i64, str)?) -> str {
-    match (p) {
-        some(pair) => `{pair.0}={pair.1}`,
-        none => "nothing",
-    }
-}
+fn describe(p: (i64, str)?) -> str { p.map(|pair| `{pair.0}={pair.1}`).value_or("nothing") }
 
 fn main() !prints {
     print(describe(lookup(true)));
@@ -31,11 +26,11 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 233
-instructions executed: 380
-binary size: 4560
-  code: 2540
+instructions executed: 453
+binary size: 4848
+  code: 2764
   data: 47
-  metadata: 1973
+  metadata: 2037
 functions:
   __eq___tuple$i64$str:
     calls: 1
@@ -57,7 +52,7 @@ functions:
     bytes: (external)
   describe:
     calls: 2
-    bytes: 604
+    bytes: 828
   main:
     calls: 1
     bytes: 1396

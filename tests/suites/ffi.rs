@@ -74,16 +74,11 @@ fn call_values_marshals_str_args_with_int_return() {
     // str args + i64 return — the shape the compiler will use for
     // `common_space_prefix`: a char-walk counting the shared leading spaces.
     let src = "\
-import { wrapping_add as +, equal as ==, logical_and as &&} from builtins;
-fn go(a: str, b: str, i: i64) -> i64 {
-    match (a[i]) {
-        some(x) => match (b[i]) {
-            some(y) => if (x == ' ' && y == ' ') { go(a, b, i + 1) } else { i },
-            none => i
-        },
-        none => i
-    }
+import { wrapping_add as +, equal as ==, logical_and as &&, map, value_or } from builtins;
+fn both_spaces(a: str, b: str, i: i64) -> bool {
+    a[i].map(|x| b[i].map(|y| x == ' ' && y == ' ').value_or(false)).value_or(false)
 }
+fn go(a: str, b: str, i: i64) -> i64 { if (both_spaces(a, b, i)) { go(a, b, i + 1) } else { i } }
 pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
     let e = Engine::compile(src).unwrap();
     use aipl::FfiValue::{Int, Str};
@@ -982,7 +977,7 @@ pub fn note_text(n: Note) -> str { n.message } #[allow]
 pub fn span_end(s: Span?) -> i64 {
     match (s) {
         some(v) => v.end,
-        none => -1,
+        none => -1, #[allow]
     }
 }
 pub fn depth(n: i64??) -> i64 {
@@ -991,7 +986,7 @@ pub fn depth(n: i64??) -> i64 {
             some(v) => v, #[allow]
             none => -1,
         },
-        none => -2,
+        none => -2, #[allow]
     }
 }
 pub fn or_zero(r: i64!str) -> i64 {
@@ -1153,12 +1148,11 @@ fn doc_example_compile_sources() {
 /// [`Engine::call_values`]'s example: `str` arguments marshaled in, an `i64` out.
 #[test]
 fn doc_example_call_values() {
-    let src = "import { wrapping_add as +, equal as ==, logical_and as &&} from builtins;\n\
+    let src = "import { wrapping_add as +, equal as ==, logical_and as &&, map, value_or } from builtins;\n\
+               fn both_spaces(a: str, b: str, i: i64) -> bool {\n\
+                 a[i].map(|x| b[i].map(|y| x == ' ' && y == ' ').value_or(false)).value_or(false) }\n\
                fn go(a: str, b: str, i: i64) -> i64 {\n\
-                 match (a[i]) {\n\
-                   some(x) => match (b[i]) {\n\
-                     some(y) => if (x == ' ' && y == ' ') { go(a, b, i + 1) } else { i }, none => i },\n\
-                   none => i } }\n\
+                 if (both_spaces(a, b, i)) { go(a, b, i + 1) } else { i } }\n\
                pub fn common_space_prefix(a: str, b: str) -> i64 { go(a, b, 0) }";
     let engine = Engine::compile(src).unwrap();
     use aipl::FfiValue;

@@ -31,7 +31,7 @@ use crate::Error;
 /// returns into one that dies; both are total now (see `saturating_rem` in
 /// codegen), and nothing in the language aborts, so the exclusion had nothing
 /// left to protect.
-fn constant_default(e: &Expr) -> bool {
+pub(super) fn constant_default(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Num(_)
         | ExprKind::Bool(_)

@@ -311,6 +311,14 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 lint:
+  lint to map->sum (with a fusion)
+    fn total(self: Node) -> i64 {
+      mut s = self.v;
+      for (let k : self.kids) {
+          set s += k.total();
+      }
+      self.next.map(|n| s + n.total()).value_or(s)
+    }
   match_value_or_err quotes an empty receiver when the scrutinee isn't a bare name:
     `match (s[i + 1]) { .. }` gets "write "let e = .value_or_err(..)?;"" — the advice
     splices `receiver` (crates/aipl-syntax/src/lint/match_value_or_err.rs, the

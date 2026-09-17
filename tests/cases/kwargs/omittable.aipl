@@ -1,4 +1,4 @@
-import { print, value_or, wrapping_add as + } from builtins;
+import { map, print, value_or, wrapping_add as + } from builtins;
 
 // `k?: T = none` — a keyword parameter that may be *omitted*, as against
 // `k: T? = none`, whose type is optional.
@@ -28,12 +28,7 @@ fn show(r: Rep) -> str {
 
 // A `?:` parameter is still an ordinary keyword parameter: it may be skipped
 // while a later one is given, and the body still sees an optional.
-fn describe(hi?: u64 = none) -> str {
-    match (hi) {
-        some(h) => `bounded at {h}`,
-        none => "unbounded",
-    }
-}
+fn describe(hi?: u64 = none) -> str { hi.map(|h| `bounded at {h}`).value_or("unbounded") }
 
 fn main() !prints {
     // Omitted: the body sees `none`.
@@ -75,11 +70,11 @@ allocations: 57
 deallocations: 57
 reallocations: 0
 bytes allocated: 3386
-instructions executed: 1355
-binary size: 5896
-  code: 3568
+instructions executed: 1512
+binary size: 5448
+  code: 3252
   data: 1
-  metadata: 2327
+  metadata: 2195
 functions:
   __to_str_u64:
     calls: 23
@@ -93,9 +88,12 @@ functions:
   clamp:
     calls: 5
     bytes: 580
+  describe:
+    calls: 3
+    bytes: 632
   main:
     calls: 1
-    bytes: 2128
+    bytes: 1180
   show:
     calls: 3
     bytes: 656

@@ -1,11 +1,6 @@
-import { equal as ==, not_equal as != } from builtins;
+import { equal as ==, map, not_equal as !=, value_or } from builtins;
 
-fn first_not_z() -> i64 {
-    match ("abc"[0]) {
-        some(c) => if (c != 'z') { 1 } else { 0 },
-        none => 0,
-    }
-}.test({
+fn first_not_z() -> i64 { "abc"[0].map(|c| if (c != 'z') { 1 } else { 0 }).value_or(0) }.test({
     assert(first_not_z() == 1);
     assert("abc"[0] != some('z'));
 })
@@ -14,15 +9,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 95
-binary size: 1464
-  code: 472
-  data: 96
-  metadata: 896
+instructions executed: 110
+binary size: 1544
+  code: 552
+  data: 95
+  metadata: 897
 functions:
   __test$first_not_z:
     calls: 1
-    bytes: 360
+    bytes: 440
   aipl_assert:
     calls: 2
     bytes: (external)
