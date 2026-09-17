@@ -506,6 +506,7 @@ case_tests! {
     cases_options_err_try_on_optional_needs_optional_return = "cases/options/err_try_on_optional_needs_optional_return",
     cases_options_if_else_with_none_branch = "cases/options/if_else_with_none_branch",
     cases_options_is_some_and = "cases/options/is_some_and",
+    cases_options_map = "cases/options/map",
     cases_options_match_trailing_comma = "cases/options/match_trailing_comma",
     cases_options_none_is_not_some = "cases/options/none_is_not_some",
     cases_options_optional_of_struct = "cases/options/optional_of_struct",

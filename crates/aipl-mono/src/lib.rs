@@ -3242,6 +3242,12 @@ impl Mono<'_> {
     /// (where `U` is the lambda body's type). The lambda is lifted like any
     /// other (its captures become parameters threaded through), and the mapping
     /// function holds the `mut out = []; for (..) { out.push(..) } out` loop.
+    ///
+    /// Over an optional — `opt.map(|x| body)` — the same lifted function maps
+    /// the one value there may be: `some(v)` becomes `some(f(v))`, `none`
+    /// stays `none`, and the result is `U?`. That body is a `match`, which
+    /// known-constructor elimination then folds into whatever takes the
+    /// result apart (`opt.map(f)?`, `opt.map(f).value_or(d)`).
     fn expand_map(
         &mut self,
         arr: &Expr,
@@ -3250,13 +3256,19 @@ impl Mono<'_> {
         span: Span,
     ) -> Result<(Expr, Type), Error> {
         let (rarr, arr_ty) = self.infer(arr, env)?;
-        let Type::Array(elem) = &arr_ty else {
-            return Err(Error::at(
-                format!("map expects an array, got {}", type_name(&arr_ty)),
-                arr.span.clone(),
-            ));
+        let (elem, over_optional) = match &arr_ty {
+            Type::Array(elem) => ((**elem).clone(), false),
+            Type::Optional(inner) => ((**inner).clone(), true),
+            _ => {
+                return Err(Error::at(
+                    format!(
+                        "map expects an array or an optional, got {}",
+                        type_name(&arr_ty)
+                    ),
+                    arr.span.clone(),
+                ));
+            }
         };
-        let elem = (**elem).clone();
         let effects = self.cur_effects.clone();
         // Resolve the per-element mapping function. A lambda literal is lifted
         // (its captures threaded through as extra parameters); a bare function
@@ -3322,15 +3334,17 @@ impl Mono<'_> {
                     || self.syn_structs.contains_key(n)
                     || self.variants.contains_key(n))
         };
-        let in_place = is_fresh_heap(&rarr, &arr_ty)
+        let in_place = !over_optional
+            && is_fresh_heap(&rarr, &arr_ty)
             && reusable(&elem)
             && reusable(&u)
             && slot_fits(&elem, &u);
 
-        // The mapping function: `(xs: T[], captures..) -> U[]`.
+        // The mapping function: `(xs: T[], captures..) -> U[]` — or, over an
+        // optional, `(opt: T?, captures..) -> U?`.
         let mut map_params = vec![Param {
             name: "$arr".to_string(),
-            ty: Type::Array(Box::new(elem.clone())),
+            ty: arr_ty.clone(),
             mutable: false,
             variadic: false,
             default: None,
@@ -3347,7 +3361,35 @@ impl Mono<'_> {
             span.clone(),
         );
 
-        let map_body = if in_place {
+        let map_body = if over_optional {
+            // Over an optional: `match ($arr) { some($e) => some(f($e, caps..)),
+            // none => none }`.
+            let some_arm = MatchArm {
+                pattern: Pattern::Ctor {
+                    name: "some".to_string(),
+                    bindings: vec!["$e".to_string()],
+                    ignore_payload: false,
+                },
+                body: Expr::new(
+                    ExprKind::Call(Callee::Some, vec![call], false),
+                    span.clone(),
+                ),
+                span: span.clone(),
+            };
+            let none_arm = MatchArm {
+                pattern: Pattern::Ctor {
+                    name: "none".to_string(),
+                    bindings: Vec::new(),
+                    ignore_payload: false,
+                },
+                body: Expr::new(ExprKind::None, span.clone()),
+                span: span.clone(),
+            };
+            Expr::new(
+                ExprKind::Match(Box::new(id("$arr")), vec![some_arm, none_arm]),
+                span.clone(),
+            )
+        } else if in_place {
             // In-place: overwrite each slot with its mapped value and reuse the
             // allocation. body: `mut $a = $arr;
             //        mut $i = 0;
@@ -3463,7 +3505,11 @@ impl Mono<'_> {
             )
         };
         let map_name = self.synth_name("map");
-        let ret = Type::Array(Box::new(decay_concat(u)));
+        let ret = if over_optional {
+            Type::Optional(Box::new(decay_concat(u)))
+        } else {
+            Type::Array(Box::new(decay_concat(u)))
+        };
         self.concrete.insert(
             map_name.clone(),
             ConcreteTemplate {

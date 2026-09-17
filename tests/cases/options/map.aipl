@@ -1,0 +1,73 @@
+import { equal as ==, map, print, to_str, value_or, wrapping_add as + } from builtins;
+
+// `map` over an optional: the one value there may be is mapped, and `none`
+// stays `none` — `some(v)` becomes `some(f(v))`, with the result an optional of
+// the lambda's type. The same `map` as an array's, dispatched on the receiver.
+fn double(n: i64) -> i64 { n + n }
+
+fn describe(o: i64?) -> str {
+    match (o) {
+        some(v) => `some({v})`,
+        none => "none",
+    }
+}
+
+fn main() !prints {
+    let three: i64? = some(3);
+    let absent: i64? = none;
+
+    // A lambda, and a named function.
+    print(describe(three.map(|n| n + 1)));
+    print(describe(absent.map(|n| n + 1)));
+    print(describe(three.map(double)));
+
+    // The result type follows the lambda: an `i64?` mapped to a `str?`.
+    print(three.map(|n| `n={n}`).value_or("nothing"));
+    print(absent.map(|n| `n={n}`).value_or("nothing"));
+
+    // A capture is threaded through like any lambda's.
+    let k = 10;
+    print(describe(three.map(|n| n + k)));
+
+    // Chains: the result is an optional, so it maps again and unwraps as one.
+    print(three.map(double).map(double).value_or(0).to_str());
+    print((absent.map(double) == none).to_str());
+}
+--- stdout ---
+some(4)
+none
+some(6)
+n=3
+nothing
+some(13)
+12
+true
+--- performance ---
+allocations: 13
+deallocations: 13
+reallocations: 0
+bytes allocated: 723
+instructions executed: 536
+binary size: 6056
+  code: 3796
+  data: 47
+  metadata: 2213
+functions:
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_i64:
+    calls: 5
+    bytes: 204
+  aipl_i64_len:
+    calls: 10
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 5
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 3360

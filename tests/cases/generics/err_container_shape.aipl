@@ -29,8 +29,8 @@ fn a_struct(p: P) -> i64[] { p.map(|x| x + 1) }
 
 fn a_variant(v: V) -> i64[] { v.map(|x| x + 1) }
 
-// An optional is the near miss worth naming: `i64?` holds an `i64` the way an
-// array holds elements, and it is still not an array.
+// An optional is *not* a shape mismatch: `map` takes one as a receiver and
+// yields an optional back, so the error here is the return type's.
 fn an_optional(o: i64?) -> i64[] { o.map(|x| x + 1) }
 
 // The receiver is fine and a later *argument* is not. That one is reported by
@@ -42,29 +42,29 @@ fn main() !prints {
     print(to_str(scalar().len()));
 }
 --- errors ---
-error: map expects an array, got i64
+error: map expects an array or an optional, got i64
   --> ./tests/cases/generics/err_container_shape.aipl:23:5
    |
 23 |     n.map(|x| x + 1)
    |     ^
 
-error: map expects an array, got P
+error: map expects an array or an optional, got P
   --> ./tests/cases/generics/err_container_shape.aipl:28:30
    |
 28 | fn a_struct(p: P) -> i64[] { p.map(|x| x + 1) }
    |                              ^
 
-error: map expects an array, got V
+error: map expects an array or an optional, got V
   --> ./tests/cases/generics/err_container_shape.aipl:30:31
    |
 30 | fn a_variant(v: V) -> i64[] { v.map(|x| x + 1) }
    |                               ^
 
-error: map expects an array, got i64?
+error: fn "an_optional": body returns i64?, but the declared return type is i64[]
   --> ./tests/cases/generics/err_container_shape.aipl:34:36
    |
 34 | fn an_optional(o: i64?) -> i64[] { o.map(|x| x + 1) }
-   |                                    ^
+   |                                    ^^^^^^^^^^^^^^^^
 
 error: fn "zip_with" arg 1: expected an array, got i64
   --> ./tests/cases/generics/err_container_shape.aipl:39:46

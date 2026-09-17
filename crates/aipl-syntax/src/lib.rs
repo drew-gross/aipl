@@ -2550,6 +2550,10 @@ fn __builtin_to_set<T: any>(self: T[]) -> #{T} { #{} }
 fn __builtin_get<K: any, V: any>(self: #{K: V}, key: K) -> V? { none }
 fn __builtin_contains_key<K: any, V: any>(self: #{K: V}, key: K) -> bool { false }
 
+// `map` also takes an optional receiver — `opt.map(f)` is `U?`, `some(f(v))`
+// for `some(v)` and `none` for `none` — which the checker and mono dispatch
+// on the receiver's type; this signature is the array form the declaration
+// language can spell.
 fn __builtin_map<T: any, U: any>(self: T[], f: (T) -> U) -> U[] { [] }
 fn __builtin_filter<T: any>(self: T[], pred: (T) -> bool) -> T[] { self }
 // `self.filter(keep).map(f)` in one pass over the elements, instead of one pass

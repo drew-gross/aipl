@@ -4042,6 +4042,20 @@ impl Cx<'_> {
                 span.clone(),
             ));
         }
+        // `map` over an optional: the declared signature is the array form
+        // (`self: T[]` to `U[]`), and an optional receiver takes the same
+        // signature with `?` for `[]` at both ends — `some(v)` maps to
+        // `some(f(v))`, `none` to `none`. The lambda is then checked against
+        // the optional's payload type exactly as it is against an element.
+        let over_optional;
+        let sig = if *callee == Callee::Map
+            && matches!(self.check_expr(&args[0], env, effects)?, Type::Optional(_))
+        {
+            over_optional = optional_map_signature(sig);
+            &over_optional
+        } else {
+            sig
+        };
 
         if !sig.is_generic() {
             // Concrete signature: check each argument against its declared
@@ -4122,13 +4136,15 @@ impl Cx<'_> {
                 // possible, and "arg 0" for it would name a position the reader
                 // never wrote. The wording then matches the check
                 // monomorphization still makes behind this one.
+                // `map` takes either container; the optional form was not
+                // selected above, so name both rather than the one that was.
+                let shape = if *callee == Callee::Map && i == 0 {
+                    "an array or an optional"
+                } else {
+                    shape_name(pty)
+                };
                 let msg = if i == 0 && sig.params.first().is_some_and(|p| p.name == "self") {
-                    format!(
-                        "{} expects {}, got {}",
-                        display(name),
-                        shape_name(pty),
-                        tyname(&aty)
-                    )
+                    format!("{} expects {}, got {}", display(name), shape, tyname(&aty))
                 } else {
                     format!(
                         "fn {:?} arg {i}: expected {}, got {}",
@@ -4707,6 +4723,23 @@ impl Cx<'_> {
             }
         }
     }
+}
+
+/// `map`'s signature over an optional receiver: the declared array form with
+/// the receiver's `T[]` and the result's `U[]` read as `T?` and `U?`. Derived
+/// from the declaration rather than written out, so the parameter names, the
+/// type variables and the lambda's shape stay whatever the declaration says.
+fn optional_map_signature(array_form: &Signature) -> Signature {
+    let as_optional = |t: &Type| match t {
+        Type::Array(inner) => Type::Optional(inner.clone()),
+        other => other.clone(),
+    };
+    let mut sig = array_form.clone();
+    if let Some(receiver) = sig.params.first_mut() {
+        receiver.ty = as_optional(&receiver.ty);
+    }
+    sig.return_ty = sig.return_ty.as_ref().map(as_optional);
+    sig
 }
 
 /// Strip the internal `__builtin_` prefix for diagnostics.
