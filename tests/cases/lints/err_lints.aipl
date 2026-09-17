@@ -28,7 +28,7 @@ import {
 // `len_gt_zero_allow`, `is_empty_longhand_allow`, `push_loop_pipeline_allow`,
 // `return_loop_find_if_allow`, `return_loop_find_index_allow`,
 // `return_loop_any_all_allow`, `union_loop_union_all_allow`,
-// `interp_to_str_allow`), and its own
+// `interp_to_str_allow`, `interp_literal_allow`), and its own
 // passing case
 // for the shapes it must *not* flag (`slice_whole_allow`,
 // `slice_from_zero_open_end`, `field_init_range_value`,
@@ -38,7 +38,7 @@ import {
 // `is_empty_longhand_user_len`, `push_loop_pipeline_not_flagged`,
 // `return_loop_find_if_not_flagged`, `return_loop_find_index_not_flagged`,
 // `return_loop_any_all_not_flagged`, `union_loop_union_all_not_flagged`,
-// `interp_to_str_not_flagged`).
+// `interp_to_str_not_flagged`, `interp_literal_not_flagged`).
 
 struct Point { x: i64, y: i64 }
 
@@ -67,6 +67,10 @@ fn stringify(xs: i64[]) -> str[] { xs.map(|x| to_str(x)) }
 // its value the same way; `{n}` says the same thing. The method spelling is
 // the same call.
 fn labelled(n: i64) -> str { `n = {to_str(n)} ({n.to_str()})` }
+
+// `{'a'}` / `{"aa"}` — a literal as the whole interpolation renders as its
+// text, which the template could have said in place: `` `a: a, aa: aa` ``.
+fn spelled() -> str { `a: {'a'}, aa: {"aa"}` }
 
 // `set x = x + 1;` — an increment written the long way; `set x++;` is the form
 // for it (either operand order counts, so `1 + n` is flagged too).
@@ -135,39 +139,39 @@ fn main() !prints {
 }
 --- errors ---
 error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
-   --> ./tests/cases/lints/err_lints.aipl:112:13
+   --> ./tests/cases/lints/err_lints.aipl:116:13
     |
-112 |     print(s[0..]);
+116 |     print(s[0..]);
     |             ^
 
 error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
-   --> ./tests/cases/lints/err_lints.aipl:113:15
+   --> ./tests/cases/lints/err_lints.aipl:117:15
     |
-113 |     print(s[..s.len()]);
+117 |     print(s[..s.len()]);
     |               ^^^^^^^
 
 error: slice covers the whole receiver — use "s" itself (or append #[allow] to this line to keep it)
-   --> ./tests/cases/lints/err_lints.aipl:114:13
+   --> ./tests/cases/lints/err_lints.aipl:118:13
     |
-114 |     print(s[0..s.len()]);
+118 |     print(s[0..s.len()]);
     |             ^
 
 error: slice end is the receiver's whole length — use the open-ended "s[3..]" (or append #[allow] to this line to keep it)
-   --> ./tests/cases/lints/err_lints.aipl:106:16
+   --> ./tests/cases/lints/err_lints.aipl:110:16
     |
-106 |     print(s[3..s.len()]);
+110 |     print(s[3..s.len()]);
     |                ^^^^^^^
 
 error: slice end is the receiver's whole length — use the open-ended "s[4..]" (or append #[allow] to this line to keep it)
-   --> ./tests/cases/lints/err_lints.aipl:123:16
+   --> ./tests/cases/lints/err_lints.aipl:127:16
     |
-123 |     print(s[4..s.len()]);
+127 |     print(s[4..s.len()]);
     |                ^^^^^^^
 
 error: slice starts at 0 — drop it for the open-ended "s[..end]" (or append #[allow] to this line to keep it)
-   --> ./tests/cases/lints/err_lints.aipl:118:13
+   --> ./tests/cases/lints/err_lints.aipl:122:13
     |
-118 |     print(s[0..2]);
+122 |     print(s[0..2]);
     |             ^
 
 error: lambda only forwards its argument(s) to "to_str" — pass "to_str" directly (or append #[allow] to this line to keep it)
@@ -188,6 +192,18 @@ error: "to_str" inside an interpolation is redundant — the interpolation alrea
 69 | fn labelled(n: i64) -> str { `n = {to_str(n)} ({n.to_str()})` }
    |                                                 ^^^^^^^^^^
 
+error: a char literal interpolated into a template is just its text — write it into the template directly (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:73:28
+   |
+73 | fn spelled() -> str { `a: {'a'}, aa: {"aa"}` }
+   |                            ^^^
+
+error: a string literal interpolated into a template is just its text — write it into the template directly (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_lints.aipl:73:39
+   |
+73 | fn spelled() -> str { `a: {'a'}, aa: {"aa"}` }
+   |                                       ^^^^
+
 error: field "x" is set to the identifier of the same name — use the shorthand "x" (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_lints.aipl:48:47
    |
@@ -201,34 +217,34 @@ error: field "y" is set to the identifier of the same name — use the shorthand
    |                                                     ^
 
 error: adding 1 to "n" — use the increment form "set n++;", importing `wrapping_increment as ++` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:75:9
+  --> ./tests/cases/lints/err_lints.aipl:79:9
    |
-75 |     set n = n + 1;
+79 |     set n = n + 1;
    |         ^^^^^^^^^
 
 error: subtracting 1 from "n" — use the decrement form "set n--;", importing `wrapping_decrement as --` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:84:9
+  --> ./tests/cases/lints/err_lints.aipl:88:9
    |
-84 |     set n = n - 1;
+88 |     set n = n - 1;
    |         ^^^^^^^^^
 
 error: a length compared against 0 — use "xs.is_nonempty()", importing `is_nonempty` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:91:35
+  --> ./tests/cases/lints/err_lints.aipl:95:35
    |
-91 | fn any_items(xs: i64[]) -> bool { 0 < xs.len() }
+95 | fn any_items(xs: i64[]) -> bool { 0 < xs.len() }
    |                                   ^^^^^^^^^^^^
 
 error: a length compared against 0 — use "is_nonempty" on the receiver, importing `is_nonempty` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:95:34
+  --> ./tests/cases/lints/err_lints.aipl:99:34
    |
-95 | fn also_any(xs: i64[]) -> bool { len(xs) > 0 }
+99 | fn also_any(xs: i64[]) -> bool { len(xs) > 0 }
    |                                  ^^^^^^^^^^^
 
 error: a negated emptiness test — use "xs.is_nonempty()", importing `is_nonempty` from builtins (or append #[allow] to this line to keep it)
-  --> ./tests/cases/lints/err_lints.aipl:99:35
-   |
-99 | fn not_empty(xs: i64[]) -> bool { !xs.is_empty() }
-   |                                   ^^^^^^^^^^^^^^
+   --> ./tests/cases/lints/err_lints.aipl:103:35
+    |
+103 | fn not_empty(xs: i64[]) -> bool { !xs.is_empty() }
+    |                                   ^^^^^^^^^^^^^^
 
 error: fn "make" returns "Point" and its body is a "Point" literal, naming the type twice — write the fields directly as the body (or append #[allow] to this line to keep it)
   --> ./tests/cases/lints/err_lints.aipl:48:36

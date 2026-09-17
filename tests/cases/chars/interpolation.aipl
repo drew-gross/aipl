@@ -7,7 +7,11 @@ import { concat as +++, print, to_str } from builtins;
 fn main() !prints {
     let c = 'b';
     print(`bare: {c}`); // bare: b
-    print(`built: {'x'}{'y'}{'z'}`); // built: xyz
+
+    // Literal chars, one per interpolation — what the lint against a literal
+    // interpolation flags, squelched here because the rendering is the point.
+    print(`built: {'x'}{'y'}{'z'}`); #[allow]
+    // built: xyz
     print("to_str: " +++ to_str(c)); // to_str: b
     print(`nested: {['a', 'b']}`); // nested: ['a', 'b']
 

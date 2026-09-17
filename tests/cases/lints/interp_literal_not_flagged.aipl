@@ -1,0 +1,35 @@
+import { concat as +++, print } from builtins;
+
+// Shapes that look close but are deliberately left alone.
+fn main() !prints {
+    let s = "x";
+
+    // A literal that is *part* of the interpolation's expression computes
+    // something; only a literal standing alone is the template's own text.
+    print(`{"a" +++ s}`);
+
+    // A `"""` literal is raw: its text reaches the template verbatim, escapes
+    // and all, which is a thing the template's own text cannot say.
+    print(`{"""back\slash"""}`);
+    // A char that is not a literal.
+    let c = 'c';
+    print(`{c}`);
+}
+--- stdout ---
+ax
+back\slash
+c
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 88
+instructions executed: 96
+binary size: 1560
+  code: 684
+  data: 1
+  metadata: 875
+functions:
+  main:
+    calls: 1
+    bytes: 684

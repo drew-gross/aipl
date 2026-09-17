@@ -1,0 +1,25 @@
+import { print } from builtins;
+
+// `#[allow]` at the end of the line keeps a literal interpolation as written;
+// the template beside it says the same thing in place.
+fn main() !prints {
+    print(`a: {'a'}, aa: {"aa"}`); #[allow]
+    print(`a: a, aa: aa`);
+}
+--- stdout ---
+a: a, aa: aa
+a: a, aa: aa
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 264
+instructions executed: 57
+binary size: 1208
+  code: 444
+  data: 1
+  metadata: 763
+functions:
+  main:
+    calls: 1
+    bytes: 444

@@ -17,6 +17,7 @@ mod eta_lambda;
 mod extend_longhand;
 mod field_init_shorthand;
 mod fn_body_type_stutter;
+mod interp_literal;
 mod interp_to_str;
 mod is_empty_longhand;
 mod len_gt_zero;
@@ -49,6 +50,7 @@ use self::eta_lambda::eta_lambda;
 use self::extend_longhand::{extend_longhand, extend_names};
 use self::field_init_shorthand::field_init_shorthand;
 use self::fn_body_type_stutter::fn_body_type_stutter;
+use self::interp_literal::interp_literal;
 use self::interp_to_str::{interp_to_str, to_str_name};
 use self::is_empty_longhand::{empty_names, is_empty_longhand};
 use self::len_gt_zero::{len_gt_zero, len_zero_cmp};
@@ -91,6 +93,8 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     if let Some(to_str) = to_str_name(program) {
         each_expr(program, &mut |e| interp_to_str(e, src, &to_str, &mut hits));
     }
+    // A string or char literal as an interpolation, which is just its text.
+    each_expr(program, &mut |e| interp_literal(e, src, &mut hits));
     // `map(f).find_if(is_some)` is `find_map(f)` — see `find_map_names` for the
     // three names the shape is made of.
     let find_map = find_map_names(program);
