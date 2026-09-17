@@ -429,15 +429,15 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 362
-deallocations: 362
+allocations: 359
+deallocations: 359
 reallocations: 33
-bytes allocated: 21526
-instructions executed: 43959
-binary size: 58752
-  code: 35516
+bytes allocated: 21382
+instructions executed: 43702
+binary size: 58712
+  code: 35480
   data: 2717
-  metadata: 20519
+  metadata: 20515
 functions:
   __arr_drop_Cst:
     calls: 138
@@ -470,7 +470,7 @@ functions:
     calls: 12
     bytes: 1028
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_leaf:
-    calls: 9
+    calls: 6
     bytes: 440
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_token:
     calls: 2
@@ -497,22 +497,22 @@ functions:
     calls: 1
     bytes: 388
   aipl_arr_elem_ptr:
-    calls: 12
+    calls: 9
     bytes: (external)
   aipl_arr_extend:
     calls: 236
     bytes: (external)
   aipl_arr_inc:
-    calls: 779
+    calls: 775
     bytes: (external)
   aipl_arr_reserve:
     calls: 318
     bytes: (external)
   aipl_arr_reverse:
-    calls: 11
+    calls: 8
     bytes: (external)
   aipl_array_dec:
-    calls: 1405
+    calls: 1398
     bytes: (external)
   aipl_array_new:
     calls: 149
@@ -530,10 +530,10 @@ functions:
     calls: 61
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 576
+    calls: 573
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 515
+    calls: 512
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -557,11 +557,11 @@ functions:
     calls: 20
     bytes: 1104
   last_leaf:
-    calls: 15
-    bytes: 796
+    calls: 12
+    bytes: 788
   last_token:
     calls: 5
-    bytes: 768
+    bytes: 760
   leaves:
     calls: 0
     bytes: 32
@@ -579,13 +579,13 @@ functions:
     bytes: 1240
   show:
     calls: 23
-    bytes: 2968
+    bytes: 2956
   span:
     calls: 7
     bytes: 252
   text:
     calls: 5
-    bytes: 1456
+    bytes: 1452
   token_leaves:
     calls: 0
     bytes: 32
@@ -597,4 +597,4 @@ functions:
     bytes: 288
   token_text:
     calls: 5
-    bytes: 1456
+    bytes: 1452

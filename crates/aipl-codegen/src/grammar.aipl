@@ -876,11 +876,11 @@ allocations: 366
 deallocations: 366
 reallocations: 54
 bytes allocated: 56058
-instructions executed: 59711
-binary size: 133904
-  code: 85144
+instructions executed: 58533
+binary size: 132728
+  code: 84252
   data: 3516
-  metadata: 45244
+  metadata: 44960
 functions:
   __arr_drop_ListStyle:
     calls: 41
@@ -983,7 +983,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 47536
+    bytes: 46900
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -997,13 +997,13 @@ functions:
     calls: 111
     bytes: (external)
   aipl_arr_inc:
-    calls: 408
+    calls: 393
     bytes: (external)
   aipl_arr_reserve:
     calls: 61
     bytes: (external)
   aipl_array_dec:
-    calls: 781
+    calls: 766
     bytes: (external)
   aipl_array_new:
     calls: 44
@@ -1085,7 +1085,7 @@ functions:
     bytes: 180
   opt_group_styles$Kind:
     calls: 61
-    bytes: 408
+    bytes: 152
   prod_names$Kind$Node:
     calls: 18
     bytes: 548

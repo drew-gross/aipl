@@ -1595,11 +1595,11 @@ allocations: 5735
 deallocations: 5735
 reallocations: 1283
 bytes allocated: 602527
-instructions executed: 1384753
-binary size: 672632
-  code: 407528
+instructions executed: 1359768
+binary size: 670520
+  code: 405864
   data: 10484
-  metadata: 254620
+  metadata: 254172
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1798,7 +1798,7 @@ functions:
     bytes: 1104
   __m1__last_leaf:
     calls: 2
-    bytes: 796
+    bytes: 788
   __m1__leaves:
     calls: 0
     bytes: 32
@@ -1810,13 +1810,13 @@ functions:
     bytes: 368
   __m1__show:
     calls: 226
-    bytes: 2968
+    bytes: 2956
   __m1__span:
     calls: 1
     bytes: 252
   __m1__text:
     calls: 12
-    bytes: 1456
+    bytes: 1452
   __m1__token_leaves:
     calls: 0
     bytes: 32
@@ -1825,7 +1825,7 @@ functions:
     bytes: 1156
   __m1__token_text:
     calls: 0
-    bytes: 1456
+    bytes: 1452
   __m2__can_start$Tok:
     calls: 26
     bytes: 256
@@ -1840,7 +1840,7 @@ functions:
     bytes: 436
   __m2__rule_first$Tok:
     calls: 149
-    bytes: 7480
+    bytes: 7216
   __m3__desugar_opt$Tok:
     calls: 60
     bytes: 580
@@ -1870,7 +1870,7 @@ functions:
     bytes: 600
   __m3__opt_group_styles$Tok:
     calls: 208
-    bytes: 408
+    bytes: 152
   __m3__prod_names$Tok$Node:
     calls: 226
     bytes: 548
@@ -1900,7 +1900,7 @@ functions:
     bytes: 1136
   __m4__step_result$Tok:
     calls: 931
-    bytes: 9276
+    bytes: 9188
   __m4__template_scan$Tok:
     calls: 0
     bytes: 2908
@@ -1956,7 +1956,7 @@ functions:
     calls: 1851
     bytes: (external)
   aipl_arr_inc:
-    calls: 30431
+    calls: 30086
     bytes: (external)
   aipl_arr_reserve:
     calls: 2041
@@ -1971,7 +1971,7 @@ functions:
     calls: 40
     bytes: (external)
   aipl_array_dec:
-    calls: 38790
+    calls: 38445
     bytes: (external)
   aipl_array_new:
     calls: 742
@@ -2029,7 +2029,7 @@ functions:
     bytes: (external)
   attach_trivia$Tok:
     calls: 88
-    bytes: 1820
+    bytes: 1812
   build_node:
     calls: 17
     bytes: 288
@@ -2041,7 +2041,7 @@ functions:
     bytes: 2992
   error_at$Tok$Node:
     calls: 40
-    bytes: 3564
+    bytes: 3180
   far_miss:
     calls: 142
     bytes: 1080
@@ -2065,7 +2065,7 @@ functions:
     bytes: 180
   match_group$Tok$Node:
     calls: 15
-    bytes: 5360
+    bytes: 5112
   match_leading_sep$Tok$Node:
     calls: 5
     bytes: 1096
@@ -2080,7 +2080,7 @@ functions:
     bytes: 1488
   match_prod$Tok$Node:
     calls: 181
-    bytes: 6852
+    bytes: 6776
   match_reps$Tok$Node:
     calls: 56
     bytes: 4136
@@ -2155,7 +2155,7 @@ functions:
     bytes: 96
   tok_text$Tok$Node:
     calls: 207
-    bytes: 1128
+    bytes: 904
   trivia_rules:
     calls: 3
     bytes: 3368
@@ -2173,4 +2173,4 @@ functions:
     bytes: 96
   trivia_span$Tok:
     calls: 17
-    bytes: 848
+    bytes: 760

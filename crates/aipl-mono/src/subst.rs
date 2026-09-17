@@ -63,8 +63,11 @@
 //!
 //! **Pre-monomorphization only.** The win is in the shape-matching passes, and
 //! [`crate::fuse_operations`] and [`crate::fold_constants`] both run before
-//! mono. Post-mono there is no shape left to expose — removing a binding there
-//! produces identical code — so the risk buys nothing and the pass isn't run.
+//! mono. The one post-mono shape pass,
+//! [`crate::eliminate_known_constructors_post_mono`], sees through the
+//! bindings inlining leaves in front of a `match` itself — they carry a type
+//! annotation this pass refuses to drop, and it needs that annotation — so a
+//! post-mono run of this pass would buy nothing there either.
 
 use std::collections::HashSet;
 
@@ -147,12 +150,12 @@ fn subst_here(e: Expr, blocked: &HashSet<String>) -> Expr {
 /// The tally [`subst_here`] needs: how many times `name` occurs free in an
 /// expression, and whether any occurrence sits somewhere that runs other than
 /// exactly once.
-struct Uses {
-    count: usize,
-    repeated: bool,
+pub(crate) struct Uses {
+    pub(crate) count: usize,
+    pub(crate) repeated: bool,
 }
 
-fn uses_of(e: &Expr, name: &str) -> Uses {
+pub(crate) fn uses_of(e: &Expr, name: &str) -> Uses {
     let mut uses = Uses {
         count: 0,
         repeated: false,

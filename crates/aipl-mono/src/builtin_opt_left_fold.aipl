@@ -90,11 +90,11 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 328
-instructions executed: 2456
-binary size: 9552
-  code: 5328
+instructions executed: 2454
+binary size: 9560
+  code: 5332
   data: 1135
-  metadata: 3089
+  metadata: 3093
 functions:
   __eq_i64$opt:
     calls: 1
@@ -104,7 +104,7 @@ functions:
     bytes: 116
   __test$opt_left_fold:
     calls: 1
-    bytes: 3868
+    bytes: 3872
   __test$opt_left_fold$filter2$own0:
     calls: 1
     bytes: 300

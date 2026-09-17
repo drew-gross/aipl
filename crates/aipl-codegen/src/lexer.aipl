@@ -1519,10 +1519,10 @@ deallocations: 434
 reallocations: 71
 bytes allocated: 67520
 instructions executed: 373643
-binary size: 2535672
-  code: 1697636
+binary size: 2535664
+  code: 1697632
   data: 11788
-  metadata: 826248
+  metadata: 826244
 functions:
   __arr_drop_StepResult$Kind:
     calls: 9
@@ -1763,7 +1763,7 @@ functions:
     bytes: 4116
   step_result$Kind:
     calls: 477
-    bytes: 16292
+    bytes: 16288
   template_scan$Kind:
     calls: 20
     bytes: 2908

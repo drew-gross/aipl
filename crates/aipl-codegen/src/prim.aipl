@@ -62,18 +62,18 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1102
-binary size: 10856
-  code: 7400
+instructions executed: 941
+binary size: 5096
+  code: 2648
   data: 609
-  metadata: 2847
+  metadata: 1839
 functions:
   __test$prim_from_name:
     calls: 1
-    bytes: 2756
+    bytes: 856
   __test$prim_name:
     calls: 1
-    bytes: 3232
+    bytes: 380
   aipl_assert:
     calls: 10
     bytes: (external)

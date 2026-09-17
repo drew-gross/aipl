@@ -3143,11 +3143,11 @@ allocations: 15944
 deallocations: 15944
 reallocations: 1765
 bytes allocated: 3322001
-instructions executed: 27232129
-binary size: 10107240
-  code: 6387144
+instructions executed: 26818619
+binary size: 10105576
+  code: 6385928
   data: 31204
-  metadata: 3688892
+  metadata: 3688444
 functions:
   __arr_drop_ImportEntry:
     calls: 21
@@ -3471,7 +3471,7 @@ functions:
     calls: 4795
     bytes: (external)
   aipl_arr_inc:
-    calls: 296363
+    calls: 288815
     bytes: (external)
   aipl_arr_reserve:
     calls: 5047
@@ -3480,7 +3480,7 @@ functions:
     calls: 83
     bytes: (external)
   aipl_array_dec:
-    calls: 419406
+    calls: 411858
     bytes: (external)
   aipl_array_new:
     calls: 3654
@@ -3556,7 +3556,7 @@ functions:
     bytes: 4428
   bump:
     calls: 1259
-    bytes: 2088
+    bytes: 1284
   call_arg:
     calls: 17
     bytes: 7200
@@ -3652,7 +3652,7 @@ functions:
     bytes: 3192
   import_item:
     calls: 14
-    bytes: 13760
+    bytes: 13756
   index_or_from:
     calls: 3
     bytes: 3916
@@ -3700,7 +3700,7 @@ functions:
     bytes: 3600
   next_start:
     calls: 54
-    bytes: 684
+    bytes: 508
   one_param:
     calls: 12
     bytes: 12976
@@ -3811,7 +3811,7 @@ functions:
     bytes: 668
   tok_text:
     calls: 4072
-    bytes: 740
+    bytes: 508
   trailing_comment:
     calls: 99
     bytes: 2284

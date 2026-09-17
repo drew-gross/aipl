@@ -13,15 +13,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 94
-binary size: 1616
-  code: 508
+instructions executed: 77
+binary size: 1528
+  code: 420
   data: 193
   metadata: 915
 functions:
   __test$divide:
     calls: 1
-    bytes: 404
+    bytes: 316
   aipl_assert:
     calls: 3
     bytes: (external)

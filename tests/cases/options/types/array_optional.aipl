@@ -14,20 +14,20 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 104
-instructions executed: 248
-binary size: 3672
-  code: 1816
+instructions executed: 197
+binary size: 3128
+  code: 1460
   data: 146
-  metadata: 1710
+  metadata: 1522
 functions:
   __test$pick:
     calls: 1
-    bytes: 1716
+    bytes: 1360
   aipl_arr_inc:
-    calls: 4
+    calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 6
+    calls: 3
     bytes: (external)
   aipl_array_new:
     calls: 1

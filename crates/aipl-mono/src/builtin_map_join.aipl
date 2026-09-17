@@ -113,16 +113,16 @@ reallocations: 2
 bytes allocated: 1265
 instructions executed: 5181
 binary size: 17832
-  code: 11092
+  code: 11088
   data: 1249
-  metadata: 5491
+  metadata: 5495
 functions:
   __eq_i64$arr:
     calls: 1
     bytes: 296
   __test$map_join:
     calls: 1
-    bytes: 7700
+    bytes: 7696
   __to_str_i64:
     calls: 6
     bytes: 204

@@ -9,15 +9,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 110
-binary size: 1544
-  code: 552
+instructions executed: 95
+binary size: 1464
+  code: 472
   data: 95
   metadata: 897
 functions:
   __test$first_not_z:
     calls: 1
-    bytes: 440
+    bytes: 360
   aipl_assert:
     calls: 2
     bytes: (external)

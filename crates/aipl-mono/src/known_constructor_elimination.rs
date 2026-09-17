@@ -72,6 +72,19 @@
 //! refused for the same reason: the binders are bound one after another, so a
 //! later payload would see an earlier binder instead of the name it meant.
 //!
+//! A `match` whose scrutinee is a *name* bound just above it is the same
+//! shape one step removed — and it is the shape inlining leaves behind, since
+//! an inlined call binds each argument to a `let` ahead of the body:
+//! `opt.map(f).value_or(d)` arrives as `let self: U? = <map's match>;
+//! match (self) { .. }`. When that name is read exactly once, there, and the
+//! value may move to where it is read (the sinker's [`can_defer`], with
+//! nothing in between writing what the value reads), the `match` is pushed
+//! into the value directly and the binding disappears. The binding's
+//! annotation is not lost with it: it is the scrutinee's type, so each payload
+//! binder the push introduces is annotated with the side it takes — which is
+//! what keeps a leaf like `some(none)`, whose payload has no type of its own,
+//! typed.
+//!
 //! The walk never enters a loop, a lambda, or a shim body, whose value is not
 //! the tail's. A comparison with a constructor on *both* sides is left alone:
 //! that is two literals, which is constant folding's to settle, and the
@@ -89,10 +102,10 @@
 
 use std::collections::HashSet;
 
-use aipl_syntax::ast::{Callee, Expr, ExprKind, FieldInit, MatchArm, Pattern};
+use aipl_syntax::ast::{Callee, Expr, ExprKind, FieldInit, MatchArm, Pattern, Type};
 
 use crate::sink::{can_defer, undeferrable_fns_post_mono};
-use crate::subst::read_names;
+use crate::subst::{assigned_names, read_names, uses_of};
 use crate::{body_size, next_inline_id, ConcreteFn, MonoProgram};
 
 /// Eliminate every known-constructor pair in `program`. `max_duplicated` bounds
@@ -142,9 +155,13 @@ fn rewrite(e: &Expr, limits: &Limits) -> Expr {
     match &out.kind {
         ExprKind::Try(inner) if ends_in(inner, is_optional_or_result) => push_try(inner, &out),
         ExprKind::Match(scrutinee, arms)
-            if ends_in(scrutinee, is_matchable) && match_can_move(scrutinee, arms, limits) =>
+            if ends_in(scrutinee, is_matchable)
+                && match_can_move(scrutinee, arms, limits, false) =>
         {
-            push_match(scrutinee, arms, &out)
+            push_match(scrutinee, arms, &out, &|_| None)
+        }
+        ExprKind::Let(name, annotation, value, body) if ends_in(value, is_matchable) => {
+            match_through_binding(name, annotation.as_ref(), value, body, limits).unwrap_or(out)
         }
         ExprKind::Field(base, field)
             if ends_in(base, is_struct) && field_can_move(base, field, limits) =>
@@ -498,8 +515,10 @@ fn arm_for<'a>(arms: &'a [MatchArm], case: &str) -> Option<&'a MatchArm> {
 /// Whether pushing `arms` into `scrutinee` is both possible and worth it: every
 /// leaf selects an arm whose binders line up with its payloads, no payload
 /// reads one of those binders, the copies stay within `max_duplicated`, and no
-/// binding the scrutinee introduces captures a name an arm reads.
-fn match_can_move(scrutinee: &Expr, arms: &[MatchArm], limits: &Limits) -> bool {
+/// binding the scrutinee introduces captures a name an arm reads. A payload
+/// with no type of its own (`some(none)`, `ok([])`) is bound to a binder only
+/// when the push can annotate it (`annotated` — see [`match_through_binding`]).
+fn match_can_move(scrutinee: &Expr, arms: &[MatchArm], limits: &Limits, annotated: bool) -> bool {
     let mut ends = Vec::new();
     leaves(scrutinee, &mut ends);
     let mut copied = 0usize;
@@ -512,6 +531,14 @@ fn match_can_move(scrutinee: &Expr, arms: &[MatchArm], limits: &Limits) -> bool 
         let payloads = kind.payloads();
         if let Pattern::Ctor { bindings, .. } = &arm.pattern {
             if bindings.len() != payloads.len() {
+                return false;
+            }
+            if !annotated
+                && bindings
+                    .iter()
+                    .zip(&payloads)
+                    .any(|(b, p)| b != "_" && crate::contains_context_literal(p))
+            {
                 return false;
             }
             let mut read = HashSet::new();
@@ -559,18 +586,136 @@ fn bound_names(e: &Expr, out: &mut HashSet<String>) {
     }
 }
 
+/// `let name = value; .. match (name) { arms } ..` with the `match` pushed into
+/// `value` and the binding gone — see the module docs. `None` when the shape
+/// does not hold: `name` read anywhere but as that one scrutinee, the scrutinee
+/// not reachable through the value-carrying wrappers alone, the value not
+/// movable past what sits between, or the push itself refused.
+fn match_through_binding(
+    name: &str,
+    annotation: Option<&Type>,
+    value: &Expr,
+    body: &Expr,
+    limits: &Limits,
+) -> Option<Expr> {
+    let uses = uses_of(body, name);
+    if uses.count != 1 || uses.repeated || !can_defer(value, &limits.blocked) {
+        return None;
+    }
+    // Moving the value to where it is read must not move it past a write to
+    // something it reads.
+    let mut written = HashSet::new();
+    assigned_names(body, &mut written);
+    if !written.is_empty() {
+        let mut read = HashSet::new();
+        read_names(value, &mut read);
+        if !read.is_disjoint(&written) {
+            return None;
+        }
+    }
+    let annotate = |case: &str| payload_annotation(annotation, case);
+    push_into_scrutinee(name, value, body, limits, annotation.is_some(), &annotate)
+}
+
+/// `body` with its one `match (name)` — reached through `let`/`mut`/`set`/`;`
+/// wrappers only — replaced by the pushed form of `match (value)`. `None` if
+/// the read of `name` sits anywhere else.
+fn push_into_scrutinee(
+    name: &str,
+    value: &Expr,
+    body: &Expr,
+    limits: &Limits,
+    annotated: bool,
+    annotate: &dyn Fn(&str) -> Option<Type>,
+) -> Option<Expr> {
+    let again = |inner: &Expr| push_into_scrutinee(name, value, inner, limits, annotated, annotate);
+    let kind = match &body.kind {
+        ExprKind::Match(scrutinee, arms) if matches!(&scrutinee.kind, ExprKind::Ident(n) if n == name) =>
+        {
+            if !match_can_move(value, arms, limits, annotated) {
+                return None;
+            }
+            return Some(push_match(value, arms, body, annotate));
+        }
+        // `let alias = name; ..` — the one read is an alias, itself read once
+        // as the scrutinee further down (the shape two inlined calls leave, the
+        // inner one's argument binding the outer one's parameter). Follow it
+        // and drop the alias; its annotation is the scrutinee's type too.
+        ExprKind::Let(alias, ty, v, rest) if matches!(&v.kind, ExprKind::Ident(n) if n == name) => {
+            let uses = uses_of(rest, alias);
+            if uses.count != 1 || uses.repeated || alias == name || reads(value, alias) {
+                return None;
+            }
+            return push_into_scrutinee(
+                alias,
+                value,
+                rest,
+                limits,
+                annotated || ty.is_some(),
+                &|case| annotate(case).or_else(|| payload_annotation(ty.as_ref(), case)),
+            );
+        }
+        // A binding of the same name below would shadow it; the read this is
+        // looking for cannot be under one. A value the pushed `value` reads
+        // cannot be re-bound between either, or the move would capture it.
+        ExprKind::Let(n, ty, v, rest) | ExprKind::LetMut(n, ty, v, rest)
+            if n != name && !reads(value, n) =>
+        {
+            let inner = Box::new(again(rest)?);
+            if matches!(&body.kind, ExprKind::Let(..)) {
+                ExprKind::Let(n.clone(), ty.clone(), v.clone(), inner)
+            } else {
+                ExprKind::LetMut(n.clone(), ty.clone(), v.clone(), inner)
+            }
+        }
+        ExprKind::Assign(lhs, v, rest) => {
+            ExprKind::Assign(lhs.clone(), v.clone(), Box::new(again(rest)?))
+        }
+        ExprKind::Seq(first, rest) => ExprKind::Seq(first.clone(), Box::new(again(rest)?)),
+        _ => return None,
+    };
+    Some(Expr::rebuilt(kind, body))
+}
+
+/// Whether `e` reads the name `n` anywhere.
+fn reads(e: &Expr, n: &str) -> bool {
+    let mut names = HashSet::new();
+    read_names(e, &mut names);
+    names.contains(n)
+}
+
+/// The type a binder of `case`'s payload is declared with, read off the
+/// scrutinee's declared type `annotation`: the optional's inner type for
+/// `some`, a result's side for `ok`/`err`, nothing for a variant case.
+fn payload_annotation(annotation: Option<&Type>, case: &str) -> Option<Type> {
+    match (annotation, case) {
+        (Some(Type::Optional(inner)), "some") => Some((**inner).clone()),
+        (Some(Type::Result(ok, _)), "ok") => Some((**ok).clone()),
+        (Some(Type::Result(_, err)), "err") => Some((**err).clone()),
+        _ => None,
+    }
+}
+
 /// `match (scrutinee) { arms }` with the `match` applied at each constructor
 /// `scrutinee` ends in: the leaf's arm, with each binder bound to the payload
 /// in its slot. A `_` binder binds nothing, and a payload no binder takes is
 /// still evaluated for whatever it does. `match_at` is the original `match`
-/// expression.
-fn push_match(scrutinee: &Expr, arms: &[MatchArm], match_at: &Expr) -> Expr {
+/// expression; `annotate` gives the type a binder of each case's payload is
+/// declared with, when the scrutinee's type is known (see
+/// [`match_through_binding`]).
+fn push_match(
+    scrutinee: &Expr,
+    arms: &[MatchArm],
+    match_at: &Expr,
+    annotate: &dyn Fn(&str) -> Option<Type>,
+) -> Expr {
     push(scrutinee, match_at, &mut |leaf, kind| {
         let arm = arm_for(arms, kind.case_name()).expect("checked by `match_can_move`");
         let payloads = kind.payloads();
+        let annotation = annotate(kind.case_name());
         let bind = |name: String, value: Expr, body: Expr| {
             Expr::rebuilt(
-                ExprKind::Let(name, None, Box::new(value), Box::new(body)),
+                ExprKind::Let(name, annotation.clone(), Box::new(value), Box::new(body)),
                 match_at,
             )
         };
@@ -578,6 +723,14 @@ fn push_match(scrutinee: &Expr, arms: &[MatchArm], match_at: &Expr) -> Expr {
             Expr::rebuilt(ExprKind::Seq(Box::new(value), Box::new(body)), match_at)
         };
         match &arm.pattern {
+            // `some(v) => v` — the arm hands its one payload straight back, so
+            // the payload *is* the value; binding it first would only copy it.
+            Pattern::Ctor { bindings, .. }
+                if matches!((&bindings[..], &payloads[..]), ([b], [_])
+                    if matches!(&arm.body.kind, ExprKind::Ident(v) if v == b)) =>
+            {
+                payloads[0].clone()
+            }
             // Binders are bound first to last, so the body sees them all; the
             // payloads' own evaluation order is preserved the same way.
             Pattern::Ctor { bindings, .. } => bindings.iter().zip(payloads).rev().fold(
@@ -786,12 +939,49 @@ mod tests {
         let ExprKind::If(_, t, f) = &out.kind else {
             panic!("expected the match pushed into the `if`, got {out:?}");
         };
-        let ExprKind::Let(name, _, payload, body) = &t.kind else {
-            panic!("expected `let v = x; v`, got {t:?}");
+        // `some(v) => v` hands the payload straight back: no binding at all.
+        assert!(matches!(&t.kind, ExprKind::Ident(x) if x == "x"));
+        assert!(matches!(&f.kind, ExprKind::Ident(d) if d == "d"));
+    }
+
+    #[test]
+    fn a_match_on_a_let_bound_name_is_pushed_into_the_binding() {
+        // `let s: i64? = if c { some(x) } else { none }; let d = 0; match (s)
+        // { some(v) => v + 1, none => d }` — inlining's shape.
+        let value = branch(call(Callee::Some, vec![id("x")]), e(ExprKind::None));
+        let matched = e(ExprKind::Match(
+            Box::new(id("s")),
+            vec![
+                arm("some", &["v"], user("inc", vec![id("v")])),
+                arm("none", &[], id("d")),
+            ],
+        ));
+        let bound = e(ExprKind::Let(
+            "s".into(),
+            Some(Type::Optional(Box::new(Type::Primitive(
+                aipl_syntax::ast::Primitive::I64,
+            )))),
+            Box::new(value),
+            Box::new(e(ExprKind::Let(
+                "d".into(),
+                None,
+                Box::new(e(ExprKind::Num(0))),
+                Box::new(matched),
+            ))),
+        ));
+        let out = rewrite(&bound, &limits(8));
+        let ExprKind::Let(d, _, _, rest) = &out.kind else {
+            panic!("expected the `d` binding to survive, got {out:?}");
         };
-        assert_eq!(name, "v");
-        assert!(matches!(&payload.kind, ExprKind::Ident(x) if x == "x"));
-        assert!(matches!(&body.kind, ExprKind::Ident(v) if v == "v"));
+        assert_eq!(d, "d");
+        let ExprKind::If(_, t, f) = &rest.kind else {
+            panic!("expected the match pushed into the `if`, got {rest:?}");
+        };
+        // The binder takes the annotation's payload type.
+        assert!(
+            matches!(&t.kind, ExprKind::Let(v, Some(Type::Primitive(_)), p, _)
+            if v == "v" && matches!(&p.kind, ExprKind::Ident(x) if x == "x"))
+        );
         assert!(matches!(&f.kind, ExprKind::Ident(d) if d == "d"));
     }
 

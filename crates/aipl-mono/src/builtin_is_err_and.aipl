@@ -77,11 +77,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1706
-binary size: 10736
-  code: 5624
+instructions executed: 1671
+binary size: 10552
+  code: 5436
   data: 1339
-  metadata: 3773
+  metadata: 3777
 functions:
   __test$check_len:
     calls: 1
@@ -91,7 +91,7 @@ functions:
     bytes: 748
   __test$is_err_and:
     calls: 1
-    bytes: 2804
+    bytes: 2616
   __test$is_not_a_digit:
     calls: 1
     bytes: 312

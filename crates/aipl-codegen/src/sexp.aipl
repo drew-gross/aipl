@@ -72,11 +72,11 @@ allocations: 16689
 deallocations: 16689
 reallocations: 2158
 bytes allocated: 1029642
-instructions executed: 5448397
-binary size: 244080
-  code: 159764
+instructions executed: 5343902
+binary size: 242320
+  code: 158344
   data: 1876
-  metadata: 82440
+  metadata: 82100
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -218,7 +218,7 @@ functions:
     bytes: 1136
   __m12__step_result$__m1__SexpKind:
     calls: 3345
-    bytes: 8632
+    bytes: 8488
   __m12__template_scan$__m1__SexpKind:
     calls: 0
     bytes: 2908
@@ -242,7 +242,7 @@ functions:
     bytes: 2992
   __m14__error_at$__m1__SexpKind$Sexp:
     calls: 0
-    bytes: 3424
+    bytes: 3048
   __m14__far_miss:
     calls: 1640
     bytes: 1080
@@ -260,7 +260,7 @@ functions:
     bytes: 4604
   __m14__match_group$__m1__SexpKind$Sexp:
     calls: 820
-    bytes: 5360
+    bytes: 5112
   __m14__match_leading_sep$__m1__SexpKind$Sexp:
     calls: 0
     bytes: 1096
@@ -275,7 +275,7 @@ functions:
     bytes: 1488
   __m14__match_prod$__m1__SexpKind$Sexp:
     calls: 1656
-    bytes: 6556
+    bytes: 6488
   __m14__match_reps$__m1__SexpKind$Sexp:
     calls: 410
     bytes: 4136
@@ -296,16 +296,16 @@ functions:
     bytes: 364
   __m14__parse_prepared$__m1__SexpKind$Sexp:
     calls: 6
-    bytes: 6876
+    bytes: 6872
   __m14__pruned$__m1__SexpKind$Sexp:
     calls: 0
     bytes: 1284
   __m14__tok_text$__m1__SexpKind$Sexp:
     calls: 1230
-    bytes: 1016
+    bytes: 792
   __m14__trivia_span$__m1__SexpKind:
     calls: 16
-    bytes: 736
+    bytes: 648
   __m15__line_at:
     calls: 0
     bytes: 636
@@ -344,7 +344,7 @@ functions:
     bytes: 1104
   __m2__last_leaf:
     calls: 0
-    bytes: 796
+    bytes: 788
   __m2__nodes$filter1$own0:
     calls: 836
     bytes: 368
@@ -359,7 +359,7 @@ functions:
     bytes: 1156
   __m2__token_text:
     calls: 16
-    bytes: 1456
+    bytes: 1452
   __m3__can_start$__m1__SexpKind:
     calls: 0
     bytes: 256
@@ -389,7 +389,7 @@ functions:
     bytes: 600
   __m4__opt_group_styles$__m1__SexpKind:
     calls: 18
-    bytes: 408
+    bytes: 152
   __m4__prod_names$__m1__SexpKind$Sexp:
     calls: 12
     bytes: 548

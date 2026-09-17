@@ -97,40 +97,40 @@ false
 true
 false
 --- performance ---
-allocations: 23
-deallocations: 23
+allocations: 21
+deallocations: 21
 reallocations: 0
-bytes allocated: 685
-instructions executed: 997
-binary size: 6160
-  code: 3364
+bytes allocated: 573
+instructions executed: 923
+binary size: 5400
+  code: 2876
   data: 127
-  metadata: 2669
+  metadata: 2397
 functions:
   __rec_drop_List:
-    calls: 6
+    calls: 4
     bytes: 44
   __to_str_bool:
     calls: 17
     bytes: 232
   aipl_rec_alloc:
-    calls: 6
+    calls: 4
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 9
+    calls: 6
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_write_bytes:
     calls: 17
     bytes: (external)
   main:
     calls: 1
-    bytes: 3088
+    bytes: 2600

@@ -36,14 +36,14 @@ deallocations: 4
 reallocations: 0
 bytes allocated: 328
 instructions executed: 1391
-binary size: 6336
-  code: 3128
+binary size: 6344
+  code: 3132
   data: 736
-  metadata: 2472
+  metadata: 2476
 functions:
   __test$sums_an_array:
     calls: 1
-    bytes: 2712
+    bytes: 2716
   __test$sums_an_array$filter4$own0:
     calls: 1
     bytes: 300

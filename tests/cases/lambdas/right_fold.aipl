@@ -47,17 +47,17 @@ deallocations: 17
 reallocations: 0
 bytes allocated: 1288
 instructions executed: 2098
-binary size: 10480
-  code: 5856
+binary size: 10496
+  code: 5868
   data: 798
-  metadata: 3826
+  metadata: 3830
 functions:
   __rec_drop_List:
     calls: 8
     bytes: 44
   __test$to_list_keeps_order:
     calls: 1
-    bytes: 5684
+    bytes: 5696
   aipl_array_dec:
     calls: 3
     bytes: (external)

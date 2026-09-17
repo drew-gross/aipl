@@ -60,9 +60,9 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 152
-instructions executed: 2137
-binary size: 12224
-  code: 6552
+instructions executed: 2134
+binary size: 12208
+  code: 6536
   data: 1501
   metadata: 4171
 functions:
@@ -107,7 +107,7 @@ functions:
     bytes: 400
   __test$first_big:
     calls: 1
-    bytes: 2168
+    bytes: 2152
   __test$first_big$filter7$own0:
     calls: 1
     bytes: 300

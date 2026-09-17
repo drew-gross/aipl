@@ -386,6 +386,7 @@ design:
   apis should express intent
 
 optimizations:
+  optimizations need to handle variable names better: a_binding_is_not_sunk_into_an_arm_that_rebinds_what_it_reads shouldn't be an issue
   code sinking should sink into potentially-unused match arms
   generalize try_push for opts, strings, structs?
   output array length prediction that propagates and allows for really good pre-reserving

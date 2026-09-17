@@ -176,11 +176,11 @@ allocations: 106
 deallocations: 106
 reallocations: 0
 bytes allocated: 4489
-instructions executed: 37808
-binary size: 90304
-  code: 61408
+instructions executed: 37694
+binary size: 89568
+  code: 60816
   data: 1806
-  metadata: 27090
+  metadata: 26946
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -205,7 +205,7 @@ functions:
     bytes: 744
   __test$parse_spec:
     calls: 1
-    bytes: 30124
+    bytes: 29532
   __test_try_fail_str:
     calls: 0
     bytes: 84

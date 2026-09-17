@@ -55,11 +55,11 @@ allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 178
-instructions executed: 721
-binary size: 6592
-  code: 3120
+instructions executed: 674
+binary size: 6416
+  code: 2940
   data: 499
-  metadata: 2973
+  metadata: 2977
 functions:
   __to_str_i64:
     calls: 3
@@ -84,4 +84,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1020
+    bytes: 840

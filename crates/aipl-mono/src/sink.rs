@@ -56,6 +56,7 @@ use std::collections::HashSet;
 
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, MatchArm, Program};
 
+use crate::subst::read_names;
 use crate::{ConcreteFn, MonoProgram};
 
 /// Builtins whose call can abort the program, so deferring one past a branch
@@ -264,6 +265,20 @@ fn sink_here(e: Expr, blocked: &HashSet<String>) -> Expr {
             let (Some(only), None) = (users.next(), users.next()) else {
                 return e;
             };
+            // The arm's own binders come into scope around the sunk value: one
+            // that names something the value reads would capture it. (Two
+            // inlined copies of one builtin bind the same `x` in nested arms,
+            // which is exactly how this was found.)
+            let mut read = HashSet::new();
+            read_names(value, &mut read);
+            if arms[only]
+                .pattern
+                .bindings()
+                .iter()
+                .any(|b| read.contains(b))
+            {
+                return e;
+            }
             let arms = arms
                 .iter()
                 .enumerate()
@@ -285,6 +300,30 @@ fn sink_here(e: Expr, blocked: &HashSet<String>) -> Expr {
         ExprKind::Seq(first, rest) if !mentions_free(rest, name) => {
             let narrowed = sink_here(rebind(first), blocked);
             Expr::rebuilt(ExprKind::Seq(Box::new(narrowed), rest.clone()), body)
+        }
+        // `let x = v; let y = w; rest` — another binding in the way, which
+        // does not read `x`, and whose name `v` does not read (moving `v`
+        // under it would otherwise capture the new `y`). Both values may be
+        // deferred, so neither can tell it ran after the other: swap them,
+        // and `x` is one binding closer to the branch that reads it. The swap
+        // is the reordering `Seq` avoids, which is why it asks the sinker's
+        // own question of `w` too.
+        ExprKind::Let(other, other_ty, other_value, rest)
+            if other != name
+                && !mentions_free(other_value, name)
+                && !mentions_free(value, other)
+                && can_defer(other_value, blocked) =>
+        {
+            let sunk = sink_here(rebind(rest), blocked);
+            Expr::rebuilt(
+                ExprKind::Let(
+                    other.clone(),
+                    other_ty.clone(),
+                    other_value.clone(),
+                    Box::new(sunk),
+                ),
+                body,
+            )
         }
         _ => e,
     }
@@ -347,5 +386,82 @@ pub fn sink_bindings_post_mono(
             })
             .collect(),
         ..program.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aipl_syntax::ast::Pattern;
+
+    fn e(kind: ExprKind) -> Expr {
+        Expr::new(kind, 0..0)
+    }
+
+    fn id(n: &str) -> Expr {
+        e(ExprKind::Ident(n.into()))
+    }
+
+    fn arm(name: &str, bindings: &[&str], body: Expr) -> MatchArm {
+        MatchArm {
+            pattern: Pattern::Ctor {
+                name: name.into(),
+                bindings: bindings.iter().map(|b| (*b).to_string()).collect(),
+                ignore_payload: false,
+            },
+            body,
+            span: 0..0,
+        }
+    }
+
+    #[test]
+    fn a_binding_is_not_sunk_into_an_arm_that_rebinds_what_it_reads() {
+        // `let c = x; match (o) { some(x) => c, none => 0 }` — sinking `c`
+        // into the `some` arm would read the arm's `x`, not the outer one.
+        let matched = e(ExprKind::Match(
+            Box::new(id("o")),
+            vec![
+                arm("some", &["x"], id("c")),
+                arm("none", &[], e(ExprKind::Num(0))),
+            ],
+        ));
+        let bound = e(ExprKind::Let(
+            "c".into(),
+            None,
+            Box::new(id("x")),
+            Box::new(matched),
+        ));
+        let out = sink_expr(&bound, &HashSet::new());
+        assert!(matches!(&out.kind, ExprKind::Let(c, _, _, _) if c == "c"));
+    }
+
+    #[test]
+    fn a_binding_moves_past_an_unrelated_binding_toward_its_branch() {
+        // `let d = 0; let t = y; match (o) { some(v) => v, none => d }` — `d`
+        // is only the `none` arm's, and `t` is nothing to it.
+        let matched = e(ExprKind::Match(
+            Box::new(id("o")),
+            vec![arm("some", &["v"], id("v")), arm("none", &[], id("d"))],
+        ));
+        let bound = e(ExprKind::Let(
+            "d".into(),
+            None,
+            Box::new(e(ExprKind::Num(0))),
+            Box::new(e(ExprKind::Let(
+                "t".into(),
+                None,
+                Box::new(id("y")),
+                Box::new(matched),
+            ))),
+        ));
+        let out = sink_expr(&bound, &HashSet::new());
+        let ExprKind::Let(t, _, _, rest) = &out.kind else {
+            panic!("expected `t` outermost, got {out:?}");
+        };
+        assert_eq!(t, "t");
+        let ExprKind::Match(_, arms) = &rest.kind else {
+            panic!("expected the match next, got {rest:?}");
+        };
+        assert!(matches!(&arms[1].body.kind, ExprKind::Let(d, _, _, _) if d == "d"));
     }
 }

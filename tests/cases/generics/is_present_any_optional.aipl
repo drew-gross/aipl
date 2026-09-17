@@ -17,15 +17,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 101
-binary size: 1608
-  code: 484
+instructions executed: 81
+binary size: 1528
+  code: 404
   data: 165
   metadata: 959
 functions:
   __test$is_present:
     calls: 1
-    bytes: 376
+    bytes: 296
   aipl_assert:
     calls: 3
     bytes: (external)

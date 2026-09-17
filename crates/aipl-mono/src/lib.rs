@@ -9007,7 +9007,7 @@ fn contains_inplace_hof_intrinsic(e: &Expr) -> bool {
 /// enclosing return type is dropped when inlining, so a function whose body holds
 /// such a literal is conservatively not inlined (it could otherwise leave the
 /// literal's type unresolved as `__none__`).
-fn contains_context_literal(e: &Expr) -> bool {
+pub(crate) fn contains_context_literal(e: &Expr) -> bool {
     let here = match &e.kind {
         ExprKind::None => true,
         ExprKind::ArrayLit(v) | ExprKind::SetLit(v, _) => v.is_empty(),
@@ -9018,7 +9018,7 @@ fn contains_context_literal(e: &Expr) -> bool {
         // somewhere with no such declaration — `to_str(ok(v))` rather than a
         // function returning `T!E` — and the placeholder survives to codegen,
         // which fails with "rendering __none__ is not yet supported".
-        ExprKind::Call(n, _, _) => n == "ok" || n == "err",
+        ExprKind::Call(n, _, _) => matches!(n, Callee::Ok | Callee::Err),
         _ => false,
     };
     here || children(e).iter().any(|c| contains_context_literal(c))

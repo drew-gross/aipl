@@ -51,9 +51,9 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 342
-binary size: 3256
-  code: 1376
+instructions executed: 332
+binary size: 3232
+  code: 1352
   data: 431
   metadata: 1449
 functions:
@@ -65,7 +65,7 @@ functions:
     bytes: 612
   __test$unwrap:
     calls: 1
-    bytes: 112
+    bytes: 88
   aipl_assert:
     calls: 8
     bytes: (external)

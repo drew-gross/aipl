@@ -26,9 +26,9 @@ reallocations: 0
 bytes allocated: 234
 instructions executed: 1105
 binary size: 4304
-  code: 2180
+  code: 2176
   data: 187
-  metadata: 1937
+  metadata: 1941
 functions:
   __to_str_i64$arr:
     calls: 1
@@ -53,4 +53,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 644
+    bytes: 640

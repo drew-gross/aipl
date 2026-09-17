@@ -667,11 +667,11 @@ allocations: 2090
 deallocations: 2090
 reallocations: 181
 bytes allocated: 167907
-instructions executed: 264909
-binary size: 221520
-  code: 142296
+instructions executed: 263248
+binary size: 220840
+  code: 141808
   data: 5044
-  metadata: 74180
+  metadata: 73988
 functions:
   __arr_drop_Piece:
     calls: 95
@@ -762,7 +762,7 @@ functions:
     bytes: 788
   __m1__last_leaf:
     calls: 0
-    bytes: 796
+    bytes: 788
   __m1__span:
     calls: 1
     bytes: 252
@@ -834,7 +834,7 @@ functions:
     bytes: 600
   __m8__opt_group_styles$FKind:
     calls: 18
-    bytes: 408
+    bytes: 152
   __rec_drop___m1__Cst:
     calls: 27
     bytes: 132
@@ -948,7 +948,7 @@ functions:
     bytes: 464
   edge:
     calls: 24
-    bytes: 504
+    bytes: 236
   fmt_node$FKind$str$s1$lam$always_space:
     calls: 1
     bytes: 3736
@@ -1038,10 +1038,10 @@ functions:
     bytes: 120
   wrapped$lam$always_space:
     calls: 0
-    bytes: 4096
+    bytes: 4112
   wrapped$lam$never_space:
     calls: 15
-    bytes: 2680
+    bytes: 2692
   wrapped$lam$spaced_unless_punct:
     calls: 3
-    bytes: 4096
+    bytes: 4112

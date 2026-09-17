@@ -16,14 +16,14 @@ deallocations: 7
 reallocations: 0
 bytes allocated: 328
 instructions executed: 295
-binary size: 3976
-  code: 1564
+binary size: 3984
+  code: 1572
   data: 470
   metadata: 1942
 functions:
   __test$drop_first:
     calls: 1
-    bytes: 1456
+    bytes: 1464
   aipl_arr_slice:
     calls: 6
     bytes: (external)

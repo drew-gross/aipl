@@ -27,15 +27,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 113
-binary size: 1552
-  code: 540
+instructions executed: 66
+binary size: 1360
+  code: 348
   data: 127
   metadata: 885
 functions:
   __test$to_i:
     calls: 1
-    bytes: 380
+    bytes: 188
   __test$to_i$lambda0:
     calls: 1
     bytes: 60
