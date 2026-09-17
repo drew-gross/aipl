@@ -86,6 +86,12 @@ pub(super) fn push_loop_pipeline(
     let ExprKind::For(var, iterable, loop_body) = &first.kind else {
         return;
     };
+    // A range (`a..b`, a `__builtin_Span` construction) is not an array: the
+    // loop that pushes each of its values is the one way to spell that array,
+    // and `filter`/`map` have no range to take.
+    if matches!(&iterable.kind, ExprKind::Construct(n, _) if n == "__builtin_Span") {
+        return;
+    }
     let Some(stmt) = lone_stmt(loop_body) else {
         return;
     };

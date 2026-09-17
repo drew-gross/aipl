@@ -449,6 +449,7 @@ case_tests! {
     cases_loops_for_loop_empty_string = "cases/loops/for_loop_empty_string",
     cases_loops_for_loop_mutates_outer_counter = "cases/loops/for_loop_mutates_outer_counter",
     cases_loops_for_loop_var_typed_as_char = "cases/loops/for_loop_var_typed_as_char",
+    cases_loops_for_range = "cases/loops/for_range",
     cases_loops_strlen_via_for = "cases/loops/strlen_via_for",
     cases_loops_while_loop = "cases/loops/while_loop",
     cases_match_arms_alternation = "cases/match_arms/alternation",

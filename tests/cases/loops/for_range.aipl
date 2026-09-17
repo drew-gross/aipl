@@ -1,0 +1,113 @@
+import {
+    len,
+    print,
+    push,
+    to_str,
+    value_or,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
+
+// `for (let i : a..b)` walks the integers from `a` up to but not including `b`
+// — the counted loop `mut i = a; while (i < b) { ..; set i++; }` stands for.
+// The range is the same `a..b` a slice takes, so its bounds are slice bounds
+// (either signedness), and the variable is a `u64` like them.
+fn main() !prints {
+    // The common case: a count.
+    mut seen: u64[] = [];
+    for (let i : 0..3) {
+        set seen.push(i);
+    }
+    print(seen.to_str());
+
+    // Bounds are expressions, evaluated once, before the loop runs.
+    let lo = 2;
+    let xs = [10, 20, 30, 40, 50];
+    mut total = 0;
+    for (let i : lo..xs.len()) {
+        set total += xs[i].value_or(0);
+    }
+    print(total.to_str());
+
+    // An empty range — `end` not past `start` — runs the body zero times.
+    mut ran = false;
+    for (let i : 3..3) {
+        set ran = true;
+    }
+    for (let i : 5..2) {
+        set ran = true;
+    }
+    print(ran.to_str());
+
+    // The index-and-value form counts the values walked, like any iterable's.
+    for (let n, v : 10..13) {
+        print(`{n}: {v}`);
+    }
+
+    // The variable is fresh per iteration; a signed bound is accepted, as a
+    // slice's would be.
+    let upto: i64 = 2;
+    for (let i : 0..upto) {
+        let doubled = i + i;
+        print(doubled.to_str());
+    }
+}
+--- stdout ---
+[0, 1, 2]
+120
+false
+0: 10
+1: 11
+2: 12
+0
+2
+--- performance ---
+allocations: 18
+deallocations: 18
+reallocations: 2
+bytes allocated: 772
+instructions executed: 1238
+binary size: 5056
+  code: 2616
+  data: 223
+  metadata: 2217
+functions:
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  __to_str_u64:
+    calls: 8
+    bytes: 204
+  __to_str_u64$arr:
+    calls: 1
+    bytes: 708
+  aipl_array_dec:
+    calls: 2
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 3
+    bytes: (external)
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_u64_len:
+    calls: 22
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 5
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  aipl_write_u64:
+    calls: 11
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1268

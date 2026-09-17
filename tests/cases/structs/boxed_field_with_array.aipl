@@ -52,10 +52,10 @@ fn total(self: Node) -> i64 {
 
 fn spine(n: i64) -> Both {
     mut b = Both { head: Nil, nums: [7, 8] };
-    mut i = 0;
-    while (i < n) {
-        set b.head = Cons(i, b.head);
-        set i++;
+    for (let i : 0..n) {
+        // A range's variable is a `u64`; the list holds `i64`s.
+        let v: i64 = i;
+        set b.head = Cons(v, b.head);
     }
     b
 }
@@ -133,11 +133,11 @@ allocations: 139
 deallocations: 139
 reallocations: 0
 bytes allocated: 4609
-instructions executed: 12027
-binary size: 18520
-  code: 9344
+instructions executed: 12037
+binary size: 18544
+  code: 9364
   data: 1309
-  metadata: 7867
+  metadata: 7871
 functions:
   __arr_drop_List:
     calls: 1
@@ -216,7 +216,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2448
+    bytes: 2468
   sum:
     calls: 9
     bytes: 104

@@ -19219,7 +19219,7 @@ fn compile_expr_inner<M: Module>(
                 _ => {
                     return Err(Error::at(
                         format!(
-                            "for-loop iterable must be a str, array, or set, got {}",
+                            "for-loop iterable must be a str, array, set, or range, got {}",
                             type_name(&it_ty)
                         ),
                         iterable.span.clone(),

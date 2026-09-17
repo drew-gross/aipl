@@ -6040,6 +6040,71 @@ impl Mono<'_> {
             }
             ExprKind::For(var, iter, body) => {
                 let (ri, it) = self.infer(iter, env)?;
+                // A range: the counted loop it stands for, spelled out —
+                //   let $range = <iter>;
+                //   mut $i: u64 = $range.start;
+                //   while ($i < $range.end) { let var = $i; body; set $i = $i + 1; }
+                // — and re-inferred, so every binding it introduces is typed
+                // like one the program wrote. The range is evaluated once, and
+                // `var` is a fresh immutable binding per iteration, as a `for`
+                // variable is.
+                if matches!(&it, Type::Named(n) if n == "__builtin_Span") {
+                    let k = self.synth;
+                    self.synth += 1;
+                    let range = format!("__range${k}");
+                    let counter = format!("__range_i${k}");
+                    let id = |n: &str| Expr::new(ExprKind::Ident(n.to_string()), span.clone());
+                    let field = |f: &str| {
+                        Expr::new(
+                            ExprKind::Field(Box::new(id(&range)), f.to_string()),
+                            span.clone(),
+                        )
+                    };
+                    let bump = Expr::new(
+                        ExprKind::Assign(
+                            Box::new(id(&counter)),
+                            Box::new(op_call(
+                                Callee::WrappingAdd,
+                                vec![id(&counter), Expr::new(ExprKind::Num(1), span.clone())],
+                                span.clone(),
+                            )),
+                            Box::new(Expr::new(ExprKind::Unit, span.clone())),
+                        ),
+                        span.clone(),
+                    );
+                    let each = Expr::new(
+                        ExprKind::Let(var.clone(), None, Box::new(id(&counter)), body.clone()),
+                        span.clone(),
+                    );
+                    let loop_ = Expr::new(
+                        ExprKind::While(
+                            Box::new(op_call(
+                                Callee::LessThan,
+                                vec![id(&counter), field("end")],
+                                span.clone(),
+                            )),
+                            Box::new(Expr::new(
+                                ExprKind::Seq(Box::new(each), Box::new(bump)),
+                                span.clone(),
+                            )),
+                        ),
+                        span.clone(),
+                    );
+                    let from_start = Expr::new(
+                        ExprKind::LetMut(
+                            counter.clone(),
+                            Some(Type::Primitive(Primitive::U64)),
+                            Box::new(field("start")),
+                            Box::new(loop_),
+                        ),
+                        span.clone(),
+                    );
+                    let counted = Expr::new(
+                        ExprKind::Let(range.clone(), None, Box::new(ri), Box::new(from_start)),
+                        span.clone(),
+                    );
+                    return self.infer(&counted, env);
+                }
                 let elem = match it {
                     Type::Array(inner) => *inner,
                     _ => Type::Primitive(Primitive::Char), // str iteration binds char

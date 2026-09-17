@@ -3057,10 +3057,15 @@ impl Cx<'_> {
                     // guarantee to write code against.
                     Type::Array(inner) | Type::Set(inner, _) => (**inner).clone(),
                     t if *t == Type::Primitive(Primitive::Str) => Type::Primitive(Primitive::Char),
+                    // A range — `for (let i : a..b)` — walks the integers from
+                    // `a` up to but not including `b`. The variable is a `u64`,
+                    // the type of a range's bounds; mono lowers the loop to the
+                    // counted `while` it stands for.
+                    Type::Named(n) if n == "__builtin_Span" => Type::Primitive(Primitive::U64),
                     other => {
                         return Err(Error::at(
                             format!(
-                                "for-loop iterable must be a str, array, or set, got {}",
+                                "for-loop iterable must be a str, array, set, or range, got {}",
                                 tyname(other)
                             ),
                             iter.span.clone(),
