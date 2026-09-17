@@ -74,7 +74,6 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  for error type parsing, can use a maybe on the before-the-! type to DRY it up a little?
   Span through should be a builtin
   json_char should be a match, and should just put the backslashes into the str rather than making a var
   in match_expr, let inner = arms.docs.map(|a: Doc| [HardLine, a]).join(); should be an interspere or a join-with-sep include leading or something.
@@ -325,7 +324,7 @@ lint:
   lint against set literals that contain duplicates
   set out = [..out, o]; should lint to set out.push(a);
   we probably don't need a separate test that #[allow] works for each kind of lint, since the machinery is generic anyway
-  for (let sub : rs) { if (cond(sub)) return true } else return false => lint require this to return any
+   for (let sub : rs) { if (cond(sub)) return true } else return false => lint require this to return any
   xs.fold(0, +) should be sum probably? I guess with wrapping and saturating variants
   any lint that works on bare assignment should work on field assignment (e.g. lint to use --)
   lint to use if let instead of match with empty none case

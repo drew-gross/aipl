@@ -245,21 +245,21 @@ fn token_values(lexed: LexResult<AiplTok>) -> str[] {
 # only — as a sorted multiset.
 fn comment_texts(lexed: LexResult<AiplTok>) -> str[] { lexed.trivia.map(|t| t.text.text).sort() }
 --- performance ---
-allocations: 20288
-deallocations: 20288
-reallocations: 2930
-bytes allocated: 4071921
-instructions executed: 8616210
-binary size: 5649960
-  code: 3727076
+allocations: 20204
+deallocations: 20204
+reallocations: 2914
+bytes allocated: 4055793
+instructions executed: 8598126
+binary size: 5649256
+  code: 3726568
   data: 10898
-  metadata: 1911986
+  metadata: 1911790
 functions:
   __arr_drop___m10__Ty:
     calls: 0
     bytes: 116
   __arr_drop___m11__ListStyle:
-    calls: 2264
+    calls: 2260
     bytes: 120
   __arr_drop___m11__Prec:
     calls: 8
@@ -268,7 +268,7 @@ functions:
     calls: 40
     bytes: 3396
   __arr_drop___m11__Rule$__m23__AiplTok:
-    calls: 2452
+    calls: 2436
     bytes: 116
   __arr_drop___m12__Cst:
     calls: 204
@@ -361,7 +361,7 @@ functions:
     calls: 232
     bytes: 3396
   __arr_retain___m11__Rule$__m23__AiplTok:
-    calls: 4784
+    calls: 4744
     bytes: 116
   __arr_retain___m12__Cst:
     calls: 155
@@ -505,7 +505,7 @@ functions:
     calls: 216
     bytes: 400
   __builtin_find_index$str$lam$__m11__link_rule$__m23__AiplTok$lambda0:
-    calls: 732
+    calls: 724
     bytes: 400
   __builtin_find_index$str$lam$__m31__parse_prepared$__m23__AiplTok$__m5__Ast$lambda0:
     calls: 4
@@ -529,7 +529,7 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m11__Rule$__m23__AiplTok$__m11__ListStyle$lam$__m11__group_styles$__m23__AiplTok$tail:
-    calls: 1476
+    calls: 1472
     bytes: 1060
   __builtin_map_join$__m12__Cst$__builtin_Span$lam$__m12__token_leaves:
     calls: 0
@@ -556,7 +556,7 @@ functions:
     calls: 0
     bytes: 440
   __builtin_try_map$__m11__Rule$__m23__AiplTok$__m11__Rule$__m23__AiplTok$__m11__ParseError$lam$__m11__desugar_rule$__m23__AiplTok:
-    calls: 656
+    calls: 652
     bytes: 504
   __builtin_try_map$__m12__Cst$__m5__Ast$__m11__ParseError$lam$__m31__lower_node$__m23__AiplTok$__m5__Ast$lambda0:
     calls: 15
@@ -652,13 +652,13 @@ functions:
     calls: 292
     bytes: 580
   __m11__desugar_rule$__m23__AiplTok:
-    calls: 3484
+    calls: 3468
     bytes: 11144
   __m11__group_styles$__m23__AiplTok:
     calls: 0
     bytes: 32
   __m11__group_styles$__m23__AiplTok$tail:
-    calls: 12704
+    calls: 12672
     bytes: 3460
   __m11__link$__m23__AiplTok$__m5__Ast:
     calls: 4
@@ -667,10 +667,10 @@ functions:
     calls: 292
     bytes: 596
   __m11__link_rule$__m23__AiplTok:
-    calls: 3484
+    calls: 3468
     bytes: 6864
   __m11__link_rules$__m23__AiplTok:
-    calls: 656
+    calls: 652
     bytes: 600
   __m11__prod_names$__m23__AiplTok$__m5__Ast:
     calls: 8
@@ -1661,7 +1661,7 @@ functions:
     bytes: 556
   __m4__types:
     calls: 8
-    bytes: 35924
+    bytes: 35416
   __m4__variadic_seq_ty:
     calls: 0
     bytes: 952
@@ -1717,7 +1717,7 @@ functions:
     calls: 0
     bytes: 408
   __rec_drop___m11__Rule$__m23__AiplTok:
-    calls: 12996
+    calls: 12932
     bytes: 340
   __rec_drop___m12__Cst:
     calls: 51
@@ -1780,13 +1780,13 @@ functions:
     calls: 46
     bytes: (external)
   aipl_arr_extend:
-    calls: 12207
+    calls: 12163
     bytes: (external)
   aipl_arr_inc:
-    calls: 77557
+    calls: 77461
     bytes: (external)
   aipl_arr_reserve:
-    calls: 12155
+    calls: 12107
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 16
@@ -1798,16 +1798,16 @@ functions:
     calls: 51
     bytes: (external)
   aipl_array_dec:
-    calls: 121740
+    calls: 121560
     bytes: (external)
   aipl_array_new:
-    calls: 2243
+    calls: 2235
     bytes: (external)
   aipl_array_push:
-    calls: 1404
+    calls: 1396
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6076
+    calls: 6036
     bytes: (external)
   aipl_array_with_cap:
     calls: 107
@@ -1819,19 +1819,19 @@ functions:
     calls: 8
     bytes: (external)
   aipl_rec_alloc:
-    calls: 14028
+    calls: 13964
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 67715
+    calls: 67471
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 4203
+    calls: 4219
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 53687
+    calls: 53507
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 4203
+    calls: 4219
     bytes: (external)
   aipl_test_begin:
     calls: 6
