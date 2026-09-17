@@ -1225,7 +1225,9 @@ pub extern "C" fn aipl_execute_program(
         if args.is_null() {
             return write_err_wide(out, b"could not execute program");
         }
-        exec_unix::run(out as *mut i64, program as *const u8, args);
+        with_heap(args, |args| {
+            exec_unix::run(out as *mut i64, program as *const u8, args)
+        });
     }
     #[cfg(not(unix))]
     {
@@ -1753,9 +1755,11 @@ pub extern "C" fn aipl_arr_reverse(
 
 /// `xs[start..end]` — array slice. Both bounds are clamped to `[0, len]` (an
 /// out-of-range end yields a shorter array; `start >= end` yields `[]`).
-/// *Borrows* `xs` (does not drop it) and returns a fresh heap array holding
-/// copies of the elements in `[start, end)`, each retained via `retain_fn`
-/// (0 for scalar elements). Mirrors the JIT runtime's `aipl_arr_slice`.
+/// *Borrows* `xs` (does not drop it) and returns an array the caller owns:
+/// a slice view sharing `xs`'s elements (see `ARR_SLICE_TAG`), a slice of a
+/// slice looking through to the source, an empty window as a fresh empty
+/// array, and the whole array as itself, retained. Mirrors the JIT runtime's
+/// `aipl_arr_slice`.
 #[no_mangle]
 pub extern "C" fn aipl_arr_slice(
     a: *const u8,
@@ -1774,23 +1778,24 @@ pub extern "C" fn aipl_arr_slice(
         let lo = start.clamp(0, len) as usize;
         let hi = end.clamp(0, len) as usize;
         let n = hi.saturating_sub(lo);
-        if elem_size == ELEM_BITPACKED {
-            let raw = array_alloc(n, n, drop_fn, ELEM_BITPACKED) as *const u8;
-            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-            for i in 0..n {
-                write_packed_bit(dst, i, arr_load_bit_rt(a, lo + i));
+        if n == 0 {
+            return array_alloc(0, 0, drop_fn, elem_size) as *const u8;
+        }
+        if lo == 0 && n == len as usize {
+            aipl_arr_inc(a);
+            return a;
+        }
+        let (source, start) = match arr_repr(a) {
+            ArrRepr::Sliced => {
+                let u = arr_untag(a);
+                let inner = *(u.add(REV_INNER_OFFSET) as *const *const u8);
+                let base = *(u.add(SLICE_START_OFFSET) as *const i64) as usize;
+                (inner, base + lo)
             }
-            return raw;
-        }
-        let es = elem_size.max(8) as usize;
-        let raw = array_alloc(n, n, drop_fn, elem_size) as *const u8;
-        let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
-        for i in 0..n {
-            let src = arr_elem_ptr_rt(a, lo + i, es);
-            memcpy(dst_base.add(i * es) as *mut c_void, src as *const c_void, es);
-        }
-        elem_rc(retain_fn, dst_base, n);
-        raw
+            ArrRepr::Heap | ArrRepr::Reversed => (a, lo),
+        };
+        aipl_arr_inc(source);
+        alloc_slice_view(source, start, n, drop_fn, retain_fn, elem_size)
     }
 }
 
@@ -1833,11 +1838,11 @@ pub extern "C" fn aipl_str_join(
     final_sep: *const str24::Str,
     only_sep: *const str24::Str,
 ) {
-    unsafe {
+    with_heap(arr, |arr| unsafe {
         let len = array_len(arr);
-        let elems = arr_untag(arr).add(ARR_ELEMS_OFFSET) as *const str24::Str;
+        let elems = arr.add(ARR_ELEMS_OFFSET) as *const str24::Str;
         *out = str24::join_from(elems, len, *sep, *final_sep, *only_sep);
-    }
+    })
 }
 
 
@@ -1881,30 +1886,39 @@ const ARR_DROPFN_OFFSET: usize = 16; // element drop-fn pointer (null = scalars)
 const ARR_ELEMS_OFFSET: usize = 24; // first element, relative to data ptr
 
 // Array representation tag bits (stored in the low 2 bits of the data pointer,
-// which are free since arrays are 8-byte aligned). Mirrors the JIT runtime.
+// which are free since arrays are 8-byte aligned). Mirrors the JIT runtime:
+// `0b00` a heap block, `0b01` a reversed view, `0b10` a slice view — a window
+// into an inner array, the array's counterpart of a `str`'s buffer window.
 const ARR_TAG_MASK: usize = 0b11;
 const ARR_HEAP_TAG: usize = 0b00;
 const ARR_REV_TAG: usize = 0b01;
+const ARR_SLICE_TAG: usize = 0b10;
 
-// Reversed-view block layout (relative to the data pointer, after HEADER_SIZE).
-// The block is `REV_BLOCK_DATA_SIZE` bytes; its pointer is tagged with ARR_REV_TAG.
+// View block layout (relative to the data pointer, after HEADER_SIZE). A
+// reversed view is `REV_BLOCK_DATA_SIZE` bytes and a slice view
+// `SLICE_BLOCK_DATA_SIZE` (one more word, the window's start); each is tagged
+// with its own tag.
 const REV_LEN_OFFSET: usize = 0; // mirrors ARR_LEN_OFFSET; len of the view
-const REV_INNER_OFFSET: usize = 8; // pointer to the inner (heap) array
+const REV_INNER_OFFSET: usize = 8; // pointer to the inner (any repr) array
 const REV_DROP_OFFSET: usize = 16; // element drop_fn (i64)
 const REV_RETAIN_OFFSET: usize = 24; // element retain_fn (i64)
 const REV_ELEMSIZE_OFFSET: usize = 32; // element stride (i64); 0 = bit-packed
+const SLICE_START_OFFSET: usize = 40; // slice view only: first element's index in inner
 const REV_BLOCK_DATA_SIZE: usize = 40;
+const SLICE_BLOCK_DATA_SIZE: usize = 48;
 
 #[derive(Clone, Copy)]
 enum ArrRepr {
     Heap,
     Reversed,
+    Sliced,
 }
 
 fn arr_repr(ptr: *const u8) -> ArrRepr {
     match ptr as usize & ARR_TAG_MASK {
         ARR_HEAP_TAG => ArrRepr::Heap,
         ARR_REV_TAG => ArrRepr::Reversed,
+        ARR_SLICE_TAG => ArrRepr::Sliced,
         tag => panic!("unknown array repr tag {tag}"),
     }
 }
@@ -1938,6 +1952,66 @@ unsafe fn alloc_reversed_view(
     }
 }
 
+/// Allocate a slice-view block: the window of `len` elements of `inner`
+/// starting at `start`. Transfers ownership of `inner` into the view (no
+/// drop, no retain on `inner`). Returns data_ptr | ARR_SLICE_TAG.
+unsafe fn alloc_slice_view(
+    inner: *const u8,
+    start: usize,
+    len: usize,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    unsafe {
+        let raw = rt_alloc(HEADER_SIZE + SLICE_BLOCK_DATA_SIZE) as *mut u8;
+        if raw.is_null() {
+            abort();
+        }
+        *(raw as *mut i64) = 1; // refcount
+        let data = raw.add(HEADER_SIZE);
+        *(data.add(REV_LEN_OFFSET) as *mut i64) = len as i64;
+        *(data.add(REV_INNER_OFFSET) as *mut *const u8) = inner;
+        *(data.add(REV_DROP_OFFSET) as *mut i64) = drop_fn;
+        *(data.add(REV_RETAIN_OFFSET) as *mut i64) = retain_fn;
+        *(data.add(REV_ELEMSIZE_OFFSET) as *mut i64) = elem_size;
+        *(data.add(SLICE_START_OFFSET) as *mut i64) = start as i64;
+        (data as usize | ARR_SLICE_TAG) as *const u8
+    }
+}
+
+/// A fresh heap array holding copies of `a`'s elements in `[start, start + n)`
+/// (any repr), each retained via `retain_fn`. Does NOT drop `a`. Mirrors the
+/// JIT runtime's `do_arr_slice_copy`.
+unsafe fn do_arr_slice_copy(
+    a: *const u8,
+    start: usize,
+    n: usize,
+    drop_fn: i64,
+    retain_fn: i64,
+    elem_size: i64,
+) -> *const u8 {
+    unsafe {
+        if elem_size == ELEM_BITPACKED {
+            let raw = array_alloc(n, n, drop_fn, ELEM_BITPACKED) as *const u8;
+            let dst = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+            for i in 0..n {
+                write_packed_bit(dst, i, arr_load_bit_rt(a, start + i));
+            }
+            return raw;
+        }
+        let es = elem_size.max(8) as usize;
+        let raw = array_alloc(n, n, drop_fn, elem_size) as *const u8;
+        let dst_base = raw.add(ARR_ELEMS_OFFSET) as *mut u8;
+        for i in 0..n {
+            let src = arr_elem_ptr_rt(a, start + i, es);
+            memcpy(dst_base.add(i * es) as *mut c_void, src as *const c_void, es);
+        }
+        elem_rc(retain_fn, dst_base, n);
+        raw
+    }
+}
+
 /// Materialize a reversed view into a fresh heap array, consuming the view
 /// (dec + free the view block).  The inner array is dec'd too.
 unsafe fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: i64) -> *const u8 {
@@ -1968,7 +2042,23 @@ unsafe fn do_arr_reverse(a: *const u8, drop_fn: i64, retain_fn: i64, elem_size: 
     }
 }
 
-/// Ensure `a` is a heap array, materializing it if it's a reversed view.
+/// A *borrowed* array as a heap block for the duration of `f`: a heap array
+/// is handed over as is, a view is materialized into a block `f` reads and
+/// that is released afterwards. Mirrors the JIT runtime's `with_heap`.
+fn with_heap<R>(a: *const u8, f: impl FnOnce(*const u8) -> R) -> R {
+    match arr_repr(a) {
+        ArrRepr::Heap => f(a),
+        ArrRepr::Reversed | ArrRepr::Sliced => {
+            aipl_arr_inc(a);
+            let heap = aipl_arr_ensure_heap(a);
+            let out = f(heap);
+            aipl_array_dec(heap);
+            out
+        }
+    }
+}
+
+/// Ensure `a` is a heap array, materializing it if it's a view.
 /// Consumes `a` (it's dec'd / freed if a view was materialized).
 fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
     if a.is_null() {
@@ -1992,6 +2082,24 @@ fn aipl_arr_ensure_heap(a: *const u8) -> *const u8 {
             aipl_array_dec(inner);
             heap
         }
+        ArrRepr::Sliced => {
+            let u = arr_untag(a);
+            let (inner, drop_fn, retain_fn, elem_size, start, len) = unsafe {
+                (
+                    *(u.add(REV_INNER_OFFSET) as *const *const u8),
+                    *(u.add(REV_DROP_OFFSET) as *const i64),
+                    *(u.add(REV_RETAIN_OFFSET) as *const i64),
+                    *(u.add(REV_ELEMSIZE_OFFSET) as *const i64),
+                    *(u.add(SLICE_START_OFFSET) as *const i64) as usize,
+                    *(u.add(REV_LEN_OFFSET) as *const i64) as usize,
+                )
+            };
+            let heap = unsafe { do_arr_slice_copy(inner, start, len, drop_fn, retain_fn, elem_size) };
+            // The view held the one reference this path owns on `inner`;
+            // releasing the view releases it.
+            aipl_array_dec(a);
+            heap
+        }
     }
 }
 
@@ -2008,6 +2116,12 @@ unsafe fn arr_elem_ptr_rt(a: *const u8, idx: usize, elem_size: usize) -> *const 
             let len = unsafe { *(u as *const i64) as usize };
             unsafe { arr_elem_ptr_rt(inner, len - 1 - idx, elem_size) }
         }
+        ArrRepr::Sliced => {
+            let u = arr_untag(a);
+            let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
+            let start = unsafe { *(u.add(SLICE_START_OFFSET) as *const i64) as usize };
+            unsafe { arr_elem_ptr_rt(inner, start + idx, elem_size) }
+        }
     }
 }
 
@@ -2022,6 +2136,12 @@ unsafe fn arr_load_bit_rt(a: *const u8, idx: usize) -> bool {
             let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
             let len = unsafe { *(u as *const i64) as usize };
             unsafe { arr_load_bit_rt(inner, len - 1 - idx) }
+        }
+        ArrRepr::Sliced => {
+            let u = arr_untag(a);
+            let inner = unsafe { *(u.add(REV_INNER_OFFSET) as *const *const u8) };
+            let start = unsafe { *(u.add(SLICE_START_OFFSET) as *const i64) as usize };
+            unsafe { arr_load_bit_rt(inner, start + idx) }
         }
     }
 }
@@ -2133,7 +2253,9 @@ pub extern "C" fn aipl_array_dec(ptr: *const u8) {
                     }
                     rt_free(h as *mut c_void);
                 }
-                ArrRepr::Reversed => {
+                // A view owns one reference on its inner array and nothing
+                // else; the elements are the inner's to release.
+                ArrRepr::Reversed | ArrRepr::Sliced => {
                     let inner = *(u.add(REV_INNER_OFFSET) as *const *const u8);
                     aipl_array_dec(inner);
                     rt_free(h as *mut c_void);

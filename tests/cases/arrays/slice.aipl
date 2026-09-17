@@ -1,10 +1,11 @@
 import { print, reverse, to_str } from builtins;
 
-// Array slicing `xs[start..end]` yields a fresh array of the elements in
+// Array slicing `xs[start..end]` yields an array of the elements in
 // `[start, end)`. Both bounds clamp to `[0, len]` (an out-of-range end gives a
 // shorter array, `start >= end` gives `[]`), and the open-ended forms run to
-// the array's edges. The slice copies (and co-owns) its elements; the source
-// is unchanged.
+// the array's edges. Like a `str`'s slice, it shares rather than copies: the
+// result is a window onto the source's elements (see `slice_shares` for what
+// that costs and what it means for mutation); the source is unchanged.
 fn main() !prints {
     let xs = [10, 20, 30, 40, 50];
     print(xs[1..4].to_str()); // [20, 30, 40]
@@ -41,8 +42,8 @@ fn main() !prints {
 allocations: 20
 deallocations: 20
 reallocations: 0
-bytes allocated: 865
-instructions executed: 3834
+bytes allocated: 888
+instructions executed: 3588
 binary size: 7224
   code: 3716
   data: 371
@@ -57,8 +58,14 @@ functions:
   __to_str_str$arr:
     calls: 2
     bytes: 828
+  aipl_arr_elem_ptr:
+    calls: 28
+    bytes: (external)
   aipl_arr_inc:
-    calls: 1
+    calls: 8
+    bytes: (external)
+  aipl_arr_load_bit:
+    calls: 6
     bytes: (external)
   aipl_arr_reverse:
     calls: 1
@@ -67,7 +74,7 @@ functions:
     calls: 8
     bytes: (external)
   aipl_array_dec:
-    calls: 11
+    calls: 18
     bytes: (external)
   aipl_array_new:
     calls: 1

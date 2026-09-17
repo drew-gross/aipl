@@ -110,8 +110,8 @@ fn same(self: str) -> str { self }.test({
 allocations: 31
 deallocations: 31
 reallocations: 2
-bytes allocated: 1265
-instructions executed: 5181
+bytes allocated: 1241
+instructions executed: 5157
 binary size: 17832
   code: 11088
   data: 1249
@@ -126,11 +126,14 @@ functions:
   __to_str_i64:
     calls: 6
     bytes: 204
+  aipl_arr_elem_ptr:
+    calls: 2
+    bytes: (external)
   aipl_arr_extend:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_arr_reserve:
     calls: 4
@@ -139,7 +142,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 29
+    calls: 30
     bytes: (external)
   aipl_array_new:
     calls: 7

@@ -753,11 +753,11 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 990
-deallocations: 990
+allocations: 991
+deallocations: 991
 reallocations: 33
-bytes allocated: 76800
-instructions executed: 128403
+bytes allocated: 75800
+instructions executed: 128328
 binary size: 144944
   code: 92988
   data: 5520
@@ -767,7 +767,7 @@ functions:
     calls: 3
     bytes: 148
   __arr_drop_Item:
-    calls: 14
+    calls: 7
     bytes: 172
   __arr_drop_Pat:
     calls: 33
@@ -779,7 +779,7 @@ functions:
     calls: 1
     bytes: 148
   __arr_retain_Item:
-    calls: 22
+    calls: 15
     bytes: 172
   __arr_retain_Pat:
     calls: 8
@@ -859,8 +859,11 @@ functions:
   __to_str_u64:
     calls: 0
     bytes: 204
+  aipl_arr_elem_ptr:
+    calls: 15
+    bytes: (external)
   aipl_arr_inc:
-    calls: 108
+    calls: 123
     bytes: (external)
   aipl_arr_reserve:
     calls: 13
@@ -869,7 +872,7 @@ functions:
     calls: 12
     bytes: (external)
   aipl_array_dec:
-    calls: 543
+    calls: 559
     bytes: (external)
   aipl_array_new:
     calls: 55
@@ -890,10 +893,10 @@ functions:
     calls: 76
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 201
+    calls: 184
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 125
+    calls: 108
     bytes: (external)
   aipl_test_begin:
     calls: 10

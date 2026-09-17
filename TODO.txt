@@ -74,6 +74,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  unify tag values for strings and arrays
   Span through should be a builtin
   json_char should be a match, and should just put the backslashes into the str rather than making a var
   in match_expr, let inner = arms.docs.map(|a: Doc| [HardLine, a]).join(); should be an interspere or a join-with-sep include leading or something.
@@ -151,6 +152,8 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
+  aipl_arr_ensure_heap for a reversed view appears to dec the inner array twice
+  binding_is_exclusive treats a later slice of a mut array as an alias for the whole body, so a push loop before the slice copies per iteration
   1 + rs.fold(0, |n, r| n + r.size()) should work, currently doens't due to wrong type getting pinned
   mut out: char[] = [] followed by push aborts at runtime (exit 134, no diagnostic)
   ['a','b'][..0] requests a 272 TB allocation, while [..2] on the same array works.

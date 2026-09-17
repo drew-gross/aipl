@@ -95,21 +95,21 @@ fn two_values(self: FieldInit[]) -> (Expr, Expr)? {
 allocations: 77
 deallocations: 77
 reallocations: 1
-bytes allocated: 5809
-instructions executed: 3644
+bytes allocated: 5825
+instructions executed: 3639
 binary size: 75656
   code: 50304
   data: 681
   metadata: 24671
 functions:
   __arr_drop___m1__Expr:
-    calls: 3
+    calls: 2
     bytes: 116
   __arr_drop___m1__FieldInit:
     calls: 1
     bytes: 116
   __arr_retain___m1__Expr:
-    calls: 2
+    calls: 1
     bytes: 116
   __arr_retain___m1__FieldInit:
     calls: 0
@@ -162,11 +162,14 @@ functions:
   __to_str_i64:
     calls: 7
     bytes: 204
+  aipl_arr_elem_ptr:
+    calls: 1
+    bytes: (external)
   aipl_arr_extend:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 8
+    calls: 9
     bytes: (external)
   aipl_arr_reserve:
     calls: 1
@@ -175,7 +178,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 13
+    calls: 14
     bytes: (external)
   aipl_array_new:
     calls: 3
@@ -190,13 +193,13 @@ functions:
     calls: 35
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 102
+    calls: 101
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 32
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 67
+    calls: 66
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 32

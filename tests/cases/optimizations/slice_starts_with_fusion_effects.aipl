@@ -50,8 +50,8 @@ true
 allocations: 8
 deallocations: 8
 reallocations: 21
-bytes allocated: 1885
-instructions executed: 16680
+bytes allocated: 317
+instructions executed: 16670
 binary size: 3448
   code: 1620
   data: 191
@@ -60,14 +60,17 @@ functions:
   __to_str_bool:
     calls: 3
     bytes: 232
+  aipl_arr_elem_ptr:
+    calls: 2
+    bytes: (external)
   aipl_arr_inc:
-    calls: 3
+    calls: 5
     bytes: (external)
   aipl_arr_slice:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 11
+    calls: 13
     bytes: (external)
   aipl_array_push:
     calls: 3

@@ -4284,8 +4284,8 @@ fn why_prepared(src: str) -> str {
 allocations: 1909902
 deallocations: 1909902
 reallocations: 251338
-bytes allocated: 319991733
-instructions executed: 481809571
+bytes allocated: 319983389
+instructions executed: 481808981
 binary size: 4956776
   code: 3246388
   data: 48636
@@ -4301,7 +4301,7 @@ functions:
     calls: 315
     bytes: 116
   __arr_drop___m1__Ast:
-    calls: 1992
+    calls: 1947
     bytes: 3292
   __arr_drop___m22__StepResult$__m21__AiplTok:
     calls: 6
@@ -4319,7 +4319,7 @@ functions:
     calls: 2601
     bytes: 140
   __arr_drop___m3__Expr:
-    calls: 83
+    calls: 80
     bytes: 116
   __arr_drop___m3__FieldInit:
     calls: 17
@@ -4349,7 +4349,7 @@ functions:
     calls: 208397
     bytes: 116
   __arr_drop___m8__Cst:
-    calls: 58025
+    calls: 58019
     bytes: 116
   __arr_drop___m9__CaseParam:
     calls: 6
@@ -4388,7 +4388,7 @@ functions:
     calls: 404
     bytes: 116
   __arr_retain___m1__Ast:
-    calls: 2311
+    calls: 2016
     bytes: 3292
   __arr_retain___m22__StepResult$__m21__AiplTok:
     calls: 8
@@ -4406,7 +4406,7 @@ functions:
     calls: 16830
     bytes: 140
   __arr_retain___m3__Expr:
-    calls: 63
+    calls: 59
     bytes: 116
   __arr_retain___m3__FieldInit:
     calls: 16
@@ -4436,7 +4436,7 @@ functions:
     calls: 419844
     bytes: 116
   __arr_retain___m8__Cst:
-    calls: 41399
+    calls: 41393
     bytes: 116
   __arr_retain___m9__CaseParam:
     calls: 10
@@ -5261,13 +5261,13 @@ functions:
     calls: 2276
     bytes: (external)
   aipl_arr_elem_ptr:
-    calls: 14995
+    calls: 15092
     bytes: (external)
   aipl_arr_extend:
     calls: 1068046
     bytes: (external)
   aipl_arr_inc:
-    calls: 5636512
+    calls: 5636554
     bytes: (external)
   aipl_arr_reserve:
     calls: 1095989
@@ -5285,7 +5285,7 @@ functions:
     calls: 38
     bytes: (external)
   aipl_array_dec:
-    calls: 8414267
+    calls: 8414309
     bytes: (external)
   aipl_array_new:
     calls: 194760
@@ -5324,13 +5324,13 @@ functions:
     calls: 1181979
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 6222538
+    calls: 6222484
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 352366
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5040559
+    calls: 5040505
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 352366

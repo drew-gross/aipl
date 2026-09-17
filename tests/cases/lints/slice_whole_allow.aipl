@@ -10,10 +10,10 @@ fn main() !prints {
 --- stdout ---
 [10, 20, 30]
 --- performance ---
-allocations: 2
-deallocations: 2
+allocations: 1
+deallocations: 1
 reallocations: 0
-bytes allocated: 84
+bytes allocated: 28
 instructions executed: 380
 binary size: 2296
   code: 872
@@ -23,6 +23,9 @@ functions:
   __to_str_i64$arr:
     calls: 1
     bytes: 708
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
   aipl_arr_slice:
     calls: 1
     bytes: (external)

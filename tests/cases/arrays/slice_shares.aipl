@@ -1,0 +1,121 @@
+import { equal as ==, len, print, push, reverse, to_str, value_or } from builtins;
+
+// An array slice is a window onto its source, the way a `str`'s slice is a
+// window onto its bytes: `xs[a..b]` allocates one small view block, never a
+// copy of the elements. So its cost does not grow with the window — the
+// `bytes allocated` below would be thousands if any of these copied — and
+// slicing a slice looks through to the source rather than stacking views.
+//
+// A window is read-only in the sense that matters: writing into it would write
+// into the source, so the first mutation (`push`, `extend`, an in-place `map`)
+// materializes the window into a block of its own. The source never changes.
+fn numbers(n: u64) -> u64[] {
+    mut out: u64[] = [];
+    for (let i : 0..n) {
+        set out.push(i);
+    }
+    out
+}
+
+fn main() !prints {
+    let big = numbers(1000);
+    let head = big[..500];
+    let tail = big[500..];
+    print(`{head.len()} {tail.len()} {head[499].value_or(-1)} {tail[0].value_or(-1)}`);
+
+    // A slice of a slice: one view, over the original block.
+    let middle = big[100..900][300..500];
+    print(`{middle.len()} {middle[0].value_or(-1)} {middle[199].value_or(-1)}`);
+
+    // The whole array is the array itself; an empty window is nothing at all.
+    let all = big[0..big.len()]; #[allow]
+    print((all == big).to_str());
+    print(big[7..7].len().to_str());
+
+    // Mutating a slice copies it out first: the source is untouched.
+    mut grown = big[..3];
+    set grown.push(99);
+    print(`{grown} {big[..4]}`);
+
+    // Views compose with the other view: a slice of a reversed array, and a
+    // reversed slice.
+    print(big.reverse()[..3].to_str());
+    print(big[..3].reverse().to_str());
+
+    // Heap elements are shared, not copied, and released exactly once: the
+    // balanced allocation counts below are the proof.
+    let words = ["alpha", "beta", "gamma", "delta"];
+    let some_words = words[1..3];
+    print(some_words.to_str());
+}
+--- stdout ---
+500 500 499 500
+200 400 599
+true
+0
+[0, 1, 2, 99] [0, 1, 2, 3]
+[999, 998, 997]
+[2, 1, 0]
+["beta", "gamma"]
+--- performance ---
+allocations: 42
+deallocations: 42
+reallocations: 10
+bytes allocated: 2292
+instructions executed: 79645
+binary size: 10440
+  code: 6136
+  data: 219
+  metadata: 4085
+functions:
+  __eq_u64$arr:
+    calls: 1
+    bytes: 296
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_str$arr:
+    calls: 1
+    bytes: 828
+  __to_str_u64:
+    calls: 8
+    bytes: 204
+  __to_str_u64$arr:
+    calls: 4
+    bytes: 708
+  aipl_arr_elem_ptr:
+    calls: 28
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 14
+    bytes: (external)
+  aipl_arr_reverse:
+    calls: 2
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 11
+    bytes: (external)
+  aipl_array_dec:
+    calls: 31
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_array_push:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 1000
+    bytes: (external)
+  aipl_u64_len:
+    calls: 44
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 24
+    bytes: (external)
+  aipl_write_u64:
+    calls: 22
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 3868
