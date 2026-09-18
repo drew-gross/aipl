@@ -80,6 +80,20 @@
 
 
 
+        <section class="item" id="item-Item">
+          <h3>
+            <a class="anchor" href="#item-Item">Item</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Item</code></pre>
+
+          <div class="doc"><p>One item of a bracketed list: its layout, and what a sorted list orders it by.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-FKind">
           <h3>
             <a class="anchor" href="#item-FKind">FKind</a>
@@ -194,6 +208,34 @@
 
 
 
+        <section class="item" id="item-leading">
+          <h3>
+            <a class="anchor" href="#item-leading">leading</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn leading(self: Piece) -&#62; str</code></pre>
+
+          <div class="doc"><p>The spelling <code>self</code> leads with, or <code>&quot;&quot;</code> for a comment — which is why a sorted item's key skips past its comments to the first thing that is not one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-item_key">
+          <h3>
+            <a class="anchor" href="#item-item_key">item_key</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn item_key(ps: Piece[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>What a sorted list orders an item by: its leading token. A comment in front of the item is not it — it rides along, but the key is what it was written against. An item that is nothing but comments keys as <code>&quot;&quot;</code>, which puts it first; there is no better answer for a comment with nothing to attach to.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-tight">
           <h3>
             <a class="anchor" href="#item-tight">tight</a>
@@ -283,9 +325,23 @@
             <a class="anchor" href="#item-list_items">list_items</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$20973: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
+          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$22928: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
 
-          <div class="doc"><p>The items between a pair of brackets, each laid out inline.</p><p>A token spelled like the style's separator ends the item it follows and is dropped; the style writes the separators back, which is what lets a list that breaks gain a trailing one it never had in the source. With an empty separator every token or child starts a new item instead, which is the juxtaposed list. A comment never starts one — it belongs to the item it was written against.</p></div>
+          <div class="doc"><p>The items between a pair of brackets, each laid out inline — in the order the style asks for.</p><p>A token spelled like the style's separator ends the item it follows and is dropped; the style writes the separators back, which is what lets a list that breaks gain a trailing one it never had in the source. With an empty separator every token or child starts a new item instead, which is the juxtaposed list. A comment never starts one — it belongs to the item it was written against.</p><p>A <code>sorted</code> style orders the items by their leading token, in ordinary <code>str</code> order. The sort is stable, so two items with one key keep the author's order — a duplicate JSON key, say, stays a duplicate in the order it was written.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-item_of">
+          <h3>
+            <a class="anchor" href="#item-item_of">item_of</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn item_of(ps: Piece[], space: (str, str) -&#62; bool) -&#62; Item</code></pre>
+
+          <div class="doc"><p>One item, laid out and keyed.</p></div>
 
 
         </section>

@@ -1,4 +1,4 @@
-import { print, to_str, += } from builtins;
+import { +=, print, to_str } from builtins;
 
 // `+=` has no bare form, exactly as `+` and `++` have none: the alias is what
 // picks the semantics, so the refusal names both flavors to choose between.
@@ -9,7 +9,7 @@ fn main() !prints {
 }
 --- errors ---
 error: the "+=" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add_assign as +=` or `saturating_add_assign as +=` from builtins
- --> ./tests/cases/compound_assign/err_bare_import.aipl:1:25
+ --> ./tests/cases/compound_assign/err_bare_import.aipl:1:10
   |
-1 | import { print, to_str, += } from builtins;
-  |                         ^^
+1 | import { +=, print, to_str } from builtins;
+  |          ^^

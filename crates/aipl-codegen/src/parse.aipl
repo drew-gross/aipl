@@ -325,7 +325,7 @@ fn match_rule<K: variant, A: any>(
         Literal(s) => ok(match_spelling(p, s, pos, far)),
         Then(rs) => match_then(p, rs, pos, cur, far),
         OneOf(rs) => match_one_of(p, rs, pos, cur, far),
-        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, _, _, group) => match_many(
+        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, _, _, _, group) => match_many(
             p,
             sub,
             min,
@@ -804,7 +804,7 @@ fn rule_labels<K: variant, A: any>(
         // A bracketed repetition is reached through its opening bracket, so
         // that is what is expected at its first token; an unbracketed one is
         // reached through its body.
-        Many(sub, _, _, _, _, _, nested_in, _, _, _) => match (nested_in) {
+        Many(sub, _, _, _, _, _, nested_in, _, _, _, _) => match (nested_in) {
             some(brackets) => rule_labels(brackets.0, prods, firsts, labels),
             none => rule_labels(sub, prods, firsts, labels),
         },
@@ -857,7 +857,7 @@ fn rule_nullable<K: variant>(r: Rule<K>, firsts: First<K>[]) -> bool {
         OneOf(rs) => rs.any(|sub| rule_nullable(sub, firsts)),
         // A bracket pair always matches at least its two brackets, so a
         // bracketed repetition is never nullable however small its minimum.
-        Many(sub, min, _, _, _, _, nested_in, _, _, _) => match (nested_in) {
+        Many(sub, min, _, _, _, _, nested_in, _, _, _, _) => match (nested_in) {
             some(brackets) => rule_nullable(brackets.0, firsts) && min == 0 && rule_nullable(
                 brackets.1,
                 firsts,
@@ -1594,12 +1594,12 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
 allocations: 5735
 deallocations: 5735
 reallocations: 1283
-bytes allocated: 602527
-instructions executed: 1359768
-binary size: 670520
-  code: 405864
+bytes allocated: 626199
+instructions executed: 1360937
+binary size: 671432
+  code: 406772
   data: 10484
-  metadata: 254172
+  metadata: 254176
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1771,7 +1771,7 @@ functions:
     bytes: 284
   __eq___m3__ListStyle:
     calls: 1
-    bytes: 200
+    bytes: 232
   __eq___m3__ListStyle$arr:
     calls: 1
     bytes: 284
@@ -1840,13 +1840,13 @@ functions:
     bytes: 436
   __m2__rule_first$Tok:
     calls: 149
-    bytes: 7216
+    bytes: 7224
   __m3__desugar_opt$Tok:
     calls: 60
     bytes: 580
   __m3__desugar_rule$Tok:
     calls: 522
-    bytes: 11144
+    bytes: 11224
   __m3__failure_message:
     calls: 42
     bytes: 488
@@ -1855,7 +1855,7 @@ functions:
     bytes: 32
   __m3__group_styles$Tok$tail:
     calls: 1010
-    bytes: 3004
+    bytes: 3052
   __m3__link$Tok$Node:
     calls: 101
     bytes: 2488
@@ -1864,7 +1864,7 @@ functions:
     bytes: 596
   __m3__link_rule$Tok:
     calls: 522
-    bytes: 6748
+    bytes: 6784
   __m3__link_rules$Tok:
     calls: 100
     bytes: 600
@@ -1936,7 +1936,7 @@ functions:
     bytes: 3292
   __test$parse:
     calls: 1
-    bytes: 211584
+    bytes: 212272
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -2086,7 +2086,7 @@ functions:
     bytes: 4136
   match_rule$Tok$Node:
     calls: 620
-    bytes: 6344
+    bytes: 6348
   match_sep$Tok$Node:
     calls: 89
     bytes: 952
@@ -2119,13 +2119,13 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 130
-    bytes: 4916
+    bytes: 4924
   rule_nullable$Tok:
     calls: 0
     bytes: 36
   rule_nullable$Tok$tail:
     calls: 13
-    bytes: 1680
+    bytes: 1684
   seq_labels$Tok$Node:
     calls: 0
     bytes: 44

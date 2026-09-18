@@ -169,6 +169,14 @@ variant Rule<K: variant> =
         # instead of twice (strict JSON's `[1, 2,]` is an error *and* is never
         # printed). Only this one cannot be derived, so it is here.
         spaced: bool = false,
+        # Whether a formatter orders the items rather than keeping them as the
+        # author wrote them — by each item's leading token, in ordinary `str`
+        # order. A list that sorts is a keyed list, and the key leads: a JSON
+        # member's `"name"`, an import's `wrapping_add` in `wrapping_add as +`.
+        # The parser never reads it; like `spaced` it is here because the
+        # grammar is where a list's style is stated, and the printer reads it
+        # back off the group.
+        sorted: bool = false,
         # The group's layout stated outright instead of derived, which is what
         # lets a bracket pair hold something whose list lives one production
         # down: `(args)` is a group that wraps like a comma list, but the `Many`
@@ -257,6 +265,11 @@ variant Build<A: any> =
 # the space between them: `(a b c)`, and every S-expression ever written. A group
 # holding one thing rather than a list — `(expr)` — is the same shape with no
 # separator ever reached.
+#
+# `sorted` is the one decision that is not about where the items go but which
+# order they go in: the printer orders them by their leading token rather than
+# keeping the author's order. A JSON object's members, an import's names.
+#
 # `wraps: false` is the group that is a bracket pair and nothing more. A block
 # `{ .. }` is one: it is a pair the parser should know about, so an unclosed brace
 # is reported against the brace that opened it, but its contents are statements
@@ -265,7 +278,13 @@ variant Build<A: any> =
 #
 # In the `nested_in` shorthand it is not written by hand: a `Many` bounded at one
 # item is not a list, so `desugar` reads `wraps: false` off `max=1`.
-struct ListStyle { sep: str = ",", spaced: bool = false, trailing: bool = true, wraps: bool = true }
+struct ListStyle {
+    sep: str = ",",
+    spaced: bool = false,
+    sorted: bool = false,
+    trailing: bool = true,
+    wraps: bool = true,
+}
 
 # How a production's matched children are joined into a `Doc` — the formatting
 # half of a language description, read by `format.aipl` exactly as `Rule` is
@@ -352,7 +371,7 @@ fn group_styles<K: variant>(r: Rule<K>) -> ListStyle[] {
         // A bracketed repetition is a group, and its own style comes first —
         // before the brackets' insides and before its own body. `link_rule`
         // hands out indices by walking this same tree the same way.
-        Many(sub, _, _, sep, _, _, nested_in, _, style, _) => match (nested_in) {
+        Many(sub, _, _, sep, _, _, nested_in, _, _, style, _) => match (nested_in) {
             some(brackets) => [
                 style.value_or(ListStyle {}),
                 ..group_styles(brackets.0),
@@ -391,7 +410,7 @@ fn group_count<K: variant>(r: Rule<K>) -> u64 { group_styles(r).len() }
 # is nothing to break at a width in that case, so it lays out inline.
 pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
     match (r) {
-        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, spaced, style, _) => {
+        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, spaced, sorted, style, _) => {
             // `none` reads as "no bound", which is never below the minimum — so
             // the check needs no case of its own for it.
             let cap = max.value_or(min);
@@ -413,16 +432,18 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
                     trailing_sep=trailing_sep,
                     leading_sep=leading_sep,
                     spaced=spaced,
+                    sorted=sorted,
                 )),
                 some(brackets) => {
                     // Stated, or read off the rule: the separator from its own
-                    // `sep`, `trailing` from `trailing_sep`, `spaced` as given,
-                    // and `wraps` from `max` — a repetition bounded at one item
-                    // is a bracket pair rather than a list, so it has nothing to
-                    // break at a width.
+                    // `sep`, `trailing` from `trailing_sep`, `spaced` and
+                    // `sorted` as given, and `wraps` from `max` — a repetition
+                    // bounded at one item is a bracket pair rather than a list,
+                    // so it has nothing to break at a width.
                     let derived = ListStyle {
                         sep: sep_spelling(sep)?,
                         spaced,
+                        sorted,
                         trailing: trailing_sep,
                         wraps: !max.is_some_and(|m| m == 1),
                     };
@@ -435,6 +456,7 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
                         leading_sep=leading_sep,
                         nested_in=(desugar_rule(brackets.0)?, desugar_rule(brackets.1)?),
                         spaced=spaced,
+                        sorted=sorted,
                         style=style.value_or(derived),
                     ))
                 },
@@ -508,7 +530,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
         // and reassigns the same index, which is what keeps `link` idempotent —
         // and why the style rides on the rule rather than living in the table
         // alone.
-        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, spaced, style, _) => match (nested_in) {
+        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, spaced, sorted, style, _) => match (nested_in) {
             none => ok(Many(
                 link_rule(sub, names, base)?,
                 min=min,
@@ -517,6 +539,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
                 trailing_sep=trailing_sep,
                 leading_sep=leading_sep,
                 spaced=spaced,
+                sorted=sorted,
                 style?=style,
             )),
             some(brackets) => {
@@ -537,6 +560,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
                     leading_sep=leading_sep,
                     nested_in=(linked_open, linked_close),
                     spaced=spaced,
+                    sorted=sorted,
                     style?=style,
                     group=base,
                 ))
@@ -800,6 +824,19 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
         }),
     );
 
+    // `sorted` rides through the same derivation: the rule says its items are
+    // ordered, and the style the printer reads off the group says so too.
+    let keyed: Rule<Kind> = Many(
+        Term(Atom),
+        sep=Literal(","),
+        nested_in=(Literal("{"), Literal("}")),
+        sorted=true,
+    );
+    let keyed_g: Grammar<Kind, Node> = Grammar {
+        prods: [Production { name: "a", rule: keyed, build: Kids(keep), layout: Inline }],
+    };
+    assert(link(keyed_g)?.groups == [ListStyle { sorted: true }]);
+
     // A juxtaposed list — no separator — carries the empty spelling, and
     // `spaced` is the one thing the `Many` cannot answer for itself.
     let words: Rule<Kind> = Many(Term(Atom), nested_in=(Literal("{"), Literal("}")), spaced=true);
@@ -872,36 +909,36 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     g.prods[i].map(|p| p.expect_as).value_or("")
 }
 --- performance ---
-allocations: 366
-deallocations: 366
-reallocations: 54
-bytes allocated: 56058
-instructions executed: 58533
-binary size: 132728
-  code: 84252
-  data: 3516
-  metadata: 44960
+allocations: 390
+deallocations: 390
+reallocations: 55
+bytes allocated: 64034
+instructions executed: 62419
+binary size: 142072
+  code: 90208
+  data: 3596
+  metadata: 48268
 functions:
   __arr_drop_ListStyle:
-    calls: 41
+    calls: 44
     bytes: 120
   __arr_drop_Prec:
     calls: 2
     bytes: 120
   __arr_drop_Production$Kind$Node:
-    calls: 20
+    calls: 22
     bytes: 236
   __arr_drop_Rule$Kind:
     calls: 13
     bytes: 116
   __arr_retain_ListStyle:
-    calls: 12
+    calls: 13
     bytes: 120
   __arr_retain_Prec:
     calls: 0
     bytes: 120
   __arr_retain_Production$Kind$Node:
-    calls: 17
+    calls: 18
     bytes: 236
   __arr_retain_Rule$Kind:
     calls: 20
@@ -913,7 +950,7 @@ functions:
     calls: 1
     bytes: 412
   __builtin_find_index$str$lam$link$Kind$Node$lambda0:
-    calls: 23
+    calls: 24
     bytes: 400
   __builtin_find_index$str$lam$link_rule$Kind$lambda0:
     calls: 9
@@ -928,10 +965,10 @@ functions:
     calls: 4
     bytes: 504
   __eq_ListStyle:
-    calls: 14
-    bytes: 200
+    calls: 15
+    bytes: 232
   __eq_ListStyle$arr:
-    calls: 5
+    calls: 6
     bytes: 284
   __eq_ListStyle$opt:
     calls: 4
@@ -947,7 +984,7 @@ functions:
     bytes: 284
   __eq_Rule$Kind:
     calls: 23
-    bytes: 708
+    bytes: 820
   __eq_Rule$Kind$arr:
     calls: 3
     bytes: 300
@@ -973,17 +1010,17 @@ functions:
     calls: 0
     bytes: 72
   __rec_drop_Rule$Kind:
-    calls: 220
+    calls: 235
     bytes: 340
   __rec_drop___tuple$Rule_Kind$Rule_Kind:
-    calls: 36
+    calls: 39
     bytes: 72
   __test$failure_message:
     calls: 1
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 46900
+    bytes: 52548
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -994,46 +1031,46 @@ functions:
     calls: 2
     bytes: 204
   aipl_arr_extend:
-    calls: 111
+    calls: 116
     bytes: (external)
   aipl_arr_inc:
-    calls: 393
+    calls: 415
     bytes: (external)
   aipl_arr_reserve:
-    calls: 61
+    calls: 63
     bytes: (external)
   aipl_array_dec:
-    calls: 766
+    calls: 808
     bytes: (external)
   aipl_array_new:
-    calls: 44
+    calls: 47
     bytes: (external)
   aipl_array_push:
-    calls: 17
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 68
-    bytes: (external)
-  aipl_array_with_cap:
     calls: 18
     bytes: (external)
+  aipl_array_push_mut:
+    calls: 70
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 19
+    bytes: (external)
   aipl_assert:
-    calls: 27
+    calls: 28
     bytes: (external)
   aipl_rec_alloc:
-    calls: 256
+    calls: 274
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1270
+    calls: 1360
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 166
+    calls: 181
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1014
+    calls: 1086
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 166
+    calls: 181
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -1051,11 +1088,11 @@ functions:
     calls: 2
     bytes: (external)
   desugar_opt$Kind:
-    calls: 17
+    calls: 18
     bytes: 580
   desugar_rule$Kind:
-    calls: 78
-    bytes: 11144
+    calls: 83
+    bytes: 11224
   failure_message:
     calls: 2
     bytes: 488
@@ -1063,20 +1100,20 @@ functions:
     calls: 0
     bytes: 32
   group_styles$Kind$tail:
-    calls: 188
-    bytes: 3004
+    calls: 200
+    bytes: 3052
   keep:
     calls: 0
     bytes: 112
   link$Kind$Node:
-    calls: 14
+    calls: 15
     bytes: 2488
   link_opt$Kind:
-    calls: 16
+    calls: 17
     bytes: 596
   link_rule$Kind:
-    calls: 76
-    bytes: 6748
+    calls: 81
+    bytes: 6784
   link_rules$Kind:
     calls: 4
     bytes: 600
@@ -1084,10 +1121,10 @@ functions:
     calls: 1
     bytes: 180
   opt_group_styles$Kind:
-    calls: 61
+    calls: 64
     bytes: 152
   prod_names$Kind$Node:
-    calls: 18
+    calls: 19
     bytes: 548
   rule_of$Kind$Node:
     calls: 11

@@ -250,7 +250,7 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
         // A bracketed repetition renders as the sequence it is — bracket,
         // contents, bracket. EBNF has no way to say "and these two are a pair",
         // and the reader does not need one: the brackets are right there.
-        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, _, _, _) => {
+        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, _, _, _, _) => {
             let reps = match (sep) {
                 some(s) => render_list(sub, s, min, max, trailing_sep, leading_sep, names),
                 none => {
@@ -370,7 +370,7 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
         // refused as binding different names.
         // A bracketed repetition begins with its opening bracket, so that is
         // where a climb could sit; an unbracketed one begins with its body.
-        Many(sub, _, _, _, _, _, nested_in, _, _, _) => match (nested_in) {
+        Many(sub, _, _, _, _, _, nested_in, _, _, _, _) => match (nested_in) {
             some(brackets) => first_precs([brackets.0, sub]),
             none => climb_precs(sub),
         },
@@ -548,7 +548,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         // nullable: a bracket pair always matches at least its two brackets.
         // Written as the sequence it is, so a nullable `open` still lets the
         // body contribute.
-        Many(sub, min, _, sep, _, leading_sep, nested_in, _, _, _) => match (nested_in) {
+        Many(sub, min, _, sep, _, leading_sep, nested_in, _, _, _, _) => match (nested_in) {
             some(brackets) => rule_first(Then([brackets.0, sub, brackets.1]), sets),
             none => {
                 let head = sep
@@ -770,12 +770,12 @@ fn fixture() -> Grammar<Tok, Node> {
 allocations: 1898
 deallocations: 1898
 reallocations: 338
-bytes allocated: 185527
-instructions executed: 239581
-binary size: 164872
-  code: 108456
+bytes allocated: 195079
+instructions executed: 239965
+binary size: 165360
+  code: 108940
   data: 4132
-  metadata: 52284
+  metadata: 52288
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -857,13 +857,13 @@ functions:
     bytes: 580
   __m1__desugar_rule$Tok:
     calls: 240
-    bytes: 11144
+    bytes: 11224
   __m1__group_styles$Tok:
     calls: 0
     bytes: 32
   __m1__group_styles$Tok$tail:
     calls: 262
-    bytes: 3004
+    bytes: 3052
   __m1__link$Tok$Node:
     calls: 9
     bytes: 2488
@@ -872,7 +872,7 @@ functions:
     bytes: 596
   __m1__link_rule$Tok:
     calls: 139
-    bytes: 6748
+    bytes: 6784
   __m1__link_rules$Tok:
     calls: 27
     bytes: 600
@@ -896,13 +896,13 @@ functions:
     bytes: 996
   __test$ebnf:
     calls: 1
-    bytes: 13520
+    bytes: 13736
   __test$first_sets:
     calls: 1
     bytes: 4904
   __test$rule_first:
     calls: 1
-    bytes: 4984
+    bytes: 5036
   __test$show_first:
     calls: 1
     bytes: 1164
@@ -1001,7 +1001,7 @@ functions:
     bytes: 32
   climb_precs$Tok$tail:
     calls: 92
-    bytes: 1388
+    bytes: 1396
   ebnf$Tok$Node:
     calls: 6
     bytes: 3588
@@ -1019,7 +1019,7 @@ functions:
     bytes: 236
   fixture:
     calls: 2
-    bytes: 5316
+    bytes: 5352
   keep:
     calls: 0
     bytes: 112
@@ -1043,7 +1043,7 @@ functions:
     bytes: 1708
   rule_first$Tok:
     calls: 235
-    bytes: 7216
+    bytes: 7224
   show_first$Tok:
     calls: 27
     bytes: 3876

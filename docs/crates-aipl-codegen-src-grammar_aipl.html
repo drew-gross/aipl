@@ -68,7 +68,21 @@
           </h3>
           <pre class="signature"><code>pub fn format_aipl_ty(src: str, width: u64) -&#62; str!ParseError</code></pre>
 
-          <div class="doc"><p>One AIPL **type**, laid out by the generated formatter.</p><p>This is the stage-4 claim, stated where it can be checked. <code>walker.aipl</code> lays out a type with six hand-written functions — <code>ty</code>, <code>paren_ty</code>, <code>ty_list</code>, <code>base_ty</code>, <code>set_or_dict_ty</code>, <code>dict_value_ty</code>, <code>named_ty</code>, <code>type_suffixes</code>, <code>array_suffixes</code> — about ninety lines of cursor-walking that mirror, by hand, productions this file already describes. Here the same layouts are four annotations on those productions plus <code>ty_space</code> below, and the assertions under this function are <code>walker.aipl</code>'s own type assertions copied verbatim: same inputs, same expected strings, including the broken-list case. Both sides lex with <code>lex_aipl</code>, so the inputs mean the same thing to both.</p><p>What that does *not* say: the rest of AIPL is not this tractable. Statements want a hard-broken block layout that <code>format.aipl</code> does not have an arm for yet, and expressions want call hugging and chain breaking, which are not layout at all. The types are the honest measure of the mechanical part — and the mechanical part is most of the grammar-shaped half of the walker.</p></div>
+          <div class="doc"><p>One AIPL **type**, laid out by the generated formatter.</p><p>This is the stage-4 claim, stated where it can be checked. <code>walker.aipl</code> lays out a type with six hand-written functions — <code>ty</code>, <code>paren_ty</code>, <code>ty_list</code>, <code>base_ty</code>, <code>set_or_dict_ty</code>, <code>dict_value_ty</code>, <code>named_ty</code>, <code>type_suffixes</code>, <code>array_suffixes</code> — about ninety lines of cursor-walking that mirror, by hand, productions this file already describes. Here the same layouts are four annotations on those productions plus <code>aipl_space</code> below, and the assertions under this function are <code>walker.aipl</code>'s own type assertions copied verbatim: same inputs, same expected strings, including the broken-list case. Both sides lex with <code>lex_aipl</code>, so the inputs mean the same thing to both.</p><p>What that does *not* say: the rest of AIPL is not this tractable. Statements want a hard-broken block layout that <code>format.aipl</code> does not have an arm for yet, and expressions want call hugging and chain breaking, which are not layout at all. The types are the honest measure of the mechanical part — and the mechanical part is most of the grammar-shaped half of the walker.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-import_decl_doc">
+          <h3>
+            <a class="anchor" href="#item-import_decl_doc">import_decl_doc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn import_decl_doc(src: str) -&#62; Doc!ParseError</code></pre>
+
+          <div class="doc"><p>One AIPL **import statement**, laid out by the generated formatter — the <code>Doc</code> rather than the text, because the caller is <code>walker.aipl</code>, which splices it into the file's layout and prints the whole thing once.</p><p>This is the first piece of AIPL's own formatter to move from the walker to the grammar, and it moved for the sake of one rule: the names sort. That used to be a comparator and a sort in the walker; it is now <code>sorted=true</code> on the <code>import_decl</code> production's <code>Many</code>, and the walker calls this instead of knowing. Everything else about an import's layout — the spaced braces, the trailing comma once it breaks, the <code>from</code> and the <code>;</code> — was already a fact the grammar stated, read back here through <code>format_cst</code> as it is for a type.</p><p><code>src</code> is the statement alone, <code>import</code> through <code>;</code>. Comments inside it are trivia the concrete tree keeps, so they come out inside the statement, beside the name they were written against; the walker skips past them so they are not emitted a second time.</p></div>
 
 
         </section>
@@ -1931,6 +1945,20 @@
 
 
 
+        <section class="item" id="item-import_doc">
+          <h3>
+            <a class="anchor" href="#item-import_doc">import_doc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn import_doc(src: str, width: u64) -&#62; str!ParseError</code></pre>
+
+          <div class="doc"><p><code>import_decl_doc</code> printed at <code>width</code>, for the assertions above.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-as_program">
           <h3>
             <a class="anchor" href="#item-as_program">as_program</a>
@@ -2015,14 +2043,14 @@
 
 
 
-        <section class="item" id="item-ty_space">
+        <section class="item" id="item-aipl_space">
           <h3>
-            <a class="anchor" href="#item-ty_space">ty_space</a>
+            <a class="anchor" href="#item-aipl_space">aipl_space</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn ty_space(l: str, r: str) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn aipl_space(l: str, r: str) -&#62; bool</code></pre>
 
-          <div class="doc"><p>The spacing rule for the productions annotated so far: spaces around <code>-&gt;</code>, a space after the <code>:</code> of a dict type, and nothing anywhere else.</p><p>Everything else a reader would call spacing in a type is a list separating its items, which the <code>Wrap</code> layouts do, or a suffix written against its core, which <code>Tight</code> does. That is the shape the rule takes in a real language: a handful of tokens that want air, and silence for the rest.</p></div>
+          <div class="doc"><p>The spacing rule for the productions the generated formatter lays out so far — types and imports: spaces around <code>-&gt;</code>, a space after the <code>:</code> of a dict type, and in an import a space after <code>import</code> and <code>from</code> and either side of <code>as</code>. Nothing anywhere else.</p><p>Everything else a reader would call spacing is a list separating its items, which the group layouts do, or a suffix written against its core, which <code>Tight</code> does. That is the shape the rule takes in a real language: a handful of tokens that want air, and silence for the rest. It is asked about the spellings on either side of a gap, so <code>import</code> then <code>{</code> is one question (yes) and <code>#</code> then <code>{</code> in a set type is another (no).</p></div>
 
 
         </section>

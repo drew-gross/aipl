@@ -173,7 +173,7 @@
           </h3>
           <pre class="signature"><code>pub fn format_json(src: str, width: u64) -&#62; str!ParseError</code></pre>
 
-          <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>The whole of JSON's layout is the eight annotations on the grammar above plus <code>json_space</code> below. There is no second walker over JSON's syntax, and adding a ninth production would need no more than a ninth annotation — which is the claim this stage exists to make good on.</p></div>
+          <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>The whole of JSON's layout is the eight annotations on the grammar above plus <code>json_space</code> below. There is no second walker over JSON's syntax, and adding a ninth production would need no more than a ninth annotation — which is the claim this stage exists to make good on. Key order is part of that claim: the members of every object come out sorted, and the only place that is said is <code>sorted=true</code> on the object's <code>Many</code>.</p></div>
 
 
         </section>

@@ -291,34 +291,6 @@
 
 
 
-        <section class="item" id="item-ImportName">
-          <h3>
-            <a class="anchor" href="#item-ImportName">ImportName</a>
-            <span class="kind kind-struct">struct</span>
-          </h3>
-          <pre class="signature"><code>struct ImportName</code></pre>
-
-          <div class="doc"><p>One imported name: what it sorts by, and how it is spelled in the output.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-WKeys">
-          <h3>
-            <a class="anchor" href="#item-WKeys">WKeys</a>
-            <span class="kind kind-struct">struct</span>
-          </h3>
-          <pre class="signature"><code>struct WKeys</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
         <section class="item" id="item-VCase">
           <h3>
             <a class="anchor" href="#item-VCase">VCase</a>
@@ -668,7 +640,7 @@
             <a class="anchor" href="#item-take_comment">take_comment</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn take_comment(self: W, __spat$14490: Span) -&#62; W</code></pre>
+          <pre class="signature"><code>fn take_comment(self: W, __spat$14485: Span) -&#62; W</code></pre>
 
           <div class="doc"><p>Consume comment <code>c</code>: step past it and mark it as the last thing emitted. The Rust <code>pop_front</code> + <code>last_end</code> update, as one move.</p></div>
 
@@ -922,63 +894,7 @@
           </h3>
           <pre class="signature"><code>fn import_item(self: W) -&#62; WImport!FmtError</code></pre>
 
-          <div class="doc"><p><code>import { a, b as c } from &quot;path&quot;;</code> — the imported names sorted, the statement rendered, and the hoist key.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-import_names">
-          <h3>
-            <a class="anchor" href="#item-import_names">import_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn import_names(self: W, acc0: ImportName[]) -&#62; WKeys!FmtError</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-import_alias">
-          <h3>
-            <a class="anchor" href="#item-import_alias">import_alias</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn import_alias(self: W, first: str) -&#62; WStr</code></pre>
-
-          <div class="doc"><p><code>name as alias</code> — the spelling written when an import is renamed.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-import_name_precedes">
-          <h3>
-            <a class="anchor" href="#item-import_name_precedes">import_name_precedes</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn import_name_precedes(a: str, b: str) -&#62; bool</code></pre>
-
-          <div class="doc"><p>Plain names first, operators last; within each group, ordinary <code>str</code> order on the *imported* name — the one to the left of an <code>as</code> — so <code>wrapping_add as +</code> sorts under <code>w</code>, next to the function it actually imports, rather than among the operator spellings. A comparator states that directly, so nothing has to be packed into a sort key.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-sorted_import_names">
-          <h3>
-            <a class="anchor" href="#item-sorted_import_names">sorted_import_names</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn sorted_import_names(names: ImportName[]) -&#62; Doc[]</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p><code>import { a, b as c } from &quot;path&quot;;</code> — the statement laid out, and the hoist key.</p><p>The layout is not the walker's. The statement's source, <code>import</code> through <code>;</code>, goes to <code>import_decl_doc</code>, which parses it against the <code>import_decl</code> production and lays it out from what that production says: the braces take inner spaces, the list breaks one name per line with a trailing comma, and the names *sort* — <code>sorted=true</code> on the production's <code>Many</code>, the one word that replaced the comparator, the sort and the two carrier structs that used to live here. What stays here is the cursor: which tokens the statement spans, and the <code>from</code> target the file-level hoist orders by.</p><p>Comments inside the statement are laid out with it — they are trivia in the concrete tree, and come out beside the name they were written against — so the walker's own comment queue steps past them, or <code>lead</code> would emit them a second time.</p></div>
 
 
         </section>
@@ -992,7 +908,7 @@
           </h3>
           <pre class="signature"><code>fn import_source_precedes(a: str, b: str) -&#62; bool</code></pre>
 
-          <div class="doc"><p>What <code>program</code> orders imports by: <code>builtins</code> ahead of every path import, then paths in ordinary <code>str</code> order. Like the name ordering above, a comparator states this directly rather than packing a bucket digit into a sort key.</p></div>
+          <div class="doc"><p>What <code>program</code> orders imports by: <code>builtins</code> ahead of every path import, then paths in ordinary <code>str</code> order. A comparator states this directly rather than packing a bucket digit into a sort key.</p></div>
 
 
         </section>
@@ -1550,7 +1466,7 @@
             <a class="anchor" href="#item-range_has_semi">range_has_semi</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_semi(self: W, __spat$54068: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_semi(self: W, __spat$53407: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
@@ -2435,6 +2351,20 @@
           <pre class="signature"><code>fn comment_starts_before(self: W, end: u64) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether the next undrained comment begins before <code>end</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-skip_comments_before">
+          <h3>
+            <a class="anchor" href="#item-skip_comments_before">skip_comments_before</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn skip_comments_before(self: W, end: u64) -&#62; W</code></pre>
+
+          <div class="doc"><p>Step past every undrained comment that begins before <code>end</code>, emitting none of them — for a span something else has already laid out, comments included.</p></div>
 
 
         </section>

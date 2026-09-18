@@ -74,6 +74,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  trailing comment attaching
+  now that all operators have names, the import parser doesn't need to support importing operators without names
   unify tag values for strings and arrays
   Span through should be a builtin
   json_char should be a match, and should just put the backslashes into the str rather than making a var

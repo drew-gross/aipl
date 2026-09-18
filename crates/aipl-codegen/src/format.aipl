@@ -11,16 +11,24 @@
 //
 // **What this is not.** `walker.aipl`, AIPL's own formatter, is 3,500 lines,
 // and most of that is judgement about AIPL in particular — which call hugs its
-// last argument, when a method chain breaks, how imports sort, where a blank
-// line survives. None of that follows from a grammar and none of it is here.
-// What is here is the mechanical majority: the productions whose layout is
-// settled by the tokens they matched, which is where the cost of describing one
-// syntax twice actually falls.
+// last argument, when a method chain breaks, where a blank line survives. None
+// of that follows from a grammar and none of it is here. What is here is the
+// mechanical majority: the productions whose layout is settled by the tokens
+// they matched, which is where the cost of describing one syntax twice actually
+// falls.
 //
-// The whole vocabulary is three `Layout` arms plus one function per language.
-// That function — `space`, below — is the piece a grammar genuinely cannot
-// supply: whether two adjacent tokens want a space between them is a convention
-// of the language, not a fact about its structure.
+// The line moves, though, and the way it moves is by growing the grammar rather
+// than this file: a rule that used to be judgement becomes a fact the grammar
+// states and this driver reads back. Sorting is the worked example. Which lists
+// sort — a JSON object's members, an import's names — is a decision about the
+// language, and it used to live in each language's walker; now the `Many` that
+// holds the list says `sorted=true`, `list_items` below orders what it finds,
+// and the walker has nothing left to say about it.
+//
+// The whole vocabulary is the `Layout` arms, the `ListStyle` bits, plus one
+// function per language. That function — `space`, below — is the piece a
+// grammar genuinely cannot supply: whether two adjacent tokens want a space
+// between them is a convention of the language, not a fact about its structure.
 import {
     Span,
     equal as ==,
@@ -37,6 +45,7 @@ import {
     map,
     not_equal as !=,
     push,
+    sort_by,
     value_or,
     value_or_err,
     wrapping_add as +,
@@ -301,6 +310,35 @@ fn starts_item(self: Piece) -> bool {
     }
 }
 
+# The spelling `self` leads with, or `""` for a comment — which is why a sorted
+# item's key skips past its comments to the first thing that is not one.
+fn leading(self: Piece) -> str {
+    match (self) {
+        Tok(t) => t,
+        Node(_, f, _) => f,
+        Note(..) => "",
+    }
+}
+
+# What a sorted list orders an item by: its leading token. A comment in front
+# of the item is not it — it rides along, but the key is what it was written
+# against. An item that is nothing but comments keys as `""`, which puts it
+# first; there is no better answer for a comment with nothing to attach to.
+fn item_key(ps: Piece[]) -> str {
+    for (let p : ps) {
+        if (p.starts_item()) {
+            return p.leading();
+        };
+    }
+    ""
+}.test({
+    assert(item_key([Tok("a"), Tok("b")]) == "a");
+    assert(item_key([Node(Text("x"), "x", "y")]) == "x");
+    assert(item_key([Note("// c", true), Tok("k")]) == "k");
+    assert(item_key([Note("// c", true)]) == "");
+    assert(item_key([]) == "");
+})
+
 // ---------- the three layouts ----------
 
 # `Tight`: the children run together, the spacing rule not consulted.
@@ -536,34 +574,45 @@ fn wrapped(
     );
 })
 
-# The items between a pair of brackets, each laid out inline.
+# One item of a bracketed list: its layout, and what a sorted list orders it by.
+struct Item { key: str, doc: Doc }
+
+# The items between a pair of brackets, each laid out inline — in the order the
+# style asks for.
 #
 # A token spelled like the style's separator ends the item it follows and is
 # dropped; the style writes the separators back, which is what lets a list that
 # breaks gain a trailing one it never had in the source. With an empty separator
 # every token or child starts a new item instead, which is the juxtaposed list. A
 # comment never starts one — it belongs to the item it was written against.
-fn list_items(mid: Piece[], ListStyle { sep }, space: (str, str) -> bool) -> Doc[] {
-    mut items: Doc[] = [];
+#
+# A `sorted` style orders the items by their leading token, in ordinary `str`
+# order. The sort is stable, so two items with one key keep the author's order —
+# a duplicate JSON key, say, stays a duplicate in the order it was written.
+fn list_items(mid: Piece[], ListStyle { sep, sorted }, space: (str, str) -> bool) -> Doc[] {
+    mut items: Item[] = [];
     mut cur: Piece[] = [];
     for (let p : mid) {
         if (sep != "" && p.is_sep(sep)) {
             if (cur.is_nonempty()) {
-                set items.push(inline_doc(cur, space));
+                set items.push(item_of(cur, space));
                 set cur = [];
             };
         } else {
             if (sep == "" && p.starts_item() && cur.is_nonempty()) {
-                set items.push(inline_doc(cur, space));
+                set items.push(item_of(cur, space));
                 set cur = [];
             };
             set cur.push(p);
         };
     }
     if (cur.is_nonempty()) {
-        set items.push(inline_doc(cur, space));
+        set items.push(item_of(cur, space));
     };
-    items
+    if (sorted) {
+        set items = items.sort_by(|a, b| a.key < b.key);
+    };
+    items.map(|i| i.doc)
 }.test({
     let a = Node(Text("a"), "a", "a");
     let b = Node(Text("b"), "b", "b");
@@ -581,7 +630,39 @@ fn list_items(mid: Piece[], ListStyle { sep }, space: (str, str) -> bool) -> Doc
             "b",
         ],
     );
+
+    // ---- sorted ----
+    let keyed = ListStyle { sorted: true };
+    assert(texts(list_items([b, Tok(","), a], keyed, never_space)) == ["a", "b"]);
+    // Unsorted, the same list keeps the author's order.
+    assert(texts(list_items([b, Tok(","), a], ListStyle {}, never_space)) == ["b", "a"]);
+
+    // The key is the item's leading token, so a comment in front of an item
+    // moves with it rather than deciding where it goes.
+    assert(
+        texts(list_items([b, Tok(","), Note("/*x*/", false), a], keyed, never_space)) == [
+            "/*x*/ a",
+            "b",
+        ],
+    );
+    // A multi-token item keys on its first token: `b: 1` sorts under `b`.
+    let kv_b = [Tok("b"), Tok(":"), Tok("1")];
+    let kv_a = [Tok("a"), Tok(":"), Tok("2")];
+    assert(texts(list_items([..kv_b, Tok(","), ..kv_a], keyed, colon_space)) == ["a: 2", "b: 1"]);
+    // Stable: equal keys stay in source order.
+    let a2 = Node(Text("a2"), "a", "a");
+    assert(texts(list_items([a2, Tok(","), a], keyed, never_space)) == ["a2", "a"]);
+    // Juxtaposed lists sort too.
+    assert(
+        texts(list_items([b, a], ListStyle { sep: "", sorted: true }, never_space)) == ["a", "b"],
+    );
 })
+
+# One item, laid out and keyed.
+fn item_of(ps: Piece[], space: (str, str) -> bool) -> Item {
+    key: item_key(ps),
+    doc: inline_doc(ps, space),
+}
 
 // ---------- test support ----------
 
@@ -663,24 +744,27 @@ fn node_of(t: str) -> Piece { Node(Text(t), t, t) }
 
 fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
 --- performance ---
-allocations: 2090
-deallocations: 2090
-reallocations: 181
-bytes allocated: 167907
-instructions executed: 263248
-binary size: 220840
-  code: 141808
-  data: 5044
-  metadata: 73988
+allocations: 2364
+deallocations: 2364
+reallocations: 192
+bytes allocated: 188947
+instructions executed: 297529
+binary size: 255592
+  code: 164120
+  data: 6068
+  metadata: 85404
 functions:
+  __arr_drop_Item:
+    calls: 69
+    bytes: 148
   __arr_drop_Piece:
-    calls: 95
+    calls: 123
     bytes: 228
   __arr_drop___m1__Cst:
     calls: 8
     bytes: 116
   __arr_drop___m2__Doc:
-    calls: 218
+    calls: 236
     bytes: 116
   __arr_drop___m8__ListStyle:
     calls: 15
@@ -691,14 +775,17 @@ functions:
   __arr_drop___m8__Rule$FKind:
     calls: 0
     bytes: 116
+  __arr_retain_Item:
+    calls: 85
+    bytes: 148
   __arr_retain_Piece:
-    calls: 100
+    calls: 124
     bytes: 228
   __arr_retain___m1__Cst:
     calls: 0
     bytes: 116
   __arr_retain___m2__Doc:
-    calls: 360
+    calls: 392
     bytes: 116
   __arr_retain___m8__ListStyle:
     calls: 6
@@ -755,7 +842,7 @@ functions:
     calls: 0
     bytes: 504
   __eq_str$arr:
-    calls: 4
+    calls: 10
     bytes: 364
   __m1__first_leaf:
     calls: 1
@@ -773,7 +860,7 @@ functions:
     calls: 99
     bytes: 1156
   __m2__col_after:
-    calls: 152
+    calls: 172
     bytes: 628
   __m2__fits:
     calls: 0
@@ -794,23 +881,23 @@ functions:
     calls: 259
     bytes: 688
   __m2__print:
-    calls: 39
+    calls: 51
     bytes: 4192
   __m2__print$map2$own0:
-    calls: 39
+    calls: 51
     bytes: 464
   __m3__reindent_block:
     calls: 0
     bytes: 6536
   __m7__trim_end_while$lam$__builtin_is_space:
-    calls: 96
+    calls: 120
     bytes: 392
   __m8__desugar_opt$FKind:
     calls: 6
     bytes: 580
   __m8__desugar_rule$FKind:
     calls: 44
-    bytes: 11144
+    bytes: 11224
   __m8__failure_message:
     calls: 2
     bytes: 488
@@ -819,7 +906,7 @@ functions:
     bytes: 32
   __m8__group_styles$FKind$tail:
     calls: 74
-    bytes: 3004
+    bytes: 3052
   __m8__link$FKind$str:
     calls: 8
     bytes: 3048
@@ -828,7 +915,7 @@ functions:
     bytes: 596
   __m8__link_rule$FKind:
     calls: 44
-    bytes: 6748
+    bytes: 6784
   __m8__link_rules$FKind:
     calls: 0
     bytes: 600
@@ -839,10 +926,10 @@ functions:
     calls: 27
     bytes: 132
   __rec_drop___m2__Doc:
-    calls: 337
+    calls: 361
     bytes: 184
   __rec_drop___m2__Work:
-    calls: 662
+    calls: 706
     bytes: 84
   __rec_drop___m8__Rule$FKind:
     calls: 94
@@ -858,13 +945,16 @@ functions:
     bytes: 444
   __test$fmt_node:
     calls: 1
-    bytes: 4116
+    bytes: 4132
   __test$inline_doc:
     calls: 1
     bytes: 4172
+  __test$item_key:
+    calls: 1
+    bytes: 2104
   __test$list_items:
     calls: 1
-    bytes: 6804
+    bytes: 19344
   __test$render_cst:
     calls: 1
     bytes: 1180
@@ -873,7 +963,7 @@ functions:
     bytes: 4316
   __test$wrapped:
     calls: 1
-    bytes: 10468
+    bytes: 10512
   __test_try_fail___m8__ParseError:
     calls: 0
     bytes: 84
@@ -884,52 +974,55 @@ functions:
     calls: 7
     bytes: 204
   aipl_arr_extend:
-    calls: 217
+    calls: 228
     bytes: (external)
   aipl_arr_inc:
-    calls: 1515
+    calls: 1720
     bytes: (external)
   aipl_arr_reserve:
-    calls: 265
+    calls: 288
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 30
     bytes: (external)
   aipl_array_dec:
-    calls: 2833
+    calls: 3267
     bytes: (external)
   aipl_array_new:
-    calls: 340
+    calls: 389
     bytes: (external)
   aipl_array_push:
-    calls: 429
+    calls: 507
     bytes: (external)
   aipl_array_push_mut:
-    calls: 378
+    calls: 433
     bytes: (external)
   aipl_array_with_cap:
-    calls: 19
+    calls: 52
     bytes: (external)
   aipl_assert:
-    calls: 45
+    calls: 56
     bytes: (external)
   aipl_rec_alloc:
-    calls: 1133
+    calls: 1201
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 8283
+    calls: 9036
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 703
+    calls: 735
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 7150
+    calls: 7835
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 703
+    calls: 735
     bytes: (external)
   aipl_test_begin:
-    calls: 8
+    calls: 9
     bytes: (external)
   aipl_test_end:
-    calls: 8
+    calls: 9
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -941,7 +1034,7 @@ functions:
     calls: 7
     bytes: (external)
   at:
-    calls: 33
+    calls: 45
     bytes: 76
   breaks_after:
     calls: 5
@@ -971,47 +1064,50 @@ functions:
     calls: 2
     bytes: 140
   gap_wanted$lam$colon_space:
-    calls: 13
+    calls: 19
     bytes: 200
   gap_wanted$lam$never_space:
-    calls: 72
+    calls: 82
     bytes: 144
   gap_wanted$lam$spaced_unless_punct:
     calls: 32
     bytes: 468
   grammar_of:
     calls: 2
-    bytes: 2340
+    bytes: 2364
   group_doc$FKind$str$s1$lam$always_space:
     calls: 0
-    bytes: 1716
+    bytes: 1732
   group_doc$FKind$str$s1$lam$never_space:
     calls: 0
-    bytes: 1716
+    bytes: 1732
   group_doc$FKind$str$s1$lam$spaced_unless_punct:
     calls: 4
-    bytes: 1716
+    bytes: 1732
   inline_doc$lam$always_space:
     calls: 1
     bytes: 2416
   inline_doc$lam$colon_space:
-    calls: 6
+    calls: 8
     bytes: 2416
   inline_doc$lam$never_space:
-    calls: 58
+    calls: 68
     bytes: 2416
   inline_doc$lam$spaced_unless_punct:
     calls: 20
     bytes: 2416
+  item_key:
+    calls: 52
+    bytes: 1072
   kv:
     calls: 2
     bytes: 288
   list_items$lam$never_space:
-    calls: 18
-    bytes: 1500
+    calls: 23
+    bytes: 3460
   main:
     calls: 1
-    bytes: 576
+    bytes: 644
   piece_doc:
     calls: 14
     bytes: 820
@@ -1038,10 +1134,10 @@ functions:
     bytes: 120
   wrapped$lam$always_space:
     calls: 0
-    bytes: 4112
+    bytes: 6100
   wrapped$lam$never_space:
     calls: 15
     bytes: 2692
   wrapped$lam$spaced_unless_punct:
     calls: 3
-    bytes: 4112
+    bytes: 6100

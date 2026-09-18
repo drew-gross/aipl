@@ -71,12 +71,12 @@ fn depth(self: Sexp) -> u64 {
 allocations: 16689
 deallocations: 16689
 reallocations: 2158
-bytes allocated: 1029642
-instructions executed: 5343902
-binary size: 242320
-  code: 158344
+bytes allocated: 1031946
+instructions executed: 5344896
+binary size: 242504
+  code: 158524
   data: 1876
-  metadata: 82100
+  metadata: 82104
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -281,7 +281,7 @@ functions:
     bytes: 4136
   __m14__match_rule$__m1__SexpKind$Sexp:
     calls: 5372
-    bytes: 6088
+    bytes: 6092
   __m14__match_sep$__m1__SexpKind$Sexp:
     calls: 420
     bytes: 952
@@ -320,7 +320,7 @@ functions:
     bytes: 468
   __m1__parse_sexp:
     calls: 6
-    bytes: 5584
+    bytes: 5596
   __m1__sexp_grammar$lambda0:
     calls: 0
     bytes: 96
@@ -368,13 +368,13 @@ functions:
     bytes: 580
   __m4__desugar_rule$__m1__SexpKind:
     calls: 42
-    bytes: 11144
+    bytes: 11224
   __m4__group_styles$__m1__SexpKind:
     calls: 0
     bytes: 32
   __m4__group_styles$__m1__SexpKind$tail:
     calls: 84
-    bytes: 3004
+    bytes: 3052
   __m4__link$__m1__SexpKind$Sexp:
     calls: 6
     bytes: 2488
@@ -383,7 +383,7 @@ functions:
     bytes: 596
   __m4__link_rule$__m1__SexpKind:
     calls: 42
-    bytes: 6748
+    bytes: 6784
   __m4__link_rules$__m1__SexpKind:
     calls: 6
     bytes: 600
