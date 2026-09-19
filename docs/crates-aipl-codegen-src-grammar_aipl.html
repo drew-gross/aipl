@@ -1630,35 +1630,7 @@
           </h3>
           <pre class="signature"><code>fn lower_import_name(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>import_name</code> — a name, an aliased name, or a bare operator spelling. The span covers the *exported* name, which is where an &quot;is not exported&quot; error points.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-op_import_span">
-          <h3>
-            <a class="anchor" href="#item-op_import_span">op_import_span</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn op_import_span(op: str, span: Span) -&#62; Span</code></pre>
-
-          <div class="doc"><p>Gazelle's <code>-</code>, <code>&lt;</code>, <code>&gt;</code>, <code>||</code> and <code>!</code> terminals carry no span, so a bare import of one of those operators gets the empty span and a diagnostic pointing at the name falls back to the enclosing import statement. Mirrored here so the two parsers agree — it is a gazelle artifact, and one worth dropping once gazelle is.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-spanless_ops">
-          <h3>
-            <a class="anchor" href="#item-spanless_ops">spanless_ops</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn spanless_ops() -&#62; str[]</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p><code>import_name</code> — a name, or an aliased name. The span covers the *exported* name, which is where an &quot;is not exported&quot; error points. A bare operator never gets here: the grammar refuses it before lowering.</p></div>
 
 
         </section>

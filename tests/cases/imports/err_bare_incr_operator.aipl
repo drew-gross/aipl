@@ -1,13 +1,12 @@
-// The `++` mirror of `err_bare_plus_operator`: `++` is recognized as an operator
-// spelling, but like `+` it has no bare form — incrementing adds 1, so it has
-// the same wrapping/saturating choice to make and the same aliased import.
-// Never referenced on purpose, so `#[allow]` squelches the unused-import lint.
-import { ++ } from builtins; #[allow]
+// The `++` mirror of `err_bare_plus_operator`: `++` is recognised as an operator
+// spelling and refused the same way — it has no bare form either, incrementing
+// being an add with the same wrapping/saturating choice to make.
+import { ++ } from builtins;
 
 fn main() {}
 --- errors ---
-error: the "++" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_increment as ++` or `saturating_increment as ++` from builtins
- --> ./tests/cases/imports/err_bare_incr_operator.aipl:5:10
+error: an operator has no bare import: import the builtin it stands for and alias it to the operator, e.g. `wrapping_add as +`
+ --> ./tests/cases/imports/err_bare_incr_operator.aipl:4:10
   |
-5 | import { ++ } from builtins; #[allow]
+4 | import { ++ } from builtins;
   |          ^^

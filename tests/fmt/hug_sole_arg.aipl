@@ -1,4 +1,4 @@
-import { wrapping_add as +, ==, len } from builtins;
+import { wrapping_add as +, equal as ==, len } from builtins;
 struct Cfg { name: str, tags: str[] }
 variant Doc = Text(str) | Concat(Doc[]) | Line
 fn group(self: Doc) -> Doc { self }
@@ -32,7 +32,7 @@ fn main() {
     let e = sizes([]);
 }
 --- formatted ---
-import { ==, len, wrapping_add as + } from builtins;
+import { equal as ==, len, wrapping_add as + } from builtins;
 
 struct Cfg { name: str, tags: str[] }
 

@@ -1,4 +1,4 @@
-import { map, filter, len, wrapping_add as +, < } from builtins;
+import { map, filter, len, wrapping_add as +, less_than as < } from builtins;
 fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 { f(a, b) }
 fn main() -> i64 {
     let doubled = [1, 2].map( | x |  x + x );
@@ -6,7 +6,7 @@ fn main() -> i64 {
     apply(2, 3, +) + small.len()
 }
 --- formatted ---
-import { <, filter, len, map, wrapping_add as + } from builtins;
+import { filter, len, less_than as <, map, wrapping_add as + } from builtins;
 
 fn apply(a: i64, b: i64, f: (i64, i64) -> i64) -> i64 { f(a, b) }
 

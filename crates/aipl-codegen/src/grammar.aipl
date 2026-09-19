@@ -213,6 +213,18 @@ variant Rule<K: variant> =
     # production's index, so `1 + 2 * 3` yields a node per operand rather than
     # one flat run.
     | Climb(Rule<K>, Prec[])
+    # A rule that never matches: reached, it fails the whole parse with this
+    # message. Refusal is not a miss — no enclosing choice, option or
+    # repetition backtracks out of it — so it is only ever reached on purpose,
+    # after a sequence has matched the thing worth refusing:
+    # `Then([Named("operator"), Refuse("..")])` accepts an operator and then
+    # rejects it, and the error underlines what the sequence matched.
+    #
+    # This is how a grammar names a shape the language *used to* have, or that a
+    # reader would plausibly write, and says something more useful than the
+    # "expected X, found Y" a plain non-match would produce. The message is the
+    # grammar author's, verbatim.
+    | Refuse(str)
 
 # How a production's matched node becomes a value of the caller's AST type `A`.
 #
@@ -383,7 +395,7 @@ fn group_styles<K: variant>(r: Rule<K>) -> ListStyle[] {
         },
         Maybe(sub) => group_styles(sub),
         Climb(atom, _) => group_styles(atom),
-        Term(..) | Literal(..) | Named(..) | NamedIdx(..) => [],
+        Term(..) | Literal(..) | Named(..) | NamedIdx(..) | Refuse(..) => [],
     }
 }
 
@@ -470,6 +482,7 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
         Literal(s) => ok(Literal(s)),
         Named(n) => ok(Named(n)),
         NamedIdx(i) => ok(NamedIdx(i)),
+        Refuse(m) => ok(Refuse(m)),
     }
 }
 
@@ -491,7 +504,8 @@ fn sep_spelling<K: variant>(sep: Rule<K>?) -> str!ParseError {
             | Maybe(..)
             | Named(..)
             | NamedIdx(..)
-            | Climb(..) => err(ParseError {
+            | Climb(..)
+            | Refuse(..) => err(ParseError {
                 message: "a bracketed list's separator must be a literal, so the printer can write it back",
                 span: 0..0,
             }),
@@ -571,6 +585,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
         Term(k) => ok(Term(k)),
         Literal(s) => ok(Literal(s)),
         NamedIdx(i) => ok(NamedIdx(i)),
+        Refuse(m) => ok(Refuse(m)),
     }
 }
 
@@ -691,6 +706,12 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
                 build: Kids(keep),
                 layout: Inline,
             },
+            Production {
+                name: "e",
+                rule: Then([Named("a"), Refuse("no")]),
+                build: Kids(keep),
+                layout: Inline,
+            },
         ],
     };
     let ls = link(shapes)?;
@@ -698,6 +719,8 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     assert(rule_of(ls, 1) == Many(NamedIdx(0), sep=Literal(",")));
     assert(rule_of(ls, 2) == Climb(NamedIdx(0), [Prec { power: 1, right: false, ops: ["+"] }]));
     assert(rule_of(ls, 3) == Many(NamedIdx(1), min=1));
+    // A refusal carries no reference and passes through with its message.
+    assert(rule_of(ls, 4) == Then([NamedIdx(0), Refuse("no")]));
 
     // An unresolved reference is a grammar error, named in the message.
     let bad: Grammar<Kind, Node> = Grammar {
@@ -909,18 +932,18 @@ fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     g.prods[i].map(|p| p.expect_as).value_or("")
 }
 --- performance ---
-allocations: 390
-deallocations: 390
-reallocations: 55
-bytes allocated: 64034
-instructions executed: 62419
-binary size: 142072
-  code: 90208
-  data: 3596
-  metadata: 48268
+allocations: 406
+deallocations: 406
+reallocations: 58
+bytes allocated: 66954
+instructions executed: 64856
+binary size: 145400
+  code: 92324
+  data: 3676
+  metadata: 49400
 functions:
   __arr_drop_ListStyle:
-    calls: 44
+    calls: 45
     bytes: 120
   __arr_drop_Prec:
     calls: 2
@@ -929,7 +952,7 @@ functions:
     calls: 22
     bytes: 236
   __arr_drop_Rule$Kind:
-    calls: 13
+    calls: 17
     bytes: 116
   __arr_retain_ListStyle:
     calls: 13
@@ -938,10 +961,10 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain_Production$Kind$Node:
-    calls: 18
+    calls: 19
     bytes: 236
   __arr_retain_Rule$Kind:
-    calls: 20
+    calls: 24
     bytes: 116
   __builtin_find_index$str$lam$__test$link$lambda0:
     calls: 1
@@ -950,19 +973,19 @@ functions:
     calls: 1
     bytes: 412
   __builtin_find_index$str$lam$link$Kind$Node$lambda0:
-    calls: 24
+    calls: 25
     bytes: 400
   __builtin_find_index$str$lam$link_rule$Kind$lambda0:
-    calls: 9
+    calls: 10
     bytes: 400
   __builtin_map_join$Rule$Kind$ListStyle$lam$group_styles$Kind:
     calls: 0
     bytes: 44
   __builtin_map_join$Rule$Kind$ListStyle$lam$group_styles$Kind$tail:
-    calls: 4
+    calls: 5
     bytes: 1060
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
-    calls: 4
+    calls: 5
     bytes: 504
   __eq_ListStyle:
     calls: 15
@@ -983,10 +1006,10 @@ functions:
     calls: 1
     bytes: 284
   __eq_Rule$Kind:
-    calls: 23
-    bytes: 820
+    calls: 25
+    bytes: 848
   __eq_Rule$Kind$arr:
-    calls: 3
+    calls: 4
     bytes: 300
   __eq_Rule$Kind$opt:
     calls: 4
@@ -1010,8 +1033,8 @@ functions:
     calls: 0
     bytes: 72
   __rec_drop_Rule$Kind:
-    calls: 235
-    bytes: 340
+    calls: 246
+    bytes: 392
   __rec_drop___tuple$Rule_Kind$Rule_Kind:
     calls: 39
     bytes: 72
@@ -1020,7 +1043,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 52548
+    bytes: 53596
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -1031,43 +1054,43 @@ functions:
     calls: 2
     bytes: 204
   aipl_arr_extend:
-    calls: 116
+    calls: 120
     bytes: (external)
   aipl_arr_inc:
-    calls: 415
+    calls: 427
     bytes: (external)
   aipl_arr_reserve:
-    calls: 63
+    calls: 68
     bytes: (external)
   aipl_array_dec:
-    calls: 808
+    calls: 835
     bytes: (external)
   aipl_array_new:
-    calls: 47
+    calls: 49
     bytes: (external)
   aipl_array_push:
-    calls: 18
+    calls: 20
     bytes: (external)
   aipl_array_push_mut:
-    calls: 70
+    calls: 76
     bytes: (external)
   aipl_array_with_cap:
     calls: 19
     bytes: (external)
   aipl_assert:
-    calls: 28
+    calls: 29
     bytes: (external)
   aipl_rec_alloc:
-    calls: 274
+    calls: 285
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1360
+    calls: 1406
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 181
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1086
+    calls: 1121
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 181
@@ -1091,8 +1114,8 @@ functions:
     calls: 18
     bytes: 580
   desugar_rule$Kind:
-    calls: 83
-    bytes: 11224
+    calls: 86
+    bytes: 11956
   failure_message:
     calls: 2
     bytes: 488
@@ -1100,8 +1123,8 @@ functions:
     calls: 0
     bytes: 32
   group_styles$Kind$tail:
-    calls: 200
-    bytes: 3052
+    calls: 205
+    bytes: 3084
   keep:
     calls: 0
     bytes: 112
@@ -1112,10 +1135,10 @@ functions:
     calls: 17
     bytes: 596
   link_rule$Kind:
-    calls: 81
-    bytes: 6784
+    calls: 84
+    bytes: 7008
   link_rules$Kind:
-    calls: 4
+    calls: 5
     bytes: 600
   main:
     calls: 1
@@ -1127,5 +1150,5 @@ functions:
     calls: 19
     bytes: 548
   rule_of$Kind$Node:
-    calls: 11
+    calls: 12
     bytes: 984

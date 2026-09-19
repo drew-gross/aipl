@@ -274,6 +274,9 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
         },
         Maybe(sub) => `{render_rule(sub, names, Item)}?`,
         Climb(atom, precs) => render_climb(atom, precs, names, ctx),
+        // EBNF has no way to say "and then fail"; a comment carrying the
+        // message is what a reader of the dump can use.
+        Refuse(m) => `(* refuse: {m} *)`,
     }
 }
 
@@ -375,7 +378,7 @@ fn climb_precs<K: variant>(r: Rule<K>) -> Prec[] {
             none => climb_precs(sub),
         },
         Maybe(sub) => climb_precs(sub),
-        Term(..) | Literal(..) | Named(..) | NamedIdx(..) => [],
+        Term(..) | Literal(..) | Named(..) | NamedIdx(..) | Refuse(..) => [],
     }
 }
 
@@ -565,6 +568,13 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
             message: `no production at index {i}`,
             span: 0..0,
         }),
+        // A refusal begins with nothing and can match nothing: a sequence
+        // that reaches one is an error, not a match, so what follows it in the
+        // sequence never contributes.
+        Refuse(..) => {
+            let kinds: #{Case<K>} = #{};
+            ok(First { kinds, texts: #{}, nullable: false })
+        },
         // `link` rewrites every one of these, and `first_sets` links first —
         // reaching one means `rule_first` was called with a rule from an
         // unlinked grammar, whose references cannot be followed.
@@ -771,11 +781,11 @@ allocations: 1898
 deallocations: 1898
 reallocations: 338
 bytes allocated: 195079
-instructions executed: 239965
-binary size: 165360
-  code: 108940
+instructions executed: 240026
+binary size: 167960
+  code: 110680
   data: 4132
-  metadata: 52288
+  metadata: 53148
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -857,13 +867,13 @@ functions:
     bytes: 580
   __m1__desugar_rule$Tok:
     calls: 240
-    bytes: 11224
+    bytes: 11956
   __m1__group_styles$Tok:
     calls: 0
     bytes: 32
   __m1__group_styles$Tok$tail:
     calls: 262
-    bytes: 3052
+    bytes: 3084
   __m1__link$Tok$Node:
     calls: 9
     bytes: 2488
@@ -872,7 +882,7 @@ functions:
     bytes: 596
   __m1__link_rule$Tok:
     calls: 139
-    bytes: 6784
+    bytes: 7008
   __m1__link_rules$Tok:
     calls: 27
     bytes: 600
@@ -887,7 +897,7 @@ functions:
     bytes: 72
   __rec_drop___m1__Rule$Tok:
     calls: 490
-    bytes: 340
+    bytes: 392
   __rec_drop___tuple$__m1__Rule_Tok$__m1__Rule_Tok:
     calls: 0
     bytes: 72
@@ -1001,7 +1011,7 @@ functions:
     bytes: 32
   climb_precs$Tok$tail:
     calls: 92
-    bytes: 1396
+    bytes: 1432
   ebnf$Tok$Node:
     calls: 6
     bytes: 3588
@@ -1037,13 +1047,13 @@ functions:
     bytes: 5508
   render_rule$Tok:
     calls: 101
-    bytes: 12328
+    bytes: 12596
   rep_suffix:
     calls: 14
     bytes: 1708
   rule_first$Tok:
     calls: 235
-    bytes: 7224
+    bytes: 7620
   show_first$Tok:
     calls: 27
     bytes: 3876

@@ -1,4 +1,4 @@
-import { ==, +++ } from builtins;
+import { equal as ==, concat as +++ } from builtins;
 
 fn block() -> str { "b" }
 
@@ -21,7 +21,7 @@ fn main() -> i64 {
     if (eq) { joined.len() } else { 0 }
 }
 --- formatted ---
-import { +++, == } from builtins;
+import { concat as +++, equal as == } from builtins;
 
 fn block() -> str { "b" }
 

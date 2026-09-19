@@ -1,10 +1,10 @@
-// `*` has no bare form; importing it bare is an error — you must pick a
-// multiply semantics (`wrapping_mul as *`).
+// `*` has no bare form; importing it bare is a parse error whose message says
+// to import the builtin aliased (`wrapping_mul as *`).
 import { * } from builtins;
 
 fn main() -> i64 { 6 * 7 }
 --- errors ---
-error: the "*" operator has no bare form; import it aliased: `wrapping_mul as *` from builtins
+error: an operator has no bare import: import the builtin it stands for and alias it to the operator, e.g. `wrapping_add as +`
  --> ./tests/cases/arithmetic/err_bare_star.aipl:3:10
   |
 3 | import { * } from builtins;

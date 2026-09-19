@@ -206,6 +206,13 @@
 
             </li>
 
+            <li id="item-Refuse"><code>Refuse(str)</code>
+
+              <div class="doc"><p>A rule that never matches: reached, it fails the whole parse with this message. Refusal is not a miss — no enclosing choice, option or repetition backtracks out of it — so it is only ever reached on purpose, after a sequence has matched the thing worth refusing: <code>Then([Named(&quot;operator&quot;), Refuse(&quot;..&quot;)])</code> accepts an operator and then rejects it, and the error underlines what the sequence matched.</p><p>This is how a grammar names a shape the language *used to* have, or that a reader would plausibly write, and says something more useful than the &quot;expected X, found Y&quot; a plain non-match would produce. The message is the grammar author's, verbatim.</p></div>
+
+
+            </li>
+
           </ul>
 
         </section>

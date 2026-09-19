@@ -1,4 +1,4 @@
-import { filter, map, minimum, value_or, len, ==, !, <, wrapping_add as + } from builtins;
+import { filter, map, minimum, value_or, len, equal as ==, logical_not as !, less_than as <, wrapping_add as + } from builtins;
 fn f(some_long_receiver_name: i64[]) -> i64 {
     // Short chain that fits stays on one line.
     let a = some_long_receiver_name.len();
@@ -11,7 +11,17 @@ fn f(some_long_receiver_name: i64[]) -> i64 {
 }
 fn one_call(a: i64, b: i64, c: i64, d: i64, e: i64) -> i64 { a }
 --- formatted ---
-import { !, <, ==, filter, len, map, minimum, value_or, wrapping_add as + } from builtins;
+import {
+    equal as ==,
+    filter,
+    len,
+    less_than as <,
+    logical_not as !,
+    map,
+    minimum,
+    value_or,
+    wrapping_add as +,
+} from builtins;
 
 fn f(some_long_receiver_name: i64[]) -> i64 {
     // Short chain that fits stays on one line.

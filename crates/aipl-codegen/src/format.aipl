@@ -749,10 +749,10 @@ deallocations: 2364
 reallocations: 192
 bytes allocated: 188947
 instructions executed: 297529
-binary size: 255592
-  code: 164120
+binary size: 257144
+  code: 165160
   data: 6068
-  metadata: 85404
+  metadata: 85916
 functions:
   __arr_drop_Item:
     calls: 69
@@ -897,7 +897,7 @@ functions:
     bytes: 580
   __m8__desugar_rule$FKind:
     calls: 44
-    bytes: 11224
+    bytes: 11956
   __m8__failure_message:
     calls: 2
     bytes: 488
@@ -906,7 +906,7 @@ functions:
     bytes: 32
   __m8__group_styles$FKind$tail:
     calls: 74
-    bytes: 3052
+    bytes: 3084
   __m8__link$FKind$str:
     calls: 8
     bytes: 3048
@@ -915,7 +915,7 @@ functions:
     bytes: 596
   __m8__link_rule$FKind:
     calls: 44
-    bytes: 6784
+    bytes: 7008
   __m8__link_rules$FKind:
     calls: 0
     bytes: 600
@@ -933,7 +933,7 @@ functions:
     bytes: 84
   __rec_drop___m8__Rule$FKind:
     calls: 94
-    bytes: 340
+    bytes: 392
   __rec_drop___tuple$__m8__Rule_FKind$__m8__Rule_FKind:
     calls: 13
     bytes: 72

@@ -1,4 +1,4 @@
-import { == } from builtins;
+import { equal as == } from builtins;
 
 fn parse(s: str) -> i64 { 0 }
 
@@ -13,7 +13,7 @@ fn main() -> i64 {
     if (check) { 1 } else { 0 }
 }
 --- formatted ---
-import { == } from builtins;
+import { equal as == } from builtins;
 
 fn parse(s: str) -> i64 { 0 }
 

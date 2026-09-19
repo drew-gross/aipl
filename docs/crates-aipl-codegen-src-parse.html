@@ -362,6 +362,20 @@
 
 
 
+        <section class="item" id="item-refusal">
+          <h3>
+            <a class="anchor" href="#item-refusal">refusal</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn refusal&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, message: str, matched: Cst[], pos: u64) -&#62; ParseError</code></pre>
+
+          <div class="doc"><p>The error a <code>Refuse</code> raises: the grammar author's message, over the tokens <code>matched</code> covers — what the enclosing sequence accepted before refusing it — or, when nothing was, the token at <code>pos</code> (the empty span at end of input past the last one).</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-match_term">
           <h3>
             <a class="anchor" href="#item-match_term">match_term</a>
