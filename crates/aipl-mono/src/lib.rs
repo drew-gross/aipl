@@ -7242,6 +7242,24 @@ pub fn builtin_is_mutating(name: &str) -> bool {
         .is_some_and(|sig| sig.is_mutating())
 }
 
+/// Whether the builtin `f` only *reads* its argument `i` for the duration of
+/// the call — copying what it needs out and keeping no reference to the
+/// argument's buffer afterwards — so a `mut` binding passed there is still
+/// exclusive once the call returns, and its `push`/`extend` may keep mutating
+/// in place.
+///
+/// This is a runtime contract, stated per argument: `extend`'s source and
+/// `union`'s second operand are copied element by element (each element
+/// retained on its own; the buffer itself is not), whereas a slice, a
+/// `reverse`, or a `str` concat hands back a view or a rope that keeps
+/// pointing into its operand, and a user function may store its argument
+/// anywhere. The in-place runtime (`aipl_array_push_mut`) never checks for a
+/// second reference — this analysis is the only guard — so an argument is
+/// added here only once its runtime has been read.
+fn builtin_reads_arg(f: &Callee, i: usize) -> bool {
+    matches!((f, i), (Callee::Extend, 1) | (Callee::Union, 1))
+}
+
 /// The declared signature of the builtin `name`: from [`BUILTIN_SIGNATURES`]
 /// for a native builtin, or from its own `.aipl` source for an
 /// AIPL-implemented one (loaded on demand — a program that never mentions the
@@ -9586,8 +9604,8 @@ fn slot_fits(from: &Type, to: &Type) -> bool {
 }
 
 /// Whether `arg` evaluates to a freshly-allocated, uniquely-owned heap value, so
-/// it can be *moved* into an owning parameter rather than borrowed: an array
-/// literal, or a call returning a heap value (a fresh rc-1 block). `arg_ty` is
+/// it can be *moved* into an owning parameter rather than borrowed: a
+/// collection literal, or a call returning a heap value (a fresh rc-1 block). `arg_ty` is
 /// `arg`'s inferred type. Mirrors codegen's former `is_fresh_heap_arg`.
 ///
 /// "Fresh" is about ownership, not about where the bytes live: a constant
@@ -9605,7 +9623,10 @@ fn is_fresh_heap(arg: &Expr, arg_ty: &Type) -> bool {
 /// temporary all the same, since the chain's value is its tail's.
 fn fresh_tail(e: &Expr) -> bool {
     match &e.kind {
-        ExprKind::ArrayLit(_) | ExprKind::Call(_, _, _) => true,
+        ExprKind::ArrayLit(_)
+        | ExprKind::SetLit(..)
+        | ExprKind::DictLit(_)
+        | ExprKind::Call(_, _, _) => true,
         ExprKind::Let(_, _, _, body)
         | ExprKind::LetMut(_, _, _, body)
         | ExprKind::Seq(_, body)
@@ -9856,9 +9877,13 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                     rec_tail(recv)
                 };
                 recv_bad
-                    || args[1..]
-                        .iter()
-                        .any(|a| if is_n(a) { !tail } else { rec_tail(a) })
+                    || args[1..].iter().enumerate().any(|(k, a)| {
+                        if is_n(a) {
+                            !tail && !builtin_reads_arg(fname, k + 1)
+                        } else {
+                            rec_tail(a)
+                        }
+                    })
             } else {
                 let consuming = matches!(
                     fname,
@@ -9875,9 +9900,9 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
                         | Callee::FilterTruncate
                         | Callee::MapSet
                 );
-                args.iter().any(|a| {
+                args.iter().enumerate().any(|(k, a)| {
                     if is_n(a) {
-                        !consuming && !tail
+                        !consuming && !tail && !builtin_reads_arg(fname, k)
                     } else {
                         rec_tail(a)
                     }

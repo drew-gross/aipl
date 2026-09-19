@@ -1,11 +1,11 @@
 import {
     concat as +++,
     equal as ==,
+    extend,
     len,
     print,
     push,
     union,
-    value_or,
     wrapping_add as +,
     wrapping_add_assign as +=,
 } from builtins;
@@ -46,7 +46,7 @@ fn merge(a: i64[], b: i64[]) -> i64[] {
     mut xs = a;
     mut ys = b;
     set ys.push(0);
-    set xs.push(ys[0].value_or(0));
+    set xs.extend(ys);
     xs
 }
 
@@ -135,9 +135,9 @@ ab!!
 9 3
 3
 3
-[1, 2, 3, 2]
-[1, 2, 3, 3] [3, 4, 5]
-[4, 5, 6, 5]
+[1, 2, 3, 2, 3, 4, 0]
+[1, 2, 3, 3, 4, 5, 0] [3, 4, 5]
+[4, 5, 6, 5, 6, 7, 0]
 [1, 2, 3, 8, 8]
 [2, 3, 4, 8, 8]
 [3, 4, 5, 8, 8] [3, 4, 5]
@@ -145,12 +145,12 @@ ab!!
 allocations: 48
 deallocations: 48
 reallocations: 3
-bytes allocated: 2544
-instructions executed: 7660
-binary size: 14992
-  code: 8688
+bytes allocated: 2643
+instructions executed: 8452
+binary size: 14904
+  code: 8508
   data: 475
-  metadata: 5829
+  metadata: 5921
 functions:
   __to_str_i64$arr:
     calls: 11
@@ -161,23 +161,29 @@ functions:
   __to_str_u64:
     calls: 8
     bytes: 204
+  aipl_arr_extend:
+    calls: 3
+    bytes: (external)
   aipl_arr_inc:
-    calls: 16
+    calls: 19
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 3
     bytes: (external)
   aipl_array_dec:
-    calls: 42
+    calls: 45
     bytes: (external)
   aipl_array_push:
-    calls: 11
+    calls: 8
     bytes: (external)
   aipl_array_push_mut:
-    calls: 16
+    calls: 14
     bytes: (external)
   aipl_array_with_cap:
     calls: 3
     bytes: (external)
   aipl_i64_len:
-    calls: 96
+    calls: 114
     bytes: (external)
   aipl_set_contains:
     calls: 4
@@ -192,10 +198,10 @@ functions:
     calls: 16
     bytes: (external)
   aipl_write_bytes:
-    calls: 60
+    calls: 69
     bytes: (external)
   aipl_write_i64:
-    calls: 48
+    calls: 57
     bytes: (external)
   aipl_write_u64:
     calls: 8
@@ -208,7 +214,7 @@ functions:
     bytes: 312
   main:
     calls: 1
-    bytes: 6100
+    bytes: 6000
   merge$own0$own1:
     calls: 2
-    bytes: 344
+    bytes: 264

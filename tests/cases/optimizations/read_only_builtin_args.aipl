@@ -1,0 +1,107 @@
+import { extend, print, push, union } from builtins;
+
+// A `mut` binding stays *exclusive* — its `push` mutates in place — as long as
+// nothing else can hold a reference to its buffer. Handing it to a call used
+// to count against that, whatever the call: a user function may store its
+// argument anywhere. A builtin's contract is known, though, and `extend`'s
+// source and `union`'s second operand are only read: the elements are copied
+// out one by one, and no reference to the buffer survives the call. So `ys`
+// here is still exclusive after `set xs.extend(ys)`, which is what lets both
+// its pushes and `merge`'s second parameter (`mut ys = b`) go in place —
+// `aipl_array_push_mut`, not the copying `aipl_array_push`, in the counts.
+fn merge(a: i64[], b: i64[]) -> i64[] {
+    mut xs = a;
+    mut ys = b;
+    for (let i : "abc") {
+        set ys.push(0);
+    }
+    set xs.extend(ys);
+    xs
+}
+
+fn join(a: #{i64}, b: #{i64}) -> #{i64} {
+    mut xs = a;
+    mut ys = b;
+    set ys = ys.union(#{9});
+    set xs = xs.union(ys);
+    xs
+}
+
+fn build(n: i64) -> i64[] { [n, n] }
+
+fn main() !prints {
+    print(`{merge(build(1), build(2))}`);
+    print(`{merge(build(3), build(4))}`);
+    print(`{join(#{1}, #{2})}`);
+    print(`{join(#{3}, #{4})}`);
+}
+--- stdout ---
+[1, 1, 2, 2, 0, 0, 0]
+[3, 3, 4, 4, 0, 0, 0]
+{1, 2, 9}
+{3, 4, 9}
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 8
+bytes allocated: 652
+instructions executed: 2993
+binary size: 6992
+  code: 3592
+  data: 331
+  metadata: 3069
+functions:
+  __to_str_i64$arr:
+    calls: 2
+    bytes: 708
+  __to_str_set$i64:
+    calls: 2
+    bytes: 708
+  aipl_arr_extend:
+    calls: 2
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 10
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 24
+    bytes: (external)
+  aipl_array_push:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 18
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 6
+    bytes: (external)
+  aipl_i64_len:
+    calls: 40
+    bytes: (external)
+  aipl_set_contains:
+    calls: 12
+    bytes: (external)
+  aipl_set_insert:
+    calls: 12
+    bytes: (external)
+  aipl_set_union_mut:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 24
+    bytes: (external)
+  aipl_write_i64:
+    calls: 20
+    bytes: (external)
+  join$own0$own1:
+    calls: 2
+    bytes: 360
+  main:
+    calls: 1
+    bytes: 1360
+  merge$own0$own1:
+    calls: 2
+    bytes: 456
