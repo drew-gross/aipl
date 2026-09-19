@@ -9,7 +9,7 @@ fn main() !prints {
     print(n.to_str());
 }
 --- errors ---
-error: an operator has no bare import: import the builtin it stands for and alias it to the operator, e.g. `wrapping_add as +`
+error: the "+=" operator has no bare form; pick a semantics and import it aliased, e.g. `wrapping_add_assign as +=` or `saturating_add_assign as +=` from builtins
  --> ./tests/cases/compound_assign/err_bare_import.aipl:1:10
   |
 1 | import { +=, print, to_str } from builtins;

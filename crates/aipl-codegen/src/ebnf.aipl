@@ -69,12 +69,14 @@ import {
 } from builtins;
 import {
     Climb,
+    Fn,
     Grammar,
     Inline,
     Kids,
     Literal,
     Many,
     Maybe,
+    Msg,
     Named,
     NamedIdx,
     OneOf,
@@ -275,8 +277,12 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
         Maybe(sub) => `{render_rule(sub, names, Item)}?`,
         Climb(atom, precs) => render_climb(atom, precs, names, ctx),
         // EBNF has no way to say "and then fail"; a comment carrying the
-        // message is what a reader of the dump can use.
-        Refuse(m) => `(* refuse: {m} *)`,
+        // message is what a reader of the dump can use — and a computed
+        // message has no text to show until something is matched.
+        Refuse(what) => match (what) {
+            Msg(m) => `(* refuse: {m} *)`,
+            Fn(..) => "(* refuse *)",
+        },
     }
 }
 
@@ -776,10 +782,10 @@ deallocations: 1898
 reallocations: 338
 bytes allocated: 195079
 instructions executed: 239966
-binary size: 167824
-  code: 110608
+binary size: 168416
+  code: 111056
   data: 4132
-  metadata: 53084
+  metadata: 53228
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -861,13 +867,13 @@ functions:
     bytes: 580
   __m1__desugar_rule$Tok:
     calls: 240
-    bytes: 11956
+    bytes: 12004
   __m1__group_styles$Tok:
     calls: 0
     bytes: 32
   __m1__group_styles$Tok$tail:
     calls: 262
-    bytes: 3084
+    bytes: 3100
   __m1__link$Tok$Node:
     calls: 9
     bytes: 2488
@@ -876,7 +882,7 @@ functions:
     bytes: 596
   __m1__link_rule$Tok:
     calls: 139
-    bytes: 7008
+    bytes: 7096
   __m1__link_rules$Tok:
     calls: 27
     bytes: 600
@@ -891,7 +897,7 @@ functions:
     bytes: 72
   __rec_drop___m1__Rule$Tok:
     calls: 490
-    bytes: 392
+    bytes: 404
   __rec_drop___tuple$__m1__Rule_Tok$__m1__Rule_Tok:
     calls: 0
     bytes: 72
@@ -1005,7 +1011,7 @@ functions:
     bytes: 32
   climb_precs$Tok$tail:
     calls: 92
-    bytes: 1432
+    bytes: 1460
   ebnf$Tok$Node:
     calls: 6
     bytes: 3588
@@ -1041,13 +1047,13 @@ functions:
     bytes: 5508
   render_rule$Tok:
     calls: 101
-    bytes: 12596
+    bytes: 12820
   rep_suffix:
     calls: 14
     bytes: 1708
   rule_first$Tok:
     calls: 235
-    bytes: 7548
+    bytes: 7580
   show_first$Tok:
     calls: 27
     bytes: 3876

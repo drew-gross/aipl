@@ -2918,6 +2918,7 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./fill_or_add_section_file.aipl",
     "./normalize_output.aipl",
     "./int_fits.aipl",
+    "./operator_named_forms.aipl",
     "./is_operator_name.aipl",
     "./lexer.aipl",
     "./lex_aipl.aipl",

@@ -206,9 +206,37 @@
 
             </li>
 
-            <li id="item-Refuse"><code>Refuse(str)</code>
+            <li id="item-Refuse"><code>Refuse(Refusal)</code>
 
-              <div class="doc"><p>A rule that never matches: reached, it fails the whole parse with this message. Refusal is not a miss — no enclosing choice, option or repetition backtracks out of it — so it is only ever reached on purpose, after a sequence has matched the thing worth refusing: <code>Then([Named(&quot;operator&quot;), Refuse(&quot;..&quot;)])</code> accepts an operator and then rejects it, and the error underlines what the sequence matched.</p><p>This is how a grammar names a shape the language *used to* have, or that a reader would plausibly write, and says something more useful than the &quot;expected X, found Y&quot; a plain non-match would produce. The message is the grammar author's, verbatim.</p></div>
+              <div class="doc"><p>A rule that never matches: reached, it fails the whole parse with the message its <code>Refusal</code> gives. Refusal is not a miss — no enclosing choice, option or repetition backtracks out of it — so it is only ever reached on purpose, after a sequence has matched the thing worth refusing: <code>Then([Named(&quot;operator&quot;), Refuse(..)])</code> accepts an operator and then rejects it, and the error underlines what the sequence matched.</p><p>This is how a grammar names a shape the language *used to* have, or that a reader would plausibly write, and says something more useful than the &quot;expected X, found Y&quot; a plain non-match would produce.</p><p>The one rule that can hold a function value, which costs <code>Rule</code> its <code>==</code> — a rule is compared through <code>show_rule</code> instead.</p></div>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-Refusal">
+          <h3>
+            <a class="anchor" href="#item-Refusal">Refusal</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Refusal</code></pre>
+
+          <div class="doc"><p>What a <code>Refuse</code> says: a fixed message, or one computed from what was matched in front of it — the tokens the enclosing sequence accepted before reaching the refusal, run together with single spaces. <code>Fn</code> is what lets the message name the offender: refusing <code>import { + }</code>, it is handed <code>+</code> and can say which aliases to write instead. A refusal reached with nothing in front of it is handed <code>&quot;&quot;</code>.</p><p><code>Fn</code> is a function value, so a <code>Refusal</code> — and any <code>Rule</code> holding one — has no <code>==</code>; see <code>Build</code> for the same constraint on lowerings.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Msg"><code>Msg(str)</code>
+
+
+            </li>
+
+            <li id="item-Fn"><code>Fn((str) -&#62; str)</code>
 
 
             </li>
@@ -364,6 +392,34 @@
           <pre class="signature"><code>pub fn prod_names&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The production names of <code>g</code>, in index order — the table <code>show</code> renders a tree against, and what <code>link</code> resolves references through.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_rule">
+          <h3>
+            <a class="anchor" href="#item-show_rule">show_rule</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>r</code> written back out as the constructor calls that build it — the debug view of a rule, and how a test asserts on one. A <code>Rule</code> cannot be compared with <code>==</code> (a <code>Refuse</code> may hold a function value) or rendered with <code>to_str</code>, so this is the one way to look at one. Defaulted arguments of a <code>Many</code> are written only where they differ from the default, so what is shown is what a grammar author would have written.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_style">
+          <h3>
+            <a class="anchor" href="#item-show_style">show_style</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_style(__spat$25065: ListStyle) -&#62; str</code></pre>
+
+          <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
 
 
         </section>
@@ -559,14 +615,28 @@
 
 
 
-        <section class="item" id="item-rule_of">
+        <section class="item" id="item-shown_rule">
           <h3>
-            <a class="anchor" href="#item-rule_of">rule_of</a>
+            <a class="anchor" href="#item-shown_rule">shown_rule</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn rule_of&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, i: u64) -&#62; Rule&#60;K&#62;</code></pre>
+          <pre class="signature"><code>fn shown_rule&#60;K: variant, A: any&#62;(g: Grammar&#60;K, A&#62;, i: u64) -&#62; str</code></pre>
 
-          <div class="doc"><p>The rule of production <code>i</code> of <code>g</code>, for the assertions above — a grammar value can't be compared with <code>==</code> (it holds function values), but the rule inside one can.</p></div>
+          <div class="doc"><p>The rule of production <code>i</code> of <code>g</code>, shown, for the assertions above — neither a grammar value nor a rule can be compared with <code>==</code> (both may hold function values), so a rule is asserted on through its <code>show_rule</code> text.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-echo">
+          <h3>
+            <a class="anchor" href="#item-echo">echo</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn echo(matched: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>A message function for the <code>Refuse(Fn(..))</code> fixtures: what was matched, back.</p></div>
 
 
         </section>

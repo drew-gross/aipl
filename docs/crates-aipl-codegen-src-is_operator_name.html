@@ -26,7 +26,7 @@
           </h3>
           <pre class="signature"><code>pub fn is_operator_name(self: str) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether <code>self</code> spells a built-in operator that must be imported to be used. Every operator is imported by aliasing its named builtin — <code>equal as ==</code>, <code>less_than as &lt;</code>, <code>wrapping_add as +</code> — and none has a bare form. Used by the loader to gate operator imports and usage; dogfooded through the FFI.</p></div>
+          <div class="doc"><p>Whether <code>self</code> spells a built-in operator that must be imported to be used. Every operator is imported by aliasing its named builtin — <code>equal as ==</code>, <code>less_than as &lt;</code>, <code>wrapping_add as +</code> — and none has a bare form. Used by the loader to gate operator imports and usage; dogfooded through the FFI.</p><p>An operator is a spelling some named builtin provides, so the list of spellings is not written here: it is <code>operator_named_forms</code>'s table, asked whether it has an answer.</p></div>
 
 
         </section>

@@ -30,9 +30,11 @@
 //     blocks here and in `parse.aipl` are written in that idiom throughout.
 import {
     Span,
+    case_name,
     equal as ==,
     extend,
     find_index,
+    is_empty,
     is_some_and,
     join,
     len,
@@ -213,18 +215,31 @@ variant Rule<K: variant> =
     # production's index, so `1 + 2 * 3` yields a node per operand rather than
     # one flat run.
     | Climb(Rule<K>, Prec[])
-    # A rule that never matches: reached, it fails the whole parse with this
-    # message. Refusal is not a miss — no enclosing choice, option or
-    # repetition backtracks out of it — so it is only ever reached on purpose,
-    # after a sequence has matched the thing worth refusing:
-    # `Then([Named("operator"), Refuse("..")])` accepts an operator and then
+    # A rule that never matches: reached, it fails the whole parse with the
+    # message its `Refusal` gives. Refusal is not a miss — no enclosing choice,
+    # option or repetition backtracks out of it — so it is only ever reached on
+    # purpose, after a sequence has matched the thing worth refusing:
+    # `Then([Named("operator"), Refuse(..)])` accepts an operator and then
     # rejects it, and the error underlines what the sequence matched.
     #
     # This is how a grammar names a shape the language *used to* have, or that a
     # reader would plausibly write, and says something more useful than the
-    # "expected X, found Y" a plain non-match would produce. The message is the
-    # grammar author's, verbatim.
-    | Refuse(str)
+    # "expected X, found Y" a plain non-match would produce.
+    #
+    # The one rule that can hold a function value, which costs `Rule` its `==`
+    # — a rule is compared through `show_rule` instead.
+    | Refuse(Refusal)
+
+# What a `Refuse` says: a fixed message, or one computed from what was matched
+# in front of it — the tokens the enclosing sequence accepted before reaching
+# the refusal, run together with single spaces. `Fn` is what lets the message
+# name the offender: refusing `import { + }`, it is handed `+` and can say which
+# aliases to write instead. A refusal reached with nothing in front of it is
+# handed `""`.
+#
+# `Fn` is a function value, so a `Refusal` — and any `Rule` holding one — has no
+# `==`; see `Build` for the same constraint on lowerings.
+variant Refusal = Msg(str) | Fn((str) -> str)
 
 # How a production's matched node becomes a value of the caller's AST type `A`.
 #
@@ -370,6 +385,135 @@ struct Grammar<K: variant, A: any> { prods: Production<K, A>[], groups: ListStyl
 # tree against, and what `link` resolves references through.
 pub fn prod_names<K: variant, A: any>(g: Grammar<K, A>) -> str[] { g.prods.map(|p| p.name) }
 
+# `r` written back out as the constructor calls that build it — the debug view
+# of a rule, and how a test asserts on one. A `Rule` cannot be compared with
+# `==` (a `Refuse` may hold a function value) or rendered with `to_str`, so
+# this is the one way to look at one. Defaulted arguments of a `Many` are
+# written only where they differ from the default, so what is shown is what a
+# grammar author would have written.
+pub fn show_rule<K: variant>(r: Rule<K>) -> str {
+    match (r) {
+        Term(k) => `Term({k.case_name()})`,
+        Literal(s) => `Literal("{s}")`,
+        Then(rs) => `Then([{rs.map(show_rule).join(sep=", ")}])`,
+        OneOf(rs) => `OneOf([{rs.map(show_rule).join(sep=", ")}])`,
+        Many(sub, min, max, sep, trailing_sep, leading_sep, nested_in, spaced, sorted, style, group) => {
+            mut args = [show_rule(sub)];
+            if (min != 0) {
+                set args.push(`min={min}`);
+            };
+            if (let some(m) = max) {
+                set args.push(`max={m}`);
+            };
+            if (let some(sr) = sep) {
+                set args.push(`sep={show_rule(sr)}`);
+            };
+            if (!trailing_sep) {
+                set args.push("trailing_sep=false");
+            };
+            if (leading_sep) {
+                set args.push("leading_sep=true");
+            };
+            if (let some(brackets) = nested_in) {
+                set args.push(`nested_in=({show_rule(brackets.0)}, {show_rule(brackets.1)})`);
+            };
+            if (spaced) {
+                set args.push("spaced=true");
+            };
+            if (sorted) {
+                set args.push("sorted=true");
+            };
+            if (let some(st) = style) {
+                set args.push(`style={show_style(st)}`);
+            };
+            if (let some(gi) = group) {
+                set args.push(`group={gi}`);
+            };
+            `Many({args.join(sep=", ")})`
+        },
+        Maybe(sub) => `Maybe({show_rule(sub)})`,
+        Named(n) => `Named("{n}")`,
+        NamedIdx(i) => `NamedIdx({i})`,
+        Climb(atom, precs) => `Climb({show_rule(atom)}, {precs})`,
+        Refuse(what) => match (what) {
+            Msg(m) => `Refuse(Msg("{m}"))`,
+            Fn(..) => "Refuse(Fn(..))",
+        },
+    }
+}.test({
+    let t: Rule<Kind> = Term(Atom);
+    assert(show_rule(t) == "Term(Atom)");
+    let seq: Rule<Kind> = Then([Literal("("), Maybe(Named("x")), NamedIdx(2)]);
+    assert(show_rule(seq) == `Then([Literal("("), Maybe(Named("x")), NamedIdx(2)])`);
+    let alt: Rule<Kind> = OneOf([Term(Atom), Term(Open)]);
+    assert(show_rule(alt) == "OneOf([Term(Atom), Term(Open)])");
+
+    // A `Many` shows only what was written: the defaults stay silent.
+    let star: Rule<Kind> = Many(Term(Atom));
+    assert(show_rule(star) == "Many(Term(Atom))");
+    let full: Rule<Kind> = Many(
+        Term(Atom),
+        min=1,
+        max=3,
+        sep=Literal(","),
+        trailing_sep=false,
+        leading_sep=true,
+        nested_in=(Literal("["), Literal("]")),
+        spaced=true,
+        sorted=true,
+        style=ListStyle { sep: ";" },
+        group=4,
+    );
+    assert(
+        show_rule(
+            full,
+        ) == """Many(Term(Atom), min=1, max=3, sep=Literal(","), trailing_sep=false, leading_sep=true, nested_in=(Literal("["), Literal("]")), spaced=true, sorted=true, style=ListStyle { sep: ";" }, group=4)""",
+    );
+
+    let climb: Rule<Kind> = Climb(Term(Atom), [Prec { power: 1, right: false, ops: ["+"] }]);
+    assert(
+        show_rule(climb) == """Climb(Term(Atom), [Prec { power: 1, right: false, ops: ["+"] }])""",
+    );
+
+    let fixed: Rule<Kind> = Refuse(Msg("no"));
+    assert(show_rule(fixed) == `Refuse(Msg("no"))`);
+    let computed: Rule<Kind> = Refuse(Fn(echo));
+    assert(show_rule(computed) == "Refuse(Fn(..))");
+})
+
+# A `ListStyle` as the literal that builds it, defaults left out — `ListStyle
+# {}` for the default style.
+pub fn show_style(ListStyle { sep, spaced, sorted, trailing, wraps }) -> str {
+    mut fields: str[] = [];
+    if (sep != ",") {
+        set fields.push(`sep: "{sep}"`);
+    };
+    if (spaced) {
+        set fields.push("spaced: true");
+    };
+    if (sorted) {
+        set fields.push("sorted: true");
+    };
+    if (!trailing) {
+        set fields.push("trailing: false");
+    };
+    if (!wraps) {
+        set fields.push("wraps: false");
+    };
+    if (fields.is_empty()) { "ListStyle {}" } else { `ListStyle \{ {fields.join(sep=", ")} }` }
+}.test({
+    assert(show_style(ListStyle {}) == "ListStyle {}");
+    assert(show_style(ListStyle { sep: "" }) == """ListStyle { sep: "" }""");
+    assert(
+        show_style(ListStyle {
+            spaced: true,
+            sorted: true,
+            trailing: false,
+            wraps: false,
+        }) == "ListStyle { spaced: true, sorted: true, trailing: false, wraps: false }",
+    );
+})
+
 # Every group style in `r`, in the order the rules mention them: a group's own
 # style first, then the styles inside its brackets. That order is the contract
 # with `link_rule`, which hands out indices by walking the same tree the same
@@ -482,7 +626,7 @@ pub fn desugar_rule<K: variant>(r: Rule<K>) -> Rule<K>!ParseError {
         Literal(s) => ok(Literal(s)),
         Named(n) => ok(Named(n)),
         NamedIdx(i) => ok(NamedIdx(i)),
-        Refuse(m) => ok(Refuse(m)),
+        Refuse(what) => ok(Refuse(what)),
     }
 }
 
@@ -585,7 +729,7 @@ fn link_rule<K: variant>(r: Rule<K>, names: str[], base: u64) -> Rule<K>!ParseEr
         Term(k) => ok(Term(k)),
         Literal(s) => ok(Literal(s)),
         NamedIdx(i) => ok(NamedIdx(i)),
-        Refuse(m) => ok(Refuse(m)),
+        Refuse(what) => ok(Refuse(what)),
     }
 }
 
@@ -672,17 +816,17 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 
     let linked = link(g)?;
     // `item`'s two alternatives: a terminal, and a reference now an index.
-    assert(rule_of(linked, 1) == OneOf([Term(Atom), NamedIdx(0)]));
+    assert(shown_rule(linked, 1) == "OneOf([Term(Atom), NamedIdx(0)])");
 
     // The reference nested two levels down inside `list` is rewritten too, and
     // everything around it is left alone.
-    assert(rule_of(linked, 0) == Then([Literal("("), Many(NamedIdx(1)), Literal(")")]));
+    assert(shown_rule(linked, 0) == `Then([Literal("("), Many(NamedIdx(1)), Literal(")")])`);
     // Linking preserves the fields a rewrite doesn't touch.
     assert(prod_names(linked) == ["list", "item"]);
     assert(expect_of(linked, 1) == "an item");
 
     // Idempotent: a linked grammar links again to itself.
-    assert(rule_of(link(linked)?, 1) == OneOf([Term(Atom), NamedIdx(0)]));
+    assert(shown_rule(link(linked)?, 1) == "OneOf([Term(Atom), NamedIdx(0)])");
 
     // Every rule shape carries its reference, and every one is rewritten.
     let shapes: Grammar<Kind, Node> = Grammar {
@@ -708,19 +852,31 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
             },
             Production {
                 name: "e",
-                rule: Then([Named("a"), Refuse("no")]),
+                rule: Then([Named("a"), Refuse(Msg("no"))]),
+                build: Kids(keep),
+                layout: Inline,
+            },
+            Production {
+                name: "f",
+                rule: Then([Named("a"), Refuse(Fn(echo))]),
                 build: Kids(keep),
                 layout: Inline,
             },
         ],
     };
     let ls = link(shapes)?;
-    assert(rule_of(ls, 0) == Maybe(NamedIdx(0)));
-    assert(rule_of(ls, 1) == Many(NamedIdx(0), sep=Literal(",")));
-    assert(rule_of(ls, 2) == Climb(NamedIdx(0), [Prec { power: 1, right: false, ops: ["+"] }]));
-    assert(rule_of(ls, 3) == Many(NamedIdx(1), min=1));
-    // A refusal carries no reference and passes through with its message.
-    assert(rule_of(ls, 4) == Then([NamedIdx(0), Refuse("no")]));
+    assert(shown_rule(ls, 0) == "Maybe(NamedIdx(0))");
+    assert(shown_rule(ls, 1) == `Many(NamedIdx(0), sep=Literal(","))`);
+    assert(
+        shown_rule(
+            ls,
+            2,
+        ) == """Climb(NamedIdx(0), [Prec { power: 1, right: false, ops: ["+"] }])""",
+    );
+    assert(shown_rule(ls, 3) == "Many(NamedIdx(1), min=1)");
+    // A refusal carries no reference and passes through, whichever kind.
+    assert(shown_rule(ls, 4) == `Then([NamedIdx(0), Refuse(Msg("no"))])`);
+    assert(shown_rule(ls, 5) == "Then([NamedIdx(0), Refuse(Fn(..))])");
 
     // An unresolved reference is a grammar error, named in the message.
     let bad: Grammar<Kind, Node> = Grammar {
@@ -776,39 +932,24 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 
     // Linked, a group wears its index. The rule is otherwise the one written —
     // there is no second spelling to rewrite into.
-    let linked_inner: Rule<Kind> = Many(
-        NamedIdx(1),
-        min=1,
-        max=1,
-        nested_in=(Literal("["), Literal("]")),
-        style=ListStyle { sep: ";" },
-        group=1,
+    let linked_inner = """Many(NamedIdx(1), min=1, max=1, nested_in=(Literal("["), Literal("]")), style=ListStyle { sep: ";" }, group=1)""";
+    assert(
+        shown_rule(
+            ns,
+            0,
+        ) == `Many({linked_inner}, min=1, max=1, nested_in=(Literal("("), Literal(")")), style=ListStyle \{}, group=0)`,
     );
     assert(
-        rule_of(ns, 0) == Many(
-            linked_inner,
-            min=1,
-            max=1,
-            nested_in=(Literal("("), Literal(")")),
-            style=ListStyle {},
-            group=0,
-        ),
-    );
-    assert(
-        rule_of(ns, 1) == Many(
-            Term(Atom),
-            min=1,
-            max=1,
-            nested_in=(Literal("{"), Literal("}")),
-            style=ListStyle { spaced: true },
-            group=2,
-        ),
+        shown_rule(
+            ns,
+            1,
+        ) == """Many(Term(Atom), min=1, max=1, nested_in=(Literal("{"), Literal("}")), style=ListStyle { spaced: true }, group=2)""",
     );
 
     // Idempotent for groups too: the linked form still reports its own style, so
     // linking again rebuilds the same table rather than emptying it.
     assert(link(ns)?.groups == ns.groups);
-    assert(rule_of(link(ns)?, 0) == rule_of(ns, 0));
+    assert(shown_rule(link(ns)?, 0) == shown_rule(ns, 0));
 
     // ---------- the derived style ----------
     //
@@ -918,32 +1059,32 @@ variant Node = Leaf(str) | List(Node[])
 # fixtures need: `Build` has no payload-free arm to mean "don't".
 fn keep(kids: Node[]) -> Node { List(kids) }
 
-# The rule of production `i` of `g`, for the assertions above — a grammar value
-# can't be compared with `==` (it holds function values), but the rule inside one
-# can.
-fn rule_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> Rule<K> {
-    match (g.prods[i]) {
-        some(p) => p.rule,
-        none => Literal(""),
-    }
+# The rule of production `i` of `g`, shown, for the assertions above — neither a
+# grammar value nor a rule can be compared with `==` (both may hold function
+# values), so a rule is asserted on through its `show_rule` text.
+fn shown_rule<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
+    g.prods[i].map(|p| show_rule(p.rule)).value_or("")
 }
+
+# A message function for the `Refuse(Fn(..))` fixtures: what was matched, back.
+fn echo(matched: str) -> str { matched }
 
 fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
     g.prods[i].map(|p| p.expect_as).value_or("")
 }
 --- performance ---
-allocations: 406
-deallocations: 406
-reallocations: 58
-bytes allocated: 66954
-instructions executed: 64856
-binary size: 145400
-  code: 92324
-  data: 3676
-  metadata: 49400
+allocations: 754
+deallocations: 754
+reallocations: 101
+bytes allocated: 94897
+instructions executed: 78536
+binary size: 162384
+  code: 100320
+  data: 6684
+  metadata: 55380
 functions:
   __arr_drop_ListStyle:
-    calls: 45
+    calls: 46
     bytes: 120
   __arr_drop_Prec:
     calls: 2
@@ -952,7 +1093,7 @@ functions:
     calls: 22
     bytes: 236
   __arr_drop_Rule$Kind:
-    calls: 17
+    calls: 18
     bytes: 116
   __arr_retain_ListStyle:
     calls: 13
@@ -961,10 +1102,10 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain_Production$Kind$Node:
-    calls: 19
+    calls: 20
     bytes: 236
   __arr_retain_Rule$Kind:
-    calls: 24
+    calls: 28
     bytes: 116
   __builtin_find_index$str$lam$__test$link$lambda0:
     calls: 1
@@ -973,149 +1114,140 @@ functions:
     calls: 1
     bytes: 412
   __builtin_find_index$str$lam$link$Kind$Node$lambda0:
-    calls: 25
+    calls: 26
     bytes: 400
   __builtin_find_index$str$lam$link_rule$Kind$lambda0:
-    calls: 10
+    calls: 11
     bytes: 400
   __builtin_map_join$Rule$Kind$ListStyle$lam$group_styles$Kind:
     calls: 0
     bytes: 44
   __builtin_map_join$Rule$Kind$ListStyle$lam$group_styles$Kind$tail:
-    calls: 5
+    calls: 6
     bytes: 1060
+  __builtin_map_join$Rule$Kind$char$s2$s3$s4$rs$lam$show_rule$Kind:
+    calls: 7
+    bytes: 1328
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
-    calls: 5
+    calls: 6
     bytes: 504
   __eq_ListStyle:
-    calls: 15
+    calls: 10
     bytes: 232
   __eq_ListStyle$arr:
     calls: 6
     bytes: 284
-  __eq_ListStyle$opt:
-    calls: 4
-    bytes: 92
   __eq_ParseError:
     calls: 5
     bytes: 128
-  __eq_Prec:
-    calls: 1
-    bytes: 128
-  __eq_Prec$arr:
-    calls: 1
-    bytes: 284
-  __eq_Rule$Kind:
-    calls: 25
-    bytes: 848
-  __eq_Rule$Kind$arr:
-    calls: 4
-    bytes: 300
-  __eq_Rule$Kind$opt:
-    calls: 4
-    bytes: 92
   __eq___builtin_Span:
     calls: 5
     bytes: 104
-  __eq___tuple$Rule_Kind$Rule_Kind:
-    calls: 5
-    bytes: 120
-  __eq___tuple$Rule_Kind$Rule_Kind$opt:
-    calls: 4
-    bytes: 92
   __eq_str$arr:
-    calls: 3
+    calls: 2
     bytes: 364
-  __eq_u64$opt:
-    calls: 8
-    bytes: 100
   __rec_drop_Node:
     calls: 0
     bytes: 72
   __rec_drop_Rule$Kind:
-    calls: 246
-    bytes: 392
+    calls: 257
+    bytes: 404
   __rec_drop___tuple$Rule_Kind$Rule_Kind:
-    calls: 39
+    calls: 37
     bytes: 72
   __test$failure_message:
     calls: 1
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 53596
+    bytes: 47692
+  __test$show_rule:
+    calls: 1
+    bytes: 4156
+  __test$show_style:
+    calls: 1
+    bytes: 824
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
   __to_str_ParseError:
     calls: 0
     bytes: 836
-  __to_str_u64:
+  __to_str_Prec$arr:
     calls: 2
+    bytes: 1756
+  __to_str_u64:
+    calls: 40
     bytes: 204
   aipl_arr_extend:
-    calls: 120
+    calls: 124
     bytes: (external)
   aipl_arr_inc:
-    calls: 427
+    calls: 452
     bytes: (external)
   aipl_arr_reserve:
-    calls: 68
+    calls: 73
     bytes: (external)
   aipl_array_dec:
-    calls: 835
+    calls: 912
     bytes: (external)
   aipl_array_new:
-    calls: 49
+    calls: 60
     bytes: (external)
   aipl_array_push:
-    calls: 20
+    calls: 32
     bytes: (external)
   aipl_array_push_mut:
-    calls: 76
+    calls: 129
     bytes: (external)
   aipl_array_with_cap:
     calls: 19
     bytes: (external)
   aipl_assert:
-    calls: 29
+    calls: 41
     bytes: (external)
   aipl_rec_alloc:
-    calls: 285
+    calls: 294
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1406
+    calls: 1494
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 181
+    calls: 180
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1121
+    calls: 1200
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 181
+    calls: 180
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 4
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 4
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 4
+    calls: 84
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 26
     bytes: (external)
   aipl_write_u64:
-    calls: 2
+    calls: 42
     bytes: (external)
   desugar_opt$Kind:
     calls: 18
     bytes: 580
   desugar_rule$Kind:
-    calls: 86
-    bytes: 11956
+    calls: 89
+    bytes: 12004
+  echo:
+    calls: 0
+    bytes: 28
   failure_message:
     calls: 2
     bytes: 488
@@ -1123,8 +1255,8 @@ functions:
     calls: 0
     bytes: 32
   group_styles$Kind$tail:
-    calls: 205
-    bytes: 3084
+    calls: 210
+    bytes: 3100
   keep:
     calls: 0
     bytes: 112
@@ -1135,20 +1267,26 @@ functions:
     calls: 17
     bytes: 596
   link_rule$Kind:
-    calls: 84
-    bytes: 7008
+    calls: 87
+    bytes: 7096
   link_rules$Kind:
-    calls: 5
+    calls: 6
     bytes: 600
   main:
     calls: 1
-    bytes: 180
+    bytes: 316
   opt_group_styles$Kind:
     calls: 64
     bytes: 152
   prod_names$Kind$Node:
     calls: 19
     bytes: 548
-  rule_of$Kind$Node:
-    calls: 12
-    bytes: 984
+  show_rule$Kind:
+    calls: 71
+    bytes: 6144
+  show_style:
+    calls: 11
+    bytes: 1396
+  shown_rule$Kind$Node:
+    calls: 13
+    bytes: 1008

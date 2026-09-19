@@ -84,6 +84,7 @@ import { First, can_start, first_sets } from "./ebnf.aipl";
 import {
     Climb,
     Const,
+    Fn,
     Grammar,
     Inline,
     Kids,
@@ -92,12 +93,14 @@ import {
     Many,
     Maybe,
     Mk,
+    Msg,
     Named,
     NamedIdx,
     OneOf,
     ParseError,
     Prec,
     Production,
+    Refusal,
     Refuse,
     Rule,
     Term,
@@ -348,29 +351,47 @@ fn match_rule<K: variant, A: any>(
         // `match_then` handles so the error can span what came before it —
         // there is nothing matched to point at, so it points at the token
         // that was next.
-        Refuse(m) => err(refusal(p, m, [], pos)),
+        Refuse(what) => err(refusal(p, what, pos, pos)),
         // `link` rewrites every one of these; reaching one means the grammar was
         // handed to the driver unlinked, which `parse_cst` makes impossible.
         Named(n) => err(ParseError { message: `unlinked rule reference "{n}"`, span: 0..0 }),
     }
 }
 
-# The error a `Refuse` raises: the grammar author's message, over the tokens
-# `matched` covers — what the enclosing sequence accepted before refusing it —
-# or, when nothing was, the token at `pos` (the empty span at end of input past
-# the last one).
-fn refusal<K: variant, A: any>(
-    p: Parser<K, A>,
-    message: str,
-    matched: Cst[],
-    pos: u64,
-) -> ParseError {
-    let toks = matched.map(token_leaves).join();
-    let span = match (toks.first()) {
-        some(f) => f.start..toks.last().value_or(f).end,
-        none => p.toks[pos].map(|t| t.text.span).value_or(p.end..p.end),
+# The error a `Refuse` raises, over the tokens `start..end` — what the
+# enclosing sequence accepted before refusing it. An empty range is a refusal
+# reached with nothing in front of it, which points at the token at `end` (the
+# empty span at end of input past the last one).
+#
+# A `Fn` refusal is handed those tokens' text, run together with a single
+# space wherever the source had a gap: the parser holds no source, only the
+# tokens, and their spans say where the gaps were.
+fn refusal<K: variant, A: any>(p: Parser<K, A>, what: Refusal, start: u64, end: u64) -> ParseError {
+    let matched = p.toks[start..end];
+    let span = match (matched.first()) {
+        some(f) => f.text.span.start..matched.last().value_or(f).text.span.end,
+        none => p.toks[end].map(|t| t.text.span).value_or(p.end..p.end),
+    };
+    let message = match (what) {
+        Msg(m) => m,
+        Fn(f) => f(matched_text(matched)),
     };
     ParseError { message, span }
+}
+
+# `toks` as one string: each token's text, with a space between two tokens the
+# source did not write together.
+fn matched_text<K: variant>(toks: Token<K>[]) -> str {
+    mut out = "";
+    mut prev_end: u64 = 0;
+    for (let i, t : toks) {
+        if (i != 0 && prev_end < t.text.span.start) {
+            set out.extend(" ");
+        };
+        set out.extend(t.text.text);
+        set prev_end = t.text.span.end;
+    }
+    out
 }
 
 # Any one token whose kind is the case `k` — `Term(Name)` matches every
@@ -410,9 +431,9 @@ fn match_then<K: variant, A: any>(
     mut f = far;
     for (let sub : rs) {
         // A refusal here is about what the sequence matched so far, and the
-        // error says so by spanning it.
-        if (let Refuse(m) = sub) {
-            return err(refusal(p, m, acc, cp));
+        // error says so by spanning it — and by handing it to the message.
+        if (let Refuse(what) = sub) {
+            return err(refusal(p, what, pos, cp));
         };
         let st = match_rule(p, sub, cp, cur, f)?;
         set f = st.far;
@@ -1420,7 +1441,7 @@ pub fn parse<K: variant, A: any>(
     // reject it with a message that says what to write instead. The error
     // spans what the sequence matched before the refusal — the offending form,
     // not the token after it.
-    let r_old: Rule<Tok> = Then([Term(Num), Refuse("write the number as a word")]);
+    let r_old: Rule<Tok> = Then([Term(Num), Refuse(Msg("write the number as a word"))]);
     let r_form: Rule<Tok> = OneOf([Term(Word), r_old]);
     let g_form = g_of([one("f", r_form)]);
     assert(shown("abc", g_form, "f")? == "(f abc)");
@@ -1431,7 +1452,7 @@ pub fn parse<K: variant, A: any>(
         }),
     );
     // The span covers everything the sequence matched, not only its last token.
-    let r_two: Rule<Tok> = Then([Term(Num), Term(Num), Refuse("one number, not two")]);
+    let r_two: Rule<Tok> = Then([Term(Num), Term(Num), Refuse(Msg("one number, not two"))]);
     assert(
         parsed("1 23", g_of([one("t", r_two)]), "t") == err(ParseError {
             message: "one number, not two",
@@ -1455,7 +1476,7 @@ pub fn parse<K: variant, A: any>(
 
     // Reached with nothing matched in front of it, the error points at the
     // token that was next — or at end of input.
-    let r_bare: Rule<Tok> = Refuse("nothing goes here");
+    let r_bare: Rule<Tok> = Refuse(Msg("nothing goes here"));
     assert(
         parsed("abc", g_of([one("b", r_bare)]), "b") == err(ParseError {
             message: "nothing goes here",
@@ -1468,6 +1489,19 @@ pub fn parse<K: variant, A: any>(
             span: 0..0,
         }),
     );
+
+    // A `Fn` refusal is handed what the sequence matched, so the message can
+    // name it: one token as written, several with a space at each gap the
+    // source had and none where there was none — and `""` when nothing was
+    // matched in front of it.
+    let r_named: Rule<Tok> = Then([Term(Num), Refuse(Fn(as_word))]);
+    assert(msg_of("42", g_of([one("n", r_named)]), "n") == "write 42 as a word");
+    let r_pair: Rule<Tok> = Then([Term(Num), Term(Num), Refuse(Fn(as_word))]);
+    assert(msg_of("1 23", g_of([one("n", r_pair)]), "n") == "write 1 23 as a word");
+    let r_glued: Rule<Tok> = Then([Literal("("), Term(Num), Literal(")"), Refuse(Fn(as_word))]);
+    assert(msg_of("(1)", g_of([one("n", r_glued)]), "n") == "write (1) as a word");
+    let r_empty: Rule<Tok> = Refuse(Fn(as_word));
+    assert(msg_of("42", g_of([one("n", r_empty)]), "n") == "write  as a word");
 
     // Pruning sees a refusal as unable to start anything, so an analysed
     // grammar refuses exactly where a one-shot parse does.
@@ -1667,6 +1701,10 @@ fn msg_of(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown(src, g, start).failure_message()
 }
 
+# A message function for the `Refuse(Fn(..))` assertions: the matched text,
+# quoted back.
+fn as_word(matched: str) -> str { `write {matched} as a word` }
+
 fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     let lexed = lex_toks(src, tok_rules())?;
     parse(src, lexed, g, start)
@@ -1684,51 +1722,51 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 6179
-deallocations: 6179
-reallocations: 1357
-bytes allocated: 680196
-instructions executed: 1449349
-binary size: 719536
-  code: 435352
-  data: 11836
-  metadata: 272348
+allocations: 6290
+deallocations: 6290
+reallocations: 1384
+bytes allocated: 697476
+instructions executed: 1482278
+binary size: 745040
+  code: 451012
+  data: 12236
+  metadata: 281792
 functions:
   __arr_drop_Node:
     calls: 16
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 634
+    calls: 644
     bytes: 116
   __arr_drop___m2__First$Tok:
     calls: 82
     bytes: 140
   __arr_drop___m3__ListStyle:
-    calls: 334
+    calls: 341
     bytes: 120
   __arr_drop___m3__Prec:
     calls: 2
     bytes: 120
   __arr_drop___m3__Production$Tok$Node:
-    calls: 142
+    calls: 150
     bytes: 236
   __arr_drop___m3__Rule$Tok:
-    calls: 262
+    calls: 271
     bytes: 116
   __arr_drop___m4__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_drop___m4__Token$Tok:
-    calls: 469
+    calls: 487
     bytes: 188
   __arr_drop___m4__TokenRule$Tok:
-    calls: 96
+    calls: 100
     bytes: 632
   __arr_retain_Node:
     calls: 13
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 638
+    calls: 651
     bytes: 116
   __arr_retain___m2__First$Tok:
     calls: 150
@@ -1740,16 +1778,16 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain___m3__Production$Tok$Node:
-    calls: 157
+    calls: 161
     bytes: 236
   __arr_retain___m3__Rule$Tok:
-    calls: 546
+    calls: 564
     bytes: 116
   __arr_retain___m4__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_retain___m4__Token$Tok:
-    calls: 284
+    calls: 291
     bytes: 188
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
@@ -1770,7 +1808,7 @@ functions:
     calls: 0
     bytes: 380
   __builtin_count_while$char$lam$__m4__lex_step$Tok$lambda1:
-    calls: 219
+    calls: 225
     bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 0
@@ -1785,13 +1823,13 @@ functions:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam$__m3__link$Tok$Node$lambda0:
-    calls: 157
+    calls: 161
     bytes: 400
   __builtin_find_index$str$lam$__m3__link_rule$Tok$lambda0:
     calls: 48
     bytes: 400
   __builtin_find_index$str$lam$parse_prepared$Tok$Node$lambda0:
-    calls: 96
+    calls: 100
     bytes: 400
   __builtin_find_map$__m1__Cst$__builtin_Span$lam$__m1__first_leaf:
     calls: 1
@@ -1806,7 +1844,7 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves$tail:
-    calls: 11
+    calls: 5
     bytes: 1028
   __builtin_map_join$__m1__Cst$__m1__Cst$lam$__m1__splice:
     calls: 0
@@ -1818,7 +1856,7 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m3__Rule$Tok$__m3__ListStyle$lam$__m3__group_styles$Tok$tail:
-    calls: 125
+    calls: 128
     bytes: 1060
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 1
@@ -1833,10 +1871,10 @@ functions:
     calls: 32
     bytes: 536
   __builtin_try_map$__m3__Rule$Tok$__m3__Rule$Tok$__m3__ParseError$lam$__m3__desugar_rule$Tok:
-    calls: 117
+    calls: 120
     bytes: 504
   __builtin_value_or$bool:
-    calls: 185
+    calls: 189
     bytes: 24
   __eq_Node:
     calls: 13
@@ -1914,7 +1952,7 @@ functions:
     calls: 0
     bytes: 32
   __m1__token_leaves$tail:
-    calls: 10
+    calls: 5
     bytes: 1156
   __m1__token_text:
     calls: 0
@@ -1933,39 +1971,39 @@ functions:
     bytes: 436
   __m2__rule_first$Tok:
     calls: 165
-    bytes: 7548
+    bytes: 7580
   __m3__desugar_opt$Tok:
     calls: 61
     bytes: 580
   __m3__desugar_rule$Tok:
-    calls: 570
-    bytes: 11956
+    calls: 583
+    bytes: 12004
   __m3__failure_message:
-    calls: 45
+    calls: 49
     bytes: 488
   __m3__group_styles$Tok:
     calls: 0
     bytes: 32
   __m3__group_styles$Tok$tail:
-    calls: 1110
-    bytes: 3084
+    calls: 1132
+    bytes: 3100
   __m3__link$Tok$Node:
-    calls: 112
+    calls: 116
     bytes: 2488
   __m3__link_opt$Tok:
     calls: 61
     bytes: 596
   __m3__link_rule$Tok:
-    calls: 570
-    bytes: 7008
+    calls: 583
+    bytes: 7096
   __m3__link_rules$Tok:
-    calls: 117
+    calls: 120
     bytes: 600
   __m3__opt_group_styles$Tok:
     calls: 210
     bytes: 152
   __m3__prod_names$Tok$Node:
-    calls: 247
+    calls: 255
     bytes: 548
   __m4__between_len:
     calls: 0
@@ -1983,16 +2021,16 @@ functions:
     calls: 0
     bytes: 1880
   __m4__lex$Tok:
-    calls: 96
+    calls: 100
     bytes: 1184
   __m4__lex_step$Tok:
-    calls: 358
+    calls: 366
     bytes: 23208
   __m4__nested_len:
     calls: 0
     bytes: 1136
   __m4__step_result$Tok:
-    calls: 965
+    calls: 989
     bytes: 9188
   __m4__template_scan$Tok:
     calls: 0
@@ -2016,11 +2054,11 @@ functions:
     calls: 30
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 474
+    calls: 481
     bytes: 132
   __rec_drop___m3__Rule$Tok:
-    calls: 1251
-    bytes: 392
+    calls: 1290
+    bytes: 404
   __rec_drop___tuple$__m3__Rule_Tok$__m3__Rule_Tok:
     calls: 37
     bytes: 72
@@ -2029,7 +2067,7 @@ functions:
     bytes: 3292
   __test$parse:
     calls: 1
-    bytes: 236700
+    bytes: 249328
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -2040,58 +2078,61 @@ functions:
     calls: 5
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 172
+    calls: 176
     bytes: (external)
   aipl_arr_elem_ptr:
-    calls: 1
+    calls: 3
     bytes: (external)
   aipl_arr_extend:
-    calls: 1983
+    calls: 2018
     bytes: (external)
   aipl_arr_inc:
-    calls: 31910
+    calls: 32277
     bytes: (external)
   aipl_arr_reserve:
-    calls: 2210
+    calls: 2242
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 414
+    calls: 421
     bytes: (external)
   aipl_arr_reverse:
     calls: 1
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 10
     bytes: (external)
   aipl_arr_sort:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 40997
+    calls: 41530
     bytes: (external)
   aipl_array_new:
-    calls: 778
+    calls: 791
     bytes: (external)
   aipl_array_push:
-    calls: 800
+    calls: 821
     bytes: (external)
   aipl_array_push_mut:
-    calls: 2285
+    calls: 2322
     bytes: (external)
   aipl_array_with_cap:
-    calls: 1141
+    calls: 1149
     bytes: (external)
   aipl_assert:
-    calls: 92
+    calls: 96
     bytes: (external)
   aipl_rec_alloc:
-    calls: 1792
+    calls: 1838
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 12170
+    calls: 12387
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 346
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 10378
+    calls: 10549
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 346
@@ -2120,8 +2161,11 @@ functions:
   aipl_write_u64:
     calls: 5
     bytes: (external)
+  as_word:
+    calls: 4
+    bytes: 232
   attach_trivia$Tok:
-    calls: 97
+    calls: 101
     bytes: 1812
   build_node:
     calls: 17
@@ -2145,10 +2189,10 @@ functions:
     calls: 22
     bytes: 204
   leaf_at$Tok$Node:
-    calls: 231
+    calls: 237
     bytes: 364
   lex_toks:
-    calls: 96
+    calls: 100
     bytes: 776
   lower_node$Tok$Node:
     calls: 18
@@ -2172,28 +2216,28 @@ functions:
     calls: 84
     bytes: 1488
   match_prod$Tok$Node:
-    calls: 192
+    calls: 196
     bytes: 6776
   match_reps$Tok$Node:
     calls: 57
     bytes: 4136
   match_rule$Tok$Node:
-    calls: 648
-    bytes: 6636
+    calls: 658
+    bytes: 6656
   match_sep$Tok$Node:
     calls: 90
     bytes: 952
   match_then$Tok$Node:
-    calls: 60
-    bytes: 2840
+    calls: 63
+    bytes: 2828
   parse$Tok$Node:
     calls: 10
     bytes: 284
   parse_cst$Tok$Node:
-    calls: 82
+    calls: 86
     bytes: 364
   parse_prepared$Tok$Node:
-    calls: 96
+    calls: 100
     bytes: 5192
   parsed:
     calls: 10
@@ -2205,8 +2249,8 @@ functions:
     calls: 12
     bytes: 1284
   refusal$Tok$Node:
-    calls: 6
-    bytes: 1388
+    calls: 10
+    bytes: 3872
   refuse:
     calls: 1
     bytes: 348
@@ -2215,13 +2259,13 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 146
-    bytes: 5016
+    bytes: 5052
   rule_nullable$Tok:
     calls: 0
     bytes: 36
   rule_nullable$Tok$tail:
     calls: 17
-    bytes: 1684
+    bytes: 1760
   seq_labels$Tok$Node:
     calls: 0
     bytes: 44
@@ -2229,13 +2273,13 @@ functions:
     calls: 17
     bytes: 912
   shown:
-    calls: 69
+    calls: 73
     bytes: 592
   shown_prepared:
     calls: 14
     bytes: 916
   tok_rules:
-    calls: 93
+    calls: 97
     bytes: 2736
   tok_rules$lambda0:
     calls: 0
@@ -2247,10 +2291,10 @@ functions:
     calls: 0
     bytes: 128
   tok_rules$lambda3:
-    calls: 50
+    calls: 55
     bytes: 96
   tok_text$Tok$Node:
-    calls: 209
+    calls: 211
     bytes: 904
   trivia_rules:
     calls: 3

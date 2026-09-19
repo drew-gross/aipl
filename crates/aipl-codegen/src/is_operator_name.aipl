@@ -1,23 +1,16 @@
-import { logical_not as ! } from builtins;
+import { is_nonempty, logical_not as ! } from builtins;
+import { operator_named_forms } from "./operator_named_forms.aipl";
 
 # Whether `self` spells a built-in operator that must be imported to be used.
 # Every operator is imported by aliasing its named builtin — `equal as ==`,
 # `less_than as <`, `wrapping_add as +` — and none has a bare form.
 # Used by the loader to gate operator imports and usage; dogfooded through the
 # FFI.
-pub fn is_operator_name(self: str) -> bool {
-    match (self) {
-        // Grouped by what they do rather than packed to the line: all of them in
-        // one alternation runs past the width, and the formatter would then break
-        // it one-per-line — back to the one-per-operator arms this replaces.
-        "+" | "-" | "*" | "/" | "%" => true,
-        "==" | "!=" | "<" | ">" | "<=" | ">=" => true,
-        "&&" | "||" | "!" => true,
-        "++" | "--" | "+++" => true,
-        "+=" | "-=" | "*=" | "/=" => true,
-        _ => false,
-    }
-}.test({
+#
+# An operator is a spelling some named builtin provides, so the list of
+# spellings is not written here: it is `operator_named_forms`'s table, asked
+# whether it has an answer.
+pub fn is_operator_name(self: str) -> bool { self.operator_named_forms().is_nonempty() }.test({
     // Every recognized operator spelling.
     assert("+".is_operator_name());
     assert("-".is_operator_name());
@@ -54,19 +47,31 @@ pub fn is_operator_name(self: str) -> bool {
     assert(!"and".is_operator_name());
 })
 --- performance ---
-allocations: 0
-deallocations: 0
+allocations: 21
+deallocations: 21
 reallocations: 0
-bytes allocated: 0
-instructions executed: 4605
-binary size: 56408
-  code: 41356
-  data: 1668
-  metadata: 13384
+bytes allocated: 1320
+instructions executed: 5484
+binary size: 17320
+  code: 9444
+  data: 1745
+  metadata: 6131
 functions:
+  __m1__operator_named_forms:
+    calls: 31
+    bytes: 5580
   __test$is_operator_name:
     calls: 1
-    bytes: 41236
+    bytes: 3744
+  aipl_arr_inc:
+    calls: 21
+    bytes: (external)
+  aipl_array_dec:
+    calls: 52
+    bytes: (external)
+  aipl_array_new:
+    calls: 21
+    bytes: (external)
   aipl_assert:
     calls: 31
     bytes: (external)

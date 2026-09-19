@@ -73,10 +73,10 @@ deallocations: 16689
 reallocations: 2158
 bytes allocated: 1031946
 instructions executed: 5344896
-binary size: 247576
-  code: 162152
+binary size: 250648
+  code: 164428
   data: 1876
-  metadata: 83548
+  metadata: 84344
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -281,13 +281,13 @@ functions:
     bytes: 4136
   __m14__match_rule$__m1__SexpKind$Sexp:
     calls: 5372
-    bytes: 6384
+    bytes: 6400
   __m14__match_sep$__m1__SexpKind$Sexp:
     calls: 420
     bytes: 952
   __m14__match_then$__m1__SexpKind$Sexp:
     calls: 0
-    bytes: 2840
+    bytes: 2828
   __m14__parse$__m1__SexpKind$Sexp:
     calls: 6
     bytes: 284
@@ -302,7 +302,7 @@ functions:
     bytes: 1284
   __m14__refusal$__m1__SexpKind$Sexp:
     calls: 0
-    bytes: 1276
+    bytes: 3384
   __m14__tok_text$__m1__SexpKind$Sexp:
     calls: 1230
     bytes: 792
@@ -371,13 +371,13 @@ functions:
     bytes: 580
   __m4__desugar_rule$__m1__SexpKind:
     calls: 42
-    bytes: 11956
+    bytes: 12004
   __m4__group_styles$__m1__SexpKind:
     calls: 0
     bytes: 32
   __m4__group_styles$__m1__SexpKind$tail:
     calls: 84
-    bytes: 3084
+    bytes: 3100
   __m4__link$__m1__SexpKind$Sexp:
     calls: 6
     bytes: 2488
@@ -386,7 +386,7 @@ functions:
     bytes: 596
   __m4__link_rule$__m1__SexpKind:
     calls: 42
-    bytes: 7008
+    bytes: 7096
   __m4__link_rules$__m1__SexpKind:
     calls: 6
     bytes: 600
@@ -404,7 +404,7 @@ functions:
     bytes: 132
   __rec_drop___m4__Rule$__m1__SexpKind:
     calls: 126
-    bytes: 392
+    bytes: 404
   __rec_drop___tuple$__m4__Rule___m1__SexpKind$__m4__Rule___m1__SexpKind:
     calls: 18
     bytes: 72

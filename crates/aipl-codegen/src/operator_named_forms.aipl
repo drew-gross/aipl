@@ -1,0 +1,99 @@
+import { equal as == } from builtins;
+
+# The named builtins that provide the operator `self` — the names it is
+# imported under (`wrapping_add as +`) — in the order the compiler declares
+# them, or `[]` for a spelling that is not an operator. Where an operator has
+# more than one semantics every flavor is listed, and the first is the one a
+# diagnostic suggests first.
+#
+# Mirrors `OPERATOR_BUILTINS` in `aipl-syntax`, which is where the compiler
+# itself reads the pairing from; the two tables are kept in the same order so a
+# diff between them reads line for line. `is_operator_name` is this table's
+# question of whether the answer is empty, so the AIPL side states the pairing
+# once.
+pub fn operator_named_forms(self: str) -> str[] {
+    match (self) {
+        "+" => ["wrapping_add", "saturating_add"],
+        "-" => ["wrapping_sub", "saturating_sub"],
+        "*" => ["wrapping_mul"],
+        "++" => ["wrapping_increment", "saturating_increment"],
+        "--" => ["wrapping_decrement", "saturating_decrement"],
+        "+=" => ["wrapping_add_assign", "saturating_add_assign"],
+        "-=" => ["wrapping_sub_assign", "saturating_sub_assign"],
+        "*=" => ["wrapping_mul_assign"],
+        "/=" => ["saturating_divide_assign"],
+        "==" => ["equal"],
+        "!=" => ["not_equal"],
+        "<" => ["less_than"],
+        ">" => ["greater_than"],
+        "<=" => ["less_than_or_equal"],
+        ">=" => ["greater_than_or_equal"],
+        "&&" => ["logical_and"],
+        "||" => ["logical_or"],
+        "!" => ["logical_not"],
+        "+++" => ["concat"],
+        "/" => ["saturating_divide"],
+        "%" => ["saturating_remainder"],
+        _ => [],
+    }
+}.test({
+    // Two flavors, in the order the compiler declares them.
+    assert("+".operator_named_forms() == ["wrapping_add", "saturating_add"]);
+    assert("+=".operator_named_forms() == ["wrapping_add_assign", "saturating_add_assign"]);
+    assert("--".operator_named_forms() == ["wrapping_decrement", "saturating_decrement"]);
+    // One flavor, still listed: every operator is imported the same way.
+    assert("==".operator_named_forms() == ["equal"]);
+    assert("+++".operator_named_forms() == ["concat"]);
+    assert("/".operator_named_forms() == ["saturating_divide"]);
+    assert("%".operator_named_forms() == ["saturating_remainder"]);
+    assert("/=".operator_named_forms() == ["saturating_divide_assign"]);
+    // Not an operator: nothing.
+    let nothing: str[] = [];
+    assert("wrapping_add".operator_named_forms() == nothing);
+    assert("=".operator_named_forms() == nothing);
+    assert("".operator_named_forms() == nothing);
+})
+--- performance ---
+allocations: 16
+deallocations: 16
+reallocations: 0
+bytes allocated: 1040
+instructions executed: 3058
+binary size: 14848
+  code: 8868
+  data: 983
+  metadata: 4997
+functions:
+  __eq_str$arr:
+    calls: 11
+    bytes: 364
+  __test$operator_named_forms:
+    calls: 1
+    bytes: 2796
+  aipl_arr_inc:
+    calls: 8
+    bytes: (external)
+  aipl_array_dec:
+    calls: 27
+    bytes: (external)
+  aipl_array_new:
+    calls: 16
+    bytes: (external)
+  aipl_assert:
+    calls: 11
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 128
+  operator_named_forms:
+    calls: 11
+    bytes: 5580

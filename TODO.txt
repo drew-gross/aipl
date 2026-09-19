@@ -76,7 +76,6 @@ highlighter:
 misc cleanup:
   bind_fields_mut looks like it can be a zip->reverse->for, also maybe mutable can default to false and then bind_fields doens't need to exist (or only it exists)
   First from ebnf should have defaults so usages can be more concise
-  refuse should accept a Msg | Fn for the error
   The Rust "has no bare form" gate is now dead code and can be eliminated
   trailing comment attaching
   now that all operators have names, the import parser doesn't need to support importing operators without names
@@ -111,9 +110,6 @@ misc cleanup:
   unify operators with regular functions even more
   field_size and elem_size_of are apparently near duplicates that can be DRYed
   use val.method() syntax a _lot_ more. Any time a function could be interpreted as a verb.
-  trailing_trivia should be a filter map
-  line_at.aipl should use doc comments
-  caret_block.aipl should use doc comments
   having both min and minimum is kinda weird. Maybe combine somehow?
   min/max shouldn't allow mixed integer types
   split pub mod lint and pub mod ast into separate files

@@ -1623,6 +1623,20 @@
 
 
 
+        <section class="item" id="item-bare_operator_import">
+          <h3>
+            <a class="anchor" href="#item-bare_operator_import">bare_operator_import</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn bare_operator_import(op: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>What refusing a bare operator import says: the operator, and the aliased import to write instead — every flavor where there is a choice to make (<code>wrapping_add as +</code> or <code>saturating_add as +</code>), the one form where there is not (<code>equal as ==</code>). The alternatives come from <code>operator_named_forms</code>, so a new operator or flavor keeps its own diagnostic correct without touching this.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_import_name">
           <h3>
             <a class="anchor" href="#item-lower_import_name">lower_import_name</a>

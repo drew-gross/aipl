@@ -281,10 +281,10 @@ deallocations: 6752
 reallocations: 918
 bytes allocated: 644606
 instructions executed: 1481734
-binary size: 404040
-  code: 265292
+binary size: 407488
+  code: 267868
   data: 4892
-  metadata: 133856
+  metadata: 134728
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -570,13 +570,13 @@ functions:
     bytes: 4136
   __m13__match_rule$SexpKind$__m15__Sexp:
     calls: 673
-    bytes: 6384
+    bytes: 6400
   __m13__match_sep$SexpKind$__m15__Sexp:
     calls: 75
     bytes: 952
   __m13__match_then$SexpKind$__m15__Sexp:
     calls: 0
-    bytes: 2840
+    bytes: 2828
   __m13__parse$SexpKind$__m15__Sexp:
     calls: 13
     bytes: 284
@@ -591,7 +591,7 @@ functions:
     bytes: 1284
   __m13__refusal$SexpKind$__m15__Sexp:
     calls: 0
-    bytes: 1276
+    bytes: 3384
   __m13__tok_text$SexpKind$__m15__Sexp:
     calls: 118
     bytes: 792
@@ -648,7 +648,7 @@ functions:
     bytes: 32
   __m2__climb_precs$SexpKind$tail:
     calls: 6
-    bytes: 1432
+    bytes: 1460
   __m2__first_precs$SexpKind:
     calls: 0
     bytes: 32
@@ -669,13 +669,13 @@ functions:
     bytes: 5508
   __m2__render_rule$SexpKind:
     calls: 7
-    bytes: 12540
+    bytes: 12780
   __m2__rep_suffix:
     calls: 1
     bytes: 1708
   __m2__rule_first$SexpKind:
     calls: 18
-    bytes: 7548
+    bytes: 7580
   __m2__show_first$SexpKind:
     calls: 2
     bytes: 3836
@@ -693,7 +693,7 @@ functions:
     bytes: 580
   __m3__desugar_rule$SexpKind:
     calls: 315
-    bytes: 11956
+    bytes: 12004
   __m3__failure_message:
     calls: 5
     bytes: 488
@@ -702,7 +702,7 @@ functions:
     bytes: 32
   __m3__group_styles$SexpKind$tail:
     calls: 616
-    bytes: 3084
+    bytes: 3100
   __m3__link$SexpKind$__m15__Sexp:
     calls: 44
     bytes: 2488
@@ -711,7 +711,7 @@ functions:
     bytes: 596
   __m3__link_rule$SexpKind:
     calls: 308
-    bytes: 7008
+    bytes: 7096
   __m3__link_rules$SexpKind:
     calls: 44
     bytes: 600
@@ -786,7 +786,7 @@ functions:
     bytes: 132
   __rec_drop___m3__Rule$SexpKind:
     calls: 976
-    bytes: 392
+    bytes: 404
   __rec_drop___m5__Doc:
     calls: 334
     bytes: 184

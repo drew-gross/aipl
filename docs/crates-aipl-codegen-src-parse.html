@@ -367,9 +367,23 @@
             <a class="anchor" href="#item-refusal">refusal</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn refusal&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, message: str, matched: Cst[], pos: u64) -&#62; ParseError</code></pre>
+          <pre class="signature"><code>fn refusal&#60;K: variant, A: any&#62;(p: Parser&#60;K, A&#62;, what: Refusal, start: u64, end: u64) -&#62; ParseError</code></pre>
 
-          <div class="doc"><p>The error a <code>Refuse</code> raises: the grammar author's message, over the tokens <code>matched</code> covers — what the enclosing sequence accepted before refusing it — or, when nothing was, the token at <code>pos</code> (the empty span at end of input past the last one).</p></div>
+          <div class="doc"><p>The error a <code>Refuse</code> raises, over the tokens <code>start..end</code> — what the enclosing sequence accepted before refusing it. An empty range is a refusal reached with nothing in front of it, which points at the token at <code>end</code> (the empty span at end of input past the last one).</p><p>A <code>Fn</code> refusal is handed those tokens' text, run together with a single space wherever the source had a gap: the parser holds no source, only the tokens, and their spans say where the gaps were.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-matched_text">
+          <h3>
+            <a class="anchor" href="#item-matched_text">matched_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn matched_text&#60;K: variant&#62;(toks: Token&#60;K&#62;[]) -&#62; str</code></pre>
+
+          <div class="doc"><p><code>toks</code> as one string: each token's text, with a space between two tokens the source did not write together.</p></div>
 
 
         </section>
@@ -846,6 +860,20 @@
           <pre class="signature"><code>fn msg_of(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str</code></pre>
 
           <div class="doc"><p>The message a failed parse reports — and a distinguishable string when it unexpectedly succeeded, so a broken assertion says which way it broke.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-as_word">
+          <h3>
+            <a class="anchor" href="#item-as_word">as_word</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn as_word(matched: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>A message function for the <code>Refuse(Fn(..))</code> assertions: the matched text, quoted back.</p></div>
 
 
         </section>

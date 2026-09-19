@@ -4,7 +4,7 @@ import { * } from builtins;
 
 fn main() -> i64 { 6 * 7 }
 --- errors ---
-error: an operator has no bare import: import the builtin it stands for and alias it to the operator, e.g. `wrapping_add as +`
+error: the "*" operator has no bare form; import it aliased: `wrapping_mul as *` from builtins
  --> ./tests/cases/arithmetic/err_bare_star.aipl:3:10
   |
 3 | import { * } from builtins;
