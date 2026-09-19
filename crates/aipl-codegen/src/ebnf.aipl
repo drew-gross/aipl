@@ -784,10 +784,10 @@ deallocations: 1654
 reallocations: 338
 bytes allocated: 187271
 instructions executed: 238682
-binary size: 168016
-  code: 110700
+binary size: 168008
+  code: 110696
   data: 4132
-  metadata: 53184
+  metadata: 53180
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -875,7 +875,7 @@ functions:
     bytes: 32
   __m1__group_styles$Tok$tail:
     calls: 262
-    bytes: 3100
+    bytes: 3096
   __m1__link$Tok$Node:
     calls: 9
     bytes: 2488

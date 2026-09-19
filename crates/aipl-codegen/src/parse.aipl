@@ -1727,10 +1727,10 @@ deallocations: 5993
 reallocations: 1384
 bytes allocated: 687972
 instructions executed: 1480818
-binary size: 744112
-  code: 450388
+binary size: 743712
+  code: 450132
   data: 12236
-  metadata: 281488
+  metadata: 281344
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1986,7 +1986,7 @@ functions:
     bytes: 32
   __m3__group_styles$Tok$tail:
     calls: 1132
-    bytes: 3100
+    bytes: 3096
   __m3__link$Tok$Node:
     calls: 116
     bytes: 2488
@@ -2034,7 +2034,7 @@ functions:
     bytes: 9188
   __m4__template_scan$Tok:
     calls: 0
-    bytes: 2908
+    bytes: 2788
   __m4__template_step$Tok:
     calls: 0
     bytes: 444
@@ -2067,7 +2067,7 @@ functions:
     bytes: 3292
   __test$parse:
     calls: 1
-    bytes: 249328
+    bytes: 249320
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -2175,7 +2175,7 @@ functions:
     bytes: 440
   climb$Tok$Node:
     calls: 15
-    bytes: 2992
+    bytes: 2984
   error_at$Tok$Node:
     calls: 42
     bytes: 3180
@@ -2217,7 +2217,7 @@ functions:
     bytes: 1488
   match_prod$Tok$Node:
     calls: 196
-    bytes: 6776
+    bytes: 6760
   match_reps$Tok$Node:
     calls: 57
     bytes: 4136
@@ -2238,7 +2238,7 @@ functions:
     bytes: 364
   parse_prepared$Tok$Node:
     calls: 100
-    bytes: 5192
+    bytes: 5092
   parsed:
     calls: 10
     bytes: 332

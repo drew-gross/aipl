@@ -176,11 +176,11 @@ allocations: 5935
 deallocations: 5935
 reallocations: 293
 bytes allocated: 488219
-instructions executed: 1432414
-binary size: 243656
-  code: 178212
+instructions executed: 1432542
+binary size: 243744
+  code: 178236
   data: 3336
-  metadata: 62108
+  metadata: 62172
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -241,7 +241,7 @@ functions:
     bytes: 1892
   __m1__caps_fld:
     calls: 4
-    bytes: 1300
+    bytes: 1320
   __m1__char_class_body:
     calls: 13
     bytes: 1468
@@ -277,7 +277,7 @@ functions:
     bytes: 1796
   __m1__pat_json:
     calls: 40
-    bytes: 4576
+    bytes: 4616
   __m1__re_escape:
     calls: 100
     bytes: 2360
@@ -337,7 +337,7 @@ functions:
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 126668
+    bytes: 126632
   __to_str_u64:
     calls: 7
     bytes: 204
@@ -357,7 +357,7 @@ functions:
     calls: 26
     bytes: (external)
   aipl_array_dec:
-    calls: 2182
+    calls: 2214
     bytes: (external)
   aipl_array_new:
     calls: 203

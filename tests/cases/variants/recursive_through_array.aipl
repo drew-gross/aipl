@@ -51,9 +51,9 @@ reallocations: 0
 bytes allocated: 1019
 instructions executed: 2761
 binary size: 5976
-  code: 2996
+  code: 3000
   data: 235
-  metadata: 2745
+  metadata: 2741
 functions:
   __arr_drop_Cst:
     calls: 2
@@ -99,7 +99,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 708
+    bytes: 712
   size:
     calls: 6
     bytes: 348

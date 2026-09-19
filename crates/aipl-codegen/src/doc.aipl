@@ -334,9 +334,9 @@ reallocations: 1
 bytes allocated: 21677
 instructions executed: 34042
 binary size: 38224
-  code: 23744
+  code: 23740
   data: 881
-  metadata: 13599
+  metadata: 13603
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -454,7 +454,7 @@ functions:
     bytes: 108
   print:
     calls: 11
-    bytes: 4192
+    bytes: 4188
   print$map2$own0:
     calls: 11
     bytes: 464

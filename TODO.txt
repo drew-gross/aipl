@@ -181,6 +181,7 @@ HOF:
 math:
 
 syntax:
+  set x = { set x = a; b } should be illegal: set inside an expression is super weird
   forwarding omittables
   more match power: earlier matches in a multi-match can be used in later matches
   generic builder api (Foo {...} .with_field_a(...).with_field_b(...))
@@ -322,6 +323,7 @@ format:
 
 
 lint:
+  lint that in an assert, when a value is compared directly against ok(...), use ? instead
   x.starts_with("'") should accept T+ i.e. char or str, and lint str constants into char constants
   lint x.value_or(<any expr except "..">) == ".." into x = some("..")
   lint while (i < n) i++ loops to range loops
@@ -400,6 +402,18 @@ design:
   apis should express intent
 
 optimizations:
+  for move-in detection:
+    need a "last use" flag
+      probably a "last use before overwrite" flag
+      also last-use detection for struct fields
+    merge's self is not owned. owned_eligible (aipl-mono/src/lib.rs:9589) requires: not self, exactly one parameter, is_heap type (structs excluded), heap return, consumed as mut y = p. merge fails all five.
+    1. Mono: generalize owned_eligible to structs. Ownership currently means "one heap-typed param moved in and rebound mut". It needs to (a) accept a struct param whose fields need drop (use needs_drop-style, not is_heap), (b) accept self receivers and functions with several params (per-param flags, like inspect_only_params), and (c) accept a new consumption shape: each heap field of the param is read at most once, and that read flows into a consumer — a builtin that takes the reference, a struct/variant construction, or a return. Output keyed by instance name so compile_call and define_fn read one answer (the inspect_only discipline).
+    2. Codegen, callee side: field move-out. For an owned struct param, a Field(self, kinds) read at its designated move site hands over the field's reference with no retain, and the callee drops the unmoved fields of an owned struct param at exit (today struct params get no entry-scope track at all, since is_heap is false).
+    3. Codegen: union with an owned receiver. In Callee::Union, when a is a reference we hold uniquely — a moved-out owned field, or a fresh temp on top of the scope — emit aipl_set_union_mut(a, b) with no pre-inc of a (pop its track) instead of inc + aipl_set_union. This is sound regardless of rc because union_mut → aipl_set_insert → aipl_array_push_mut copies on rc > 1 or STATIC_REFCOUNT; it's only fast when rc is 1, which is what 1+2 deliver. It's a narrow, contract-specific exception to the "never move into builtins" rule in my notes, and should be documented as such.
+    4. Caller side: move a mut binding into the call that feeds its own reassignment. Codegen then copies the struct's words out of the slot without retaining and marks the slot moved, so the Assign arm skips releasing its snapshot. This also needs struct-typed mut slots audited: mut_binding_owns_slot_ref doesn't list structs, so their old-value release on set goes some other route that has to learn "moved".
+    5. Caller side: the spread temp. __spread_base$k is a let of a fresh struct whose only uses are one read per field; the same owned-binding/field-move-out analysis as 1–2 applied to a let of a fresh value makes those reads moves and skips the temp's drop. (Alternative: have desugar_struct_spread emit the field reads as explicit moves when the base is a call — but the general analysis covers both and let x = f(); T { ..x } written by hand.)
+    6. The function-value wrinkle, specific to merge. rule_first's OneOf arm passes merge to left_fold as a value (ebnf.aipl:550). An address-taken instance is disqualified from elision because compile_indirect_call knows only the type. So either the ownership analysis distinguishes direct calls (owned) from indirect ones (which get a retaining shim/instance), or that left_fold gets rewritten as a loop — otherwise 1–5 land and merge still doesn't qualify.
+    7. A perf fixture asserting the shape: the scratch case I used, under tests/cases/optimizations/, with functions: showing aipl_set_union_mut: 6 and aipl_set_union: 0 — so the whole chain is pinned, not just the pieces
   optimizations need to handle variable names better: a_binding_is_not_sunk_into_an_arm_that_rebinds_what_it_reads shouldn't be an issue
   code sinking should sink into potentially-unused match arms
   generalize try_push for opts, strings, structs?

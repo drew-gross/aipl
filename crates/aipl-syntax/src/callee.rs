@@ -187,6 +187,13 @@ pub enum Callee {
     /// The moved-in array parameter as a writable block, for the in-place
     /// `map`/`filter` lowering (mono).
     ArrWritable,
+    /// `__move(x)`: the local binding `x` at its last use, as a value the
+    /// caller may hand off rather than borrow. Mono wraps a heap binding's
+    /// last-use call argument in it (`move_last_use`); codegen turns the
+    /// binding's own reference into a fresh temporary the call then moves in,
+    /// so the retain/release pair a borrow would cost is never emitted. On a
+    /// binding that holds no reference of its own it is a plain read.
+    Move,
     /// In-place `map`: overwrite one slot of the reused buffer (mono).
     MapSet,
     /// In-place `map`: reinterpret the reused buffer as the result type (mono).
@@ -345,6 +352,7 @@ impl Callee {
         Callee::ArrConcat,
         Callee::WithCapacity,
         Callee::ArrWritable,
+        Callee::Move,
         Callee::MapSet,
         Callee::MapResult,
         Callee::FilterKeep,
@@ -485,6 +493,7 @@ impl Callee {
             Callee::ArrConcat => "__aipl_arr_concat",
             Callee::WithCapacity => "__builtin_with_capacity",
             Callee::ArrWritable => "__arr_writable",
+            Callee::Move => "__move",
             Callee::MapSet => "__map_set",
             Callee::MapResult => "__map_result",
             Callee::FilterKeep => "__filter_keep",

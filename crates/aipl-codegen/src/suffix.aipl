@@ -97,8 +97,8 @@ deallocations: 77
 reallocations: 1
 bytes allocated: 5825
 instructions executed: 3639
-binary size: 75656
-  code: 50304
+binary size: 75648
+  code: 50296
   data: 681
   metadata: 24671
 functions:
@@ -158,7 +158,7 @@ functions:
     bytes: 72
   __test$apply_suffix:
     calls: 1
-    bytes: 4720
+    bytes: 4712
   __to_str_i64:
     calls: 7
     bytes: 204

@@ -80,21 +80,21 @@ fn brace_mix_message() -> str {
     """a "#{ .. }" literal can't mix set elements and "key: value" pairs — use either all bare elements (a set) or all pairs (a dict)"""
 }
 --- performance ---
-allocations: 76
-deallocations: 76
-reallocations: 1
-bytes allocated: 5163
-instructions executed: 4775
-binary size: 73792
-  code: 48392
+allocations: 74
+deallocations: 74
+reallocations: 3
+bytes allocated: 5067
+instructions executed: 4769
+binary size: 73624
+  code: 48320
   data: 1436
-  metadata: 23964
+  metadata: 23868
 functions:
   __arr_drop_BraceEntry:
     calls: 5
     bytes: 184
   __arr_drop___m1__Expr:
-    calls: 5
+    calls: 3
     bytes: 116
   __arr_drop___tuple$__m1__Expr$__m1__Expr:
     calls: 3
@@ -103,7 +103,7 @@ functions:
     calls: 0
     bytes: 184
   __arr_retain___m1__Expr:
-    calls: 7
+    calls: 5
     bytes: 116
   __arr_retain___tuple$__m1__Expr$__m1__Expr:
     calls: 3
@@ -160,15 +160,18 @@ functions:
     calls: 6
     bytes: 204
   aipl_arr_inc:
-    calls: 18
+    calls: 5
     bytes: (external)
   aipl_array_dec:
-    calls: 50
+    calls: 40
     bytes: (external)
   aipl_array_new:
     calls: 5
     bytes: (external)
   aipl_array_push:
+    calls: 6
+    bytes: (external)
+  aipl_array_push_mut:
     calls: 8
     bytes: (external)
   aipl_assert:
@@ -181,13 +184,13 @@ functions:
     calls: 35
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 90
+    calls: 88
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 22
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 55
+    calls: 53
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 22
@@ -206,7 +209,7 @@ functions:
     bytes: (external)
   brace_literal:
     calls: 7
-    bytes: 2064
+    bytes: 1992
   main:
     calls: 1
     bytes: 116

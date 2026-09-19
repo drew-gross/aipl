@@ -115,9 +115,9 @@ reallocations: 0
 bytes allocated: 1403
 instructions executed: 2386
 binary size: 4560
-  code: 1980
+  code: 1984
   data: 173
-  metadata: 2407
+  metadata: 2403
 functions:
   __rec_drop_List:
     calls: 14
@@ -151,4 +151,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1228
+    bytes: 1232

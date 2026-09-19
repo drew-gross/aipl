@@ -42,6 +42,10 @@ pub use sink::{sink_bindings, sink_bindings_post_mono};
 mod known_constructor_elimination;
 pub use known_constructor_elimination::eliminate_known_constructors_post_mono;
 
+mod move_last_use;
+use move_last_use::move_last_uses;
+pub use move_last_use::move_last_uses_post_mono;
+
 mod subst;
 pub use subst::inline_single_use_bindings;
 
@@ -5609,6 +5613,19 @@ impl Mono<'_> {
 
     /// Infer `expr`'s concrete type while rewriting any generic call names to
     /// their mangled instances. Returns the rewritten expression and its type.
+    /// `body`, the scope of the binding `name` of type `ty`, with the
+    /// binding's last-use call arguments marked for moving — for a heap-typed
+    /// binding, which is the kind whose borrow costs a retain/release pair.
+    /// See `move_last_use`. Runs here, before the body is inferred, so
+    /// `owned_for_call` sees the marks when it chooses each callee's instance.
+    fn with_last_uses_moved(&self, name: &str, ty: &Type, value: &Expr, body: &Expr) -> Expr {
+        if is_heap(ty) {
+            move_last_uses(name, value, body, &self.mutating)
+        } else {
+            body.clone()
+        }
+    }
+
     fn infer(&mut self, expr: &Expr, env: &Env) -> Result<(Expr, Type), Error> {
         let span = expr.span.clone();
         // Carries `Expr::ty` onto the rewritten node: codegen re-derives types
@@ -5948,9 +5965,10 @@ impl Mono<'_> {
                 };
                 self.check_folded_literal_fits(val, &rv, &vt, ty.as_ref())?;
                 let vt = ty.clone().unwrap_or(vt);
+                let body = self.with_last_uses_moved(name, &vt, val, body);
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
-                let (rb, bt) = self.infer(body, &env2)?;
+                let (rb, bt) = self.infer(&body, &env2)?;
                 (
                     node(ExprKind::Let(
                         name.clone(),
@@ -5978,9 +5996,10 @@ impl Mono<'_> {
                 };
                 self.check_folded_literal_fits(val, &rv, &vt, ty.as_ref())?;
                 let vt = ty.clone().unwrap_or(vt);
+                let body = self.with_last_uses_moved(name, &vt, val, body);
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
-                let (rb, bt) = self.infer(body, &env2)?;
+                let (rb, bt) = self.infer(&body, &env2)?;
                 (
                     node(ExprKind::LetMut(
                         name.clone(),
@@ -7410,6 +7429,9 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
                     .unwrap_or(Type::Array(Box::new(Type::NoneInner))),
             )
         }
+        // Internal: a binding at its last use (see `move_last_use`) — the
+        // binding's own value, typed as itself.
+        Callee::Move => return Some(arg_tys.first().cloned().unwrap_or(Type::Unit)),
         // Internal: the moved-in array as a writable block (see `writable`) —
         // the same array, typed as itself.
         Callee::ArrWritable => {
@@ -9779,6 +9801,11 @@ fn aliases_or_unsafe(name: &str, e: &Expr, iterating: bool, tail: bool) -> bool 
             // trailing `$a`, so it doesn't alias the binding.
             if *fname == Callee::MapResult {
                 return args.iter().any(|a| if is_n(a) { !tail } else { rec(a) });
+            }
+            // `__move(name)` is the binding's last use by construction — a
+            // move-out, never an alias, wherever it sits.
+            if *fname == Callee::Move {
+                return args.iter().any(|a| !is_n(a) && rec(a));
             }
             // An operator, resolved to its canonical impl. Its operands are read,
             // not aliased — a bare `name` operand does not disqualify the binding

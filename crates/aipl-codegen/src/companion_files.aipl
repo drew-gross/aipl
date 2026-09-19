@@ -159,11 +159,11 @@ allocations: 70
 deallocations: 70
 reallocations: 1
 bytes allocated: 3514
-instructions executed: 15968
-binary size: 25488
-  code: 13700
+instructions executed: 15965
+binary size: 25480
+  code: 13696
   data: 2661
-  metadata: 9127
+  metadata: 9123
 functions:
   __arr_drop_Companion:
     calls: 10
@@ -224,7 +224,7 @@ functions:
     bytes: (external)
   companion_files:
     calls: 12
-    bytes: 3156
+    bytes: 3152
   companion_path:
     calls: 15
     bytes: 968

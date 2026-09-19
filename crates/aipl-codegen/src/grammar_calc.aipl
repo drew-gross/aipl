@@ -470,11 +470,11 @@ allocations: 12820
 deallocations: 12820
 reallocations: 2085
 bytes allocated: 1272377
-instructions executed: 2596870
-binary size: 423344
-  code: 277368
+instructions executed: 2597004
+binary size: 422632
+  code: 276960
   data: 6044
-  metadata: 139932
+  metadata: 139628
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -706,7 +706,7 @@ functions:
     bytes: 7444
   __m11__template_scan$CalcTok:
     calls: 0
-    bytes: 2908
+    bytes: 2788
   __m11__template_step$CalcTok:
     calls: 0
     bytes: 444
@@ -724,7 +724,7 @@ functions:
     bytes: 324
   __m13__climb$CalcTok$Calc:
     calls: 160
-    bytes: 2992
+    bytes: 2984
   __m13__error_at$CalcTok$Calc:
     calls: 4
     bytes: 2856
@@ -781,7 +781,7 @@ functions:
     bytes: 364
   __m13__parse_prepared$CalcTok$Calc:
     calls: 53
-    bytes: 6644
+    bytes: 6548
   __m13__pruned$CalcTok$Calc:
     calls: 0
     bytes: 1232
@@ -898,7 +898,7 @@ functions:
     bytes: 32
   __m3__group_styles$CalcTok$tail:
     calls: 1701
-    bytes: 3100
+    bytes: 3096
   __m3__link$CalcTok$Calc:
     calls: 63
     bytes: 2488
@@ -934,19 +934,19 @@ functions:
     bytes: 1732
   __m4__inline_doc$lam$calc_space:
     calls: 67
-    bytes: 2416
+    bytes: 2408
   __m4__item_key:
     calls: 0
     bytes: 1072
   __m4__pieces$CalcTok$Calc$s1$lam$calc_space:
     calls: 99
-    bytes: 3220
+    bytes: 3208
   __m4__render_cst$CalcTok$Calc$s1$lam$calc_space:
     calls: 9
     bytes: 4380
   __m4__wrapped$lam$calc_space:
     calls: 0
-    bytes: 6100
+    bytes: 5940
   __m5__col_after:
     calls: 76
     bytes: 628
@@ -1032,7 +1032,7 @@ functions:
     calls: 5244
     bytes: (external)
   aipl_arr_inc:
-    calls: 50223
+    calls: 50156
     bytes: (external)
   aipl_arr_reserve:
     calls: 7274

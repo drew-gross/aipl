@@ -25,9 +25,9 @@ reallocations: 2
 bytes allocated: 379
 instructions executed: 936
 binary size: 7680
-  code: 3540
+  code: 3544
   data: 577
-  metadata: 3563
+  metadata: 3559
 functions:
   __eq_P:
     calls: 2
@@ -43,7 +43,7 @@ functions:
     bytes: 296
   __test$chars:
     calls: 1
-    bytes: 2488
+    bytes: 2492
   aipl_arr_extend:
     calls: 1
     bytes: (external)

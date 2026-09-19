@@ -1078,8 +1078,8 @@ deallocations: 754
 reallocations: 101
 bytes allocated: 94897
 instructions executed: 78536
-binary size: 162384
-  code: 100320
+binary size: 162376
+  code: 100312
   data: 6684
   metadata: 55380
 functions:
@@ -1160,7 +1160,7 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 47692
+    bytes: 47688
   __test$show_rule:
     calls: 1
     bytes: 4156
@@ -1256,7 +1256,7 @@ functions:
     bytes: 32
   group_styles$Kind$tail:
     calls: 210
-    bytes: 3100
+    bytes: 3096
   keep:
     calls: 0
     bytes: 112

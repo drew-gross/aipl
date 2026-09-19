@@ -501,6 +501,7 @@ case_tests! {
     cases_optimizations_loop_tuple_windows_fusion = "cases/optimizations/loop_tuple_windows_fusion",
     cases_optimizations_map_find_if_fusion = "cases/optimizations/map_find_if_fusion",
     cases_optimizations_map_value_or_unwraps = "cases/optimizations/map_value_or_unwraps",
+    cases_optimizations_move_last_use = "cases/optimizations/move_last_use",
     cases_optimizations_sink_effects_stay_put = "cases/optimizations/sink_effects_stay_put",
     cases_optimizations_sink_into_branch = "cases/optimizations/sink_into_branch",
     cases_optimizations_sink_past_trailing_statements = "cases/optimizations/sink_past_trailing_statements",

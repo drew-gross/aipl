@@ -1,0 +1,163 @@
+import {
+    concat as +++,
+    equal as ==,
+    len,
+    print,
+    push,
+    union,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+} from builtins;
+
+// A heap binding passed to a user function at its last use is *moved* — the
+// caller hands over the reference it holds instead of retaining a second one
+// for the callee and releasing its own at scope exit. Mono marks such
+// arguments (`move_last_use`), and what this case pins is that every one of
+// the shapes below still computes the right answer: the moves are invisible
+// except in the `--- performance ---` counts, and the borrows that must
+// survive — an alias, a later read, a use inside a loop — do.
+fn consume(xs: i64[]) -> u64 { xs.len() }
+
+fn grow(xs: i64[]) -> i64[] {
+    mut ys = xs;
+    for (let i : "ab") {
+        set ys.push(9);
+    }
+    ys
+}
+
+fn stretch(s: str) -> str { s +++ "!" }
+
+fn widen(s: #{i64}) -> #{i64} { s.union(#{7}) }
+
+fn build(n: i64) -> i64[] { [n, n + 1, n + 2] }
+
+fn main() !prints {
+    // An immutable binding, read once and then handed over.
+    let a = build(1);
+    print(`{a.len()} {consume(a)}`);
+
+    // A `mut` array reassigned from a call on itself: the old value moves into
+    // the call, the new one lands in the slot.
+    mut b = build(1);
+    set b = grow(b);
+    set b = grow(b);
+    print(`{b}`);
+
+    // The same for a `mut` str — a wide value that lives in its slot.
+    mut s = "ab";
+    set s = stretch(s);
+    set s = stretch(s);
+    print(s);
+
+    // And a `mut` set.
+    mut t = #{1};
+    set t = widen(t);
+    print(`{t}`);
+
+    // An alias holds no reference of its own, so the binding it reads through
+    // is never moved: `c` stays valid after `d` is handed over.
+    let c = build(4);
+    let d = c;
+    print(`{consume(d)} {c}`);
+
+    // A later read keeps the earlier call a borrow.
+    let e = build(7);
+    let n = consume(e);
+    print(`{n} {e}`);
+
+    // A use inside a loop is followed by the next iteration, so it borrows;
+    // the use after the loop is the last one.
+    let f = build(2);
+    mut total: u64 = 0;
+    for (let i : "abc") {
+        set total += consume(f);
+    }
+    print(`{total} {consume(f)}`);
+
+    // Each branch has its own last use.
+    let g = build(3);
+    let h = if (total == 9) { consume(g) } else { grow(g).len() };
+    print(`{h}`);
+
+    // A binding moved from inside a branch it was declared in.
+    if (total == 9) {
+        let k = build(5);
+        print(`{consume(k)}`);
+    };
+}
+--- stdout ---
+3 3
+[1, 2, 3, 9, 9, 9, 9]
+ab!!
+{1, 7}
+3 [4, 5, 6]
+3 [7, 8, 9]
+9 3
+3
+3
+--- performance ---
+allocations: 26
+deallocations: 26
+reallocations: 1
+bytes allocated: 1317
+instructions executed: 2920
+binary size: 10544
+  code: 5764
+  data: 475
+  metadata: 4305
+functions:
+  __to_str_i64$arr:
+    calls: 3
+    bytes: 708
+  __to_str_set$i64:
+    calls: 1
+    bytes: 708
+  __to_str_u64:
+    calls: 8
+    bytes: 204
+  aipl_arr_inc:
+    calls: 8
+    bytes: (external)
+  aipl_array_dec:
+    calls: 15
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 8
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 3
+    bytes: (external)
+  aipl_i64_len:
+    calls: 30
+    bytes: (external)
+  aipl_set_contains:
+    calls: 4
+    bytes: (external)
+  aipl_set_insert:
+    calls: 4
+    bytes: (external)
+  aipl_set_union:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 16
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 19
+    bytes: (external)
+  aipl_write_i64:
+    calls: 15
+    bytes: (external)
+  aipl_write_u64:
+    calls: 8
+    bytes: (external)
+  grow$own0:
+    calls: 2
+    bytes: 312
+  main:
+    calls: 1
+    bytes: 3832

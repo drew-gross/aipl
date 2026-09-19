@@ -4050,6 +4050,11 @@ fn compile_program<M: Module>(
         &aipl_mono::effectful_fns(&check_program.items),
     );
 
+    // Last of all, mark each binding's last-use call arguments for moving —
+    // after every pass that reorders pure reads, so a mark reflects the order
+    // codegen will actually evaluate in. See `aipl_mono::move_last_use`.
+    let program = &aipl_mono::move_last_uses_post_mono(program);
+
     let mut ctx = module.make_context();
     let mut fbc = FunctionBuilderContext::new();
     let mut funcs: HashMap<String, FuncInfo> = HashMap::new();
@@ -14636,8 +14641,12 @@ fn compile_call<M: Module>(
         if !p.retained() && !p.owned {
             continue;
         }
+        // Only a fresh temporary moves — into an owned param or a borrowed one
+        // alike. An owned param handed a borrow (a binding whose `__move` the
+        // final marking withdrew, say) is retained like any other argument;
+        // the callee consumes that reference, and the accounting balances.
         let is_builtin = matches!(info.link, FuncLink::Builtin(_));
-        let moved = p.owned || (arg_fresh[idx] && !is_builtin);
+        let moved = arg_fresh[idx] && !is_builtin;
         hand_off_arg(builder, module, builtins, structs, scopes, *v, &p.ty, moved);
     }
     // A composite result (struct or optional) is returned through a caller-
@@ -16801,6 +16810,82 @@ fn compile_call_expr<M: Module>(
                 ARR_DROPFN_OFFSET as i32,
             );
             (builder.ins().iconst(types::I64, 0), ConcreteType::Unit)
+        }
+        Callee::Move => {
+            // Internal (`aipl_mono::move_last_use`): the local binding at its
+            // last use, as a temporary the enclosing call may move. The binding
+            // holds a reference the caller would otherwise retain for the callee
+            // and release at scope exit; handing that reference over as a fresh
+            // tracked value lets the call's hand-off move it, and the two
+            // refcount operations are never emitted.
+            //
+            // What "handing over" means depends on how the binding owns it:
+            //
+            // - An immutable binding names an SSA value whose tracking entry,
+            //   if the value was fresh, sits in the scope the `let` ran in. If
+            //   that is this scope, the entry moves to the top, which is the
+            //   shape `owned_temp_since` recognises. If it is not — the `let`
+            //   is in an enclosing scope and this use in a branch or loop body
+            //   — nothing moves: the entry stays where the scope exit that
+            //   releases it runs on every path, and the use is a borrow as
+            //   before. So is a binding that never owned a reference (`let a =
+            //   b`), which has no entry at all.
+            // - A mutable binding owns its reference through its slot, released
+            //   at scope exit by the slot-track. The value is *taken*: read out,
+            //   and the slot left holding the empty value of its type — a null
+            //   block pointer, or the inline empty `str` — which every release
+            //   treats as nothing to do. That is safe on any path, so a `mut`
+            //   binding moves from inside a branch too. A wide `str` is copied
+            //   out first, since its value is the slot's own bytes.
+            //
+            // Mono only marks heap-typed bindings, so a binding of any other
+            // type reaching here is a plain read.
+            let [arg] = args else {
+                return Err(Error::at(
+                    format!("__move expects 1 arg, got {}", args.len()),
+                    span.clone(),
+                ));
+            };
+            let ExprKind::Ident(name) = &arg.kind else {
+                // Inlining may have put the binding's value here directly; a
+                // fresh value is already what a move wants.
+                return compile_expr(module, builder, cx, scopes, arg);
+            };
+            let binding = env
+                .get(name)
+                .ok_or_else(|| Error::at(format!("unknown identifier {name:?}"), span.clone()))?;
+            match binding {
+                EnvBinding::Immut(v, t) => {
+                    let scope = scopes.last_mut().expect("scope");
+                    if let Some(pos) = scope
+                        .iter()
+                        .rposition(|tr| matches!(tr.owned, Owned::Value(x) if x == *v))
+                    {
+                        let entry = scope.remove(pos);
+                        scope.push(entry);
+                    }
+                    (*v, t.clone())
+                }
+                EnvBinding::Mut(slot, ty_cell, _) => {
+                    let t = ty_cell.borrow().clone();
+                    if is_str_shaped(&t) {
+                        let src = builder.ins().stack_addr(types::I64, *slot, 0);
+                        let v = copy_str_value(builder, src);
+                        let (empty, _) = emit_const_str(module, builder, cx, b"")?;
+                        copy_composite(builder, src, empty, &t, structs);
+                        scopes.last_mut().expect("scope").push(Tracked::new(v, &t));
+                        (v, t)
+                    } else if mut_binding_owns_slot_ref(&t, structs) {
+                        let v = builder.ins().stack_load(types::I64, types::I64, *slot, 0);
+                        let null = builder.ins().iconst(types::I64, 0);
+                        builder.ins().stack_store(types::I64, null, *slot, 0);
+                        scopes.last_mut().expect("scope").push(Tracked::new(v, &t));
+                        (v, t)
+                    } else {
+                        env_load(builder, name, env, span.clone())?
+                    }
+                }
+            }
         }
         Callee::ArrWritable => {
             // Internal (in-place `map`/`filter`/`zip_with`): the moved-in array
@@ -19067,10 +19152,18 @@ fn compile_expr_inner<M: Module>(
             // For a `str`, or for a binding whose slot owns a reference on its
             // current value — a set, a dict, a non-`char[]` array, a boxed type;
             // see `LetMut` and `mut_binding_owns_slot_ref` — snapshot the slot's
-            // current value so it can be released after the store. Read before
-            // evaluating the new value: `set s = f(s)` reads `s` but never writes
-            // it, so the snapshot holds. Scalars keep the plain store.
+            // current value so it can be released after the store. Scalars keep
+            // the plain store.
+            //
+            // The snapshot is read *after* the new value is evaluated: the value
+            // may itself have changed the slot, and what is released must be
+            // what the slot holds at the moment of the store. `set x = f(__move(x))`
+            // is one such value — the move takes the old value out of the slot
+            // and leaves the empty one behind, which a snapshot read beforehand
+            // would release a second time — and a nested `set x = ..` inside the
+            // value is another.
             let arr_slot_ref = mut_binding_owns_slot_ref(&expected_ty, structs);
+            let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
             // `is_str_shaped`, matching `LetMut`: a `char[]` binding's slot owns
             // one reference like a `str`'s, so `set` has to maintain that here
             // too. Testing `is_str_repr` let a `char[]` skip both halves — it
@@ -19081,7 +19174,6 @@ fn compile_expr_inner<M: Module>(
             } else {
                 None
             };
-            let (v, t) = compile_expr(module, builder, cx, scopes, value)?;
             // A bare literal takes the binding's int type.
             let t = flex_int_ty(value, &t, &expected_ty);
             expect_type(&t, &expected_ty, "set", value.span.clone())?;

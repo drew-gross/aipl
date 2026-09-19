@@ -86,21 +86,21 @@ a,b,c b,c
 [[1], [2], [3, 4]]
 [1, 1, 2, 2, 3, 3]
 --- performance ---
-allocations: 40
-deallocations: 40
-reallocations: 3
-bytes allocated: 2117
+allocations: 39
+deallocations: 39
+reallocations: 4
+bytes allocated: 2061
 instructions executed: 4964
-binary size: 13992
-  code: 7376
+binary size: 13912
+  code: 7344
   data: 715
-  metadata: 5901
+  metadata: 5853
 functions:
   __arr_drop_Tree:
-    calls: 3
+    calls: 2
     bytes: 116
   __arr_retain_Tree:
-    calls: 2
+    calls: 1
     bytes: 116
   __rec_drop_Tree:
     calls: 5
@@ -124,7 +124,7 @@ functions:
     calls: 12
     bytes: (external)
   aipl_arr_inc:
-    calls: 12
+    calls: 10
     bytes: (external)
   aipl_arr_reserve:
     calls: 11
@@ -133,7 +133,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_array_dec:
-    calls: 43
+    calls: 41
     bytes: (external)
   aipl_array_new:
     calls: 9
@@ -148,13 +148,13 @@ functions:
     calls: 5
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 17
+    calls: 16
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 2
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 12
+    calls: 11
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 2
@@ -167,7 +167,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3888
+    bytes: 3856
   sum:
     calls: 2
     bytes: 232

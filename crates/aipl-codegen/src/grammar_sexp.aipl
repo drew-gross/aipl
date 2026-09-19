@@ -276,15 +276,15 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 6731
-deallocations: 6731
-reallocations: 918
-bytes allocated: 643934
-instructions executed: 1481632
-binary size: 407120
-  code: 267580
+allocations: 6697
+deallocations: 6697
+reallocations: 935
+bytes allocated: 641894
+instructions executed: 1481860
+binary size: 406400
+  code: 267168
   data: 4892
-  metadata: 134648
+  metadata: 134340
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -323,7 +323,7 @@ functions:
     calls: 165
     bytes: 228
   __arr_drop___m5__Doc:
-    calls: 268
+    calls: 234
     bytes: 116
   __arr_retain___m11__StepResult$SexpKind:
     calls: 0
@@ -362,7 +362,7 @@ functions:
     calls: 195
     bytes: 228
   __arr_retain___m5__Doc:
-    calls: 416
+    calls: 382
     bytes: 116
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 53
@@ -510,7 +510,7 @@ functions:
     bytes: 8488
   __m11__template_scan$SexpKind:
     calls: 0
-    bytes: 2908
+    bytes: 2788
   __m11__template_step$SexpKind:
     calls: 0
     bytes: 444
@@ -528,7 +528,7 @@ functions:
     bytes: 384
   __m13__climb$SexpKind$__m15__Sexp:
     calls: 0
-    bytes: 2992
+    bytes: 2984
   __m13__error_at$SexpKind$__m15__Sexp:
     calls: 4
     bytes: 3048
@@ -585,7 +585,7 @@ functions:
     bytes: 364
   __m13__parse_prepared$SexpKind$__m15__Sexp:
     calls: 31
-    bytes: 6872
+    bytes: 6772
   __m13__pruned$SexpKind$__m15__Sexp:
     calls: 0
     bytes: 1232
@@ -702,7 +702,7 @@ functions:
     bytes: 32
   __m3__group_styles$SexpKind$tail:
     calls: 616
-    bytes: 3100
+    bytes: 3096
   __m3__link$SexpKind$__m15__Sexp:
     calls: 44
     bytes: 2488
@@ -738,19 +738,19 @@ functions:
     bytes: 1732
   __m4__inline_doc$lam$sexp_space:
     calls: 148
-    bytes: 2416
+    bytes: 2408
   __m4__item_key:
     calls: 41
     bytes: 1072
   __m4__pieces$SexpKind$__m15__Sexp$s1$lam$sexp_space:
     calls: 125
-    bytes: 3220
+    bytes: 3208
   __m4__render_cst$SexpKind$__m15__Sexp$s1$lam$sexp_space:
     calls: 12
     bytes: 4380
   __m4__wrapped$lam$sexp_space:
     calls: 18
-    bytes: 6100
+    bytes: 5940
   __m5__col_after:
     calls: 77
     bytes: 628
@@ -824,7 +824,7 @@ functions:
     calls: 3216
     bytes: (external)
   aipl_arr_inc:
-    calls: 27594
+    calls: 27378
     bytes: (external)
   aipl_arr_reserve:
     calls: 4173
@@ -836,16 +836,16 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 38874
+    calls: 38789
     bytes: (external)
   aipl_array_new:
     calls: 1537
     bytes: (external)
   aipl_array_push:
-    calls: 974
+    calls: 940
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1243
+    calls: 1277
     bytes: (external)
   aipl_array_with_cap:
     calls: 146
@@ -857,13 +857,13 @@ functions:
     calls: 2524
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 19385
+    calls: 19300
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 1164
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 16861
+    calls: 16776
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 1164
