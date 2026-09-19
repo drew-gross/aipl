@@ -430,7 +430,12 @@ fn level_text(precs: Prec[], power: u64) -> str {
 # with `nullable: true` are a rule that matches only emptiness, and non-empty
 # ones with it are a rule that may or may not consume — so all three travel
 # together.
-struct First<K: variant> { kinds: #{Case<K>}, texts: #{str}, nullable: bool }
+#
+# Every field defaults to "nothing": `First {}` is the set that begins with no
+# token and cannot match empty — a dead rule, and the seed a fixed point starts
+# from — and a literal names only what a rule contributes (`First { kinds: #{k}
+# }`, `First { nullable: true }`).
+struct First<K: variant> { kinds: #{Case<K>} = #{}, texts: #{str} = #{}, nullable: bool = false }
 
 # Everything either of `self` and `other` can begin with — the union of both
 # sets, nullable when either is: what a choice between the two can begin with,
@@ -484,10 +489,10 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
 # loop reads whole productions and `link` returns a whole grammar, and a `let`
 # binding that only ever has its fields read is a lint.
 fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError {
-    // One empty set per production, and the annotated `[]` is what pins `K`:
-    // nothing in `First { kinds: .., texts: #{}, nullable: false }` mentions it otherwise.
-    let none_yet: #{Case<K>} = #{};
-    mut sets = g.prods.map(|p| First { kinds: none_yet, texts: #{}, nullable: false });
+    // One empty set per production. The annotated binding is what pins `K`:
+    // nothing in `First {}` mentions it.
+    let none_yet: First<K> = First {};
+    mut sets = g.prods.map(|p| none_yet);
     mut going = true;
     while (going) {
         // The round is computed against the previous round's sets, not against
@@ -518,16 +523,13 @@ fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseEr
 # is safe here.
 pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseError {
     match (r) {
-        Term(k) => ok(First { kinds: #{k}, texts: #{}, nullable: false }),
-        // A spelling mentions no `K`, so nothing in the constructor pins
-        // the type parameter — the annotated binding is what does, the
-        // same idiom `grammar.aipl` writes its rules with.
-        Literal(s) => ok(First { kinds: #{}, texts: #{s}, nullable: false }),
+        Term(k) => ok(First { kinds: #{k} }),
+        Literal(s) => ok(First { texts: #{s} }),
         // A sequence begins with its first element — and also with its second,
         // when the first can match nothing, and so on. It is nullable only when
         // every element is.
         Then(rs) => {
-            mut acc: First<K> = First { kinds: #{}, texts: #{}, nullable: true };
+            mut acc: First<K> = First { nullable: true };
             for (let sub : rs) {
                 if (acc.nullable) {
                     // The element's own nullability replaces the running
@@ -544,7 +546,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         // the parse: this is what *could* start a match, not which branch takes
         // it.
         OneOf(rs) => {
-            let none_yet: First<K> = First { kinds: #{}, texts: #{}, nullable: false };
+            let none_yet: First<K> = First {};
             ok(rs.try_map(|sub| rule_first(sub, sets))?.left_fold(none_yet, merge))
         },
         // A separated list begins with its item, and with its separator only
@@ -574,7 +576,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         // A refusal begins with nothing and can match nothing: a sequence
         // that reaches one is an error, not a match, so what follows it in the
         // sequence never contributes.
-        Refuse(..) => ok(First { kinds: #{}, texts: #{}, nullable: false }),
+        Refuse(..) => ok(First {}),
         // `link` rewrites every one of these, and `first_sets` links first —
         // reaching one means `rule_first` was called with a rule from an
         // unlinked grammar, whose references cannot be followed.
@@ -631,7 +633,7 @@ pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
     let num: Case<Tok> = Num;
     let name: Case<Tok> = Name;
     let punct: Case<Tok> = Punct;
-    let f: First<Tok> = First { kinds: #{num}, texts: #{"("}, nullable: false };
+    let f: First<Tok> = First { kinds: #{num}, texts: #{"("} };
 
     // By kind, ignoring the token's text; by spelling, ignoring its kind.
     assert(f.can_start(num, "3"));
@@ -640,11 +642,11 @@ pub fn can_start<K: variant>(self: First<K>, kind: Case<K>, text: str) -> bool {
     assert(!f.can_start(name, "x"));
 
     // A nullable rule accepts anything: it need not consume the token at all.
-    let nullable: First<Tok> = First { kinds: #{}, texts: #{}, nullable: true };
+    let nullable: First<Tok> = First { nullable: true };
     assert(nullable.can_start(name, "x"));
 
     // A rule that begins with nothing and matches nothing accepts nothing.
-    let dead: First<Tok> = First { kinds: #{}, texts: #{}, nullable: false };
+    let dead: First<Tok> = First {};
     assert(!dead.can_start(name, "x"));
 })
 
@@ -664,7 +666,7 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
     `{syms} <empty>`
 }.test({
     let num: Case<Tok> = Num;
-    let f: First<Tok> = First { kinds: #{num}, texts: #{"("}, nullable: false };
+    let f: First<Tok> = First { kinds: #{num}, texts: #{"("} };
     assert(f.show_first() == `Num "("`);
 
     // Nullability is not a member of either set, so it renders after both.
@@ -673,9 +675,9 @@ pub fn show_first<K: variant>(self: First<K>) -> str {
 
     // The two degenerate sets are distinguishable: matching only emptiness is
     // not the same as matching nothing at all.
-    let only_empty: First<Tok> = First { kinds: #{}, texts: #{}, nullable: true };
+    let only_empty: First<Tok> = First { nullable: true };
     assert(only_empty.show_first() == "<empty>");
-    let dead: First<Tok> = First { kinds: #{}, texts: #{}, nullable: false };
+    let dead: First<Tok> = First {};
     assert(dead.show_first() == "");
 })
 
@@ -777,15 +779,15 @@ fn fixture() -> Grammar<Tok, Node> {
     }
 }
 --- performance ---
-allocations: 1898
-deallocations: 1898
+allocations: 1880
+deallocations: 1880
 reallocations: 338
-bytes allocated: 195079
-instructions executed: 239966
-binary size: 168416
-  code: 111056
+bytes allocated: 194503
+instructions executed: 239594
+binary size: 168360
+  code: 111012
   data: 4132
-  metadata: 53228
+  metadata: 53216
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -935,7 +937,7 @@ functions:
     calls: 213
     bytes: (external)
   aipl_arr_inc:
-    calls: 4053
+    calls: 4029
     bytes: (external)
   aipl_arr_reserve:
     calls: 286
@@ -944,7 +946,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 5539
+    calls: 5497
     bytes: (external)
   aipl_array_new:
     calls: 62
@@ -956,7 +958,7 @@ functions:
     calls: 731
     bytes: (external)
   aipl_array_with_cap:
-    calls: 595
+    calls: 577
     bytes: (external)
   aipl_assert:
     calls: 25
@@ -1035,7 +1037,7 @@ functions:
     bytes: 112
   linked_first_sets$Tok$Node:
     calls: 6
-    bytes: 1096
+    bytes: 1052
   main:
     calls: 1
     bytes: 452

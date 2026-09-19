@@ -466,15 +466,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 12869
-deallocations: 12869
+allocations: 12867
+deallocations: 12867
 reallocations: 2085
-bytes allocated: 1273945
-instructions executed: 2597102
-binary size: 423712
-  code: 277656
+bytes allocated: 1273881
+instructions executed: 2597060
+binary size: 423656
+  code: 277612
   data: 6044
-  metadata: 140012
+  metadata: 140000
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -856,7 +856,7 @@ functions:
     bytes: 236
   __m2__linked_first_sets$CalcTok$Calc:
     calls: 1
-    bytes: 1096
+    bytes: 1052
   __m2__merge$CalcTok:
     calls: 24
     bytes: 436
@@ -1032,7 +1032,7 @@ functions:
     calls: 5244
     bytes: (external)
   aipl_arr_inc:
-    calls: 50227
+    calls: 50224
     bytes: (external)
   aipl_arr_reserve:
     calls: 7274
@@ -1047,7 +1047,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 69316
+    calls: 69311
     bytes: (external)
   aipl_array_new:
     calls: 3395
@@ -1059,7 +1059,7 @@ functions:
     calls: 3345
     bytes: (external)
   aipl_array_with_cap:
-    calls: 896
+    calls: 894
     bytes: (external)
   aipl_assert:
     calls: 51

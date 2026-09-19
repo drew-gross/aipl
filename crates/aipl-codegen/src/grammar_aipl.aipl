@@ -4412,15 +4412,15 @@ fn why_prepared(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 1969403
-deallocations: 1969403
+allocations: 1968926
+deallocations: 1968926
 reallocations: 261525
-bytes allocated: 357096415
-instructions executed: 499153695
-binary size: 4977504
-  code: 3258432
+bytes allocated: 357081151
+instructions executed: 499144137
+binary size: 4977496
+  code: 3258436
   data: 51804
-  metadata: 1667268
+  metadata: 1667256
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -5135,7 +5135,7 @@ functions:
     bytes: 236
   __m31__linked_first_sets$__m21__AiplTok$__m1__Ast:
     calls: 9
-    bytes: 7412
+    bytes: 7416
   __m31__merge$__m21__AiplTok:
     calls: 21816
     bytes: 436
@@ -5419,7 +5419,7 @@ functions:
     calls: 1110441
     bytes: (external)
   aipl_arr_inc:
-    calls: 5749281
+    calls: 5748795
     bytes: (external)
   aipl_arr_reserve:
     calls: 1138417
@@ -5437,7 +5437,7 @@ functions:
     calls: 39
     bytes: (external)
   aipl_array_dec:
-    calls: 8621210
+    calls: 8620247
     bytes: (external)
   aipl_array_new:
     calls: 199885
@@ -5449,7 +5449,7 @@ functions:
     calls: 708925
     bytes: (external)
   aipl_array_with_cap:
-    calls: 127066
+    calls: 126589
     bytes: (external)
   aipl_assert:
     calls: 341
