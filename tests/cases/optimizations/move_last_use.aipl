@@ -26,6 +26,17 @@ fn grow(xs: i64[]) -> i64[] {
     ys
 }
 
+# The same shape as a method: a `self` receiver is a parameter like any
+# other, so the receiver of `xs.extended()` moves in the same way — fresh, or
+# a binding at its last use.
+fn extended(self: i64[]) -> i64[] {
+    mut ys = self;
+    for (let i : "ab") {
+        set ys.push(8);
+    }
+    ys
+}
+
 fn stretch(s: str) -> str { s +++ "!" }
 
 fn widen(s: #{i64}) -> #{i64} { s.union(#{7}) }
@@ -85,6 +96,14 @@ fn main() !prints {
         let k = build(5);
         print(`{consume(k)}`);
     };
+
+    // Receivers: a fresh one and a last-use binding move into `extended`'s
+    // owned instance; one read again afterwards is borrowed, and unchanged.
+    print(`{build(1).extended()}`);
+    let m = build(2);
+    print(`{m.extended()}`);
+    let p = build(3);
+    print(`{p.extended()} {p}`);
 }
 --- stdout ---
 3 3
@@ -96,19 +115,22 @@ ab!!
 9 3
 3
 3
+[1, 2, 3, 8, 8]
+[2, 3, 4, 8, 8]
+[3, 4, 5, 8, 8] [3, 4, 5]
 --- performance ---
-allocations: 26
-deallocations: 26
-reallocations: 1
-bytes allocated: 1317
-instructions executed: 2920
-binary size: 10544
-  code: 5764
+allocations: 36
+deallocations: 36
+reallocations: 3
+bytes allocated: 1875
+instructions executed: 5560
+binary size: 12648
+  code: 7160
   data: 475
-  metadata: 4305
+  metadata: 5013
 functions:
   __to_str_i64$arr:
-    calls: 3
+    calls: 7
     bytes: 708
   __to_str_set$i64:
     calls: 1
@@ -117,22 +139,22 @@ functions:
     calls: 8
     bytes: 204
   aipl_arr_inc:
-    calls: 8
+    calls: 12
     bytes: (external)
   aipl_array_dec:
-    calls: 15
+    calls: 26
     bytes: (external)
   aipl_array_push:
-    calls: 1
+    calls: 5
     bytes: (external)
   aipl_array_push_mut:
-    calls: 8
+    calls: 12
     bytes: (external)
   aipl_array_with_cap:
     calls: 3
     bytes: (external)
   aipl_i64_len:
-    calls: 30
+    calls: 66
     bytes: (external)
   aipl_set_contains:
     calls: 4
@@ -147,17 +169,20 @@ functions:
     calls: 16
     bytes: (external)
   aipl_write_bytes:
-    calls: 19
+    calls: 41
     bytes: (external)
   aipl_write_i64:
-    calls: 15
+    calls: 33
     bytes: (external)
   aipl_write_u64:
     calls: 8
     bytes: (external)
+  extended$own0:
+    calls: 2
+    bytes: 312
   grow$own0:
     calls: 2
     bytes: 312
   main:
     calls: 1
-    bytes: 3832
+    bytes: 4916

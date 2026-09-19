@@ -6545,11 +6545,11 @@ impl Mono<'_> {
                         .collect();
                     let (type_args, ret, lit_pinned) =
                         self.instantiate_types(name, &atys, &flexible, span.clone())?;
-                    let owned = if method_style {
-                        Vec::new()
-                    } else {
-                        self.owned_for_call(name, &type_args, args, &atys)
-                    };
+                    // A method-style call is the same call with its receiver
+                    // first, so the receiver can be moved in like any argument;
+                    // `owned_eligible` itself declines the one receiver that
+                    // cannot be, a `mut self`.
+                    let owned = self.owned_for_call(name, &type_args, args, &atys);
                     // Per-parameter specialization: each parameter records whether
                     // it's moved in (`owned`) and whether a `str` argument hit a
                     // `char[]`/`T[]` parameter (`str_kept` — specialize on the str
@@ -6618,11 +6618,8 @@ impl Mono<'_> {
                             }
                         })
                         .collect();
-                    let mut owned = if method_style {
-                        Vec::new()
-                    } else {
-                        self.owned_for_call(name, &[], args, &atys)
-                    };
+                    // Method-style or not — see the generic site above.
+                    let mut owned = self.owned_for_call(name, &[], args, &atys);
                     // A specialized (element/optional) variadic parameter is
                     // borrowed — its prologue retains the value into the rebuilt
                     // sequence — so it never moves in.
@@ -9604,10 +9601,15 @@ fn is_fresh_heap(arg: &Expr, arg_ty: &Type) -> bool {
 
 /// Whether the function with these (concrete) `params`/`return_ty`/`body` can
 /// take ownership of a parameter, returning that parameter's index. The v0
-/// "take ownership and mutate" shape: not `main`, exactly one heap parameter
-/// (not a `self` receiver), a heap return, and the parameter consumed exactly
-/// once as `mut y = p` with `y` exclusive in the rest of the body — so a fresh
-/// argument can be moved in and reused. `name` distinguishes `main`.
+/// "take ownership and mutate" shape: not `main`, exactly one heap parameter,
+/// a heap return, and the parameter consumed exactly once as `mut y = p` with
+/// `y` exclusive in the rest of the body — so a fresh argument can be moved in
+/// and reused. `name` distinguishes `main`.
+///
+/// A `self` receiver qualifies like any other parameter — `xs.grow()` is
+/// `grow(xs)` by the time this runs. A `mut self` one does not: it is a
+/// slot-backed binding with the writeback protocol (`set x = x.f(..)`), not a
+/// value the body rebinds.
 fn owned_eligible(
     name: &str,
     params: &[Param],
@@ -9618,7 +9620,7 @@ fn owned_eligible(
         return None;
     }
     let p = &params[0];
-    if p.name == "self" || !is_heap(&p.ty) {
+    if p.mutable || !is_heap(&p.ty) {
         return None;
     }
     if !return_ty.as_ref().is_some_and(is_heap) {
