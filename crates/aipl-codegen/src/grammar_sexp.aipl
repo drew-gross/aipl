@@ -276,15 +276,15 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 6751
-deallocations: 6751
+allocations: 6731
+deallocations: 6731
 reallocations: 918
-bytes allocated: 644574
-instructions executed: 1481712
-binary size: 407424
-  code: 267824
+bytes allocated: 643934
+instructions executed: 1481632
+binary size: 407120
+  code: 267580
   data: 4892
-  metadata: 134708
+  metadata: 134648
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -588,7 +588,7 @@ functions:
     bytes: 6872
   __m13__pruned$SexpKind$__m15__Sexp:
     calls: 0
-    bytes: 1284
+    bytes: 1232
   __m13__refusal$SexpKind$__m15__Sexp:
     calls: 0
     bytes: 3384
@@ -660,7 +660,7 @@ functions:
     bytes: 236
   __m2__linked_first_sets$SexpKind$__m15__Sexp:
     calls: 1
-    bytes: 1052
+    bytes: 1020
   __m2__merge$SexpKind:
     calls: 9
     bytes: 436
@@ -669,13 +669,13 @@ functions:
     bytes: 5508
   __m2__render_rule$SexpKind:
     calls: 7
-    bytes: 12780
+    bytes: 12756
   __m2__rep_suffix:
     calls: 1
     bytes: 1708
   __m2__rule_first$SexpKind:
     calls: 18
-    bytes: 7580
+    bytes: 7444
   __m2__show_first$SexpKind:
     calls: 2
     bytes: 3836
@@ -848,7 +848,7 @@ functions:
     calls: 1243
     bytes: (external)
   aipl_array_with_cap:
-    calls: 166
+    calls: 146
     bytes: (external)
   aipl_assert:
     calls: 30

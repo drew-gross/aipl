@@ -779,15 +779,15 @@ fn fixture() -> Grammar<Tok, Node> {
     }
 }
 --- performance ---
-allocations: 1880
-deallocations: 1880
+allocations: 1654
+deallocations: 1654
 reallocations: 338
-bytes allocated: 194503
-instructions executed: 239594
-binary size: 168360
-  code: 111012
+bytes allocated: 187271
+instructions executed: 238682
+binary size: 168016
+  code: 110700
   data: 4132
-  metadata: 53216
+  metadata: 53184
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -905,7 +905,7 @@ functions:
     bytes: 72
   __test$can_start:
     calls: 1
-    bytes: 996
+    bytes: 932
   __test$ebnf:
     calls: 1
     bytes: 13736
@@ -917,7 +917,7 @@ functions:
     bytes: 5036
   __test$show_first:
     calls: 1
-    bytes: 1164
+    bytes: 1100
   __test$show_first_sets:
     calls: 1
     bytes: 1840
@@ -937,7 +937,7 @@ functions:
     calls: 213
     bytes: (external)
   aipl_arr_inc:
-    calls: 4029
+    calls: 4025
     bytes: (external)
   aipl_arr_reserve:
     calls: 286
@@ -946,7 +946,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 5497
+    calls: 5493
     bytes: (external)
   aipl_array_new:
     calls: 62
@@ -958,7 +958,7 @@ functions:
     calls: 731
     bytes: (external)
   aipl_array_with_cap:
-    calls: 577
+    calls: 351
     bytes: (external)
   aipl_assert:
     calls: 25
@@ -1037,7 +1037,7 @@ functions:
     bytes: 112
   linked_first_sets$Tok$Node:
     calls: 6
-    bytes: 1052
+    bytes: 1020
   main:
     calls: 1
     bytes: 452
@@ -1049,13 +1049,13 @@ functions:
     bytes: 5508
   render_rule$Tok:
     calls: 101
-    bytes: 12820
+    bytes: 12804
   rep_suffix:
     calls: 14
     bytes: 1708
   rule_first$Tok:
     calls: 235
-    bytes: 7580
+    bytes: 7444
   show_first$Tok:
     calls: 27
     bytes: 3876

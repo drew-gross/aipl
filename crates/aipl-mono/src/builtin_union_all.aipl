@@ -40,15 +40,15 @@ pub fn union_all<T: any>(self: #{T}[]) -> #{T} {
     assert([#{true}, #{false}].union_all() == #{false, true});
 })
 --- performance ---
-allocations: 71
-deallocations: 71
+allocations: 56
+deallocations: 56
 reallocations: 0
-bytes allocated: 3117
-instructions executed: 2924
-binary size: 14192
-  code: 8152
-  data: 684
-  metadata: 5356
+bytes allocated: 2637
+instructions executed: 2842
+binary size: 13808
+  code: 7856
+  data: 716
+  metadata: 5236
 functions:
   __eq_set$bool:
     calls: 1
@@ -64,7 +64,7 @@ functions:
     bytes: 304
   __test$union_all:
     calls: 1
-    bytes: 6168
+    bytes: 5908
   __test$union_all$filter1$own0:
     calls: 1
     bytes: 372
@@ -72,13 +72,13 @@ functions:
     calls: 10
     bytes: (external)
   aipl_arr_inc:
-    calls: 99
+    calls: 89
     bytes: (external)
   aipl_arr_reserve:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 170
+    calls: 158
     bytes: (external)
   aipl_array_new:
     calls: 10
@@ -87,7 +87,7 @@ functions:
     calls: 69
     bytes: (external)
   aipl_array_with_cap:
-    calls: 61
+    calls: 46
     bytes: (external)
   aipl_assert:
     calls: 10
@@ -115,4 +115,4 @@ functions:
     bytes: 108
   union_all$i64:
     calls: 7
-    bytes: 432
+    bytes: 396

@@ -9,15 +9,15 @@ fn eq_set(a: #{i64}, b: #{i64}) -> bool { a == b }.test({
     assert(#{} == #{});
 })
 --- performance ---
-allocations: 10
-deallocations: 10
+allocations: 8
+deallocations: 8
 reallocations: 0
-bytes allocated: 488
-instructions executed: 594
-binary size: 4480
-  code: 2308
-  data: 215
-  metadata: 1957
+bytes allocated: 424
+instructions executed: 584
+binary size: 4456
+  code: 2236
+  data: 249
+  metadata: 1971
 functions:
   __eq_set$i64:
     calls: 4
@@ -27,15 +27,15 @@ functions:
     bytes: 32
   __test$eq_set:
     calls: 1
-    bytes: 1916
+    bytes: 1844
   aipl_array_dec:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_array_push_mut:
     calls: 21
     bytes: (external)
   aipl_array_with_cap:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_assert:
     calls: 5

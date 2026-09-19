@@ -250,10 +250,10 @@ deallocations: 20224
 reallocations: 2922
 bytes allocated: 4355985
 instructions executed: 8621471
-binary size: 5526888
-  code: 3645692
+binary size: 5526800
+  code: 3645640
   data: 11050
-  metadata: 1870146
+  metadata: 1870110
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -983,7 +983,7 @@ functions:
     bytes: 8256
   __m32__pruned$__m23__AiplTok$__m5__Ast:
     calls: 0
-    bytes: 1284
+    bytes: 1232
   __m32__refusal$__m23__AiplTok$__m5__Ast:
     calls: 0
     bytes: 7296

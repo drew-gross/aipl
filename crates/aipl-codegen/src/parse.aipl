@@ -1722,15 +1722,15 @@ fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
     shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
-allocations: 6282
-deallocations: 6282
+allocations: 5993
+deallocations: 5993
 reallocations: 1384
-bytes allocated: 697220
-instructions executed: 1482090
-binary size: 744976
-  code: 450968
+bytes allocated: 687972
+instructions executed: 1480818
+binary size: 744112
+  code: 450388
   data: 12236
-  metadata: 281772
+  metadata: 281488
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1965,13 +1965,13 @@ functions:
     bytes: 236
   __m2__linked_first_sets$Tok$Node:
     calls: 14
-    bytes: 1052
+    bytes: 1020
   __m2__merge$Tok:
     calls: 96
     bytes: 436
   __m2__rule_first$Tok:
     calls: 165
-    bytes: 7580
+    bytes: 7444
   __m3__desugar_opt$Tok:
     calls: 61
     bytes: 580
@@ -2087,7 +2087,7 @@ functions:
     calls: 2018
     bytes: (external)
   aipl_arr_inc:
-    calls: 32255
+    calls: 32208
     bytes: (external)
   aipl_arr_reserve:
     calls: 2242
@@ -2105,7 +2105,7 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 41500
+    calls: 41431
     bytes: (external)
   aipl_array_new:
     calls: 791
@@ -2117,7 +2117,7 @@ functions:
     calls: 2322
     bytes: (external)
   aipl_array_with_cap:
-    calls: 1141
+    calls: 852
     bytes: (external)
   aipl_assert:
     calls: 96
@@ -2244,10 +2244,10 @@ functions:
     bytes: 332
   prepare$Tok$Node:
     calls: 14
-    bytes: 1832
+    bytes: 1796
   pruned$Tok$Node:
     calls: 12
-    bytes: 1284
+    bytes: 1232
   refusal$Tok$Node:
     calls: 10
     bytes: 3872
@@ -2259,7 +2259,7 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 146
-    bytes: 5052
+    bytes: 4788
   rule_nullable$Tok:
     calls: 0
     bytes: 36
@@ -2271,7 +2271,7 @@ functions:
     bytes: 44
   seq_labels$Tok$Node$tail:
     calls: 17
-    bytes: 912
+    bytes: 852
   shown:
     calls: 73
     bytes: 592

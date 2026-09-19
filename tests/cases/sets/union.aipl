@@ -38,15 +38,15 @@ fn empty_union() -> #{i64} { empty_set().union(empty_set()) }.test({
     assert(empty_union().is_empty());
 })
 --- performance ---
-allocations: 17
-deallocations: 17
+allocations: 15
+deallocations: 15
 reallocations: 0
-bytes allocated: 1112
-instructions executed: 1026
-binary size: 7720
-  code: 4448
-  data: 235
-  metadata: 3037
+bytes allocated: 1048
+instructions executed: 1016
+binary size: 7696
+  code: 4384
+  data: 267
+  metadata: 3045
 functions:
   __eq_set$i64:
     calls: 2
@@ -59,7 +59,7 @@ functions:
     bytes: 1196
   __test$empty_union:
     calls: 1
-    bytes: 1272
+    bytes: 1208
   __test$in_place:
     calls: 1
     bytes: 1176
@@ -67,13 +67,13 @@ functions:
     calls: 13
     bytes: (external)
   aipl_array_dec:
-    calls: 30
+    calls: 28
     bytes: (external)
   aipl_array_push_mut:
     calls: 46
     bytes: (external)
   aipl_array_with_cap:
-    calls: 17
+    calls: 15
     bytes: (external)
   aipl_assert:
     calls: 7

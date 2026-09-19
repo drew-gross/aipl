@@ -12351,24 +12351,25 @@ fn emit_const_str<M: Module>(
     }
 
     // Static literal: `[cap][refcount = STATIC][bytes]` in the data section, with
-    // `base` past both header words. Interned by content (see `Literals`), so
-    // a repeated literal shares one object and one content-hash symbol.
+    // `base` past both header words.
     //
     // No NUL: the new representation is length-delimited everywhere, and a
     // buffer no longer promises a terminator.
-    let data_id = cx
-        .literals
-        .borrow_mut()
-        .intern(module, LiteralKind::Str, content, || {
+    let base = static_block(
+        module,
+        builder,
+        cx,
+        LiteralKind::Str,
+        content,
+        str24::BUF_HEADER,
+        || {
             let mut bytes = Vec::with_capacity(str24::BUF_HEADER + content.len());
             bytes.extend_from_slice(&(content.len() as i64).to_le_bytes()); // cap
             bytes.extend_from_slice(&str24::STATIC_REFCOUNT.to_le_bytes());
             bytes.extend_from_slice(content);
-            bytes.into_boxed_slice()
-        })?;
-    let gv = module.declare_data_in_func(data_id, builder.func);
-    let symbol = builder.ins().symbol_value(types::I64, gv);
-    let base = builder.ins().iadd_imm_s(symbol, str24::BUF_HEADER as i64);
+            bytes
+        },
+    )?;
     let meta = builder
         .ins()
         .iconst(types::I64, str24::buffer_meta(content.len()) as i64);
@@ -12417,6 +12418,53 @@ fn const_array_words(elems: &[Expr]) -> Option<(Vec<i64>, ConcreteType)> {
     Some((words, elem))
 }
 
+/// A literal's block as a static data object, and the pointer `header` bytes
+/// into it — the data pointer every refcounted block hands out, with its
+/// `STATIC_REFCOUNT` word behind it. The one emission path for every static
+/// literal: a `str`'s buffer ([`emit_const_str`]), an array's block
+/// ([`emit_const_array`]), and the empty block a set or dict literal shares
+/// with `[]` ([`emit_const_empty`]).
+///
+/// Interned by `key` (see [`Literals`]), so a repeated literal shares one
+/// object and one content-hash symbol; `layout` produces the bytes only for a
+/// key not seen before.
+fn static_block<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    kind: LiteralKind,
+    key: &[u8],
+    header: usize,
+    layout: impl FnOnce() -> Vec<u8>,
+) -> Result<Value, Error> {
+    let data_id = cx
+        .literals
+        .borrow_mut()
+        .intern(module, kind, key, || layout().into_boxed_slice())?;
+    let gv = module.declare_data_in_func(data_id, builder.func);
+    let symbol = builder.ins().symbol_value(types::I64, gv);
+    Ok(builder.ins().iadd_imm_s(symbol, header as i64))
+}
+
+/// The empty collection: `[]`, `#{}` as a set, `#{}` as a dict. One static
+/// block for all three, because they *are* one block — a set and a dict are
+/// array blocks with a different insert — and an empty one has no element
+/// type to lay out. Every writer copies a `STATIC_REFCOUNT` block before
+/// touching it (`aipl_set_insert` and `aipl_dict_insert` both bottom out in
+/// `aipl_array_push_mut`), so the value behaves as a fresh empty collection
+/// in every respect except that reading it costs no allocation — the same
+/// deal a short `str` gets from its inline form.
+///
+/// Like every static literal, the result needs no scope tracking: a release
+/// at scope exit would be a no-op.
+fn emit_const_empty<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+) -> Result<Value, Error> {
+    emit_const_array(module, builder, cx, &[], &ConcreteType::NoneInner)
+}
+
 /// Materialize a constant array literal as a static data object and return its
 /// data pointer — the array value, an untagged `ArrRepr::Heap` pointer into the
 /// binary's data section. The block is laid out exactly as `alloc_array` would
@@ -12431,8 +12479,7 @@ fn const_array_words(elems: &[Expr]) -> Option<(Vec<i64>, ConcreteType)> {
 /// `[0, 3, 5]` doesn't either.
 ///
 /// Like `emit_const_str`, the result needs no scope tracking — a release at
-/// scope exit would be a no-op. Interned by content (see [`Literals`]), so a
-/// repeated literal shares one object and one content-hash symbol.
+/// scope exit would be a no-op.
 ///
 /// `words` are the element values as `const_array_words` gives them; `elem` is
 /// the element type, which fixes the block's layout: an integer is one 8-byte
@@ -12469,15 +12516,15 @@ fn emit_const_array<M: Module>(
         }
     }
     debug_assert_eq!(content.len(), HEADER_SIZE + ARR_ELEMS_OFFSET + cap_bytes);
-    let data_id = cx
-        .literals
-        .borrow_mut()
-        .intern(module, LiteralKind::Array, &content, || {
-            content.clone().into_boxed_slice()
-        })?;
-    let gv = module.declare_data_in_func(data_id, builder.func);
-    let symbol = builder.ins().symbol_value(types::I64, gv);
-    Ok(builder.ins().iadd_imm_s(symbol, HEADER_SIZE as i64))
+    static_block(
+        module,
+        builder,
+        cx,
+        LiteralKind::Array,
+        &content,
+        HEADER_SIZE,
+        || content.clone(),
+    )
 }
 
 /// Build a file-op `Result` value `{tag, value@8}` from a runtime call's raw
@@ -19872,12 +19919,19 @@ fn compile_expr_inner<M: Module>(
             (ptr, arr_ty)
         }
         ExprKind::SetLit(elems, order) => {
+            // An empty `#{}` is `__none__`-typed and coerces to any `T{}` — and
+            // is the same static block an empty `[]` is (`emit_const_empty`),
+            // so it allocates nothing.
+            if elems.is_empty() {
+                let value = emit_const_empty(module, builder, cx)?;
+                let set_ty = ConcreteType::Set(Box::new(ConcreteType::NoneInner), *order);
+                return Ok((value, set_ty));
+            }
             // A set reuses the array heap block. Pre-size to the literal length
             // (an upper bound), then insert each element deduplicated via
             // `aipl_set_insert`. For `str` elements the block carries the array
             // `str` drop/retain helpers (so it frees/retains its strings) and
-            // membership compares by content; scalars need neither. An empty
-            // `#{}` is `__none__`-typed and coerces to any `T{}`.
+            // membership compares by content; scalars need neither.
             let mut elem_ty: Option<ConcreteType> = None;
             let mut vals = Vec::with_capacity(elems.len());
             for el in elems {
@@ -19946,7 +20000,17 @@ fn compile_expr_inner<M: Module>(
             // block carries the pair drop/retain helpers so it frees/retains each
             // pair's key and value; key membership compares by content for `str`.
             // An empty dict literal is `__none__`-typed and coerces to any
-            // `#{K: V}`; `#{}` is the spelling, and it flexes to a set too.
+            // `#{K: V}`; `#{}` is the spelling, and it flexes to a set too — and
+            // it is the static empty block every empty collection is
+            // (`emit_const_empty`), so it allocates nothing.
+            if pairs.is_empty() {
+                let value = emit_const_empty(module, builder, cx)?;
+                let dict_ty = ConcreteType::Dict(
+                    Box::new(ConcreteType::NoneInner),
+                    Box::new(ConcreteType::NoneInner),
+                );
+                return Ok((value, dict_ty));
+            }
             let mut key_ty: Option<ConcreteType> = None;
             let mut val_ty: Option<ConcreteType> = None;
             let mut vals = Vec::with_capacity(pairs.len());

@@ -87,15 +87,15 @@ true
 true
 2
 --- performance ---
-allocations: 37
-deallocations: 37
+allocations: 31
+deallocations: 31
 reallocations: 2
-bytes allocated: 1745
-instructions executed: 1880
-binary size: 11600
-  code: 6920
+bytes allocated: 1553
+instructions executed: 1856
+binary size: 11480
+  code: 6804
   data: 147
-  metadata: 4533
+  metadata: 4529
 functions:
   __dict_drop_str$i64:
     calls: 1
@@ -140,7 +140,7 @@ functions:
     calls: 20
     bytes: (external)
   aipl_array_with_cap:
-    calls: 17
+    calls: 11
     bytes: (external)
   aipl_dict_get:
     calls: 1
@@ -171,7 +171,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 4996
+    bytes: 4880
   total_size:
     calls: 2
     bytes: 232
