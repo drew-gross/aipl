@@ -82,15 +82,15 @@ fn xs_of(ps: Pt[], lo: i64) -> i64[] { ps.filter_map(|p| lo <= p.x, |p| p.x * p.
     assert(xs_of([Pt { x: 1, y: 2 }, Pt { x: 5, y: 3 }], 2) == [15]);
 })
 --- performance ---
-allocations: 33
-deallocations: 33
+allocations: 29
+deallocations: 29
 reallocations: 1
-bytes allocated: 2218
-instructions executed: 6052
-binary size: 15096
-  code: 7504
+bytes allocated: 1962
+instructions executed: 6148
+binary size: 15344
+  code: 7632
   data: 1563
-  metadata: 6029
+  metadata: 6149
 functions:
   __eq_i64$arr:
     calls: 12
@@ -129,19 +129,19 @@ functions:
     calls: 16
     bytes: (external)
   aipl_arr_reserve:
-    calls: 5
+    calls: 9
     bytes: (external)
   aipl_array_dec:
-    calls: 43
+    calls: 39
     bytes: (external)
   aipl_array_new:
     calls: 11
     bytes: (external)
   aipl_array_push_mut:
-    calls: 23
+    calls: 15
     bytes: (external)
   aipl_array_with_cap:
-    calls: 14
+    calls: 10
     bytes: (external)
   aipl_assert:
     calls: 17
@@ -165,8 +165,17 @@ functions:
     calls: 2
     bytes: 304
   from_call:
+    calls: 0
+    bytes: 36
+  from_call$filter_map2$own0:
+    calls: 0
+    bytes: 36
+  from_call$filter_map2$own0$tail:
     calls: 4
-    bytes: 436
+    bytes: 344
+  from_call$tail:
+    calls: 4
+    bytes: 148
   labels:
     calls: 0
     bytes: 32

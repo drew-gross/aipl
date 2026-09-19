@@ -5,6 +5,7 @@ import {
     print,
     push,
     union,
+    value_or,
     wrapping_add as +,
     wrapping_add_assign as +=,
 } from builtins;
@@ -35,6 +36,18 @@ fn extended(self: i64[]) -> i64[] {
         set ys.push(8);
     }
     ys
+}
+
+# Two heap parameters, each consumed into its own `mut`: a call moves in
+# whichever of them it has a fresh (or last-use) argument for, and gets the
+# instance owning exactly those — `merge$own0$own1`, `merge$own0`, or the
+# borrowing `merge`.
+fn merge(a: i64[], b: i64[]) -> i64[] {
+    mut xs = a;
+    mut ys = b;
+    set ys.push(0);
+    set xs.push(ys[0].value_or(0));
+    xs
 }
 
 fn stretch(s: str) -> str { s +++ "!" }
@@ -97,6 +110,13 @@ fn main() !prints {
         print(`{consume(k)}`);
     };
 
+    // Both fresh; fresh and borrowed; a last-use binding and a fresh one.
+    print(`{merge(build(1), build(2))}`);
+    let q = build(3);
+    print(`{merge(build(1), q)} {q}`);
+    let r = build(4);
+    print(`{merge(r, build(5))}`);
+
     // Receivers: a fresh one and a last-use binding move into `extended`'s
     // owned instance; one read again afterwards is borrowed, and unchanged.
     print(`{build(1).extended()}`);
@@ -115,22 +135,25 @@ ab!!
 9 3
 3
 3
+[1, 2, 3, 2]
+[1, 2, 3, 3] [3, 4, 5]
+[4, 5, 6, 5]
 [1, 2, 3, 8, 8]
 [2, 3, 4, 8, 8]
 [3, 4, 5, 8, 8] [3, 4, 5]
 --- performance ---
-allocations: 36
-deallocations: 36
+allocations: 48
+deallocations: 48
 reallocations: 3
-bytes allocated: 1875
-instructions executed: 5560
-binary size: 12648
-  code: 7160
+bytes allocated: 2544
+instructions executed: 7660
+binary size: 14992
+  code: 8688
   data: 475
-  metadata: 5013
+  metadata: 5829
 functions:
   __to_str_i64$arr:
-    calls: 7
+    calls: 11
     bytes: 708
   __to_str_set$i64:
     calls: 1
@@ -139,22 +162,22 @@ functions:
     calls: 8
     bytes: 204
   aipl_arr_inc:
-    calls: 12
+    calls: 16
     bytes: (external)
   aipl_array_dec:
-    calls: 26
+    calls: 42
     bytes: (external)
   aipl_array_push:
-    calls: 5
+    calls: 11
     bytes: (external)
   aipl_array_push_mut:
-    calls: 12
+    calls: 16
     bytes: (external)
   aipl_array_with_cap:
     calls: 3
     bytes: (external)
   aipl_i64_len:
-    calls: 66
+    calls: 96
     bytes: (external)
   aipl_set_contains:
     calls: 4
@@ -169,10 +192,10 @@ functions:
     calls: 16
     bytes: (external)
   aipl_write_bytes:
-    calls: 41
+    calls: 60
     bytes: (external)
   aipl_write_i64:
-    calls: 33
+    calls: 48
     bytes: (external)
   aipl_write_u64:
     calls: 8
@@ -185,4 +208,7 @@ functions:
     bytes: 312
   main:
     calls: 1
-    bytes: 4916
+    bytes: 6100
+  merge$own0$own1:
+    calls: 2
+    bytes: 344

@@ -4646,8 +4646,8 @@ impl Mono<'_> {
     }
 
     /// Which parameters the call to `template` (with the given concrete
-    /// `type_args`) takes ownership of: a parameter the template is
-    /// owned-eligible for, whose argument is a fresh, uniquely-owned heap value.
+    /// `type_args`) takes ownership of: every parameter the template is
+    /// owned-eligible for whose argument is a fresh, uniquely-owned heap value.
     /// Empty unless an owned instance is warranted.
     fn owned_for_call(
         &self,
@@ -4657,10 +4657,10 @@ impl Mono<'_> {
         arg_tys: &[Type],
     ) -> Vec<usize> {
         let (params, return_ty, body) = self.concrete_signature(template, type_args);
-        match owned_eligible(template, &params, &return_ty, &body) {
-            Some(i) if i < args.len() && is_fresh_heap(&args[i], &arg_tys[i]) => vec![i],
-            _ => vec![],
-        }
+        owned_eligible(template, &params, &return_ty, &body)
+            .into_iter()
+            .filter(|&i| i < args.len() && is_fresh_heap(&args[i], &arg_tys[i]))
+            .collect()
     }
 
     /// The concrete signature (params, return type, body) of `template` under
@@ -9596,15 +9596,35 @@ fn slot_fits(from: &Type, to: &Type) -> bool {
 /// without going through a guard (`aipl_array_push_mut`, `aipl_arr_reserve`,
 /// [`writable`]) that copies a block it must not write.
 fn is_fresh_heap(arg: &Expr, arg_ty: &Type) -> bool {
-    is_heap(arg_ty) && matches!(&arg.kind, ExprKind::ArrayLit(_) | ExprKind::Call(_, _, _))
+    is_heap(arg_ty) && fresh_tail(arg)
 }
 
-/// Whether the function with these (concrete) `params`/`return_ty`/`body` can
-/// take ownership of a parameter, returning that parameter's index. The v0
-/// "take ownership and mutate" shape: not `main`, exactly one heap parameter,
-/// a heap return, and the parameter consumed exactly once as `mut y = p` with
-/// `y` exclusive in the rest of the body — so a fresh argument can be moved in
-/// and reused. `name` distinguishes `main`.
+/// Whether `e`'s value is a fresh heap value: a literal or a call, possibly at
+/// the end of a chain of statements — which is what an inlined call becomes
+/// (`let $n = 1; [$n, $n]` for `build(1)`), and what codegen tracks as a fresh
+/// temporary all the same, since the chain's value is its tail's.
+fn fresh_tail(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::ArrayLit(_) | ExprKind::Call(_, _, _) => true,
+        ExprKind::Let(_, _, _, body)
+        | ExprKind::LetMut(_, _, _, body)
+        | ExprKind::Seq(_, body)
+        | ExprKind::Assign(_, _, body) => fresh_tail(body),
+        _ => false,
+    }
+}
+
+/// Which parameters of the function with these (concrete)
+/// `params`/`return_ty`/`body` it can take ownership of, by index. The "take
+/// ownership and mutate" shape, decided per parameter: a heap parameter
+/// consumed exactly once as `mut y = p` with `y` exclusive in the rest of the
+/// body — so a fresh argument can be moved in and reused. The function must
+/// not be `main` and must return a heap value. `name` distinguishes `main`.
+///
+/// Every parameter is judged on its own, so a function may own several
+/// (`merge(a, b)` with `mut xs = a; mut ys = b;`), and a call moves in
+/// whichever of them it has a fresh argument for — see `owned_for_call`, and
+/// `enqueue`, which mangles an instance per owned set.
 ///
 /// A `self` receiver qualifies like any other parameter — `xs.grow()` is
 /// `grow(xs)` by the time this runs. A `mut self` one does not: it is a
@@ -9615,22 +9635,20 @@ fn owned_eligible(
     params: &[Param],
     return_ty: &Option<Type>,
     body: &Expr,
-) -> Option<usize> {
-    if name == "main" || params.len() != 1 {
-        return None;
+) -> Vec<usize> {
+    if name == "main" || !return_ty.as_ref().is_some_and(is_heap) {
+        return Vec::new();
     }
-    let p = &params[0];
-    if p.mutable || !is_heap(&p.ty) {
-        return None;
-    }
-    if !return_ty.as_ref().is_some_and(is_heap) {
-        return None;
-    }
-    if count_ident(&p.name, body) != 1 {
-        return None;
-    }
-    let (y, body_after) = find_move_into(&p.name, body)?;
-    binding_is_exclusive(y, body_after, true).then_some(0)
+    params
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| !p.mutable && is_heap(&p.ty) && count_ident(&p.name, body) == 1)
+        .filter(|(_, p)| {
+            find_move_into(&p.name, body)
+                .is_some_and(|(y, body_after)| binding_is_exclusive(y, body_after, true))
+        })
+        .map(|(i, _)| i)
+        .collect()
 }
 
 // ---- Borrow-only parameter analysis (retain elision) ------------------------
