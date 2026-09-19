@@ -10,6 +10,7 @@
 //! file right after parsing (the markers come from the lexer via
 //! `parse_with_allows`), so lints fire before type checking.
 
+mod arm_block_value;
 mod compound_assign;
 mod destructure_binding;
 mod destructure_param;
@@ -44,6 +45,7 @@ use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::{each_expr, each_subexpr, Error, Span};
 use std::collections::{HashMap, HashSet};
 
+use self::arm_block_value::arm_block_value;
 use self::compound_assign::{compound_assign, matching_compound};
 use self::destructure_binding::destructure_binding;
 use self::destructure_param::destructure_param;
@@ -102,6 +104,8 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     let find_map = find_map_names(program);
     each_expr(program, &mut |e| map_find_if_some(e, &find_map, &mut hits));
     each_expr(program, &mut |e| match_is_some_and(e, &mut hits));
+    // A match arm whose block is only its value — braces around nothing.
+    each_expr(program, &mut |e| arm_block_value(e, src, &mut hits));
     each_expr(program, &mut |e| match_value_or(e, src, &mut hits));
     each_expr(program, &mut |e| match_map_value_or(e, src, &mut hits));
     // Not `each_expr`: this lint needs to know whether the *enclosing* function

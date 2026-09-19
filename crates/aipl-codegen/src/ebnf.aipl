@@ -516,7 +516,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         // A spelling mentions no `K`, so nothing in the constructor pins
         // the type parameter — the annotated binding is what does, the
         // same idiom `grammar.aipl` writes its rules with.
-        Literal(s) => { ok(First { kinds: #{}, texts: #{s}, nullable: false }) },
+        Literal(s) => ok(First { kinds: #{}, texts: #{s}, nullable: false }),
         // A sequence begins with its first element — and also with its second,
         // when the first can match nothing, and so on. It is nullable only when
         // every element is.
@@ -568,7 +568,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         // A refusal begins with nothing and can match nothing: a sequence
         // that reaches one is an error, not a match, so what follows it in the
         // sequence never contributes.
-        Refuse(..) => { ok(First { kinds: #{}, texts: #{}, nullable: false }) },
+        Refuse(..) => ok(First { kinds: #{}, texts: #{}, nullable: false }),
         // `link` rewrites every one of these, and `first_sets` links first —
         // reaching one means `rule_first` was called with a rule from an
         // unlinked grammar, whose references cannot be followed.

@@ -74,6 +74,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  bind_fields_mut looks like it can be a zip->reverse->for, also maybe mutable can default to false and then bind_fields doens't need to exist (or only it exists)
   First from ebnf should have defaults so usages can be more concise
   refuse should accept a Msg | Fn for the error
   The Rust "has no bare form" gate is now dead code and can be eliminated
@@ -318,7 +319,6 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 format:
-  Literal(s) => { ok(First { kinds: #{}, texts: #{s}, nullable: false }) , <--- this should drop the brackets
   should format like this:
     assert(a == b(
       loooooooooooooooooooooooooooooooooooooooooooooooo)
@@ -326,6 +326,8 @@ format:
 
 
 lint:
+  x.starts_with("'") should accept T+ i.e. char or str, and lint str constants into char constants
+  lint x.value_or(<any expr except "..">) == ".." into x = some("..")
   lint while (i < n) i++ loops to range loops
   lint to map->sum (with a fusion)
     fn total(self: Node) -> i64 {

@@ -1998,21 +1998,37 @@ fn wrap_stmt(stmt: Stmt, acc: Expr) -> Expr {
             let span = join_spans(ret_span, acc.span);
             seq(at(Return(value), ret_span), acc, span)
         },
-        SFor(name, name_span, index, iterable, body, for_span) => {
-            for_chain(name, name_span, index, iterable, body, for_span, acc)
-        },
+        SFor(name, name_span, index, iterable, body, for_span) => for_chain(
+            name,
+            name_span,
+            index,
+            iterable,
+            body,
+            for_span,
+            acc,
+        ),
         SLetTuple(names, value, tup_span) => {
             let tmp = `__tpat${tup_span.start}`;
             let inner = bind_fields(names, tmp, tup_span, acc, tuple_slot_names(names));
             let span = join_spans(tup_span, inner.span);
             at(Let(tmp, none, value, inner), span)
         },
-        SLetStruct(struct_name, fields, value, span) => {
-            destructure_struct(struct_name, fields, value, span, acc, false)
-        },
-        SMutStruct(struct_name, fields, value, span) => {
-            destructure_struct(struct_name, fields, value, span, acc, true)
-        },
+        SLetStruct(struct_name, fields, value, span) => destructure_struct(
+            struct_name,
+            fields,
+            value,
+            span,
+            acc,
+            false,
+        ),
+        SMutStruct(struct_name, fields, value, span) => destructure_struct(
+            struct_name,
+            fields,
+            value,
+            span,
+            acc,
+            true,
+        ),
     }
 }
 

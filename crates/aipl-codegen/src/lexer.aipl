@@ -588,9 +588,9 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
         Delimited(..) => StrVal(text[1..text.len() - 1]),
         // The two bracketing matchers strip the same way — their delimiters are
         // the only difference, and the arm reads both out of the case it matched.
-        Between(open, close) | Nested(open, close) => {
-            StrVal(text[open.len()..text.len() - close.len()])
-        },
+        Between(open, close) | Nested(open, close) => StrVal(
+            text[open.len()..text.len() - close.len()],
+        ),
         CharRun(..)
         | OneChar(..)
         | Exact(..)
