@@ -510,11 +510,13 @@ impl Loader {
                 // so the duplicate-import conflict check below covers them too
                 // (including an operator imported both from builtins and as a
                 // function — its view slot is already taken by the path import
-                // resolved above). A builtin operator maps its spelling to
-                // itself: there's no callable canonical, just a marker that
-                // `rewrite_expr` keeps as a primitive `Binop`. An operator
-                // aliased to a user function maps to that function instead and
-                // is dispatched to a call.
+                // resolved above). An operator aliased to a user function maps
+                // to that function instead and is dispatched to a call.
+                //
+                // A *bare* operator spelling (`import { + }`) never reaches
+                // here: the grammar refuses it during the parse, with the
+                // aliases to write instead (`bare_operator_import` in
+                // `grammar_aipl.aipl`), so `n.name` is always a name.
                 let canonical =
                     if let Some((_op, canonical_impl)) = aipl_syntax::operator_builtin(&n.name) {
                         // A named operator builtin can be aliased to any operator
@@ -532,35 +534,6 @@ impl Loader {
                         // `concat as +++`, because gating looks up the operator's
                         // spelling in the view and a bare import adds only its name.
                         canonical_impl.to_string()
-                    } else if aipl_syntax::is_operator_name(&n.name) {
-                        // No operator has a bare form: every one is imported as
-                        // `name as op`. Where a flavor choice exists (`+` is
-                        // wrapping or saturating) that spelling is what records the
-                        // choice; where it does not, the uniformity is the point —
-                        // an import list names every operator a file uses the same
-                        // way, so a reader never has to know which operators happen
-                        // to be ambiguous.
-                        let forms = aipl_syntax::operator_named_forms(&n.name);
-                        if !forms.is_empty() {
-                            let options = forms
-                                .iter()
-                                .map(|f| format!("`{f} as {}`", n.name))
-                                .collect::<Vec<_>>()
-                                .join(" or ");
-                            let pick = if forms.len() > 1 {
-                                "pick a semantics and import it aliased, e.g. "
-                            } else {
-                                "import it aliased: "
-                            };
-                            return Err(Error::at(
-                                format!(
-                                "the {:?} operator has no bare form; {pick}{options} from builtins",
-                                n.name
-                            ),
-                                n.span.clone(),
-                            ));
-                        }
-                        n.name.clone()
                     } else if let Some(builtin) = Callee::importable(&n.name) {
                         // Reserved for the builtins' own implementations until
                         // it is decided whether programs get it.

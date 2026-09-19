@@ -2149,10 +2149,14 @@ pub fn operator_arity(canonical: &Callee) -> Option<usize> {
     }
 }
 
-/// The named builtins that provide `op`, in [`OPERATOR_BUILTINS`] order.
+/// The named builtins that provide `op`, in [`OPERATOR_BUILTINS`] order —
+/// non-empty exactly when `op` is an operator spelling, which is how the lints
+/// tell an operator call from a named one.
 ///
-/// Every operator has at least one, which is what lets the loader refuse a bare
-/// operator import uniformly and name the alias to write instead.
+/// A bare operator *import* is refused before the loader sees it, by the
+/// parser (`bare_operator_import` in `grammar_aipl.aipl`, reading the same
+/// pairing from the dogfooded `operator_named_forms.aipl`), so nothing here
+/// generates that message any more.
 pub fn operator_named_forms(op: &str) -> Vec<&'static str> {
     OPERATOR_BUILTINS
         .iter()

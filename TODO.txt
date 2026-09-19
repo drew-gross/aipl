@@ -41,6 +41,7 @@ type checker:
     c) ensure all untyped or flex typed items exist in the representation that all optimizations including inlining operate on. This may require a new intermediate representation.
 
 inlining:
+  aipl_test_summary isn't inlined in single-test files, why?
   inline when it would create a known constructor elimination opportunity
   functions where inlining creates large code sinking opportunities should be inlined (or partially inlined i.e. just the branch)
   inline no-arg-no-effect functions into data section
@@ -74,9 +75,9 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  make Rule =='able again, maybe by separating the refuse renderers from the rule structure? Since the problem is that it contains a function. Or maybe make functions == comparable?
   bind_fields_mut looks like it can be a zip->reverse->for, also maybe mutable can default to false and then bind_fields doens't need to exist (or only it exists)
   First from ebnf should have defaults so usages can be more concise
-  The Rust "has no bare form" gate is now dead code and can be eliminated
   trailing comment attaching
   now that all operators have names, the import parser doesn't need to support importing operators without names
   unify tag values for strings and arrays

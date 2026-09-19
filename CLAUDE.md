@@ -342,12 +342,20 @@ would both answer `Add` and the flavor would be lost.
 | `+++` | `concat` | `\|\|` | `logical_or` |
 | `!` | `logical_not` | | |
 
-`OPERATOR_BUILTINS` (`crates/aipl-syntax/src/lib.rs`) is the single place these
-are declared — extend it rather than adding a per-operator special case. The
-loader's refusal message is generated from that table, so a new operator or
-flavor keeps its own diagnostic correct: one named form yields
+`OPERATOR_BUILTINS` (`crates/aipl-syntax/src/lib.rs`) is where the compiler
+declares these — extend it rather than adding a per-operator special case. The
+dogfooded side reads the same pairing from `operator_named_forms.aipl`
+(`crates/aipl-codegen/src/`), kept in the same order so the two diff line for
+line; `is_operator_name` is that table asked whether it has an answer. A new
+operator or flavor goes in both.
+
+A bare operator import (`import { + }`) is refused by the **parser**, not the
+loader: `import_name` in `grammar_aipl.aipl` matches the operator and then
+`Refuse`s it, and the message is generated from the AIPL table, so a new
+operator or flavor keeps its own diagnostic correct: one named form yields
 "import it aliased: `equal as ==`", several yields "pick a semantics, e.g.
-`wrapping_add as +` or `saturating_add as +`".
+`wrapping_add as +` or `saturating_add as +`". Nothing downstream of the parse
+ever sees a bare operator in an import list.
 
 The loader gates operator *usage* per file against its imports (unimported →
 compile error). So every new `.aipl` (test case, example, embedded compiler
