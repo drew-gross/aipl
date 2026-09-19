@@ -470,11 +470,11 @@ allocations: 12869
 deallocations: 12869
 reallocations: 2085
 bytes allocated: 1273945
-instructions executed: 2597336
-binary size: 421104
-  code: 275644
+instructions executed: 2597320
+binary size: 420968
+  code: 275572
   data: 6044
-  metadata: 139416
+  metadata: 139352
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -871,7 +871,7 @@ functions:
     bytes: 1708
   __m2__rule_first$CalcTok:
     calls: 40
-    bytes: 7620
+    bytes: 7548
   __m2__show_first$CalcTok:
     calls: 3
     bytes: 3836
@@ -1032,7 +1032,7 @@ functions:
     calls: 5244
     bytes: (external)
   aipl_arr_inc:
-    calls: 50344
+    calls: 50336
     bytes: (external)
   aipl_arr_reserve:
     calls: 7274
@@ -1047,7 +1047,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 69433
+    calls: 69425
     bytes: (external)
   aipl_array_new:
     calls: 3395

@@ -1688,11 +1688,11 @@ allocations: 6179
 deallocations: 6179
 reallocations: 1357
 bytes allocated: 680196
-instructions executed: 1449391
-binary size: 719672
-  code: 435424
+instructions executed: 1449349
+binary size: 719536
+  code: 435352
   data: 11836
-  metadata: 272412
+  metadata: 272348
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1933,7 +1933,7 @@ functions:
     bytes: 436
   __m2__rule_first$Tok:
     calls: 165
-    bytes: 7620
+    bytes: 7548
   __m3__desugar_opt$Tok:
     calls: 61
     bytes: 580
@@ -2049,7 +2049,7 @@ functions:
     calls: 1983
     bytes: (external)
   aipl_arr_inc:
-    calls: 31931
+    calls: 31910
     bytes: (external)
   aipl_arr_reserve:
     calls: 2210
@@ -2064,7 +2064,7 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 41018
+    calls: 40997
     bytes: (external)
   aipl_array_new:
     calls: 778

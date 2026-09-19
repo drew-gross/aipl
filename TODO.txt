@@ -74,6 +74,9 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  First from ebnf should have defaults so usages can be more concise
+  refuse should accept a Msg | Fn for the error
+  The Rust "has no bare form" gate is now dead code and can be eliminated
   trailing comment attaching
   now that all operators have names, the import parser doesn't need to support importing operators without names
   unify tag values for strings and arrays
@@ -313,6 +316,14 @@ utilities:
 
 skills:
   make an "add lint" skill that describes how to lint against a reimplementation
+
+format:
+  Literal(s) => { ok(First { kinds: #{}, texts: #{s}, nullable: false }) , <--- this should drop the brackets
+  should format like this:
+    assert(a == b(
+      loooooooooooooooooooooooooooooooooooooooooooooooo)
+    ))
+
 
 lint:
   lint while (i < n) i++ loops to range loops

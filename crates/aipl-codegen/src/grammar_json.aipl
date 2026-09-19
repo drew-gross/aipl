@@ -522,11 +522,11 @@ allocations: 22327
 deallocations: 22327
 reallocations: 3250
 bytes allocated: 2839755
-instructions executed: 5454668
-binary size: 459832
-  code: 300176
+instructions executed: 5454632
+binary size: 459696
+  code: 300104
   data: 8652
-  metadata: 151004
+  metadata: 150940
 functions:
   __arr_drop_Json:
     calls: 125
@@ -920,7 +920,7 @@ functions:
     bytes: 1708
   __m2__rule_first$JsonTok:
     calls: 72
-    bytes: 7620
+    bytes: 7548
   __m2__show_first$JsonTok:
     calls: 8
     bytes: 3916
@@ -1075,7 +1075,7 @@ functions:
     calls: 9823
     bytes: (external)
   aipl_arr_inc:
-    calls: 87900
+    calls: 87882
     bytes: (external)
   aipl_arr_reserve:
     calls: 12652
@@ -1090,7 +1090,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 122411
+    calls: 122393
     bytes: (external)
   aipl_array_new:
     calls: 3996
