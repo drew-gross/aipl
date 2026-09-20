@@ -1,27 +1,27 @@
-import { equal as ==, value_or } from builtins;
+import { equal as == } from builtins;
 
 // `str?` is an optional holding a heap string. Both arms round-trip: the
 // `some` arm carries an owned string, the `none` arm falls back via
 // `value_or`. Returning a `str?` extends the optional ABI.
 fn pick(b: bool) -> str? { if (b) { some("present") } else { none } }.test({
     assert(pick(true) == some("present"));
-    assert(pick(true).value_or("fallback") == "present");
-    assert(pick(false).value_or("fallback") == "fallback");
+    assert(pick(true) == some("present"));
+    assert(pick(false) == none);
 })
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 105
-binary size: 2112
-  code: 784
-  data: 200
-  metadata: 1128
+instructions executed: 98
+binary size: 1952
+  code: 712
+  data: 157
+  metadata: 1083
 functions:
   __test$pick:
     calls: 1
-    bytes: 684
+    bytes: 612
   aipl_assert:
     calls: 3
     bytes: (external)

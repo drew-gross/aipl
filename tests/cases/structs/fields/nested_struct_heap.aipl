@@ -1,4 +1,4 @@
-import { concat as +++, equal as ==, value_or } from builtins;
+import { concat as +++, equal as == } from builtins;
 
 // A nested struct that holds heap data: the inner `Name` owns two `str`s (built
 // by concatenation, so they're genuinely heap-allocated, not static literals),
@@ -16,22 +16,22 @@ fn full_first(Contact { name }) -> str { name.first }.test({
     };
     assert(full_first(c) == "Ada"); // heap str through two struct levels
     assert(c.name.last == "Lovelace");
-    assert(c.nick.value_or("(none)") == "Countess"); // optional field on outer
+    assert(c.nick == some("Countess")); // optional field on outer
 })
 --- performance ---
 allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 264
-instructions executed: 275
-binary size: 3072
-  code: 1428
-  data: 170
-  metadata: 1474
+instructions executed: 268
+binary size: 2928
+  code: 1320
+  data: 157
+  metadata: 1451
 functions:
   __test$full_first:
     calls: 1
-    bytes: 1320
+    bytes: 1212
   aipl_assert:
     calls: 3
     bytes: (external)

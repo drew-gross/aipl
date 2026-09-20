@@ -5,7 +5,7 @@ import { equal as ==, len, value_or, wrapping_add as + } from builtins;
 // array; the `none` arm falls back to an empty one.
 fn pick(b: bool) -> str[]? { if (b) { some(["x", "y", "z"]) } else { none } }.test({
     let present = pick(true).value_or([]);
-    assert(present[1].value_or("?") == "y");
+    assert(present[1] == some("y"));
     let absent = pick(false).value_or([]);
     assert(len(present) + len(absent) == 3); // 3 + 0
 })
@@ -14,15 +14,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 104
-instructions executed: 197
-binary size: 3128
-  code: 1460
-  data: 146
-  metadata: 1522
+instructions executed: 190
+binary size: 3024
+  code: 1384
+  data: 138
+  metadata: 1502
 functions:
   __test$pick:
     calls: 1
-    bytes: 1360
+    bytes: 1284
   aipl_arr_inc:
     calls: 1
     bytes: (external)

@@ -3125,10 +3125,10 @@ deallocations: 95194
 reallocations: 15954
 bytes allocated: 19428244
 instructions executed: 48348855
-binary size: 14378392
-  code: 9220844
+binary size: 14374440
+  code: 9218172
   data: 33548
-  metadata: 5124000
+  metadata: 5122720
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -4032,7 +4032,7 @@ functions:
     bytes: 1644
   __m7__dotted_assign:
     calls: 0
-    bytes: 18312
+    bytes: 18140
   __m7__else_or_unit:
     calls: 0
     bytes: 13380
@@ -4065,7 +4065,7 @@ functions:
     bytes: 652
   __m7__lower_arg:
     calls: 0
-    bytes: 23364
+    bytes: 23284
   __m7__lower_args:
     calls: 0
     bytes: 6776
@@ -4083,7 +4083,7 @@ functions:
     bytes: 14740
   __m7__lower_binding:
     calls: 0
-    bytes: 55168
+    bytes: 54520
   __m7__lower_block:
     calls: 0
     bytes: 8084
@@ -4098,13 +4098,13 @@ functions:
     bytes: 6776
   __m7__lower_case_param:
     calls: 0
-    bytes: 29588
+    bytes: 29500
   __m7__lower_construct_fields:
     calls: 0
-    bytes: 27420
+    bytes: 27228
   __m7__lower_ctor_payload:
     calls: 0
-    bytes: 14164
+    bytes: 14044
   __m7__lower_effect:
     calls: 0
     bytes: 952
@@ -4131,10 +4131,10 @@ functions:
     bytes: 29396
   __m7__lower_for_stmt:
     calls: 0
-    bytes: 33104
+    bytes: 32764
   __m7__lower_function:
     calls: 0
-    bytes: 56068
+    bytes: 55940
   __m7__lower_if:
     calls: 0
     bytes: 19088
@@ -4143,7 +4143,7 @@ functions:
     bytes: 15640
   __m7__lower_import_name:
     calls: 0
-    bytes: 30628
+    bytes: 30420
   __m7__lower_item:
     calls: 0
     bytes: 68440
@@ -4152,7 +4152,7 @@ functions:
     bytes: 6940
   __m7__lower_lambda:
     calls: 0
-    bytes: 14748
+    bytes: 14612
   __m7__lower_lambda_param:
     calls: 0
     bytes: 22300
@@ -4179,7 +4179,7 @@ functions:
     bytes: 216
   __m7__lower_param:
     calls: 0
-    bytes: 30952
+    bytes: 30504
   __m7__lower_pattern:
     calls: 0
     bytes: 71236
@@ -4260,7 +4260,7 @@ functions:
     bytes: 376
   __m7__qualified_name:
     calls: 0
-    bytes: 1328
+    bytes: 1216
   __m7__repair_block_value:
     calls: 0
     bytes: 12932

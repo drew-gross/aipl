@@ -320,14 +320,12 @@ skills:
 format:
   should format like this:
     assert(a == b(
-      loooooooooooooooooooooooooooooooooooooooooooooooo)
+      loooooooooooooooooooooooooooooooooooooooooooooooo()
     ))
 
-
 lint:
-  lint that in an assert, when a value is compared directly against ok(...), use ? instead
+  lint that in an assert, when a value is compared directly against some(...)/ok(...), use ? instead (also support ? for optionals in tests)
   x.starts_with("'") should accept T+ i.e. char or str, and lint str constants into char constants
-  lint x.value_or(<any expr except "..">) == ".." into x = some("..")
   lint while (i < n) i++ loops to range loops
   lint to map->sum (with a fusion)
     fn total(self: Node) -> i64 {
@@ -345,7 +343,6 @@ lint:
     would print advice that doesn't parse. Fix is either a placeholder ("<the
     optional>.value_or_err(..)") or widening `spans_its_text` (lint.rs) to the shapes
     whose spans are exact. Predates the return-form arm; both arms have it.
-  self[end].value_or(' ') == '.' should be self[end] == some('.')
   for (let x : xs) { if (p(x)) { set out.push(f(x)) } } should lint to a filter->map
   lint against set literals that contain duplicates
   set out = [..out, o]; should lint to set out.push(a);

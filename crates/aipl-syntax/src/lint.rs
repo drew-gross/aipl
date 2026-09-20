@@ -40,6 +40,7 @@ mod slice_whole;
 mod step_by_one;
 mod union_loop_union_all;
 mod unused_imports;
+mod value_or_compare;
 
 use crate::ast::{Expr, ExprKind, ImportSource, Item, Program};
 use crate::{each_expr, each_subexpr, Error, Span};
@@ -75,6 +76,7 @@ use self::slice_whole::slice_whole;
 use self::step_by_one::{matching_steps, step_by_one};
 use self::union_loop_union_all::{union_loop_union_all, union_names};
 use self::unused_imports::unused_imports;
+use self::value_or_compare::{value_or_compare, value_or_compare_names};
 
 /// Run every lint over `program` — function bodies, `.test` blocks, and
 /// keyword-parameter / struct-field default expressions — then drop the
@@ -198,6 +200,11 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     // `len_zero_cmp`, which also says whether `is_nonempty` needs importing.
     let cmp = len_zero_cmp(program);
     each_expr(program, &mut |e| len_gt_zero(e, src, &cmp, &mut hits));
+    // `x.value_or(d) == lit` — same import caution for `==`/`!=`.
+    let filled = value_or_compare_names(program);
+    each_expr(program, &mut |e| {
+        value_or_compare(e, src, &filled, &mut hits)
+    });
     // The mirror of the above: `<`/`>` against zero go to `is_nonempty`, `== 0`
     // and the negated predicate go to `is_empty`. Same import caution.
     let empties = empty_names(program);

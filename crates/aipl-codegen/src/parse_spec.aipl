@@ -106,10 +106,10 @@ pub fn parse_spec(src: str) -> Spec!str {
     // Companions, both flavors.
     let Spec { extra_files } = parse_spec("x\n--- file: m.aipl ---\nbody\n")?;
     assert(extra_files.len() == 1);
-    assert(extra_files[0].map(|f| f.path).value_or("") == "m.aipl");
+    assert(extra_files[0].map(|f| f.path) == some("m.aipl"));
     let Spec { expect_files } = parse_spec("x\n--- expect file: out.txt ---\nwritten\n")?;
     assert(expect_files.len() == 1);
-    assert(expect_files[0].map(|f| f.contents).value_or("") == "written");
+    assert(expect_files[0].map(|f| f.contents) == some("written"));
 
     // Rejections: a mistyped marker, and unusable companion paths.
     assert(parse_spec("x\n--- stdou ---\n").is_err_and(|m| m.contains("unknown section")));
@@ -176,11 +176,11 @@ allocations: 106
 deallocations: 106
 reallocations: 0
 bytes allocated: 4489
-instructions executed: 41849
-binary size: 90584
-  code: 61140
-  data: 1806
-  metadata: 27638
+instructions executed: 41831
+binary size: 90160
+  code: 60840
+  data: 1798
+  metadata: 27522
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -205,7 +205,7 @@ functions:
     bytes: 744
   __test$parse_spec:
     calls: 1
-    bytes: 28152
+    bytes: 27852
   __test_try_fail_str:
     calls: 0
     bytes: 84

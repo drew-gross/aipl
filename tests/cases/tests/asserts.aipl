@@ -5,7 +5,6 @@ import {
     get,
     len,
     print,
-    value_or,
     wrapping_add as +,
 } from builtins;
 
@@ -29,7 +28,7 @@ fn first_three() -> i64[] { [1, 2, 3] }.test({
 })
 
 fn ages() -> #{str: i64} { #{"al": 30, "mo": 25} }.test({
-    assert(ages().get("al").value_or(0) == 30);
+    assert(ages().get("al") == some(30));
     assert(ages().contains_key("mo"));
     assert(len(ages()) == 2);
 })

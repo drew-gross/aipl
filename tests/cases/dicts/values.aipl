@@ -31,25 +31,25 @@ fn heap_str_values() -> #{str: str} {
     #{"k" +++ "1": "a" +++ "b", "k" +++ "2": "c" +++ "d"}
 }.test({
     let d = heap_str_values();
-    assert(d.get("k1").value_or("?") == "ab");
+    assert(d.get("k1") == some("ab"));
     assert(len(d) == 2);
 })
 
 fn char_keys() -> #{char: i64} { #{'a': 1, 'b': 2} }.test({
-    assert(char_keys().get('b').value_or(0) == 2);
+    assert(char_keys().get('b') == some(2));
     let b = #{true: "yes", false: "no"};
-    assert(b.get(true).value_or("?") == "yes");
+    assert(b.get(true) == some("yes"));
 })
 --- performance ---
 allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 1072
-instructions executed: 1568
-binary size: 12752
-  code: 7464
-  data: 781
-  metadata: 4507
+instructions executed: 1554
+binary size: 12536
+  code: 7292
+  data: 765
+  metadata: 4479
 functions:
   __dict_drop_bool$str:
     calls: 1
@@ -98,10 +98,10 @@ functions:
     bytes: 1032
   __test$char_keys:
     calls: 1
-    bytes: 996
+    bytes: 908
   __test$heap_str_values:
     calls: 1
-    bytes: 1176
+    bytes: 1092
   __test$optional_values:
     calls: 1
     bytes: 876

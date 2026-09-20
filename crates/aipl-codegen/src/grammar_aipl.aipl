@@ -1539,7 +1539,7 @@ fn lower_arg(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         .first()
         .value_or_err(ParseError { message: "a keyword argument has no name", span: sp })?;
     let span = join_spans(name_span, value.span);
-    ok(AExpr(at(KwArg(head, value, toks[1].value_or("") == "?"), span)))
+    ok(AExpr(at(KwArg(head, value, toks[1] == some("?")), span)))
 }
 
 # `op_value` — an operator passed as a value (`apply(2, 3, +)`) is a binary
@@ -1566,7 +1566,7 @@ fn lower_lambda(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     // The *first* token, not the run of them: `|x|` matches two `|` tokens, and
     // their texts run together are indistinguishable from the one `||` token
     // the no-parameter form is.
-    if (node.own_texts(src)[0].value_or("") == "||") {
+    if (node.own_texts(src)[0] == some("||")) {
         let body = kid_expr(kids, 0, sp)?;
         let span = body.span;
         let no_params: LambdaParam[] = [];
@@ -1797,7 +1797,7 @@ fn lower_binding(src: str, node: Cst, kids: Ast[], mutable: bool) -> Ast!ParseEr
 
     // `let (a, b) = e;` — a tuple pattern, spanned at its value like the struct
     // form, since the names are not one run of text.
-    if (toks[1].value_or("") == "(") {
+    if (toks[1] == some("(")) {
         if (names.len() < 2) {
             return err(ParseError {
                 message: "a tuple pattern needs at least 2 names, e.g. let (a, b) = expr;",
@@ -1809,7 +1809,7 @@ fn lower_binding(src: str, node: Cst, kids: Ast[], mutable: bool) -> Ast!ParseEr
         return ok(AStmt(SLetTuple(names, value, span)));
     };
     // `let T { x, y } = e;` — the struct name leads the name list.
-    if (toks[2].value_or("") == "{") {
+    if (toks[2] == some("{")) {
         let value = kid_expr(kids, 0, sp)?;
         let span = value.span;
         let struct_name = names.first().value_or("");
@@ -1824,7 +1824,7 @@ fn lower_binding(src: str, node: Cst, kids: Ast[], mutable: bool) -> Ast!ParseEr
 
     // `let x: T = e;` — the annotation is a child, so its presence is a child
     // count rather than a token test; the `:` is what the grammar matched.
-    let annotated = toks[2].value_or("") == ":";
+    let annotated = toks[2] == some(":");
     let ty = if (annotated) { some(as_ty(kid(kids, 0, sp)?, sp)?) } else { none };
     let value = kid_expr(kids, if (annotated) { 1 } else { 0 }, sp)?;
     if (mutable) {
@@ -1884,7 +1884,7 @@ fn dotted_assign(src: str, node: Cst, kids: Ast[], name: str, name_span: Span) -
     // folds in as `args[0]` and the call is flagged method-style, exactly as it
     // parses in expression position. The enclosing `set` is what writes the
     // mutated result back.
-    if (toks[4].value_or("") == "(") {
+    if (toks[4] == some("(")) {
         let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a method call")?;
         let end = match (args.last()) {
             some(a) => a.span,
@@ -1919,13 +1919,13 @@ fn lower_for_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let names = binder_names(toks);
     let iterable = kid_expr(kids, 0, sp)?;
     let body = kid_expr(kids, 1, sp)?;
-    if (toks[3].value_or("") == "(") {
+    if (toks[3] == some("(")) {
         return ok(AStmt(for_tuple(names, none, iterable, body, sp)?));
     };
 
     // `for (let i, (a, b) : xs)` — the first name is the index, the rest the
     // pattern.
-    if (toks[5].value_or("") == "(") {
+    if (toks[5] == some("(")) {
         return ok(AStmt(for_tuple(names[1..], names.first(), iterable, body, sp)?));
     };
 
@@ -2274,7 +2274,7 @@ fn as_pat(v: Ast, span: Span) -> Pat!ParseError {
 # bare one are the same shape from here on. Anything but a `.` in second
 # position means this pattern was not qualified.
 fn qualified_name(toks: str[], head: str) -> str {
-    if (toks[1].value_or("") != ".") {
+    if (toks[1] != some(".")) {
         return head;
     };
     toks[2].map(|tail| `{head}.{tail}`).value_or(head)
@@ -2287,7 +2287,7 @@ fn qualified_name(toks: str[], head: str) -> str {
 fn lower_ctor_payload(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let no_slots: Pat[] = [];
-    if (node.own_texts(src).first().value_or("") == "..") {
+    if (node.own_texts(src).first() == some("..")) {
         return ok(APayload(no_slots, true));
     };
     ok(APayload(kids.try_map(|k| as_pat(k, sp))?, false))
@@ -2514,7 +2514,7 @@ fn lower_import_name(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let toks = node.own_texts(src);
     let spans = node.own_tokens();
     let name_span = spans.first().value_or(node.tok_span());
-    if (toks[1].value_or("") == "as") {
+    if (toks[1] == some("as")) {
         let name = toks[0].value_or("");
 
         // `a as b` spells the alias as a token; `a as +` as the `operator`
@@ -2569,7 +2569,7 @@ fn lower_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let toks = node.own_texts(src);
     let spans = node.own_tokens();
     let name_span = spans.first().value_or(node.tok_span());
-    if (toks[1].value_or("") == "{") {
+    if (toks[1] == some("{")) {
         let scrutinee = Param {
             name: `__spat${name_span.start}`,
             ty: TyNamed(toks[0].value_or("")),
@@ -2581,9 +2581,9 @@ fn lower_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         let fields = toks[1..].filter(|w| !binder_punct().contains(w));
         return ok(AParam(ParsedParam { param: scrutinee, fields, span: name_span }));
     };
-    let mutable = toks[0].value_or("") == "mut";
+    let mutable = toks[0] == some("mut");
     let at_name: u64 = if (mutable) { 1 } else { 0 };
-    let implicit_some = toks[at_name + 1].value_or("") == "?";
+    let implicit_some = toks[at_name + 1] == some("?");
     let variadic = toks.contains("*");
     let written = as_ty(kid(kids, 0, sp)?, sp)?;
 
@@ -2656,7 +2656,7 @@ fn lower_construct_fields(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 
     // `{ name, rest.. }` — a leading shorthand field, which is also how the
     // trailing-comma form `{ x, }` spells a lone one.
-    if (toks[1].value_or("") == ",") {
+    if (toks[1] == some(",")) {
         let first = FieldInit { name: head, value: at(Ident(head), name_span) };
         return ok(AFieldInits([first, ..kids.try_map(|k| as_field_init(k, sp))?]));
     };
@@ -2788,7 +2788,7 @@ fn lower_case_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
             doc,
         }));
     };
-    let implicit_some = toks[1].value_or("") == "?";
+    let implicit_some = toks[1] == some("?");
     let default = if (kids.len() == 2) { some(kid_expr(kids, 1, sp)?) } else { none };
     let ty = if (implicit_some) { TyOptional(written) } else { written };
     ok(ACaseParam(CaseParam { name: some(toks[0].value_or("")), ty, default, implicit_some, doc }))
@@ -2801,7 +2801,7 @@ fn lower_case_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 fn lower_function(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let is_pub = toks[0].value_or("") == "pub";
+    let is_pub = toks[0] == some("pub");
     let name = toks[if (is_pub) { 2 } else { 1 }].value_or("");
     mut type_vars: TypeParam[] = [];
     mut params: ParsedParam[] = [];
@@ -4416,11 +4416,11 @@ allocations: 1908760
 deallocations: 1908760
 reallocations: 271828
 bytes allocated: 354702439
-instructions executed: 503067296
-binary size: 4989760
-  code: 3267376
+instructions executed: 503064871
+binary size: 4985808
+  code: 3264704
   data: 51804
-  metadata: 1670580
+  metadata: 1669300
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 15
@@ -5618,7 +5618,7 @@ functions:
     bytes: 1644
   dotted_assign:
     calls: 3
-    bytes: 18312
+    bytes: 18140
   else_or_unit:
     calls: 10
     bytes: 13380
@@ -5681,7 +5681,7 @@ functions:
     bytes: 3680
   lower_arg:
     calls: 27
-    bytes: 23364
+    bytes: 23284
   lower_args:
     calls: 34
     bytes: 6776
@@ -5699,7 +5699,7 @@ functions:
     bytes: 14740
   lower_binding:
     calls: 11
-    bytes: 55168
+    bytes: 54520
   lower_block:
     calls: 66
     bytes: 8084
@@ -5714,13 +5714,13 @@ functions:
     bytes: 6776
   lower_case_param:
     calls: 10
-    bytes: 29588
+    bytes: 29500
   lower_construct_fields:
     calls: 5
-    bytes: 27420
+    bytes: 27228
   lower_ctor_payload:
     calls: 20
-    bytes: 14164
+    bytes: 14044
   lower_effect:
     calls: 2
     bytes: 952
@@ -5747,10 +5747,10 @@ functions:
     bytes: 29396
   lower_for_stmt:
     calls: 6
-    bytes: 33104
+    bytes: 32764
   lower_function:
     calls: 22
-    bytes: 56068
+    bytes: 55940
   lower_if:
     calls: 10
     bytes: 19088
@@ -5759,7 +5759,7 @@ functions:
     bytes: 15640
   lower_import_name:
     calls: 6
-    bytes: 30628
+    bytes: 30420
   lower_item:
     calls: 33
     bytes: 68440
@@ -5768,7 +5768,7 @@ functions:
     bytes: 6940
   lower_lambda:
     calls: 3
-    bytes: 14748
+    bytes: 14612
   lower_lambda_param:
     calls: 3
     bytes: 22300
@@ -5795,7 +5795,7 @@ functions:
     bytes: 216
   lower_param:
     calls: 15
-    bytes: 30952
+    bytes: 30504
   lower_pattern:
     calls: 87
     bytes: 71236
@@ -5891,7 +5891,7 @@ functions:
     bytes: 668
   qualified_name:
     calls: 60
-    bytes: 1328
+    bytes: 1216
   repair_block_value:
     calls: 107
     bytes: 12932

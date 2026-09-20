@@ -14,9 +14,9 @@ fn make(present: bool) -> Box {
     }
 }.test({
     let b = make(true);
-    assert(b.item.value_or("(none)") == "here");
+    assert(b.item == some("here"));
     let e = make(false);
-    assert(e.item.value_or("(none)") == "(none)");
+    assert(e.item == none);
     assert(b.count.value_or(0) + e.count.value_or(35) == 42);
 })
 --- performance ---
@@ -24,15 +24,15 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 88
-instructions executed: 317
-binary size: 3184
-  code: 1572
-  data: 203
-  metadata: 1409
+instructions executed: 287
+binary size: 2744
+  code: 1252
+  data: 163
+  metadata: 1329
 functions:
   __test$make:
     calls: 1
-    bytes: 908
+    bytes: 588
   aipl_assert:
     calls: 3
     bytes: (external)

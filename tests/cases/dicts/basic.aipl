@@ -1,4 +1,4 @@
-import { contains_key, equal as ==, get, is_empty, len, logical_not as !, value_or } from builtins;
+import { contains_key, equal as ==, get, is_empty, len, logical_not as ! } from builtins;
 
 // A dict `#{K: V}` maps scalar/str keys to values of any type. Built from a
 // literal `#{k: v, ...}` (last binding wins on a duplicate key); looked up with
@@ -10,9 +10,9 @@ fn ints() -> #{i64: str} { #{1: "one", 2: "two", 3: "three"} }.test({
     assert(d == #{1: "one", 2: "two", 3: "three"});
     assert(len(d) == 3);
     assert(d.get(2) == some("two"));
-    assert(d.get(2).value_or("?") == "two");
+    assert(d.get(2) == some("two"));
     assert(d.get(9) == none); // absent
-    assert(d.get(9).value_or("?") == "?");
+    assert(d.get(9) == none);
     assert(d.contains_key(1));
     assert(!d.contains_key(9));
 })
@@ -24,7 +24,7 @@ fn strs() -> #{str: i64} {
     let d = strs();
     assert(d == #{"a": 10, "b": 20});
     assert(d.get("b") == some(20));
-    assert(d.get("b").value_or(0) == 20);
+    assert(d.get("b") == some(20));
 })
 
 fn dedup() -> #{i64: str} {
@@ -32,25 +32,25 @@ fn dedup() -> #{i64: str} {
 }.test({
     let d = dedup();
     assert(len(d) == 1);
-    assert(d.get(1).value_or("?") == "y");
+    assert(d.get(1) == some("y"));
 })
 
 fn make_empty() -> #{i64: str} { #{} }.test({
     let d = make_empty();
     assert(d.is_empty());
     assert(d.get(1) == none); // absent
-    assert(d.get(1).value_or("none") == "none");
+    assert(d.get(1) == none);
 })
 --- performance ---
 allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 544
-instructions executed: 1108
-binary size: 10696
-  code: 6192
-  data: 742
-  metadata: 3762
+instructions executed: 1048
+binary size: 9976
+  code: 5680
+  data: 691
+  metadata: 3605
 functions:
   __dict_drop_i64$str:
     calls: 4
@@ -72,13 +72,13 @@ functions:
     bytes: 276
   __test$dedup:
     calls: 1
-    bytes: 772
+    bytes: 696
   __test$ints:
     calls: 1
-    bytes: 2348
+    bytes: 2092
   __test$make_empty:
     calls: 1
-    bytes: 748
+    bytes: 568
   __test$strs:
     calls: 1
     bytes: 980

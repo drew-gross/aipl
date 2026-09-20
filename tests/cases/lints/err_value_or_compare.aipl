@@ -1,0 +1,49 @@
+import { equal as ==, not_equal as !=, print, value_or } from builtins;
+
+// `x.value_or(' ') == '.'` fills the `none` with a value chosen only so the
+// comparison rejects it. `x == some('.')` says the same thing without inventing
+// one: `none` already fails the comparison. Both operand orders and `!=` are
+// the same shape.
+fn is_dot(c: char?) -> bool { c.value_or(' ') == '.' }
+
+fn dot_first(c: char?) -> bool { '.' == c.value_or(' ') }
+
+fn not_dot(c: char?) -> bool { c.value_or(' ') != '.' }
+
+fn free_form(c: char?) -> bool { value_or(c, ' ') == '.' }
+
+// Not flagged: the default and the compared value agree, so this is a genuine
+// "none or dot" test that `c == some('.')` would answer differently.
+fn dot_or_none(c: char?) -> bool { c.value_or('.') == '.' }
+
+fn main() !prints {
+    print(is_dot(some('.')).to_str());
+    print(dot_first(some('.')).to_str());
+    print(not_dot(some('.')).to_str());
+    print(free_form(some('.')).to_str());
+    print(dot_or_none(none).to_str());
+}
+--- errors ---
+error: `value_or` here only supplies a value for the comparison to reject; compare the optional directly: `c == some('.')` (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_value_or_compare.aipl:7:42
+  |
+7 | fn is_dot(c: char?) -> bool { c.value_or(' ') == '.' }
+  |                                          ^^^
+
+error: `value_or` here only supplies a value for the comparison to reject; compare the optional directly: `c == some('.')` (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_value_or_compare.aipl:9:52
+  |
+9 | fn dot_first(c: char?) -> bool { '.' == c.value_or(' ') }
+  |                                                    ^^^
+
+error: `value_or` here only supplies a value for the comparison to reject; compare the optional directly: `c != some('.')` (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_value_or_compare.aipl:11:43
+   |
+11 | fn not_dot(c: char?) -> bool { c.value_or(' ') != '.' }
+   |                                           ^^^
+
+error: `value_or` here only supplies a value for the comparison to reject; compare the optional directly: `c == some('.')` (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_value_or_compare.aipl:13:46
+   |
+13 | fn free_form(c: char?) -> bool { value_or(c, ' ') == '.' }
+   |                                              ^^^

@@ -1,0 +1,47 @@
+import { equal as ==, print, to_str, value_or } from builtins;
+
+// `#[allow]` keeps the filled form — the escape hatch every lint carries.
+// The marker goes on the line holding the default argument, which is where
+// this lint points; a literal is always one line, so it always takes a
+// trailing marker and keeps it through `aipl fmt`.
+fn is_dot(c: char?) -> bool { c.value_or(' ') == '.' } #[allow]
+
+// The rewrite the lint asks for, so the two spellings are checked side by
+// side and proven to agree.
+fn is_dot_short(c: char?) -> bool { c == some('.') }
+
+fn main() !prints {
+    print(is_dot(some('.')).to_str());
+    print(is_dot_short(some('.')).to_str());
+    print(is_dot(some('x')).to_str());
+    print(is_dot_short(some('x')).to_str());
+    print(is_dot(none).to_str());
+    print(is_dot_short(none).to_str());
+}
+--- stdout ---
+true
+true
+false
+false
+false
+false
+--- performance ---
+allocations: 6
+deallocations: 6
+reallocations: 0
+bytes allocated: 124
+instructions executed: 267
+binary size: 1880
+  code: 744
+  data: 47
+  metadata: 1089
+functions:
+  __to_str_bool:
+    calls: 6
+    bytes: 232
+  aipl_write_bytes:
+    calls: 6
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 512

@@ -1,4 +1,4 @@
-import { equal as ==, len, push, value_or, wrapping_add as +, wrapping_mul as * } from builtins;
+import { equal as ==, len, push, wrapping_add as +, wrapping_mul as * } from builtins;
 
 // A struct field may be an array (`str[]`), an 8-byte heap pointer. The
 // field is retained on construction and released when the struct drops.
@@ -10,8 +10,8 @@ fn make() -> Tags {
     Tags { id: 7, names: ns }
 }.test({
     let Tags { names, id } = make();
-    assert(names[0].value_or("?") == "a");
-    assert(names[1].value_or("?") == "b");
+    assert(names[0] == some("a"));
+    assert(names[1] == some("b"));
     let n: i64 = len(names);
     assert(id * 10 + n == 72);
 })
@@ -20,15 +20,15 @@ allocations: 1
 deallocations: 1
 reallocations: 1
 bytes allocated: 56
-instructions executed: 288
-binary size: 3240
-  code: 1476
-  data: 156
-  metadata: 1608
+instructions executed: 274
+binary size: 3032
+  code: 1316
+  data: 140
+  metadata: 1576
 functions:
   __test$make:
     calls: 1
-    bytes: 1376
+    bytes: 1216
   aipl_arr_inc:
     calls: 1
     bytes: (external)
