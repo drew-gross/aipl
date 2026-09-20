@@ -169,11 +169,11 @@ allocations: 18
 deallocations: 18
 reallocations: 2
 bytes allocated: 1338
-instructions executed: 1445
-binary size: 91400
-  code: 64216
+instructions executed: 1453
+binary size: 91384
+  code: 64244
   data: 238
-  metadata: 26946
+  metadata: 26902
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -204,10 +204,10 @@ functions:
     bytes: 1560
   __m2__show_expr:
     calls: 0
-    bytes: 21964
+    bytes: 21984
   __m2__show_exprs:
     calls: 0
-    bytes: 1388
+    bytes: 1396
   __m2__show_field_init:
     calls: 0
     bytes: 628
@@ -216,13 +216,13 @@ functions:
     bytes: 2548
   __m3__show_pats:
     calls: 0
-    bytes: 1388
+    bytes: 1396
   __m5__show_ty:
     calls: 1
     bytes: 5064
   __m5__show_tys:
     calls: 0
-    bytes: 1388
+    bytes: 1396
   __rec_drop___m5__Ty:
     calls: 1
     bytes: 408
@@ -270,7 +270,7 @@ functions:
     bytes: 188
   show_case:
     calls: 0
-    bytes: 3912
+    bytes: 3920
   show_default:
     calls: 1
     bytes: 420
@@ -279,7 +279,7 @@ functions:
     bytes: 384
   show_item:
     calls: 2
-    bytes: 16276
+    bytes: 16244
   show_type_params:
     calls: 1
-    bytes: 2156
+    bytes: 2164

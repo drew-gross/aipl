@@ -26,33 +26,33 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1380
-binary size: 6416
-  code: 3428
+instructions executed: 1394
+binary size: 6440
+  code: 3456
   data: 473
-  metadata: 2515
+  metadata: 2511
 functions:
   __builtin_count_while$char$s0$lam$__test$trim_while$lambda0:
     calls: 1
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__test$trim_while$lambda1:
     calls: 1
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__test$trim_while$lambda2:
     calls: 1
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__test$trim_while$lambda3:
     calls: 1
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__test$trim_while$lambda4:
     calls: 1
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__test$trim_while$lambda5:
     calls: 1
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__test$trim_while$lambda6:
     calls: 1
-    bytes: 264
+    bytes: 268
   __test$trim_while:
     calls: 1
     bytes: 1472

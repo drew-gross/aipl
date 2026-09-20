@@ -61,9 +61,9 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 21
-instructions executed: 1742
-binary size: 3880
-  code: 1468
+instructions executed: 1754
+binary size: 3888
+  code: 1476
   data: 426
   metadata: 1986
 functions:
@@ -93,10 +93,10 @@ functions:
     bytes: (external)
   count_ones:
     calls: 4
-    bytes: 244
+    bytes: 248
   main:
     calls: 1
     bytes: 116
   total:
     calls: 2
-    bytes: 184
+    bytes: 188

@@ -34,9 +34,9 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1115
-binary size: 7688
-  code: 3776
+instructions executed: 1119
+binary size: 7696
+  code: 3784
   data: 994
   metadata: 2918
 functions:
@@ -72,7 +72,7 @@ functions:
     bytes: 920
   __test$first_big$filter6$own0:
     calls: 1
-    bytes: 300
+    bytes: 308
   aipl_arr_inc:
     calls: 1
     bytes: (external)

@@ -20,9 +20,9 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 632
-instructions executed: 841
-binary size: 6424
-  code: 3476
+instructions executed: 845
+binary size: 6432
+  code: 3484
   data: 177
   metadata: 2771
 functions:
@@ -34,10 +34,10 @@ functions:
     bytes: 300
   __test$add_row:
     calls: 1
-    bytes: 1208
+    bytes: 1212
   __test$first:
     calls: 1
-    bytes: 1432
+    bytes: 1436
   aipl_arr_drop_arr:
     calls: 5
     bytes: (external)

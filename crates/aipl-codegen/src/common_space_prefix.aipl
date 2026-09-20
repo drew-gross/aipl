@@ -47,11 +47,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1458
+instructions executed: 1484
 binary size: 4672
-  code: 1948
+  code: 1952
   data: 873
-  metadata: 1851
+  metadata: 1847
 functions:
   __test$common_space_prefix:
     calls: 1
@@ -70,7 +70,7 @@ functions:
     bytes: (external)
   common_space_prefix:
     calls: 13
-    bytes: 240
+    bytes: 244
   main:
     calls: 1
     bytes: 128

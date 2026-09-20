@@ -44,9 +44,9 @@ allocations: 14
 deallocations: 14
 reallocations: 21
 bytes allocated: 864
-instructions executed: 2398
-binary size: 8056
-  code: 4240
+instructions executed: 2434
+binary size: 8072
+  code: 4256
   data: 745
   metadata: 3071
 functions:
@@ -82,10 +82,10 @@ functions:
     bytes: (external)
   intersperse$i64:
     calls: 4
-    bytes: 356
+    bytes: 364
   intersperse$str:
     calls: 5
-    bytes: 424
+    bytes: 432
   main:
     calls: 1
     bytes: 112

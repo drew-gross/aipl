@@ -28,9 +28,9 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 215
-binary size: 1512
-  code: 416
+instructions executed: 227
+binary size: 1520
+  code: 424
   data: 139
   metadata: 957
 functions:
@@ -54,4 +54,4 @@ functions:
     bytes: 108
   triangle:
     calls: 3
-    bytes: 88
+    bytes: 96

@@ -50,9 +50,9 @@ allocations: 11
 deallocations: 11
 reallocations: 1
 bytes allocated: 272
-instructions executed: 1436
-binary size: 4648
-  code: 2588
+instructions executed: 1460
+binary size: 4664
+  code: 2604
   data: 89
   metadata: 1971
 functions:
@@ -85,10 +85,10 @@ functions:
     bytes: 428
   scaled_above:
     calls: 2
-    bytes: 296
+    bytes: 300
   scaled_above_short:
     calls: 2
-    bytes: 304
+    bytes: 308
   show:
     calls: 4
-    bytes: 1356
+    bytes: 1364

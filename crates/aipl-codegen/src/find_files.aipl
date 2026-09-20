@@ -36,11 +36,11 @@ allocations: 18
 deallocations: 18
 reallocations: 3
 bytes allocated: 1064
-instructions executed: 1731
-binary size: 10552
-  code: 5872
+instructions executed: 1743
+binary size: 10584
+  code: 5900
   data: 585
-  metadata: 4095
+  metadata: 4099
 functions:
   __eq_str$arr:
     calls: 6
@@ -50,7 +50,7 @@ functions:
     bytes: 388
   __test$with_extension:
     calls: 1
-    bytes: 4176
+    bytes: 4200
   aipl_arr_inc:
     calls: 6
     bytes: (external)
@@ -86,7 +86,7 @@ functions:
     bytes: (external)
   find_files:
     calls: 1
-    bytes: 760
+    bytes: 764
   main:
     calls: 1
     bytes: 184

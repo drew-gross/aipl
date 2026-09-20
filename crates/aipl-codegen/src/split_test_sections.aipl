@@ -54,11 +54,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 10081
-binary size: 9984
-  code: 5324
+instructions executed: 10117
+binary size: 9976
+  code: 5320
   data: 1012
-  metadata: 3648
+  metadata: 3644
 functions:
   __eq___tuple$str$str:
     calls: 9
@@ -86,4 +86,4 @@ functions:
     bytes: 128
   split_test_sections:
     calls: 9
-    bytes: 1272
+    bytes: 1268

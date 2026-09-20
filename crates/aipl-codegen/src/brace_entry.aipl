@@ -84,11 +84,11 @@ allocations: 74
 deallocations: 74
 reallocations: 3
 bytes allocated: 5067
-instructions executed: 4769
-binary size: 73624
-  code: 48320
+instructions executed: 4817
+binary size: 73680
+  code: 48372
   data: 1436
-  metadata: 23868
+  metadata: 23872
 functions:
   __arr_drop_BraceEntry:
     calls: 5
@@ -119,10 +119,10 @@ functions:
     bytes: 1560
   __m1__show_expr:
     calls: 11
-    bytes: 21964
+    bytes: 21984
   __m1__show_exprs:
     calls: 4
-    bytes: 1388
+    bytes: 1396
   __m1__show_field_init:
     calls: 0
     bytes: 628
@@ -131,13 +131,13 @@ functions:
     bytes: 2548
   __m2__show_pats:
     calls: 0
-    bytes: 1388
+    bytes: 1396
   __m4__show_ty:
     calls: 0
     bytes: 5064
   __m4__show_tys:
     calls: 0
-    bytes: 1388
+    bytes: 1396
   __rec_drop___m1__Expr:
     calls: 16
     bytes: 36
@@ -209,7 +209,7 @@ functions:
     bytes: (external)
   brace_literal:
     calls: 7
-    bytes: 1992
+    bytes: 2000
   main:
     calls: 1
     bytes: 116

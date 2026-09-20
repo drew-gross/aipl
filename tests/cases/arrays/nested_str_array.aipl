@@ -29,9 +29,9 @@ allocations: 8
 deallocations: 8
 reallocations: 1
 bytes allocated: 584
-instructions executed: 1478
-binary size: 5880
-  code: 3480
+instructions executed: 1482
+binary size: 5888
+  code: 3488
   data: 150
   metadata: 2250
 functions:
@@ -43,7 +43,7 @@ functions:
     bytes: 300
   __test$grid3:
     calls: 1
-    bytes: 2712
+    bytes: 2720
   aipl_arr_drop_arr:
     calls: 2
     bytes: (external)

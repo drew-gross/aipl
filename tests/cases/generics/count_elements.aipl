@@ -22,22 +22,22 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 33
-instructions executed: 496
-binary size: 2560
-  code: 924
+instructions executed: 506
+binary size: 2544
+  code: 948
   data: 249
-  metadata: 1387
+  metadata: 1347
 functions:
   __test$count:
     calls: 1
-    bytes: 820
-  aipl_arr_inc:
-    calls: 1
-    bytes: (external)
+    bytes: 844
   aipl_array_dec:
     calls: 3
     bytes: (external)
   aipl_array_push:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
     calls: 1
     bytes: (external)
   aipl_assert:

@@ -159,9 +159,9 @@ allocations: 70
 deallocations: 70
 reallocations: 1
 bytes allocated: 3514
-instructions executed: 15965
-binary size: 25480
-  code: 13696
+instructions executed: 16013
+binary size: 25488
+  code: 13704
   data: 2661
   metadata: 9123
 functions:
@@ -224,7 +224,7 @@ functions:
     bytes: (external)
   companion_files:
     calls: 12
-    bytes: 3152
+    bytes: 3160
   companion_path:
     calls: 15
     bytes: 968

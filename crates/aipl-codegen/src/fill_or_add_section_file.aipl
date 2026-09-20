@@ -29,10 +29,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 28
 instructions executed: 110
-binary size: 8720
-  code: 5620
+binary size: 8744
+  code: 5648
   data: 237
-  metadata: 2863
+  metadata: 2859
 functions:
   __builtin_any$str$lam$__m1__fill_or_add_section$lambda0:
     calls: 0
@@ -60,7 +60,7 @@ functions:
     bytes: (external)
   fill_or_add_section_file:
     calls: 1
-    bytes: 3948
+    bytes: 3976
   main:
     calls: 1
     bytes: 100

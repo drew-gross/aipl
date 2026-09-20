@@ -54,7 +54,7 @@ allocations: 21
 deallocations: 21
 reallocations: 0
 bytes allocated: 938
-instructions executed: 17279
+instructions executed: 17367
 binary size: 9368
   code: 5520
   data: 537
@@ -65,10 +65,10 @@ functions:
     bytes: 304
   __builtin_count_while$char$s0$lam$__m1__dedent$lambda1:
     calls: 0
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__m1__dedent$lambda2$lambda0:
     calls: 9
-    bytes: 264
+    bytes: 268
   __m4__trim_prefix:
     calls: 14
     bytes: 252
@@ -107,4 +107,4 @@ functions:
     bytes: 124
   process_raw_string:
     calls: 7
-    bytes: 2764
+    bytes: 2756

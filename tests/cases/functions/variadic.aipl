@@ -35,22 +35,22 @@ fn joined(self: str, parts: str*) -> str {
     assert(joined("x", none) == "x"); // none -> []
 })
 --- performance ---
-allocations: 9
-deallocations: 9
+allocations: 6
+deallocations: 6
 reallocations: 0
-bytes allocated: 345
-instructions executed: 1262
-binary size: 8664
-  code: 4480
+bytes allocated: 290
+instructions executed: 1190
+binary size: 8216
+  code: 4284
   data: 635
-  metadata: 3549
+  metadata: 3297
 functions:
   __test$joined:
     calls: 1
-    bytes: 2220
+    bytes: 2012
   __test$sum:
     calls: 1
-    bytes: 684
+    bytes: 688
   aipl_arr_inc:
     calls: 2
     bytes: (external)
@@ -73,7 +73,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_write_bytes:
-    calls: 8
+    calls: 2
     bytes: (external)
   joined$vo1:
     calls: 2
@@ -83,7 +83,7 @@ functions:
     bytes: 164
   sum:
     calls: 3
-    bytes: 176
+    bytes: 180
   sum$vo1:
     calls: 2
-    bytes: 316
+    bytes: 320

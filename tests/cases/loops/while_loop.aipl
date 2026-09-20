@@ -26,9 +26,9 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 230
-binary size: 1520
-  code: 420
+instructions executed: 242
+binary size: 1528
+  code: 428
   data: 140
   metadata: 960
 functions:
@@ -52,4 +52,4 @@ functions:
     bytes: 108
   sum_below:
     calls: 3
-    bytes: 92
+    bytes: 100

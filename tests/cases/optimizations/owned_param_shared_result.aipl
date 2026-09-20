@@ -1,0 +1,109 @@
+import { equal as ==, print, push, wrapping_add_assign as += } from builtins;
+
+// A call result counts as *fresh* — a candidate for moving into an owned
+// parameter — but a function may return one of its own borrowed arguments,
+// retained: `same(a)` hands back `a`'s block at refcount two. The owned
+// instance of `grow` then takes that block as its exclusive `mut ys` and
+// pushes in place — which grew `a`'s block underneath it (its length word
+// lives in the block) until the move into `mut ys` learned to make the block
+// unique first: `aipl_arr_reserve` keeps a refcount-one block and copies any
+// other, the guard the in-place `map`/`filter` bodies already had. A call
+// boundary is the one place a refcount above one means sharing; the runtime's
+// in-place entries themselves never check it, since inside a function one
+// owner's bookkeeping holds several.
+//
+// `same` is kept too large to inline: inlined, `grow(same(a))` is
+// `grow(let p = a; p)`, whose value is a binding rather than a call, and no
+// owned instance is chosen at all.
+fn same(xs: i64[]) -> i64[] {
+    mut n = 0;
+    for (let x : xs) {
+        set n += x;
+    }
+    for (let x : xs) {
+        set n += x;
+    }
+    for (let x : xs) {
+        set n += x;
+    }
+    if (n == 12345) { [] } else { xs }
+}
+
+fn grow(xs: i64[]) -> i64[] {
+    mut ys = xs;
+    for (let i : "ab") {
+        set ys.push(9);
+    }
+    ys
+}
+
+# A heap block, not a constant literal — a static block is already copied on
+# the first write.
+fn build(n: i64) -> i64[] {
+    mut v = []; #[allow]
+    set v.push(n);
+    set v.push(n);
+    set v.push(n);
+    v
+}
+
+fn main() !prints {
+    let a = build(1);
+    let b = grow(same(a));
+    print(`{a} {b}`);
+    let c = build(3);
+    print(`{grow(same(c))} {c}`);
+}
+--- stdout ---
+[1, 1, 1] [1, 1, 1, 9, 9]
+[3, 3, 3, 9, 9] [3, 3, 3]
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 6
+bytes allocated: 656
+instructions executed: 3157
+binary size: 5040
+  code: 2716
+  data: 99
+  metadata: 2225
+functions:
+  __to_str_i64$arr:
+    calls: 4
+    bytes: 708
+  aipl_arr_inc:
+    calls: 6
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 2
+    bytes: (external)
+  aipl_array_dec:
+    calls: 12
+    bytes: (external)
+  aipl_array_push:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 10
+    bytes: (external)
+  aipl_i64_len:
+    calls: 32
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 20
+    bytes: (external)
+  aipl_write_i64:
+    calls: 16
+    bytes: (external)
+  build:
+    calls: 2
+    bytes: 224
+  grow$own0:
+    calls: 2
+    bytes: 388
+  main:
+    calls: 1
+    bytes: 880
+  same:
+    calls: 2
+    bytes: 516

@@ -67,18 +67,18 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 128
-instructions executed: 1650
-binary size: 10264
-  code: 5472
+instructions executed: 1676
+binary size: 10320
+  code: 5524
   data: 1193
-  metadata: 3599
+  metadata: 3603
 functions:
   __test$find_index:
     calls: 1
     bytes: 1372
   __test$find_index$filter9$own0:
     calls: 1
-    bytes: 300
+    bytes: 308
   __test$is_nine:
     calls: 1
     bytes: 184
@@ -108,37 +108,37 @@ functions:
     bytes: (external)
   find_index$char$lam$__test$find_index$lambda4:
     calls: 1
-    bytes: 328
+    bytes: 332
   find_index$char$s0$lam$__test$find_index$lambda6:
     calls: 1
-    bytes: 328
+    bytes: 332
   find_index$char$s0$lam$__test$find_index$lambda7:
     calls: 1
-    bytes: 328
+    bytes: 332
   find_index$i64$lam$__test$find_index$lambda0:
     calls: 1
-    bytes: 292
+    bytes: 296
   find_index$i64$lam$__test$find_index$lambda1:
     calls: 1
-    bytes: 292
+    bytes: 296
   find_index$i64$lam$__test$find_index$lambda10:
     calls: 1
-    bytes: 292
+    bytes: 296
   find_index$i64$lam$__test$find_index$lambda2:
     calls: 1
-    bytes: 292
+    bytes: 296
   find_index$i64$lam$__test$find_index$lambda3:
     calls: 1
-    bytes: 292
+    bytes: 296
   find_index$i64$lam$__test$find_index$lambda8:
     calls: 1
-    bytes: 292
+    bytes: 296
   find_index$i64$lam$is_nine:
     calls: 1
-    bytes: 292
+    bytes: 296
   find_index$str$lam$__test$find_index$lambda5:
     calls: 1
-    bytes: 412
+    bytes: 416
   main:
     calls: 1
     bytes: 176

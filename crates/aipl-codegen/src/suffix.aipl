@@ -96,9 +96,9 @@ allocations: 77
 deallocations: 77
 reallocations: 1
 bytes allocated: 5825
-instructions executed: 3639
-binary size: 75648
-  code: 50296
+instructions executed: 3645
+binary size: 75704
+  code: 50352
   data: 681
   metadata: 24671
 functions:
@@ -125,10 +125,10 @@ functions:
     bytes: 1560
   __m1__show_expr:
     calls: 21
-    bytes: 21964
+    bytes: 21984
   __m1__show_exprs:
     calls: 1
-    bytes: 1388
+    bytes: 1396
   __m1__show_field_init:
     calls: 0
     bytes: 628
@@ -137,13 +137,13 @@ functions:
     bytes: 2548
   __m2__show_pats:
     calls: 0
-    bytes: 1388
+    bytes: 1396
   __m4__show_ty:
     calls: 0
     bytes: 5064
   __m4__show_tys:
     calls: 0
-    bytes: 1388
+    bytes: 1396
   __rec_drop___m1__Expr:
     calls: 16
     bytes: 36
@@ -218,7 +218,7 @@ functions:
     bytes: (external)
   apply_suffix:
     calls: 7
-    bytes: 3020
+    bytes: 3032
   main:
     calls: 1
     bytes: 112

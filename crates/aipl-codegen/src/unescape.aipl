@@ -114,9 +114,9 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 528
-instructions executed: 10519
-binary size: 18064
-  code: 10372
+instructions executed: 10687
+binary size: 18096
+  code: 10404
   data: 1741
   metadata: 5951
 functions:
@@ -146,7 +146,7 @@ functions:
     bytes: 260
   unescape:
     calls: 15
-    bytes: 1612
+    bytes: 1628
   unescape_braces:
     calls: 7
-    bytes: 972
+    bytes: 988

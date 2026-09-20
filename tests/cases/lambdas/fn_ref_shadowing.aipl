@@ -21,9 +21,9 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 56
-instructions executed: 412
-binary size: 2384
-  code: 968
+instructions executed: 416
+binary size: 2392
+  code: 976
   data: 181
   metadata: 1235
 functions:
@@ -35,7 +35,7 @@ functions:
     bytes: 288
   __test$double$map1$own0:
     calls: 1
-    bytes: 280
+    bytes: 288
   aipl_arr_inc:
     calls: 1
     bytes: (external)

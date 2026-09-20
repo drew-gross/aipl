@@ -46,12 +46,12 @@ start-then-some-more-text
 allocations: 10
 deallocations: 10
 reallocations: 0
-bytes allocated: 484
-instructions executed: 359
-binary size: 3360
-  code: 1732
+bytes allocated: 491
+instructions executed: 358
+binary size: 3056
+  code: 1652
   data: 1
-  metadata: 1627
+  metadata: 1403
 functions:
   __to_str_i64:
     calls: 5
@@ -59,12 +59,9 @@ functions:
   aipl_i64_len:
     calls: 10
     bytes: (external)
-  aipl_write_bytes:
-    calls: 2
-    bytes: (external)
   aipl_write_i64:
     calls: 5
     bytes: (external)
   main:
     calls: 1
-    bytes: 1528
+    bytes: 1448

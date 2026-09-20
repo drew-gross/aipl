@@ -37,9 +37,9 @@ allocations: 12
 deallocations: 12
 reallocations: 0
 bytes allocated: 760
-instructions executed: 3008
-binary size: 10544
-  code: 4356
+instructions executed: 3032
+binary size: 10592
+  code: 4404
   data: 1397
   metadata: 4791
 functions:
@@ -48,7 +48,7 @@ functions:
     bytes: 296
   __test$joined:
     calls: 1
-    bytes: 3956
+    bytes: 4004
   aipl_arr_extend:
     calls: 11
     bytes: (external)

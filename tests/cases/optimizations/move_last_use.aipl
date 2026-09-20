@@ -142,15 +142,15 @@ ab!!
 [2, 3, 4, 8, 8]
 [3, 4, 5, 8, 8] [3, 4, 5]
 --- performance ---
-allocations: 48
-deallocations: 48
-reallocations: 3
-bytes allocated: 2643
-instructions executed: 8452
-binary size: 14904
-  code: 8508
+allocations: 49
+deallocations: 49
+reallocations: 4
+bytes allocated: 2715
+instructions executed: 8640
+binary size: 15240
+  code: 8820
   data: 475
-  metadata: 5921
+  metadata: 5945
 functions:
   __to_str_i64$arr:
     calls: 11
@@ -165,13 +165,13 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 19
+    calls: 18
     bytes: (external)
   aipl_arr_reserve:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 45
+    calls: 46
     bytes: (external)
   aipl_array_push:
     calls: 8
@@ -208,13 +208,13 @@ functions:
     bytes: (external)
   extended$own0:
     calls: 2
-    bytes: 312
+    bytes: 388
   grow$own0:
     calls: 2
-    bytes: 312
+    bytes: 388
   main:
     calls: 1
-    bytes: 6000
+    bytes: 5980
   merge$own0$own1:
     calls: 2
-    bytes: 264
+    bytes: 444

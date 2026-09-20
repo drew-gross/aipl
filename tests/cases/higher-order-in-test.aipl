@@ -36,11 +36,11 @@ allocations: 2
 deallocations: 2
 reallocations: 2
 bytes allocated: 80
-instructions executed: 843
+instructions executed: 847
 binary size: 2912
-  code: 996
+  code: 1000
   data: 425
-  metadata: 1491
+  metadata: 1487
 functions:
   __eq_i64$arr:
     calls: 2
@@ -74,7 +74,7 @@ functions:
     bytes: (external)
   filter_evens$lam$is_even:
     calls: 2
-    bytes: 352
+    bytes: 356
   main:
     calls: 1
     bytes: 112

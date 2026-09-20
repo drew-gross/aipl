@@ -22,11 +22,11 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 51
-instructions executed: 123
-binary size: 1448
-  code: 516
+instructions executed: 125
+binary size: 1456
+  code: 520
   data: 1
-  metadata: 931
+  metadata: 935
 functions:
   __to_str_u8:
     calls: 3
@@ -39,4 +39,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 312
+    bytes: 316

@@ -1077,11 +1077,11 @@ allocations: 754
 deallocations: 754
 reallocations: 101
 bytes allocated: 94897
-instructions executed: 78536
-binary size: 162376
-  code: 100312
+instructions executed: 78861
+binary size: 164240
+  code: 101688
   data: 6684
-  metadata: 55380
+  metadata: 55868
 functions:
   __arr_drop_ListStyle:
     calls: 46
@@ -1109,28 +1109,28 @@ functions:
     bytes: 116
   __builtin_find_index$str$lam$__test$link$lambda0:
     calls: 1
-    bytes: 412
+    bytes: 416
   __builtin_find_index$str$lam$__test$link$lambda1:
     calls: 1
-    bytes: 412
+    bytes: 416
   __builtin_find_index$str$lam$link$Kind$Node$lambda0:
     calls: 26
-    bytes: 400
+    bytes: 404
   __builtin_find_index$str$lam$link_rule$Kind$lambda0:
     calls: 11
-    bytes: 400
+    bytes: 404
   __builtin_map_join$Rule$Kind$ListStyle$lam$group_styles$Kind:
     calls: 0
     bytes: 44
   __builtin_map_join$Rule$Kind$ListStyle$lam$group_styles$Kind$tail:
     calls: 6
-    bytes: 1060
+    bytes: 1072
   __builtin_map_join$Rule$Kind$char$s2$s3$s4$rs$lam$show_rule$Kind:
     calls: 7
-    bytes: 1328
+    bytes: 1336
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
     calls: 6
-    bytes: 504
+    bytes: 508
   __eq_ListStyle:
     calls: 10
     bytes: 232
@@ -1160,13 +1160,13 @@ functions:
     bytes: 676
   __test$link:
     calls: 1
-    bytes: 47688
+    bytes: 47540
   __test$show_rule:
     calls: 1
     bytes: 4156
   __test$show_style:
     calls: 1
-    bytes: 824
+    bytes: 756
   __test_try_fail_ParseError:
     calls: 0
     bytes: 84
@@ -1210,13 +1210,13 @@ functions:
     calls: 294
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1494
+    calls: 1460
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 180
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 1200
+    calls: 1166
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 180
@@ -1256,22 +1256,22 @@ functions:
     bytes: 32
   group_styles$Kind$tail:
     calls: 210
-    bytes: 3096
+    bytes: 3104
   keep:
     calls: 0
     bytes: 112
   link$Kind$Node:
     calls: 15
-    bytes: 2488
+    bytes: 2480
   link_opt$Kind:
     calls: 17
     bytes: 596
   link_rule$Kind:
     calls: 87
-    bytes: 7096
+    bytes: 6984
   link_rules$Kind:
     calls: 6
-    bytes: 600
+    bytes: 604
   main:
     calls: 1
     bytes: 316
@@ -1280,13 +1280,13 @@ functions:
     bytes: 152
   prod_names$Kind$Node:
     calls: 19
-    bytes: 548
+    bytes: 552
   show_rule$Kind:
     calls: 71
-    bytes: 6144
-  show_style:
-    calls: 11
-    bytes: 1396
+    bytes: 7724
+  show_style$own0:
+    calls: 3
+    bytes: 1472
   shown_rule$Kind$Node:
     calls: 13
     bytes: 1008

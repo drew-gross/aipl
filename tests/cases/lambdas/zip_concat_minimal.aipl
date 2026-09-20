@@ -19,9 +19,9 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 360
-instructions executed: 610
-binary size: 4216
-  code: 2476
+instructions executed: 616
+binary size: 4240
+  code: 2500
   data: 1
   metadata: 1739
 functions:
@@ -42,4 +42,4 @@ functions:
     bytes: 804
   main$zip1$own0$own1:
     calls: 1
-    bytes: 1672
+    bytes: 1696

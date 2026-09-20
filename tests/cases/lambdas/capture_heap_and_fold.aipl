@@ -34,9 +34,9 @@ allocations: 6
 deallocations: 6
 reallocations: 1
 bytes allocated: 346
-instructions executed: 569
-binary size: 4032
-  code: 1668
+instructions executed: 573
+binary size: 4040
+  code: 1676
   data: 305
   metadata: 2059
 functions:
@@ -45,10 +45,10 @@ functions:
     bytes: 364
   __test$reduce:
     calls: 1
-    bytes: 240
+    bytes: 244
   __test$tag:
     calls: 1
-    bytes: 696
+    bytes: 700
   __to_str_i64:
     calls: 2
     bytes: 204

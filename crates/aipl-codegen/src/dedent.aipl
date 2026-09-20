@@ -63,9 +63,9 @@ allocations: 30
 deallocations: 30
 reallocations: 2
 bytes allocated: 1525
-instructions executed: 21490
-binary size: 8848
-  code: 4796
+instructions executed: 21584
+binary size: 8872
+  code: 4820
   data: 841
   metadata: 3211
 functions:
@@ -74,10 +74,10 @@ functions:
     bytes: 304
   __builtin_count_while$char$s0$lam$dedent$lambda1:
     calls: 0
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$dedent$lambda2$lambda0:
     calls: 17
-    bytes: 264
+    bytes: 268
   __test$dedent:
     calls: 1
     bytes: 1652
@@ -107,7 +107,7 @@ functions:
     bytes: (external)
   dedent:
     calls: 10
-    bytes: 2208
+    bytes: 2224
   main:
     calls: 1
     bytes: 104

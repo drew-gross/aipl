@@ -1342,8 +1342,16 @@ extern "C" fn aipl_rec_inc_weak(p: *const u8) {
     unsafe { *rec_block(p).add(REC_WEAK_WORD) += 1 }
 }
 
+/// A null pointer is the empty value a boxed field or `mut` binding is left
+/// holding once its reference has been *taken* (a move out of it — see the
+/// `Callee::Move` arm and `take_field` in codegen); releasing it is nothing to
+/// do, exactly as `aipl_array_dec` treats a null block. Mirrors the linker
+/// runtime.
 #[no_mangle]
 extern "C" fn aipl_rec_dec_strong(p: *const u8) {
+    if p.is_null() {
+        return;
+    }
     let b = rec_block(p);
     unsafe {
         *b -= 1;
@@ -1477,18 +1485,23 @@ extern "C" fn aipl_array_push_mut(
     elem_size: i64,
 ) -> *const u8 {
     let a = aipl_arr_ensure_heap(a);
-    // A `STATIC_REFCOUNT` block belongs to someone else — an array the *host*
-    // lent us as an FFI argument (see [`ArgBufs::array_block`]) and frees itself
-    // after the call — so it can neither be written into nor `realloc`ed here.
-    // Copy instead, exactly as `aipl_concat_mut` does for a static string
-    // literal.
+    // A `STATIC_REFCOUNT` block belongs to someone else — a constant literal in
+    // the data section, or an array the *host* lent us as an FFI argument (see
+    // [`ArgBufs::array_block`]) and frees itself after the call — so it can
+    // neither be written into nor `realloc`ed here. Copy instead, exactly as
+    // `aipl_concat_mut` does for a static string literal.
     //
-    // Reaching this needs a host array to become an exclusive `mut` binding,
-    // which today it can't: `exclusive` wants a fresh array literal or a
-    // *moved-in* parameter, and a moved-in parameter is a separate `$own`
-    // instance that the host never calls (an FFI entry is always the borrow
-    // form). The check keeps that a property of the runtime rather than of an
-    // invariant maintained two crates away in the monomorphizer.
+    // The refcount is deliberately *not* consulted beyond that. Static
+    // ownership — an exclusive `mut` binding, an owned parameter — is what
+    // brought the caller here, and inside a function a uniquely-owned block
+    // routinely reads two or three: a `mut` parameter's slot and its entry
+    // track, the caller's reference under the `set x = x.f(..)` writeback,
+    // all one owner's bookkeeping. Treating those as sharing turned every such
+    // push into a copy and broke the accounting around it. The one place a
+    // refcount above one *does* mean sharing is a call boundary, and that is
+    // where it is checked: an owned parameter is made unique on its way into
+    // `mut y = p` (`aipl_arr_reserve`, see the `LetMut` arm), as the in-place
+    // `map`/`filter` bodies already do through `__arr_writable`.
     if !a.is_null() && unsafe { *header_of(a) } == STATIC_REFCOUNT {
         return aipl_array_push(a, x, drop_fn, retain_fn, elem_size);
     }
@@ -4054,6 +4067,13 @@ fn compile_program<M: Module>(
     // after every pass that reorders pure reads, so a mark reflects the order
     // codegen will actually evaluate in. See `aipl_mono::move_last_use`.
     let program = &aipl_mono::move_last_uses_post_mono(program);
+    if let Ok(want) = std::env::var("AIPL_DUMP_FN") {
+        for f in &program.fns {
+            if f.name == want {
+                eprintln!("{:#?}", f.body);
+            }
+        }
+    }
 
     let mut ctx = module.make_context();
     let mut fbc = FunctionBuilderContext::new();
@@ -8558,6 +8578,13 @@ fn define_fn<M: Module>(
             };
             if retained {
                 scopes[0].push(Tracked::new(*v, &p.ty));
+            } else if p.owned && !is_heap(&p.ty) && needs_drop(&p.ty, structs) {
+                // An owned *struct* parameter: the caller handed over its
+                // fields, and this function owns them. Whatever the body does
+                // not move out (`Field` on an owned param, which nulls the
+                // field it takes) is released here at exit — the same track a
+                // fresh struct temporary gets, on the caller's buffer.
+                scopes[0].push(Tracked::new(*v, &p.ty));
             }
         }
 
@@ -9240,6 +9267,114 @@ fn hand_off_arg<M: Module>(
     } else {
         emit_retain(builder, module, builtins, structs, v, ty);
     }
+}
+
+/// Take the field at `offset` (of type `fty`, a pointer-word block or a wide
+/// `str`) out of the struct at `obj_ptr`: its reference goes to the returned
+/// value, and the field is left holding the empty value of its type — a null
+/// block pointer, or the inline empty `str` — which any later release of the
+/// struct passes over.
+fn take_field<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    obj_ptr: Value,
+    offset: u32,
+    fty: &ConcreteType,
+) -> Result<Value, Error> {
+    let structs = cx.structs;
+    if is_str_shaped(fty) {
+        let src = builder.ins().iadd_imm_s(obj_ptr, offset as i64);
+        let v = copy_str_value(builder, src);
+        let (empty, _) = emit_const_str(module, builder, cx, b"")?;
+        copy_composite(builder, src, empty, fty, structs);
+        Ok(v)
+    } else {
+        let v = builder
+            .ins()
+            .load(types::I64, MemFlagsData::trusted(), obj_ptr, offset as i32);
+        let null = builder.ins().iconst(types::I64, 0);
+        builder
+            .ins()
+            .store(MemFlagsData::trusted(), null, obj_ptr, offset as i32);
+        Ok(v)
+    }
+}
+
+/// A moved-in array block (an array, a set, or a dict — all one block shape)
+/// as one this function holds the sole reference to. A block whose refcount
+/// is above one is *shared* — the one case a move cannot make its own — and
+/// goes through `aipl_arr_reserve` with nothing extra, which copies it and
+/// releases the shared original. Everything else is handed back untouched:
+/// a refcount-one block is already unique, and a `STATIC_REFCOUNT` block, a
+/// null one, or a view is left for the first in-place write to copy lazily
+/// (`aipl_array_push_mut` does exactly that), so a binding that never writes
+/// pays nothing — which a `mut acc = acc0` seeded with an empty literal and
+/// pushed to zero times is.
+///
+/// The refcount is read inline: the representation tag is masked off the
+/// pointer and the header word is at `-8`, for a view as for a heap block
+/// (`array_layout`).
+fn owned_block_made_unique<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    cx: Cx,
+    v: Value,
+    ty: &ConcreteType,
+) -> Value {
+    let structs = cx.structs;
+    let (drop_fn, retain_fn, esz) = match ty {
+        ConcreteType::Array(elem) | ConcreteType::Set(elem, _) => (
+            array_drop_fn_addr(builder, module, cx, elem),
+            array_retain_fn_addr(builder, module, cx, elem),
+            runtime_elem_size(elem, structs),
+        ),
+        ConcreteType::Dict(key, val) => {
+            let (d, r) = pair_rc_fn_addrs(builder, module, cx, key, val);
+            (d, r, dict_pair_size(key, val, structs))
+        }
+        _ => return v,
+    };
+    let copy_block = builder.create_block();
+    let merge = builder.create_block();
+    builder.append_block_param(merge, types::I64);
+    // Null: nothing to share. Otherwise read the refcount behind the untagged
+    // pointer; `1` and `STATIC_REFCOUNT` both mean "not shared with anyone
+    // who could be hurt by an in-place write" here.
+    let is_null = builder.ins().icmp_imm_s(IntCC::Equal, v, 0);
+    let check = builder.create_block();
+    builder
+        .ins()
+        .brif(is_null, merge, &[BlockArg::Value(v)], check, &[]);
+    builder.switch_to_block(check);
+    builder.seal_block(check);
+    let untagged = builder.ins().band_imm_u(v, !(ARR_TAG_MASK as i64));
+    let rc = builder.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        untagged,
+        -(HEADER_SIZE as i32),
+    );
+    let unique = builder.ins().icmp_imm_s(IntCC::Equal, rc, 1);
+    let static_rc = builder.ins().icmp_imm_s(IntCC::Equal, rc, STATIC_REFCOUNT);
+    let keep = builder.ins().bor(unique, static_rc);
+    builder
+        .ins()
+        .brif(keep, merge, &[BlockArg::Value(v)], copy_block, &[]);
+    builder.switch_to_block(copy_block);
+    builder.seal_block(copy_block);
+    let esz = builder.ins().iconst(types::I64, esz);
+    let zero = builder.ins().iconst(types::I64, 0);
+    let copied = cx.builtins.call(
+        module,
+        builder,
+        "aipl_arr_reserve",
+        &[v, zero, drop_fn, retain_fn, esz],
+    );
+    builder.ins().jump(merge, &[BlockArg::Value(copied)]);
+    builder.switch_to_block(merge);
+    builder.seal_block(merge);
+    builder.block_params(merge)[0]
 }
 
 /// Whether a value of type `ty` owns any heap references that must be released
@@ -14629,6 +14764,7 @@ fn compile_call<M: Module>(
     // "caller pre-incs"; a str concat/rope builds a view that keeps referencing
     // its operands), so it isn't guaranteed to free exactly the one ref we'd hand
     // it — retain into builtins as before. (Owned params never apply to builtins.)
+    let mut copied: Vec<(usize, Value)> = Vec::new();
     for (idx, (v, p)) in arg_values.iter().zip(info.params.iter()).enumerate() {
         // Not retained: either the parameter owns no heap, or it is a pure
         // borrow — an inspect-only heap parameter, or a boxed one outside a
@@ -14647,7 +14783,26 @@ fn compile_call<M: Module>(
         // the callee consumes that reference, and the accounting balances.
         let is_builtin = matches!(info.link, FuncLink::Builtin(_));
         let moved = arg_fresh[idx] && !is_builtin;
-        hand_off_arg(builder, module, builtins, structs, scopes, *v, &p.ty, moved);
+        // An owned *struct* parameter takes its fields out of the buffer it is
+        // given, nulling them behind it (`take_field`). That is only its to do
+        // in a buffer nobody else reads: a borrowed struct argument is a
+        // pointer into the caller's own storage — a binding's slot, the payload
+        // of a `?`-unwrapped result — which the caller will still release. So
+        // a borrow is retained into a *copy* of its own, and the copy is what
+        // the callee gets to consume.
+        let v = if p.owned && !moved && is_composite(&p.ty, structs) && !is_str_shaped(&p.ty) {
+            let copy = value_slot(builder, &p.ty, structs);
+            let copy_addr = builder.ins().stack_addr(types::I64, copy, 0);
+            copy_composite(builder, copy_addr, *v, &p.ty, structs);
+            copied.push((idx, copy_addr));
+            copy_addr
+        } else {
+            *v
+        };
+        hand_off_arg(builder, module, builtins, structs, scopes, v, &p.ty, moved);
+    }
+    for (idx, copy_addr) in copied {
+        arg_values[idx] = copy_addr;
     }
     // A composite result (struct or optional) is returned through a caller-
     // provided pointer (sret): allocate a slot of its size and pass its address.
@@ -16555,7 +16710,12 @@ fn compile_call_expr<M: Module>(
                     span.clone(),
                 ));
             }
+            let before_a = scope_depth(scopes);
             let (a_ptr, a_ty) = compile_expr(module, builder, cx, scopes, &args[0])?;
+            // Whether the receiver is a fresh temporary this scope owns outright
+            // — a field moved out of an owned struct parameter, a call result —
+            // captured before the second operand can grow the scope past it.
+            let a_owned = owned_temp_since(scopes, before_a, a_ptr);
             let (b_ptr, b_ty) = compile_expr(module, builder, cx, scopes, &args[1])?;
             // Both sides must be the same set type (up to an empty-`#{}` operand,
             // whose element merges to the concrete side).
@@ -16573,9 +16733,6 @@ fn compile_call_expr<M: Module>(
             let ConcreteType::Set(elem, order) = &result_ty else {
                 unreachable!()
             };
-            // Sets are array blocks — see the note at `reverse`'s array arm.
-            builtins.call_void(module, builder, "aipl_arr_inc", &[a_ptr]);
-            builtins.call_void(module, builder, "aipl_arr_inc", &[b_ptr]);
             let drop_fn = array_drop_fn_addr(builder, module, cx, elem);
             let retain_fn = array_retain_fn_addr(builder, module, cx, elem);
             let esz = builder
@@ -16585,12 +16742,48 @@ fn compile_call_expr<M: Module>(
             let ord = builder
                 .ins()
                 .iconst(types::I64, set_order_code(elem, *order));
-            let res = builtins.call(
-                module,
-                builder,
-                "aipl_set_union",
-                &[a_ptr, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord],
-            );
+            // Sets are array blocks — see the note at `reverse`'s array arm.
+            // `aipl_set_union_mut` decs `b`, so it is inc'd to balance its own
+            // track either way.
+            builtins.call_void(module, builder, "aipl_arr_inc", &[b_ptr]);
+            let res = if a_owned && !is_none_inner(elem) {
+                // A receiver this scope owns outright grows in place: its
+                // reference (its tracking entry, popped here) goes to
+                // `aipl_set_union_mut`, which reuses the block. Owning the
+                // reference is not owning the block — a moved-out field may
+                // still be shared with whatever built the struct — so the
+                // block is first made unique (`aipl_arr_reserve`: kept at
+                // refcount one, copied otherwise), as at every other in-place
+                // entry. The result is a fresh value, tracked below like the
+                // allocating union's. An `#{}` receiver has no element type to
+                // grow under and takes the copying path, as in the `Assign` arm.
+                let popped = move_owned_temp(scopes, before_a, a_ptr)
+                    || scopes
+                        .last_mut()
+                        .expect("scope")
+                        .iter()
+                        .rposition(|t| matches!(t.owned, Owned::Value(x) if x == a_ptr))
+                        .map(|pos| {
+                            scopes.last_mut().expect("scope").remove(pos);
+                        })
+                        .is_some();
+                debug_assert!(popped, "an owned union receiver is tracked");
+                let a_unique = owned_block_made_unique(builder, module, cx, a_ptr, &result_ty);
+                builtins.call(
+                    module,
+                    builder,
+                    "aipl_set_union_mut",
+                    &[a_unique, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord],
+                )
+            } else {
+                builtins.call_void(module, builder, "aipl_arr_inc", &[a_ptr]);
+                builtins.call(
+                    module,
+                    builder,
+                    "aipl_set_union",
+                    &[a_ptr, b_ptr, drop_fn, retain_fn, esz, str_cmp, ord],
+                )
+            };
             scopes
                 .last_mut()
                 .expect("scope")
@@ -16846,6 +17039,48 @@ fn compile_call_expr<M: Module>(
                     span.clone(),
                 ));
             };
+            // `__move(x.f)`: a heap field taken out of a struct binding that
+            // owns its value (`move_field_reads`). The struct keeps its own
+            // tracking entry — the field is left empty in the buffer, which its
+            // release passes over — so this is safe from inside a branch too,
+            // and the entry may sit in any enclosing scope. What it must not
+            // be is absent: a binding with no entry anywhere (an alias of a
+            // parameter, an element read out of an array) does not own the
+            // struct, and its fields are borrowed as before. An owned
+            // parameter's fields are taken by the `Field` arm itself.
+            if let ExprKind::Field(obj, field_name) = &arg.kind {
+                if let ExprKind::Ident(owner) = &obj.kind {
+                    if let Some(EnvBinding::Immut(obj_ptr, obj_ty)) = env.get(owner) {
+                        let obj_ptr = *obj_ptr;
+                        let owned_here = cx.owned_params.contains(owner)
+                            || scopes.iter().any(|s| {
+                                s.iter()
+                                    .any(|t| matches!(t.owned, Owned::Value(x) if x == obj_ptr))
+                            });
+                        let field = match &obj_ty {
+                            ConcreteType::Named(n) => structs
+                                .get(n)
+                                .and_then(TypeDef::as_struct)
+                                .and_then(|l| l.field(field_name))
+                                .map(|f| (f.offset, f.ty.clone())),
+                            _ => None,
+                        };
+                        if let (true, Some((foff, fty))) = (owned_here, field) {
+                            if needs_drop(&fty, structs)
+                                && (is_str_shaped(&fty) || mut_binding_owns_slot_ref(&fty, structs))
+                            {
+                                let v = take_field(module, builder, cx, obj_ptr, foff, &fty)?;
+                                scopes
+                                    .last_mut()
+                                    .expect("scope")
+                                    .push(Tracked::new(v, &fty));
+                                return Ok((v, fty));
+                            }
+                        }
+                    }
+                }
+                return compile_expr(module, builder, cx, scopes, arg);
+            }
             let ExprKind::Ident(name) = &arg.kind else {
                 // Inlining may have put the binding's value here directly; a
                 // fresh value is already what a move wants.
@@ -16856,13 +17091,20 @@ fn compile_call_expr<M: Module>(
                 .ok_or_else(|| Error::at(format!("unknown identifier {name:?}"), span.clone()))?;
             match binding {
                 EnvBinding::Immut(v, t) => {
+                    // The binding's entry is not relocated but *replaced*: the
+                    // old one is neutralized in place (a `Unit` entry drops
+                    // nothing) and a new one pushed, so the scope grows by one
+                    // — which is how `owned_temp_since` tells a fresh temporary
+                    // from a bare read of a binding whose entry merely happens
+                    // to be on top. Relocating alone left every such move a
+                    // retain.
                     let scope = scopes.last_mut().expect("scope");
                     if let Some(pos) = scope
                         .iter()
                         .rposition(|tr| matches!(tr.owned, Owned::Value(x) if x == *v))
                     {
-                        let entry = scope.remove(pos);
-                        scope.push(entry);
+                        let ty = std::mem::replace(&mut scope[pos].ty, ConcreteType::Unit);
+                        scope.push(Tracked::new(*v, &ty));
                     }
                     (*v, t.clone())
                 }
@@ -16879,6 +17121,25 @@ fn compile_call_expr<M: Module>(
                         let v = builder.ins().stack_load(types::I64, types::I64, *slot, 0);
                         let null = builder.ins().iconst(types::I64, 0);
                         builder.ins().stack_store(types::I64, null, *slot, 0);
+                        scopes.last_mut().expect("scope").push(Tracked::new(v, &t));
+                        (v, t)
+                    } else if is_composite(&t, structs) && needs_drop(&t, structs) {
+                        // A `mut` struct binding's slot points at the value's
+                        // own storage and holds a reference of its own *beside*
+                        // the initial value's tracking entry — two owners of
+                        // one buffer, kept that way so an alias taken before a
+                        // later `set` stays valid (see `LetMut`). Neither can be
+                        // taken out from under the other, so a struct is not
+                        // taken but copied: the fields go into a fresh
+                        // temporary with their own references, and the buffer
+                        // keeps what its owners will release. The copy is what
+                        // a read of the binding is anyway; it is a fresh value
+                        // now, which is what the call's hand-off wants.
+                        let buf = builder.ins().stack_load(types::I64, types::I64, *slot, 0);
+                        let fresh = value_slot(builder, &t, structs);
+                        let v = builder.ins().stack_addr(types::I64, fresh, 0);
+                        copy_composite(builder, v, buf, &t, structs);
+                        emit_retain(builder, module, builtins, structs, v, &t);
                         scopes.last_mut().expect("scope").push(Tracked::new(v, &t));
                         (v, t)
                     } else {
@@ -18635,6 +18896,28 @@ fn compile_expr_inner<M: Module>(
                 )
             })?;
             let (foff, fty) = (field.offset, field.ty.clone());
+            // A field of an *owned* struct parameter is this function's to
+            // take: mono admits a struct parameter as owned only when the body
+            // reads each heap-owning field at most once and never in a loop
+            // (`fields_read_once`), so this read is that field's move-out. The
+            // field's reference goes to the result with no retain, and the
+            // field is left holding the empty value of its type — null block
+            // pointer, inline empty `str` — which the parameter's exit release
+            // then passes over. Only the pointer-word (a block, or a boxed
+            // value — both released null-safely) and wide-`str` fields move;
+            // an inline composite has no empty value to leave behind, so those
+            // keep the borrow-and-retain below.
+            if matches!(&obj.kind, ExprKind::Ident(n) if cx.owned_params.contains(n))
+                && needs_drop(&fty, structs)
+                && (is_str_shaped(&fty) || mut_binding_owns_slot_ref(&fty, structs))
+            {
+                let v = take_field(module, builder, cx, obj_ptr, foff, &fty)?;
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .push(Tracked::new(v, &fty));
+                return Ok((v, fty));
+            }
             // A scalar/heap field loads as an 8-byte value; an optional field
             // is an inline composite, so its "value" is the address of that
             // storage within the struct.
@@ -18784,6 +19067,57 @@ fn compile_expr_inner<M: Module>(
             // (see `coerce_empty_to_char_array`); bindings did not.
             let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, &t);
             reject_unit_binding(&t, name, value.span.clone())?;
+            // A composite the binding *owns* must own its storage, not only
+            // the references in it. A call result or a constructor lands in a
+            // slot of its own; anything else that arrives tracked — a nested
+            // struct read out of a parent (`let sig = self.sig`), an element
+            // read out of an array, a `?`'s payload, an `if`'s merged value —
+            // is an address into storage someone else keeps, with the fields
+            // retained on the way out. That is enough for reading, but not
+            // for the moves the ownership passes make of a binding: a field
+            // taken out of it is nulled in place (`take_field`), and a callee
+            // an owned struct is moved into does the same, so the storage has
+            // to be the binding's alone. The copy is the value-semantics read
+            // anyway (the `str` element read snapshots for the same reason).
+            //
+            // A `__move` of a *field* is not a call result: when the field is
+            // a nested struct it cannot be taken (see `Callee::Move`), so the
+            // move falls through to the borrowing read, and the binding holds
+            // an address into the parent again.
+            let fresh_storage = match &value.kind {
+                ExprKind::Construct(..) => true,
+                ExprKind::Call(Callee::Move, args, _) => {
+                    !matches!(args.first().map(|a| &a.kind), Some(ExprKind::Field(..)))
+                }
+                ExprKind::Call(..) => true,
+                _ => false,
+            };
+            //
+            // And only for a binding the body goes on to move: one that is only
+            // read keeps borrowing, as it always has.
+            let v = if needs_drop(&t, structs)
+                && is_composite(&t, structs)
+                && !is_str_shaped(&t)
+                && !is_boxed(&t, structs)
+                && !fresh_storage
+                && aipl_mono::moves_binding(name, body)
+                && matches!(
+                    scopes.last().and_then(|s| s.last()),
+                    Some(Tracked { owned: Owned::Value(x), .. }) if *x == v
+                ) {
+                let own = value_slot(builder, &t, structs);
+                let own_addr = builder.ins().stack_addr(types::I64, own, 0);
+                copy_composite(builder, own_addr, v, &t, structs);
+                scopes
+                    .last_mut()
+                    .expect("scope")
+                    .last_mut()
+                    .expect("entry")
+                    .owned = Owned::Value(own_addr);
+                own_addr
+            } else {
+                v
+            };
             let mut new_env = env.clone();
             cx.bindings
                 .borrow_mut()
@@ -18844,35 +19178,91 @@ fn compile_expr_inner<M: Module>(
             // may mutate it in place. Re-own it via the slot rather than the
             // literal's value-track, so a relocating grow is still dropped
             // exactly once (the slot-track loads the current pointer at exit).
-            let fresh_literal = match &t {
-                // A reserved-capacity array (`map`'s pre-sized output) is just as
-                // fresh and unaliased as an `[..]` literal, so it's eligible for
-                // the in-place `push` path too — and so is the block
-                // `__arr_writable` hands the in-place `map`/`filter` bodies.
-                //
-                // A *constant* literal lives in the data section, and is
-                // exclusive all the same: the first in-place mutation finds its
-                // `STATIC_REFCOUNT` and copies (`emit_const_array`), and every
-                // one after that grows the copy in place.
-                ConcreteType::Array(_) => {
-                    matches!(&value.kind, ExprKind::ArrayLit(_))
-                        || matches!(
-                            &value.kind,
-                            ExprKind::Call(Callee::WithCapacity | Callee::ArrWritable, _, _)
-                        )
-                }
-                ConcreteType::Primitive(Primitive::Str) => matches!(&value.kind, ExprKind::Str(_)),
-                _ => false,
-            };
+            // `mut y = __move(x)`: another binding's value at its last use
+            // (`aipl_mono::move_last_use`), handed over as a fresh temporary —
+            // owned like a moved-in parameter, and made unique like one below.
+            let moved_binding = matches!(&value.kind, ExprKind::Call(Callee::Move, _, _));
+            let fresh_literal = moved_binding
+                || match &t {
+                    // A reserved-capacity array (`map`'s pre-sized output) is
+                    // just as fresh and unaliased as an `[..]` literal, so it's
+                    // eligible for the in-place `push` path too — and so is the
+                    // block `__arr_writable` hands the in-place `map`/`filter`
+                    // bodies.
+                    //
+                    // A *constant* literal lives in the data section, and is
+                    // exclusive all the same: the first in-place mutation finds
+                    // its `STATIC_REFCOUNT` and copies (`emit_const_array`), and
+                    // every one after that grows the copy in place.
+                    ConcreteType::Array(_) => {
+                        matches!(&value.kind, ExprKind::ArrayLit(_))
+                            || matches!(
+                                &value.kind,
+                                ExprKind::Call(Callee::WithCapacity | Callee::ArrWritable, _, _)
+                            )
+                    }
+                    ConcreteType::Primitive(Primitive::Str) => {
+                        matches!(&value.kind, ExprKind::Str(_))
+                    }
+                    _ => false,
+                };
             // `mut y = p` where `p` is a moved-in owned parameter: take ownership
             // (no copy, no extra inc) so `y` is exclusive. The parameter's own
             // drop was suppressed, so there's no value-track to pop.
             let owned_move =
                 matches!(&value.kind, ExprKind::Ident(n) if cx.owned_params.contains(n));
+            // Owning the reference is not the same as owning the block. The
+            // caller moved the parameter in because its argument looked fresh —
+            // a call result — but a callee may return one of its own borrowed
+            // arguments, retained (`fn same(xs) { xs }`), and then this block is
+            // still read through the caller's binding. Exclusive `push`
+            // mutates in place without asking, so the block is made unique here,
+            // once, on its way into the slot: `aipl_arr_reserve` keeps a block
+            // at refcount one and copies any other, static and views included —
+            // the same guard `__arr_writable` gives the in-place `map`/`filter`
+            // bodies, for the same reason. A call boundary is the one place a
+            // refcount above one means sharing: inside a function a single
+            // owner's bookkeeping holds several, which is why the runtime's
+            // in-place entries never check it themselves. A `str` needs nothing
+            // here — its appends refine ownership with `is_unique` already.
             // `allow_tail_move`: a mut binding returned (or moved out) in tail
             // position is a last-use move, not an alias, so it stays exclusive.
             let exclusive =
                 (fresh_literal || owned_move) && aipl_mono::binding_is_exclusive(name, body, true);
+            // Only on the exclusive path, where the slot becomes the block's
+            // sole owner: a non-exclusive binding retains its value and leaves
+            // the value's own ownership in place, and a unique copy made for it
+            // would have no one to release it. And only for a binding the body
+            // goes on to assign — an in-place `push` is a `set` — since a
+            // binding that is only read has no use for a block of its own.
+            let v = if exclusive
+                && (owned_move || moved_binding)
+                && !is_str_shaped(&t)
+                && mut_binding_owns_slot_ref(&t, structs)
+                && aipl_mono::assigns_binding(name, body)
+            {
+                // A moved binding's fresh entry names the old pointer; the
+                // unique block replaces it under the same entry, which the
+                // exclusive path below pops.
+                let unique = owned_block_made_unique(builder, module, cx, v, &t);
+                if let Some(entry) = scopes
+                    .last_mut()
+                    .expect("scope")
+                    .iter_mut()
+                    .rev()
+                    .find(|e| matches!(e.owned, Owned::Value(x) if x == v))
+                {
+                    entry.owned = Owned::Value(unique);
+                }
+                unique
+            } else {
+                v
+            };
+            // Stored again below for the str-shaped slot; a tagged binding's
+            // slot takes the (possibly new) pointer here.
+            if !is_str_shaped(&t) {
+                builder.ins().stack_store(types::I64, v, slot, 0);
+            }
             if is_str_shaped(&t) {
                 // A `str` binding's slot owns one reference to its current
                 // value, released once at scope exit by this slot-track. `set`

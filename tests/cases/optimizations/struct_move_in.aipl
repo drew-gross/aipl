@@ -1,0 +1,150 @@
+import { concat as +++, len, logical_or as ||, print, union } from builtins;
+
+// A struct parameter can be owned too. Where an array parameter is owned when
+// the body consumes it as `mut y = p`, a struct one is owned when the body
+// reads it only through its fields, each heap-owning field at most once and
+// never in a loop: every such read is then a *move* of that field — its
+// reference goes to the value read, nothing is retained — and what the body
+// never read is released at exit. A fresh argument (a literal, a call
+// result) moves in whole; a binding at its last use moves in through
+// `__move`; anything else is retained field by field and released by the
+// callee, as any borrowed argument is.
+//
+// The payoff is `merge`: `self.kinds` taken out of an owned `self` is a set
+// this scope owns outright, and `union` on such a receiver grows it in place
+// (`aipl_set_union_mut`, behind an `aipl_arr_reserve` that copies a block
+// anyone else still holds) instead of building a fresh set.
+struct First { kinds: #{i64} = #{}, texts: #{str} = #{}, nullable: bool = false }
+
+fn merge(self: First, other: First) -> First {
+    kinds: self.kinds.union(other.kinds),
+    texts: self.texts.union(other.texts),
+    nullable: self.nullable || other.nullable,
+}
+
+fn fold(parts: First[]) -> First {
+    mut acc: First = First { nullable: true };
+    for (let sub : parts) {
+        if (acc.nullable) {
+            set acc = First { ..acc.merge(sub), nullable: sub.nullable };
+        };
+    }
+    acc
+}
+
+struct Named { name: str, tags: str[] }
+
+fn rename(self: Named, suffix: str) -> Named { name: self.name +++ suffix, tags: self.tags }
+
+fn width(n: Named) -> u64 { n.name.len() } #[allow]
+
+fn main() !prints {
+    let f = fold([
+        First { kinds: #{1}, nullable: true },
+        First { texts: #{"a"}, nullable: true },
+        First { kinds: #{2}, texts: #{"b"} },
+    ]);
+    print(`{f}`);
+    let g = fold([First { kinds: #{5}, nullable: true }, First { kinds: #{6} }]);
+    print(`{g}`);
+    // Two fresh receivers: both move in whole.
+    print(`{First { kinds: #{9} }.merge(First { texts: #{"z"} })}`);
+
+    // A borrowed struct is retained field by field and stays intact; a fresh
+    // one moves; a chain of fresh results moves at every step.
+    let n = Named { name: "x", tags: ["p", "q"] };
+    print(`{n.rename("!")} {n}`);
+    print(`{Named { name: "y", tags: [] }.rename("?")}`);
+    print(`{width(n.rename("."))} {width(n)} {n}`);
+    let m = Named { name: "z", tags: ["r"] };
+    print(`{m.rename("+").rename("-")}`);
+    // A binding at its last use moves in whole.
+    let k = Named { name: "k", tags: ["s", "t", "u"] };
+    print(`{k.rename("=")}`);
+}
+--- stdout ---
+First { kinds: {1, 2}, texts: {"a", "b"}, nullable: false }
+First { kinds: {5, 6}, texts: {}, nullable: false }
+First { kinds: {9}, texts: {"z"}, nullable: false }
+Named { name: "x!", tags: ["p", "q"] } Named { name: "x", tags: ["p", "q"] }
+Named { name: "y?", tags: [] }
+2 1 Named { name: "x", tags: ["p", "q"] }
+Named { name: "z+-", tags: ["r"] }
+Named { name: "k=", tags: ["s", "t", "u"] }
+--- performance ---
+allocations: 48
+deallocations: 48
+reallocations: 3
+bytes allocated: 2930
+instructions executed: 6459
+binary size: 18760
+  code: 11252
+  data: 604
+  metadata: 6904
+functions:
+  __arr_drop_First:
+    calls: 2
+    bytes: 140
+  __arr_retain_First:
+    calls: 0
+    bytes: 140
+  __to_str_First:
+    calls: 3
+    bytes: 1772
+  __to_str_Named:
+    calls: 6
+    bytes: 1208
+  __to_str_u64:
+    calls: 2
+    bytes: 204
+  aipl_arr_inc:
+    calls: 62
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 4
+    bytes: (external)
+  aipl_array_dec:
+    calls: 112
+    bytes: (external)
+  aipl_array_new:
+    calls: 5
+    bytes: (external)
+  aipl_array_push:
+    calls: 4
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 15
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 8
+    bytes: (external)
+  aipl_i64_len:
+    calls: 10
+    bytes: (external)
+  aipl_set_contains:
+    calls: 15
+    bytes: (external)
+  aipl_set_insert:
+    calls: 15
+    bytes: (external)
+  aipl_set_union_mut:
+    calls: 12
+    bytes: (external)
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 105
+    bytes: (external)
+  aipl_write_i64:
+    calls: 5
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  fold:
+    calls: 2
+    bytes: 1228
+  main:
+    calls: 1
+    bytes: 6560

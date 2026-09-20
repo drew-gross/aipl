@@ -43,8 +43,8 @@ mod known_constructor_elimination;
 pub use known_constructor_elimination::eliminate_known_constructors_post_mono;
 
 mod move_last_use;
-use move_last_use::move_last_uses;
 pub use move_last_use::move_last_uses_post_mono;
+use move_last_use::{move_field_reads, move_last_uses};
 
 mod subst;
 pub use subst::inline_single_use_bindings;
@@ -4657,9 +4657,9 @@ impl Mono<'_> {
         arg_tys: &[Type],
     ) -> Vec<usize> {
         let (params, return_ty, body) = self.concrete_signature(template, type_args);
-        owned_eligible(template, &params, &return_ty, &body)
+        owned_eligible(template, &params, &return_ty, &body, &|t| self.owns_heap(t))
             .into_iter()
-            .filter(|&i| i < args.len() && is_fresh_heap(&args[i], &arg_tys[i]))
+            .filter(|&i| i < args.len() && self.owns_heap(&arg_tys[i]) && fresh_tail(&args[i]))
             .collect()
     }
 
@@ -4922,6 +4922,42 @@ impl Mono<'_> {
     /// The element types of a tuple type — a `Type::Tuple` (an element-wise
     /// scrutinee's), or a synthetic tuple struct's fields in order — or `None`
     /// for anything that is not a tuple.
+    /// The fields of the struct `ty` names, from either table — `None` for a
+    /// type that is not a struct.
+    fn struct_fields_of(&self, ty: &Type) -> Option<&Vec<(String, Type, Option<Expr>)>> {
+        let Type::Named(name) = ty else {
+            return None;
+        };
+        self.structs
+            .get(name)
+            .or_else(|| self.syn_structs.get(name))
+    }
+
+    /// Whether a value of `ty` owns heap references — a heap type itself, or a
+    /// struct with a field that does. The ownership analyses ask this where
+    /// codegen asks `needs_drop`: only such a value has anything to move.
+    fn owns_heap(&self, ty: &Type) -> bool {
+        is_heap(ty)
+            || self
+                .struct_fields_of(ty)
+                .is_some_and(|fields| fields.iter().any(|(_, t, _)| self.owns_heap(t)))
+    }
+
+    /// The names of `ty`'s fields that own heap references — the fields a move
+    /// of the whole value is *about*, and the ones a borrower must not read
+    /// once it has been moved. Empty for anything but a struct.
+    fn heap_fields_of(&self, ty: &Type) -> HashSet<String> {
+        self.struct_fields_of(ty)
+            .map(|fields| {
+                fields
+                    .iter()
+                    .filter(|(_, t, _)| self.owns_heap(t))
+                    .map(|(n, _, _)| n.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     fn tuple_field_tys(&self, ty: &Type) -> Option<Vec<Type>> {
         if let Type::Tuple(es) = ty {
             return Some(es.clone());
@@ -5618,9 +5654,26 @@ impl Mono<'_> {
     /// binding, which is the kind whose borrow costs a retain/release pair.
     /// See `move_last_use`. Runs here, before the body is inferred, so
     /// `owned_for_call` sees the marks when it chooses each callee's instance.
+    /// The annotation a binding leaves mono with: what was written, or — for a
+    /// struct binding written without one — the struct type inferred for it.
+    /// The passes after mono see no types otherwise, and the final move
+    /// marking (`move_last_uses_post_mono`) needs a struct binding's type to
+    /// tell a scalar field read from a borrow. Only a struct is recorded: a
+    /// `Named` type round-trips to codegen exactly, and a heap binding's
+    /// eligibility never needed its type.
+    fn recorded_struct_ty(&self, written: &Option<Type>, inferred: &Type) -> Option<Type> {
+        match written {
+            Some(t) => Some(t.clone()),
+            None if self.struct_fields_of(inferred).is_some() => Some(inferred.clone()),
+            None => None,
+        }
+    }
+
     fn with_last_uses_moved(&self, name: &str, ty: &Type, value: &Expr, body: &Expr) -> Expr {
-        if is_heap(ty) {
-            move_last_uses(name, value, body, &self.mutating)
+        if self.owns_heap(ty) {
+            let heap_fields = self.heap_fields_of(ty);
+            let body = move_last_uses(name, value, body, &heap_fields, &self.mutating);
+            move_field_reads(name, value, &body, &heap_fields)
         } else {
             body.clone()
         }
@@ -5966,6 +6019,7 @@ impl Mono<'_> {
                 self.check_folded_literal_fits(val, &rv, &vt, ty.as_ref())?;
                 let vt = ty.clone().unwrap_or(vt);
                 let body = self.with_last_uses_moved(name, &vt, val, body);
+                let ty = self.recorded_struct_ty(&ty, &vt);
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
                 let (rb, bt) = self.infer(&body, &env2)?;
@@ -5997,6 +6051,7 @@ impl Mono<'_> {
                 self.check_folded_literal_fits(val, &rv, &vt, ty.as_ref())?;
                 let vt = ty.clone().unwrap_or(vt);
                 let body = self.with_last_uses_moved(name, &vt, val, body);
+                let ty = self.recorded_struct_ty(&ty, &vt);
                 let mut env2 = env.clone();
                 env2.insert(name.clone(), vt);
                 let (rb, bt) = self.infer(&body, &env2)?;
@@ -9551,7 +9606,7 @@ fn is_heap(t: &Type) -> bool {
 /// Spelled out rather than widening at the call site: which representation an
 /// analysis speaks is a property of *when* it runs, and saying so once here
 /// beats converting at each use as though a boundary were being crossed.
-fn is_heap_concrete(t: &ConcreteType) -> bool {
+pub(crate) fn is_heap_concrete(t: &ConcreteType) -> bool {
     *t == ConcreteType::Primitive(Primitive::Str)
         || aipl_syntax::concrete::is_error(t)
         || matches!(
@@ -9626,6 +9681,7 @@ fn fresh_tail(e: &Expr) -> bool {
         ExprKind::ArrayLit(_)
         | ExprKind::SetLit(..)
         | ExprKind::DictLit(_)
+        | ExprKind::Construct(..)
         | ExprKind::Call(_, _, _) => true,
         ExprKind::Let(_, _, _, body)
         | ExprKind::LetMut(_, _, _, body)
@@ -9651,25 +9707,74 @@ fn fresh_tail(e: &Expr) -> bool {
 /// `grow(xs)` by the time this runs. A `mut self` one does not: it is a
 /// slot-backed binding with the writeback protocol (`set x = x.f(..)`), not a
 /// value the body rebinds.
+///
+/// A *struct* parameter is owned on a different shape: the body reads it only
+/// through its fields, and reads each heap-owning field at most once, never
+/// inside a loop or a lambda. Then every such read is a *move-out* — the
+/// callee takes the field's reference instead of retaining a copy — and what
+/// it never read is released at exit. `owns_heap` is the struct-aware test for
+/// "has something to move" (the caller's tables know the fields); a struct
+/// with no heap field has nothing to own.
 fn owned_eligible(
     name: &str,
     params: &[Param],
     return_ty: &Option<Type>,
     body: &Expr,
+    owns_heap: &dyn Fn(&Type) -> bool,
 ) -> Vec<usize> {
-    if name == "main" || !return_ty.as_ref().is_some_and(is_heap) {
+    if name == "main" || !return_ty.as_ref().is_some_and(owns_heap) {
         return Vec::new();
     }
     params
         .iter()
         .enumerate()
-        .filter(|(_, p)| !p.mutable && is_heap(&p.ty) && count_ident(&p.name, body) == 1)
+        .filter(|(_, p)| !p.mutable && owns_heap(&p.ty))
         .filter(|(_, p)| {
-            find_move_into(&p.name, body)
-                .is_some_and(|(y, body_after)| binding_is_exclusive(y, body_after, true))
+            if is_heap(&p.ty) {
+                count_ident(&p.name, body) == 1
+                    && find_move_into(&p.name, body)
+                        .is_some_and(|(y, body_after)| binding_is_exclusive(y, body_after, true))
+            } else {
+                fields_read_once(&p.name, body)
+            }
         })
         .map(|(i, _)| i)
         .collect()
+}
+
+/// Whether `body` uses `param` only as `param.f` reads, with no field read
+/// twice, in a loop, or in a lambda — the shape under which each read of a
+/// heap field can be the move of that field. Conservative on every count: a
+/// read of the whole value, a second read of one field (on any path), and any
+/// read that could run more than once all disqualify.
+pub(crate) fn fields_read_once(param: &str, body: &Expr) -> bool {
+    let mut seen: Vec<String> = Vec::new();
+    fields_read_once_into(param, body, false, &mut seen)
+}
+
+fn fields_read_once_into(param: &str, e: &Expr, repeats: bool, seen: &mut Vec<String>) -> bool {
+    match &e.kind {
+        ExprKind::Field(obj, f) if matches!(&obj.kind, ExprKind::Ident(n) if n == param) => {
+            if repeats || seen.contains(f) {
+                return false;
+            }
+            seen.push(f.clone());
+            true
+        }
+        ExprKind::Ident(n) => n != param,
+        ExprKind::For(_, iter, fbody) => {
+            fields_read_once_into(param, iter, repeats, seen)
+                && fields_read_once_into(param, fbody, true, seen)
+        }
+        ExprKind::While(cond, wbody) => {
+            fields_read_once_into(param, cond, true, seen)
+                && fields_read_once_into(param, wbody, true, seen)
+        }
+        ExprKind::Lambda(_, lbody) => fields_read_once_into(param, lbody, true, seen),
+        _ => children(e)
+            .into_iter()
+            .all(|c| fields_read_once_into(param, c, repeats, seen)),
+    }
 }
 
 // ---- Borrow-only parameter analysis (retain elision) ------------------------
@@ -9789,6 +9894,37 @@ fn param_is_inspect_only(name: &str, body: &Expr) -> bool {
 /// true iff every use of `name` in `body` is provably non-aliasing, so `push` /
 /// `+` may mutate it in place. `allow_tail_move` permits a final move-out (a
 /// returned binding). Conservative: any unhandled use disqualifies it.
+/// Whether `body` ever assigns the binding `name` — a `set name = ..`, which
+/// is also what every in-place mutation (`set name.push(x)`) desugars to.
+/// A binding that is never assigned is only ever read, so nothing needs its
+/// block unique.
+pub fn assigns_binding(name: &str, body: &Expr) -> bool {
+    if let ExprKind::Assign(lhs, _, _) = &body.kind {
+        if matches!(&lhs.kind, ExprKind::Ident(n) if n == name) {
+            return true;
+        }
+    }
+    children(body).into_iter().any(|c| assigns_binding(name, c))
+}
+
+/// Whether `body` moves the binding `name` — whole (`__move(name)`) or by a
+/// field (`__move(name.f)`), the marks `move_last_use` leaves. Only such a
+/// binding needs storage of its own; one that is merely read can keep
+/// borrowing the storage it was read out of.
+pub fn moves_binding(name: &str, body: &Expr) -> bool {
+    if let ExprKind::Call(Callee::Move, args, _) = &body.kind {
+        let moved = match args.first().map(|a| &a.kind) {
+            Some(ExprKind::Ident(n)) => n == name,
+            Some(ExprKind::Field(obj, _)) => matches!(&obj.kind, ExprKind::Ident(n) if n == name),
+            _ => false,
+        };
+        if moved {
+            return true;
+        }
+    }
+    children(body).into_iter().any(|c| moves_binding(name, c))
+}
+
 pub fn binding_is_exclusive(name: &str, body: &Expr, allow_tail_move: bool) -> bool {
     !aliases_or_unsafe(name, body, false, allow_tail_move)
 }

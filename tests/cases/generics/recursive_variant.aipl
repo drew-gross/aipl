@@ -78,9 +78,9 @@ allocations: 41
 deallocations: 41
 reallocations: 0
 bytes allocated: 2212
-instructions executed: 2686
-binary size: 11336
-  code: 5976
+instructions executed: 2690
+binary size: 11344
+  code: 5984
   data: 499
   metadata: 4861
 functions:
@@ -158,7 +158,7 @@ functions:
     bytes: 580
   shift$Tok:
     calls: 4
-    bytes: 972
+    bytes: 976
   size$Tok:
     calls: 4
-    bytes: 464
+    bytes: 468

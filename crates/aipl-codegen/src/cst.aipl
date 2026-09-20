@@ -433,11 +433,11 @@ allocations: 359
 deallocations: 359
 reallocations: 33
 bytes allocated: 21382
-instructions executed: 43702
-binary size: 58712
-  code: 35480
+instructions executed: 44284
+binary size: 58552
+  code: 35448
   data: 2717
-  metadata: 20515
+  metadata: 20387
 functions:
   __arr_drop_Cst:
     calls: 138
@@ -456,19 +456,19 @@ functions:
     bytes: 44
   __builtin_map_join$Cst$Cst$lam$splice$tail:
     calls: 46
-    bytes: 1556
+    bytes: 1572
   __builtin_map_join$Cst$__builtin_Span$lam$leaves:
     calls: 0
     bytes: 44
   __builtin_map_join$Cst$__builtin_Span$lam$leaves$tail:
     calls: 20
-    bytes: 1028
+    bytes: 1040
   __builtin_map_join$Cst$__builtin_Span$lam$token_leaves:
     calls: 0
     bytes: 44
   __builtin_map_join$Cst$__builtin_Span$lam$token_leaves$tail:
     calls: 12
-    bytes: 1028
+    bytes: 1040
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_leaf:
     calls: 6
     bytes: 440
@@ -492,7 +492,7 @@ functions:
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 13468
+    bytes: 13340
   __test$through:
     calls: 1
     bytes: 388
@@ -530,10 +530,10 @@ functions:
     calls: 61
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 573
+    calls: 569
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 512
+    calls: 508
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -555,7 +555,7 @@ functions:
     bytes: 32
   flat_kids$tail:
     calls: 20
-    bytes: 1104
+    bytes: 1108
   last_leaf:
     calls: 12
     bytes: 788
@@ -567,34 +567,34 @@ functions:
     bytes: 32
   leaves$tail:
     calls: 48
-    bytes: 1232
+    bytes: 1236
   main:
     calls: 1
     bytes: 168
   nodes$filter1$own0:
     calls: 7
-    bytes: 368
+    bytes: 376
   own_token_text:
     calls: 3
-    bytes: 1240
+    bytes: 1248
   show:
     calls: 23
-    bytes: 2956
+    bytes: 2968
   span:
     calls: 7
     bytes: 252
   text:
     calls: 5
-    bytes: 1452
+    bytes: 1460
   token_leaves:
     calls: 0
     bytes: 32
   token_leaves$tail:
     calls: 38
-    bytes: 1156
+    bytes: 1160
   token_span:
     calls: 3
     bytes: 288
   token_text:
     calls: 5
-    bytes: 1452
+    bytes: 1460

@@ -1518,11 +1518,11 @@ allocations: 415
 deallocations: 415
 reallocations: 90
 bytes allocated: 66104
-instructions executed: 373713
-binary size: 2539440
-  code: 1701580
+instructions executed: 375484
+binary size: 2539512
+  code: 1701684
   data: 11788
-  metadata: 826072
+  metadata: 826040
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1544,22 +1544,22 @@ functions:
     bytes: 916
   __builtin_count_while$char$lam$lex_step$Kind$lambda1:
     calls: 85
-    bytes: 308
+    bytes: 312
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 13
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 49
-    bytes: 276
+    bytes: 280
   __builtin_count_while$char$s0$lam$to_eol_len$lambda0:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$to_eol_len$lambda0$tail:
     calls: 8
-    bytes: 352
+    bytes: 356
   __builtin_int_parse:
     calls: 13
-    bytes: 1116
+    bytes: 1080
   __builtin_int_parse$lambda1:
     calls: 67
     bytes: 140
@@ -1586,10 +1586,10 @@ functions:
     bytes: 104
   __m1__unescape:
     calls: 24
-    bytes: 1612
+    bytes: 1628
   __test$keep_skipped:
     calls: 1
-    bytes: 25276
+    bytes: 25356
   __test$keep_skipped$lambda0:
     calls: 0
     bytes: 128
@@ -1684,7 +1684,7 @@ functions:
     calls: 366
     bytes: (external)
   aipl_arr_inc:
-    calls: 3192
+    calls: 3144
     bytes: (external)
   aipl_arr_reserve:
     calls: 366
@@ -1718,34 +1718,34 @@ functions:
     bytes: (external)
   between_len:
     calls: 3
-    bytes: 824
+    bytes: 800
   checked_seg:
     calls: 2
     bytes: 1780
   delimited_len:
     calls: 28
-    bytes: 1908
+    bytes: 1904
   esc_str:
     calls: 2
     bytes: 140
   finalize_template$Kind:
     calls: 16
-    bytes: 8388
+    bytes: 8376
   float_len:
     calls: 14
-    bytes: 832
+    bytes: 824
   int_tok:
     calls: 13
     bytes: 1048
   interp_scan$Kind:
     calls: 10
-    bytes: 1880
+    bytes: 1896
   keep_skipped$Kind:
     calls: 3
-    bytes: 5956
+    bytes: 5960
   lex$Kind:
     calls: 78
-    bytes: 1184
+    bytes: 1196
   lex_step$Kind:
     calls: 178
     bytes: 29168
@@ -1754,19 +1754,19 @@ functions:
     bytes: 240
   nested_len:
     calls: 3
-    bytes: 1136
+    bytes: 1148
   nonempty_str:
     calls: 2
     bytes: 1836
   rawtpl_kind:
     calls: 4
-    bytes: 4116
+    bytes: 4112
   step_result$Kind:
     calls: 477
     bytes: 16288
   template_scan$Kind:
     calls: 20
-    bytes: 2788
+    bytes: 2824
   template_step$Kind:
     calls: 32
     bytes: 444

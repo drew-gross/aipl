@@ -25,33 +25,36 @@ fn extend2(mut self: i64[], a: i64, b: i64) {
     assert(ys == [7, 8, 9]);
 })
 --- performance ---
-allocations: 4
-deallocations: 4
-reallocations: 2
-bytes allocated: 208
-instructions executed: 793
-binary size: 3216
-  code: 1216
+allocations: 3
+deallocations: 3
+reallocations: 3
+bytes allocated: 136
+instructions executed: 815
+binary size: 3208
+  code: 1232
   data: 330
-  metadata: 1670
+  metadata: 1646
 functions:
   __eq_i64$arr:
     calls: 3
     bytes: 296
   __test$extend2:
     calls: 1
-    bytes: 812
+    bytes: 828
   aipl_arr_inc:
-    calls: 5
+    calls: 2
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 11
+    calls: 8
     bytes: (external)
   aipl_array_push:
-    calls: 4
+    calls: 2
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3
+    calls: 5
     bytes: (external)
   aipl_assert:
     calls: 3

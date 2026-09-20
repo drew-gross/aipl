@@ -41,9 +41,9 @@ allocations: 9
 deallocations: 9
 reallocations: 0
 bytes allocated: 752
-instructions executed: 3484
-binary size: 8184
-  code: 4224
+instructions executed: 3504
+binary size: 8224
+  code: 4264
   data: 852
   metadata: 3108
 functions:
@@ -55,13 +55,13 @@ functions:
     bytes: 364
   __test$is_even:
     calls: 1
-    bytes: 2692
+    bytes: 2716
   __test$is_even$filter14$own0:
     calls: 1
-    bytes: 464
+    bytes: 472
   __test$is_even$filter7$own0:
     calls: 1
-    bytes: 300
+    bytes: 308
   aipl_arr_inc:
     calls: 3
     bytes: (external)

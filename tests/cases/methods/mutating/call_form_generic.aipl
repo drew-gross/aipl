@@ -16,9 +16,9 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 56
-instructions executed: 377
-binary size: 2248
-  code: 760
+instructions executed: 381
+binary size: 2256
+  code: 768
   data: 192
   metadata: 1296
 functions:
@@ -27,7 +27,7 @@ functions:
     bytes: 296
   __test$append:
     calls: 1
-    bytes: 360
+    bytes: 368
   aipl_arr_inc:
     calls: 3
     bytes: (external)

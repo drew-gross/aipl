@@ -97,15 +97,15 @@ allocations: 63
 deallocations: 63
 reallocations: 0
 bytes allocated: 2552
-instructions executed: 4786
-binary size: 11544
-  code: 6872
+instructions executed: 4840
+binary size: 11688
+  code: 7016
   data: 203
   metadata: 4469
 functions:
   __builtin_union_all$i64:
     calls: 3
-    bytes: 396
+    bytes: 436
   __to_str_i64:
     calls: 10
     bytes: 204
@@ -159,10 +159,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3512
+    bytes: 3560
   merged:
     calls: 2
-    bytes: 396
+    bytes: 436
   show:
     calls: 6
-    bytes: 1656
+    bytes: 1672

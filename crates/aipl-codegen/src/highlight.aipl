@@ -757,11 +757,11 @@ allocations: 991
 deallocations: 991
 reallocations: 33
 bytes allocated: 75800
-instructions executed: 128336
-binary size: 145056
-  code: 93040
+instructions executed: 128893
+binary size: 145328
+  code: 93468
   data: 5520
-  metadata: 46496
+  metadata: 46340
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -792,10 +792,10 @@ functions:
     bytes: 304
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda0:
     calls: 0
-    bytes: 524
+    bytes: 528
   __builtin_count_while$Item$lam$rule_pats$Kind$lambda1$lambda0:
     calls: 4
-    bytes: 524
+    bytes: 528
   __eq_Entry:
     calls: 1
     bytes: 128
@@ -813,13 +813,13 @@ functions:
     bytes: 364
   __m1__indent:
     calls: 12
-    bytes: 1652
+    bytes: 1660
   __rec_drop_Pat:
     calls: 76
     bytes: 268
   __test$brace_group_entry:
     calls: 1
-    bytes: 1868
+    bytes: 1948
   __test$char_class_body:
     calls: 1
     bytes: 1852
@@ -849,13 +849,13 @@ functions:
     bytes: 1104
   __test$rule_pats:
     calls: 1
-    bytes: 7844
+    bytes: 7828
   __test$tm_json:
     calls: 1
-    bytes: 5900
+    bytes: 6104
   __test$word_pat:
     calls: 1
-    bytes: 2188
+    bytes: 2196
   __to_str_u64:
     calls: 0
     bytes: 204
@@ -863,7 +863,7 @@ functions:
     calls: 15
     bytes: (external)
   aipl_arr_inc:
-    calls: 123
+    calls: 117
     bytes: (external)
   aipl_arr_reserve:
     calls: 13
@@ -909,13 +909,13 @@ functions:
     bytes: (external)
   arr_fld:
     calls: 2
-    bytes: 1892
+    bytes: 1900
   caps_fld:
     calls: 0
-    bytes: 1320
+    bytes: 1332
   char_class_body:
     calls: 17
-    bytes: 1468
+    bytes: 1476
   class_char:
     calls: 49
     bytes: 996
@@ -933,7 +933,7 @@ functions:
     bytes: 1228
   json_str:
     calls: 21
-    bytes: 1588
+    bytes: 1596
   main:
     calls: 1
     bytes: 760
@@ -942,16 +942,16 @@ functions:
     bytes: 6684
   obj_fld:
     calls: 1
-    bytes: 2448
+    bytes: 2456
   obj_of:
     calls: 2
-    bytes: 1796
+    bytes: 1804
   pat_json:
     calls: 2
-    bytes: 4616
+    bytes: 4648
   re_escape:
     calls: 42
-    bytes: 2360
+    bytes: 2368
   rule_pats$Kind:
     calls: 2
-    bytes: 12684
+    bytes: 12728

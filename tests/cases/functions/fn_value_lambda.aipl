@@ -44,9 +44,9 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 144
-instructions executed: 538
-binary size: 4104
-  code: 1664
+instructions executed: 542
+binary size: 4112
+  code: 1672
   data: 369
   metadata: 2071
 functions:
@@ -79,7 +79,7 @@ functions:
     bytes: 8
   __test$probe$map9$own0:
     calls: 1
-    bytes: 280
+    bytes: 288
   aipl_arr_inc:
     calls: 1
     bytes: (external)

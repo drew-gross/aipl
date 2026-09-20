@@ -32,11 +32,11 @@ allocations: 6
 deallocations: 6
 reallocations: 0
 bytes allocated: 288
-instructions executed: 772
-binary size: 5048
-  code: 1952
+instructions executed: 776
+binary size: 5056
+  code: 1956
   data: 712
-  metadata: 2384
+  metadata: 2388
 functions:
   __eq_i64$arr:
     calls: 4
@@ -79,4 +79,4 @@ functions:
     bytes: 256
   sum_reversed:
     calls: 2
-    bytes: 180
+    bytes: 184

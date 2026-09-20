@@ -966,11 +966,11 @@ allocations: 277
 deallocations: 277
 reallocations: 61
 bytes allocated: 401925
-instructions executed: 1475143
-binary size: 576744
-  code: 392292
+instructions executed: 1476273
+binary size: 576832
+  code: 392400
   data: 10500
-  metadata: 173952
+  metadata: 173932
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -995,28 +995,28 @@ functions:
     bytes: 304
   __builtin_count_while$char$lam$__m1__lex_step$AiplTok$lambda1:
     calls: 50
-    bytes: 308
+    bytes: 312
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 4
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 41
-    bytes: 276
+    bytes: 280
   __builtin_count_while$char$s0$lam$__m1__to_eol_len$lambda0:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$__m1__to_eol_len$lambda0$tail:
     calls: 6
-    bytes: 352
+    bytes: 356
   __builtin_count_while$char$s0$lam$__m4__dedent$lambda1:
     calls: 0
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__m4__dedent$lambda2$lambda0:
     calls: 11
-    bytes: 264
+    bytes: 268
   __builtin_int_parse:
     calls: 4
-    bytes: 1116
+    bytes: 1080
   __builtin_int_parse$lambda1:
     calls: 5
     bytes: 140
@@ -1052,34 +1052,34 @@ functions:
     bytes: 744
   __m1__between_len:
     calls: 37
-    bytes: 824
+    bytes: 800
   __m1__delimited_len:
     calls: 66
-    bytes: 1908
+    bytes: 1904
   __m1__finalize_template$AiplTok:
     calls: 6
-    bytes: 7232
+    bytes: 7228
   __m1__float_len:
     calls: 0
-    bytes: 832
+    bytes: 824
   __m1__interp_scan$AiplTok:
     calls: 2
-    bytes: 1880
+    bytes: 1896
   __m1__lex$AiplTok:
     calls: 30
-    bytes: 1184
+    bytes: 1196
   __m1__lex_step$AiplTok:
     calls: 106
     bytes: 27352
   __m1__nested_len:
     calls: 71
-    bytes: 1136
+    bytes: 1148
   __m1__step_result$AiplTok:
     calls: 2436
     bytes: 14264
   __m1__template_scan$AiplTok:
     calls: 6
-    bytes: 2788
+    bytes: 2824
   __m1__template_step$AiplTok:
     calls: 52
     bytes: 444
@@ -1094,13 +1094,13 @@ functions:
     bytes: 368
   __m2__unescape:
     calls: 34
-    bytes: 1612
+    bytes: 1628
   __m2__unescape_braces:
     calls: 5
-    bytes: 972
+    bytes: 988
   __m3__process_raw_string:
     calls: 12
-    bytes: 2764
+    bytes: 2756
   __m7__trim_prefix:
     calls: 36
     bytes: 252
@@ -1109,7 +1109,7 @@ functions:
     bytes: 356
   __m9__strip_test_sections:
     calls: 2
-    bytes: 780
+    bytes: 788
   __test$char_lit_value:
     calls: 1
     bytes: 1848
@@ -1141,13 +1141,13 @@ functions:
     calls: 218
     bytes: (external)
   aipl_arr_inc:
-    calls: 10537
+    calls: 10521
     bytes: (external)
   aipl_arr_reserve:
     calls: 218
     bytes: (external)
   aipl_array_dec:
-    calls: 15852
+    calls: 15856
     bytes: (external)
   aipl_array_new:
     calls: 145
@@ -1232,7 +1232,7 @@ functions:
     bytes: 576
   template_segments:
     calls: 5
-    bytes: 1608
+    bytes: 1660
   tpl_kind:
     calls: 6
     bytes: 2608

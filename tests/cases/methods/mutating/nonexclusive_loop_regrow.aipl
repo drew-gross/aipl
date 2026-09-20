@@ -36,33 +36,36 @@ fn grow_aliased_matches() -> bool {
     assert(grow_aliased_matches());
 })
 --- performance ---
-allocations: 7
-deallocations: 7
-reallocations: 0
-bytes allocated: 376
-instructions executed: 911
-binary size: 3520
-  code: 1360
+allocations: 4
+deallocations: 4
+reallocations: 2
+bytes allocated: 208
+instructions executed: 943
+binary size: 3536
+  code: 1368
   data: 401
-  metadata: 1759
+  metadata: 1767
 functions:
   __eq_i64$arr:
     calls: 3
     bytes: 296
   __test$addtwo:
     calls: 1
-    bytes: 496
+    bytes: 500
   __test$grow_aliased_matches:
     calls: 1
-    bytes: 376
+    bytes: 380
   aipl_arr_inc:
-    calls: 11
+    calls: 5
     bytes: (external)
   aipl_array_dec:
-    calls: 20
+    calls: 13
     bytes: (external)
   aipl_array_push:
-    calls: 7
+    calls: 4
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 4
     bytes: (external)
   aipl_assert:
     calls: 2

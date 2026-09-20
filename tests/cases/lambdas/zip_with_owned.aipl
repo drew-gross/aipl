@@ -74,9 +74,9 @@ allocations: 26
 deallocations: 26
 reallocations: 2
 bytes allocated: 1036
-instructions executed: 3794
-binary size: 12880
-  code: 8244
+instructions executed: 3836
+binary size: 13008
+  code: 8372
   data: 545
   metadata: 4091
 functions:
@@ -112,25 +112,25 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 1828
+    bytes: 1836
   main$zip1$own0$own1:
     calls: 1
-    bytes: 1024
+    bytes: 1048
   main$zip11$own0$own1:
     calls: 1
-    bytes: 1024
+    bytes: 1048
   main$zip15$own0$own1:
     calls: 1
-    bytes: 1672
+    bytes: 1696
   main$zip3$own0$own1:
     calls: 1
-    bytes: 1024
+    bytes: 1048
   main$zip5$own0:
     calls: 1
-    bytes: 492
+    bytes: 504
   main$zip7$own1:
     calls: 1
-    bytes: 496
+    bytes: 508
   show:
     calls: 5
     bytes: 224

@@ -55,18 +55,18 @@ allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 264
-instructions executed: 730
-binary size: 5640
-  code: 2960
+instructions executed: 734
+binary size: 5648
+  code: 2968
   data: 406
   metadata: 2274
 functions:
   __test$retag:
     calls: 1
-    bytes: 1892
+    bytes: 1896
   __test$shift_start_x:
     calls: 1
-    bytes: 888
+    bytes: 892
   aipl_assert:
     calls: 10
     bytes: (external)

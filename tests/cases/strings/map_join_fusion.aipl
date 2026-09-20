@@ -35,15 +35,15 @@ allocations: 46
 deallocations: 46
 reallocations: 3
 bytes allocated: 1922
-instructions executed: 4315
-binary size: 11224
-  code: 7252
+instructions executed: 4349
+binary size: 11264
+  code: 7292
   data: 299
   metadata: 3673
 functions:
   __builtin_map_join$i64$char$s2$s3$s4$rs$lam$__builtin_to_str:
     calls: 5
-    bytes: 1292
+    bytes: 1304
   __to_str_i64:
     calls: 15
     bytes: 204
@@ -79,4 +79,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 5048
+    bytes: 5076

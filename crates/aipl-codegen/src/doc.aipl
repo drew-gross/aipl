@@ -332,9 +332,9 @@ allocations: 314
 deallocations: 314
 reallocations: 1
 bytes allocated: 21677
-instructions executed: 34042
-binary size: 38224
-  code: 23740
+instructions executed: 34410
+binary size: 38336
+  code: 23852
   data: 881
   metadata: 13603
 functions:
@@ -355,16 +355,16 @@ functions:
     bytes: 324
   __builtin_count_while$char$s0$lam$__m2__dedent$lambda1:
     calls: 0
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__m2__dedent$lambda2$lambda0:
     calls: 1
-    bytes: 264
+    bytes: 268
   __m1__reindent_block:
     calls: 1
-    bytes: 6536
+    bytes: 6592
   __m5__trim_end_while$lam$__builtin_is_space:
     calls: 34
-    bytes: 392
+    bytes: 400
   __rec_drop_Doc:
     calls: 46
     bytes: 184
@@ -436,7 +436,7 @@ functions:
     bytes: 36
   fits$tail:
     calls: 42
-    bytes: 2700
+    bytes: 2708
   fits_atom:
     calls: 0
     bytes: 52
@@ -454,7 +454,7 @@ functions:
     bytes: 108
   print:
     calls: 11
-    bytes: 4188
+    bytes: 4212
   print$map2$own0:
     calls: 11
-    bytes: 464
+    bytes: 472

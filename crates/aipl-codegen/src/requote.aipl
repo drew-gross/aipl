@@ -542,11 +542,11 @@ allocations: 626
 deallocations: 626
 reallocations: 8
 bytes allocated: 40594
-instructions executed: 166437
-binary size: 80392
-  code: 47576
+instructions executed: 167295
+binary size: 80488
+  code: 47668
   data: 7993
-  metadata: 24823
+  metadata: 24827
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 20
@@ -568,16 +568,16 @@ functions:
     bytes: 324
   __builtin_count_while$char$s0$lam$__m5__dedent$lambda1:
     calls: 0
-    bytes: 264
+    bytes: 268
   __builtin_count_while$char$s0$lam$__m5__dedent$lambda2$lambda0:
     calls: 10
-    bytes: 264
+    bytes: 268
   __m1__str_lit_value:
     calls: 21
-    bytes: 2980
+    bytes: 3012
   __m4__process_raw_string:
     calls: 9
-    bytes: 2764
+    bytes: 2756
   __m8__trim_prefix:
     calls: 18
     bytes: 252
@@ -676,19 +676,19 @@ functions:
     bytes: 804
   brace_escaped:
     calls: 18
-    bytes: 1880
+    bytes: 1888
   encode:
     calls: 43
-    bytes: 2060
+    bytes: 2068
   escape_cost:
     calls: 21
-    bytes: 352
+    bytes: 360
   is_shared_escape:
     calls: 32
     bytes: 64
   join_template:
     calls: 13
-    bytes: 1728
+    bytes: 1732
   main:
     calls: 1
     bytes: 1352
@@ -697,25 +697,25 @@ functions:
     bytes: 64
   raw_seg_fits_single:
     calls: 16
-    bytes: 396
+    bytes: 400
   redelimit:
     calls: 13
-    bytes: 1952
+    bytes: 1956
   requote:
     calls: 22
-    bytes: 2484
+    bytes: 2492
   reswap:
     calls: 4
     bytes: 932
   retemplate:
     calls: 11
-    bytes: 704
+    bytes: 708
   single_cost:
     calls: 43
-    bytes: 312
+    bytes: 316
   single_seg_fits_raw:
     calls: 13
-    bytes: 428
+    bytes: 436
   single_to_raw:
     calls: 4
     bytes: 1260

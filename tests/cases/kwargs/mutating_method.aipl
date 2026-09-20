@@ -16,24 +16,30 @@ fn main() !prints {
 --- performance ---
 allocations: 3
 deallocations: 3
-reallocations: 0
-bytes allocated: 121
-instructions executed: 105
-binary size: 1944
-  code: 656
+reallocations: 1
+bytes allocated: 113
+instructions executed: 143
+binary size: 2000
+  code: 740
   data: 41
-  metadata: 1247
+  metadata: 1219
 functions:
   __to_str_u64:
     calls: 1
     bytes: 204
   aipl_arr_inc:
-    calls: 6
+    calls: 2
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 9
+    calls: 7
     bytes: (external)
   aipl_array_push:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
     calls: 2
     bytes: (external)
   aipl_u64_len:
@@ -44,4 +50,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 452
+    bytes: 536

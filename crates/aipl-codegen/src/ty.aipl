@@ -94,9 +94,9 @@ allocations: 70
 deallocations: 70
 reallocations: 2
 bytes allocated: 5134
-instructions executed: 4595
-binary size: 21384
-  code: 12284
+instructions executed: 4619
+binary size: 21392
+  code: 12292
   data: 1334
   metadata: 7766
 functions:
@@ -162,4 +162,4 @@ functions:
     bytes: 5064
   show_tys:
     calls: 6
-    bytes: 1388
+    bytes: 1396

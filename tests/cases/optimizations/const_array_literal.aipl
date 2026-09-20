@@ -70,11 +70,11 @@ allocations: 38
 deallocations: 38
 reallocations: 0
 bytes allocated: 2178
-instructions executed: 6295
-binary size: 13736
-  code: 7640
+instructions executed: 6313
+binary size: 13776
+  code: 7676
   data: 615
-  metadata: 5481
+  metadata: 5485
 functions:
   __eq_i64$arr:
     calls: 1
@@ -132,16 +132,16 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3380
+    bytes: 3384
   main$filter3$own0:
     calls: 1
-    bytes: 300
+    bytes: 308
   main$filter7$own0:
     calls: 1
-    bytes: 300
+    bytes: 308
   main$map1$own0:
     calls: 1
-    bytes: 280
+    bytes: 288
   main$map5$own0:
     calls: 1
-    bytes: 284
+    bytes: 292

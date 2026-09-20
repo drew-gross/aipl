@@ -31,9 +31,9 @@ allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1088
-binary size: 6064
-  code: 2648
+instructions executed: 1092
+binary size: 6072
+  code: 2656
   data: 767
   metadata: 2649
 functions:
@@ -66,7 +66,7 @@ functions:
     bytes: 568
   __test$positive$filter5$own0:
     calls: 1
-    bytes: 300
+    bytes: 308
   aipl_arr_inc:
     calls: 1
     bytes: (external)

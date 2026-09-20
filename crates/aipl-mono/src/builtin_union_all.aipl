@@ -44,9 +44,9 @@ allocations: 56
 deallocations: 56
 reallocations: 0
 bytes allocated: 2637
-instructions executed: 2842
-binary size: 13808
-  code: 7856
+instructions executed: 2866
+binary size: 13928
+  code: 7976
   data: 716
   metadata: 5236
 functions:
@@ -64,10 +64,10 @@ functions:
     bytes: 304
   __test$union_all:
     calls: 1
-    bytes: 5908
+    bytes: 5980
   __test$union_all$filter1$own0:
     calls: 1
-    bytes: 372
+    bytes: 380
   aipl_arr_drop_arr:
     calls: 10
     bytes: (external)
@@ -115,4 +115,4 @@ functions:
     bytes: 108
   union_all$i64:
     calls: 7
-    bytes: 396
+    bytes: 436

@@ -91,11 +91,11 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 6110
-binary size: 5568
-  code: 2468
+instructions executed: 6230
+binary size: 5584
+  code: 2488
   data: 1088
-  metadata: 2012
+  metadata: 2008
 functions:
   __eq___builtin_Span:
     calls: 7
@@ -117,7 +117,7 @@ functions:
     bytes: (external)
   find_trailing_whitespace:
     calls: 12
-    bytes: 568
+    bytes: 588
   line_end_span:
     calls: 18
     bytes: 176

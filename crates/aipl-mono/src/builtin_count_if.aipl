@@ -63,18 +63,18 @@ allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 152
-instructions executed: 2269
-binary size: 8192
-  code: 4060
+instructions executed: 2297
+binary size: 8248
+  code: 4116
   data: 1188
   metadata: 2944
 functions:
   __test$count_if:
     calls: 1
-    bytes: 3400
+    bytes: 3448
   __test$count_if$filter10$own0:
     calls: 1
-    bytes: 300
+    bytes: 308
   __test$is_nine:
     calls: 1
     bytes: 184

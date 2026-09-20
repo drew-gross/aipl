@@ -146,9 +146,9 @@ allocations: 13
 deallocations: 13
 reallocations: 0
 bytes allocated: 277
-instructions executed: 1788
-binary size: 8952
-  code: 5468
+instructions executed: 1796
+binary size: 8968
+  code: 5484
   data: 407
   metadata: 3077
 functions:
@@ -178,7 +178,7 @@ functions:
     bytes: (external)
   first_big_after:
     calls: 1
-    bytes: 356
+    bytes: 360
   first_big_doubled:
     calls: 1
     bytes: 288
@@ -190,7 +190,7 @@ functions:
     bytes: 432
   first_multiple:
     calls: 1
-    bytes: 148
+    bytes: 152
   has_big:
     calls: 1
     bytes: 216
@@ -202,4 +202,4 @@ functions:
     bytes: 280
   main:
     calls: 1
-    bytes: 2012
+    bytes: 2020

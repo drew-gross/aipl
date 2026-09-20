@@ -2292,6 +2292,11 @@ pub extern "C" fn aipl_rec_inc_weak(p: *const u8) {
 #[no_mangle]
 pub extern "C" fn aipl_rec_dec_strong(p: *const u8) {
     count_builtin!(builtin_calls::AIPL_REC_DEC_STRONG);
+    // Null is the empty value a taken boxed field or binding is left holding;
+    // nothing to release. Mirrors the JIT runtime.
+    if p.is_null() {
+        return;
+    }
     let b = rec_block(p);
     unsafe {
         *b -= 1;
@@ -2430,7 +2435,11 @@ pub extern "C" fn aipl_array_push_mut(
     // unaliased codegen proved the binding to be: it has no owner to answer to
     // and may live in read-only data. Copy instead, exactly as `aipl_concat_mut`
     // does for a static string literal. Mirrors the JIT runtime's guard, which
-    // is what keeps a host-lent FFI argument array off this path.
+    // is what keeps a host-lent FFI argument array off this path. The refcount
+    // is deliberately not consulted here — see the JIT runtime's note: a
+    // uniquely-owned block reads more than one inside a function, and the
+    // boundary where a higher count means sharing is the owned-parameter
+    // move-in, guarded there by `aipl_arr_reserve`.
     if !a.is_null() && unsafe { *header_of(a) } == STATIC_REFCOUNT {
         return aipl_array_push(a, x, drop_fn, retain_fn, elem_size);
     }

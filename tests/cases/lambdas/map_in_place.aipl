@@ -44,9 +44,9 @@ allocations: 15
 deallocations: 15
 reallocations: 2
 bytes allocated: 996
-instructions executed: 2965
-binary size: 9952
-  code: 5212
+instructions executed: 2989
+binary size: 10000
+  code: 5260
   data: 836
   metadata: 3904
 functions:
@@ -61,22 +61,22 @@ functions:
     bytes: 364
   __test$doubled:
     calls: 1
-    bytes: 2320
+    bytes: 2328
   __test$doubled$map1$own0:
     calls: 1
-    bytes: 284
+    bytes: 292
   __test$doubled$map3$own0:
     calls: 1
-    bytes: 280
+    bytes: 288
   __test$doubled$map5$own0:
     calls: 1
-    bytes: 280
+    bytes: 288
   __test$doubled$map7$own0:
     calls: 1
-    bytes: 500
+    bytes: 508
   __test$doubled$map9$own0:
     calls: 1
-    bytes: 280
+    bytes: 288
   __to_str_i64:
     calls: 3
     bytes: 204
