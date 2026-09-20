@@ -19,7 +19,7 @@ fn main() !prints {
     mut m = 0;
     set m = n + 1; // an accumulate onto a *different* binding
     mut c = Counter { n: 0 };
-    set c.n = c.n + 1; // a field store, which has no compound spelling
+    set c.n = m + 1; // a field store fed from a different binding
     print(n.to_str());
     print(m.to_str());
     print(c.n.to_str());
@@ -27,17 +27,17 @@ fn main() !prints {
 --- stdout ---
 10
 11
-1
+12
 --- performance ---
 allocations: 3
 deallocations: 3
 reallocations: 0
-bytes allocated: 53
-instructions executed: 150
+bytes allocated: 54
+instructions executed: 149
 binary size: 1552
-  code: 620
+  code: 616
   data: 1
-  metadata: 931
+  metadata: 935
 functions:
   __to_str_i64:
     calls: 3
@@ -50,4 +50,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 416
+    bytes: 412

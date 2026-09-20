@@ -10,10 +10,9 @@ use crate::Error;
 /// on the left: `set x = k - x;` is not `set x -= k;`, and rewriting it that
 /// way would silently change the program.
 ///
-/// Only a bare-identifier LHS is flagged — that is all `set x += e;` accepts,
-/// for the reason the form exists at all: the receiver is mentioned twice, so a
-/// field path or a call would have to be re-evaluated. A field store
-/// (`set p.n = p.n + 1;`) therefore has no shorter spelling to recommend.
+/// The target may be a name or a field path off one (`set p.n = p.n + 1;` is
+/// `set p.n += 1;`): every `set` form takes either, and a path's span spells
+/// it, so the advice can quote it as written.
 ///
 /// `steps` is what [`super::step_by_one`] can advise here. Where it has advice
 /// for this operator, `set x = x ± 1;` belongs to it — `set x++;` / `set x--;`
@@ -23,13 +22,20 @@ use crate::Error;
 ///
 /// `ops` is what to recommend per operator, from [`matching_compound`]: the
 /// compound spelling, plus the import to name when the file lacks it.
-pub(super) fn compound_assign(e: &Expr, ops: &CompoundOps, steps: &Steps, hits: &mut Vec<Error>) {
+pub(super) fn compound_assign(
+    e: &Expr,
+    src: &str,
+    ops: &CompoundOps,
+    steps: &Steps,
+    hits: &mut Vec<Error>,
+) {
     let ExprKind::Assign(lhs, value, _) = &e.kind else {
         return;
     };
-    let ExprKind::Ident(name) = &lhs.kind else {
+    if !super::spans_its_text(lhs) {
         return;
-    };
+    }
+    let name = &src[lhs.span.clone()];
     // An operator use is a call named for the spelling written.
     let ExprKind::Call(written, args, _) = &value.kind else {
         return;
@@ -40,7 +46,7 @@ pub(super) fn compound_assign(e: &Expr, ops: &CompoundOps, steps: &Steps, hits: 
     let Some((spelling, import)) = ops.get(written.name()) else {
         return;
     };
-    let is_target = |e: &Expr| matches!(&e.kind, ExprKind::Ident(n) if n == name);
+    let is_target = |e: &Expr| e.kind == lhs.kind;
     // The receiver on the left works for every operator; on the right only
     // where the operation is commutative, since `k - x` and `k / x` are not
     // accumulations of `x` at all.

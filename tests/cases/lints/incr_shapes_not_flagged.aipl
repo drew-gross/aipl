@@ -3,8 +3,9 @@ import { print, to_str, wrapping_add as +, wrapping_increment as ++ } from built
 struct Counter { n: i64 }
 
 // The shapes the increment lint must leave alone: adding something other than
-// one, adding one to a *different* binding, and a field store — which has no
-// `++` spelling, since `set x++;` takes a bare binding.
+// one, adding one to a *different* binding, and a field store fed from a
+// different binding — a field path is a target like any other, so only the
+// same path on both sides is a step.
 //
 // The first of those is still an accumulate, so the *compound* lint owns it and
 // is squelched here: this case is about what `incr_by_one` does, and it can only
@@ -16,7 +17,7 @@ fn main() !prints {
     mut m = 0;
     set m = n + 1; // one, but added to another binding
     mut c = Counter { n: 0 };
-    set c.n = c.n + 1; // a field store, not a bare binding
+    set c.n = m + 1; // a field store fed from a different binding
     set n++; // the recommended form itself never trips its own lint
     print(n.to_str());
     print(m.to_str());
@@ -25,17 +26,17 @@ fn main() !prints {
 --- stdout ---
 3
 3
-1
+4
 --- performance ---
 allocations: 3
 deallocations: 3
 reallocations: 0
 bytes allocated: 51
-instructions executed: 138
+instructions executed: 137
 binary size: 1456
-  code: 524
+  code: 520
   data: 1
-  metadata: 931
+  metadata: 935
 functions:
   __to_str_i64:
     calls: 3
@@ -48,4 +49,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 320
+    bytes: 316

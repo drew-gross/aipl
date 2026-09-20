@@ -10,20 +10,21 @@ use crate::Error;
 /// (`set x = 1 - x;` is not a decrement), and the compound forms, whose
 /// receiver is always on the left.
 ///
-/// Only a bare-identifier LHS is flagged, because that is all `set x++;`
-/// accepts — a field store (`set p.n = p.n + 1;`) has no shorter spelling to
-/// recommend.
+/// The target may be a name or a field path off one (`set p.n = p.n + 1;` is
+/// `set p.n++;`): every `set` form takes either, and a path's span spells it,
+/// so the advice can quote it as written.
 ///
 /// `steps` says which written operators have a step form that provably means
 /// the same thing here, and names the import to add when the file lacks it —
 /// see [`matching_steps`].
-pub(super) fn step_by_one(e: &Expr, steps: &Steps, hits: &mut Vec<Error>) {
+pub(super) fn step_by_one(e: &Expr, src: &str, steps: &Steps, hits: &mut Vec<Error>) {
     let ExprKind::Assign(lhs, value, _) = &e.kind else {
         return;
     };
-    let ExprKind::Ident(name) = &lhs.kind else {
+    if !super::spans_its_text(lhs) {
         return;
-    };
+    }
+    let name = &src[lhs.span.clone()];
     // An operator use is a call whose callee is the spelling that was written —
     // which is exactly what this lint keys on, since `+` and `+=` want different
     // advice and are told apart by nothing else.
@@ -37,7 +38,7 @@ pub(super) fn step_by_one(e: &Expr, steps: &Steps, hits: &mut Vec<Error>) {
         return;
     };
     let is_one = |e: &Expr| matches!(e.kind, ExprKind::Num(1));
-    let is_target = |e: &Expr| matches!(&e.kind, ExprKind::Ident(n) if n == name);
+    let is_target = |e: &Expr| e.kind == lhs.kind;
     let stepped = if is_target(l) {
         is_one(r)
     } else {

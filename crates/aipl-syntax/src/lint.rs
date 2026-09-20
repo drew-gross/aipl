@@ -34,6 +34,7 @@ mod push_loop_pipeline;
 mod return_loop_any_all;
 mod return_loop_find_if;
 mod return_loop_find_index;
+mod set_spread_field;
 mod slice_from_zero;
 mod slice_to_len;
 mod slice_whole;
@@ -70,6 +71,7 @@ use self::push_loop_pipeline::{pipeline_names, push_loop_pipeline};
 use self::return_loop_any_all::{any_all_names, return_loop_any_all};
 use self::return_loop_find_if::{find_if_name, return_loop_find_if};
 use self::return_loop_find_index::{find_index_name, return_loop_find_index};
+use self::set_spread_field::set_spread_field;
 use self::slice_from_zero::slice_from_zero;
 use self::slice_to_len::slice_to_len;
 use self::slice_whole::slice_whole;
@@ -132,6 +134,7 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     each_expr(program, &mut |e| match_map_err(e, &mut hits));
     each_expr(program, &mut |e| match_map_ok(e, &mut hits));
     each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));
+    each_expr(program, &mut |e| set_spread_field(e, src, &mut hits));
     // Only where this file's `push` is the builtin — see `pipeline_names`,
     // which also reports what `map`/`filter` are called here.
     let pipeline = pipeline_names(program);
@@ -176,7 +179,7 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     // see `matching_steps`, which also names the import when it's missing.
     let steps = matching_steps(program);
     if !steps.is_empty() {
-        each_expr(program, &mut |e| step_by_one(e, &steps, &mut hits));
+        each_expr(program, &mut |e| step_by_one(e, src, &steps, &mut hits));
     }
     // The general form of the above, and partitioned against it rather than
     // overlapping: `set x = x + 1;` belongs to the step lint whenever that lint
@@ -186,7 +189,7 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     let compound = matching_compound(program);
     if !compound.is_empty() {
         each_expr(program, &mut |e| {
-            compound_assign(e, &compound, &steps, &mut hits)
+            compound_assign(e, src, &compound, &steps, &mut hits)
         });
     }
     // The same accumulate shape for `+++`, whose in-place form is a method
@@ -386,6 +389,33 @@ fn spans_its_text(e: &Expr) -> bool {
         ExprKind::Ident(_) => true,
         ExprKind::Field(recv, _) => spans_its_text(recv),
         _ => false,
+    }
+}
+
+/// The source text that spells `e`, or `placeholder` when its span doesn't
+/// cover it. [`spans_its_text`] settles the name and field-path forms; a
+/// literal is added on top of them here, and *checked* against the source
+/// rather than assumed, because the parser also synthesizes literals carrying
+/// the span of whatever desugared into them — the `1` an `++` expands to holds
+/// the `++`'s own span, and splicing that back would quote the wrong text. A
+/// literal that fails its check simply falls back to the placeholder.
+fn quote<'a>(e: &Expr, src: &'a str, placeholder: &'a str) -> &'a str {
+    let text = src.get(e.span.clone()).unwrap_or("");
+    let spells_it = match &e.kind {
+        ExprKind::Num(n) => text.parse::<i64>() == Ok(*n),
+        ExprKind::Bool(b) => text == if *b { "true" } else { "false" },
+        ExprKind::Char(_) => text.len() >= 3 && text.starts_with('\'') && text.ends_with('\''),
+        // A `"""` block spells itself too — it is raw source either way — but
+        // only while it stays on one line, which is all a message can hold.
+        ExprKind::Str(_) => {
+            text.len() >= 2 && text.starts_with('"') && text.ends_with('"') && !text.contains('\n')
+        }
+        _ => spans_its_text(e),
+    };
+    if spells_it {
+        text
+    } else {
+        placeholder
     }
 }
 

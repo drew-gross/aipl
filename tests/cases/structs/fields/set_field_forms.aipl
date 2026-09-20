@@ -1,0 +1,99 @@
+import {
+    equal as ==,
+    len,
+    push,
+    wrapping_add_assign as +=,
+    wrapping_decrement as --,
+    wrapping_increment as ++,
+    wrapping_mul_assign as *=,
+} from builtins;
+
+struct Counter { n: i64, hits: i64[] = [] }
+
+struct Board { counter: Counter, name: str }
+
+// Every `set` form takes a field path as its target, not just a name: the
+// step and compound operators, and the mutating-method writeback, all read
+// the field, apply, and store it back — `set b.counter.n++` is
+// `set b.counter.n = b.counter.n ++ 1`, and `set b.counter.hits.push(x)` is
+// `set b.counter.hits = b.counter.hits.push(x)`. Siblings at every level are
+// left alone, exactly as with a plain `set b.counter.n = v`.
+fn tally(mut self: Board, x: i64) {
+    set self.counter.n++;
+    set self.counter.n += x;
+    set self.counter.n *= 2;
+    set self.counter.n--;
+    set self.counter.hits.push(x);
+}.test({
+    mut b = Board { counter: Counter { n: 1 }, name: "b" };
+    set b.tally(5);
+    assert(b.counter.n == 13); // ((1 + 1 + 5) * 2) - 1
+    assert(b.counter.hits == [5]);
+    assert(b.name == "b");
+    set b.tally(2);
+    assert(b.counter.n == 31);
+    assert(b.counter.hits == [5, 2]);
+})
+
+// One level as well as several: the shortest path is a plain field.
+fn count(mut self: Counter) {
+    set self.n++;
+    set self.hits.push(self.n);
+}.test({
+    mut c = Counter { n: 0 };
+    set c.count();
+    set c.count();
+    assert(c.n == 2);
+    assert(c.hits.len() == 2);
+    assert(c.hits == [1, 2]);
+})
+--- performance ---
+allocations: 4
+deallocations: 4
+reallocations: 0
+bytes allocated: 176
+instructions executed: 1765
+binary size: 8752
+  code: 4440
+  data: 499
+  metadata: 3813
+functions:
+  __eq_i64$arr:
+    calls: 3
+    bytes: 296
+  __test$count:
+    calls: 1
+    bytes: 492
+  __test$tally:
+    calls: 1
+    bytes: 988
+  aipl_arr_inc:
+    calls: 74
+    bytes: (external)
+  aipl_array_dec:
+    calls: 80
+    bytes: (external)
+  aipl_array_push:
+    calls: 4
+    bytes: (external)
+  aipl_assert:
+    calls: 8
+    bytes: (external)
+  aipl_test_begin:
+    calls: 2
+    bytes: (external)
+  aipl_test_end:
+    calls: 2
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  count:
+    calls: 2
+    bytes: 488
+  main:
+    calls: 1
+    bytes: 168
+  tally:
+    calls: 2
+    bytes: 2008

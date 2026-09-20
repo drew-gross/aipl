@@ -1,4 +1,4 @@
-import { print, wrapping_add as + } from builtins;
+import { print, wrapping_add as +, wrapping_increment as ++ } from builtins;
 
 struct Pos { line: i64, col: i64 }
 
@@ -16,7 +16,7 @@ fn keyworded(n: i64, at: Pos = Pos { line: 0, col: 0 }) -> i64 { n + at.line + a
 
 // `mut` is written through rather than read.
 fn bumped(mut self: Pos) {
-    set self.line = self.line + 1;
+    set self.line++;
 }
 
 // One mention that is not a field read is enough: the value itself is passed,

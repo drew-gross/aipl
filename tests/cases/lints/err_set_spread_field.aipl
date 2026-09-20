@@ -1,0 +1,46 @@
+import { print, to_str, wrapping_add as + } from builtins;
+
+struct Inner { n: i64, tag: str = "" }
+
+struct Point { x: i64, y: i64, inner: Inner = Inner { n: 0 } }
+
+// `set self = Point { ..self, x: 1 }` rebuilds `self` from itself to replace one field.
+// `set self.x = 1` says just that. The same holds a level down, and for several
+// fields at once when none of the replacements reads the target.
+fn bump(mut self: Point) {
+    set self = Point { ..self, x: 1 };
+    set self.inner = Inner { ..self.inner, n: self.inner.n + 1 };
+    set self = Point { ..self, x: 5, y: 6 };
+}
+
+// Not flagged: the base is a different value, and a multi-field replacement
+// that reads the target would not survive being split into two stores.
+fn swap(mut self: Point) {
+    set self = Point { ..self, x: self.y, y: self.x };
+}
+
+fn main() !prints {
+    mut p = Point { x: 0, y: 0 };
+    set p.bump();
+    print(to_str(p));
+    set p.swap();
+    print(to_str(p));
+}
+--- errors ---
+error: this "set" rebuilds "self" from itself only to replace "x" — assign the field directly: "set self.x = 1;" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_set_spread_field.aipl:11:26
+   |
+11 |     set self = Point { ..self, x: 1 };
+   |                          ^^^^
+
+error: this "set" rebuilds "self.inner" from itself only to replace "n" — assign the field directly: "set self.inner.n = ..;" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_set_spread_field.aipl:12:32
+   |
+12 |     set self.inner = Inner { ..self.inner, n: self.inner.n + 1 };
+   |                                ^^^^^^^^^^
+
+error: this "set" rebuilds "self" from itself only to replace some fields — assign each field directly: "set self.x = 5; set self.y = 6;" (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_set_spread_field.aipl:13:26
+   |
+13 |     set self = Point { ..self, x: 5, y: 6 };
+   |                          ^^^^

@@ -1,4 +1,4 @@
-import { concat as +++, equal as ==, wrapping_add as + } from builtins;
+import { concat as +++, equal as ==, wrapping_add_assign as += } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -8,7 +8,7 @@ struct Line { start: Point, end: Point, label: str }
 // at both levels — unchanged.
 fn shift_start_x(l: Line, by: i64) -> Line {
     mut m = l;
-    set m.start.x = m.start.x + by;
+    set m.start.x += by;
     m
 }.test({
     let l = Line {

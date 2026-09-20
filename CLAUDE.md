@@ -427,7 +427,7 @@ fields, and especially to the functional-update longhand:
 ```
 fn advance(self: W, end: u64) -> W {     fn advance(self: W, end: u64) -> W {
     mut w = self;                   →        W { ..self, pos: self.pos + 1, last_end: end }
-    set w.pos = w.pos + 1;               }
+    set w.pos++;                         }
     set w.last_end = end;
     w
 }

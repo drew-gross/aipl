@@ -1111,7 +1111,7 @@
           </h3>
           <pre class="signature"><code>fn lower_assign_stmt(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>assign_stmt</code> — nine alternatives, told apart by the token after the target.</p></div>
+          <div class="doc"><p><code>assign_stmt</code> — eight alternatives on one target, told apart by the token after it. The target is a name or a <code>.</code>-led field path (<code>p</code>, <code>p.a.b</code>), read off the token run as a <code>Field</code> chain exactly as <code>p.a.b</code> parses in expression position; every form then desugars around that chain the way it does around a bare name, so <code>set p.n++</code> is <code>set p.n = p.n ++ 1</code> and <code>set p.xs.push(x)</code> is <code>set p.xs = p.xs.push(x)</code>. The field-path store itself is not desugared here: the rewrite into nested constructs needs the structs' field lists, which only mono's <code>infer</code> knows.</p></div>
 
 
         </section>
@@ -1126,20 +1126,6 @@
           <pre class="signature"><code>fn compound_ops() -&#62; str[]</code></pre>
 
           <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-dotted_assign">
-          <h3>
-            <a class="anchor" href="#item-dotted_assign">dotted_assign</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn dotted_assign(src: str, node: Cst, kids: Ast[], name: str, name_span: Span) -&#62; Stmt!ParseError</code></pre>
-
-          <div class="doc"><p>The two <code>set recv . ..</code> forms. A <code>(</code> after the member name is the writeback of a mutating method call; anything else is a field path.</p></div>
 
 
         </section>

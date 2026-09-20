@@ -1,0 +1,13 @@
+import { print } from builtins;
+
+// `set xs.push(x);` writes a mutating method's result back to its receiver, so
+// the call needs one: a bare `set f(x);` has nothing to store into.
+fn main() !prints {
+    set print("x");
+}
+--- errors ---
+error: set: a mutating method call needs a receiver to write back to, as in `set xs.push(x);`
+ --> ./tests/cases/syntax/err_set_call_no_receiver.aipl:6:9
+  |
+6 |     set print("x");
+  |         ^^^^^^

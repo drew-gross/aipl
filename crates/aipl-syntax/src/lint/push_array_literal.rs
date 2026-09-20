@@ -1,7 +1,7 @@
 use crate::ast::{Expr, ExprKind};
 use crate::Error;
 
-use super::{pushed_element, spans_its_text};
+use super::{pushed_element, quote};
 
 /// Whether `e` mentions the binding `acc` anywhere.
 fn mentions(e: &Expr, acc: &str) -> bool {
@@ -12,34 +12,6 @@ fn mentions(e: &Expr, acc: &str) -> bool {
         }
     });
     hit
-}
-
-/// The source text that spells `e`, or `placeholder` when its span doesn't
-/// cover it. [`spans_its_text`](super::spans_its_text()) settles the name and
-/// field-path forms; a literal is added on top of them here, and *checked*
-/// against the source rather than assumed, because the parser also synthesizes
-/// literals carrying the span of whatever desugared into them — the `1` an `++`
-/// expands to holds the `++`'s own span, and splicing that back would quote the
-/// wrong text. A literal that fails its check simply falls back to the
-/// placeholder.
-fn quote<'a>(e: &Expr, src: &'a str, placeholder: &'a str) -> &'a str {
-    let text = src.get(e.span.clone()).unwrap_or("");
-    let spells_it = match &e.kind {
-        ExprKind::Num(n) => text.parse::<i64>() == Ok(*n),
-        ExprKind::Bool(b) => text == if *b { "true" } else { "false" },
-        ExprKind::Char(_) => text.len() >= 3 && text.starts_with('\'') && text.ends_with('\''),
-        // A `"""` block spells itself too — it is raw source either way — but
-        // only while it stays on one line, which is all a message can hold.
-        ExprKind::Str(_) => {
-            text.len() >= 2 && text.starts_with('"') && text.ends_with('"') && !text.contains('\n')
-        }
-        _ => spans_its_text(e),
-    };
-    if spells_it {
-        text
-    } else {
-        placeholder
-    }
 }
 
 /// One element of the rewritten literal. A spread stays a spread — the seed may

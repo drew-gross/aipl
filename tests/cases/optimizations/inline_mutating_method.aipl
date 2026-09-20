@@ -1,4 +1,11 @@
-import { len, print, push, to_str, wrapping_add as + } from builtins;
+import {
+    len,
+    print,
+    push,
+    to_str,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
+} from builtins;
 
 // Inlining a mutating method (`fn f(mut self: T, ..)`).
 //
@@ -20,7 +27,7 @@ import { len, print, push, to_str, wrapping_add as + } from builtins;
 struct Counter { n: i64 }
 
 fn bump(mut self: Counter, by: i64) {
-    set self.n = self.n + by;
+    set self.n += by;
 }
 
 fn append_twice(mut self: i64[], x: i64) {
@@ -32,11 +39,11 @@ fn append_twice(mut self: i64[], x: i64) {
 // reaches the *single-use* inliner rather than `inline_small` — the two select
 // candidates separately and share the substitution.
 fn stagger(mut self: Counter) {
-    set self.n = self.n + 1;
-    set self.n = self.n + 2;
-    set self.n = self.n + 3;
-    set self.n = self.n + 4;
-    set self.n = self.n + 5;
+    set self.n++;
+    set self.n += 2;
+    set self.n += 3;
+    set self.n += 4;
+    set self.n += 5;
 }
 
 fn main() !prints {

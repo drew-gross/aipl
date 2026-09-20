@@ -1580,21 +1580,7 @@
           </h3>
           <pre class="signature"><code>fn set_stmt(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p><code>set n = e;</code>, <code>set n++;</code>, <code>set n--;</code>, <code>set n += e;</code> (and the other three compound assignments), <code>set recv.f.g = e;</code>, or the writeback form <code>set recv.method(args);</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-set_member">
-          <h3>
-            <a class="anchor" href="#item-set_member">set_member</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn set_member(self: W, name: str) -&#62; WDoc!FmtError</code></pre>
-
-          <div class="doc"><p>After <code>set recv</code>, a <code>.</code>-led path: the token after the last member (<code>(</code> vs <code>=</code>) picks between a mutating-method writeback and a field assignment.</p></div>
+          <div class="doc"><p><code>set t = e;</code>, <code>set t++;</code>, <code>set t--;</code>, <code>set t += e;</code> (and the other three compound assignments), or the writeback form <code>set t.method(args);</code>, where the target <code>t</code> is a name or a <code>.</code>-led field path. The token after the path picks the form; for the writeback the method is the path's last member.</p></div>
 
 
         </section>

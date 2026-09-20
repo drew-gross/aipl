@@ -1,4 +1,4 @@
-import { concat as +++, equal as ==, wrapping_add as + } from builtins;
+import { concat as +++, equal as ==, wrapping_add_assign as += } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -6,7 +6,7 @@ struct Point { x: i64, y: i64 }
 // the other fields unchanged. The old field value may appear on the right.
 fn bump_x(p: Point, by: i64) -> Point {
     mut q = p;
-    set q.x = q.x + by;
+    set q.x += by;
     q
 }.test({
     let p = Point { x: 1, y: 2 };

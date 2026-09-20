@@ -1,0 +1,61 @@
+import { equal as ==, print, to_str } from builtins;
+
+struct Point { x: i64, y: i64 }
+
+// `#[allow]` keeps the spread form — the escape hatch every lint carries. The
+// marker goes on the line holding the `..self` spread, which is where this lint
+// points; it is always one line, so it takes a trailing marker and keeps it
+// through `aipl fmt`.
+fn rebuilt(mut self: Point) {
+    set self = Point { ..self, x: 1 }; #[allow]
+}
+
+// The rewrite the lint asks for, so the two spellings are checked side by
+// side and proven to agree.
+fn stored(mut self: Point) {
+    set self.x = 1;
+}
+
+fn main() !prints {
+    mut a = Point { x: 0, y: 2 };
+    mut b = a;
+    set a.rebuilt();
+    set b.stored();
+    print(to_str(a == b));
+    print(to_str(a));
+}
+--- stdout ---
+true
+Point { x: 1, y: 2 }
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 56
+instructions executed: 270
+binary size: 2912
+  code: 1220
+  data: 172
+  metadata: 1520
+functions:
+  __eq_Point:
+    calls: 1
+    bytes: 104
+  __to_str_Point:
+    calls: 1
+    bytes: 484
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 6
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 400

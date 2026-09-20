@@ -17,9 +17,19 @@ fn drop_one(start: i64) -> i64 {
     n
 }
 
+// A field path is a target like any other, quoted as written.
+fn bump_field(mut self: Counter) {
+    set self.n = self.n + 1;
+}
+
+struct Counter { n: i64 }
+
 fn main() !prints {
     print(bump(1).to_str());
     print(drop_one(1).to_str());
+    mut c = Counter { n: 1 };
+    set c.bump_field();
+    print(c.n.to_str());
 }
 --- errors ---
 error: adding 1 to "n" — use the increment form "set n++;", importing `wrapping_increment as ++` from builtins (or append #[allow] to this line to keep it)
@@ -33,3 +43,9 @@ error: subtracting 1 from "n" — use the decrement form "set n--;", importing `
    |
 16 |     set n = n - 1;
    |         ^^^^^^^^^
+
+error: adding 1 to "self.n" — use the increment form "set self.n++;", importing `wrapping_increment as ++` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_step_by_one.aipl:22:9
+   |
+22 |     set self.n = self.n + 1;
+   |         ^^^^^^^^^^^^^^^^^^^

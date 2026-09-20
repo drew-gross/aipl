@@ -9,7 +9,13 @@ fn main() !prints {
     set n = 3 + n; // the commutative order counts too
     set n = n / 2;
     print(n.to_str());
+    // A field path is a target like any other, quoted as written.
+    mut c = Counter { n: 1 };
+    set c.n = c.n + 5;
+    print(c.n.to_str());
 }
+
+struct Counter { n: i64 }
 --- errors ---
 error: "n" accumulates onto itself — use the compound form "set n += ...;", importing `wrapping_add_assign as +=` from builtins (or append #[allow] to this line to keep it)
  --> ./tests/cases/lints/err_compound_assign.aipl:8:9
@@ -28,3 +34,9 @@ error: "n" accumulates onto itself — use the compound form "set n /= ...;", im
    |
 10 |     set n = n / 2;
    |         ^^^^^^^^^
+
+error: "c.n" accumulates onto itself — use the compound form "set c.n += ...;", importing `wrapping_add_assign as +=` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_compound_assign.aipl:14:9
+   |
+14 |     set c.n = c.n + 5;
+   |         ^^^^^^^^^^^^^
