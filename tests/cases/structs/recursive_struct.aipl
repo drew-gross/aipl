@@ -34,13 +34,11 @@ fn main() !prints {
 
     // Structural equality recurses through the optional children.
     assert(leaf(9) == leaf(9));
-    assert(
-        Tree { value: 1, left: some(leaf(2)), right: none } == Tree {
-            value: 1,
-            left: some(leaf(2)),
-            right: none,
-        },
-    );
+    assert(Tree { value: 1, left: some(leaf(2)), right: none } == Tree {
+        value: 1,
+        left: some(leaf(2)),
+        right: none,
+    });
 })
 --- stdout ---
 10

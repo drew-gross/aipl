@@ -355,19 +355,17 @@ fn single_cost(value: str, delim: char) -> u64 {
 # own escapes (`needs_escape`); everything else verbatim.
 fn encode(value: str, delim: char) -> str {
     value
-        .map(
-            |c| if (c == '\\') {
-                """\\"""
-            } else if (c == '\t') {
-                """\t"""
-            } else if (c == '\r') {
-                """\r"""
-            } else if (c.needs_escape(delim)) {
-                `\\{c}`
-            } else {
-                `{c}`
-            },
-        )
+        .map(|c| if (c == '\\') {
+            """\\"""
+        } else if (c == '\t') {
+            """\t"""
+        } else if (c == '\r') {
+            """\r"""
+        } else if (c.needs_escape(delim)) {
+            `\\{c}`
+        } else {
+            `{c}`
+        })
         .join()
 }.test({
     assert(encode("plain", '"') == "plain");

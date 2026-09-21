@@ -21,15 +21,13 @@ fn oxford(items: str[]) -> str { items.join(sep=", ", final_sep=", or ", only_se
 
     // ...including a bit-packed `bool[]`, which has no byte-addressable
     // elements and so appends one bit at a time.
-    assert(
-        [[true], [false], [true]].join(sep=true, final_sep=false) == [
-            true,
-            true,
-            false,
-            false,
-            true,
-        ],
-    );
+    assert([[true], [false], [true]].join(sep=true, final_sep=false) == [
+        true,
+        true,
+        false,
+        false,
+        true,
+    ]);
 })
 
 fn main() !prints {

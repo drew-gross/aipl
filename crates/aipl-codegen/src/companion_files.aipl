@@ -83,12 +83,10 @@ pub fn companion_files(src: str) -> Companion[]!str {
         --- exit code ---
         0
     """;
-    assert(
-        companion_files(many)? == [
-            Companion { path: "a.aipl", contents: "pub fn a() -> i64 { 1 }" },
-            Companion { path: "sub/b.txt", contents: "two\nlines" },
-        ],
-    );
+    assert(companion_files(many)? == [
+        Companion { path: "a.aipl", contents: "pub fn a() -> i64 { 1 }" },
+        Companion { path: "sub/b.txt", contents: "two\nlines" },
+    ]);
 
     // An empty body is a real companion — `--- file: empty.txt ---` stages an
     // empty file, which is exactly what a case testing "read an empty file"
@@ -120,11 +118,9 @@ pub fn companion_files(src: str) -> Companion[]!str {
 
     // The path is trimmed, and a `file:`-prefixed name that isn't the marker
     // (e.g. `files:`) is not a companion.
-    assert(
-        companion_files("--- file:   spaced.txt   ---\nx\n")? == [
-            Companion { path: "spaced.txt", contents: "x" },
-        ],
-    );
+    assert(companion_files("--- file:   spaced.txt   ---\nx\n")? == [
+        Companion { path: "spaced.txt", contents: "x" },
+    ]);
     assert(companion_files("--- files: x.txt ---\nx\n")? == []);
 })
 
@@ -149,9 +145,9 @@ fn companion_path(header: str) -> str!str {
     assert(companion_path("file: sub/b.txt") == ok("sub/b.txt")); // separators kept
     // Unusable paths are errors, not silent skips.
     assert(companion_path("file:").is_err_and(|e| e.starts_with("`file:` section needs a path")));
-    assert(
-        companion_path("file:    ").is_err_and(|e| e.starts_with("`file:` section needs a path")),
-    );
+    assert(companion_path("file:    ").is_err_and(|e| e.starts_with(
+        "`file:` section needs a path",
+    )));
     assert(companion_path("""file: a\b.txt""").is_err_and(|e| e.starts_with(`use "/"`)));
 })
 --- performance ---
@@ -160,9 +156,9 @@ deallocations: 70
 reallocations: 1
 bytes allocated: 3514
 instructions executed: 16013
-binary size: 25488
+binary size: 25480
   code: 13704
-  data: 2661
+  data: 2653
   metadata: 9123
 functions:
   __arr_drop_Companion:

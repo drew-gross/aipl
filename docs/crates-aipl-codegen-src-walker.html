@@ -640,7 +640,7 @@
             <a class="anchor" href="#item-take_comment">take_comment</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn take_comment(self: W, __spat$14485: Span) -&#62; W</code></pre>
+          <pre class="signature"><code>fn take_comment(self: W, __spat$14450: Span) -&#62; W</code></pre>
 
           <div class="doc"><p>Consume comment <code>c</code>: step past it and mark it as the last thing emitted. The Rust <code>pop_front</code> + <code>last_end</code> update, as one move.</p></div>
 
@@ -1466,7 +1466,7 @@
             <a class="anchor" href="#item-range_has_semi">range_has_semi</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_semi(self: W, __spat$53407: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_semi(self: W, __spat$53384: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
@@ -2364,9 +2364,9 @@
           </h3>
           <pre class="signature"><code>fn hugs_sole_arg(self: W) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether the call whose <code>(</code> was just consumed takes exactly one argument that either *is* a bracketed construct — a nested call, an array, a struct literal, or a set/dict literal — filling the parens end to end, or *ends in* a multi-line <code>&quot;&quot;&quot;</code>/<code></code><code></code> <code></code><code> </code><code></code><code> block. Such a call is *hugged*: the argument's own brackets, or the block's own lines, carry the break, so the nesting costs one indent level instead of one per layer, and the block's closing delimiter lands under the call rather than under an argument line —</code></p><pre><code>assert(ebnf(g) == &quot;&quot;&quot;
-    prog = stmt ;
-&quot;&quot;&quot;);
+          <div class="doc"><p>Whether the call whose <code>(</code> was just consumed takes exactly one argument that *ends in* a nesting construct — a bracketed one (a nested call, an array, a struct literal, a set/dict literal, a lambda's block body) or a multi-line <code>&quot;&quot;&quot;</code>/<code></code><code></code> <code></code><code> </code><code></code><code> block — whether that construct is the whole argument or the tail of a larger expression (</code>x == [..]<code>, </code>ebnf(g) == &quot;&quot;&quot;...&quot;&quot;&quot;<code>). Such a call is *hugged*: the construct's own brackets, or the block's own lines, carry the break, so the nesting costs one indent level instead of one per layer, and the closing bracket lands under the call rather than under an argument line —</code></p><pre><code>assert(companion_files(many)? == [
+    Companion { path: &quot;a.aipl&quot;, contents: &quot;1&quot; },
+]);
 </code></pre><p>Pure lookahead over the token stream, no parse state.</p></div>
 
 
@@ -2374,28 +2374,31 @@
 
 
 
-        <section class="item" id="item-hugs_bracket_arg">
+        <section class="item" id="item-chain_in">
           <h3>
-            <a class="anchor" href="#item-hugs_bracket_arg">hugs_bracket_arg</a>
+            <a class="anchor" href="#item-chain_in">chain_in</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn hugs_bracket_arg(self: W) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn chain_in(self: W, first: u64, last: u64) -&#62; bool</code></pre>
 
-          <div class="doc"><p>The bracketed-construct half of <code>hugs_sole_arg</code>. The candidate's opening bracket: <code>[</code>/<code>#{</code> open directly, <code>name(</code>/<code>name {</code> one token in.</p></div>
+          <div class="doc"><p>Whether tokens <code>first</code> through <code>last</code> hold a member chain at bracket depth zero — two or more <code>.method(</code> segments, which <code>postfix</code> lays out as one group that breaks before every call. Hugging such an argument would put that break inside the hug, splitting the receiver from its calls right after the <code>(</code>:</p><pre><code>ok(ATy(node
+    .own_tokens()
+    .left_fold(..)))
+</code></pre><p>so a chained argument keeps the ordinary broken list, where the chain breaks on a line of its own.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-hugs_block_arg">
+        <section class="item" id="item-is_construct_end">
           <h3>
-            <a class="anchor" href="#item-hugs_block_arg">hugs_block_arg</a>
+            <a class="anchor" href="#item-is_construct_end">is_construct_end</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn hugs_block_arg(self: W) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn is_construct_end(self: W, i: u64) -&#62; bool</code></pre>
 
-          <div class="doc"><p>The trailing-block half of <code>hugs_sole_arg</code>: the token before the call's <code>)</code> (past a trailing comma, from source already broken) is a block that stays a block once respelled, and no top-level comma sits before it — the block ends the call's one argument, whatever that argument is (<code>x == &quot;&quot;&quot;...&quot;&quot;&quot;</code>, or the block alone). A block whose value is one line is respelled as a one-line literal, so it is not one of these: it breaks like any other text.</p></div>
+          <div class="doc"><p>Whether token <code>i</code> closes a non-empty bracketed construct. <code>f()</code>/<code>[]</code> have nothing to hug, and a call ending in one takes the ordinary broken list.</p></div>
 
 
         </section>
@@ -2458,14 +2461,14 @@
 
 
 
-        <section class="item" id="item-hug_fills_call">
+        <section class="item" id="item-hug_open">
           <h3>
-            <a class="anchor" href="#item-hug_fills_call">hug_fills_call</a>
+            <a class="anchor" href="#item-hug_open">hug_open</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn hug_fills_call(self: W, open_at: u64, close: u64) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn hug_open(self: W, end: u64) -&#62; u64?</code></pre>
 
-          <div class="doc"><p>Hug only a non-empty construct (<code>f()</code>/<code>[]</code> have nothing to hug) that runs all the way to the call's own <code>)</code> — otherwise the argument is a larger expression that merely *starts* with a bracketed one. Source that is already broken has a trailing comma after the argument, so step over one.</p></div>
+          <div class="doc"><p>Index of the bracket opening the one closed at <code>end</code>, or <code>none</code> if unbalanced — <code>hug_close</code> walked backwards.</p></div>
 
 
         </section>

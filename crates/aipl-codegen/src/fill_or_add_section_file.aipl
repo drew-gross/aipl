@@ -17,11 +17,9 @@ pub fn fill_or_add_section_file(
     // nothing on disk — is safe to exercise directly here. The write-failure
     // branch mirrors it exactly, and `write_string_to_file`'s own error
     // behavior is covered in `tests/cases/files/write_file.aipl`.
-    assert(
-        fill_or_add_section_file("no_such_file_xyz_12345.aipl", "foo", "bar") == err(
-            "could not read file",
-        ),
-    );
+    assert(fill_or_add_section_file("no_such_file_xyz_12345.aipl", "foo", "bar") == err(
+        "could not read file",
+    ));
 })
 --- performance ---
 allocations: 1
@@ -29,9 +27,9 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 28
 instructions executed: 110
-binary size: 8744
+binary size: 8736
   code: 5648
-  data: 237
+  data: 229
   metadata: 2859
 functions:
   __builtin_any$str$lam$__m1__fill_or_add_section$lambda0:

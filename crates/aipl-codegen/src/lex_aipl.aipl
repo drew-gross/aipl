@@ -175,12 +175,10 @@ pub fn doc_line_value(line: str) -> str { line.trim_prefix('#').trim_prefix(' ')
     assert(doc_line_value("#   indented") == "  indented");
     // And it is the answer the lexer's own rule gives.
     let src = "# hi";
-    assert(
-        lex_aipl(src)? == LexResult {
-            tokens: [atok(src, DocComment(doc_line_value(src)), 0..4)],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl(src)? == LexResult {
+        tokens: [atok(src, DocComment(doc_line_value(src)), 0..4)],
+        trivia: [],
+    });
 })
 
 pub fn ident_start() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_" }
@@ -309,34 +307,28 @@ pub fn str_lit_value(text: str) -> str {
     // A `"..."` literal: escapes decoded, nothing else.
     let q = `"a\\nb"`;
     assert(str_lit_value(q) == "a\nb");
-    assert(
-        lex_aipl(q)? == LexResult {
-            tokens: [atok(q, StrLit(str_lit_value(q), Quoted), 0..q.len())],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl(q)? == LexResult {
+        tokens: [atok(q, StrLit(str_lit_value(q), Quoted), 0..q.len())],
+        trivia: [],
+    });
 
     // A `"""..."""` literal: verbatim contents, de-dented as a block.
     let raw = `"""a"b"""`;
     assert(str_lit_value(raw) == `a"b`);
-    assert(
-        lex_aipl(raw)? == LexResult {
-            tokens: [atok(raw, StrLit(str_lit_value(raw), TripleQuoted), 0..raw.len())],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl(raw)? == LexResult {
+        tokens: [atok(raw, StrLit(str_lit_value(raw), TripleQuoted), 0..raw.len())],
+        trivia: [],
+    });
 
     // An interpolation-free template, which lexes to a `StrLit` like any other
     // string — escape-decoded for the single-backtick form, verbatim for the
     // triple.
     let tpl = "`hi`";
     assert(str_lit_value(tpl) == "hi");
-    assert(
-        lex_aipl(tpl)? == LexResult {
-            tokens: [atok(tpl, StrLit(str_lit_value(tpl), Backtick), 0..tpl.len())],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl(tpl)? == LexResult {
+        tokens: [atok(tpl, StrLit(str_lit_value(tpl), Backtick), 0..tpl.len())],
+        trivia: [],
+    });
 
     let raw_tpl = "```a`b```";
     assert(str_lit_value(raw_tpl) == "a`b");
@@ -347,14 +339,10 @@ pub fn str_lit_value(text: str) -> str {
     assert(str_lit_value(braced) == """a{b}\n""");
     assert(str_lit_value(`"""a\\\{b"""`) == """a\{b""");
     assert(str_lit_value("""`\{\}`""") == "{}");
-    assert(
-        lex_aipl(raw_tpl)? == LexResult {
-            tokens: [
-                atok(raw_tpl, StrLit(str_lit_value(raw_tpl), TripleBacktick), 0..raw_tpl.len()),
-            ],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl(raw_tpl)? == LexResult {
+        tokens: [atok(raw_tpl, StrLit(str_lit_value(raw_tpl), TripleBacktick), 0..raw_tpl.len())],
+        trivia: [],
+    });
 
     // The empty literal, where the strip has nothing left to take.
     assert(str_lit_value(`""`) == "");
@@ -374,12 +362,10 @@ pub fn char_lit_value(text: str) -> char? {
     assert(char_lit_value("""'\n'""") == some('\n'));
     assert(char_lit_value("""'\''""") == some('\''));
     let c = "'q'";
-    assert(
-        lex_aipl(c)? == LexResult {
-            tokens: [atok(c, CharTok(char_lit_value(c).value_or('?')), 0..c.len())],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl(c)? == LexResult {
+        tokens: [atok(c, CharTok(char_lit_value(c).value_or('?')), 0..c.len())],
+        trivia: [],
+    });
 
     // The shapes the lexer refuses, which is why this returns an optional.
     assert(char_lit_value("''") == none);
@@ -424,16 +410,14 @@ pub fn template_segments(texts: str[]) -> str[] {
     // which is what makes this a claim rather than a second opinion.
     let src = "`a{x}b`";
     let segs = template_segments(["`a{", "}b`"]);
-    assert(
-        lex_aipl(src)? == LexResult {
-            tokens: [
-                atok(src, TemplateHead(segs[0].value_or("")), 0..3),
-                atok(src, Name("x"), 3..4),
-                atok(src, TemplateTail(segs[1].value_or("")), 4..7),
-            ],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl(src)? == LexResult {
+        tokens: [
+            atok(src, TemplateHead(segs[0].value_or("")), 0..3),
+            atok(src, Name("x"), 3..4),
+            atok(src, TemplateTail(segs[1].value_or("")), 4..7),
+        ],
+        trivia: [],
+    });
 })
 
 # The AIPL rule set. Order is priority (the first matching rule wins): skipped
@@ -681,114 +665,96 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // A small snippet exercising several kinds; a fuller suite comes with the
     // real grammar. `let x = 42;` plus a trailing line comment (trivia).
     let src = "let x = 42; // note";
-    assert(
-        lex_aipl(src)? == LexResult {
-            tokens: [
-                atok(src, Let, 0..3),
-                atok(src, Name("x"), 4..5),
-                atok(src, Eq, 6..7),
-                atok(src, IntLit(42), 8..10),
-                atok(src, Semi, 10..11),
-            ],
-            trivia: [atok(src, LineComment, 12..19)],
-        },
-    );
+    assert(lex_aipl(src)? == LexResult {
+        tokens: [
+            atok(src, Let, 0..3),
+            atok(src, Name("x"), 4..5),
+            atok(src, Eq, 6..7),
+            atok(src, IntLit(42), 8..10),
+            atok(src, Semi, 10..11),
+        ],
+        trivia: [atok(src, LineComment, 12..19)],
+    });
 
     // Keywords beyond the starter set. `builtins` is a keyword everywhere (as in
     // the Rust lexer), not just in a `from builtins;` import; `iffy` still lexes
     // as a `Name`, since the `Keyword` matcher stops at an identifier boundary.
-    assert(
-        lex_aipl("if else builtins iffy")? == LexResult {
-            tokens: [
-                atok("if else builtins iffy", If, 0..2),
-                atok("if else builtins iffy", Else, 3..7),
-                atok("if else builtins iffy", Builtins, 8..16),
-                atok("if else builtins iffy", Name("iffy"), 17..21),
-            ],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl("if else builtins iffy")? == LexResult {
+        tokens: [
+            atok("if else builtins iffy", If, 0..2),
+            atok("if else builtins iffy", Else, 3..7),
+            atok("if else builtins iffy", Builtins, 8..16),
+            atok("if else builtins iffy", Name("iffy"), 17..21),
+        ],
+        trivia: [],
+    });
 
     // The constant literals get their own kinds, distinct from keywords and from
     // identifiers. `some`/`ok`/`err` are ordinary `Name`s (constructors, not
     // constants); `noneish` stays a `Name` (identifier-boundary matched).
-    assert(
-        lex_aipl("true false none some noneish")? == LexResult {
-            tokens: [
-                atok("true false none some noneish", True, 0..4),
-                atok("true false none some noneish", False, 5..10),
-                atok("true false none some noneish", None, 11..15),
-                atok("true false none some noneish", Name("some"), 16..20),
-                atok("true false none some noneish", Name("noneish"), 21..28),
-            ],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl("true false none some noneish")? == LexResult {
+        tokens: [
+            atok("true false none some noneish", True, 0..4),
+            atok("true false none some noneish", False, 5..10),
+            atok("true false none some noneish", None, 11..15),
+            atok("true false none some noneish", Name("some"), 16..20),
+            atok("true false none some noneish", Name("noneish"), 21..28),
+        ],
+        trivia: [],
+    });
 
     // The rest of the operator/punctuation table: `<=`/`>=` beat `<`/`>`, `++`
     // beats `+` (but not `+++`), and `|` is the lambda delimiter. `Exact` always
     // takes the longest spelling, so the two-char forms win over their one-char
     // prefixes.
-    assert(
-        lex_aipl("a <= b >= |x| ++")? == LexResult {
-            tokens: [
-                atok("a <= b >= |x| ++", Name("a"), 0..1),
-                atok("a <= b >= |x| ++", Le, 2..4),
-                atok("a <= b >= |x| ++", Name("b"), 5..6),
-                atok("a <= b >= |x| ++", Ge, 7..9),
-                atok("a <= b >= |x| ++", Pipe, 10..11),
-                atok("a <= b >= |x| ++", Name("x"), 11..12),
-                atok("a <= b >= |x| ++", Pipe, 12..13),
-                atok("a <= b >= |x| ++", PlusPlus, 14..16),
-            ],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl("a <= b >= |x| ++")? == LexResult {
+        tokens: [
+            atok("a <= b >= |x| ++", Name("a"), 0..1),
+            atok("a <= b >= |x| ++", Le, 2..4),
+            atok("a <= b >= |x| ++", Name("b"), 5..6),
+            atok("a <= b >= |x| ++", Ge, 7..9),
+            atok("a <= b >= |x| ++", Pipe, 10..11),
+            atok("a <= b >= |x| ++", Name("x"), 11..12),
+            atok("a <= b >= |x| ++", Pipe, 12..13),
+            atok("a <= b >= |x| ++", PlusPlus, 14..16),
+        ],
+        trivia: [],
+    });
 
     // `#` disambiguation: a bare `#` (the `#{...}` dict prefix) is a `Hash` token,
     // but `#[allow]` is the lint-squelch marker — recorded as trivia and kept out
     // of the token stream, matching the Rust lexer.
-    assert(
-        lex_aipl("#{ #[allow]")? == LexResult {
-            tokens: [atok("#{ #[allow]", Hash, 0..1), atok("#{ #[allow]", LBrace, 1..2)],
-            trivia: [atok("#{ #[allow]", AllowMarker, 3..11)],
-        },
-    );
+    assert(lex_aipl("#{ #[allow]")? == LexResult {
+        tokens: [atok("#{ #[allow]", Hash, 0..1), atok("#{ #[allow]", LBrace, 1..2)],
+        trivia: [atok("#{ #[allow]", AllowMarker, 3..11)],
+    });
     // The ordered-set brackets are three tokens each, not a doc comment.
-    assert(
-        lex_aipl("#>{")? == LexResult {
-            tokens: [atok("#>{", Hash, 0..1), atok("#>{", Gt, 1..2), atok("#>{", LBrace, 2..3)],
-            trivia: [],
-        },
-    );
-    assert(
-        lex_aipl("#<{")? == LexResult {
-            tokens: [atok("#<{", Hash, 0..1), atok("#<{", Lt, 1..2), atok("#<{", LBrace, 2..3)],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl("#>{")? == LexResult {
+        tokens: [atok("#>{", Hash, 0..1), atok("#>{", Gt, 1..2), atok("#>{", LBrace, 2..3)],
+        trivia: [],
+    });
+    assert(lex_aipl("#<{")? == LexResult {
+        tokens: [atok("#<{", Hash, 0..1), atok("#<{", Lt, 1..2), atok("#<{", LBrace, 2..3)],
+        trivia: [],
+    });
 
     // Block comments are trivia, and `Nested` depth-tracks them, so the inner
     // `/* */` doesn't close the outer — the whole `/* a /* b */ c */` is one
     // comment, out of the token stream.
-    assert(
-        lex_aipl("x /* a /* b */ c */ y")? == LexResult {
-            tokens: [
-                atok("x /* a /* b */ c */ y", Name("x"), 0..1),
-                atok("x /* a /* b */ c */ y", Name("y"), 20..21),
-            ],
-            trivia: [atok("x /* a /* b */ c */ y", BlockComment, 2..19)],
-        },
-    );
+    assert(lex_aipl("x /* a /* b */ c */ y")? == LexResult {
+        tokens: [
+            atok("x /* a /* b */ c */ y", Name("x"), 0..1),
+            atok("x /* a /* b */ c */ y", Name("y"), 20..21),
+        ],
+        trivia: [atok("x /* a /* b */ c */ y", BlockComment, 2..19)],
+    });
 
     // An unterminated block comment is a hard error spanning the open `/*` to the
     // end of source, matching the Rust lexer.
-    assert(
-        lex_aipl("a /* never closed") == err(LexError {
-            message: "unterminated block comment",
-            span: 2..17,
-        }),
-    );
+    assert(lex_aipl("a /* never closed") == err(LexError {
+        message: "unterminated block comment",
+        span: 2..17,
+    }));
 
     // A string literal with escapes: the source is `s = "a\nb"` (a literal
     // backslash-`n`, not a newline). The `StrLit` emit decodes it (with `Quoted`
@@ -796,51 +762,43 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // value carries an actual newline — escape handling lives in `str_lit`, not in
     // the lexer library.
     let esc = `s = "a\\nb"`;
-    assert(
-        lex_aipl(esc)? == LexResult {
-            tokens: [
-                atok(esc, Name("s"), 0..1),
-                atok(esc, Eq, 2..3),
-                atok(esc, StrLit("a\nb", Quoted), 4..10),
-            ],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl(esc)? == LexResult {
+        tokens: [
+            atok(esc, Name("s"), 0..1),
+            atok(esc, Eq, 2..3),
+            atok(esc, StrLit("a\nb", Quoted), 4..10),
+        ],
+        trivia: [],
+    });
 
     // A raw string `"""a"b"""` (the AIPL source here is written with escaped
     // quotes). `Between` scans to the balancing `"""`, so the lone `"` inside is
     // content and no escapes are decoded; it lexes to `StrLit` with `TripleQuoted`
     // style. De-denting a single-line literal is a no-op, so the value is `a"b`.
     let raw = `"""a"b"""`;
-    assert(
-        lex_aipl(raw)? == LexResult {
-            tokens: [atok(raw, StrLit(`a"b`, TripleQuoted), 0..9)],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl(raw)? == LexResult {
+        tokens: [atok(raw, StrLit(`a"b`, TripleQuoted), 0..9)],
+        trivia: [],
+    });
 
     // The empty raw string is six quotes: the opening `"""` closed at once,
     // not a `""` and a stray `""""`. (The formatter respells it `""`, so no
     // formatted source keeps this spelling — it is covered here.)
     let empty_raw = `""""""`;
-    assert(
-        lex_aipl(empty_raw)? == LexResult {
-            tokens: [atok(empty_raw, StrLit("", TripleQuoted), 0..6)],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl(empty_raw)? == LexResult {
+        tokens: [atok(empty_raw, StrLit("", TripleQuoted), 0..6)],
+        trivia: [],
+    });
 
     // Char literals: an ordinary `'x'` and an escaped `'\n'` (the AIPL source
     // writes the escape as a literal backslash-`n`), each decoded to its byte.
-    assert(
-        lex_aipl("""'x' '\n'""")? == LexResult {
-            tokens: [
-                atok("""'x' '\n'""", CharTok('x'), 0..3),
-                atok("""'x' '\n'""", CharTok('\n'), 4..8),
-            ],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl("""'x' '\n'""")? == LexResult {
+        tokens: [
+            atok("""'x' '\n'""", CharTok('x'), 0..3),
+            atok("""'x' '\n'""", CharTok('\n'), 4..8),
+        ],
+        trivia: [],
+    });
 
     // The one-char shape is enforced: an empty `''` is a hard error whose span
     // (the two quotes) matches the Rust lexer's `empty char literal` error.
@@ -851,58 +809,48 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // `'multiple'` between the quotes. Because the verdict comes from the emit,
     // the error spans the *entire* literal (7..17 here) — the caret underlines
     // the whole mistake, not just the opening quote and first char.
-    assert(
-        lex_aipl("oops = 'multiple'") == err(LexError {
-            message: "char literal must contain exactly one character",
-            span: 7..17,
-        }),
-    );
+    assert(lex_aipl("oops = 'multiple'") == err(LexError {
+        message: "char literal must contain exactly one character",
+        span: 7..17,
+    }));
 
     // A template literal with no interpolation lexes as one `StrLit` with
     // `Backtick` style (the same token any string literal produces) — the whole
     // literal, backticks included, is its span.
-    assert(
-        lex_aipl("`hi`")? == LexResult {
-            tokens: [atok("`hi`", StrLit("hi", Backtick), 0..4)],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl("`hi`")? == LexResult {
+        tokens: [atok("`hi`", StrLit("hi", Backtick), 0..4)],
+        trivia: [],
+    });
 
     // A template with an interpolation `` `a{x}b` ``: the head runs from the
     // opening backtick through the first `{`, the `{x}` re-lexes with the full
     // rule set (a lone `Name`), and the tail runs from the `}` that closed the
     // interpolation through the closing backtick. Every segment's span runs
     // brace to brace, so the three tokens tile the literal with no gap.
-    assert(
-        lex_aipl("`a{x}b`")? == LexResult {
-            tokens: [
-                atok("`a{x}b`", TemplateHead("a"), 0..3),
-                atok("`a{x}b`", Name("x"), 3..4),
-                atok("`a{x}b`", TemplateTail("b"), 4..7),
-            ],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl("`a{x}b`")? == LexResult {
+        tokens: [
+            atok("`a{x}b`", TemplateHead("a"), 0..3),
+            atok("`a{x}b`", Name("x"), 3..4),
+            atok("`a{x}b`", TemplateTail("b"), 4..7),
+        ],
+        trivia: [],
+    });
 
     // A triple-backtick raw template with no interpolation scans verbatim and
     // folds into `StrLit` with `TripleBacktick` style (de-dented, a no-op here);
     // it wins over the single-backtick rule (longest delim first).
-    assert(
-        lex_aipl("```hi```")? == LexResult {
-            tokens: [atok("```hi```", StrLit("hi", TripleBacktick), 0..8)],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl("```hi```")? == LexResult {
+        tokens: [atok("```hi```", StrLit("hi", TripleBacktick), 0..8)],
+        trivia: [],
+    });
 
     // An integer that overflows i64: the `Try` emit (`int_lit`) reports it,
     // and the library attaches the literal's span. Overflow policy is the
     // consumer's — the lexer library never parses ints itself.
-    assert(
-        lex_aipl("99999999999999999999") == err(LexError {
-            message: "integer literal overflows i64",
-            span: 0..20,
-        }),
-    );
+    assert(lex_aipl("99999999999999999999") == err(LexError {
+        message: "integer literal overflows i64",
+        span: 0..20,
+    }));
 })
 
 // --- Differential-testing bridge (dogfooding) ------------------------------
@@ -918,15 +866,13 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
 # token stream (the Rust lexer's dump has no comment/marker lines to compare the
 # side-channel against).
 pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError { ok(lex_aipl(src)?.tokens) }.test({
-    assert(
-        lex_aipl_tokens("let x = 42;")? == [
-            atok("let x = 42;", Let, 0..3),
-            atok("let x = 42;", Name("x"), 4..5),
-            atok("let x = 42;", Eq, 6..7),
-            atok("let x = 42;", IntLit(42), 8..10),
-            atok("let x = 42;", Semi, 10..11),
-        ],
-    );
+    assert(lex_aipl_tokens("let x = 42;")? == [
+        atok("let x = 42;", Let, 0..3),
+        atok("let x = 42;", Name("x"), 4..5),
+        atok("let x = 42;", Eq, 6..7),
+        atok("let x = 42;", IntLit(42), 8..10),
+        atok("let x = 42;", Semi, 10..11),
+    ]);
     // A byte no rule matches makes the whole lex an error, carrying its span.
     assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
 })
@@ -942,24 +888,20 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
 }.test({
     // The `--- stdout ---` marker and everything after it is dropped before
     // lexing; the tokens before it keep their original spans.
-    assert(
-        lex_aipl_stripped("let x = 1\n--- stdout ---\nfoo")? == LexResult {
-            tokens: [
-                atok("let x = 1\n--- stdout ---\nfoo", Let, 0..3),
-                atok("let x = 1\n--- stdout ---\nfoo", Name("x"), 4..5),
-                atok("let x = 1\n--- stdout ---\nfoo", Eq, 6..7),
-                atok("let x = 1\n--- stdout ---\nfoo", IntLit(1), 8..9),
-            ],
-            trivia: [],
-        },
-    );
+    assert(lex_aipl_stripped("let x = 1\n--- stdout ---\nfoo")? == LexResult {
+        tokens: [
+            atok("let x = 1\n--- stdout ---\nfoo", Let, 0..3),
+            atok("let x = 1\n--- stdout ---\nfoo", Name("x"), 4..5),
+            atok("let x = 1\n--- stdout ---\nfoo", Eq, 6..7),
+            atok("let x = 1\n--- stdout ---\nfoo", IntLit(1), 8..9),
+        ],
+        trivia: [],
+    });
     // No marker: identical to lexing `src` directly (comments still trivia).
-    assert(
-        lex_aipl_stripped("y // c")? == LexResult {
-            tokens: [atok("y // c", Name("y"), 0..1)],
-            trivia: [atok("y // c", LineComment, 2..6)],
-        },
-    );
+    assert(lex_aipl_stripped("y // c")? == LexResult {
+        tokens: [atok("y // c", Name("y"), 0..1)],
+        trivia: [atok("y // c", LineComment, 2..6)],
+    });
 })
 --- performance ---
 allocations: 277
@@ -967,9 +909,9 @@ deallocations: 277
 reallocations: 61
 bytes allocated: 401925
 instructions executed: 1476273
-binary size: 576832
+binary size: 576296
   code: 392400
-  data: 10500
+  data: 9964
   metadata: 173932
 functions:
   __arr_drop___m1__StepResult$AiplTok:

@@ -4,32 +4,26 @@ import { equal as ==, split } from builtins;
 # `\n` yields a final empty element (not Rust's `str::lines()` semantics, which
 # would drop it), and an empty `self` yields a single empty element.
 pub fn lines(self: str) -> str[] { self.split("\n") }.test({
-    assert(
-        lines("""
-            a
-            b
-            c
-        """) == ["a", "b", "c"],
-    );
+    assert(lines("""
+        a
+        b
+        c
+    """) == ["a", "b", "c"]);
     assert(lines("solo") == ["solo"]);
     assert(lines("") == [""]);
     // Trailing newline produces a trailing empty line.
-    assert(
-        lines("""
-            a
-            b
+    assert(lines("""
+        a
+        b
 
-        """) == ["a", "b", ""],
-    );
+    """) == ["a", "b", ""]);
     // Every line blank.
     assert(lines("\n\n") == ["", "", ""]);
     // Long (heap) lines exercise the view/concat paths.
-    assert(
-        lines("""
-            first long line
-            second long line
-        """) == ["first long line", "second long line"],
-    );
+    assert(lines("""
+        first long line
+        second long line
+    """) == ["first long line", "second long line"]);
 })
 --- performance ---
 allocations: 12
@@ -37,10 +31,10 @@ deallocations: 12
 reallocations: 0
 bytes allocated: 1008
 instructions executed: 1347
-binary size: 5592
+binary size: 5560
   code: 2812
-  data: 565
-  metadata: 2215
+  data: 529
+  metadata: 2219
 functions:
   __eq_str$arr:
     calls: 6

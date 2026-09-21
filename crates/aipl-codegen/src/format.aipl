@@ -141,12 +141,10 @@ fn fmt_node<K: variant, A: any>(
                 span: node.span(),
             })?.layout;
             let ps = pieces(g, src, kids, space)?;
-            ok(
-                match (layout) {
-                    Tight => tight(ps),
-                    Inline => inline_doc(ps, space),
-                },
-            )
+            ok(match (layout) {
+                Tight => tight(ps),
+                Inline => inline_doc(ps, space),
+            })
         },
         // A group reached directly, rather than as a child of the production
         // holding it — the same layout either way.
@@ -624,12 +622,10 @@ fn list_items(mid: Piece[], ListStyle { sep, sorted }, space: (str, str) -> bool
     // Juxtaposed: every child is its own item.
     assert(texts(list_items([a, b], ListStyle { sep: "" }, never_space)) == ["a", "b"]);
     // A comment rides with the item it was written against, not on its own.
-    assert(
-        texts(list_items([Note("/*x*/", false), a, Tok(","), b], ListStyle {}, never_space)) == [
-            "/*x*/ a",
-            "b",
-        ],
-    );
+    assert(texts(list_items([Note("/*x*/", false), a, Tok(","), b], ListStyle {}, never_space)) == [
+        "/*x*/ a",
+        "b",
+    ]);
 
     // ---- sorted ----
     let keyed = ListStyle { sorted: true };
@@ -639,12 +635,10 @@ fn list_items(mid: Piece[], ListStyle { sep, sorted }, space: (str, str) -> bool
 
     // The key is the item's leading token, so a comment in front of an item
     // moves with it rather than deciding where it goes.
-    assert(
-        texts(list_items([b, Tok(","), Note("/*x*/", false), a], keyed, never_space)) == [
-            "/*x*/ a",
-            "b",
-        ],
-    );
+    assert(texts(list_items([b, Tok(","), Note("/*x*/", false), a], keyed, never_space)) == [
+        "/*x*/ a",
+        "b",
+    ]);
     // A multi-token item keys on its first token: `b: 1` sorts under `b`.
     let kv_b = [Tok("b"), Tok(":"), Tok("1")];
     let kv_a = [Tok("a"), Tok(":"), Tok("2")];
@@ -653,9 +647,10 @@ fn list_items(mid: Piece[], ListStyle { sep, sorted }, space: (str, str) -> bool
     let a2 = Node(Text("a2"), "a", "a");
     assert(texts(list_items([a2, Tok(","), a], keyed, never_space)) == ["a2", "a"]);
     // Juxtaposed lists sort too.
-    assert(
-        texts(list_items([b, a], ListStyle { sep: "", sorted: true }, never_space)) == ["a", "b"],
-    );
+    assert(texts(list_items([b, a], ListStyle { sep: "", sorted: true }, never_space)) == [
+        "a",
+        "b",
+    ]);
 })
 
 # One item, laid out and keyed.
@@ -749,9 +744,9 @@ deallocations: 2325
 reallocations: 217
 bytes allocated: 186475
 instructions executed: 300822
-binary size: 256920
+binary size: 256928
   code: 165556
-  data: 6068
+  data: 6076
   metadata: 85296
 functions:
   __arr_drop_Item:

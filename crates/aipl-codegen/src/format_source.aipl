@@ -65,11 +65,9 @@ pub fn format_source(src: str, width: u64) -> str!FmtError {
     // The whole pipeline: whitespace cleaned, laid out, newline normalized, and
     // the sections re-attached exactly as they were.
     assert(format_source("fn  main( )  {  }  \n\n", 100) == ok("fn main() {}\n"));
-    assert(
-        format_source("fn  main( ) {}\n--- stdout ---\nhi  \n", 100) == ok(
-            "fn main() {}\n--- stdout ---\nhi  \n",
-        ),
-    );
+    assert(format_source("fn  main( ) {}\n--- stdout ---\nhi  \n", 100) == ok(
+        "fn main() {}\n--- stdout ---\nhi  \n",
+    ));
     assert(format_source("", 100) == ok("\n"));
 
     // A malformed program fails with the *parser's* message, not the walker's.
@@ -140,9 +138,10 @@ fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
 # positions.
 fn verify_same_tokens(input: str, output: str) -> !FmtError {
     let before = lex_aipl(input).map_err(|e| FmtError { message: e.message, span: e.span })?;
-    let after = lex_aipl(output).map_err(
-        |e| FmtError { message: `formatter produced unlexable output: {e.message}`, span: e.span },
-    )?;
+    let after = lex_aipl(output).map_err(|e| FmtError {
+        message: `formatter produced unlexable output: {e.message}`,
+        span: e.span,
+    })?;
     let was = token_values(before);
     let now = token_values(after);
     if (was != now) {
@@ -250,10 +249,10 @@ deallocations: 20176
 reallocations: 2882
 bytes allocated: 4330577
 instructions executed: 8657058
-binary size: 5539808
-  code: 3657284
-  data: 11154
-  metadata: 1871370
+binary size: 5540936
+  code: 3658264
+  data: 11146
+  metadata: 1871526
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1110,15 +1109,12 @@ functions:
   __m36__hug_close:
     calls: 0
     bytes: 740
-  __m36__hugs_block_arg:
+  __m36__hug_open:
     calls: 0
-    bytes: 308
-  __m36__hugs_bracket_arg:
-    calls: 0
-    bytes: 800
+    bytes: 684
   __m36__hugs_sole_arg:
     calls: 0
-    bytes: 580
+    bytes: 1632
   __m36__ident_list$own2:
     calls: 0
     bytes: 1800
@@ -1143,6 +1139,9 @@ functions:
   __m36__is_block_tok:
     calls: 0
     bytes: 1576
+  __m36__is_construct_end:
+    calls: 0
+    bytes: 352
   __m36__item:
     calls: 5
     bytes: 2448

@@ -45,9 +45,10 @@ pub fn split_test_sections(src: str) -> (str, str) {
     // A non-marker dashed line (only two dashes) doesn't split.
     assert(split_test_sections("-- not a marker --\ncode") == ("-- not a marker --\ncode", ""));
     // An indented marker line doesn't split — a header must start at column 0.
-    assert(
-        split_test_sections("code\n  --- stdout ---\nfoo") == ("code\n  --- stdout ---\nfoo", ""),
-    );
+    assert(split_test_sections("code\n  --- stdout ---\nfoo") == (
+        "code\n  --- stdout ---\nfoo",
+        "",
+    ));
 })
 --- performance ---
 allocations: 0
@@ -55,10 +56,10 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 10117
-binary size: 9976
+binary size: 10000
   code: 5320
-  data: 1012
-  metadata: 3644
+  data: 1035
+  metadata: 3645
 functions:
   __eq___tuple$str$str:
     calls: 9

@@ -114,13 +114,11 @@ fn main() !prints {
     };
     assert(n.total() == 15);
     assert(leaf(6).total() == 6);
-    assert(
-        n == Node {
-            v: 1,
-            next: some(leaf(2)),
-            kids: [leaf(3), Node { v: 4, next: none, kids: [leaf(5)] }],
-        },
-    );
+    assert(n == Node {
+        v: 1,
+        next: some(leaf(2)),
+        kids: [leaf(3), Node { v: 4, next: none, kids: [leaf(5)] }],
+    });
 })
 --- stdout ---
 Both { head: Cons(2, Cons(1, Cons(0, Nil))), nums: [7, 8] }

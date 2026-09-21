@@ -276,12 +276,10 @@ fn bump(self: W) -> WStr {
     // panic; every caller dispatches on `peek_text` first, so neither runs.
     self
         .peek()
-        .map(
-            |t| WStr {
-                w: W { ..self, pos: self.pos + 1, last_end: t.span.end },
-                text: self.src[t.span],
-            },
-        )
+        .map(|t| WStr {
+            w: W { ..self, pos: self.pos + 1, last_end: t.span.end },
+            text: self.src[t.span],
+        })
         .value_or(WStr { w: self, text: "" })
 }
 
@@ -461,9 +459,10 @@ fn comma_list_docs(items: Doc[], style: ListStyle) -> Doc {
 # trailing `--- section ---` blocks, stripping trailing whitespace, validating
 # with the real parser, and the token-preservation check.
 pub fn format_program(src: str, width: u64) -> str!FmtError {
-    let LexResult { tokens, trivia } = lex_aipl(src).map_err(
-        |e| FmtError { message: e.message, span: e.span },
-    )?;
+    let LexResult { tokens, trivia } = lex_aipl(src).map_err(|e| FmtError {
+        message: e.message,
+        span: e.span,
+    })?;
 
     // The lexer's tokens as the walker's own `(kind, span)` pairs. Trivia is
     // comments and `#[allow]` markers only — whitespace is a `skip` rule, so it
@@ -641,9 +640,10 @@ fn import_item(self: W) -> WImport!FmtError {
     }
     let done = w.expect(";")?.w;
     let end = done.last_end;
-    let doc = import_decl_doc(self.src[start..end]).map_err(
-        |e| FmtError { message: e.message, span: e.span.start + start..e.span.end + start },
-    )?;
+    let doc = import_decl_doc(self.src[start..end]).map_err(|e| FmtError {
+        message: e.message,
+        span: e.span.start + start..e.span.end + start,
+    })?;
     ok(WImport { w: done.skip_comments_before(end), source, doc })
 }
 
@@ -2423,16 +2423,18 @@ fn skip_comments_before(self: W, end: u64) -> W {
 // ---------- call-argument layout ----------
 
 # Whether the call whose `(` was just consumed takes exactly one argument that
-# either *is* a bracketed construct — a nested call, an array, a struct literal,
-# or a set/dict literal — filling the parens end to end, or *ends in* a
-# multi-line `"""`/```` ``` ```` block. Such a call is *hugged*: the argument's
-# own brackets, or the block's own lines, carry the break, so the nesting costs
-# one indent level instead of one per layer, and the block's closing delimiter
-# lands under the call rather than under an argument line —
+# *ends in* a nesting construct — a bracketed one (a nested call, an array, a
+# struct literal, a set/dict literal, a lambda's block body) or a multi-line
+# `"""`/```` ``` ```` block — whether that construct is the whole argument or
+# the tail of a larger expression (`x == [..]`, `ebnf(g) == """..."""`). Such
+# a call is *hugged*: the construct's own brackets, or the block's own lines,
+# carry the break, so the nesting costs one indent level instead of one per
+# layer, and the closing bracket lands under the call rather than under an
+# argument line —
 #
-#     assert(ebnf(g) == """
-#         prog = stmt ;
-#     """);
+#     assert(companion_files(many)? == [
+#         Companion { path: "a.aipl", contents: "1" },
+#     ]);
 #
 # Pure lookahead over the token stream, no parse state.
 fn hugs_sole_arg(self: W) -> bool {
@@ -2441,37 +2443,56 @@ fn hugs_sole_arg(self: W) -> bool {
     if (self.comment_before_cursor()) {
         return false;
     };
-    self.hugs_bracket_arg() || self.hugs_block_arg()
-}
 
-# The bracketed-construct half of `hugs_sole_arg`. The candidate's opening
-# bracket: `[`/`#{` open directly, `name(`/`name {` one token in.
-fn hugs_bracket_arg(self: W) -> bool {
-    let t = self.peek_text();
-    let direct = t == "[" || t == "#{";
-    let indirect = self.peek_is(Ident) && (self.peek_text_n(1) == "(" || self.peek_text_n(
-        1,
-    ) == "{");
-    if (!direct && !indirect) {
-        return false;
-    };
-    let open_at = if (direct) { self.pos } else { self.pos + 1 };
-    self.hug_close(open_at).is_some_and(|close| self.hug_fills_call(open_at, close))
-}
-
-# The trailing-block half of `hugs_sole_arg`: the token before the call's `)`
-# (past a trailing comma, from source already broken) is a block that stays a
-# block once respelled, and no top-level comma sits before it — the block ends
-# the call's one argument, whatever that argument is (`x == """..."""`, or the
-# block alone). A block whose value is one line is respelled as a one-line
-# literal, so it is not one of these: it breaks like any other text.
-fn hugs_block_arg(self: W) -> bool {
-    let open_at = self.pos - 1;
-    if (let some(close) = self.hug_close(open_at)) {
+    // The argument's last token: the one before the call's `)`, past a trailing
+    // comma from source already broken. An empty call has none.
+    if (let some(close) = self.hug_close(self.pos - 1)) {
         let last = if (self.tok_text(close - 1) == ",") { close - 2 } else { close - 1 };
-        return self.pos <= last && !self.top_comma_in(self.pos, last) && self.is_block_tok(last);
+        return self.pos <= last && !self.top_comma_in(self.pos, last) && !self.chain_in(
+            self.pos,
+            last,
+        ) && (self.is_construct_end(last) || self.is_block_tok(last));
     };
     false
+}
+
+# Whether tokens `first` through `last` hold a member chain at bracket depth
+# zero — two or more `.method(` segments, which `postfix` lays out as one group
+# that breaks before every call. Hugging such an argument would put that break
+# inside the hug, splitting the receiver from its calls right after the `(`:
+#
+#     ok(ATy(node
+#         .own_tokens()
+#         .left_fold(..)))
+#
+# so a chained argument keeps the ordinary broken list, where the chain breaks
+# on a line of its own.
+fn chain_in(self: W, first: u64, last: u64) -> bool {
+    mut i = first;
+    mut depth: u64 = 0;
+    mut calls: u64 = 0;
+    while (i <= last) {
+        let t = self.tok_text(i);
+        if (t == "(" || t == "[" || t == "{" || t == "#{") {
+            set depth++;
+        } else if (t == ")" || t == "]" || t == "}") {
+            set depth--;
+        } else if (t == "." && depth == 0 && self.tok_text(i + 2) == "(") {
+            set calls++;
+        };
+        set i++;
+    }
+    2 <= calls
+}
+
+# Whether token `i` closes a non-empty bracketed construct. `f()`/`[]` have
+# nothing to hug, and a call ending in one takes the ordinary broken list.
+fn is_construct_end(self: W, i: u64) -> bool {
+    let t = self.tok_text(i);
+    if (t != ")" && t != "]" && t != "}") {
+        return false;
+    };
+    self.hug_open(i).is_some_and(|open| open + 1 < i)
 }
 
 # Whether a comma at bracket depth zero sits among tokens `first` through `last`.
@@ -2553,13 +2574,26 @@ fn hug_close(self: W, start: u64) -> u64? {
     none
 }
 
-# Hug only a non-empty construct (`f()`/`[]` have nothing to hug) that runs all
-# the way to the call's own `)` — otherwise the argument is a larger expression
-# that merely *starts* with a bracketed one. Source that is already broken has a
-# trailing comma after the argument, so step over one.
-fn hug_fills_call(self: W, open_at: u64, close: u64) -> bool {
-    let after = if (self.tok_text(close + 1) == ",") { close + 2 } else { close + 1 };
-    open_at + 1 < close && self.tok_text(after) == ")"
+# Index of the bracket opening the one closed at `end`, or `none` if
+# unbalanced — `hug_close` walked backwards.
+fn hug_open(self: W, end: u64) -> u64? {
+    mut i = end;
+    mut depth: u64 = 0;
+    while (0 < i) {
+        let t = self.tok_text(i);
+        if (t == ")" || t == "]" || t == "}") {
+            set depth++;
+        } else {
+            if (t == "(" || t == "[" || t == "{" || t == "#{") {
+                if (depth <= 1) {
+                    return some(i);
+                };
+                set depth--;
+            };
+        };
+        set i--;
+    }
+    none
 }
 
 # The `(..)` of a call: hugged when `hugs_sole_arg` approved, else the ordinary
@@ -2586,9 +2620,10 @@ fn call_arg_list(args: Doc[], hug: bool) -> Doc {
 # how `# { str : i64 }` sat here as a set type when `# ` in fact opens a doc
 # comment. Avoiding that is worth the `?` on every call below.
 fn walker_of(src: str) -> W!FmtError {
-    let LexResult { tokens, trivia } = lex_aipl(src).map_err(
-        |e| FmtError { message: e.message, span: e.span },
-    )?;
+    let LexResult { tokens, trivia } = lex_aipl(src).map_err(|e| FmtError {
+        message: e.message,
+        span: e.span,
+    })?;
     let toks = tokens.map(|t| FmtTok { kind: fmt_kind(t.kind), span: t.text.span });
     ok(new_walker(src, toks, trivia.map(|t| t.text.span)))
 }.test({
@@ -2694,11 +2729,9 @@ fn walker_of(src: str) -> W!FmtError {
     // A string literal keeps its bytes verbatim, spacing inside untouched.
     assert(format_program("""fn f() -> str { "a  b" }""", 100)? == """fn f() -> str { "a  b" }""");
     // A lex error surfaces as a formatter error rather than a panic.
-    assert(
-        format_program("""fn f() -> str { "unterminated }""", 100).is_err_and(
-            |e| e.message.is_nonempty(),
-        ),
-    );
+    assert(format_program("""fn f() -> str { "unterminated }""", 100).is_err_and(
+        |e| e.message.is_nonempty(),
+    ));
 
     // --- kind-dispatched atoms ---------------------------------------------
     //
@@ -2750,6 +2783,35 @@ fn walker_of(src: str) -> W!FmtError {
             .rendered(100)? == `f(\n    """\n        a\n        b\n    """ == x,\n)\n`,
     );
     assert(walker_of(`f(x == """\n    a\n""")`)?.expr().rendered(100)? == `f(x == "a")`);
+
+    // The same for a bracketed construct ending the argument: the construct
+    // breaks, the call's parens hug it. An empty one has nothing to hug.
+    assert(
+        walker_of("f(g(x) == [aaaa, bbbb])")?
+            .expr()
+            .rendered(18)? == "f(g(x) == [\n    aaaa,\n    bbbb,\n])\n",
+    );
+    assert(
+        walker_of("f(x == g(aaaa, bbbb))")?
+            .expr()
+            .rendered(16)? == "f(x == g(\n    aaaa,\n    bbbb,\n))\n",
+    );
+    assert(
+        walker_of("f(|x| { g(x); h(x) })")?
+            .expr()
+            .rendered(100)? == "f(|x| {\n    g(x);\n    h(x)\n})\n",
+    );
+    assert(
+        walker_of("f(xxxxxxxx == g())")?.expr().rendered(12)? == "f(\n    xxxxxxxx == g(),\n)\n",
+    );
+
+    // A member chain in the argument breaks before its calls, which a hug would
+    // put right after the `(`; it takes the ordinary list instead.
+    assert(
+        walker_of("f(xxxxxxxxxx.g().h(a, b))")?
+            .expr()
+            .rendered(20)? == "f(\n    xxxxxxxxxx\n        .g()\n        .h(a, b),\n)\n",
+    );
 
     // A template literal is copied verbatim, interpolations and all — three
     // token positions (head, middle, tail) that only a kind tells apart.
@@ -3237,21 +3299,21 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 96423
-deallocations: 96423
-reallocations: 15855
-bytes allocated: 19565025
-instructions executed: 50019973
-binary size: 15474920
-  code: 9914496
-  data: 35716
-  metadata: 5524708
+allocations: 97654
+deallocations: 97654
+reallocations: 15965
+bytes allocated: 19727754
+instructions executed: 51543039
+binary size: 16114784
+  code: 10320200
+  data: 36844
+  metadata: 5757740
 functions:
   __arr_drop_ImportEntry:
     calls: 17
     bytes: 148
   __arr_drop_Seg:
-    calls: 11
+    calls: 13
     bytes: 120
   __arr_drop_VCase:
     calls: 26
@@ -3314,7 +3376,7 @@ functions:
     calls: 0
     bytes: 232
   __arr_drop___m1__Doc:
-    calls: 1670
+    calls: 1809
     bytes: 116
   __arr_drop___m21__Item:
     calls: 50
@@ -3326,10 +3388,10 @@ functions:
     calls: 1
     bytes: 140
   __arr_drop___m23__Token$__m22__AiplTok:
-    calls: 1810
+    calls: 1884
     bytes: 388
   __arr_drop___m23__TokenRule$__m22__AiplTok:
-    calls: 193
+    calls: 198
     bytes: 832
   __arr_drop___m8__Ast:
     calls: 0
@@ -3347,7 +3409,7 @@ functions:
     calls: 12
     bytes: 148
   __arr_retain_Seg:
-    calls: 13
+    calls: 16
     bytes: 120
   __arr_retain_VCase:
     calls: 36
@@ -3410,7 +3472,7 @@ functions:
     calls: 0
     bytes: 232
   __arr_retain___m1__Doc:
-    calls: 1728
+    calls: 1833
     bytes: 116
   __arr_retain___m21__Item:
     calls: 40
@@ -3422,7 +3484,7 @@ functions:
     calls: 1
     bytes: 140
   __arr_retain___m23__Token$__m22__AiplTok:
-    calls: 1452
+    calls: 1516
     bytes: 388
   __arr_retain___m23__TokenRule$__m22__AiplTok:
     calls: 781
@@ -3458,7 +3520,7 @@ functions:
     calls: 0
     bytes: 32
   __builtin_any$__m1__Doc$lam$__m1__has_hard$tail:
-    calls: 757
+    calls: 835
     bytes: 324
   __builtin_any$str$lam$__m34__retemplate$lambda0:
     calls: 1
@@ -3470,16 +3532,16 @@ functions:
     calls: 1
     bytes: 324
   __builtin_count_is_at_least$char$s0:
-    calls: 57
+    calls: 59
     bytes: 348
   __builtin_count_while$char$lam$__m23__lex_step$__m22__AiplTok$lambda1:
-    calls: 1501
+    calls: 1539
     bytes: 312
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 29
     bytes: 268
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
-    calls: 814
+    calls: 853
     bytes: 280
   __builtin_count_while$char$s0$lam$__m23__to_eol_len$lambda0:
     calls: 0
@@ -3521,7 +3583,7 @@ functions:
     calls: 29
     bytes: 140
   __builtin_intersperse$__m1__Doc:
-    calls: 183
+    calls: 201
     bytes: 412
   __builtin_map_join$__m11__Pat$str$lam$__m11__nested_bindings:
     calls: 0
@@ -3635,7 +3697,7 @@ functions:
     calls: 27
     bytes: 24
   __eq_FmtKind:
-    calls: 1334
+    calls: 1527
     bytes: 64
   __eq___builtin_Span:
     calls: 1
@@ -3773,31 +3835,31 @@ functions:
     calls: 0
     bytes: 3524
   __m1__col_after:
-    calls: 1188
+    calls: 1254
     bytes: 628
   __m1__fits:
     calls: 0
     bytes: 36
   __m1__fits$tail:
-    calls: 1815
+    calls: 2062
     bytes: 2708
   __m1__fits_atom:
     calls: 0
     bytes: 52
   __m1__fits_atom$tail:
-    calls: 604
+    calls: 670
     bytes: 328
   __m1__has_hard:
     calls: 0
     bytes: 32
   __m1__has_hard$tail:
-    calls: 1786
+    calls: 1958
     bytes: 688
   __m1__print:
-    calls: 173
+    calls: 178
     bytes: 4212
   __m1__print$map2$own0:
-    calls: 173
+    calls: 178
     bytes: 472
   __m21__breaks_after:
     calls: 1
@@ -3827,13 +3889,13 @@ functions:
     calls: 10
     bytes: 6072
   __m22__aipl_rules:
-    calls: 182
+    calls: 187
     bytes: 90368
   __m22__aipl_rules$lambda0:
     calls: 0
     bytes: 136
   __m22__aipl_rules$lambda1:
-    calls: 397
+    calls: 422
     bytes: 104
   __m22__aipl_rules$lambda2:
     calls: 0
@@ -3881,10 +3943,10 @@ functions:
     calls: 2
     bytes: 2608
   __m23__between_len:
-    calls: 785
+    calls: 824
     bytes: 800
   __m23__delimited_len:
-    calls: 1545
+    calls: 1623
     bytes: 1904
   __m23__finalize_template$__m22__AiplTok:
     calls: 2
@@ -3896,31 +3958,31 @@ functions:
     calls: 1
     bytes: 1896
   __m23__lex$__m22__AiplTok:
-    calls: 182
+    calls: 187
     bytes: 1196
   __m23__lex_step$__m22__AiplTok:
-    calls: 2481
+    calls: 2558
     bytes: 27352
   __m23__nested_len:
-    calls: 1373
+    calls: 1437
     bytes: 1148
   __m23__step_result$__m22__AiplTok:
-    calls: 62184
+    calls: 65257
     bytes: 14264
   __m23__template_scan$__m22__AiplTok:
     calls: 2
     bytes: 2824
   __m23__template_step$__m22__AiplTok:
-    calls: 1531
+    calls: 1609
     bytes: 444
   __m23__to_eol_len:
     calls: 0
     bytes: 52
   __m23__to_eol_len$tail:
-    calls: 2750
+    calls: 2878
     bytes: 268
   __m23__to_eol_unless_len:
-    calls: 1373
+    calls: 1437
     bytes: 368
   __m24__unescape:
     calls: 17
@@ -4055,7 +4117,7 @@ functions:
     calls: 26
     bytes: 2224
   __m6__trim_end_while$lam$__builtin_is_space:
-    calls: 508
+    calls: 533
     bytes: 400
   __m7__angles:
     calls: 33
@@ -4433,10 +4495,10 @@ functions:
     calls: 205
     bytes: 132
   __rec_drop___m1__Doc:
-    calls: 3665
+    calls: 3941
     bytes: 184
   __rec_drop___m1__Work:
-    calls: 5118
+    calls: 5638
     bytes: 84
   __rec_drop___tuple$__m10__Expr$__m10__Expr:
     calls: 0
@@ -4455,7 +4517,7 @@ functions:
     bytes: 2188
   __test$walker_of:
     calls: 1
-    bytes: 6280236
+    bytes: 6684960
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
@@ -4469,13 +4531,13 @@ functions:
     calls: 11
     bytes: (external)
   aipl_arr_extend:
-    calls: 64795
+    calls: 64965
     bytes: (external)
   aipl_arr_inc:
-    calls: 464186
+    calls: 481153
     bytes: (external)
   aipl_arr_reserve:
-    calls: 63963
+    calls: 64139
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 86
@@ -4487,37 +4549,37 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 722085
+    calls: 745870
     bytes: (external)
   aipl_array_new:
-    calls: 10507
+    calls: 10741
     bytes: (external)
   aipl_array_push:
-    calls: 9173
+    calls: 9305
     bytes: (external)
   aipl_array_push_mut:
-    calls: 30833
+    calls: 30951
     bytes: (external)
   aipl_array_with_cap:
-    calls: 459
+    calls: 469
     bytes: (external)
   aipl_assert:
-    calls: 219
+    calls: 224
     bytes: (external)
   aipl_rec_alloc:
-    calls: 65031
+    calls: 65827
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 386044
+    calls: 391799
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 22632
+    calls: 23170
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 321013
+    calls: 325972
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 22632
+    calls: 23170
     bytes: (external)
   aipl_test_begin:
     calls: 4
@@ -4532,13 +4594,13 @@ functions:
     calls: 30
     bytes: (external)
   array_atom:
-    calls: 3
+    calls: 4
     bytes: 1952
   at:
     calls: 5
     bytes: 76
   atom:
-    calls: 165
+    calls: 188
     bytes: 2892
   base_ty:
     calls: 86
@@ -4547,40 +4609,40 @@ functions:
     calls: 7
     bytes: 2032
   binop_expr:
-    calls: 157
+    calls: 177
     bytes: 2592
   binop_tail:
-    calls: 157
+    calls: 177
     bytes: 4128
   block:
-    calls: 58
+    calls: 59
     bytes: 908
   block_entries:
-    calls: 63
+    calls: 64
     bytes: 3760
   block_layout:
-    calls: 63
+    calls: 64
     bytes: 4284
   bump:
-    calls: 1311
+    calls: 1387
     bytes: 1284
   call_arg:
-    calls: 26
+    calls: 40
     bytes: 7412
   call_arg_list:
-    calls: 29
+    calls: 41
     bytes: 776
   call_args_until:
-    calls: 36
+    calls: 49
     bytes: 2636
   case_params:
     calls: 8
     bytes: 10268
   comma_list_docs:
-    calls: 102
+    calls: 112
     bytes: 5272
   comment_starts_before:
-    calls: 413
+    calls: 453
     bytes: 280
   construct_body:
     calls: 0
@@ -4601,7 +4663,7 @@ functions:
     calls: 39
     bytes: 1204
   dot_seg:
-    calls: 6
+    calls: 8
     bytes: 4928
   drop_trailing_break:
     calls: 0
@@ -4610,16 +4672,16 @@ functions:
     calls: 4
     bytes: 864
   expect:
-    calls: 497
+    calls: 514
     bytes: 1228
   expr:
-    calls: 155
+    calls: 175
     bytes: 544
   flat_parens:
     calls: 9
     bytes: 560
   fmt_kind:
-    calls: 1280
+    calls: 1344
     bytes: 3120
   fn_attrs:
     calls: 26
@@ -4643,17 +4705,14 @@ functions:
     calls: 11
     bytes: 1708
   hug_close:
-    calls: 30
+    calls: 41
     bytes: 740
-  hugs_block_arg:
-    calls: 29
-    bytes: 308
-  hugs_bracket_arg:
-    calls: 29
-    bytes: 800
+  hug_open:
+    calls: 5
+    bytes: 684
   hugs_sole_arg:
-    calls: 29
-    bytes: 580
+    calls: 41
+    bytes: 1632
   ident_list$own2:
     calls: 9
     bytes: 1800
@@ -4676,22 +4735,25 @@ functions:
     calls: 4
     bytes: 3444
   is_block_tok:
-    calls: 29
+    calls: 41
     bytes: 1576
+  is_construct_end:
+    calls: 41
+    bytes: 352
   item:
     calls: 22
     bytes: 2448
   lambda:
-    calls: 3
+    calls: 4
     bytes: 5640
   lambda_param_ty:
     calls: 1
     bytes: 1384
   lambda_params:
-    calls: 3
+    calls: 4
     bytes: 3316
   lead:
-    calls: 394
+    calls: 434
     bytes: 1664
   let_stmt:
     calls: 3
@@ -4706,19 +4768,19 @@ functions:
     calls: 4
     bytes: 11336
   more_before:
-    calls: 283
+    calls: 312
     bytes: 200
   mut_stmt:
     calls: 2
     bytes: 6024
   name_atom:
-    calls: 106
+    calls: 128
     bytes: 5380
   named_ty:
     calls: 80
     bytes: 3672
   next_start:
-    calls: 57
+    calls: 59
     bytes: 508
   one_param:
     calls: 12
@@ -4742,13 +4804,13 @@ functions:
     calls: 5
     bytes: 2344
   peek_is_n:
-    calls: 1350
+    calls: 1543
     bytes: 296
   postfix:
-    calls: 165
+    calls: 188
     bytes: 5752
   postfix_segs:
-    calls: 165
+    calls: 188
     bytes: 3108
   program:
     calls: 13
@@ -4757,16 +4819,16 @@ functions:
     calls: 13
     bytes: 4292
   range_has_semi:
-    calls: 46
+    calls: 47
     bytes: 224
   range_tail:
-    calls: 155
+    calls: 175
     bytes: 2128
   rendered:
-    calls: 151
+    calls: 156
     bytes: 572
   sep_entry:
-    calls: 48
+    calls: 50
     bytes: 312
   set_or_dict_atom:
     calls: 5
@@ -4793,7 +4855,7 @@ functions:
     calls: 6
     bytes: 1660
   statement:
-    calls: 48
+    calls: 50
     bytes: 5200
   str_atom$own0:
     calls: 12
@@ -4829,13 +4891,13 @@ functions:
     calls: 1
     bytes: 668
   tok_text:
-    calls: 4503
+    calls: 5168
     bytes: 508
   top_comma_in:
-    calls: 29
+    calls: 41
     bytes: 676
   trailing_comment:
-    calls: 102
+    calls: 104
     bytes: 2284
   trim_last_break:
     calls: 0
@@ -4859,7 +4921,7 @@ functions:
     calls: 52
     bytes: 5948
   unary:
-    calls: 167
+    calls: 190
     bytes: 1724
   variant_cases:
     calls: 16
@@ -4871,7 +4933,7 @@ functions:
     calls: 8
     bytes: 1932
   walker_of:
-    calls: 163
+    calls: 168
     bytes: 3364
   while_stmt:
     calls: 1

@@ -176,13 +176,11 @@ pub fn parse_sexp(src: str) -> Sexp!ParseError {
     assert(parse_sexp("a")? == AtomNode("a"));
     assert(parse_sexp("()")? == List([]));
     assert(parse_sexp("(a b)")? == List([AtomNode("a"), AtomNode("b")]));
-    assert(
-        parse_sexp("(a (b c) d)")? == List([
-            AtomNode("a"),
-            List([AtomNode("b"), AtomNode("c")]),
-            AtomNode("d"),
-        ]),
-    );
+    assert(parse_sexp("(a (b c) d)")? == List([
+        AtomNode("a"),
+        List([AtomNode("b"), AtomNode("c")]),
+        AtomNode("d"),
+    ]));
     // Nesting with nothing else in it — the shape the deep test scales up.
     assert(parse_sexp("(((x)))")? == List([List([List([AtomNode("x")])])]));
 
@@ -277,9 +275,9 @@ deallocations: 6690
 reallocations: 935
 bytes allocated: 641670
 instructions executed: 1504893
-binary size: 406840
+binary size: 406824
   code: 267920
-  data: 4868
+  data: 4852
   metadata: 134052
 functions:
   __arr_drop___m11__StepResult$SexpKind:

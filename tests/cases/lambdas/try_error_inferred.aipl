@@ -30,12 +30,10 @@ fn main() !prints {
     // Through `try_map` — the call shape this inference was needed for. Every
     // element is wrapped, and the first failure comes back whole.
     let ws = [3, 4].try_map(|n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
-    print(
-        match (ws) {
-            ok(list) => list.map(|w| w.n).to_str(),
-            err(e) => e,
-        },
-    );
+    print(match (ws) {
+        ok(list) => list.map(|w| w.n).to_str(),
+        err(e) => e,
+    });
     let bad = [3, 0, 5].try_map(|n| ok(Wrapped { n: checked(n)?, tag: "keep" }));
     print(if (bad.is_err_and(|e| e == "zero")) { "err" } else { "ok" });
 

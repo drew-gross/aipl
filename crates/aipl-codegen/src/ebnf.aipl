@@ -257,17 +257,15 @@ fn render_rule<K: variant>(r: Rule<K>, names: str[], ctx: Ctx) -> str {
                 },
             };
             nested_in
-                .map(
-                    |brackets| {
-                        let o = render_rule(brackets.0, names, Item);
-                        let c = render_rule(brackets.1, names, Item);
-                        let seq = `{o} {reps} {c}`;
-                        match (ctx) {
-                            Alt | Seq => seq,
-                            Item => `({seq})`,
-                        }
-                    },
-                )
+                .map(|brackets| {
+                    let o = render_rule(brackets.0, names, Item);
+                    let c = render_rule(brackets.1, names, Item);
+                    let seq = `{o} {reps} {c}`;
+                    match (ctx) {
+                        Alt | Seq => seq,
+                        Item => `({seq})`,
+                    }
+                })
                 .value_or(reps)
         },
         Maybe(sub) => `{render_rule(sub, names, Item)}?`,

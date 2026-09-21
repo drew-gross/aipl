@@ -55,21 +55,17 @@ pub fn brace_literal(entries: BraceEntry[], order: SetOrder, span: Span) -> Expr
     assert(brace_literal([Pair(num(1), num(2))], Unordered, 0..0)?.show_expr() == "Dict([1: 2])");
     // Empty is a set: nothing said "key: value".
     assert(brace_literal([], Unordered, 0..0)?.show_expr() == "Set([])");
-    assert(
-        brace_literal([Key(num(1)), Pair(num(1), num(2))], Unordered, 0..0).is_err_and(
-            |e| e.message == brace_mix_message(),
-        ),
-    );
+    assert(brace_literal([Key(num(1)), Pair(num(1), num(2))], Unordered, 0..0).is_err_and(
+        |e| e.message == brace_mix_message(),
+    ));
     // An ordered literal carries its order, and is never a dict.
     assert(
         brace_literal([Key(num(2)), Key(num(1))], Desc, 0..0)?.show_expr() == "Set([2, 1], Desc)",
     );
     assert(brace_literal([], Asc, 0..0)?.show_expr() == "Set([], Asc)");
-    assert(
-        brace_literal([Pair(num(1), num(2))], Desc, 0..0).is_err_and(
-            |e| e.message == ordered_pairs_message(),
-        ),
-    );
+    assert(brace_literal([Pair(num(1), num(2))], Desc, 0..0).is_err_and(
+        |e| e.message == ordered_pairs_message(),
+    ));
 })
 
 fn ordered_pairs_message() -> str {
@@ -85,9 +81,9 @@ deallocations: 74
 reallocations: 3
 bytes allocated: 5067
 instructions executed: 4817
-binary size: 73680
+binary size: 73664
   code: 48372
-  data: 1436
+  data: 1420
   metadata: 23872
 functions:
   __arr_drop_BraceEntry:

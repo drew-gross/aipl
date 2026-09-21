@@ -981,12 +981,10 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     let back_g: Grammar<Kind, Node> = Grammar {
         prods: [Production { name: "a", rule: backwards, build: Kids(keep), layout: Inline }],
     };
-    assert(
-        link(back_g) == err(ParseError {
-            message: "a repetition's max must be at least its min, got min=2, max=1",
-            span: 0..0,
-        }),
-    );
+    assert(link(back_g) == err(ParseError {
+        message: "a repetition's max must be at least its min, got min=2, max=1",
+        span: 0..0,
+    }));
 
     // `sorted` rides through the same derivation: the rule says its items are
     // ordered, and the style the printer reads off the group says so too.
@@ -1022,12 +1020,10 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     let odd_g: Grammar<Kind, Node> = Grammar {
         prods: [Production { name: "a", rule: odd_sep, build: Kids(keep), layout: Inline }],
     };
-    assert(
-        link(odd_g) == err(ParseError {
-            message: "a bracketed list's separator must be a literal, so the printer can write it back",
-            span: 0..0,
-        }),
-    );
+    assert(link(odd_g) == err(ParseError {
+        message: "a bracketed list's separator must be a literal, so the printer can write it back",
+        span: 0..0,
+    }));
 
     // A group's insides are linked like anything else, and an unresolved
     // reference inside one is still the grammar error it would be outside.
@@ -1078,9 +1074,9 @@ deallocations: 754
 reallocations: 101
 bytes allocated: 94897
 instructions executed: 78861
-binary size: 164240
+binary size: 164216
   code: 101688
-  data: 6684
+  data: 6660
   metadata: 55868
 functions:
   __arr_drop_ListStyle:

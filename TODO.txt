@@ -318,10 +318,7 @@ skills:
   make an "add lint" skill that describes how to lint against a reimplementation
 
 format:
-  should format like this:
-    assert(a == b(
-      loooooooooooooooooooooooooooooooooooooooooooooooo()
-    ))
+  exclude if expressions from being on same line as function it's result is passed to
 
 lint:
   lint that in an assert, when a value is compared directly against some(...)/ok(...), use ? instead (also support ? for optionals in tests)

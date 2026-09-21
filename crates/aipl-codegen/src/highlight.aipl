@@ -287,36 +287,30 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
 
     // A nestable region refers to itself by the name its scope makes.
     let self_ref: Pat[] = [Include("comment-block")];
-    assert(
-        matcher_pat(Nested("/*", "*/"), "comment.block.aipl", "esc") == Region(
-            """/\*""",
-            """\*/""",
-            self_ref,
-            scope="comment.block.aipl",
-        ),
-    );
+    assert(matcher_pat(Nested("/*", "*/"), "comment.block.aipl", "esc") == Region(
+        """/\*""",
+        """\*/""",
+        self_ref,
+        scope="comment.block.aipl",
+    ));
 
     // A template carries its escapes *and* an interpolation that includes the
     // whole language back into itself; a raw one (no escapes) carries only the
     // interpolation.
     let interp: Pat = Region("""\{""", """\}""", [Include("brace-group"), Include("main")]);
-    assert(
-        matcher_pat(Template("`", "nt", |segs: str[]| segs), "s", "esc") == Region(
-            "`",
-            "`",
-            [Match("""\\[nt{}]""", "esc"), interp],
-            scope="s",
-        ),
-    );
+    assert(matcher_pat(Template("`", "nt", |segs: str[]| segs), "s", "esc") == Region(
+        "`",
+        "`",
+        [Match("""\\[nt{}]""", "esc"), interp],
+        scope="s",
+    ));
     // A raw template's escapes are the braces alone.
-    assert(
-        matcher_pat(Template("```", "", |segs: str[]| segs), "s", "esc") == Region(
-            "```",
-            "```",
-            [Match("""\\[{}]""", "esc"), interp],
-            scope="s",
-        ),
-    );
+    assert(matcher_pat(Template("```", "", |segs: str[]| segs), "s", "esc") == Region(
+        "```",
+        "```",
+        [Match("""\\[{}]""", "esc"), interp],
+        scope="s",
+    ));
 })
 
 # The plain regex `m` matches, or `none` when `m` scans between delimiters and
@@ -372,9 +366,9 @@ pub fn brace_group_entry(punct_scope: str) -> Entry {
 }.test({
     let Entry { name, pats } = brace_group_entry("p");
     assert(name == "brace-group");
-    assert(
-        pats == [Region("""\{""", """\}""", [Include("brace-group"), Include("main")], scope="p")],
-    );
+    assert(pats == [
+        Region("""\{""", """\}""", [Include("brace-group"), Include("main")], scope="p"),
+    ]);
 })
 
 # The repository entry name a scope makes: its parts joined with `-`, without
@@ -438,13 +432,11 @@ pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
 
     // The unscoped whitespace rule is gone; the two keyword rules are one
     // alternation; `==` still precedes `=`, which is what keeps it maximal munch.
-    assert(
-        got.pats == [
-            Match("""\bfn\b|\blet\b""", "kw"),
-            Match("""\btrue\b""", "const"),
-            Match("==|=", "op"),
-        ],
-    );
+    assert(got.pats == [
+        Match("""\bfn\b|\blet\b""", "kw"),
+        Match("""\btrue\b""", "const"),
+        Match("==|=", "op"),
+    ]);
 
     // A region is never merged into a run, and a self-referential one becomes a
     // named entry plus the include that reaches it.
@@ -455,21 +447,14 @@ pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
     let block = rule_pats(with_block, "esc");
     assert(block.pats == [Include("comment-block"), Match("""\+""", "op")]);
     assert(block.entries.len() == 1);
-    assert(
-        block.entries == [
-            Entry {
-                name: "comment-block",
-                pats: [
-                    Region(
-                        """/\*""",
-                        """\*/""",
-                        [Include("comment-block")],
-                        scope="comment.block.x",
-                    ),
-                ],
-            },
-        ],
-    );
+    assert(block.entries == [
+        Entry {
+            name: "comment-block",
+            pats: [
+                Region("""/\*""", """\*/""", [Include("comment-block")], scope="comment.block.x"),
+            ],
+        },
+    ]);
 })
 
 fn items_of<K>(rules: TokenRule<K>[], esc_scope: str) -> Item[] {
@@ -526,13 +511,11 @@ fn merge_runs(items: Item[]) -> Item[] {
 fn run_len(items: Item[]) -> u64 {
     items
         .first()
-        .map(
-            |it| if (it.plain) {
-                items.count_while(|x: Item| x.plain && x.scope == it.scope)
-            } else {
-                1
-            },
-        )
+        .map(|it| if (it.plain) {
+            items.count_while(|x: Item| x.plain && x.scope == it.scope)
+        } else {
+            1
+        })
         .value_or(0)
 }
 
@@ -758,9 +741,9 @@ deallocations: 991
 reallocations: 33
 bytes allocated: 75800
 instructions executed: 128893
-binary size: 145328
+binary size: 145128
   code: 93468
-  data: 5520
+  data: 5320
   metadata: 46340
 functions:
   __arr_drop_Entry:

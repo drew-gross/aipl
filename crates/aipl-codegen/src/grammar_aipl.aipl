@@ -3765,12 +3765,10 @@ pub fn aipl_node_spans(src: str) -> u64[]!ParseError {
     assert(widest == src.len());
 
     // A parse error has no tree and so no spans.
-    assert(
-        match (aipl_node_spans("fn f( {")) {
-            ok(..) => false,
-            err(..) => true,
-        },
-    );
+    assert(match (aipl_node_spans("fn f( {")) {
+        ok(..) => false,
+        err(..) => true,
+    });
 })
 
 # `src` lowered to the AST, as the AST — the FFI entry the Rust side rebuilds an
@@ -3778,12 +3776,10 @@ pub fn aipl_node_spans(src: str) -> u64[]!ParseError {
 # AIPL, marshal the result, reconstruct on the other side.
 pub fn aipl_program(src: str) -> Program!ParseError { lower_aipl_program(src) }.test({
     assert(aipl_program("fn f() { }")?.show_program() == "fn f() = ()");
-    assert(
-        match (aipl_program("fn f( {")) {
-            ok(..) => false,
-            err(..) => true,
-        },
-    );
+    assert(match (aipl_program("fn f( {")) {
+        ok(..) => false,
+        err(..) => true,
+    });
 })
 
 # What a source file parses to: its program, and the spans of every `#[allow]`
@@ -4400,9 +4396,9 @@ deallocations: 1930471
 reallocations: 271722
 bytes allocated: 357502521
 instructions executed: 510428058
-binary size: 4985232
+binary size: 4985200
   code: 3262844
-  data: 52580
+  data: 52548
   metadata: 1669808
 functions:
   __arr_drop___m11__ParsedParam:

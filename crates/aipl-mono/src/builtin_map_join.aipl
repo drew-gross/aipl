@@ -64,9 +64,13 @@ pub fn map_join<T: any, U: any>(
     set out.reserve(cap);
     for (let i, x : self) {
         if (0 < i) {
-            set out.extend(
-                if (n == 2) { only_sep } else if (i == n - 1) { final_sep } else { sep },
-            );
+            set out.extend(if (n == 2) {
+                only_sep
+            } else if (i == n - 1) {
+                final_sep
+            } else {
+                sep
+            });
         };
         let piece = f(x);
         let need = out.len() + piece.len();
@@ -112,9 +116,9 @@ deallocations: 31
 reallocations: 2
 bytes allocated: 1241
 instructions executed: 5199
-binary size: 17888
+binary size: 17896
   code: 11144
-  data: 1249
+  data: 1257
   metadata: 5495
 functions:
   __eq_i64$arr:

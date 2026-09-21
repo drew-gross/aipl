@@ -345,12 +345,10 @@ pub fn parse_json(src: str) -> Json!ParseError {
     // ---- objects ----
     assert(parse_json("{}")? == Object([]));
     assert(parse_json("""{"a": 1}""")? == Object([Member("a", Number("1"))]));
-    assert(
-        parse_json("""{"a": 1, "b": [2]}""")? == Object([
-            Member("a", Number("1")),
-            Member("b", Array([Number("2")])),
-        ]),
-    );
+    assert(parse_json("""{"a": 1, "b": [2]}""")? == Object([
+        Member("a", Number("1")),
+        Member("b", Array([Number("2")])),
+    ]));
     // A key with an escape in it goes through the same decoding as a value.
     assert(parse_json("""{"a\tb": null}""")? == Object([Member("a\tb", Null)]));
 
@@ -423,17 +421,15 @@ pub fn render_json(self: Json) -> str {
 # for the round trip, and for anything this library will parse back.
 fn escape_json(s: str) -> str {
     s
-        .map(
-            |c| match (c) {
-                '"' => `\\"`,
-                '\\' => """\\""",
-                '\n' => """\n""",
-                '\t' => """\t""",
-                '\r' => """\r""",
-                // A `char` interpolates as the bare character.
-                _ => `{c}`,
-            },
-        )
+        .map(|c| match (c) {
+            '"' => `\\"`,
+            '\\' => """\\""",
+            '\n' => """\n""",
+            '\t' => """\t""",
+            '\r' => """\r""",
+            // A `char` interpolates as the bare character.
+            _ => `{c}`,
+        })
         .join()
 }.test({
     assert(escape_json("plain") == "plain");
@@ -519,9 +515,9 @@ deallocations: 22173
 reallocations: 3287
 bytes allocated: 2833155
 instructions executed: 5530758
-binary size: 462448
+binary size: 462432
   code: 302712
-  data: 8580
+  data: 8564
   metadata: 151156
 functions:
   __arr_drop_Json:

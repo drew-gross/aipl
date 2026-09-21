@@ -1057,12 +1057,10 @@ fn error_at<K: variant, A: any>(p: Parser<K, A>, src: str, far: Far) -> ParseErr
 fn unclosed_hint(src: str, open: Span[]) -> str {
     open
         .first()
-        .map(
-            |sp| {
-                let line = line_at(src, sp.start).line + 1;
-                ` (\`{src[sp]}\` at line {line} is never closed)`
-            },
-        )
+        .map(|sp| {
+            let line = line_at(src, sp.start).line + 1;
+            ` (\`{src[sp]}\` at line {line} is never closed)`
+        })
         .value_or("")
 }
 
@@ -1422,13 +1420,11 @@ pub fn parse<K: variant, A: any>(
     // whether it got any. `Node` is boxed and recursive, and `build` reaches it
     // through a function *value* — the shape this library was waiting on.
     assert(parsed("(a b)", g_sexp, "list")? == List([Atom("a"), Atom("b")]));
-    assert(
-        parsed("(a (b) c)", g_sexp, "list")? == List([
-            Atom("a"),
-            List([List([Atom("b")])]),
-            Atom("c"),
-        ]),
-    );
+    assert(parsed("(a (b) c)", g_sexp, "list")? == List([
+        Atom("a"),
+        List([List([Atom("b")])]),
+        Atom("c"),
+    ]));
     // A `build` that refuses fails the parse with its own error, unchanged.
     let refuser = g_of([
         Production { name: "w", rule: r_word, build: TryMk(refuse), layout: Inline },
@@ -1445,30 +1441,24 @@ pub fn parse<K: variant, A: any>(
     let r_form: Rule<Tok> = OneOf([Term(Word), r_old]);
     let g_form = g_of([one("f", r_form)]);
     assert(shown("abc", g_form, "f")? == "(f abc)");
-    assert(
-        parsed("42", g_form, "f") == err(ParseError {
-            message: "write the number as a word",
-            span: 0..2,
-        }),
-    );
+    assert(parsed("42", g_form, "f") == err(ParseError {
+        message: "write the number as a word",
+        span: 0..2,
+    }));
     // The span covers everything the sequence matched, not only its last token.
     let r_two: Rule<Tok> = Then([Term(Num), Term(Num), Refuse(Msg("one number, not two"))]);
-    assert(
-        parsed("1 23", g_of([one("t", r_two)]), "t") == err(ParseError {
-            message: "one number, not two",
-            span: 0..4,
-        }),
-    );
+    assert(parsed("1 23", g_of([one("t", r_two)]), "t") == err(ParseError {
+        message: "one number, not two",
+        span: 0..4,
+    }));
 
     // Neither a choice nor a repetition backtracks out of a refusal: reaching
     // it is the error, wherever it sits.
     let r_list: Rule<Tok> = Many(Named("f"));
-    assert(
-        parsed("abc 42 def", g_of([one("f", r_form), one("l", r_list)]), "l") == err(ParseError {
-            message: "write the number as a word",
-            span: 4..6,
-        }),
-    );
+    assert(parsed("abc 42 def", g_of([one("f", r_form), one("l", r_list)]), "l") == err(ParseError {
+        message: "write the number as a word",
+        span: 4..6,
+    }));
 
     // A form that is not reached is not refused: input the earlier alternative
     // takes never gets there, and neither does input that matches nothing.
@@ -1477,18 +1467,14 @@ pub fn parse<K: variant, A: any>(
     // Reached with nothing matched in front of it, the error points at the
     // token that was next — or at end of input.
     let r_bare: Rule<Tok> = Refuse(Msg("nothing goes here"));
-    assert(
-        parsed("abc", g_of([one("b", r_bare)]), "b") == err(ParseError {
-            message: "nothing goes here",
-            span: 0..3,
-        }),
-    );
-    assert(
-        parsed("", g_of([one("b", r_bare)]), "b") == err(ParseError {
-            message: "nothing goes here",
-            span: 0..0,
-        }),
-    );
+    assert(parsed("abc", g_of([one("b", r_bare)]), "b") == err(ParseError {
+        message: "nothing goes here",
+        span: 0..3,
+    }));
+    assert(parsed("", g_of([one("b", r_bare)]), "b") == err(ParseError {
+        message: "nothing goes here",
+        span: 0..0,
+    }));
 
     // A `Fn` refusal is handed what the sequence matched, so the message can
     // name it: one token as written, several with a space at each gap the
@@ -1727,9 +1713,9 @@ deallocations: 5908
 reallocations: 1407
 bytes allocated: 685068
 instructions executed: 1505503
-binary size: 744080
+binary size: 744000
   code: 450748
-  data: 12236
+  data: 12156
   metadata: 281096
 functions:
   __arr_drop_Node:
