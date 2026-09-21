@@ -90,6 +90,8 @@ misc cleanup:
   unterminated error messages can be DRYer
   fmt_node can only fail due to bad internal index; see if we can fix that, maybe with a LinkedGrammar type?
   breaks_after can be take_while->starts_with I think?
+  lower_atom should be able to better than an if chain
+  fill_section seems like it should be able to be simpler. And maybe should be fill_sections with str* or str+?
   Remove need for Member JSON arm. Should be dict probably?
   unescape + unescape_braces can probably be DRYed up
   union_all can be context ordered, like to_set
@@ -239,7 +241,6 @@ types:
 
 numbers:
   remove auto-converstion between numeric types, u64->i64 should require a .narrow() call that returns none when out of range
-  make the rest of the .len() wrappers in walker return u64
   divide by zero behaviour <--- investigate, should implement saturating div probably
 
 mod_aipl:
@@ -458,6 +459,10 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
+    .lines().len() should fuse
+    for line in v.lines() should fuse
+    can we make a fully general v.foo().len() fusion? Maybe by monomorphizing?
+    to_str().len() should fuse to a a new, super simple/fast function that just computes and returns an int
     .reverse().find_map() should fuse
     .map(f).find(p) should fuse to map_find and not keep mapping after found
     fuse sequential extends

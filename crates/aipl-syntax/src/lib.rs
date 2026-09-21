@@ -487,6 +487,14 @@ pub mod ast {
         /// a test for this function; ignored by `run`/`build`. The `assert(c)`
         /// calls inside it are rewritten at parse time to `__assert(c, "loc")`.
         pub test_body: Option<Expr>,
+        /// Functions declared inside the `.test({ .. })` block — helpers
+        /// private to the test, never `pub`, unreachable from anything else.
+        /// Filled by the parser and emptied by `aipl_parser::post_parse`, which
+        /// hoists each one to a top-level item named by [`test_helper_name`]
+        /// and renames its uses in the test body and the helpers themselves; so
+        /// every later pass sees only ordinary private functions, and this is
+        /// always empty past the parser.
+        pub test_fns: Vec<Function>,
         /// The text of the `# ..` doc comment above the declaration, if any —
         /// structured
         /// documentation for the function, surfaced by the `doc` command and
@@ -2228,6 +2236,28 @@ pub fn is_test_body(name: &str) -> bool {
         .is_some_and(|f| !f.contains('$'))
 }
 
+/// The top-level name a function declared inside `f`'s `.test` block is hoisted
+/// to — `__test$<f>$<helper>`. Under the test body's prefix so it reads as the
+/// test's, and past it so [`is_test_body`] says no: a helper's `?` acts on its
+/// own return type, like any function's.
+pub fn test_helper_name(f: &str, helper: &str) -> String {
+    format!("{}${helper}", test_fn_name(f))
+}
+
+/// The name a hoisted test helper was declared with — see
+/// [`test_helper_name`] — or `None` when `name` is not one.
+pub fn test_helper_source_name(name: &str) -> Option<&str> {
+    let rest = name.strip_prefix("__test$")?;
+    let (f, helper) = rest.split_once('$')?;
+    (!f.is_empty() && !helper.is_empty() && !helper.contains('$')).then_some(helper)
+}
+
+/// Whether `name` is a hoisted test helper — see [`test_helper_name`]. Test
+/// code like the body it came from, so `assert` is baked in it too.
+pub fn is_test_helper(name: &str) -> bool {
+    test_helper_source_name(name).is_some()
+}
+
 #[cfg(test)]
 mod test_body_tests {
     use super::*;
@@ -2238,6 +2268,14 @@ mod test_body_tests {
         assert!(is_test_body(&test_fn_name("__m9__at_end")));
         // Functions synthesized *from* a test body are not the body.
         assert!(!is_test_body("__test$map$lambda0"));
+        assert!(!is_test_body(&test_helper_name("map", "fixture")));
+        assert!(is_test_helper(&test_helper_name("map", "fixture")));
+        assert!(!is_test_helper(&test_fn_name("map")));
+        assert!(!is_test_helper("__test$map$fixture$lambda0"));
+        assert_eq!(
+            test_helper_source_name(&test_helper_name("map", "fixture")),
+            Some("fixture")
+        );
         assert!(!is_test_body("__test$map$map0"));
         // Nor are the runner's own entry points, or ordinary functions.
         assert!(!is_test_body("__test_main"));

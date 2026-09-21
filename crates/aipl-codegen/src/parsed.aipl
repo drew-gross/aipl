@@ -6,7 +6,7 @@
 import { Span, equal as ==, is_err_and, value_or_err } from builtins;
 import { Construct as ConstructExpr, Expr, FieldInit, at, num, show_expr } from "./expr.aipl";
 import { ParseError } from "./grammar.aipl";
-import { Param } from "./item.aipl";
+import { Function, Param } from "./item.aipl";
 import { Generic, Named, Ty, Unit, show_ty } from "./ty.aipl";
 
 # One keyword statement, after its own production has read it and before the
@@ -39,9 +39,16 @@ variant ParsedBody = Block(Expr) | Construct(FieldInit[], Span)
 # function's own lowering then binds those fields off.
 struct ParsedParam { param: Param, fields: str[], span: Span }
 
-# One `.test({ .. })` attribute: its block, and the span of the attribute name,
-# which is where a duplicate is reported.
-struct FnAttr { body: Expr, span: Span }
+# One `.test({ .. })` attribute: its block, the functions declared inside the
+# block, and the span of the attribute name, which is where a duplicate is
+# reported.
+struct FnAttr { body: Expr, fns: Function[], span: Span }
+
+# A `.test` block's contents as its production hands them up: the functions
+# declared in it, and the statement chain — `none` while nothing has followed
+# yet, which is how `test_tail` tells "the expression before the `;` was the
+# block's value" from "the rest of the block follows".
+struct TestBlock { fns: Function[], body: Expr? }
 
 # The body, with the struct-literal shorthand resolved. What it builds is
 # exactly the `EConstruct` the long form parses to, so nothing downstream of the

@@ -35,6 +35,17 @@ pub fn map_find_if<T: any, U: any>(self: T[], f: (T) -> U, pred: (U) -> bool) ->
     }
     none
 }.test({
+    fn double(self: i64) -> i64 { self * 2 }
+    assert(double(4) == 8);
+
+    fn is_big(self: i64) -> bool { self > 5 }
+    assert(is_big(6));
+    assert(!is_big(5));
+
+    fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }
+    assert(nonzero(0) == none);
+    assert(nonzero(2) == some(2));
+
     assert([1, 2, 3].map_find_if(|x| x * 10, |y| y > 15) == some(20));
     assert([1, 2, 3].map_find_if(|x| x * 10, |y| y > 99) == none);
     // The first match, not the last.
@@ -48,40 +59,20 @@ pub fn map_find_if<T: any, U: any>(self: T[], f: (T) -> U, pred: (U) -> bool) ->
     // The mapped value may be an optional: the first `some` of a lookup.
     assert([0, 3, 5].map_find_if(nonzero, is_some) == some(some(3)));
 })
-
-fn double(self: i64) -> i64 { self * 2 }.test({
-    assert(double(4) == 8);
-})
-
-fn is_big(self: i64) -> bool { self > 5 }.test({
-    assert(is_big(6));
-    assert(!is_big(5));
-})
-
-fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }.test({
-    assert(nonzero(0) == none);
-    assert(nonzero(2) == some(2));
-})
 --- performance ---
 allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 32
-instructions executed: 974
-binary size: 7000
-  code: 3304
-  data: 944
-  metadata: 2752
+instructions executed: 927
+binary size: 6616
+  code: 3036
+  data: 939
+  metadata: 2641
 functions:
-  __test$is_big:
-    calls: 1
-    bytes: 180
   __test$map_find_if:
     calls: 1
-    bytes: 804
-  __test$nonzero:
-    calls: 1
-    bytes: 216
+    bytes: 1192
   aipl_arr_slice:
     calls: 1
     bytes: (external)
@@ -92,20 +83,23 @@ functions:
     calls: 12
     bytes: (external)
   aipl_test_begin:
-    calls: 4
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 4
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 372
+    bytes: 112
   map_find_if$char$bool$s0$lam$__test$map_find_if$lambda6$__test$map_find_if$lambda7:
     calls: 1
     bytes: 316
+  map_find_if$i64$i64$lam$__test$map_find_if$double$__test$map_find_if$is_big:
+    calls: 2
+    bytes: 276
   map_find_if$i64$i64$lam$__test$map_find_if$lambda0$__test$map_find_if$lambda1:
     calls: 1
     bytes: 276
@@ -115,9 +109,6 @@ functions:
   map_find_if$i64$i64$lam$__test$map_find_if$lambda4$__test$map_find_if$lambda5:
     calls: 1
     bytes: 276
-  map_find_if$i64$i64$lam$double$is_big:
-    calls: 2
-    bytes: 276
-  map_find_if$i64$i64?$lam$nonzero$__builtin_is_some:
+  map_find_if$i64$i64?$lam$__test$map_find_if$nonzero$__builtin_is_some:
     calls: 1
     bytes: 312

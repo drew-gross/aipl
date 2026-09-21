@@ -18,6 +18,10 @@ pub fn is_some_and<T: any>(self: T?, pred: (T) -> bool) -> bool {
         none => false, #[allow]
     }
 }.test({
+    fn is_nine(self: i64) -> bool { self == 9 }
+    assert(is_nine(9));
+    assert(!is_nine(8));
+
     assert(some(5).is_some_and(|x| x == 5)); // some, predicate holds
     assert(!some(5).is_some_and(|x| x == 6)); // some, predicate fails
     assert(!""[0].is_some_and(|c| c == 'a')); // none -> false (char? from index past end)
@@ -26,40 +30,32 @@ pub fn is_some_and<T: any>(self: T?, pred: (T) -> bool) -> bool {
     let limit = 3;
     assert(some(2).is_some_and(|x| x <= limit)); // a captured bound
 })
-
-fn is_nine(self: i64) -> bool { self == 9 }.test({
-    assert(is_nine(9));
-    assert(!is_nine(8));
-})
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 157
-binary size: 2496
-  code: 844
+instructions executed: 142
+binary size: 2328
+  code: 748
   data: 374
-  metadata: 1278
+  metadata: 1206
 functions:
-  __test$is_nine:
-    calls: 1
-    bytes: 184
   __test$is_some_and:
     calls: 1
-    bytes: 480
+    bytes: 636
   aipl_assert:
     calls: 8
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 180
+    bytes: 112

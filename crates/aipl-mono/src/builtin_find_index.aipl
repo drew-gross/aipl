@@ -35,6 +35,10 @@ pub fn find_index<T: any>(self: T[], pred: (T) -> bool) -> u64? {
     }
     none
 }.test({
+    fn is_nine(self: i64) -> bool { self == 9 }
+    assert(is_nine(9));
+    assert(!is_nine(8));
+
     assert([1, 2, 3, 4].find_index(|x| x > 2) == some(2));
     assert([1, 2, 3].find_index(|x| x > 9) == none); // nothing matches
 
@@ -57,31 +61,23 @@ pub fn find_index<T: any>(self: T[], pred: (T) -> bool) -> u64? {
     // `none` on an empty array (a typed empty from `filter`).
     assert([1, 2].filter(is_nine).find_index(|x| x == 99) == none);
 })
-
-fn is_nine(self: i64) -> bool { self == 9 }.test({
-    assert(is_nine(9));
-    assert(!is_nine(8));
-})
 --- performance ---
 allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 128
-instructions executed: 1676
-binary size: 10320
-  code: 5524
+instructions executed: 1661
+binary size: 10184
+  code: 5436
   data: 1193
-  metadata: 3603
+  metadata: 3555
 functions:
   __test$find_index:
     calls: 1
-    bytes: 1372
+    bytes: 1536
   __test$find_index$filter9$own0:
     calls: 1
     bytes: 308
-  __test$is_nine:
-    calls: 1
-    bytes: 184
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -98,10 +94,10 @@ functions:
     calls: 13
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -115,6 +111,9 @@ functions:
   find_index$char$s0$lam$__test$find_index$lambda7:
     calls: 1
     bytes: 332
+  find_index$i64$lam$__test$find_index$is_nine:
+    calls: 1
+    bytes: 296
   find_index$i64$lam$__test$find_index$lambda0:
     calls: 1
     bytes: 296
@@ -133,12 +132,9 @@ functions:
   find_index$i64$lam$__test$find_index$lambda8:
     calls: 1
     bytes: 296
-  find_index$i64$lam$is_nine:
-    calls: 1
-    bytes: 296
   find_index$str$lam$__test$find_index$lambda5:
     calls: 1
     bytes: 416
   main:
     calls: 1
-    bytes: 176
+    bytes: 108

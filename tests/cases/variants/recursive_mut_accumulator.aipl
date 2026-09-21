@@ -62,32 +62,32 @@ fn conditional() -> List {
     acc
 }
 
-// A boxed accumulator grown in a nested scope while an earlier version is still
-// borrowed: `first` names the pre-loop value, which stays valid because its
-// creation-scope track outlives the loop.
-fn borrow_survives() -> i64 {
-    mut acc = Cons(5, Nil);
-    let first = acc;
-    for (let x : [1, 2]) {
-        set acc = Cons(x, acc);
-    }
-    first.len() + acc.len()
-}
-
-// A boxed *struct* accumulator folds the same way.
-fn nodes(xs: i64[]) -> Node {
-    mut n = Node { v: 0, next: none };
-    for (let x : xs) {
-        set n = Node { v: x, next: some(n) };
-    }
-    n
-}
-
 fn main() !prints {
     print(to_str(reversed([1, 2, 3])));
     print(to_str(last_only([1, 2, 3])));
     print(to_str(conditional()));
 }.test({
+    // A boxed accumulator grown in a nested scope while an earlier version is still
+    // borrowed: `first` names the pre-loop value, which stays valid because its
+    // creation-scope track outlives the loop.
+    fn borrow_survives() -> i64 {
+        mut acc = Cons(5, Nil);
+        let first = acc;
+        for (let x : [1, 2]) {
+            set acc = Cons(x, acc);
+        }
+        first.len() + acc.len()
+    }
+
+    // A boxed *struct* accumulator folds the same way.
+    fn nodes(xs: i64[]) -> Node {
+        mut n = Node { v: 0, next: none };
+        for (let x : xs) {
+            set n = Node { v: x, next: some(n) };
+        }
+        n
+    }
+
     assert(reversed([1, 2, 3]) == Cons(3, Cons(2, Cons(1, Nil))));
     assert(reversed([1, 2, 3]).len() == 3);
     assert(reversed([]).len() == 0);

@@ -42,6 +42,12 @@ pub fn right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A) -> A {
     }
     acc
 }.test({
+    fn add(x: i64, acc: i64) -> i64 { x + acc }
+    assert(add(1, 2) == 3);
+
+    fn is_big(self: i64) -> bool { self == 99 }
+    assert(!is_big(1));
+
     assert([1, 2, 3].right_fold(0, |x, acc| x + acc) == 6); // sum: order-agnostic
     assert(right_fold([2, 3], 1, |x, acc| x + acc) == 6); // free-call form
     // Empty (a typed empty from `filter`) folds to its init untouched.
@@ -57,28 +63,20 @@ pub fn right_fold<T: any, A: any>(self: T[], init: A, f: (T, A) -> A) -> A {
     let bump = 10;
     assert([1, 2].right_fold(0, |x, acc| x + acc + bump) == 23); // a captured value
 })
-
-fn add(x: i64, acc: i64) -> i64 { x + acc }.test({
-    assert(add(1, 2) == 3);
-})
-
-fn is_big(self: i64) -> bool { self == 99 }.test({
-    assert(!is_big(1));
-})
 --- performance ---
 allocations: 7
 deallocations: 7
 reallocations: 0
 bytes allocated: 608
-instructions executed: 1990
-binary size: 8280
-  code: 4568
+instructions executed: 1956
+binary size: 8080
+  code: 4412
   data: 806
-  metadata: 2906
+  metadata: 2862
 functions:
   __test$right_fold:
     calls: 1
-    bytes: 3608
+    bytes: 3724
   __test$right_fold$filter2$own0:
     calls: 1
     bytes: 308
@@ -98,17 +96,17 @@ functions:
     calls: 10
     bytes: (external)
   aipl_test_begin:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 380
-  right_fold$i64$i64$lam$add:
+    bytes: 108
+  right_fold$i64$i64$lam$__test$right_fold$add:
     calls: 2
     bytes: 272

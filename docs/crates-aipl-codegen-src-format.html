@@ -325,7 +325,7 @@
             <a class="anchor" href="#item-list_items">list_items</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$22885: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
+          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$23914: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
 
           <div class="doc"><p>The items between a pair of brackets, each laid out inline — in the order the style asks for.</p><p>A token spelled like the style's separator ends the item it follows and is dropped; the style writes the separators back, which is what lets a list that breaks gain a trailing one it never had in the source. With an empty separator every token or child starts a new item instead, which is the juxtaposed list. A comment never starts one — it belongs to the item it was written against.</p><p>A <code>sorted</code> style orders the items by their leading token, in ordinary <code>str</code> order. The sort is stable, so two items with one key keep the author's order — a duplicate JSON key, say, stays a duplicate in the order it was written.</p></div>
 
@@ -390,20 +390,6 @@
 
 
 
-        <section class="item" id="item-always_space">
-          <h3>
-            <a class="anchor" href="#item-always_space">always_space</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn always_space(l: str, r: str) -&#62; bool</code></pre>
-
-          <div class="doc"><p>A <code>build</code> that lowers nothing: the formatter never lowers, and a <code>Production</code> needs one anyway.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-never_space">
           <h3>
             <a class="anchor" href="#item-never_space">never_space</a>
@@ -432,34 +418,6 @@
 
 
 
-        <section class="item" id="item-spaced_unless_punct">
-          <h3>
-            <a class="anchor" href="#item-spaced_unless_punct">spaced_unless_punct</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn spaced_unless_punct(l: str, r: str) -&#62; bool</code></pre>
-
-          <div class="doc"><p>A spacing rule small enough to read in the driver's own tests: nothing after an opening bracket, nothing before a closing one or before hugging punctuation, a space everywhere else.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-rendered">
-          <h3>
-            <a class="anchor" href="#item-rendered">rendered</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn rendered(g: Grammar&#60;FKind, str&#62;, src: str, node: Cst, width: u64) -&#62; str!ParseError</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
         <section class="item" id="item-at">
           <h3>
             <a class="anchor" href="#item-at">at</a>
@@ -468,48 +426,6 @@
           <pre class="signature"><code>fn at(self: Doc, width: u64) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>Doc</code> at a width, for the assertions above.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-kv">
-          <h3>
-            <a class="anchor" href="#item-kv">kv</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn kv(at: u64) -&#62; Cst</code></pre>
-
-          <div class="doc"><p>A two-leaf node at <code>at</code>, standing in for a production that matched a key and its colon — enough shape for the driver's tests without a parse.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-node_of">
-          <h3>
-            <a class="anchor" href="#item-node_of">node_of</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn node_of(t: str) -&#62; Piece</code></pre>
-
-          <div class="doc"><p>A child piece that renders as <code>t</code> and has <code>t</code> at both edges.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-texts">
-          <h3>
-            <a class="anchor" href="#item-texts">texts</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn texts(ds: Doc[]) -&#62; str[]</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>

@@ -20,6 +20,27 @@ pub fn is_err_and<T: any, E: any>(self: T!E, pred: (E) -> bool) -> bool {
         err(e) => pred(e),
     }
 }.test({
+    // A result whose error side is a struct, so the tests above cover reading a
+    // single field out of a multi-field payload.
+    fn check_len(s: str) -> str!LenError {
+        if (s == "hi") { err(LenError { reason: "too short", at: 2 }) } else { ok(s) }
+    }
+    assert(!check_len("hello").is_err_and(|e| e.at == 2));
+    assert(check_len("hi").is_err_and(|e| e.at == 2));
+
+    fn is_not_a_digit(self: str) -> bool { self == "not a digit" }
+    assert(is_not_a_digit("not a digit"));
+    assert(!is_not_a_digit("empty"));
+
+    // Two ways to fail, so the tests can tell one error message from another.
+    fn digit_of(s: str) -> i64!str {
+        let c = s[0].value_or_err("empty")?;
+        if (c == '7') { ok(7) } else { err("not a digit") }
+    }
+    assert(!digit_of("7").is_err_and(|e| e == "empty"));
+    assert(digit_of("").is_err_and(|e| e == "empty"));
+    assert(digit_of("x").is_err_and(|e| e == "not a digit"));
+
     // err: the predicate runs on the error payload.
     assert(digit_of("x").is_err_and(|e| e == "not a digit"));
     assert(!digit_of("x").is_err_and(|e| e == "some other message"));
@@ -48,71 +69,38 @@ pub fn is_err_and<T: any, E: any>(self: T!E, pred: (E) -> bool) -> bool {
 })
 
 struct LenError { reason: str, at: i64 }
-
-# A result whose error side is a struct, so the tests above cover reading a
-# single field out of a multi-field payload.
-fn check_len(s: str) -> str!LenError {
-    if (s == "hi") { err(LenError { reason: "too short", at: 2 }) } else { ok(s) }
-}.test({
-    assert(!check_len("hello").is_err_and(|e| e.at == 2));
-    assert(check_len("hi").is_err_and(|e| e.at == 2));
-})
-
-fn is_not_a_digit(self: str) -> bool { self == "not a digit" }.test({
-    assert(is_not_a_digit("not a digit"));
-    assert(!is_not_a_digit("empty"));
-})
-
-# Two ways to fail, so the tests can tell one error message from another.
-fn digit_of(s: str) -> i64!str {
-    let c = s[0].value_or_err("empty")?;
-    if (c == '7') { ok(7) } else { err("not a digit") }
-}.test({
-    assert(!digit_of("7").is_err_and(|e| e == "empty"));
-    assert(digit_of("").is_err_and(|e| e == "empty"));
-    assert(digit_of("x").is_err_and(|e| e == "not a digit"));
-})
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 1671
-binary size: 10552
-  code: 5436
-  data: 1339
-  metadata: 3777
+instructions executed: 1626
+binary size: 10072
+  code: 5152
+  data: 1342
+  metadata: 3578
 functions:
-  __test$check_len:
-    calls: 1
-    bytes: 488
-  __test$digit_of:
-    calls: 1
-    bytes: 748
   __test$is_err_and:
     calls: 1
-    bytes: 2616
-  __test$is_not_a_digit:
-    calls: 1
-    bytes: 312
+    bytes: 4092
+  __test$is_err_and$check_len:
+    calls: 5
+    bytes: 504
+  __test$is_err_and$digit_of:
+    calls: 9
+    bytes: 448
   aipl_assert:
     calls: 18
     bytes: (external)
   aipl_test_begin:
-    calls: 4
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 4
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  check_len:
-    calls: 5
-    bytes: 504
-  digit_of:
-    calls: 9
-    bytes: 448
   main:
     calls: 1
-    bytes: 320
+    bytes: 108

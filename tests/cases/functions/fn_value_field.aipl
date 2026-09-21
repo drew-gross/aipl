@@ -9,18 +9,18 @@ struct Ops { step: (i64) -> i64, decorate: (str) -> str }
 
 fn inc(x: i64) -> i64 { x + 1 }
 
-fn dbl(x: i64) -> i64 { x + x }
-
 fn bang(s: str) -> str { s +++ "!" }
-
-// The field call also works on a struct received as a parameter, not just a
-// local — the receiver is any expression of the struct type.
-fn run_step(o: Ops, n: i64) -> i64 { o.step(n) }
 
 fn scalar_field() -> i64 {
     let o = Ops { step: inc, decorate: bang };
     o.step(41)
 }.test({
+    fn dbl(x: i64) -> i64 { x + x }
+
+    // The field call also works on a struct received as a parameter, not just a
+    // local — the receiver is any expression of the struct type.
+    fn run_step(o: Ops, n: i64) -> i64 { o.step(n) }
+
     assert(scalar_field() == 42);
     assert(run_step(Ops { step: dbl, decorate: bang }, 21) == 42);
 
@@ -46,10 +46,10 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 88
 instructions executed: 193
-binary size: 2752
+binary size: 2768
   code: 976
   data: 272
-  metadata: 1504
+  metadata: 1520
 functions:
   __test$heap_field:
     calls: 1
@@ -57,6 +57,9 @@ functions:
   __test$scalar_field:
     calls: 1
     bytes: 428
+  __test$scalar_field$dbl:
+    calls: 2
+    bytes: 8
   aipl_assert:
     calls: 5
     bytes: (external)
@@ -72,9 +75,6 @@ functions:
   bang:
     calls: 1
     bytes: 132
-  dbl:
-    calls: 2
-    bytes: 8
   inc:
     calls: 2
     bytes: 8

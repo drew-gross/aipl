@@ -25,19 +25,6 @@ fn escaped(c: char) -> str {
     }
 }
 
-// A char match is an ordinary expression, so it nests and composes.
-fn score(s: str) -> i64 {
-    mut total = 0;
-    for (let c : s) {
-        set total += match (c) {
-            'a' => 1,
-            'b' => 10,
-            _ => 0,
-        };
-    }
-    total
-}
-
 fn main() !prints {
     print(kind('a'));
     print(kind('z'));
@@ -45,6 +32,19 @@ fn main() !prints {
     print(escaped('\n'));
     print(escaped('x'));
 }.test({
+    // A char match is an ordinary expression, so it nests and composes.
+    fn score(s: str) -> i64 {
+        mut total = 0;
+        for (let c : s) {
+            set total += match (c) {
+                'a' => 1,
+                'b' => 10,
+                _ => 0,
+            };
+        }
+        total
+    }
+
     assert(kind('a') == "vowel");
     assert(kind('i') == "vowel");
     assert(kind(' ') == "space");

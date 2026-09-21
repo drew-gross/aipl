@@ -124,7 +124,7 @@
           </h3>
           <pre class="signature"><code>struct Function</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p><code>test_fns</code> are the functions declared inside the <code>.test</code> block — helpers private to the test, never <code>pub</code>. The parser hands them over here and the Rust side hoists them to top-level items under a name only the test can reach (<code>aipl_parser::post_parse</code>), so nothing past it sees the nesting.</p></div>
 
 
         </section>

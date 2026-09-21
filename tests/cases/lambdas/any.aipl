@@ -7,14 +7,14 @@ import {
     logical_not as !,
 } from builtins;
 
-// `arr.any(pred)` is true when at least one element satisfies `pred`
-// (short-circuits at the first that does; an empty array is false) — the dual of
-// `all`. A higher-order builtin like `filter`/`map`: the lambda is lifted,
-// captures threaded through. Like `all`, `any` is implemented in AIPL itself
-// (`builtin_any.aipl`) and specializes like a user generic.
-fn is_neg(self: i64) -> bool { self < 0 }
-
 fn has_big(xs: i64[]) -> bool { xs.any(|x| x > 10) }.test({
+    // `arr.any(pred)` is true when at least one element satisfies `pred`
+    // (short-circuits at the first that does; an empty array is false) — the dual of
+    // `all`. A higher-order builtin like `filter`/`map`: the lambda is lifted,
+    // captures threaded through. Like `all`, `any` is implemented in AIPL itself
+    // (`builtin_any.aipl`) and specializes like a user generic.
+    fn is_neg(self: i64) -> bool { self < 0 }
+
     assert([1, 2, 9].any(|x| x > 5)); // 9 satisfies it
     assert(![2, 4, 6].any(|x| x > 6)); // none does -> false
     assert(any([5, 4], |x| x == 4)); // free-call form
@@ -32,14 +32,17 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 48
 instructions executed: 936
-binary size: 6048
+binary size: 6064
   code: 2560
   data: 806
-  metadata: 2682
+  metadata: 2698
 functions:
   __builtin_any$char$lam$__test$has_big$lambda3:
     calls: 1
     bytes: 232
+  __builtin_any$i64$lam$__test$has_big$is_neg:
+    calls: 1
+    bytes: 192
   __builtin_any$i64$lam$__test$has_big$lambda0:
     calls: 1
     bytes: 192
@@ -56,9 +59,6 @@ functions:
     calls: 1
     bytes: 192
   __builtin_any$i64$lam$__test$has_big$lambda8:
-    calls: 1
-    bytes: 192
-  __builtin_any$i64$lam$is_neg:
     calls: 1
     bytes: 192
   __test$has_big:

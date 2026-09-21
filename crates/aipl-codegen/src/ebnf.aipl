@@ -570,6 +570,16 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         Named(n) => err(ParseError { message: `unlinked rule reference "{n}"`, span: 0..0 }),
     }
 }.test({
+    // The message a `rule_first` failure reports — and a distinguishable string when
+    // it unexpectedly succeeded, so a broken assertion says which way it broke.
+    // `grammar.aipl`'s `failure_message` is the same idea over a `str!ParseError`.
+    fn first_msg(r: Rule<Tok>, sets: First<Tok>[]) -> str {
+        match (rule_first(r, sets)) {
+            ok(f) => `unexpectedly computed: {f.show_first()}`,
+            err(e) => e.message,
+        }
+    }
+
     let sets = first_sets(fixture())?;
 
     // An arbitrary rule against the grammar's sets — what a driver would prune
@@ -725,16 +735,6 @@ fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> {
 
 fn g_of(ps: Production<Tok, Node>[]) -> Grammar<Tok, Node> { prods: ps }
 
-# The message a `rule_first` failure reports — and a distinguishable string when
-# it unexpectedly succeeded, so a broken assertion says which way it broke.
-# `grammar.aipl`'s `failure_message` is the same idea over a `str!ParseError`.
-fn first_msg(r: Rule<Tok>, sets: First<Tok>[]) -> str {
-    match (rule_first(r, sets)) {
-        ok(f) => `unexpectedly computed: {f.show_first()}`,
-        err(e) => e.message,
-    }
-}
-
 # A grammar with one production per shape worth rendering: a separated list, a
 # sequence, a precedence climb over two levels, an ordered choice with a nested
 # sequence in it, and an optional prefix in front of a one-or-more.
@@ -767,10 +767,10 @@ deallocations: 1579
 reallocations: 352
 bytes allocated: 184735
 instructions executed: 243904
-binary size: 168088
+binary size: 168112
   code: 111000
   data: 4004
-  metadata: 53084
+  metadata: 53108
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -898,6 +898,9 @@ functions:
   __test$rule_first:
     calls: 1
     bytes: 5036
+  __test$rule_first$first_msg:
+    calls: 2
+    bytes: 596
   __test$show_first:
     calls: 1
     bytes: 1116
@@ -1003,9 +1006,6 @@ functions:
   ebnf$Tok$Node:
     calls: 6
     bytes: 3604
-  first_msg:
-    calls: 2
-    bytes: 596
   first_precs$Tok:
     calls: 0
     bytes: 32

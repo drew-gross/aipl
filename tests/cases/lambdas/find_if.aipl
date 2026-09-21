@@ -8,14 +8,14 @@ import {
     logical_not as !,
 } from builtins;
 
-// `arr.find_if(pred)` is the first element satisfying `pred`, or `none` when no
-// element does — `any` with the element handed back, and short-circuiting the
-// same way. A higher-order builtin like `filter`/`map`: the lambda is lifted,
-// captures threaded through. Like `any`, it is implemented in AIPL itself
-// (`builtin_find_if.aipl`) and specializes like a user generic.
-fn is_neg(self: i64) -> bool { self < 0 }
-
 fn first_big(xs: i64[]) -> i64? { xs.find_if(|x| x > 10) }.test({
+    // `arr.find_if(pred)` is the first element satisfying `pred`, or `none` when no
+    // element does — `any` with the element handed back, and short-circuiting the
+    // same way. A higher-order builtin like `filter`/`map`: the lambda is lifted,
+    // captures threaded through. Like `any`, it is implemented in AIPL itself
+    // (`builtin_find_if.aipl`) and specializes like a user generic.
+    fn is_neg(self: i64) -> bool { self < 0 }
+
     assert([1, 2, 9].find_if(|x| x > 5) == some(9));
     assert([1, 2, 3].find_if(|x| x > 5) == none); // nothing matches -> none
     // The *first* match, not the last: it stops there.
@@ -35,14 +35,17 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 48
 instructions executed: 1119
-binary size: 7696
+binary size: 7712
   code: 3784
   data: 994
-  metadata: 2918
+  metadata: 2934
 functions:
   __builtin_find_if$char$lam$__test$first_big$lambda4:
     calls: 1
     bytes: 304
+  __builtin_find_if$i64$lam$__test$first_big$is_neg:
+    calls: 1
+    bytes: 268
   __builtin_find_if$i64$lam$__test$first_big$lambda0:
     calls: 1
     bytes: 268
@@ -62,9 +65,6 @@ functions:
     calls: 1
     bytes: 268
   __builtin_find_if$i64$lam$__test$first_big$lambda9:
-    calls: 1
-    bytes: 268
-  __builtin_find_if$i64$lam$is_neg:
     calls: 1
     bytes: 268
   __test$first_big:

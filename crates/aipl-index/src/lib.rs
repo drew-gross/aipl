@@ -263,6 +263,14 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
     for item in &program.items {
         match item {
             Item::Fn(f) => {
+                // A function declared inside a `.test` block is hoisted here
+                // under a name the source never spells. Step the token cursor
+                // past its `fn <name>` so the streams stay in sync, and index
+                // nothing: it is private to its test.
+                if let Some(helper) = aipl_syntax::test_helper_source_name(&f.name) {
+                    spans.next_named(SymbolKind::Function, helper);
+                    continue;
+                }
                 let Some(name_span) = spans.next_named(SymbolKind::Function, &f.name) else {
                     continue;
                 };

@@ -24,6 +24,10 @@ pub fn reverse_find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
     }
     none
 }.test({
+    fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }
+    assert(nonzero(0) == none);
+    assert(nonzero(2) == some(2));
+
     // The *last* answer, not the first.
     assert([0, 3, 5].reverse_find_map(nonzero) == some(5));
     assert([3, 0].reverse_find_map(nonzero) == some(3));
@@ -34,28 +38,20 @@ pub fn reverse_find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
     // A `str` receiver iterates its chars.
     assert("1a2b".reverse_find_map(to_digit) == some(2));
 })
-
-fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }.test({
-    assert(nonzero(0) == none);
-    assert(nonzero(2) == some(2));
-})
 --- performance ---
 allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 71
-instructions executed: 625
-binary size: 5160
-  code: 2044
-  data: 824
-  metadata: 2292
+instructions executed: 610
+binary size: 5016
+  code: 1948
+  data: 823
+  metadata: 2245
 functions:
-  __test$nonzero:
-    calls: 1
-    bytes: 216
   __test$reverse_find_map:
     calls: 1
-    bytes: 672
+    bytes: 860
   aipl_arr_slice:
     calls: 1
     bytes: (external)
@@ -66,23 +62,23 @@ functions:
     calls: 8
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 188
+    bytes: 120
   reverse_find_map$char$i64$s0$lam$__builtin_to_digit:
     calls: 1
     bytes: 436
   reverse_find_map$i64$i64$lam$__test$reverse_find_map$lambda0:
     calls: 1
     bytes: 272
-  reverse_find_map$i64$i64$lam$nonzero:
+  reverse_find_map$i64$i64$lam$__test$reverse_find_map$nonzero:
     calls: 4
     bytes: 260

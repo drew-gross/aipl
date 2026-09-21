@@ -28,16 +28,6 @@ fn readings_never_go_backwards() !clock -> bool {
     assert(monotonic_now() > 0);
 })
 
-// Loose on both ends deliberately: `sleep` never returns early, and the ceiling
-// is far enough out that a loaded machine can't trip it.
-fn is_about_one_second(ns: u64) -> bool { ns > 500000000 && ns < 60000000000 }.test({
-    assert(is_about_one_second(1000000000)); // one second, on the nose
-    assert(is_about_one_second(1400000000)); // a slow second still counts
-    assert(!is_about_one_second(1000000)); // a millisecond clock: 1000x small
-    assert(!is_about_one_second(1000)); // a microsecond clock: 1e6 too small
-    assert(!is_about_one_second(0));
-})
-
 fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
     let start = monotonic_now();
     match ("sleep".execute_program(args=["1"])) {
@@ -47,6 +37,15 @@ fn elapsed_over_a_one_second_sleep() !clock !execute_program -> u64 {
         err(..) => 0,
     }
 }.test({
+    // Loose on both ends deliberately: `sleep` never returns early, and the ceiling
+    // is far enough out that a loaded machine can't trip it.
+    fn is_about_one_second(ns: u64) -> bool { ns > 500000000 && ns < 60000000000 }
+    assert(is_about_one_second(1000000000)); // one second, on the nose
+    assert(is_about_one_second(1400000000)); // a slow second still counts
+    assert(!is_about_one_second(1000000)); // a millisecond clock: 1000x small
+    assert(!is_about_one_second(1000)); // a microsecond clock: 1e6 too small
+    assert(!is_about_one_second(0));
+
     // Sleeping a second has to show up as roughly a billion nanoseconds. This is
     // what pins the *unit*: a micro- or millisecond clock reads a thousand or a
     // million times smaller, and would fail here.
@@ -57,18 +56,15 @@ allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 88
-instructions executed: 290
-binary size: 4424
-  code: 1656
+instructions executed: 275
+binary size: 4208
+  code: 1532
   data: 577
-  metadata: 2191
+  metadata: 2099
 functions:
   __test$elapsed_over_a_one_second_sleep:
     calls: 1
-    bytes: 592
-  __test$is_about_one_second:
-    calls: 1
-    bytes: 532
+    bytes: 1088
   __test$readings_never_go_backwards:
     calls: 1
     bytes: 284
@@ -91,14 +87,14 @@ functions:
     calls: 5
     bytes: (external)
   aipl_test_begin:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 2
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 248
+    bytes: 160

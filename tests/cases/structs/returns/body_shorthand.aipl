@@ -20,21 +20,6 @@ fn square(x: i64) -> Vec2 { x, y: x }
 
 fn shifted(x: i64, y: i64) -> Vec2 { x, y }
 
-// A single *explicit* field needs no comma, since `id:` already rules out a
-// block. A single *shorthand* field is the one shape that does need one —
-// `{ id }` is a block whose value is `id`, which is what it has always meant —
-// so it is written `{ id, }`.
-fn tag(id: i64) -> Tag { id: id + 0 }
-
-fn tag_short(id: i64) -> Tag { id, }
-
-// A generic return type contributes its base name; the arguments infer, exactly
-// as they do when the literal is spelled `Pair { .. }`.
-fn twin(x: i64) -> Pair<i64> { left: x, right: x }
-
-// `{ p }` is still a block returning `p` — not a one-field struct literal.
-fn passthrough(p: Vec2) -> Vec2 { p }
-
 // Nested literals still name their own type; only the outermost one is implied.
 fn place(name: str, x: i64) -> Named { name, at: Vec2 { x, y: 0 } }
 
@@ -52,6 +37,21 @@ fn main() !prints {
     print(to_str(place("home", 7)));
     print(to_str(logged(4)));
 }.test({
+    // A single *explicit* field needs no comma, since `id:` already rules out a
+    // block. A single *shorthand* field is the one shape that does need one —
+    // `{ id }` is a block whose value is `id`, which is what it has always meant —
+    // so it is written `{ id, }`.
+    fn tag(id: i64) -> Tag { id: id + 0 }
+
+    fn tag_short(id: i64) -> Tag { id, }
+
+    // A generic return type contributes its base name; the arguments infer, exactly
+    // as they do when the literal is spelled `Pair { .. }`.
+    fn twin(x: i64) -> Pair<i64> { left: x, right: x }
+
+    // `{ p }` is still a block returning `p` — not a one-field struct literal.
+    fn passthrough(p: Vec2) -> Vec2 { p }
+
     assert(origin() == Vec2 { x: 0, y: 0 });
     assert(square(3) == Vec2 { x: 3, y: 3 });
     assert(shifted(1, 2) == Vec2 { x: 1, y: 2 });

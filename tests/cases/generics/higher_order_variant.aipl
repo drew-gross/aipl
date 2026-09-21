@@ -4,13 +4,6 @@ import { equal as ==, wrapping_sub as - } from builtins;
 // call a function stored in a payload — the shape the lexer's `Emit<K>` uses.
 variant Emit<K> = OfInt((i64) -> K) | Plain(K)
 
-fn apply<K>(e: Emit<K>, n: i64) -> K {
-    match (e) {
-        OfInt(f) => f(n),
-        Plain(k) => k,
-    }
-}
-
 variant Tok = Num(i64) | Bare
 
 fn to_i(t: Tok) -> i64 {
@@ -19,6 +12,13 @@ fn to_i(t: Tok) -> i64 {
         Bare => 0 - 1,
     }
 }.test({
+    fn apply<K>(e: Emit<K>, n: i64) -> K {
+        match (e) {
+            OfInt(f) => f(n),
+            Plain(k) => k,
+        }
+    }
+
     assert(to_i(apply(OfInt(Num), 9)) == 9);
     assert(to_i(apply(Plain(Bare), 9)) == 0 - 1);
 })

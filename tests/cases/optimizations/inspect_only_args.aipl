@@ -26,14 +26,6 @@ fn count_ones(s: str) -> i64 {
     n
 }
 
-fn total(xs: i64[]) -> i64 {
-    mut t = 0;
-    for (let x : xs) {
-        set t += x;
-    }
-    t
-}
-
 // Re-owns its argument into a `mut` binding, so it is *not* inspect-only: the
 // binding's slot may take over the incoming reference rather than retaining a
 // fresh one, so the borrow pair stays exactly as it was.
@@ -41,6 +33,14 @@ fn count_via_copy(s: str) -> i64 {
     mut t = s;
     count_ones(t)
 }.test({
+    fn total(xs: i64[]) -> i64 {
+        mut t = 0;
+        for (let x : xs) {
+            set t += x;
+        }
+        t
+    }
+
     // A real heap string (a literal would be statically refcounted, so its
     // inc/dec are no-ops and would hide the difference).
     let digits = to_str(11011);
@@ -62,14 +62,17 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 21
 instructions executed: 1754
-binary size: 3888
+binary size: 3912
   code: 1476
   data: 426
-  metadata: 1986
+  metadata: 2010
 functions:
   __test$count_via_copy:
     calls: 1
     bytes: 720
+  __test$count_via_copy$total:
+    calls: 2
+    bytes: 188
   __to_str_i64:
     calls: 1
     bytes: 204
@@ -97,6 +100,3 @@ functions:
   main:
     calls: 1
     bytes: 116
-  total:
-    calls: 2
-    bytes: 188

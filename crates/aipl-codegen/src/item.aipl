@@ -31,7 +31,19 @@ struct Param {
 
 struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], return_ty: Ty? }
 
-struct Function { name: str, is_pub: bool, sig: Signature, body: Expr, test_body: Expr?, doc: str? }
+# `test_fns` are the functions declared inside the `.test` block — helpers
+# private to the test, never `pub`. The parser hands them over here and the
+# Rust side hoists them to top-level items under a name only the test can
+# reach (`aipl_parser::post_parse`), so nothing past it sees the nesting.
+struct Function {
+    name: str,
+    is_pub: bool,
+    sig: Signature,
+    body: Expr,
+    test_body: Expr?,
+    test_fns: Function[] = [],
+    doc: str?,
+}
 
 struct FieldDecl { name: str, ty: Ty, default: Expr? }
 
@@ -101,7 +113,8 @@ fn show_fn(self: Function) -> str {
     let sig = self.sig;
     let ret = sig.return_ty.map(|t| ` -> {t.show_ty()}`).value_or("");
     let effects = sig.effects.map(effect_marker).join();
-    let test = self.test_body.map(|b| ` .test({b.show_expr()})`).value_or("");
+    let helpers = self.test_fns.map(|h| ` {h.show_fn()}`).join();
+    let test = self.test_body.map(|b| ` .test({b.show_expr()}{helpers})`).value_or("");
     `{show_doc(self.doc)}{vis}fn {self.name}{show_type_params(sig.type_vars)}({sig.params.map(show_param).join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}`
 }
 
@@ -170,10 +183,10 @@ deallocations: 18
 reallocations: 2
 bytes allocated: 1338
 instructions executed: 1453
-binary size: 91384
-  code: 64244
-  data: 238
-  metadata: 26902
+binary size: 92016
+  code: 64804
+  data: 239
+  metadata: 26973
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -228,7 +241,7 @@ functions:
     bytes: 408
   __test$show_item:
     calls: 1
-    bytes: 2372
+    bytes: 1980
   __to_str_i64:
     calls: 0
     bytes: 204
@@ -277,9 +290,12 @@ functions:
   show_doc:
     calls: 1
     bytes: 384
+  show_fn:
+    calls: 0
+    bytes: 8648
   show_item:
     calls: 2
-    bytes: 16244
+    bytes: 8548
   show_type_params:
     calls: 1
     bytes: 2164

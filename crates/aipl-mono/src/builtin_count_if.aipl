@@ -33,6 +33,10 @@ pub fn count_if<T: any>(self: T[], pred: (T) -> bool) -> u64 {
     }
     n
 }.test({
+    fn is_nine(self: i64) -> bool { self == 9 }
+    assert(is_nine(9));
+    assert(!is_nine(8));
+
     assert([1, 2, 3, 4].count_if(|x| x > 2) == 2);
     assert([1, 2, 3].count_if(|x| x > 9) == 0); // nothing matches
     assert([1, 2, 3].count_if(|x| x > 0) == 3); // everything matches
@@ -53,31 +57,23 @@ pub fn count_if<T: any>(self: T[], pred: (T) -> bool) -> u64 {
     // Zero on an empty array (a typed empty from `filter`).
     assert([1, 2].filter(is_nine).count_if(|x| x == 99) == 0);
 })
-
-fn is_nine(self: i64) -> bool { self == 9 }.test({
-    assert(is_nine(9));
-    assert(!is_nine(8));
-})
 --- performance ---
 allocations: 2
 deallocations: 2
 reallocations: 0
 bytes allocated: 152
-instructions executed: 2297
-binary size: 8248
-  code: 4116
+instructions executed: 2282
+binary size: 8072
+  code: 4012
   data: 1188
-  metadata: 2944
+  metadata: 2872
 functions:
   __test$count_if:
     calls: 1
-    bytes: 3448
+    bytes: 3596
   __test$count_if$filter10$own0:
     calls: 1
     bytes: 308
-  __test$is_nine:
-    calls: 1
-    bytes: 184
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -94,14 +90,14 @@ functions:
     calls: 14
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 176
+    bytes: 108

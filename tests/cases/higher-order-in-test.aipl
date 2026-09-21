@@ -8,8 +8,6 @@
 // which effects are actually needed from their body.
 import { equal as ==, push, saturating_remainder as % } from builtins;
 
-fn is_even(x: i64) -> bool { x % 2 == 0 }
-
 fn filter_evens(arr: i64[], pred: (i64) -> bool) -> i64[] {
     // The hand-written filter loop is the shape under test — the lint that
     // wants `arr.filter(pred)` would delete the lambda specialization this
@@ -22,6 +20,8 @@ fn filter_evens(arr: i64[], pred: (i64) -> bool) -> i64[] {
     }
     result
 }.test({
+    fn is_even(x: i64) -> bool { x % 2 == 0 }
+
     // Lambda in test block calling is_even. Without the fix, the lambda
     // would inherit !prints from the synthesized test function, causing
     // effect mismatches. With the fix, the lambda correctly has no effects.
@@ -37,10 +37,10 @@ deallocations: 2
 reallocations: 2
 bytes allocated: 80
 instructions executed: 847
-binary size: 2912
+binary size: 2936
   code: 1000
   data: 425
-  metadata: 1487
+  metadata: 1511
 functions:
   __eq_i64$arr:
     calls: 2
@@ -72,7 +72,7 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  filter_evens$lam$is_even:
+  filter_evens$lam$__test$filter_evens$is_even:
     calls: 2
     bytes: 356
   main:

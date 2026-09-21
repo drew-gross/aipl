@@ -467,20 +467,6 @@
         <p class="note">Not importable from another file.</p>
 
 
-        <section class="item" id="item-lex_err">
-          <h3>
-            <a class="anchor" href="#item-lex_err">lex_err</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lex_err(message: str, span: Span) -&#62; LexError</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
         <section class="item" id="item-char_run_len">
           <h3>
             <a class="anchor" href="#item-char_run_len">char_run_len</a>
@@ -696,7 +682,7 @@
             <a class="anchor" href="#item-apply_emit">apply_emit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31938: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
+          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31870: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
 
           <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its content string — the matcher-computed <code>value</code> (a delimited string, stripped) when there is one, else the raw matched <code>text</code>. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
 
@@ -825,104 +811,6 @@
           <pre class="signature"><code>fn interp_scan&#60;K: any&#62;(src: str, at: u64, open: u64, rules: TokenRule&#60;K&#62;[]) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
 
           <div class="doc"><p>A template interpolation's <code>{ ... }</code> body: lexes expression tokens with the full rule set from <code>at</code> (just past the opening <code>{</code>, which sits at <code>open</code>) until the <code>}</code> balancing it; that closing <code>}</code> is consumed without a token of its own — it's the template's delimiter, not an expression token, and it is the *next* text segment's span that covers it (see <code>template_scan</code>). Depth moves by what each step consumed: a step consuming exactly <code>{</code> or <code>}</code> (a brace lexed as its own token — set/dict literals, blocks) raises/lowers it, while a brace buried inside a bigger token (a delimited string's content, a nested template) doesn't. The result's <code>end</code> sits just past the closing <code>}</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-tpl_kind">
-          <h3>
-            <a class="anchor" href="#item-tpl_kind">tpl_kind</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn tpl_kind(text: str, seg: Seg) -&#62; Kind</code></pre>
-
-          <div class="doc"><p>The <code>.test</code> block's template <code>OfSeg</code> emit: the library hands each segment's *raw* text, so this emit decodes it (with the imported <code>unescape</code>) before mapping to a <code>Kind</code> arm — escape handling is the caller's job.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-esc_str">
-          <h3>
-            <a class="anchor" href="#item-esc_str">esc_str</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn esc_str(text: str) -&#62; Kind</code></pre>
-
-          <div class="doc"><p>The <code>Of</code> emit for the escaped-string test below: the library hands the raw (un-decoded) delimiter-stripped contents, so the emit decodes them itself.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-int_tok">
-          <h3>
-            <a class="anchor" href="#item-int_tok">int_tok</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn int_tok(text: str) -&#62; Kind!str</code></pre>
-
-          <div class="doc"><p>The <code>Try</code> emit for the <code>Int</code> test below: the library hands the raw digit run, so this emit parses it — here with the <code>int_parse</code> builtin, reporting an i64 overflow as an error *message* (the library attaches the token's span). Parsing policy, and what overflow means, is the caller's — a bignum lexer would parse into a wide type and never fail here.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-nonempty_str">
-          <h3>
-            <a class="anchor" href="#item-nonempty_str">nonempty_str</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn nonempty_str(text: str) -&#62; Kind!str</code></pre>
-
-          <div class="doc"><p>A <code>Try</code> emit: the escaped-string decoder above, plus a content rule the caller enforces — a string literal may not be empty. A whole-token verdict, so the token's span is the right place for the error.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-checked_seg">
-          <h3>
-            <a class="anchor" href="#item-checked_seg">checked_seg</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn checked_seg(text: str, seg: Seg) -&#62; Kind!str</code></pre>
-
-          <div class="doc"><p>A <code>TrySeg</code> emit: like <code>tpl_kind</code>, but the caller rejects a <code>TODO</code> segment. The error carries the whole template's span.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-rawtpl_kind">
-          <h3>
-            <a class="anchor" href="#item-rawtpl_kind">rawtpl_kind</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn rawtpl_kind(text: str, seg: Seg) -&#62; Kind</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-tok">
-          <h3>
-            <a class="anchor" href="#item-tok">tok</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn tok(src: str, kind: Kind, span: Span) -&#62; Token&#60;Kind&#62;</code></pre>
-
-          <div class="doc"><p>Test-block shorthands over the concrete <code>Kind</code> (each kind arm carries its own content): an expected token, and a token-only result (no trivia).</p><p><code>tok</code> slices its text out of <code>src</code> — the same source the <code>lex</code> call under test was given — rather than taking it as a literal. An expectation therefore cannot claim text the source does not hold at that span, which is the one thing a hand-written <code>SpanStr</code> could get wrong while still looking right.</p></div>
 
 
         </section>

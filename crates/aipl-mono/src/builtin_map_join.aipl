@@ -83,6 +83,9 @@ pub fn map_join<T: any, U: any>(
     }
     out
 }.test({
+    fn same(self: str) -> str { self }
+    assert(same("x") == "x");
+
     assert([1, 2, 3].map_join(to_str, sep=", ") == "1, 2, 3");
     assert([1].map_join(to_str, sep=", ") == "1");
     assert([1, 2][..0].map_join(to_str, sep=", ") == "");
@@ -106,27 +109,23 @@ pub fn map_join<T: any, U: any>(
     // Non-string elements: arrays of numbers joined with a number.
     assert([1, 2].map_join(|x| [x, x], sep=0) == [1, 1, 0, 2, 2]);
 })
-
-fn same(self: str) -> str { self }.test({
-    assert(same("x") == "x");
-})
 --- performance ---
 allocations: 31
 deallocations: 31
 reallocations: 2
 bytes allocated: 1241
-instructions executed: 5199
-binary size: 17896
-  code: 11144
+instructions executed: 5187
+binary size: 17824
+  code: 11084
   data: 1257
-  metadata: 5495
+  metadata: 5483
 functions:
   __eq_i64$arr:
     calls: 1
     bytes: 296
   __test$map_join:
     calls: 1
-    bytes: 7732
+    bytes: 7840
   __to_str_i64:
     calls: 6
     bytes: 204
@@ -158,10 +157,10 @@ functions:
     calls: 12
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -171,10 +170,10 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 276
+    bytes: 108
   map_join$i64$char$s2$s3$s4$rs$lam$__builtin_to_str:
     calls: 4
     bytes: 1304
-  map_join$str$char$s2$s3$s4$rs$lam$same:
+  map_join$str$char$s2$s3$s4$rs$lam$__test$map_join$same:
     calls: 2
     bytes: 1332

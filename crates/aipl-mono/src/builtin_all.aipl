@@ -18,6 +18,10 @@ pub fn all<T: any>(self: T[], pred: (T) -> bool) -> bool {
     }
     true
 }.test({
+    fn is_nine(self: i64) -> bool { self == 9 }
+    assert(is_nine(9));
+    assert(!is_nine(8));
+
     assert([2, 4, 6].all(|x| x <= 6)); // every element satisfies it
     assert(![1, 2, 9].all(|x| x <= 5)); // 9 fails -> false
     assert(all([5, 5], |x| x == 5)); // free-call form
@@ -30,31 +34,23 @@ pub fn all<T: any>(self: T[], pred: (T) -> bool) -> bool {
     let limit = 3;
     assert([1, 2].all(|x| x <= limit)); // a captured bound
 })
-
-fn is_nine(self: i64) -> bool { self == 9 }.test({
-    assert(is_nine(9));
-    assert(!is_nine(8));
-})
 --- performance ---
 allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 48
-instructions executed: 1371
-binary size: 6824
-  code: 3284
+instructions executed: 1356
+binary size: 6664
+  code: 3188
   data: 773
-  metadata: 2767
+  metadata: 2703
 functions:
   __test$all:
     calls: 1
-    bytes: 668
+    bytes: 824
   __test$all$filter6$own0:
     calls: 1
     bytes: 308
-  __test$is_nine:
-    calls: 1
-    bytes: 184
   aipl_arr_inc:
     calls: 1
     bytes: (external)
@@ -68,10 +64,10 @@ functions:
     calls: 11
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -85,6 +81,9 @@ functions:
   all$char$s0$lam$__test$all$lambda5:
     calls: 1
     bytes: 244
+  all$i64$lam$__test$all$is_nine:
+    calls: 1
+    bytes: 204
   all$i64$lam$__test$all$lambda0:
     calls: 1
     bytes: 204
@@ -100,9 +99,6 @@ functions:
   all$i64$lam$__test$all$lambda8:
     calls: 1
     bytes: 204
-  all$i64$lam$is_nine:
-    calls: 1
-    bytes: 204
   main:
     calls: 1
-    bytes: 168
+    bytes: 100

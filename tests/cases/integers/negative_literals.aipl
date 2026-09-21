@@ -7,6 +7,10 @@ import { equal as ==, less_than as < } from builtins;
 // i64::MIN, whose magnitude exceeds i64::MAX and so can't be written as a positive
 // literal and then negated.
 fn probe() -> bool { true }.test({
+    fn id(x: i64) -> i64 { x }
+
+    fn neg_one() -> i64 { -1 }
+
     // A plain constant, not a unary-minus expression — no `-` imported.
     assert(-1234 == -1234);
     assert(-1 < 0);
@@ -23,10 +27,6 @@ fn probe() -> bool { true }.test({
     assert(id(-7) == -7);
     assert(neg_one() == -1);
 })
-
-fn id(x: i64) -> i64 { x }
-
-fn neg_one() -> i64 { -1 }
 --- performance ---
 allocations: 0
 deallocations: 0

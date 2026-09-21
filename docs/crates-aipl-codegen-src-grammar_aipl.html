@@ -1763,6 +1763,62 @@
 
 
 
+        <section class="item" id="item-lower_test_block">
+          <h3>
+            <a class="anchor" href="#item-lower_test_block">lower_test_block</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_test_block(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>test_block</code> — the braces around a <code>test_body</code>: the chain's value is located the way <code>block</code> does it, and the functions ride along.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_test_body">
+          <h3>
+            <a class="anchor" href="#item-lower_test_body">lower_test_body</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_test_body(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>test_body</code> — <code>block_body</code> with one more alternative: a function declaration, which is set aside rather than folded into the chain. A <code>pub</code> helper, or one carrying a <code>.test</code> of its own, is refused: the block is the only place the function exists, so neither could mean anything.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_test_tail">
+          <h3>
+            <a class="anchor" href="#item-lower_test_tail">lower_test_tail</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_test_tail(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>test_tail</code> — <code>block_tail</code>'s twin: nothing followed (the expression before it was the value), or the rest of the block, which is a chain even when empty.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-as_test_block">
+          <h3>
+            <a class="anchor" href="#item-as_test_block">as_test_block</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn as_test_block(v: Ast, span: Span) -&#62; TestBlock!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
         <section class="item" id="item-unknown_attr">
           <h3>
             <a class="anchor" href="#item-unknown_attr">unknown_attr</a>
@@ -1917,20 +1973,6 @@
 
 
 
-        <section class="item" id="item-import_doc">
-          <h3>
-            <a class="anchor" href="#item-import_doc">import_doc</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn import_doc(src: str, width: u64) -&#62; str!ParseError</code></pre>
-
-          <div class="doc"><p><code>import_decl_doc</code> printed at <code>width</code>, for the assertions above.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-as_program">
           <h3>
             <a class="anchor" href="#item-as_program">as_program</a>
@@ -1945,34 +1987,6 @@
 
 
 
-        <section class="item" id="item-program_dump">
-          <h3>
-            <a class="anchor" href="#item-program_dump">program_dump</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn program_dump(src: str) -&#62; str</code></pre>
-
-          <div class="doc"><p>A lowered program as text, one item per line, or the refusal that stopped it.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-block_dump">
-          <h3>
-            <a class="anchor" href="#item-block_dump">block_dump</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn block_dump(src: str) -&#62; str</code></pre>
-
-          <div class="doc"><p>A lowered block as text, or the refusal that stopped it.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-expr_dump">
           <h3>
             <a class="anchor" href="#item-expr_dump">expr_dump</a>
@@ -1981,34 +1995,6 @@
           <pre class="signature"><code>fn expr_dump(src: str) -&#62; str</code></pre>
 
           <div class="doc"><p>A lowered expression as text, or the refusal that stopped it.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-pat_dump">
-          <h3>
-            <a class="anchor" href="#item-pat_dump">pat_dump</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn pat_dump(src: str) -&#62; str</code></pre>
-
-          <div class="doc"><p>A lowered pattern as text, or the refusal that stopped it.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-ty_dump">
-          <h3>
-            <a class="anchor" href="#item-ty_dump">ty_dump</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn ty_dump(src: str) -&#62; str</code></pre>
-
-          <div class="doc"><p>A lowered type as text, or the refusal that stopped it — so an assertion above reads as one line whichever it is.</p></div>
 
 
         </section>
@@ -2443,20 +2429,6 @@
           <pre class="signature"><code>fn why(src: str) -&#62; str</code></pre>
 
           <div class="doc"><p>Why a source failed to parse, for the diagnostic assertions.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-why_prepared">
-          <h3>
-            <a class="anchor" href="#item-why_prepared">why_prepared</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn why_prepared(src: str) -&#62; str</code></pre>
-
-          <div class="doc"><p>The same, against an analysed grammar — the path that prunes on FIRST sets. <code>parse.aipl</code> proves pruning is invisible against toy grammars; this asks the same question of the real one, where the sets are large and nearly every production reference is a candidate to skip.</p></div>
 
 
         </section>

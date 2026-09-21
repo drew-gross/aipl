@@ -792,6 +792,17 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     }
     ok(Grammar { prods, groups })
 }.test({
+    // The rule of production `i` of `g`, shown, for the assertions above — neither a
+    // grammar value nor a rule can be compared with `==` (both may hold function
+    // values), so a rule is asserted on through its `show_rule` text.
+    fn shown_rule<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
+        g.prods[i].map(|p| show_rule(p.rule)).value_or("")
+    }
+
+    fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
+        g.prods[i].map(|p| p.expect_as).value_or("")
+    }
+
     // A tiny grammar over one token kind: `list -> "(" item* ")"`, `item -> atom
     // | list`. Enough to have a reference reach back through another production,
     // which is what linking has to get right.
@@ -1055,29 +1066,18 @@ variant Node = Leaf(str) | List(Node[])
 # fixtures need: `Build` has no payload-free arm to mean "don't".
 fn keep(kids: Node[]) -> Node { List(kids) }
 
-# The rule of production `i` of `g`, shown, for the assertions above — neither a
-# grammar value nor a rule can be compared with `==` (both may hold function
-# values), so a rule is asserted on through its `show_rule` text.
-fn shown_rule<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
-    g.prods[i].map(|p| show_rule(p.rule)).value_or("")
-}
-
 # A message function for the `Refuse(Fn(..))` fixtures: what was matched, back.
 fn echo(matched: str) -> str { matched }
-
-fn expect_of<K: variant, A: any>(g: Grammar<K, A>, i: u64) -> str {
-    g.prods[i].map(|p| p.expect_as).value_or("")
-}
 --- performance ---
 allocations: 754
 deallocations: 754
 reallocations: 101
 bytes allocated: 94897
 instructions executed: 78861
-binary size: 164216
+binary size: 164232
   code: 101688
   data: 6660
-  metadata: 55868
+  metadata: 55884
 functions:
   __arr_drop_ListStyle:
     calls: 46
@@ -1157,6 +1157,9 @@ functions:
   __test$link:
     calls: 1
     bytes: 47540
+  __test$link$shown_rule$Kind$Node:
+    calls: 13
+    bytes: 1008
   __test$show_rule:
     calls: 1
     bytes: 4156
@@ -1283,6 +1286,3 @@ functions:
   show_style$own0:
     calls: 3
     bytes: 1472
-  shown_rule$Kind$Node:
-    calls: 13
-    bytes: 1008

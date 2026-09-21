@@ -1,0 +1,16 @@
+import { equal as ==, wrapping_add as + } from builtins;
+
+// A function declared inside a `.test` block exists only for that block: the
+// function under test cannot call it.
+fn double(n: i64) -> i64 { four() + n }.test({
+    fn four() -> i64 { 4 }
+    assert(double(2) == 6);
+})
+
+fn main() {}
+--- errors ---
+error: call to undefined fn "four"
+ --> ./tests/cases/tests/err_fn_in_test_unreachable.aipl:5:28
+  |
+5 | fn double(n: i64) -> i64 { four() + n }.test({
+  |                            ^^^^^^

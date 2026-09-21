@@ -24,6 +24,19 @@ pub fn map_ok<T: any, U: any, E: any>(self: T!E, f: (T) -> U) -> U!E {
         err(e) => err(e), #[allow]
     }
 }.test({
+    // A named conversion, so the tests cover passing a function rather than a
+    // lambda.
+    fn shout(self: str) -> str { `{self}!` }
+    assert(shout("hi") == "hi!");
+
+    // Fails with a struct error, so the tests above cover an error payload that is
+    // carried through untouched rather than a bare message.
+    fn lex(s: str) -> str!LexError {
+        if (s == "bad") { err(LexError { message: "unexpected", span: 3 }) } else { ok(s) }
+    }
+    assert(lex("bad").is_err_and(|e| e.message == "unexpected"));
+    assert(!lex("fine").is_err_and(|e| e.span == 3));
+
     // ok: the value is rewritten, and the error type is carried along.
     assert(lex("fine").map_ok(shout)? == "fine!");
 
@@ -58,38 +71,23 @@ pub fn map_ok<T: any, U: any, E: any>(self: T!E, f: (T) -> U) -> U!E {
 struct LexError { message: str, span: i64 }
 
 struct Tagged { text: str, n: i64 }
-
-# A named conversion, so the tests cover passing a function rather than a
-# lambda.
-fn shout(self: str) -> str { `{self}!` }.test({
-    assert(shout("hi") == "hi!");
-})
-
-# Fails with a struct error, so the tests above cover an error payload that is
-# carried through untouched rather than a bare message.
-fn lex(s: str) -> str!LexError {
-    if (s == "bad") { err(LexError { message: "unexpected", span: 3 }) } else { ok(s) }
-}.test({
-    assert(lex("bad").is_err_and(|e| e.message == "unexpected"));
-    assert(!lex("fine").is_err_and(|e| e.span == 3));
-})
 --- performance ---
 allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 704
-instructions executed: 2494
-binary size: 28120
-  code: 17028
+instructions executed: 2651
+binary size: 25104
+  code: 14600
   data: 1292
-  metadata: 9800
+  metadata: 9212
 functions:
-  __test$lex:
-    calls: 1
-    bytes: 564
   __test$map_ok:
     calls: 1
-    bytes: 14520
+    bytes: 12392
+  __test$map_ok$lex:
+    calls: 14
+    bytes: 508
   __test_try_fail_LexError:
     calls: 0
     bytes: 84
@@ -106,17 +104,17 @@ functions:
     calls: 15
     bytes: (external)
   aipl_test_begin:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  lex:
-    calls: 14
-    bytes: 508
   main:
     calls: 1
-    bytes: 500
+    bytes: 104
+  map_ok$str$str$LexError$lam$__test$map_ok$shout:
+    calls: 8
+    bytes: 660

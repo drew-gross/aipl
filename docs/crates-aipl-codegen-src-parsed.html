@@ -131,7 +131,21 @@
           </h3>
           <pre class="signature"><code>struct FnAttr</code></pre>
 
-          <div class="doc"><p>One <code>.test({ .. })</code> attribute: its block, and the span of the attribute name, which is where a duplicate is reported.</p></div>
+          <div class="doc"><p>One <code>.test({ .. })</code> attribute: its block, the functions declared inside the block, and the span of the attribute name, which is where a duplicate is reported.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-TestBlock">
+          <h3>
+            <a class="anchor" href="#item-TestBlock">TestBlock</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct TestBlock</code></pre>
+
+          <div class="doc"><p>A <code>.test</code> block's contents as its production hands them up: the functions declared in it, and the statement chain — <code>none</code> while nothing has followed yet, which is how <code>test_tail</code> tells &quot;the expression before the <code>;</code> was the block's value&quot; from &quot;the rest of the block follows&quot;.</p></div>
 
 
         </section>

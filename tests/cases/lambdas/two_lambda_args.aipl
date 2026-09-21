@@ -16,6 +16,8 @@ import {
 // onward together.
 
 fn combine(x: i64, f: (i64) -> i64, g: (i64) -> i64) -> i64 { f(x) + g(x) }.test({
+    fn double(x: i64) -> i64 { x * 2 }
+
     assert(combine(5, |x| x + 1, |x| x * 2) == 16);
 
     // The two lambdas capture different variables, so each specialization has
@@ -37,8 +39,6 @@ fn combine(x: i64, f: (i64) -> i64, g: (i64) -> i64) -> i64 { f(x) + g(x) }.test
     assert(combine(5, |x| x + 1, double) == 16);
     assert(combine(5, double, double) == 20);
 })
-
-fn double(x: i64) -> i64 { x * 2 }
 
 // The two parameters need not have the same type: `keep` is a predicate and
 // `f` a mapping, so neither specialization could stand in for the other.

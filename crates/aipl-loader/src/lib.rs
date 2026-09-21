@@ -904,6 +904,7 @@ fn rewrite_item(
             } else {
                 None
             },
+            test_fns: Vec::new(),
             // Documentation is plain text — no global references to rewrite.
             doc: f.doc.clone(),
         }),

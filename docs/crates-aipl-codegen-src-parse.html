@@ -145,6 +145,39 @@
 
 
 
+        <section class="item" id="item-Tok">
+          <h3>
+            <a class="anchor" href="#item-Tok">Tok</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Tok</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+          <ul class="cases">
+
+            <li id="item-Word"><code>Word(str)</code>
+
+
+            </li>
+
+            <li id="item-Num"><code>Num(str)</code>
+
+
+            </li>
+
+            <li id="item-Punct"><code>Punct</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
         <section class="item" id="item-Node">
           <h3>
             <a class="anchor" href="#item-Node">Node</a>
@@ -286,20 +319,6 @@
           <pre class="signature"><code>fn attach_trivia&#60;K: variant&#62;(toks: Token&#60;K&#62;[], trivia: Token&#60;K&#62;[]) -&#62; (Cst[][], Cst[])</code></pre>
 
           <div class="doc"><p>Every token's <code>leaf_at</code> children, in token order, and the trivia left after the last token. Both lists arrive sorted by position and never overlap, so one pass that advances through the trivia as it walks the tokens pairs them off exactly as the per-token filter did — each trivia record lands in front of the first token that starts after it.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-tok_at">
-          <h3>
-            <a class="anchor" href="#item-tok_at">tok_at</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn tok_at(span: Span) -&#62; Token&#60;Tok&#62;</code></pre>
-
-          <div class="doc"><p>A token at a span, for the attachment test — only the position matters to it.</p></div>
 
 
         </section>
@@ -740,20 +759,6 @@
 
 
 
-        <section class="item" id="item-trivia_rules">
-          <h3>
-            <a class="anchor" href="#item-trivia_rules">trivia_rules</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn trivia_rules() -&#62; TokenRule&#60;Tok&#62;[]</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
         <section class="item" id="item-lex_toks">
           <h3>
             <a class="anchor" href="#item-lex_toks">lex_toks</a>
@@ -782,20 +787,6 @@
 
 
 
-        <section class="item" id="item-refuse">
-          <h3>
-            <a class="anchor" href="#item-refuse">refuse</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn refuse(src: str, node: Cst, kids: Node[]) -&#62; Node!ParseError</code></pre>
-
-          <div class="doc"><p>A <code>build</code> that always refuses, for the error-propagation assertion.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-one">
           <h3>
             <a class="anchor" href="#item-one">one</a>
@@ -810,110 +801,12 @@
 
 
 
-        <section class="item" id="item-labelled_prod">
-          <h3>
-            <a class="anchor" href="#item-labelled_prod">labelled_prod</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn labelled_prod(name: str, rule: Rule&#60;Tok&#62;, expect_as: str) -&#62; Production&#60;Tok, Node&#62;</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-g_of">
-          <h3>
-            <a class="anchor" href="#item-g_of">g_of</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn g_of(ps: Production&#60;Tok, Node&#62;[]) -&#62; Grammar&#60;Tok, Node&#62;</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-shown">
-          <h3>
-            <a class="anchor" href="#item-shown">shown</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn shown(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str!ParseError</code></pre>
-
-          <div class="doc"><p>Parse and render, so an assertion is one readable string rather than a nested <code>Tree</code> literal.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-msg_of">
-          <h3>
-            <a class="anchor" href="#item-msg_of">msg_of</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn msg_of(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str</code></pre>
-
-          <div class="doc"><p>The message a failed parse reports — and a distinguishable string when it unexpectedly succeeded, so a broken assertion says which way it broke.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-as_word">
-          <h3>
-            <a class="anchor" href="#item-as_word">as_word</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn as_word(matched: str) -&#62; str</code></pre>
-
-          <div class="doc"><p>A message function for the <code>Refuse(Fn(..))</code> assertions: the matched text, quoted back.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-parsed">
           <h3>
             <a class="anchor" href="#item-parsed">parsed</a>
             <span class="kind kind-fn">fn</span>
           </h3>
           <pre class="signature"><code>fn parsed(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; Node!ParseError</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-shown_prepared">
-          <h3>
-            <a class="anchor" href="#item-shown_prepared">shown_prepared</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn shown_prepared(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str!ParseError</code></pre>
-
-          <div class="doc"><p>The same as <code>shown</code>, against an *analysed* grammar — so the assertions can be made twice and compared. This is the path that prunes.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-msg_of_prepared">
-          <h3>
-            <a class="anchor" href="#item-msg_of_prepared">msg_of_prepared</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn msg_of_prepared(src: str, g: Grammar&#60;Tok, Node&#62;, start: str) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

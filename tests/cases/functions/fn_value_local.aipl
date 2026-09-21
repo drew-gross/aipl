@@ -7,12 +7,12 @@ import { concat as +++, equal as ==, wrapping_add as + } from builtins;
 // run time, so nothing is resolved at compile time.
 fn inc(x: i64) -> i64 { x + 1 }
 
-fn dbl(x: i64) -> i64 { x + x }
-
 fn scalar_values() -> i64 {
     let f = inc;
     f(10)
 }.test({
+    fn dbl(x: i64) -> i64 { x + x }
+
     assert(scalar_values() == 11);
     // A `mut` fn value reassigned, then called: the callee is a runtime choice.
     mut g = inc;
@@ -25,12 +25,12 @@ fn scalar_values() -> i64 {
 // leak or double-free would unbalance the allocation accounting below).
 fn shout(s: str) -> str { s +++ "!" }
 
-fn twice(s: str) -> str { s +++ s }
-
 fn heap_values() -> str {
     let f = shout;
     f("hi")
 }.test({
+    fn twice(s: str) -> str { s +++ s }
+
     assert(heap_values() == "hi!");
     mut g = shout;
     set g = twice;
@@ -42,17 +42,23 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 176
 instructions executed: 192
-binary size: 2792
+binary size: 2832
   code: 1184
   data: 140
-  metadata: 1468
+  metadata: 1508
 functions:
   __test$heap_values:
     calls: 1
     bytes: 420
+  __test$heap_values$twice:
+    calls: 1
+    bytes: 108
   __test$scalar_values:
     calls: 1
     bytes: 320
+  __test$scalar_values$dbl:
+    calls: 1
+    bytes: 8
   aipl_assert:
     calls: 5
     bytes: (external)
@@ -65,9 +71,6 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  dbl:
-    calls: 1
-    bytes: 8
   inc:
     calls: 2
     bytes: 8
@@ -77,6 +80,3 @@ functions:
   shout:
     calls: 1
     bytes: 132
-  twice:
-    calls: 1
-    bytes: 108

@@ -127,6 +127,7 @@ fn function(v: &FfiValue) -> R<ast::Function> {
         },
         body: expr(field(v, "body")?)?,
         test_body: maybe(field(v, "test_body")?, expr)?,
+        test_fns: each(field(v, "test_fns")?, function)?,
         doc: maybe(field(v, "doc")?, text)?,
     })
 }

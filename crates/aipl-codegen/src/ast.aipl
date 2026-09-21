@@ -48,7 +48,13 @@ import {
     VariantCase as VariantCaseNode,
     VariantDecl,
 } from "./item.aipl";
-import { FnAttr, ParsedBody, ParsedParam, Stmt as StmtNode } from "./parsed.aipl";
+import {
+    FnAttr,
+    ParsedBody,
+    ParsedParam,
+    Stmt as StmtNode,
+    TestBlock as TestBlockNode,
+} from "./parsed.aipl";
 import { Pat as PatNode } from "./pat.aipl";
 import { Suffix as SuffixNode, Try } from "./suffix.aipl";
 import { Ty as TyNode, Unit } from "./ty.aipl";
@@ -93,6 +99,7 @@ variant Ast =
     | Body(ParsedBody)
     | FieldInits(FieldInitNode[])
     | Attr(FnAttr)
+    | TestBlock(TestBlockNode)
     | Struct(StructDecl)
     | FieldDecl(FieldDeclNode)
     | Variant(VariantDecl)
@@ -129,6 +136,7 @@ pub fn ast_case_name(self: Ast) -> str {
         Body(..) => "a function body",
         FieldInits(..) => "a field initializer list",
         Attr(..) => "a function attribute",
+        TestBlock(..) => "a test block",
         Struct(..) => "a struct declaration",
         FieldDecl(..) => "a field declaration",
         Variant(..) => "a variant declaration",

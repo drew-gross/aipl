@@ -1,0 +1,16 @@
+import { equal as ==, wrapping_add as + } from builtins;
+
+// A function inside a `.test` block cannot be `pub`: there is nowhere to
+// export it to.
+fn double(n: i64) -> i64 { n + n }.test({
+    pub fn four() -> i64 { 4 }
+    assert(double(2) == four());
+})
+
+fn main() {}
+--- errors ---
+error: a function inside a `.test` block cannot be `pub`: "four" exists only for that test
+ --> ./tests/cases/tests/err_fn_in_test_pub.aipl:6:5
+  |
+6 |     pub fn four() -> i64 { 4 }
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -25,6 +25,10 @@ pub fn find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
     }
     none
 }.test({
+    fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }
+    assert(nonzero(0) == none);
+    assert(nonzero(2) == some(2));
+
     assert([0, 3, 5].find_map(nonzero) == some(3));
     assert([0, 0].find_map(nonzero) == none);
     // The first answer, not the last, and the lambda form.
@@ -34,28 +38,20 @@ pub fn find_map<T: any, U: any>(self: T[], f: (T) -> U?) -> U? {
     // A `str` receiver iterates its chars.
     assert("a1b".find_map(to_digit) == some(1));
 })
-
-fn nonzero(self: i64) -> i64? { if (self == 0) { none } else { some(self) } }.test({
-    assert(nonzero(0) == none);
-    assert(nonzero(2) == some(2));
-})
 --- performance ---
 allocations: 1
 deallocations: 1
 reallocations: 0
 bytes allocated: 32
-instructions executed: 586
-binary size: 4480
-  code: 1852
-  data: 664
-  metadata: 1964
+instructions executed: 571
+binary size: 4328
+  code: 1756
+  data: 662
+  metadata: 1910
 functions:
   __test$find_map:
     calls: 1
-    bytes: 576
-  __test$nonzero:
-    calls: 1
-    bytes: 216
+    bytes: 764
   aipl_arr_slice:
     calls: 1
     bytes: (external)
@@ -66,10 +62,10 @@ functions:
     calls: 7
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -80,9 +76,9 @@ functions:
   find_map$i64$i64$lam$__test$find_map$lambda0:
     calls: 1
     bytes: 276
-  find_map$i64$i64$lam$nonzero:
+  find_map$i64$i64$lam$__test$find_map$nonzero:
     calls: 3
     bytes: 264
   main:
     calls: 1
-    bytes: 176
+    bytes: 108

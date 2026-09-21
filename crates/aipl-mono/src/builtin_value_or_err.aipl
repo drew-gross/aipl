@@ -23,6 +23,43 @@ pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
         none => err(e), #[allow]
     }
 }.test({
+    // `?` on the result `value_or_err` builds: the `none` cases leave `digit_of`
+    // early carrying a message, so the body reads as the happy path alone.
+    fn digit_of(s: str) -> i64!str {
+        ok(s[0].value_or_err("empty")?.to_digit().value_or_err("not a digit")?)
+    }
+    assert(unwrap(digit_of("42"), -1) == 4); // first char only
+    assert(message(digit_of("")) == "empty"); // the first `?` fires
+    assert(message(digit_of("x")) == "not a digit"); // the second one does
+
+    // Test helpers. The optionals come from functions rather than a bare `none`
+    // literal so each one's element type is pinned by a declared return type.
+    fn maybe_int(present: bool) -> i64? { if (present) { some(7) } else { none } }
+
+    fn maybe_str(present: bool) -> str? { if (present) { some("hi") } else { none } }
+
+    // Reading one side of a result at a time, since `==` doesn't span the two.
+    fn unwrap(r: i64!str, default: i64) -> i64 {
+        match (r) {
+            ok(v) => v,
+            err(..) => default,
+        }
+    }
+
+    fn unwrap_str(r: str!str, default: str) -> str {
+        match (r) {
+            ok(v) => v,
+            err(..) => default,
+        }
+    }
+
+    fn code(r: char!i64) -> i64 {
+        match (r) {
+            ok(..) => 0,
+            err(e) => e,
+        }
+    }
+
     // some -> ok, none -> err(e).
     assert(unwrap(maybe_int(true).value_or_err("absent"), 0) == 7);
     assert(unwrap(maybe_int(false).value_or_err("absent"), -1) == -1);
@@ -45,47 +82,9 @@ pub fn value_or_err<T: any, E: any>(self: T?, e: E) -> T!E {
     assert(message(digit_of("x")) == "not a digit");
 })
 
-# `?` on the result `value_or_err` builds: the `none` cases leave `digit_of`
-# early carrying a message, so the body reads as the happy path alone.
-fn digit_of(s: str) -> i64!str {
-    ok(s[0].value_or_err("empty")?.to_digit().value_or_err("not a digit")?)
-}.test({
-    assert(unwrap(digit_of("42"), -1) == 4); // first char only
-    assert(message(digit_of("")) == "empty"); // the first `?` fires
-    assert(message(digit_of("x")) == "not a digit"); // the second one does
-})
-
-# Test helpers. The optionals come from functions rather than a bare `none`
-# literal so each one's element type is pinned by a declared return type.
-fn maybe_int(present: bool) -> i64? { if (present) { some(7) } else { none } }
-
-fn maybe_str(present: bool) -> str? { if (present) { some("hi") } else { none } }
-
-# Reading one side of a result at a time, since `==` doesn't span the two.
-fn unwrap(r: i64!str, default: i64) -> i64 {
-    match (r) {
-        ok(v) => v,
-        err(..) => default,
-    }
-}
-
-fn unwrap_str(r: str!str, default: str) -> str {
-    match (r) {
-        ok(v) => v,
-        err(..) => default,
-    }
-}
-
 fn message(r: i64!str) -> str {
     match (r) {
         ok(..) => "",
-        err(e) => e,
-    }
-}
-
-fn code(r: char!i64) -> i64 {
-    match (r) {
-        ok(..) => 0,
         err(e) => e,
     }
 }
@@ -94,33 +93,30 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 981
-binary size: 8896
-  code: 4796
+instructions executed: 966
+binary size: 8720
+  code: 4680
   data: 1066
-  metadata: 3034
+  metadata: 2974
 functions:
-  __test$digit_of:
-    calls: 1
-    bytes: 836
   __test$value_or_err:
     calls: 1
-    bytes: 3276
+    bytes: 4064
+  __test$value_or_err$digit_of:
+    calls: 5
+    bytes: 504
   aipl_assert:
     calls: 14
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  digit_of:
-    calls: 5
-    bytes: 504
   main:
     calls: 1
-    bytes: 180
+    bytes: 112

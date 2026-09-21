@@ -25,6 +25,21 @@ pub fn map_err<T: any, E: any, F: any>(self: T!E, f: (E) -> F) -> T!F {
         err(e) => err(f(e)),
     }
 }.test({
+    // A named conversion, so the tests cover passing a function rather than a
+    // lambda — the two sides carry the same shape, which is exactly the case
+    // `map_err` exists to bridge.
+    fn to_fmt(self: LexError) -> FmtError { message: self.message, span: self.span }
+    assert(to_fmt(LexError { message: "unexpected", span: 3 }).message == "unexpected");
+    assert(to_fmt(LexError { message: "unexpected", span: 3 }).span == 3);
+
+    // Fails with a struct error, so the tests above cover rewriting a multi-field
+    // payload as well as reading one field out of it.
+    fn lex(s: str) -> str!LexError {
+        if (s == "bad") { err(LexError { message: "unexpected", span: 3 }) } else { ok(s) }
+    }
+    assert(lex("bad").is_err_and(|e| e.message == "unexpected"));
+    assert(!lex("fine").is_err_and(|e| e.span == 3));
+
     // err: the payload is rewritten, ok type carried along unchanged.
     assert(lex("bad").map_err(to_fmt).is_err_and(|e| e.message == "unexpected"));
     assert(lex("bad").map_err(to_fmt).is_err_and(|e| e.span == 3));
@@ -66,43 +81,23 @@ pub fn map_err<T: any, E: any, F: any>(self: T!E, f: (E) -> F) -> T!F {
 struct LexError { message: str, span: i64 }
 
 struct FmtError { message: str, span: i64 }
-
-# A named conversion, so the tests cover passing a function rather than a
-# lambda — the two sides carry the same shape, which is exactly the case
-# `map_err` exists to bridge.
-fn to_fmt(self: LexError) -> FmtError { message: self.message, span: self.span }.test({
-    assert(to_fmt(LexError { message: "unexpected", span: 3 }).message == "unexpected");
-    assert(to_fmt(LexError { message: "unexpected", span: 3 }).span == 3);
-})
-
-# Fails with a struct error, so the tests above cover rewriting a multi-field
-# payload as well as reading one field out of it.
-fn lex(s: str) -> str!LexError {
-    if (s == "bad") { err(LexError { message: "unexpected", span: 3 }) } else { ok(s) }
-}.test({
-    assert(lex("bad").is_err_and(|e| e.message == "unexpected"));
-    assert(!lex("fine").is_err_and(|e| e.span == 3));
-})
 --- performance ---
 allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 2730
-binary size: 20968
-  code: 11960
+instructions executed: 2700
+binary size: 21648
+  code: 12416
   data: 1639
-  metadata: 7369
+  metadata: 7593
 functions:
-  __test$lex:
-    calls: 1
-    bytes: 564
   __test$map_err:
     calls: 1
-    bytes: 8292
-  __test$to_fmt:
-    calls: 1
-    bytes: 504
+    bytes: 9940
+  __test$map_err$lex:
+    calls: 12
+    bytes: 508
   __test_try_fail_FmtError:
     calls: 0
     bytes: 84
@@ -125,20 +120,17 @@ functions:
     calls: 16
     bytes: (external)
   aipl_test_begin:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  lex:
-    calls: 12
-    bytes: 508
   main:
     calls: 1
-    bytes: 232
-  map_err$str$LexError$FmtError$lam$to_fmt:
+    bytes: 108
+  map_err$str$LexError$FmtError$lam$__test$map_err$to_fmt:
     calls: 6
     bytes: 608

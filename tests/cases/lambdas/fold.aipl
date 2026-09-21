@@ -11,9 +11,9 @@ import { concat as +++, equal as ==, filter, left_fold as fold, wrapping_add as 
 // `right_fold.aipl`).
 fn sum(xs: i64[]) -> i64 { xs.fold(0, |acc, x| acc + x) }
 
-fn is_big(self: i64) -> bool { self == 99 }
-
 fn sums_an_array() -> i64 { sum([1, 2, 3]) }.test({
+    fn is_big(self: i64) -> bool { self == 99 }
+
     assert(sum([1, 2, 3]) == 6);
     assert(sum([]) == 0); // empty folds to the init
     assert([1, 2, 3].fold(10, |acc, x| acc + x) == 16); // a nonzero init

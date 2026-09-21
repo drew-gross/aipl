@@ -140,6 +140,12 @@ fn lex_sexp(src: str) -> LexResult<SexpKind>!ParseError {
 pub fn sexp_cst(src: str) -> Cst!ParseError {
     parse_cst(src, lex_sexp(src)?, sexp_grammar(), "item")
 }.test({
+    // The concrete tree, rendered against the production names — the debug view a
+    // tree assertion reads better as than a nested `CTree` literal.
+    fn shown(src: str) -> str!ParseError {
+        ok(sexp_cst(src)?.show(src, prod_names(sexp_grammar())))
+    }
+
     // The tree the two productions build: one `item` node per element, and a
     // `list` node inside the `item` that took that alternative. The parentheses
     // are leaves of the `list`, since only a rule *reference* builds a node.
@@ -172,6 +178,10 @@ pub fn sexp_cst(src: str) -> Cst!ParseError {
 pub fn parse_sexp(src: str) -> Sexp!ParseError {
     parse(src, lex_sexp(src)?, sexp_grammar(), "item")
 }.test({
+    // The message a failed parse reports — and a distinguishable string when it
+    // unexpectedly succeeded, so a broken assertion says which way it broke.
+    fn msg_of(src: str) -> str { parse_sexp(src).map_ok(render_sexp).failure_message() }
+
     // ---- the two productions, and the recursion between them ----
     assert(parse_sexp("a")? == AtomNode("a"));
     assert(parse_sexp("()")? == List([]));
@@ -213,14 +223,6 @@ pub fn parse_sexp(src: str) -> Sexp!ParseError {
 })
 
 // ---------- test-only helpers ----------
-
-# The message a failed parse reports — and a distinguishable string when it
-# unexpectedly succeeded, so a broken assertion says which way it broke.
-fn msg_of(src: str) -> str { parse_sexp(src).map_ok(render_sexp).failure_message() }
-
-# The concrete tree, rendered against the production names — the debug view a
-# tree assertion reads better as than a nested `CTree` literal.
-fn shown(src: str) -> str!ParseError { ok(sexp_cst(src)?.show(src, prod_names(sexp_grammar()))) }
 
 # `src` reformatted: parse it to the concrete tree, then lay that out at `width`.
 #
@@ -275,10 +277,10 @@ deallocations: 6690
 reallocations: 935
 bytes allocated: 641670
 instructions executed: 1504911
-binary size: 406688
+binary size: 406704
   code: 267848
   data: 4852
-  metadata: 133988
+  metadata: 134004
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -799,6 +801,9 @@ functions:
   __test$sexp_cst:
     calls: 1
     bytes: 3232
+  __test$sexp_cst$shown:
+    calls: 5
+    bytes: 392
   __test$sexp_grammar:
     calls: 1
     bytes: 4044
@@ -925,6 +930,3 @@ functions:
   sexp_grammar$lambda3:
     calls: 13
     bytes: 112
-  shown:
-    calls: 5
-    bytes: 392

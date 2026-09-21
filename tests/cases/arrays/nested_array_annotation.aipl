@@ -1,15 +1,14 @@
 import { equal as ==, len, value_or } from builtins;
 
-// Explicitly-written nested type annotations: `str[][]` as a parameter and
-// return type, `str[]` as the element. The recursive type grammar parses
-// `T[]`, `T[][]`, `T[]?`, etc.
-fn add_row(grid: str[][], row: str[]) -> str[][] { [..grid, row] }.test({
+fn first(grid: str[][]) -> str[]? { grid[0] }.test({
+    // Explicitly-written nested type annotations: `str[][]` as a parameter and
+    // return type, `str[]` as the element. The recursive type grammar parses
+    // `T[]`, `T[][]`, `T[]?`, etc.
+    fn add_row(grid: str[][], row: str[]) -> str[][] { [..grid, row] }
     let g = add_row([["a"]], ["b", "c"]);
     assert(g == [["a"], ["b", "c"]]);
     assert(len(g) == 2);
-})
 
-fn first(grid: str[][]) -> str[]? { grid[0] }.test({
     let g = add_row([["a"]], ["b", "c"]);
     let row0 = first(g).value_or([]);
     assert(row0[0] == some("a"));
@@ -20,11 +19,11 @@ allocations: 11
 deallocations: 11
 reallocations: 0
 bytes allocated: 632
-instructions executed: 845
-binary size: 6432
-  code: 3484
+instructions executed: 830
+binary size: 6232
+  code: 3360
   data: 177
-  metadata: 2771
+  metadata: 2695
 functions:
   __eq_str$arr:
     calls: 2
@@ -32,12 +31,9 @@ functions:
   __eq_str$arr$arr:
     calls: 1
     bytes: 300
-  __test$add_row:
-    calls: 1
-    bytes: 1212
   __test$first:
     calls: 1
-    bytes: 1436
+    bytes: 2592
   aipl_arr_drop_arr:
     calls: 5
     bytes: (external)
@@ -63,14 +59,14 @@ functions:
     calls: 4
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 172
+    bytes: 104

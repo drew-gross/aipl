@@ -5,9 +5,9 @@ import { equal as ==, join } from builtins;
 // typed array rather than an untyped empty literal.
 struct P { x: i64 }
 
-fn empty() -> i64[] { [] }
-
 fn chars() -> char[] { [..['a', 'b'], 'c'] }.test({
+    fn empty() -> i64[] { [] }
+
     assert(chars() == ['a', 'b', 'c']);
     assert([..["x", "y"], "z"].join(sep="-") == "x-y-z");
     assert([..[true], false] == [true, false]);

@@ -1,7 +1,5 @@
 import { equal as ==, wrapping_add as + } from builtins;
 
-fn inc(x: i64) -> i64 { x + 1 }
-
 // A function value is a legal variant payload: stored inline as its 8-byte code
 // address, bound out by a `match`, and called indirectly.
 variant Apply = Fn((i64) -> i64) | Const(i64)
@@ -12,6 +10,8 @@ fn eval(a: Apply, x: i64) -> i64 {
         Const(c) => c,
     }
 }.test({
+    fn inc(x: i64) -> i64 { x + 1 }
+
     assert(eval(Fn(inc), 41) == 42);
     assert(eval(Const(7), 41) == 7);
 })
@@ -21,14 +21,17 @@ deallocations: 0
 reallocations: 0
 bytes allocated: 0
 instructions executed: 50
-binary size: 1248
+binary size: 1264
   code: 268
   data: 106
-  metadata: 874
+  metadata: 890
 functions:
   __test$eval:
     calls: 1
     bytes: 160
+  __test$eval$inc:
+    calls: 1
+    bytes: 8
   aipl_assert:
     calls: 2
     bytes: (external)
@@ -41,9 +44,6 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  inc:
-    calls: 1
-    bytes: 8
   main:
     calls: 1
     bytes: 100

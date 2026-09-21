@@ -7,14 +7,14 @@ import {
     logical_not as !,
 } from builtins;
 
-// `arr.all(pred)` is true when every element satisfies `pred` (short-circuits at
-// the first that fails; an empty array is vacuously true). A higher-order
-// builtin like `filter`/`map`: the lambda is lifted, captures threaded through.
-// Unlike those, `all` is implemented in AIPL itself (`builtin_all.aipl`) and
-// specializes like a user generic.
-fn is_pos(self: i64) -> bool { self > 0 }
-
 fn positive(xs: i64[]) -> bool { xs.all(|x| x > 0) }.test({
+    // `arr.all(pred)` is true when every element satisfies `pred` (short-circuits at
+    // the first that fails; an empty array is vacuously true). A higher-order
+    // builtin like `filter`/`map`: the lambda is lifted, captures threaded through.
+    // Unlike those, `all` is implemented in AIPL itself (`builtin_all.aipl`) and
+    // specializes like a user generic.
+    fn is_pos(self: i64) -> bool { self > 0 }
+
     assert([2, 4, 6].all(|x| x <= 6)); // every element satisfies it
     assert(![1, 2, 9].all(|x| x <= 5)); // 9 fails -> false
     assert(all([5, 5], |x| x == 5)); // free-call form
@@ -32,14 +32,17 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 48
 instructions executed: 1092
-binary size: 6072
+binary size: 6088
   code: 2656
   data: 767
-  metadata: 2649
+  metadata: 2665
 functions:
   __builtin_all$char$lam$__test$positive$lambda3:
     calls: 1
     bytes: 244
+  __builtin_all$i64$lam$__test$positive$is_pos:
+    calls: 1
+    bytes: 204
   __builtin_all$i64$lam$__test$positive$lambda0:
     calls: 1
     bytes: 204
@@ -56,9 +59,6 @@ functions:
     calls: 1
     bytes: 204
   __builtin_all$i64$lam$__test$positive$lambda8:
-    calls: 1
-    bytes: 204
-  __builtin_all$i64$lam$is_pos:
     calls: 1
     bytes: 204
   __test$positive:

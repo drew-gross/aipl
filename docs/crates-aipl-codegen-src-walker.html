@@ -1461,14 +1461,14 @@
 
 
 
-        <section class="item" id="item-range_has_semi">
+        <section class="item" id="item-range_has_stmt">
           <h3>
-            <a class="anchor" href="#item-range_has_semi">range_has_semi</a>
+            <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_semi(self: W, __spat$53384: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$53420: Span) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
+          <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
 
         </section>
@@ -2454,7 +2454,7 @@
           </h3>
           <pre class="signature"><code>fn hug_close(self: W, start: u64) -&#62; u64?</code></pre>
 
-          <div class="doc"><p>Index of the bracket closing the one at <code>start</code>, or <code>none</code> if unbalanced. A loop for the same reason as <code>range_has_semi</code>: it walks token by token to the match, which on a large construct is far too deep to recurse.</p></div>
+          <div class="doc"><p>Index of the bracket closing the one at <code>start</code>, or <code>none</code> if unbalanced. A loop for the same reason as <code>range_has_stmt</code>: it walks token by token to the match, which on a large construct is far too deep to recurse.</p></div>
 
 
         </section>

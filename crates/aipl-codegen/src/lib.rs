@@ -2828,6 +2828,7 @@ pub fn build_test_program(program: &Program) -> Program {
                     },
                     body: f.test_body.clone().expect("test body present"),
                     test_body: None,
+                    test_fns: Vec::new(),
                     doc: None,
                 }));
                 tests.push((f.name.clone(), test_fn));
@@ -2855,6 +2856,7 @@ pub fn build_test_program(program: &Program) -> Program {
         },
         body,
         test_body: None,
+        test_fns: Vec::new(),
         doc: None,
     }));
     Program {

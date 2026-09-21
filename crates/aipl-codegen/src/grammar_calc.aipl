@@ -239,6 +239,26 @@ fn lex_calc(src: str) -> LexResult<CalcTok>!ParseError {
 pub fn calc_cst(src: str) -> Cst!ParseError {
     parse_cst(src, lex_calc(src)?, calc_grammar(), "expr")
 }.test({
+    fn shown(src: str) -> str!ParseError {
+        ok(calc_cst(src)?.show(src, prod_names(calc_grammar())))
+    }
+
+    // How deeply a parsed expression nests — the cheap shape check for a `Climb`
+    // that grouped its operands wrongly: a flat run would come back shallower.
+    fn depth_of(src: str) -> u64!ParseError { ok(depth(parse_calc(src)?)) }
+
+    fn depth(self: Calc) -> u64 {
+        match (self) {
+            Lit(..) => 1,
+            Neg(x) => 1 + x.depth(),
+            Bin(_, l, r) => {
+                let a = l.depth();
+                let b = r.depth();
+                if (a < b) { 1 + b } else { 1 + a }
+            },
+        }
+    }
+
     // What `Climb` actually builds: one node per operand, nested by binding
     // power, with the operator a direct leaf of the node that applies it. The
     // outermost application is flat because `match_prod`'s own wrap completes it.
@@ -266,6 +286,8 @@ pub fn calc_cst(src: str) -> Cst!ParseError {
 pub fn parse_calc(src: str) -> Calc!ParseError {
     parse(src, lex_calc(src)?, calc_grammar(), "expr")
 }.test({
+    fn msg_of(src: str) -> str { parse_calc(src).map_ok(render_calc).failure_message() }
+
     // ---- atoms ----
     assert(parse_calc("7")? == Lit(7));
     assert(parse_calc("(7)")? == Lit(7));
@@ -360,6 +382,8 @@ pub fn eval_calc(self: Calc) -> i64 {
         },
     }
 }.test({
+    fn eval(src: str) -> i64!ParseError { ok(parse_calc(src)?.eval_calc()) }
+
     // The assertion a wrong tree cannot survive: precedence as arithmetic.
     assert(eval("2 + 3 * 4")? == 14);
     assert(eval("2 * 3 + 4")? == 10);
@@ -395,28 +419,6 @@ fn pow(base: i64, exp: i64) -> i64 {
 }
 
 // ---------- test-only helpers ----------
-
-fn eval(src: str) -> i64!ParseError { ok(parse_calc(src)?.eval_calc()) }
-
-fn msg_of(src: str) -> str { parse_calc(src).map_ok(render_calc).failure_message() }
-
-fn shown(src: str) -> str!ParseError { ok(calc_cst(src)?.show(src, prod_names(calc_grammar()))) }
-
-# How deeply a parsed expression nests — the cheap shape check for a `Climb`
-# that grouped its operands wrongly: a flat run would come back shallower.
-fn depth_of(src: str) -> u64!ParseError { ok(depth(parse_calc(src)?)) }
-
-fn depth(self: Calc) -> u64 {
-    match (self) {
-        Lit(..) => 1,
-        Neg(x) => 1 + x.depth(),
-        Bin(_, l, r) => {
-            let a = l.depth();
-            let b = r.depth();
-            if (a < b) { 1 + b } else { 1 + a }
-        },
-    }
-}
 
 # `src` reformatted: parse it to the concrete tree, then lay that out at `width`.
 #
@@ -467,10 +469,10 @@ deallocations: 12803
 reallocations: 2088
 bytes allocated: 1271761
 instructions executed: 2645754
-binary size: 423000
+binary size: 423064
   code: 277684
   data: 6012
-  metadata: 139304
+  metadata: 139368
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -991,12 +993,24 @@ functions:
   __test$calc_cst:
     calls: 1
     bytes: 2320
+  __test$calc_cst$depth:
+    calls: 10
+    bytes: 288
+  __test$calc_cst$depth_of:
+    calls: 2
+    bytes: 260
+  __test$calc_cst$shown:
+    calls: 1
+    bytes: 392
   __test$calc_grammar:
     calls: 1
     bytes: 4044
   __test$eval_calc:
     calls: 1
     bytes: 2116
+  __test$eval_calc$eval:
+    calls: 12
+    bytes: 228
   __test$format_calc:
     calls: 1
     bytes: 4112
@@ -1111,15 +1125,6 @@ functions:
   calc_grammar:
     calls: 65
     bytes: 3632
-  depth:
-    calls: 10
-    bytes: 288
-  depth_of:
-    calls: 2
-    bytes: 260
-  eval:
-    calls: 12
-    bytes: 228
   eval_calc:
     calls: 0
     bytes: 32
@@ -1159,6 +1164,3 @@ functions:
   render_calc:
     calls: 57
     bytes: 1008
-  shown:
-    calls: 1
-    bytes: 392

@@ -1,0 +1,49 @@
+import { equal as ==, map, wrapping_add as + } from builtins;
+
+// A `.test` block may declare functions of its own — fixtures and helpers the
+// test needs and nothing else does. They sit wherever a statement could, may
+// call each other and themselves, and are named only inside the block: the
+// function under test, and every other function in the file, cannot see them.
+fn double(n: i64) -> i64 { n + n }.test({
+    fn four() -> i64 { 4 }
+    assert(double(2) == four());
+    assert([1, 2].map(double) == [2, 4]);
+
+    // Declared after its use, like any function; recursion and calling a
+    // sibling both work.
+    assert(sum_to(3) == 6);
+    fn sum_to(n: i64) -> i64 { if (n == 0) { 0 } else { n + sum_to(n + -1) } }
+    fn is_six(n: i64) -> bool { n == four() + 2 }
+    assert(is_six(sum_to(3)));
+    // `assert` and `?` work in a helper the way they do in the block.
+    fn checked(n: i64) -> i64!str { if (n == 0) { err("zero") } else { ok(n) } }
+    fn unwrapped(n: i64) -> i64 {
+        assert(n == 5);
+        n
+    }
+    assert(unwrapped(checked(5)?) == 5);
+})
+
+// A second test block declares its own `four`, unrelated to the first's.
+fn triple(n: i64) -> i64 { n + n + n }.test({
+    fn four() -> i64 { 12 }
+    assert(triple(4) == four());
+})
+
+fn main() {}
+--- check ---
+2 tests: 2 passed, 0 failed
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 3
+binary size: 488
+  code: 8
+  data: 1
+  metadata: 479
+functions:
+  main:
+    calls: 1
+    bytes: 8

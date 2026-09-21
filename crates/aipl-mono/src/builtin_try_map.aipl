@@ -26,6 +26,18 @@ pub fn try_map<T: any, U: any, E: any>(self: T[], f: (T) -> U!E) -> U[]!E {
     }
     ok(out)
 }.test({
+    // Fails on a negative input, so a test can place a failure at a chosen position
+    // and name which one came back.
+    fn label(n: i64) -> str!str { if (n < 0) { err(`negative {n}`) } else { ok(`n{n}`) } }
+    assert(label(1)? == "n1");
+    assert(label(-2).is_err_and(|e| e == "negative -2"));
+
+    // A second fallible mapping whose ok, err and element types all differ from
+    // `label`'s, so the tests cover `try_map` being generic in all three.
+    fn width(s: str) -> u64!char { if (s == "") { err('e') } else { ok(s.len()) } }
+    assert(width("abc")? == 3);
+    assert(width("").is_err_and(|c| c == 'e'));
+
     // Every element succeeds: the mapped values come back in order.
     assert([1, 2, 3].try_map(label)? == ["n1", "n2", "n3"]);
     assert(try_map([1, 2], label)? == ["n1", "n2"]); // function-call form too
@@ -62,30 +74,16 @@ pub fn try_map<T: any, U: any, E: any>(self: T[], f: (T) -> U!E) -> U[]!E {
             .is_err_and(|e| e == "under"),
     );
 })
-
-# Fails on a negative input, so a test can place a failure at a chosen position
-# and name which one came back.
-fn label(n: i64) -> str!str { if (n < 0) { err(`negative {n}`) } else { ok(`n{n}`) } }.test({
-    assert(label(1)? == "n1");
-    assert(label(-2).is_err_and(|e| e == "negative -2"));
-})
-
-# A second fallible mapping whose ok, err and element types all differ from
-# `label`'s, so the tests cover `try_map` being generic in all three.
-fn width(s: str) -> u64!char { if (s == "") { err('e') } else { ok(s.len()) } }.test({
-    assert(width("abc")? == 3);
-    assert(width("").is_err_and(|c| c == 'e'));
-})
 --- performance ---
 allocations: 45
 deallocations: 45
 reallocations: 6
 bytes allocated: 2485
-instructions executed: 4428
-binary size: 20416
-  code: 11368
+instructions executed: 4398
+binary size: 20960
+  code: 11656
   data: 1485
-  metadata: 7563
+  metadata: 7819
 functions:
   __eq_i64$arr:
     calls: 1
@@ -96,21 +94,21 @@ functions:
   __eq_u64$arr:
     calls: 1
     bytes: 296
-  __test$label:
-    calls: 1
-    bytes: 484
   __test$try_map:
     calls: 1
-    bytes: 4384
-  __test$try_map$lambda3:
+    bytes: 5560
+  __test$try_map$label:
+    calls: 16
+    bytes: 680
+  __test$try_map$lambda5:
     calls: 2
     bytes: 244
-  __test$try_map$lambda4:
+  __test$try_map$lambda6:
     calls: 2
     bytes: 244
-  __test$width:
-    calls: 1
-    bytes: 276
+  __test$try_map$width:
+    calls: 4
+    bytes: 184
   __test_try_fail_char:
     calls: 0
     bytes: 84
@@ -148,10 +146,10 @@ functions:
     calls: 32
     bytes: (external)
   aipl_test_begin:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -159,30 +157,24 @@ functions:
   aipl_write_i64:
     calls: 16
     bytes: (external)
-  label:
-    calls: 16
-    bytes: 680
   main:
     calls: 1
-    bytes: 236
-  try_map$i64$i64$str$lam$__test$try_map$lambda6:
+    bytes: 108
+  try_map$i64$i64$str$lam$__test$try_map$lambda8:
     calls: 1
     bytes: 488
-  try_map$i64$i64$str$lam$__test$try_map$lambda7:
+  try_map$i64$i64$str$lam$__test$try_map$lambda9:
     calls: 1
     bytes: 488
-  try_map$i64$str$str$lam$__test$try_map$lambda3:
-    calls: 1
-    bytes: 440
-  try_map$i64$str$str$lam$__test$try_map$lambda4:
-    calls: 1
-    bytes: 440
-  try_map$i64$str$str$lam$label:
+  try_map$i64$str$str$lam$__test$try_map$label:
     calls: 6
     bytes: 440
-  try_map$str$u64$char$lam$width:
+  try_map$i64$str$str$lam$__test$try_map$lambda5:
+    calls: 1
+    bytes: 440
+  try_map$i64$str$str$lam$__test$try_map$lambda6:
+    calls: 1
+    bytes: 440
+  try_map$str$u64$char$lam$__test$try_map$width:
     calls: 1
     bytes: 508
-  width:
-    calls: 4
-    bytes: 184

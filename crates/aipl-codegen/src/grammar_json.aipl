@@ -283,6 +283,12 @@ fn lex_json(src: str) -> LexResult<JsonTok>!ParseError {
 pub fn json_cst(src: str) -> Cst!ParseError {
     parse_cst(src, lex_json(src)?, json_grammar(), "value")
 }.test({
+    // The concrete tree, rendered against the production names — the debug view a
+    // tree assertion reads better as than a nested `Tree` literal.
+    fn shown(src: str) -> str!ParseError {
+        ok(json_cst(src)?.show(src, prod_names(json_grammar())))
+    }
+
     // The tree the eight productions build. Every alternative of `value` is a
     // rule *reference*, so a value is always a `value` node wrapping the node
     // that matched — which is what gives `lower_value` its single child. The
@@ -318,6 +324,10 @@ pub fn json_cst(src: str) -> Cst!ParseError {
 pub fn parse_json(src: str) -> Json!ParseError {
     parse(src, lex_json(src)?, json_grammar(), "value")
 }.test({
+    // The message a failed parse reports — and a distinguishable string when it
+    // unexpectedly succeeded, so a broken assertion says which way it broke.
+    fn msg_of(src: str) -> str { parse_json(src).map_ok(render_json).failure_message() }
+
     // ---- the terminal classes, one at a time ----
     assert(parse_json("null")? == Null);
     assert(parse_json("true")? == Bool(true));
@@ -441,14 +451,6 @@ fn escape_json(s: str) -> str {
 
 // ---------- test-only helpers ----------
 
-# The message a failed parse reports — and a distinguishable string when it
-# unexpectedly succeeded, so a broken assertion says which way it broke.
-fn msg_of(src: str) -> str { parse_json(src).map_ok(render_json).failure_message() }
-
-# The concrete tree, rendered against the production names — the debug view a
-# tree assertion reads better as than a nested `Tree` literal.
-fn shown(src: str) -> str!ParseError { ok(json_cst(src)?.show(src, prod_names(json_grammar()))) }
-
 # `src` reformatted: parse it to the concrete tree, then lay that out at `width`.
 #
 # The whole of JSON's layout is the eight annotations on the grammar above plus
@@ -515,10 +517,10 @@ deallocations: 22173
 reallocations: 3287
 bytes allocated: 2833155
 instructions executed: 5530884
-binary size: 462296
+binary size: 462312
   code: 302640
   data: 8564
-  metadata: 151092
+  metadata: 151108
 functions:
   __arr_drop_Json:
     calls: 125
@@ -1042,6 +1044,9 @@ functions:
   __test$json_cst:
     calls: 1
     bytes: 2884
+  __test$json_cst$shown:
+    calls: 4
+    bytes: 392
   __test$json_grammar:
     calls: 1
     bytes: 4044
@@ -1234,6 +1239,3 @@ functions:
   render_json:
     calls: 50
     bytes: 1796
-  shown:
-    calls: 4
-    bytes: 392

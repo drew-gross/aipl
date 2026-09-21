@@ -10,27 +10,27 @@ import {
     logical_not as !,
 } from builtins;
 
-// `arr.find_index(pred)` is the *position* of the first element satisfying
-// `pred`, or `none` when no element does — `find_if` answering where rather than
-// what, and short-circuiting the same way. A higher-order builtin like
-// `filter`/`map`: the lambda is lifted, captures threaded through. Like
-// `find_if`, it is implemented in AIPL itself (`builtin_find_index.aipl`) and
-// specializes like a user generic.
-//
-// The answer is an optional and not a bare `u64` because position 0 is a real
-// answer: `some(0)` (matched at the front) and `none` (matched nowhere) are
-// different, and a sentinel would conflate them.
-fn is_neg(self: i64) -> bool { self < 0 }
-
-// What the position is *for*: reading a second array at the same offset.
-fn value_for(keys: str[], vals: i64[], k: str) -> i64? {
-    match (keys.find_index(|x| x == k)) {
-        some(i) => vals[i],
-        none => none,
-    }
-}
-
 fn first_big(xs: i64[]) -> u64? { xs.find_index(|x| x > 10) }.test({
+    // `arr.find_index(pred)` is the *position* of the first element satisfying
+    // `pred`, or `none` when no element does — `find_if` answering where rather than
+    // what, and short-circuiting the same way. A higher-order builtin like
+    // `filter`/`map`: the lambda is lifted, captures threaded through. Like
+    // `find_if`, it is implemented in AIPL itself (`builtin_find_index.aipl`) and
+    // specializes like a user generic.
+    //
+    // The answer is an optional and not a bare `u64` because position 0 is a real
+    // answer: `some(0)` (matched at the front) and `none` (matched nowhere) are
+    // different, and a sentinel would conflate them.
+    fn is_neg(self: i64) -> bool { self < 0 }
+
+    // What the position is *for*: reading a second array at the same offset.
+    fn value_for(keys: str[], vals: i64[], k: str) -> i64? {
+        match (keys.find_index(|x| x == k)) {
+            some(i) => vals[i],
+            none => none,
+        }
+    }
+
     assert([1, 2, 9].find_index(|x| x > 5) == some(2));
     assert([1, 2, 3].find_index(|x| x > 5) == none); // nothing matches -> none
     // The *first* match, not the last: it stops there.
@@ -61,10 +61,10 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 152
 instructions executed: 2166
-binary size: 12272
+binary size: 12304
   code: 6596
   data: 1501
-  metadata: 4175
+  metadata: 4207
 functions:
   __builtin_find_index$char$lam$__test$first_big$lambda4:
     calls: 1
@@ -72,6 +72,9 @@ functions:
   __builtin_find_index$char$s0$lam$__test$first_big$lambda5:
     calls: 1
     bytes: 332
+  __builtin_find_index$i64$lam$__test$first_big$is_neg:
+    calls: 1
+    bytes: 296
   __builtin_find_index$i64$lam$__test$first_big$lambda0:
     calls: 1
     bytes: 296
@@ -99,10 +102,7 @@ functions:
   __builtin_find_index$i64$lam$__test$first_big$lambda9:
     calls: 1
     bytes: 296
-  __builtin_find_index$i64$lam$is_neg:
-    calls: 1
-    bytes: 296
-  __builtin_find_index$str$lam$value_for$lambda0:
+  __builtin_find_index$str$lam$__test$first_big$value_for$lambda0:
     calls: 2
     bytes: 404
   __test$first_big:

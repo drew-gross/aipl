@@ -7,18 +7,17 @@ struct Line { start: Point, end: Point }
 
 struct Point { x: i64, y: i64 }
 
-// Passing a nested struct by value, then reading through the field chain.
-fn dx(Line { end, start }) -> i64 { end.x - start.x }.test({
-    let l = Line { start: Point { x: 1, y: 2 }, end: Point { x: 10, y: 20 } };
-    assert(l.start.y == 2); // chained field access
-    assert(dx(l) == 9); // pass by value
-})
-
 // Returning a nested struct (built from another's fields) via the sret ABI.
 fn shift(Line { start, end }, by: i64) -> Line {
     start: Point { x: start.x + by, y: start.y },
     end: Point { x: end.x + by, y: end.y },
 }.test({
+    // Passing a nested struct by value, then reading through the field chain.
+    fn dx(Line { end, start }) -> i64 { end.x - start.x }
+    let l = Line { start: Point { x: 1, y: 2 }, end: Point { x: 10, y: 20 } };
+    assert(l.start.y == 2); // chained field access
+    assert(dx(l) == 9); // pass by value
+
     let l = Line { start: Point { x: 1, y: 2 }, end: Point { x: 10, y: 20 } };
     let m = shift(l, 100);
     assert(m.start.x == 101); // returned nested struct
@@ -29,33 +28,30 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 195
-binary size: 1816
-  code: 764
+instructions executed: 180
+binary size: 1672
+  code: 672
   data: 83
-  metadata: 969
+  metadata: 917
 functions:
-  __test$dx:
-    calls: 1
-    bytes: 256
   __test$shift:
     calls: 1
-    bytes: 332
+    bytes: 552
+  __test$shift$dx:
+    calls: 2
+    bytes: 16
   aipl_assert:
     calls: 4
     bytes: (external)
   aipl_test_begin:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 2
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  dx:
-    calls: 2
-    bytes: 16
   main:
     calls: 1
-    bytes: 160
+    bytes: 104

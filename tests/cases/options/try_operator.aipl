@@ -1,16 +1,16 @@
 import { concat as +++, equal as ==, wrapping_add as + } from builtins;
 
-// The postfix `?` unwraps an optional inside a function that itself returns one:
-// `some` continues with the inner value, `none` early-returns `none` — the value
-// analog of `?`-propagates-`err` on a result. Chaining threads the first `none`
-// straight out. The `str` payload exercises refcounting on both paths (the perf
-// section's balanced alloc/dealloc counts are the check).
-fn bang(o: str?) -> str? {
-    let s = o?;
-    some(s +++ "!")
-}
-
 fn add2(a: i64?, b: i64?) -> i64? { some(a? + b?) }.test({
+    // The postfix `?` unwraps an optional inside a function that itself returns one:
+    // `some` continues with the inner value, `none` early-returns `none` — the value
+    // analog of `?`-propagates-`err` on a result. Chaining threads the first `none`
+    // straight out. The `str` payload exercises refcounting on both paths (the perf
+    // section's balanced alloc/dealloc counts are the check).
+    fn bang(o: str?) -> str? {
+        let s = o?;
+        some(s +++ "!")
+    }
+
     assert(bang(some("hi")) == some("hi!")); // some: unwrap and continue
     assert(bang(none) == none); // none: early return
     assert(add2(some(3), some(4)) == some(7)); // both some
@@ -23,14 +23,17 @@ deallocations: 1
 reallocations: 0
 bytes allocated: 88
 instructions executed: 277
-binary size: 3056
+binary size: 3064
   code: 1332
   data: 286
-  metadata: 1438
+  metadata: 1446
 functions:
   __test$add2:
     calls: 1
     bytes: 816
+  __test$add2$bang:
+    calls: 2
+    bytes: 288
   add2:
     calls: 3
     bytes: 128
@@ -46,9 +49,6 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  bang:
-    calls: 2
-    bytes: 288
   main:
     calls: 1
     bytes: 100

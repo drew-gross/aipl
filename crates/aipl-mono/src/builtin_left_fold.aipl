@@ -21,6 +21,12 @@ pub fn left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A) -> A {
     }
     acc
 }.test({
+    fn add(acc: i64, x: i64) -> i64 { acc + x }
+    assert(add(1, 2) == 3);
+
+    fn is_big(self: i64) -> bool { self == 99 }
+    assert(!is_big(1));
+
     assert([1, 2, 3].left_fold(0, |acc, x| acc + x) == 6); // sum
     assert([1, 2, 3].left_fold(10, |acc, x| acc + x) == 16); // from a nonzero init
     assert(left_fold([2, 3], 1, |acc, x| acc + x) == 6); // free-call form
@@ -34,28 +40,20 @@ pub fn left_fold<T: any, A: any>(self: T[], init: A, f: (A, T) -> A) -> A {
     let bump = 10;
     assert([1, 2].left_fold(0, |acc, x| acc + x + bump) == 23); // a captured value
 })
-
-fn add(acc: i64, x: i64) -> i64 { acc + x }.test({
-    assert(add(1, 2) == 3);
-})
-
-fn is_big(self: i64) -> bool { self == 99 }.test({
-    assert(!is_big(1));
-})
 --- performance ---
 allocations: 4
 deallocations: 4
 reallocations: 0
 bytes allocated: 328
-instructions executed: 1322
-binary size: 6400
-  code: 3032
+instructions executed: 1288
+binary size: 6208
+  code: 2884
   data: 789
-  metadata: 2579
+  metadata: 2535
 functions:
   __test$left_fold:
     calls: 1
-    bytes: 2160
+    bytes: 2284
   __test$left_fold$filter5$own0:
     calls: 1
     bytes: 308
@@ -75,17 +73,17 @@ functions:
     calls: 10
     bytes: (external)
   aipl_test_begin:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 1
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  left_fold$i64$i64$lam$add:
+  left_fold$i64$i64$lam$__test$left_fold$add:
     calls: 2
     bytes: 184
   main:
     calls: 1
-    bytes: 380
+    bytes: 108

@@ -272,6 +272,9 @@ fn attach_trivia<K: variant>(toks: Token<K>[], trivia: Token<K>[]) -> (Cst[][], 
     }
     (attached, trailing)
 }.test({
+    // A token at a span, for the attachment test — only the position matters to it.
+    fn tok_at(span: Span) -> Token<Tok> { kind: Punct, text: SpanStr { text: "", span } }
+
     // Two tokens with trivia before each and one trailing record: each record
     // lands in front of the first token that starts after it, and what is left
     // is the tail.
@@ -288,9 +291,6 @@ fn attach_trivia<K: variant>(toks: Token<K>[], trivia: Token<K>[]) -> (Cst[][], 
     let no_trailing: Cst[] = [];
     assert(nothing == no_trailing);
 })
-
-# A token at a span, for the attachment test — only the position matters to it.
-fn tok_at(span: Span) -> Token<Tok> { kind: Punct, text: SpanStr { text: "", span } }
 
 # Whether trivia record `j` exists and starts before `at`.
 fn trivia_starts_before<K: variant>(trivia: Token<K>[], j: u64, at: u64) -> bool {
@@ -1196,6 +1196,63 @@ pub fn parse<K: variant, A: any>(
     g: Grammar<K, A>,
     start: str,
 ) -> A!ParseError { lower(src, parse_cst(src, lexed, g, start)?, g) }.test({
+    fn trivia_rules() -> TokenRule<Tok>[] {
+        let alpha = "abcdefghijklmnopqrstuvwxyz";
+        let digit = "0123456789";
+        [
+            TokenRule { matcher: CharRun(" \t\n"), emit: Bare(Punct), trivia: true },
+            TokenRule { matcher: ToEol("//"), emit: Bare(Punct), trivia: true },
+            TokenRule { matcher: CharRun(alpha), emit: Of(Word) },
+            TokenRule { matcher: CharRun(digit), emit: Of(Num) },
+            TokenRule { matcher: OneChar("()[],;+*"), emit: Bare(Punct) },
+        ]
+    }
+
+    // A `build` that always refuses, for the error-propagation assertion.
+    fn refuse(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
+        err(ParseError { message: "refused", span: node.span() })
+    }
+
+    fn labelled_prod(name: str, rule: Rule<Tok>, expect_as: str) -> Production<Tok, Node> {
+        name,
+        rule,
+        build: Mk(build_node),
+        expect_as,
+        layout: Inline,
+    }
+
+    fn g_of(ps: Production<Tok, Node>[]) -> Grammar<Tok, Node> { prods: ps }
+
+    // The message a failed parse reports — and a distinguishable string when it
+    // unexpectedly succeeded, so a broken assertion says which way it broke.
+    fn msg_of(src: str, g: Grammar<Tok, Node>, start: str) -> str {
+        shown(src, g, start).failure_message()
+    }
+
+    // Parse and render, so an assertion is one readable string rather than a nested
+    // `Tree` literal.
+    fn shown(src: str, g: Grammar<Tok, Node>, start: str) -> str!ParseError {
+        let lexed = lex_toks(src, tok_rules())?;
+        let tree = parse_cst(src, lexed, g, start)?;
+        ok(tree.show(src, prod_names(g)))
+    }
+
+    // A message function for the `Refuse(Fn(..))` assertions: the matched text,
+    // quoted back.
+    fn as_word(matched: str) -> str { `write {matched} as a word` }
+
+    fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
+        shown_prepared(src, g, start).failure_message()
+    }
+
+    // The same as `shown`, against an *analysed* grammar — so the assertions can be
+    // made twice and compared. This is the path that prunes.
+    fn shown_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str!ParseError {
+        let lexed = lex_toks(src, tok_rules())?;
+        let tree = parse_prepared(src, lexed, prepare(g)?, start)?;
+        ok(tree.show(src, prod_names(g)))
+    }
+
     // ---- Term: any token of a kind, payload ignored ----
     let r_word: Rule<Tok> = Term(Word);
     let g_word = g_of([one("w", r_word)]);
@@ -1620,18 +1677,6 @@ fn tok_rules() -> TokenRule<Tok>[] {
     ]
 }
 
-fn trivia_rules() -> TokenRule<Tok>[] {
-    let alpha = "abcdefghijklmnopqrstuvwxyz";
-    let digit = "0123456789";
-    [
-        TokenRule { matcher: CharRun(" \t\n"), emit: Bare(Punct), trivia: true },
-        TokenRule { matcher: ToEol("//"), emit: Bare(Punct), trivia: true },
-        TokenRule { matcher: CharRun(alpha), emit: Of(Word) },
-        TokenRule { matcher: CharRun(digit), emit: Of(Num) },
-        TokenRule { matcher: OneChar("()[],;+*"), emit: Bare(Punct) },
-    ]
-}
-
 # Lexing and parsing report failure in the same shape but not the same type, so
 # the tests convert once here rather than at every call.
 fn lex_toks(src: str, rules: TokenRule<Tok>[]) -> LexResult<Tok>!ParseError {
@@ -1649,11 +1694,6 @@ fn build_node(src: str, node: Cst, kids: Node[]) -> Node {
     Atom(node.text(src))
 }
 
-# A `build` that always refuses, for the error-propagation assertion.
-fn refuse(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
-    err(ParseError { message: "refused", span: node.span() })
-}
-
 fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> {
     name,
     rule,
@@ -1661,49 +1701,9 @@ fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> {
     layout: Inline,
 }
 
-fn labelled_prod(name: str, rule: Rule<Tok>, expect_as: str) -> Production<Tok, Node> {
-    name,
-    rule,
-    build: Mk(build_node),
-    expect_as,
-    layout: Inline,
-}
-
-fn g_of(ps: Production<Tok, Node>[]) -> Grammar<Tok, Node> { prods: ps }
-
-# Parse and render, so an assertion is one readable string rather than a nested
-# `Tree` literal.
-fn shown(src: str, g: Grammar<Tok, Node>, start: str) -> str!ParseError {
-    let lexed = lex_toks(src, tok_rules())?;
-    let tree = parse_cst(src, lexed, g, start)?;
-    ok(tree.show(src, prod_names(g)))
-}
-
-# The message a failed parse reports — and a distinguishable string when it
-# unexpectedly succeeded, so a broken assertion says which way it broke.
-fn msg_of(src: str, g: Grammar<Tok, Node>, start: str) -> str {
-    shown(src, g, start).failure_message()
-}
-
-# A message function for the `Refuse(Fn(..))` assertions: the matched text,
-# quoted back.
-fn as_word(matched: str) -> str { `write {matched} as a word` }
-
 fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     let lexed = lex_toks(src, tok_rules())?;
     parse(src, lexed, g, start)
-}
-
-# The same as `shown`, against an *analysed* grammar — so the assertions can be
-# made twice and compared. This is the path that prunes.
-fn shown_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str!ParseError {
-    let lexed = lex_toks(src, tok_rules())?;
-    let tree = parse_prepared(src, lexed, prepare(g)?, start)?;
-    ok(tree.show(src, prod_names(g)))
-}
-
-fn msg_of_prepared(src: str, g: Grammar<Tok, Node>, start: str) -> str {
-    shown_prepared(src, g, start).failure_message()
 }
 --- performance ---
 allocations: 5908
@@ -1711,10 +1711,10 @@ deallocations: 5908
 reallocations: 1407
 bytes allocated: 685068
 instructions executed: 1505647
-binary size: 743864
+binary size: 743976
   code: 450676
   data: 12156
-  metadata: 281032
+  metadata: 281144
 functions:
   __arr_drop_Node:
     calls: 16
@@ -2052,6 +2052,33 @@ functions:
   __test$parse:
     calls: 1
     bytes: 249460
+  __test$parse$as_word:
+    calls: 4
+    bytes: 232
+  __test$parse$refuse:
+    calls: 1
+    bytes: 348
+  __test$parse$shown:
+    calls: 73
+    bytes: 592
+  __test$parse$shown_prepared:
+    calls: 14
+    bytes: 932
+  __test$parse$trivia_rules:
+    calls: 3
+    bytes: 3368
+  __test$parse$trivia_rules$lambda0:
+    calls: 0
+    bytes: 128
+  __test$parse$trivia_rules$lambda1:
+    calls: 5
+    bytes: 96
+  __test$parse$trivia_rules$lambda2:
+    calls: 0
+    bytes: 128
+  __test$parse$trivia_rules$lambda3:
+    calls: 0
+    bytes: 96
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -2148,9 +2175,6 @@ functions:
   aipl_write_u64:
     calls: 5
     bytes: (external)
-  as_word:
-    calls: 4
-    bytes: 232
   attach_trivia$Tok:
     calls: 101
     bytes: 1828
@@ -2238,9 +2262,6 @@ functions:
   refusal$Tok$Node:
     calls: 10
     bytes: 3880
-  refuse:
-    calls: 1
-    bytes: 348
   rule_labels$Tok$Node:
     calls: 0
     bytes: 44
@@ -2259,12 +2280,6 @@ functions:
   seq_labels$Tok$Node$tail:
     calls: 17
     bytes: 876
-  shown:
-    calls: 73
-    bytes: 592
-  shown_prepared:
-    calls: 14
-    bytes: 932
   tok_rules:
     calls: 97
     bytes: 2736
@@ -2283,21 +2298,6 @@ functions:
   tok_text$Tok$Node:
     calls: 211
     bytes: 904
-  trivia_rules:
-    calls: 3
-    bytes: 3368
-  trivia_rules$lambda0:
-    calls: 0
-    bytes: 128
-  trivia_rules$lambda1:
-    calls: 5
-    bytes: 96
-  trivia_rules$lambda2:
-    calls: 0
-    bytes: 128
-  trivia_rules$lambda3:
-    calls: 0
-    bytes: 96
   trivia_span$Tok:
     calls: 17
     bytes: 760

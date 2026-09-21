@@ -156,6 +156,7 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
                     .as_ref()
                     .map(|tb| cx.expand_expr(tb, &HashSet::new()))
                     .transpose()?,
+                test_fns: Vec::new(),
                 doc: f.doc.clone(),
             }))
         })

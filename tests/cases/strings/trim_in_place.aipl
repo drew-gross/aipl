@@ -1,25 +1,25 @@
 import { equal as ==, extend, len, trim } from builtins;
 
-// `trim` on a uniquely-owned (never-aliased) string costs nothing at all: the
-// result is a window into the same bytes — `{base, data + lo, hi - lo}` — so
-// there is no shifting, no copy and no allocation, whatever the length.
-//
-// `trimmed` is the shape that used to crash: with no other statement in the
-// body, the binding is exclusive, and the in-place arm then read a single word
-// out of the slot and dereferenced it as a `Str`. For an inline value that word
-// is the first eight *content* bytes, so `"  z  "` became a wild pointer.
-fn build() -> str {
-    mut s = "";
-    set s.extend("  padded  ");
-    set s = trim(s);
-    s
-}
-
 fn trimmed() -> u64 {
     mut u = "  z  ";
     set u = trim(u);
     u.len()
 }.test({
+    // `trim` on a uniquely-owned (never-aliased) string costs nothing at all: the
+    // result is a window into the same bytes — `{base, data + lo, hi - lo}` — so
+    // there is no shifting, no copy and no allocation, whatever the length.
+    //
+    // `trimmed` is the shape that used to crash: with no other statement in the
+    // body, the binding is exclusive, and the in-place arm then read a single word
+    // out of the slot and dereferenced it as a `Str`. For an inline value that word
+    // is the first eight *content* bytes, so `"  z  "` became a wild pointer.
+    fn build() -> str {
+        mut s = "";
+        set s.extend("  padded  ");
+        set s = trim(s);
+        s
+    }
+
     assert(build() == "padded");
     assert(trimmed() == 1);
 })

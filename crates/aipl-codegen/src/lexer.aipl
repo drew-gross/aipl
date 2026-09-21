@@ -360,8 +360,6 @@ pub fn keep_skipped<K>(self: TokenRule<K>[]) -> TokenRule<K>[] {
     assert(space.is_some_and(|tr| tr.text.span == 1..2));
 })
 
-fn lex_err(message: str, span: Span) -> LexError { message, span }
-
 # `CharRun`: length of the maximal run at the start of `self` — a `head`
 # char, then `cont` chars. 0 when the first char isn't in `head`.
 # (`head` rather than `first`, which is now a builtin this file calls.)
@@ -977,65 +975,6 @@ variant Kind =
     | RawTplMid(str)
     | RawTplTail(str)
 
-# The `.test` block's template `OfSeg` emit: the library hands each segment's
-# *raw* text, so this emit decodes it (with the imported `unescape`) before
-# mapping to a `Kind` arm — escape handling is the caller's job.
-fn tpl_kind(text: str, seg: Seg) -> Kind {
-    let t = text.unescape();
-    match (seg) {
-        Plain => Tpl(t),
-        Head => TplHead(t),
-        Middle => TplMid(t),
-        Tail => TplTail(t),
-    }
-}
-
-# The `Of` emit for the escaped-string test below: the library hands the raw
-# (un-decoded) delimiter-stripped contents, so the emit decodes them itself.
-fn esc_str(text: str) -> Kind { Str(text.unescape()) }
-
-# The `Try` emit for the `Int` test below: the library hands the raw digit
-# run, so this emit parses it — here with the `int_parse` builtin, reporting an
-# i64 overflow as an error *message* (the library attaches the token's span).
-# Parsing policy, and what overflow means, is the caller's — a bignum lexer would
-# parse into a wide type and never fail here.
-fn int_tok(text: str) -> Kind!str {
-    ok(IntTok(text.int_parse().value_or_err("integer literal overflows i64")?))
-}
-
-# A `Try` emit: the escaped-string decoder above, plus a content rule the
-# caller enforces — a string literal may not be empty. A whole-token verdict, so
-# the token's span is the right place for the error.
-fn nonempty_str(text: str) -> Kind!str {
-    let s = text.unescape();
-    if (s.is_empty()) { err("empty string literal") } else { ok(Str(s)) }
-}
-
-# A `TrySeg` emit: like `tpl_kind`, but the caller rejects a `TODO` segment. The
-# error carries the whole template's span.
-fn checked_seg(text: str, seg: Seg) -> Kind!str {
-    if (text == "TODO") { err("TODO segment not allowed") } else { ok(tpl_kind(text, seg)) }
-}
-
-fn rawtpl_kind(text: str, seg: Seg) -> Kind {
-    let t = text.unescape_braces();
-    match (seg) {
-        Plain => RawTpl(t),
-        Head => RawTplHead(t),
-        Middle => RawTplMid(t),
-        Tail => RawTplTail(t),
-    }
-}
-
-# Test-block shorthands over the concrete `Kind` (each kind arm carries its own
-# content): an expected token, and a token-only result (no trivia).
-#
-# `tok` slices its text out of `src` — the same source the `lex` call under
-# test was given — rather than taking it as a literal. An expectation therefore
-# cannot claim text the source does not hold at that span, which is the one
-# thing a hand-written `SpanStr` could get wrong while still looking right.
-fn tok(src: str, kind: Kind, span: Span) -> Token<Kind> { kind, text: span_str(src, span) }
-
 fn toks(tokens: Token<Kind>[]) -> LexResult<Kind> { tokens, trivia: [] }
 
 # Lexes `self` into a `LexResult`: the flat token list, plus the trivia
@@ -1068,6 +1007,67 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     }
     ok(LexResult { tokens, trivia })
 }.test({
+    fn lex_err(message: str, span: Span) -> LexError { message, span }
+
+    // The `Of` emit for the escaped-string test below: the library hands the raw
+    // (un-decoded) delimiter-stripped contents, so the emit decodes them itself.
+    fn esc_str(text: str) -> Kind { Str(text.unescape()) }
+
+    // The `Try` emit for the `Int` test below: the library hands the raw digit
+    // run, so this emit parses it — here with the `int_parse` builtin, reporting an
+    // i64 overflow as an error *message* (the library attaches the token's span).
+    // Parsing policy, and what overflow means, is the caller's — a bignum lexer would
+    // parse into a wide type and never fail here.
+    fn int_tok(text: str) -> Kind!str {
+        ok(IntTok(text.int_parse().value_or_err("integer literal overflows i64")?))
+    }
+
+    // A `Try` emit: the escaped-string decoder above, plus a content rule the
+    // caller enforces — a string literal may not be empty. A whole-token verdict, so
+    // the token's span is the right place for the error.
+    fn nonempty_str(text: str) -> Kind!str {
+        let s = text.unescape();
+        if (s.is_empty()) { err("empty string literal") } else { ok(Str(s)) }
+    }
+
+    // A `TrySeg` emit: like `tpl_kind`, but the caller rejects a `TODO` segment. The
+    // error carries the whole template's span.
+    fn checked_seg(text: str, seg: Seg) -> Kind!str {
+        if (text == "TODO") { err("TODO segment not allowed") } else { ok(tpl_kind(text, seg)) }
+    }
+
+    // The `.test` block's template `OfSeg` emit: the library hands each segment's
+    // *raw* text, so this emit decodes it (with the imported `unescape`) before
+    // mapping to a `Kind` arm — escape handling is the caller's job.
+    fn tpl_kind(text: str, seg: Seg) -> Kind {
+        let t = text.unescape();
+        match (seg) {
+            Plain => Tpl(t),
+            Head => TplHead(t),
+            Middle => TplMid(t),
+            Tail => TplTail(t),
+        }
+    }
+
+    fn rawtpl_kind(text: str, seg: Seg) -> Kind {
+        let t = text.unescape_braces();
+        match (seg) {
+            Plain => RawTpl(t),
+            Head => RawTplHead(t),
+            Middle => RawTplMid(t),
+            Tail => RawTplTail(t),
+        }
+    }
+
+    // Test-block shorthands over the concrete `Kind` (each kind arm carries its own
+    // content): an expected token, and a token-only result (no trivia).
+    //
+    // `tok` slices its text out of `src` — the same source the `lex` call under
+    // test was given — rather than taking it as a literal. An expectation therefore
+    // cannot claim text the source does not hold at that span, which is the one
+    // thing a hand-written `SpanStr` could get wrong while still looking right.
+    fn tok(src: str, kind: Kind, span: Span) -> Token<Kind> { kind, text: span_str(src, span) }
+
     // Character classes shared across the rule sets below.
     let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
     let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
@@ -1485,10 +1485,10 @@ deallocations: 415
 reallocations: 90
 bytes allocated: 66104
 instructions executed: 375484
-binary size: 2539344
+binary size: 2539408
   code: 1701684
   data: 11620
-  metadata: 826040
+  metadata: 826104
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1565,6 +1565,15 @@ functions:
   __test$lex:
     calls: 1
     bytes: 1578000
+  __test$lex$checked_seg:
+    calls: 2
+    bytes: 1780
+  __test$lex$esc_str:
+    calls: 2
+    bytes: 140
+  __test$lex$int_tok:
+    calls: 13
+    bytes: 1048
   __test$lex$lambda0:
     calls: 0
     bytes: 128
@@ -1637,6 +1646,15 @@ functions:
   __test$lex$lambda9:
     calls: 1
     bytes: 96
+  __test$lex$nonempty_str:
+    calls: 2
+    bytes: 1836
+  __test$lex$rawtpl_kind:
+    calls: 4
+    bytes: 4112
+  __test$lex$tpl_kind:
+    calls: 20
+    bytes: 3224
   __test$span_str:
     calls: 1
     bytes: 2248
@@ -1685,24 +1703,15 @@ functions:
   between_len:
     calls: 3
     bytes: 800
-  checked_seg:
-    calls: 2
-    bytes: 1780
   delimited_len:
     calls: 28
     bytes: 1904
-  esc_str:
-    calls: 2
-    bytes: 140
   finalize_template$Kind:
     calls: 16
     bytes: 8376
   float_len:
     calls: 14
     bytes: 824
-  int_tok:
-    calls: 13
-    bytes: 1048
   interp_scan$Kind:
     calls: 10
     bytes: 1896
@@ -1721,12 +1730,6 @@ functions:
   nested_len:
     calls: 3
     bytes: 1148
-  nonempty_str:
-    calls: 2
-    bytes: 1836
-  rawtpl_kind:
-    calls: 4
-    bytes: 4112
   step_result$Kind:
     calls: 477
     bytes: 16288
@@ -1748,6 +1751,3 @@ functions:
   toks:
     calls: 50
     bytes: 124
-  tpl_kind:
-    calls: 20
-    bytes: 3224

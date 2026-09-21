@@ -1,16 +1,5 @@
 import { equal as ==, map, push, to_str, wrapping_add as +, wrapping_mul as * } from builtins;
 
-// Plain named functions — no captures, just regular `fn`s.
-fn double(x: i64) -> i64 { x * 2 }.test({
-    let xs = [1, 2, 3];
-    // Pass a named function to a builtin HOF (method form).
-    assert(xs.map(double) == [2, 4, 6]);
-    // A named function and a lambda are interchangeable as the map function.
-    assert(xs.map(double).map(inc) == [3, 5, 7]);
-    // A builtin (`to_str`) passed by name as the mapping function.
-    assert(xs.map(to_str) == ["1", "2", "3"]);
-})
-
 fn inc(x: i64) -> i64 { x + 1 }.test({
     let xs = [1, 2, 3];
     // Pass a named function to a builtin HOF (function form).
@@ -19,6 +8,16 @@ fn inc(x: i64) -> i64 { x + 1 }.test({
 
 // A user-defined higher-order function taking a function-typed parameter.
 fn apply(f: (i64) -> i64, x: i64) -> i64 { f(x) }.test({
+    // Plain named functions — no captures, just regular `fn`s.
+    fn double(x: i64) -> i64 { x * 2 }
+    let xs = [1, 2, 3];
+    // Pass a named function to a builtin HOF (method form).
+    assert(xs.map(double) == [2, 4, 6]);
+    // A named function and a lambda are interchangeable as the map function.
+    assert(xs.map(double).map(inc) == [3, 5, 7]);
+    // A builtin (`to_str`) passed by name as the mapping function.
+    assert(xs.map(to_str) == ["1", "2", "3"]);
+
     // Pass a named function to a user-defined HOF (function-call form).
     assert(apply(double, 20) == 40);
     // A lambda is interchangeable with a named function here.
@@ -44,11 +43,11 @@ allocations: 10
 deallocations: 10
 reallocations: 4
 bytes allocated: 475
-instructions executed: 2189
-binary size: 7504
-  code: 3588
+instructions executed: 2174
+binary size: 7328
+  code: 3488
   data: 660
-  metadata: 3256
+  metadata: 3180
 functions:
   __eq_i64$arr:
     calls: 4
@@ -58,11 +57,8 @@ functions:
     bytes: 364
   __test$apply:
     calls: 1
-    bytes: 160
-  __test$double:
-    calls: 1
-    bytes: 1264
-  __test$double$map2$own0:
+    bytes: 1388
+  __test$apply$map2$own0:
     calls: 1
     bytes: 288
   __test$each:
@@ -105,10 +101,10 @@ functions:
     calls: 6
     bytes: (external)
   aipl_test_begin:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_test_end:
-    calls: 4
+    calls: 3
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -118,4 +114,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 288
+    bytes: 224

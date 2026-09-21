@@ -151,6 +151,21 @@ fn fmt_node<K: variant, A: any>(
         Group(gi, open, body, close) => group_doc(g, src, gi, open, body, close, space),
     }
 }.test({
+    fn rendered(g: Grammar<FKind, str>, src: str, node: Cst, width: u64) -> str!ParseError {
+        render_cst(g, src, node, spaced_unless_punct, width)
+    }
+
+    // A spacing rule small enough to read in the driver's own tests: nothing after an
+    // opening bracket, nothing before a closing one or before hugging punctuation, a
+    // space everywhere else.
+    fn spaced_unless_punct(l: str, r: str) -> bool {
+        l != "{" && l != "(" && r != "," && r != ":" && r != "}" && r != ")"
+    }
+
+    // A two-leaf node at `at`, standing in for a production that matched a key and
+    // its colon — enough shape for the driver's tests without a parse.
+    fn kv(at: u64) -> Cst { Tree(1, [Leaf(at..at + 1), Leaf(at + 1..at + 2)]) }
+
     // Two productions, one per layout, one group style, and a tree written out
     // by hand: the driver reads a production's `layout` and never its `rule`, so
     // a grammar carrying the simplest rule there is exercises it exactly.
@@ -216,6 +231,10 @@ pub fn render_cst<K: variant, A: any>(
     space: (str, str) -> bool,
     width: u64,
 ) -> str!ParseError { ok(format_cst(g, src, node, space)?.print(width)) }.test({
+    // A `build` that lowers nothing: the formatter never lowers, and a `Production`
+    // needs one anyway.
+    fn always_space(l: str, r: str) -> bool { true }
+
     let g = grammar_of([Inline], []);
     let src = "a b";
     let tree = Tree(0, [Leaf(0..1), Trivia(1..2), Leaf(2..3)]);
@@ -499,6 +518,9 @@ fn wrapped(
     set parts.push(cd);
     group(Concat(parts))
 }.test({
+    // A child piece that renders as `t` and has `t` at both edges.
+    fn node_of(t: str) -> Piece { Node(Text(t), t, t) }
+
     let parens = ListStyle { spaced: false };
     let lp = [Tok("(")];
     let rp = [Tok(")")];
@@ -612,6 +634,8 @@ fn list_items(mid: Piece[], ListStyle { sep, sorted }, space: (str, str) -> bool
     };
     items.map(|i| i.doc)
 }.test({
+    fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
+
     let a = Node(Text("a"), "a", "a");
     let b = Node(Text("b"), "b", "b");
 
@@ -706,48 +730,24 @@ fn prod_of(i: u64, l: Layout) -> Production<FKind, str> {
     Production { name: `p{i}`, rule: word, build: Const(""), layout: l }
 }
 
-# A `build` that lowers nothing: the formatter never lowers, and a `Production`
-# needs one anyway.
-fn always_space(l: str, r: str) -> bool { true }
-
 fn never_space(l: str, r: str) -> bool { false }
 
 # A space after a colon and nowhere else — the smallest rule that is not a
 # constant, which is what `inline_doc`'s tests need.
 fn colon_space(l: str, r: str) -> bool { l == ":" }
 
-# A spacing rule small enough to read in the driver's own tests: nothing after an
-# opening bracket, nothing before a closing one or before hugging punctuation, a
-# space everywhere else.
-fn spaced_unless_punct(l: str, r: str) -> bool {
-    l != "{" && l != "(" && r != "," && r != ":" && r != "}" && r != ")"
-}
-
-fn rendered(g: Grammar<FKind, str>, src: str, node: Cst, width: u64) -> str!ParseError {
-    render_cst(g, src, node, spaced_unless_punct, width)
-}
-
 # A `Doc` at a width, for the assertions above.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
-
-# A two-leaf node at `at`, standing in for a production that matched a key and
-# its colon — enough shape for the driver's tests without a parse.
-fn kv(at: u64) -> Cst { Tree(1, [Leaf(at..at + 1), Leaf(at + 1..at + 2)]) }
-
-# A child piece that renders as `t` and has `t` at both edges.
-fn node_of(t: str) -> Piece { Node(Text(t), t, t) }
-
-fn texts(ds: Doc[]) -> str[] { ds.map(|d| d.at(80)) }
 --- performance ---
 allocations: 2325
 deallocations: 2325
 reallocations: 217
 bytes allocated: 186475
-instructions executed: 300822
-binary size: 256928
-  code: 165556
+instructions executed: 300720
+binary size: 256840
+  code: 165328
   data: 6076
-  metadata: 85296
+  metadata: 85436
 functions:
   __arr_drop_Item:
     calls: 69
@@ -940,7 +940,10 @@ functions:
     bytes: 444
   __test$fmt_node:
     calls: 1
-    bytes: 4132
+    bytes: 4024
+  __test$fmt_node$kv:
+    calls: 2
+    bytes: 288
   __test$inline_doc:
     calls: 1
     bytes: 4172
@@ -1037,25 +1040,28 @@ functions:
   edge:
     calls: 24
     bytes: 236
-  fmt_node$FKind$str$s1$lam$always_space:
+  fmt_node$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
+    calls: 17
+    bytes: 3740
+  fmt_node$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 1
     bytes: 3740
   fmt_node$FKind$str$s1$lam$never_space:
     calls: 1
     bytes: 3740
-  fmt_node$FKind$str$s1$lam$spaced_unless_punct:
-    calls: 17
-    bytes: 3740
-  format_cst$FKind$str$s1$lam$always_space:
+  format_cst$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
+    calls: 6
+    bytes: 264
+  format_cst$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 1
     bytes: 264
   format_cst$FKind$str$s1$lam$never_space:
     calls: 1
     bytes: 264
-  format_cst$FKind$str$s1$lam$spaced_unless_punct:
-    calls: 6
-    bytes: 264
-  gap_wanted$lam$always_space:
+  gap_wanted$lam$__test$fmt_node$spaced_unless_punct:
+    calls: 32
+    bytes: 468
+  gap_wanted$lam$__test$render_cst$always_space:
     calls: 2
     bytes: 140
   gap_wanted$lam$colon_space:
@@ -1064,22 +1070,22 @@ functions:
   gap_wanted$lam$never_space:
     calls: 82
     bytes: 144
-  gap_wanted$lam$spaced_unless_punct:
-    calls: 32
-    bytes: 468
   grammar_of:
     calls: 2
     bytes: 2376
-  group_doc$FKind$str$s1$lam$always_space:
+  group_doc$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
+    calls: 4
+    bytes: 1788
+  group_doc$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 0
     bytes: 1788
   group_doc$FKind$str$s1$lam$never_space:
     calls: 0
     bytes: 1788
-  group_doc$FKind$str$s1$lam$spaced_unless_punct:
-    calls: 4
-    bytes: 1788
-  inline_doc$lam$always_space:
+  inline_doc$lam$__test$fmt_node$spaced_unless_punct:
+    calls: 20
+    bytes: 2412
+  inline_doc$lam$__test$render_cst$always_space:
     calls: 1
     bytes: 2412
   inline_doc$lam$colon_space:
@@ -1088,15 +1094,9 @@ functions:
   inline_doc$lam$never_space:
     calls: 68
     bytes: 2412
-  inline_doc$lam$spaced_unless_punct:
-    calls: 20
-    bytes: 2412
   item_key:
     calls: 52
     bytes: 1072
-  kv:
-    calls: 2
-    bytes: 288
   list_items$lam$never_space:
     calls: 23
     bytes: 3548
@@ -1106,33 +1106,30 @@ functions:
   piece_doc:
     calls: 14
     bytes: 820
-  pieces$FKind$str$s1$lam$always_space:
+  pieces$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
+    calls: 20
+    bytes: 2728
+  pieces$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 1
     bytes: 2728
   pieces$FKind$str$s1$lam$never_space:
     calls: 1
     bytes: 2728
-  pieces$FKind$str$s1$lam$spaced_unless_punct:
-    calls: 20
-    bytes: 2728
-  render_cst$FKind$str$s1$lam$always_space:
+  render_cst$FKind$str$s1$lam$__test$fmt_node$spaced_unless_punct:
+    calls: 6
+    bytes: 288
+  render_cst$FKind$str$s1$lam$__test$render_cst$always_space:
     calls: 1
     bytes: 288
   render_cst$FKind$str$s1$lam$never_space:
     calls: 1
     bytes: 288
-  render_cst$FKind$str$s1$lam$spaced_unless_punct:
-    calls: 6
-    bytes: 288
-  rendered:
-    calls: 6
-    bytes: 120
-  wrapped$lam$always_space:
+  wrapped$lam$__test$fmt_node$spaced_unless_punct:
+    calls: 3
+    bytes: 6072
+  wrapped$lam$__test$render_cst$always_space:
     calls: 0
     bytes: 6072
   wrapped$lam$never_space:
     calls: 15
     bytes: 2568
-  wrapped$lam$spaced_unless_punct:
-    calls: 3
-    bytes: 6072
