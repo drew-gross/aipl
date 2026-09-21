@@ -167,23 +167,21 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
         one("exactly", r_exactly),
         one("range", r_range),
     ]);
-    assert(
-        ebnf(g) == """
-            alt = Num | Name ;
-            seq = Num (Name | "+") ;
-            star = (Num | Name)* ;
-            plus = (Num Name)+ ;
-            min2 = Num{2,} ;
-            opt = alt? ;
-            empty = (* empty *) ;
-            never = (* never *) ;
-            list = (Num ("," Num)*)? ;
-            led = "|"? Num ("|" Num)* ;
-            upto = Num? ;
-            exactly = Num ;
-            range = Num{2,4} ;
-        """,
-    );
+    assert(ebnf(g) == """
+        alt = Num | Name ;
+        seq = Num (Name | "+") ;
+        star = (Num | Name)* ;
+        plus = (Num Name)+ ;
+        min2 = Num{2,} ;
+        opt = alt? ;
+        empty = (* empty *) ;
+        never = (* never *) ;
+        list = (Num ("," Num)*)? ;
+        led = "|"? Num ("|" Num)* ;
+        upto = Num? ;
+        exactly = Num ;
+        range = Num{2,4} ;
+    """);
 
     // A right-associative level is marked, because the flat rendering is the
     // one thing that cannot show which way it nests.
@@ -197,12 +195,10 @@ pub fn ebnf<K: variant, A: any>(g: Grammar<K, A>) -> str {
     let nine: u64 = 9;
     let r_far: Rule<Tok> = NamedIdx(nine);
     let r_miss: Rule<Tok> = Named("nope");
-    assert(
-        ebnf(g_of([one("a", r_far), one("b", r_miss)])) == """
-            a = ? ;
-            b = nope ;
-        """,
-    );
+    assert(ebnf(g_of([one("a", r_far), one("b", r_miss)])) == """
+        a = ? ;
+        b = nope ;
+    """);
 })
 
 # One production's line, plus the precedence note if its rule climbs. The note
@@ -466,13 +462,11 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
     let r_b: Rule<Tok> = Maybe(Literal("x"));
     let r_c: Rule<Tok> = Term(Num);
     let fp = g_of([one("a", r_a), one("b", r_b), one("c", r_c)]);
-    assert(
-        show_first_sets(fp)? == """
-            a = Num "x"
-            b = "x" <empty>
-            c = Num
-        """,
-    );
+    assert(show_first_sets(fp)? == """
+        a = Num "x"
+        b = "x" <empty>
+        c = Num
+    """);
 
     // Left recursion: the parse would not terminate, and this does — the sets
     // only grow, so the round that adds nothing ends it.
@@ -693,25 +687,21 @@ pub fn show_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> str!ParseError {
     // The fixture grammar, dumped both ways. Between them the two dumps say
     // everything this file computes, over every `Rule` arm the grammar uses.
     let g = fixture();
-    assert(
-        ebnf(g) == """
-            prog = (stmt (";" stmt)* ";"?)? ;
-            stmt = Name "=" expr ;
-            expr = atom (("+" | "*") atom)* ; (* precedence: "*" > "+" *)
-            atom = Num | Name | "(" expr ")" ;
-            opt = "!"? Name+ ;
-        """,
-    );
+    assert(ebnf(g) == """
+        prog = (stmt (";" stmt)* ";"?)? ;
+        stmt = Name "=" expr ;
+        expr = atom (("+" | "*") atom)* ; (* precedence: "*" > "+" *)
+        atom = Num | Name | "(" expr ")" ;
+        opt = "!"? Name+ ;
+    """);
 
-    assert(
-        show_first_sets(g)? == """
-            prog = Name <empty>
-            stmt = Name
-            expr = Num Name "("
-            atom = Num Name "("
-            opt = Name "!"
-        """,
-    );
+    assert(show_first_sets(g)? == """
+        prog = Name <empty>
+        stmt = Name
+        expr = Num Name "("
+        atom = Num Name "("
+        opt = Name "!"
+    """);
 
     // Linking changes indices, not meaning: both dumps come out the same from a
     // grammar handed over linked.
@@ -784,9 +774,9 @@ deallocations: 1579
 reallocations: 352
 bytes allocated: 184735
 instructions executed: 243580
-binary size: 168344
+binary size: 168216
   code: 111060
-  data: 4132
+  data: 4004
   metadata: 53152
 functions:
   __arr_drop_First$Tok:

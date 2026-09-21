@@ -116,20 +116,16 @@ pub fn sexp_grammar() -> Grammar<SexpKind, Sexp> {
 }.test({
     // The two productions of the header comment, rendered back out of the value
     // the driver parses with rather than written by hand next to it.
-    assert(
-        ebnf(sexp_grammar()) == """
-            list = "(" item* ")" ;
-            item = Atom | list ;
-        """,
-    );
+    assert(ebnf(sexp_grammar()) == """
+        list = "(" item* ")" ;
+        item = Atom | list ;
+    """);
 
     // `item` begins with either — which is the recursion, seen from the front.
-    assert(
-        show_first_sets(sexp_grammar())? == """
-            list = "("
-            item = Atom "("
-        """,
-    );
+    assert(show_first_sets(sexp_grammar())? == """
+        list = "("
+        item = Atom "("
+    """);
 })
 
 # Lexing and parsing report failure in the same shape but not the same type, so
@@ -281,9 +277,9 @@ deallocations: 6690
 reallocations: 935
 bytes allocated: 641670
 instructions executed: 1504893
-binary size: 406864
+binary size: 406840
   code: 267920
-  data: 4892
+  data: 4868
   metadata: 134052
 functions:
   __arr_drop___m11__StepResult$SexpKind:

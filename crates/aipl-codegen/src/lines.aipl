@@ -5,36 +5,30 @@ import { equal as ==, split } from builtins;
 # would drop it), and an empty `self` yields a single empty element.
 pub fn lines(self: str) -> str[] { self.split("\n") }.test({
     assert(
-        lines(
-            """
-                a
-                b
-                c
-            """,
-        ) == ["a", "b", "c"],
+        lines("""
+            a
+            b
+            c
+        """) == ["a", "b", "c"],
     );
     assert(lines("solo") == ["solo"]);
     assert(lines("") == [""]);
     // Trailing newline produces a trailing empty line.
     assert(
-        lines(
-            """
-                a
-                b
+        lines("""
+            a
+            b
 
-            """,
-        ) == ["a", "b", ""],
+        """) == ["a", "b", ""],
     );
     // Every line blank.
     assert(lines("\n\n") == ["", "", ""]);
     // Long (heap) lines exercise the view/concat paths.
     assert(
-        lines(
-            """
-                first long line
-                second long line
-            """,
-        ) == ["first long line", "second long line"],
+        lines("""
+            first long line
+            second long line
+        """) == ["first long line", "second long line"],
     );
 })
 --- performance ---
@@ -43,10 +37,10 @@ deallocations: 12
 reallocations: 0
 bytes allocated: 1008
 instructions executed: 1347
-binary size: 5704
+binary size: 5592
   code: 2812
-  data: 680
-  metadata: 2212
+  data: 565
+  metadata: 2215
 functions:
   __eq_str$arr:
     calls: 6

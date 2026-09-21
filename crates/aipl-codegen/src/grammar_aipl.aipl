@@ -3536,40 +3536,34 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     // A case takes `# ..` lines of its own, above its `|`. The variant's docs
     // and a case's are separate slots, and a documented case does not need
     // every case documented.
-    assert(
-        program_dump(
-            """
-                # A shape.
-                variant V =
-                    # Round.
-                    # Has a radius.
-                    | Circle(i64)
-                    | Empty
-                    # Cornered.
-                    | Rect(i64, i64)
-            """,
-        ) == """
-            doc(A shape.) variant V(doc(Round.
-            Has a radius.) Circle(i64) | Empty | doc(Cornered.) Rect(i64, i64))
-        """,
-    );
+    assert(program_dump("""
+        # A shape.
+        variant V =
+            # Round.
+            # Has a radius.
+            | Circle(i64)
+            | Empty
+            # Cornered.
+            | Rect(i64, i64)
+    """) == """
+        doc(A shape.) variant V(doc(Round.
+        Has a radius.) Circle(i64) | Empty | doc(Cornered.) Rect(i64, i64))
+    """);
 
     // A payload slot takes `# ..` lines too, inside the parentheses: a bare
     // type, a named slot, and a keyword slot alike, and a documented slot
     // needs no company.
     assert(
-        program_dump(
-            """
-                variant V =
-                    | Many(
-                        # The repeated rule.
-                        str,
-                        # Fewest accepted.
-                        min: u64 = 0,
-                        max?: u64 = none
-                    )
-            """,
-        ) == "variant V(Many(doc(The repeated rule.) str, doc(Fewest accepted.) min: u64 = 0, max?: Optional(u64) = none))",
+        program_dump("""
+            variant V =
+                | Many(
+                    # The repeated rule.
+                    str,
+                    # Fewest accepted.
+                    min: u64 = 0,
+                    max?: u64 = none
+                )
+        """) == "variant V(Many(doc(The repeated rule.) str, doc(Fewest accepted.) min: u64 = 0, max?: Optional(u64) = none))",
     );
     // The first case's `|` is optional; every later one is required.
     assert(program_dump("variant V = A\n| B") == "variant V(A | B)");
@@ -3586,12 +3580,10 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
         ) == "error: expected DocComment or `|`, found `A`",
     );
     // Doc lines after the last case belong to the next item, not to a case.
-    assert(
-        program_dump("variant V = A | B\n# Docs f.\nfn f() { }") == """
-            variant V(A | B)
-            doc(Docs f.) fn f() = ()
-        """,
-    );
+    assert(program_dump("variant V = A | B\n# Docs f.\nfn f() { }") == """
+        variant V(A | B)
+        doc(Docs f.) fn f() = ()
+    """);
 
     // Imports. An operator is imported aliased; a bare spelling is refused by
     // the grammar itself, with the message saying what to write instead.
@@ -3635,22 +3627,18 @@ pub fn lower_aipl_program(src: str) -> Program!ParseError {
     );
 
     // And a whole small file, which is the shape everything above is a piece of.
-    assert(
-        program_dump(
-            """
-                import { equal as == } from builtins;
+    assert(program_dump("""
+        import { equal as == } from builtins;
 
-                # A point.
-                struct P { x: i64, y: i64 }
+        # A point.
+        struct P { x: i64, y: i64 }
 
-                pub fn same(a: P, b: P) -> bool { a.x == b.x }
-            """,
-        ) == """
-            import [equal as ==] from builtins
-            doc(A point.) struct P(x: i64, y: i64)
-            pub fn same(a: P, b: P) -> bool = ==(a.x, b.x)
-        """,
-    );
+        pub fn same(a: P, b: P) -> bool { a.x == b.x }
+    """) == """
+        import [equal as ==] from builtins
+        doc(A point.) struct P(x: i64, y: i64)
+        pub fn same(a: P, b: P) -> bool = ==(a.x, b.x)
+    """);
 })
 
 fn as_program(v: Ast, span: Span) -> Program!ParseError {
@@ -4412,9 +4400,9 @@ deallocations: 1930471
 reallocations: 271722
 bytes allocated: 357502521
 instructions executed: 510428058
-binary size: 4985496
+binary size: 4985232
   code: 3262844
-  data: 52844
+  data: 52580
   metadata: 1669808
 functions:
   __arr_drop___m11__ParsedParam:

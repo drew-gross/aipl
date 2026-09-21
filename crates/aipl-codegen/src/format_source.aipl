@@ -250,10 +250,10 @@ deallocations: 20176
 reallocations: 2882
 bytes allocated: 4330577
 instructions executed: 8657058
-binary size: 5535448
-  code: 3653920
+binary size: 5539808
+  code: 3657284
   data: 11154
-  metadata: 1870374
+  metadata: 1871370
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1110,9 +1110,15 @@ functions:
   __m36__hug_close:
     calls: 0
     bytes: 740
+  __m36__hugs_block_arg:
+    calls: 0
+    bytes: 308
+  __m36__hugs_bracket_arg:
+    calls: 0
+    bytes: 800
   __m36__hugs_sole_arg:
     calls: 0
-    bytes: 1312
+    bytes: 580
   __m36__ident_list$own2:
     calls: 0
     bytes: 1800
@@ -1134,6 +1140,9 @@ functions:
   __m36__index_seg:
     calls: 0
     bytes: 3444
+  __m36__is_block_tok:
+    calls: 0
+    bytes: 1576
   __m36__item:
     calls: 5
     bytes: 2448
@@ -1269,6 +1278,9 @@ functions:
   __m36__take_comment:
     calls: 0
     bytes: 256
+  __m36__template_head:
+    calls: 0
+    bytes: 736
   __m36__template_scan:
     calls: 0
     bytes: 3668
@@ -1278,6 +1290,9 @@ functions:
   __m36__tok_text:
     calls: 85
     bytes: 508
+  __m36__top_comma_in:
+    calls: 0
+    bytes: 676
   __m36__trailing_comment:
     calls: 5
     bytes: 2284

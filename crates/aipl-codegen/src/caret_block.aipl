@@ -50,71 +50,57 @@ pub fn caret_block(source: str, Span { start, end }, filename: str) -> str {
         {blank} | {" ".repeat(col)}{"^".repeat(underline_len)}
     ```
 }.test({
-    assert(
-        caret_block("hello world", Span { start: 0, end: 5 }, "input") == """
-             --> input:1:1
-              |
-            1 | hello world
-              | ^^^^^
-        """,
-    );
-    assert(
-        caret_block("hello\nworld", Span { start: 6, end: 11 }, "input") == """
-             --> input:2:1
-              |
-            2 | world
-              | ^^^^^
-        """,
-    );
-    assert(
-        caret_block("hello world", Span { start: 6, end: 11 }, "input") == """
-             --> input:1:7
-              |
-            1 | hello world
-              |       ^^^^^
-        """,
-    );
+    assert(caret_block("hello world", Span { start: 0, end: 5 }, "input") == """
+         --> input:1:1
+          |
+        1 | hello world
+          | ^^^^^
+    """);
+    assert(caret_block("hello\nworld", Span { start: 6, end: 11 }, "input") == """
+         --> input:2:1
+          |
+        2 | world
+          | ^^^^^
+    """);
+    assert(caret_block("hello world", Span { start: 6, end: 11 }, "input") == """
+         --> input:1:7
+          |
+        1 | hello world
+          |       ^^^^^
+    """);
     // Zero-width span at col 0 gets at least one caret.
-    assert(
-        caret_block("hi", Span { start: 0, end: 0 }, "input") == """
-             --> input:1:1
-              |
-            1 | hi
-              | ^
-        """,
-    );
+    assert(caret_block("hi", Span { start: 0, end: 0 }, "input") == """
+         --> input:1:1
+          |
+        1 | hi
+          | ^
+    """);
     // Span extending past line end is clamped to the line.
-    assert(
-        caret_block("hi\nthere", Span { start: 0, end: 10 }, "input") == """
-             --> input:1:1
-              |
-            1 | hi
-              | ^^
-        """,
-    );
+    assert(caret_block("hi\nthere", Span { start: 0, end: 10 }, "input") == """
+         --> input:1:1
+          |
+        1 | hi
+          | ^^
+    """);
     // Real filename appears in output.
-    assert(
-        caret_block("hello world", Span { start: 0, end: 5 }, "foo.aipl") == """
-             --> foo.aipl:1:1
-              |
-            1 | hello world
-              | ^^^^^
-        """,
-    );
+    assert(caret_block("hello world", Span { start: 0, end: 5 }, "foo.aipl") == """
+         --> foo.aipl:1:1
+          |
+        1 | hello world
+          | ^^^^^
+    """);
 
     // A span that starts *past the end* of `source` — which is what a span
     // belonging to some other file looks like once it is rendered against this
     // one. `line_at` clamps to the last line and the column clamps to that
     // line's width, so the block stays the size of the source. Unclamped, the
     // caret row alone was the error's whole start offset in spaces.
-    assert(
-        caret_block("a\nb", Span { start: 5000, end: 5006 }, "input") == """
-             --> input:2:2
-              |
-            2 | b
-              |  ^
-        """,
-    );
+    assert(caret_block("a\nb", Span { start: 5000, end: 5006 }, "input") == """
+         --> input:2:2
+          |
+        2 | b
+          |  ^
+    """);
     assert(caret_block("a\nb", Span { start: 5000, end: 5006 }, "input").len() < 40);
 })
 --- performance ---
@@ -123,9 +109,9 @@ deallocations: 187
 reallocations: 0
 bytes allocated: 13008
 instructions executed: 7194
-binary size: 9888
+binary size: 9744
   code: 4580
-  data: 1884
+  data: 1740
   metadata: 3424
 functions:
   __m1__line_at:

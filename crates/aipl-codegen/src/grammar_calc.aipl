@@ -214,24 +214,20 @@ pub fn calc_grammar() -> Grammar<CalcTok, Calc> {
     // driver parses with — so the description and the parser cannot drift.
     // `Climb` has no EBNF operator, so it renders flat with its binding powers
     // stated alongside; everything else is the grammar verbatim.
-    assert(
-        ebnf(calc_grammar()) == """
-            expr = unary (("+" | "-" | "*" | "/" | "%" | "^") unary)* ; (* precedence: "^" (right) > "*" "/" "%" > "+" "-" *)
-            unary = "-" unary | atom ;
-            atom = Num | "(" expr ")" ;
-        """,
-    );
+    assert(ebnf(calc_grammar()) == """
+        expr = unary (("+" | "-" | "*" | "/" | "%" | "^") unary)* ; (* precedence: "^" (right) > "*" "/" "%" > "+" "-" *)
+        unary = "-" unary | atom ;
+        atom = Num | "(" expr ")" ;
+    """);
 
     // Two of the three begin identically, which is the grammar saying that a
     // unary minus is an expression: nothing here can be told apart by its first
     // token alone, so `unary`'s two alternatives are ordered, not disjoint.
-    assert(
-        show_first_sets(calc_grammar())? == """
-            expr = Num "-" "("
-            unary = Num "-" "("
-            atom = Num "("
-        """,
-    );
+    assert(show_first_sets(calc_grammar())? == """
+        expr = Num "-" "("
+        unary = Num "-" "("
+        atom = Num "("
+    """);
 })
 
 fn lex_calc(src: str) -> LexResult<CalcTok>!ParseError {
@@ -471,9 +467,9 @@ deallocations: 12803
 reallocations: 2088
 bytes allocated: 1271761
 instructions executed: 2645718
-binary size: 423168
+binary size: 423136
   code: 277756
-  data: 6044
+  data: 6012
   metadata: 139368
 functions:
   __arr_drop_Calc:

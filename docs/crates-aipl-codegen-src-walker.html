@@ -2364,7 +2364,80 @@
           </h3>
           <pre class="signature"><code>fn hugs_sole_arg(self: W) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether the call whose <code>(</code> was just consumed takes exactly one argument that *is* a bracketed construct — a nested call, an array, a struct literal, or a set/dict literal — filling the parens end to end. Such a call is *hugged*: the argument's own brackets carry the break, so the nesting costs one indent level instead of one per layer. Pure lookahead over the token stream, no parse state.</p></div>
+          <div class="doc"><p>Whether the call whose <code>(</code> was just consumed takes exactly one argument that either *is* a bracketed construct — a nested call, an array, a struct literal, or a set/dict literal — filling the parens end to end, or *ends in* a multi-line <code>&quot;&quot;&quot;</code>/<code></code><code></code> <code></code><code> </code><code></code><code> block. Such a call is *hugged*: the argument's own brackets, or the block's own lines, carry the break, so the nesting costs one indent level instead of one per layer, and the block's closing delimiter lands under the call rather than under an argument line —</code></p><pre><code>assert(ebnf(g) == &quot;&quot;&quot;
+    prog = stmt ;
+&quot;&quot;&quot;);
+</code></pre><p>Pure lookahead over the token stream, no parse state.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-hugs_bracket_arg">
+          <h3>
+            <a class="anchor" href="#item-hugs_bracket_arg">hugs_bracket_arg</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hugs_bracket_arg(self: W) -&#62; bool</code></pre>
+
+          <div class="doc"><p>The bracketed-construct half of <code>hugs_sole_arg</code>. The candidate's opening bracket: <code>[</code>/<code>#{</code> open directly, <code>name(</code>/<code>name {</code> one token in.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-hugs_block_arg">
+          <h3>
+            <a class="anchor" href="#item-hugs_block_arg">hugs_block_arg</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn hugs_block_arg(self: W) -&#62; bool</code></pre>
+
+          <div class="doc"><p>The trailing-block half of <code>hugs_sole_arg</code>: the token before the call's <code>)</code> (past a trailing comma, from source already broken) is a block that stays a block once respelled, and no top-level comma sits before it — the block ends the call's one argument, whatever that argument is (<code>x == &quot;&quot;&quot;...&quot;&quot;&quot;</code>, or the block alone). A block whose value is one line is respelled as a one-line literal, so it is not one of these: it breaks like any other text.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-top_comma_in">
+          <h3>
+            <a class="anchor" href="#item-top_comma_in">top_comma_in</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn top_comma_in(self: W, first: u64, last: u64) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a comma at bracket depth zero sits among tokens <code>first</code> through <code>last</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_block_tok">
+          <h3>
+            <a class="anchor" href="#item-is_block_tok">is_block_tok</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_block_tok(self: W, i: u64) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether token <code>i</code> closes a multi-line block literal: a <code>&quot;&quot;&quot;</code>/<code></code><code></code> <code></code><code> </code><code></code><code> string that stays a block once </code>requote<code>d, or the tail of a raw template holding a newline (</code>retemplate<code> keeps those as written; a raw template on one line may lose its </code><code></code> <code></code><code></code> and is not a block).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-template_head">
+          <h3>
+            <a class="anchor" href="#item-template_head">template_head</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn template_head(self: W, i: u64) -&#62; u64</code></pre>
+
+          <div class="doc"><p>Index of the <code>TplHead</code> opening the template whose <code>TplTail</code> is at <code>i</code>: walk back over the tokens, nested templates (an interpolation may hold one) closing and opening in step.</p></div>
 
 
         </section>

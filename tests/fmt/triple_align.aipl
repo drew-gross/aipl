@@ -36,22 +36,18 @@ fn main() !prints {
     // A `"""` raw string: the closing triple aligns with the opening (both at
     // the statement indent), and the content is shifted one level deeper,
     // keeping each line's indentation relative to the common base.
-    print(
-        """
-              four spaces
-            two spaces
-        """,
-    );
+    print("""
+          four spaces
+        two spaces
+    """);
 
     // A triple-backtick template formats the same way — content one level
     // deeper — with interpolations carried along on their lines.
     let name = "world";
-    print(
-        ```
-              indented {name}
-            two spaces
-        ```,
-    );
+    print(```
+          indented {name}
+        two spaces
+    ```);
 }
 
 // A mid-line opening (`let s = """`): the block aligns to the *opening line's*
