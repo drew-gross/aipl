@@ -1088,9 +1088,7 @@ pub fn parse_cst<K: variant, A: any>(
     // ~750 one-shot parses — analysing every time is an 8% loss, while the same
     // analysis reused across parses is a 2x win. So a one-shot parse links and
     // nothing more, and the driver simply finds no FIRST set to prune on.
-    let none_yet: First<K>[] = [];
-    let no_labels: #{str}[] = [];
-    let prep = Prepared { grammar: link(g)?, firsts: none_yet, labels: no_labels };
+    let prep = Prepared { grammar: link(g)?, firsts: [], labels: [] };
     parse_prepared(src, lexed, prep, start)
 }
 
@@ -1712,11 +1710,11 @@ allocations: 5908
 deallocations: 5908
 reallocations: 1407
 bytes allocated: 685068
-instructions executed: 1505503
-binary size: 744000
-  code: 450748
+instructions executed: 1505647
+binary size: 743864
+  code: 450676
   data: 12156
-  metadata: 281096
+  metadata: 281032
 functions:
   __arr_drop_Node:
     calls: 16
@@ -1951,13 +1949,13 @@ functions:
     bytes: 236
   __m2__linked_first_sets$Tok$Node:
     calls: 14
-    bytes: 1032
+    bytes: 996
   __m2__merge$Tok:
     calls: 96
     bytes: 604
   __m2__rule_first$Tok:
     calls: 165
-    bytes: 7552
+    bytes: 7528
   __m3__desugar_opt$Tok:
     calls: 61
     bytes: 580
@@ -2091,7 +2089,7 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 41205
+    calls: 41221
     bytes: (external)
   aipl_array_new:
     calls: 791
@@ -2224,7 +2222,7 @@ functions:
     bytes: 284
   parse_cst$Tok$Node:
     calls: 86
-    bytes: 364
+    bytes: 352
   parse_prepared$Tok$Node:
     calls: 100
     bytes: 5012

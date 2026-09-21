@@ -274,11 +274,11 @@ allocations: 6690
 deallocations: 6690
 reallocations: 935
 bytes allocated: 641670
-instructions executed: 1504893
-binary size: 406824
-  code: 267920
+instructions executed: 1504911
+binary size: 406688
+  code: 267848
   data: 4852
-  metadata: 134052
+  metadata: 133988
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -576,7 +576,7 @@ functions:
     bytes: 284
   __m13__parse_cst$SexpKind$__m15__Sexp:
     calls: 31
-    bytes: 364
+    bytes: 352
   __m13__parse_prepared$SexpKind$__m15__Sexp:
     calls: 31
     bytes: 6696
@@ -654,7 +654,7 @@ functions:
     bytes: 236
   __m2__linked_first_sets$SexpKind$__m15__Sexp:
     calls: 1
-    bytes: 1032
+    bytes: 996
   __m2__merge$SexpKind:
     calls: 9
     bytes: 604
@@ -669,7 +669,7 @@ functions:
     bytes: 1708
   __m2__rule_first$SexpKind:
     calls: 18
-    bytes: 7552
+    bytes: 7528
   __m2__show_first$SexpKind:
     calls: 2
     bytes: 3852
@@ -830,7 +830,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 38787
+    calls: 38789
     bytes: (external)
   aipl_array_new:
     calls: 1537

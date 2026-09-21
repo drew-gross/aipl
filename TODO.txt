@@ -75,7 +75,6 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  grep none_yet and eliminate
   make Rule =='able again, maybe by separating the refuse renderers from the rule structure? Since the problem is that it contains a function. Or maybe make functions == comparable?
   bind_fields_mut looks like it can be a zip->reverse->for, also maybe mutable can default to false and then bind_fields doens't need to exist (or only it exists)
   trailing comment attaching

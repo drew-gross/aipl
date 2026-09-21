@@ -481,10 +481,8 @@ pub fn first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError
 # loop reads whole productions and `link` returns a whole grammar, and a `let`
 # binding that only ever has its fields read is a lint.
 fn linked_first_sets<K: variant, A: any>(g: Grammar<K, A>) -> First<K>[]!ParseError {
-    // One empty set per production. The annotated binding is what pins `K`:
-    // nothing in `First {}` mentions it.
-    let none_yet: First<K> = First {};
-    mut sets = g.prods.map(|p| none_yet);
+    // One empty set per production.
+    mut sets = g.prods.map(|p| First {});
     mut going = true;
     while (going) {
         // The round is computed against the previous round's sets, not against
@@ -537,10 +535,7 @@ pub fn rule_first<K: variant>(r: Rule<K>, sets: First<K>[]) -> First<K>!ParseErr
         // when any one is. Order does not matter here even though it matters to
         // the parse: this is what *could* start a match, not which branch takes
         // it.
-        OneOf(rs) => {
-            let none_yet: First<K> = First {};
-            ok(rs.try_map(|sub| rule_first(sub, sets))?.left_fold(none_yet, merge))
-        },
+        OneOf(rs) => ok(rs.try_map(|sub| rule_first(sub, sets))?.left_fold(First {}, merge)),
         // A separated list begins with its item, and with its separator only
         // when it allows a leading one — then the optional separator in front
         // is the sequence `sep? item`, and contributes like one.
@@ -771,11 +766,11 @@ allocations: 1579
 deallocations: 1579
 reallocations: 352
 bytes allocated: 184735
-instructions executed: 243580
-binary size: 168216
-  code: 111060
+instructions executed: 243904
+binary size: 168088
+  code: 111000
   data: 4004
-  metadata: 53152
+  metadata: 53084
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -934,7 +929,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 5338
+    calls: 5374
     bytes: (external)
   aipl_array_new:
     calls: 62
@@ -1028,7 +1023,7 @@ functions:
     bytes: 112
   linked_first_sets$Tok$Node:
     calls: 6
-    bytes: 1032
+    bytes: 996
   main:
     calls: 1
     bytes: 452
@@ -1046,7 +1041,7 @@ functions:
     bytes: 1708
   rule_first$Tok:
     calls: 235
-    bytes: 7552
+    bytes: 7528
   show_first$Tok:
     calls: 27
     bytes: 3892
