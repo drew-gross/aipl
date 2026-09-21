@@ -81,7 +81,6 @@ misc cleanup:
   now that all operators have names, the import parser doesn't need to support importing operators without names
   unify tag values for strings and arrays
   Span through should be a builtin
-  json_char should be a match, and should just put the backslashes into the str rather than making a var
   in match_expr, let inner = arms.docs.map(|a: Doc| [HardLine, a]).join(); should be an interspere or a join-with-sep include leading or something.
   tm_json test has a multiline literal concatenated with a newline literal which is weird, it should be possible to have a trailing newline in a multiline str literal.
   use variants for errors

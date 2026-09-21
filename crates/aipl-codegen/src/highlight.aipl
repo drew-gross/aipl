@@ -709,23 +709,14 @@ pub fn json_str(s: str) -> str { `"{s.map(json_char).join()}"` }.test({
 })
 
 fn json_char(ch: char) -> str {
-    let backslash = """\""";
-    if (ch == '\\') {
-        return `{backslash}{backslash}`;
-    };
-    if (ch == '"') {
-        return `{backslash}"`;
-    };
-    if (ch == '\n') {
-        return `{backslash}n`;
-    };
-    if (ch == '\t') {
-        return `{backslash}t`;
-    };
-    if (ch == '\r') {
-        return `{backslash}r`;
-    };
-    `{ch}`
+    match (ch) {
+        '\\' => """\\""",
+        '"' => `\\"`,
+        '\n' => """\n""",
+        '\t' => """\t""",
+        '\r' => """\r""",
+        _ => `{ch}`,
+    }
 }
 
 // ---------- test-only fixtures ----------
@@ -736,15 +727,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 991
-deallocations: 991
+allocations: 975
+deallocations: 975
 reallocations: 33
-bytes allocated: 75800
-instructions executed: 128893
-binary size: 145128
-  code: 93468
+bytes allocated: 74784
+instructions executed: 124912
+binary size: 144296
+  code: 92868
   data: 5320
-  metadata: 46340
+  metadata: 46108
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -911,12 +902,9 @@ functions:
   fld:
     calls: 6
     bytes: 348
-  json_char:
-    calls: 201
-    bytes: 1228
   json_str:
     calls: 21
-    bytes: 1596
+    bytes: 2224
   main:
     calls: 1
     bytes: 760

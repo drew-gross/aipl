@@ -172,15 +172,15 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 5935
-deallocations: 5935
+allocations: 5643
+deallocations: 5643
 reallocations: 293
-bytes allocated: 488219
-instructions executed: 1434827
-binary size: 244072
-  code: 178692
+bytes allocated: 469677
+instructions executed: 1383064
+binary size: 243232
+  code: 178092
   data: 3336
-  metadata: 62044
+  metadata: 61804
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -260,12 +260,9 @@ functions:
   __m1__fld:
     calls: 70
     bytes: 348
-  __m1__json_char:
-    calls: 2662
-    bytes: 1228
   __m1__json_str:
     calls: 170
-    bytes: 1596
+    bytes: 2224
   __m1__matcher_pat:
     calls: 77
     bytes: 6684
