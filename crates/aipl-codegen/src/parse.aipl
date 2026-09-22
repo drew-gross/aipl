@@ -107,7 +107,6 @@ import {
     Term,
     Text,
     Then,
-    TryKid,
     TryKids,
     TryMk,
     TryText,
@@ -1176,8 +1175,7 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
                 TryMk(f) => f(src, node, vals),
                 Kids(f) => ok(f(vals)),
                 TryKids(f) => f(vals),
-                Kid(f) => ok(f(only_kid(vals, node.span())?)),
-                TryKid(f) => f(only_kid(vals, node.span())?),
+                Kid => only_kid(vals, node.span()),
                 Text(f) => ok(f(node.token_text(src))),
                 TryText(f) => f(node.token_text(src)),
                 Const(v) => ok(v),
@@ -1231,15 +1229,6 @@ pub fn parse<K: variant, A: any>(
     // A `build` that always refuses, for the error-propagation assertion.
     fn refuse(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
         err(ParseError { message: "refused", span: node.span() })
-    }
-
-    // A `TryKid` lowering: it sees the child and nothing else, so the span it
-    // blames is its own to pick rather than the node's.
-    fn not_reserved(v: Node) -> Node!ParseError {
-        if (v == Atom("end")) {
-            return err(ParseError { message: "`end` is reserved", span: 0..0 });
-        };
-        ok(v)
     }
 
     fn labelled_prod(name: str, rule: Rule<Tok>, expect_as: str) -> Production<Tok, Node> {
@@ -1518,17 +1507,16 @@ pub fn parse<K: variant, A: any>(
     // ---- Kid: the one child, with the count checked by the driver ----
     //
     // A production that is exactly one other thing takes the child itself, so
-    // its lowering is the pass-through `Kid(|v: Node| v)` rather than an indexing
+    // its lowering is the pass-through `Kid` rather than an indexing
     // one. A rule that can match some other number of children disagrees with
     // its own `build`, and the driver is what names that — once, here, instead
     // of in every lowering that reaches for a child which might not be there.
     let r_one_w: Rule<Tok> = Named("w");
     let r_two_w: Rule<Tok> = Then([Named("w"), Named("w")]);
     let g_kid = g_of([
-        Production { name: "pass", rule: r_one_w, build: Kid(|v: Node| v), layout: Inline },
-        Production { name: "two_kids", rule: r_two_w, build: Kid(|v: Node| v), layout: Inline },
-        Production { name: "no_kid", rule: r_word, build: Kid(|v: Node| v), layout: Inline },
-        Production { name: "checked", rule: r_one_w, build: TryKid(not_reserved), layout: Inline },
+        Production { name: "pass", rule: r_one_w, build: Kid, layout: Inline },
+        Production { name: "two_kids", rule: r_two_w, build: Kid, layout: Inline },
+        Production { name: "no_kid", rule: r_word, build: Kid, layout: Inline },
         one("w", r_word),
     ]);
     assert(parsed("abc", g_kid, "pass")? == Atom("abc"));
@@ -1542,14 +1530,6 @@ pub fn parse<K: variant, A: any>(
     assert(parsed("abc", g_kid, "no_kid") == err(ParseError {
         message: "a `Kid` lowering wants exactly one child; this production matched 0",
         span: 0..3,
-    }));
-
-    // `TryKid` reads only the child, so what it refuses is a property of that
-    // value — and the refusal reaches the caller unchanged, as any other does.
-    assert(parsed("abc", g_kid, "checked")? == Atom("abc"));
-    assert(parsed("end", g_kid, "checked") == err(ParseError {
-        message: "`end` is reserved",
-        span: 0..0,
     }));
 
     // ---- Refuse: a rule that is an error when reached ----
@@ -1772,51 +1752,51 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 6146
-deallocations: 6146
-reallocations: 1459
-bytes allocated: 715664
-instructions executed: 1571269
-binary size: 779928
-  code: 471660
-  data: 13116
-  metadata: 295152
+allocations: 6048
+deallocations: 6048
+reallocations: 1436
+bytes allocated: 702644
+instructions executed: 1541796
+binary size: 764576
+  code: 462704
+  data: 12892
+  metadata: 288980
 functions:
   __arr_drop_Node:
-    calls: 20
+    calls: 18
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 687
+    calls: 671
     bytes: 116
   __arr_drop___m2__First$Tok:
     calls: 82
     bytes: 140
   __arr_drop___m3__ListStyle:
-    calls: 351
+    calls: 347
     bytes: 120
   __arr_drop___m3__Prec:
     calls: 2
     bytes: 120
   __arr_drop___m3__Production$Tok$Node:
-    calls: 156
+    calls: 154
     bytes: 236
   __arr_drop___m3__Rule$Tok:
-    calls: 282
+    calls: 278
     bytes: 116
   __arr_drop___m4__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_drop___m4__Token$Tok:
-    calls: 503
+    calls: 497
     bytes: 188
   __arr_drop___m4__TokenRule$Tok:
-    calls: 105
+    calls: 103
     bytes: 632
   __arr_retain_Node:
-    calls: 18
+    calls: 16
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 675
+    calls: 667
     bytes: 116
   __arr_retain___m2__First$Tok:
     calls: 150
@@ -1828,16 +1808,16 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain___m3__Production$Tok$Node:
-    calls: 186
+    calls: 173
     bytes: 236
   __arr_retain___m3__Rule$Tok:
-    calls: 584
+    calls: 576
     bytes: 116
   __arr_retain___m4__StepResult$Tok:
     calls: 0
     bytes: 140
   __arr_retain___m4__Token$Tok:
-    calls: 297
+    calls: 295
     bytes: 188
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
@@ -1858,7 +1838,7 @@ functions:
     calls: 0
     bytes: 380
   __builtin_count_while$char$lam$__m4__lex_step$Tok$lambda1:
-    calls: 232
+    calls: 230
     bytes: 312
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 0
@@ -1873,22 +1853,22 @@ functions:
     calls: 11
     bytes: 688
   __builtin_find_index$str$lam$__m3__link$Tok$Node$lambda0:
-    calls: 186
+    calls: 173
     bytes: 404
   __builtin_find_index$str$lam$__m3__link_rule$Tok$lambda0:
-    calls: 68
+    calls: 57
     bytes: 404
   __builtin_find_index$str$lam$parse_prepared$Tok$Node$lambda0:
-    calls: 105
+    calls: 103
     bytes: 404
   __builtin_find_map$__m1__Cst$__builtin_Span$lam$__m1__first_leaf:
-    calls: 10
+    calls: 4
     bytes: 364
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves:
     calls: 0
     bytes: 44
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__leaves$tail:
-    calls: 29
+    calls: 27
     bytes: 1040
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves:
     calls: 0
@@ -1900,19 +1880,19 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m1__Cst$__m1__Cst$lam$__m1__splice$tail:
-    calls: 43
+    calls: 39
     bytes: 1572
   __builtin_map_join$__m3__Rule$Tok$__m3__ListStyle$lam$__m3__group_styles$Tok:
     calls: 0
     bytes: 44
   __builtin_map_join$__m3__Rule$Tok$__m3__ListStyle$lam$__m3__group_styles$Tok$tail:
-    calls: 133
+    calls: 131
     bytes: 1072
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
-    calls: 10
+    calls: 4
     bytes: 440
   __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam$lower_node$Tok$Node$lambda0:
-    calls: 28
+    calls: 24
     bytes: 536
   __builtin_try_map$__m3__Production$Tok$Node$__m2__First<Tok>$__m3__ParseError$lam$__m2__linked_first_sets$Tok$Node$lambda2:
     calls: 36
@@ -1921,10 +1901,10 @@ functions:
     calls: 32
     bytes: 552
   __builtin_try_map$__m3__Rule$Tok$__m3__Rule$Tok$__m3__ParseError$lam$__m3__desugar_rule$Tok:
-    calls: 125
+    calls: 123
     bytes: 508
   __builtin_value_or$bool:
-    calls: 199
+    calls: 195
     bytes: 24
   __eq_Node:
     calls: 13
@@ -1933,7 +1913,7 @@ functions:
     calls: 8
     bytes: 300
   __eq___builtin_Span:
-    calls: 15
+    calls: 14
     bytes: 104
   __eq___m1__Cst:
     calls: 6
@@ -1957,7 +1937,7 @@ functions:
     calls: 1
     bytes: 284
   __eq___m3__ParseError:
-    calls: 9
+    calls: 8
     bytes: 128
   __eq_set$Tok$case:
     calls: 52
@@ -1969,34 +1949,34 @@ functions:
     calls: 34
     bytes: 300
   __m1__first_leaf:
-    calls: 16
+    calls: 7
     bytes: 788
   __m1__flat_kids:
     calls: 0
     bytes: 32
   __m1__flat_kids$tail:
-    calls: 31
+    calls: 27
     bytes: 1108
   __m1__last_leaf:
-    calls: 16
+    calls: 7
     bytes: 788
   __m1__leaves:
     calls: 0
     bytes: 32
   __m1__leaves$tail:
-    calls: 74
+    calls: 70
     bytes: 1236
   __m1__nodes$filter1$own0:
-    calls: 28
+    calls: 24
     bytes: 376
   __m1__show:
     calls: 228
     bytes: 2968
   __m1__span:
-    calls: 6
+    calls: 3
     bytes: 252
   __m1__text:
-    calls: 17
+    calls: 15
     bytes: 1460
   __m1__token_leaves:
     calls: 0
@@ -2026,7 +2006,7 @@ functions:
     calls: 61
     bytes: 580
   __m3__desugar_rule$Tok:
-    calls: 618
+    calls: 601
     bytes: 12048
   __m3__failure_message:
     calls: 49
@@ -2035,25 +2015,25 @@ functions:
     calls: 0
     bytes: 32
   __m3__group_styles$Tok$tail:
-    calls: 1177
+    calls: 1156
     bytes: 3104
   __m3__link$Tok$Node:
-    calls: 121
+    calls: 119
     bytes: 2480
   __m3__link_opt$Tok:
     calls: 61
     bytes: 596
   __m3__link_rule$Tok:
-    calls: 618
+    calls: 601
     bytes: 6984
   __m3__link_rules$Tok:
-    calls: 125
+    calls: 123
     bytes: 604
   __m3__opt_group_styles$Tok:
     calls: 210
     bytes: 152
   __m3__prod_names$Tok$Node:
-    calls: 265
+    calls: 261
     bytes: 552
   __m4__between_len:
     calls: 0
@@ -2071,16 +2051,16 @@ functions:
     calls: 0
     bytes: 1896
   __m4__lex$Tok:
-    calls: 105
+    calls: 103
     bytes: 1196
   __m4__lex_step$Tok:
-    calls: 373
+    calls: 371
     bytes: 23208
   __m4__nested_len:
     calls: 0
     bytes: 1148
   __m4__step_result$Tok:
-    calls: 1002
+    calls: 998
     bytes: 9192
   __m4__template_scan$Tok:
     calls: 0
@@ -2101,13 +2081,13 @@ functions:
     calls: 5
     bytes: 652
   __rec_drop_Node:
-    calls: 35
+    calls: 33
     bytes: 72
   __rec_drop___m1__Cst:
-    calls: 502
+    calls: 494
     bytes: 132
   __rec_drop___m3__Rule$Tok:
-    calls: 1364
+    calls: 1330
     bytes: 404
   __rec_drop___tuple$__m3__Rule_Tok$__m3__Rule_Tok:
     calls: 37
@@ -2117,31 +2097,10 @@ functions:
     bytes: 3256
   __test$parse:
     calls: 1
-    bytes: 267624
+    bytes: 260616
   __test$parse$as_word:
     calls: 4
     bytes: 232
-  __test$parse$lambda0:
-    calls: 0
-    bytes: 48
-  __test$parse$lambda1:
-    calls: 1
-    bytes: 48
-  __test$parse$lambda2:
-    calls: 0
-    bytes: 48
-  __test$parse$lambda3:
-    calls: 0
-    bytes: 48
-  __test$parse$lambda4:
-    calls: 0
-    bytes: 48
-  __test$parse$lambda5:
-    calls: 0
-    bytes: 48
-  __test$parse$not_reserved:
-    calls: 2
-    bytes: 532
   __test$parse$refuse:
     calls: 1
     bytes: 348
@@ -2176,25 +2135,25 @@ functions:
     calls: 7
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 181
+    calls: 179
     bytes: (external)
   aipl_arr_elem_ptr:
-    calls: 12
+    calls: 6
     bytes: (external)
   aipl_arr_extend:
-    calls: 2096
+    calls: 2065
     bytes: (external)
   aipl_arr_inc:
-    calls: 32437
+    calls: 32163
     bytes: (external)
   aipl_arr_reserve:
-    calls: 2386
+    calls: 2343
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 427
+    calls: 425
     bytes: (external)
   aipl_arr_reverse:
-    calls: 10
+    calls: 4
     bytes: (external)
   aipl_arr_slice:
     calls: 10
@@ -2203,34 +2162,34 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 42337
+    calls: 41910
     bytes: (external)
   aipl_array_new:
-    calls: 830
+    calls: 816
     bytes: (external)
   aipl_array_push:
-    calls: 922
+    calls: 910
     bytes: (external)
   aipl_array_push_mut:
-    calls: 2388
+    calls: 2337
     bytes: (external)
   aipl_array_with_cap:
-    calls: 670
+    calls: 666
     bytes: (external)
   aipl_assert:
-    calls: 101
+    calls: 99
     bytes: (external)
   aipl_rec_alloc:
-    calls: 1938
+    calls: 1894
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 12887
+    calls: 12580
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 346
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 10949
+    calls: 10686
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 346
@@ -2263,10 +2222,10 @@ functions:
     calls: 7
     bytes: (external)
   attach_trivia$Tok:
-    calls: 106
+    calls: 104
     bytes: 1828
   build_node:
-    calls: 22
+    calls: 20
     bytes: 288
   can_reach$Tok$Node$map1:
     calls: 0
@@ -2287,14 +2246,14 @@ functions:
     calls: 22
     bytes: 204
   leaf_at$Tok$Node:
-    calls: 243
+    calls: 241
     bytes: 364
   lex_toks:
-    calls: 105
+    calls: 103
     bytes: 776
   lower_node$Tok$Node:
-    calls: 28
-    bytes: 5812
+    calls: 24
+    bytes: 5460
   main:
     calls: 1
     bytes: 180
@@ -2314,13 +2273,13 @@ functions:
     calls: 84
     bytes: 1492
   match_prod$Tok$Node:
-    calls: 206
+    calls: 202
     bytes: 6932
   match_reps$Tok$Node:
     calls: 57
     bytes: 4144
   match_rule$Tok$Node:
-    calls: 670
+    calls: 666
     bytes: 6656
   match_sep$Tok$Node:
     calls: 90
@@ -2328,20 +2287,17 @@ functions:
   match_then$Tok$Node:
     calls: 64
     bytes: 2816
-  only_kid$Node:
-    calls: 5
-    bytes: 776
   parse$Tok$Node:
-    calls: 15
+    calls: 13
     bytes: 284
   parse_cst$Tok$Node:
-    calls: 91
+    calls: 89
     bytes: 352
   parse_prepared$Tok$Node:
-    calls: 105
+    calls: 103
     bytes: 4988
   parsed:
-    calls: 15
+    calls: 13
     bytes: 328
   prepare$Tok$Node:
     calls: 14
@@ -2371,13 +2327,13 @@ functions:
     calls: 17
     bytes: 876
   tok_rules:
-    calls: 102
+    calls: 100
     bytes: 2736
   tok_rules$lambda0:
     calls: 0
     bytes: 128
   tok_rules$lambda1:
-    calls: 85
+    calls: 83
     bytes: 96
   tok_rules$lambda2:
     calls: 0

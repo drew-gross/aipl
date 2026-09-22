@@ -227,6 +227,7 @@ case_tests! {
     cases_generics_is_present_any_optional = "cases/generics/is_present_any_optional",
     cases_generics_let_annotation_type_param = "cases/generics/let_annotation_type_param",
     cases_generics_none_literal_arg = "cases/generics/none_literal_arg",
+    cases_generics_nullary_ctor_from_context = "cases/generics/nullary_ctor_from_context",
     cases_generics_ord_bound = "cases/generics/ord_bound",
     cases_generics_recursive_variant = "cases/generics/recursive_variant",
     cases_generics_same_length_distinct_types = "cases/generics/same_length_distinct_types",

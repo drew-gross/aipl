@@ -1,0 +1,104 @@
+import { first, len, map, print, to_str, value_or } from builtins;
+
+// A *payload-free* case of a generic variant takes its instance from context,
+// like any other constructor whose arguments don't pin it. It is the one shape
+// with nothing of its own to pin the type parameter — there is no payload to
+// read a type off — so every answer has to come from where the constructor
+// sits.
+variant Tok = Space | Word(str)
+
+variant Tok2 = Dot | Num(i64)
+
+variant Slot<K: any> = Filled(K) | Blank
+
+// A second instance, so nothing below resolves merely by being the only one.
+fn filled() -> Slot<Tok2> { Filled(Dot) }
+
+// 1. From the declared return type, where the constructor *is* the whole body.
+//    The checker records this node's type twice — once as the application
+//    `Slot<Tok>` while resolving the constructor, once as the instance that
+//    application names while checking the body against the declared return —
+//    and the two spellings are one answer. Read as a conflict, they poisoned
+//    the record, and mono was left re-deriving a context that inlining had by
+//    then discarded.
+fn blank() -> Slot<Tok> { Blank }
+
+// 2. Through named templates: `Blank` is written as a field of a `Holder`
+//    inside a `Pair`, and only the enclosing return type says which instance.
+//    Nothing between them mentions `Slot`.
+struct Holder<K: any> { slot: Slot<K>, tag: str }
+
+struct Pair<K: any> { holders: Holder<K>[] }
+
+fn nested() -> Pair<Tok> { holders: [Holder { slot: Blank, tag: "t" }] }
+
+// 3. From a parameter type: the callee's signature is the only context, and it
+//    is two templates away from the constructor as well.
+fn count(hs: Holder<Tok2>[]) -> u64 { hs.len() }
+
+// The fields, rather than the whole struct: a generic instance renders under
+// its mangled name, which is not what this case is about.
+fn shown(p: Pair<Tok>) -> str { p.holders.first().map(|h| `{h.tag}={h.slot}`).value_or("empty") }
+
+fn main() !prints {
+    print(to_str(blank()));
+    print(to_str(filled()));
+    print(shown(nested()));
+    print(to_str(count([Holder { slot: Blank, tag: "x" }])));
+}
+--- stdout ---
+Blank
+Filled(Dot)
+t=Blank
+1
+
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 438
+instructions executed: 518
+binary size: 8016
+  code: 4320
+  data: 383
+  metadata: 3313
+functions:
+  __arr_drop_Holder$Tok:
+    calls: 1
+    bytes: 180
+  __arr_drop_Holder$Tok2:
+    calls: 1
+    bytes: 120
+  __arr_retain_Holder$Tok:
+    calls: 0
+    bytes: 180
+  __arr_retain_Holder$Tok2:
+    calls: 0
+    bytes: 120
+  __to_str_Slot$Tok:
+    calls: 2
+    bytes: 844
+  __to_str_Slot$Tok2:
+    calls: 1
+    bytes: 736
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_array_dec:
+    calls: 3
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 6
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1936

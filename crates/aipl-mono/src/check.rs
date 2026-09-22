@@ -413,15 +413,49 @@ impl<'a> Cx<'a> {
         if mentions_placeholder(ty) || mentions_typevar(ty) {
             return;
         }
-        let mut locks = self.locks.borrow_mut();
-        match locks.get(&key) {
+        // Read out before the map is borrowed mutably: `same_answer` reaches
+        // into the instance registry, and holding this borrow across that is a
+        // hazard for no gain.
+        let previous = self.locks.borrow().get(&key).cloned();
+        match previous {
             None => {
-                locks.insert(key, Some(ty.clone()));
+                self.locks.borrow_mut().insert(key, Some(ty.clone()));
             }
-            Some(Some(prev)) if prev != ty => {
-                locks.insert(key, None);
+            // The first answer is kept, so a node reached twice keeps the
+            // *application* form the constructor path records — see
+            // `same_answer` for why the second visit is not a conflict.
+            Some(Some(prev)) if prev != *ty && !self.same_answer(&prev, ty) => {
+                self.locks.borrow_mut().insert(key, None);
             }
             _ => {}
+        }
+    }
+
+    /// Whether two recorded types are one answer spelled two ways. A generic
+    /// *application* (`Holder<Json>`) and the *instance* it resolves to
+    /// (`Holder$Json`) name the same type, and a single node reaches
+    /// [`Cx::lock_node`] with one of each: `infer_generic_variant_ctor` records
+    /// the application (deliberately — see the note there), and a later check of
+    /// the same node against a declared type records the instance.
+    ///
+    /// Treating that as a conflict poisons the lock, and a poisoned lock stamps
+    /// nothing — which costs mono the context that a nullary constructor has no
+    /// other way to get. `fn f() -> Holder<Json> { Empty }` is the whole shape:
+    /// the checker resolves it, both spellings land on the one node, and mono
+    /// then rejects a program that checked clean.
+    fn same_answer(&self, a: &Type, b: &Type) -> bool {
+        self.as_application(a) == self.as_application(b)
+    }
+
+    /// `ty` with a generic instance name rewritten to the application it stands
+    /// for, and anything else left alone.
+    fn as_application(&self, ty: &Type) -> Type {
+        match ty {
+            Type::Named(n) => self
+                .instance_args(n)
+                .map(|(base, args)| Type::Generic(base, args))
+                .unwrap_or_else(|| ty.clone()),
+            _ => ty.clone(),
         }
     }
 
@@ -691,21 +725,12 @@ impl<'a> Cx<'a> {
     }
 
     fn find_generic_args(&self, ty: &Type, base: &str) -> Option<Vec<Type>> {
-        match ty {
-            Type::Generic(b, args) if b == base => Some(args.clone()),
-            Type::Named(n) => self
-                .instance_args(n)
-                .filter(|(b, _)| b == base)
-                .map(|(_, a)| a),
-            Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => self.find_generic_args(i, base),
-            Type::Dict(k, v) => self
-                .find_generic_args(k, base)
-                .or_else(|| self.find_generic_args(v, base)),
-            Type::Result(a, b) => self
-                .find_generic_args(a, base)
-                .or_else(|| self.find_generic_args(b, base)),
-            _ => None,
-        }
+        let tmpls = crate::Templates {
+            structs: self.generic_structs,
+            variants: self.generic_variants,
+            instance_args: &|n: &str| self.instance_args(n),
+        };
+        crate::find_generic_args_in(ty, base, &tmpls, 0, &mut HashSet::new())
     }
 
     /// Register (if new) the monomorphic instance of generic `base` applied to
@@ -4384,7 +4409,17 @@ impl Cx<'_> {
                 return Ok(Type::Fn(ptys.clone(), Box::new(actual_ret)));
             }
         }
-        let aty = self.check_expr(arg, env, effects)?;
+        // The parameter type is in scope *while* the argument is checked, the
+        // way an annotation is for the value of a `let` — a construction the
+        // argument's own parts don't pin (`g_of([Production { build: Kid }])`)
+        // has nothing else to resolve from. Saved and restored rather than set,
+        // since calls nest.
+        let prev = self
+            .current_expected
+            .replace(expected.map(|t| subst_typevars(t, &self.current_type_params.borrow())));
+        let checked = self.check_expr(arg, env, effects);
+        *self.current_expected.borrow_mut() = prev;
+        let aty = checked?;
         if let Some(e) = expected {
             // A bare literal argument flexes to a narrow-int parameter type.
             let aty = self.flex_int(arg, &aty, e)?;

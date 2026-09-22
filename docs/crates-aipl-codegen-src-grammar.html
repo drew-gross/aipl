@@ -287,16 +287,9 @@
 
             </li>
 
-            <li id="item-Kid"><code>Kid((A) -&#62; A)</code>
+            <li id="item-Kid"><code>Kid</code>
 
-              <div class="doc"><p>The one child, for a production whose rule guarantees exactly one — the child itself, not a one-element array. <code>Kid(|v: Ast| v)</code> is the pass-through a production that only names alternatives wants; it is the one arm whose lambda must annotate its parameter, since a payload of <code>(A) -&gt; A</code> has nothing in it to infer <code>A</code> *from*.</p></div>
-
-
-            </li>
-
-            <li id="item-TryKid"><code>TryKid((A) -&#62; A!ParseError)</code>
-
-              <div class="doc"><p><code>Kid</code> for a lowering that can refuse.</p></div>
+              <div class="doc"><p>The one child, unchanged, for a production whose rule guarantees exactly one — the pass-through a production that only names alternatives wants.</p><p>The one arm that carries no <code>A</code>, and so the one that cannot pin the type parameter itself: it takes it from the <code>Production</code> field it is written in, which takes it from the <code>Grammar</code> around that, which takes it from the enclosing function's return type. Nothing else in <code>Build</code> depends on that search, so if a future arm needs a lowering *function* over the one child, it carries one and pins <code>A</code> the way every other arm does.</p></div>
 
 
             </li>
@@ -431,7 +424,7 @@
             <a class="anchor" href="#item-show_style">show_style</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_style(__spat$26013: ListStyle) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_style(__spat$26194: ListStyle) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
 

@@ -279,14 +279,16 @@ variant Build<A: any> =
     | Kids((A[]) -> A)
     # `Kids` for a lowering that can refuse.
     | TryKids((A[]) -> A!ParseError)
-    # The one child, for a production whose rule guarantees exactly one — the
-    # child itself, not a one-element array. `Kid(|v: Ast| v)` is the
-    # pass-through a production that only names alternatives wants; it is the
-    # one arm whose lambda must annotate its parameter, since a payload of
-    # `(A) -> A` has nothing in it to infer `A` *from*.
-    | Kid((A) -> A)
-    # `Kid` for a lowering that can refuse.
-    | TryKid((A) -> A!ParseError)
+    # The one child, unchanged, for a production whose rule guarantees exactly
+    # one — the pass-through a production that only names alternatives wants.
+    #
+    # The one arm that carries no `A`, and so the one that cannot pin the type
+    # parameter itself: it takes it from the `Production` field it is written
+    # in, which takes it from the `Grammar` around that, which takes it from the
+    # enclosing function's return type. Nothing else in `Build` depends on that
+    # search, so if a future arm needs a lowering *function* over the one child,
+    # it carries one and pins `A` the way every other arm does.
+    | Kid
     # Only the node's token text (`token_text`, the matched tokens run
     # together) — a leaf-only node whose value is its spelling.
     | Text((str) -> A)

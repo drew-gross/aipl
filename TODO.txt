@@ -615,6 +615,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  display the number of test excluded from handoff
   merge tests of similar things into the same file for less process overhead
   use bazel
   do test result caching and/or build caching. Maybe with sccache?

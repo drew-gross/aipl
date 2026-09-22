@@ -3343,11 +3343,11 @@ allocations: 101061
 deallocations: 101061
 reallocations: 16523
 bytes allocated: 20378957
-instructions executed: 54996257
-binary size: 16847560
-  code: 10798756
+instructions executed: 54995993
+binary size: 16834000
+  code: 10789876
   data: 38012
-  metadata: 6010792
+  metadata: 6006112
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -4491,10 +4491,7 @@ functions:
     bytes: 376
   __m7__patterns:
     calls: 22
-    bytes: 31940
-  __m7__patterns$lambda0:
-    calls: 0
-    bytes: 2948
+    bytes: 31932
   __m7__pipes:
     calls: 44
     bytes: 376
@@ -4512,13 +4509,7 @@ functions:
     bytes: 3072
   __m7__statements:
     calls: 22
-    bytes: 106408
-  __m7__statements$lambda0:
-    calls: 0
-    bytes: 2948
-  __m7__statements$lambda1:
-    calls: 0
-    bytes: 2948
+    bytes: 106380
   __m7__tuple_slot_names:
     calls: 0
     bytes: 548

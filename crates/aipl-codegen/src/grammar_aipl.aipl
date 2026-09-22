@@ -829,13 +829,13 @@ fn statements() -> Production<AiplTok, Ast>[] {
         // in `aipl-syntax`'s lint driver), which is how they know a body holds
         // one statement and nothing after it. Giving the `0` a location
         // switched every one of them off.
-        p("loop_body", loop_body, Kid(|v: Ast| v)),
+        p("loop_body", loop_body, Kid),
         p("loop_inner", loop_inner, TryMk(lower_loop_inner)),
         // `kw_stmt` is the six statement productions behind one name, so a
         // block's choice between a statement and an expression stays a
         // single-token decision. Every alternative is a reference, so the node
         // is exactly the statement that matched.
-        pl("kw_stmt", kw_stmt, "a statement", Kid(|v: Ast| v)),
+        pl("kw_stmt", kw_stmt, "a statement", Kid),
         p("let_stmt", let_stmt, TryMk(lower_let_stmt)),
         p("mut_stmt", mut_stmt, TryMk(lower_mut_stmt)),
         p("assign_stmt", assign_stmt, TryMk(lower_assign_stmt)),
@@ -1107,7 +1107,7 @@ fn patterns() -> Production<AiplTok, Ast>[] {
 
     [
         p("match_arm", match_arm, TryMk(lower_match_arm)),
-        p("arm_body", arm_body, Kid(|v: Ast| v)),
+        p("arm_body", arm_body, Kid),
         pl("pattern", pattern, "a pattern", TryMk(lower_pattern)),
         p("ctor_payload", ctor_payload, TryMk(lower_ctor_payload)),
     ]
@@ -4597,15 +4597,15 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2097540
-deallocations: 2097540
+allocations: 2097365
+deallocations: 2097365
 reallocations: 295775
-bytes allocated: 387623274
-instructions executed: 574250873
-binary size: 5116272
-  code: 3356996
+bytes allocated: 387614874
+instructions executed: 574190772
+binary size: 5046584
+  code: 3310448
   data: 56396
-  metadata: 1702880
+  metadata: 1679740
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 18
@@ -4860,7 +4860,7 @@ functions:
     calls: 72960
     bytes: 404
   __builtin_find_map$__m8__Cst$__builtin_Span$lam$__m8__first_leaf:
-    calls: 6318
+    calls: 6155
     bytes: 364
   __builtin_find_map$__m8__Cst$__builtin_Span$lam$__m8__first_token:
     calls: 9000
@@ -4911,7 +4911,7 @@ functions:
     calls: 30
     bytes: 11200
   __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam$__m8__last_leaf:
-    calls: 7183
+    calls: 7008
     bytes: 440
   __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam$__m8__last_token:
     calls: 9254
@@ -5251,7 +5251,7 @@ functions:
     bytes: 364
   __m30__lower_node$__m21__AiplTok$__m1__Ast:
     calls: 2712
-    bytes: 145480
+    bytes: 122544
   __m30__match_group$__m21__AiplTok$__m1__Ast:
     calls: 12557
     bytes: 5084
@@ -5282,9 +5282,6 @@ functions:
   __m30__match_then$__m21__AiplTok$__m1__Ast:
     calls: 29101
     bytes: 2816
-  __m30__only_kid$__m1__Ast:
-    calls: 56
-    bytes: 14724
   __m30__parse$__m21__AiplTok$__m1__Ast:
     calls: 232
     bytes: 424
@@ -5445,7 +5442,7 @@ functions:
     calls: 747
     bytes: 6280
   __m8__first_leaf:
-    calls: 8780
+    calls: 8561
     bytes: 788
   __m8__first_token:
     calls: 18267
@@ -5457,7 +5454,7 @@ functions:
     calls: 13828
     bytes: 1108
   __m8__last_leaf:
-    calls: 9645
+    calls: 9414
     bytes: 788
   __m8__last_token:
     calls: 14051
@@ -5478,7 +5475,7 @@ functions:
     calls: 1110
     bytes: 920
   __m8__span:
-    calls: 2616
+    calls: 2560
     bytes: 252
   __m8__text:
     calls: 10
@@ -5634,13 +5631,13 @@ functions:
     calls: 2361
     bytes: (external)
   aipl_arr_elem_ptr:
-    calls: 16540
+    calls: 16365
     bytes: (external)
   aipl_arr_extend:
     calls: 1208239
     bytes: (external)
   aipl_arr_inc:
-    calls: 6279408
+    calls: 6278845
     bytes: (external)
   aipl_arr_reserve:
     calls: 1256584
@@ -5649,7 +5646,7 @@ functions:
     calls: 16645
     bytes: (external)
   aipl_arr_reverse:
-    calls: 16437
+    calls: 16262
     bytes: (external)
   aipl_arr_slice:
     calls: 367
@@ -5658,7 +5655,7 @@ functions:
     calls: 39
     bytes: (external)
   aipl_array_dec:
-    calls: 9451202
+    calls: 9450464
     bytes: (external)
   aipl_array_new:
     calls: 218284
@@ -5697,13 +5694,13 @@ functions:
     calls: 1338931
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 7136656
+    calls: 7136162
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 408655
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5797430
+    calls: 5796936
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 408655
@@ -6103,10 +6100,7 @@ functions:
     bytes: 376
   patterns:
     calls: 708
-    bytes: 22560
-  patterns$lambda0:
-    calls: 17
-    bytes: 2948
+    bytes: 22548
   pipes:
     calls: 1416
     bytes: 376
@@ -6127,13 +6121,7 @@ functions:
     bytes: 3072
   statements:
     calls: 708
-    bytes: 67548
-  statements$lambda0:
-    calls: 8
-    bytes: 2948
-  statements$lambda1:
-    calls: 31
-    bytes: 2948
+    bytes: 67516
   tuple_slot_names:
     calls: 3
     bytes: 548

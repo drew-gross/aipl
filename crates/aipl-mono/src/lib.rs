@@ -803,6 +803,139 @@ fn expand_ignored_payload(pattern: &Pattern, arity: usize) -> Pattern {
     }
 }
 
+/// How many named templates [`find_generic_args_in`] will look inside before
+/// giving up. Four covers the shapes that occur — a grammar's `Grammar` ->
+/// `Production` -> `Build` is three — and bounds the search on a type whose
+/// templates nest more deeply than any context is plausibly deciding through.
+const TEMPLATE_SEARCH_DEPTH: usize = 4;
+
+/// The template tables [`find_generic_args_in`] reads, plus the caller's way of
+/// decomposing a synthesized instance name.
+///
+/// Passed rather than reached through `self` because both the checker and mono
+/// run this search and their answers have to agree — the checker accepting a
+/// program mono then rejects is a crash after a clean check, so there is one
+/// implementation and two thin wrappers rather than two copies to keep in step.
+pub(crate) struct Templates<'a> {
+    pub structs: &'a HashMap<String, aipl_syntax::ast::StructDecl>,
+    pub variants: &'a HashMap<String, aipl_syntax::ast::VariantDecl>,
+    /// `Holder$Json` -> `("Holder", [Json])`, or `None` if the name is not a
+    /// generic instance. Each caller has its own registry to look it up in.
+    pub instance_args: &'a dyn Fn(&str) -> Option<(String, Vec<Type>)>,
+}
+
+/// The type arguments an application of generic `base` takes, found anywhere
+/// inside `ty`.
+///
+/// `ty` is the context a construction is being resolved against — the enclosing
+/// function's return type, or an annotation. A direct hit answers immediately;
+/// otherwise the search looks through the containers (`Box<T>[]`, `T?`, a
+/// dict's halves, a result's two sides) and then *inside named templates*,
+/// substituting each one's type arguments as it descends. That last step is
+/// what lets a `Build<A>` written as a field of a `Production` inside a
+/// `Grammar` take its `A` from `-> Grammar<Tok, Ast>`, which is the only place
+/// it is written.
+///
+/// Two fields that disagree answer `None` rather than picking one: the context
+/// genuinely does not say, and a wrong answer here is far worse than a missing
+/// one — it silently builds the wrong instance.
+pub(crate) fn find_generic_args_in(
+    ty: &Type,
+    base: &str,
+    tmpls: &Templates<'_>,
+    depth: usize,
+    seen: &mut HashSet<String>,
+) -> Option<Vec<Type>> {
+    match ty {
+        Type::Generic(b, args) if b == base => Some(args.clone()),
+        Type::Generic(b, args) => within_template(b, args, base, tmpls, depth, seen),
+        Type::Named(n) => match (tmpls.instance_args)(n) {
+            Some((b, args)) if b == base => Some(args),
+            Some((b, args)) => within_template(&b, &args, base, tmpls, depth, seen),
+            None => None,
+        },
+        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => {
+            find_generic_args_in(i, base, tmpls, depth, seen)
+        }
+        Type::Dict(k, v) => find_generic_args_in(k, base, tmpls, depth, seen)
+            .or_else(|| find_generic_args_in(v, base, tmpls, depth, seen)),
+        Type::Result(a, b) => find_generic_args_in(a, base, tmpls, depth, seen)
+            .or_else(|| find_generic_args_in(b, base, tmpls, depth, seen)),
+        _ => None,
+    }
+}
+
+/// [`find_generic_args_in`] inside the fields (or case payloads) of the
+/// template `name` applied to `args`.
+///
+/// `seen` holds the templates on the path down, so a recursive type — whose
+/// payload names its own instance — stops instead of descending forever. It is
+/// a *path* set: the name is released on the way back up, so two sibling fields
+/// of the same type are each searched.
+fn within_template(
+    name: &str,
+    args: &[Type],
+    base: &str,
+    tmpls: &Templates<'_>,
+    depth: usize,
+    seen: &mut HashSet<String>,
+) -> Option<Vec<Type>> {
+    if depth >= TEMPLATE_SEARCH_DEPTH || !seen.insert(name.to_string()) {
+        return None;
+    }
+    let inner = template_member_types(name, args, tmpls);
+    let mut found: Option<Vec<Type>> = None;
+    for ty in inner {
+        let Some(hit) = find_generic_args_in(&ty, base, tmpls, depth + 1, seen) else {
+            continue;
+        };
+        match &found {
+            None => found = Some(hit),
+            Some(prev) if *prev != hit => {
+                seen.remove(name);
+                return None;
+            }
+            _ => {}
+        }
+    }
+    seen.remove(name);
+    found
+}
+
+/// The field types of generic struct `name`, or the payload types of generic
+/// variant `name`, with `args` substituted for its type variables. Empty when
+/// `name` is not a template, or is applied to the wrong number of arguments.
+fn template_member_types(name: &str, args: &[Type], tmpls: &Templates<'_>) -> Vec<Type> {
+    let bind = |vars: &[aipl_syntax::ast::TypeParam]| -> Option<HashMap<String, Type>> {
+        (vars.len() == args.len()).then(|| {
+            vars.iter()
+                .map(|v| v.name.clone())
+                .zip(args.iter().cloned())
+                .collect()
+        })
+    };
+    if let Some(tmpl) = tmpls.structs.get(name) {
+        if let Some(map) = bind(&tmpl.type_vars) {
+            return tmpl
+                .fields
+                .iter()
+                .map(|f| subst_type_params(&f.ty, &map))
+                .collect();
+        }
+    }
+    if let Some(tmpl) = tmpls.variants.get(name) {
+        if let Some(map) = bind(&tmpl.type_vars) {
+            return tmpl
+                .cases
+                .iter()
+                .flat_map(|c| c.payload.iter())
+                .map(|p| subst_type_params(&p.ty, &map))
+                .collect();
+        }
+    }
+    Vec::new()
+}
+
 /// Substitute template type variables in `t` with concrete types from `map`,
 /// recursing through every compound type — including nested generic
 /// applications, so a generic field like `inner: Box<T>` becomes `Box<i64>`
@@ -5448,21 +5581,12 @@ impl Mono<'_> {
     }
 
     fn find_generic_args(&self, ty: &Type, base: &str) -> Option<Vec<Type>> {
-        match ty {
-            Type::Generic(b, args) if b == base => Some(args.clone()),
-            Type::Named(n) => self
-                .instance_args(n)
-                .filter(|(b, _)| b == base)
-                .map(|(_, a)| a),
-            Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => self.find_generic_args(i, base),
-            Type::Dict(k, v) => self
-                .find_generic_args(k, base)
-                .or_else(|| self.find_generic_args(v, base)),
-            Type::Result(a, b) => self
-                .find_generic_args(a, base)
-                .or_else(|| self.find_generic_args(b, base)),
-            _ => None,
-        }
+        let tmpls = crate::Templates {
+            structs: self.generic_structs,
+            variants: self.generic_variants,
+            instance_args: &|n: &str| self.instance_args(n),
+        };
+        crate::find_generic_args_in(ty, base, &tmpls, 0, &mut HashSet::new())
     }
 
     /// If `t` is a struct with a field named `field` holding a function value,
