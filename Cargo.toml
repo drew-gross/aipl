@@ -146,4 +146,18 @@ opt-level = 2
 # what the workspace crates get. The `test` profile inherits from `dev`, so
 # the test binaries — the things being linked over and over — get it too.
 [profile.dev]
+# Our own crates are optimized, not just the dependencies above. The compiler
+# *is* the thing the test suite runs, hundreds of times: at `opt-level = 0` the
+# whole suite took 390s and `walker.aipl` alone 41.5s to check, against 255s and
+# 20.4s here — a third off the wall clock of every full run.
+#
+# It is free. Optimizing also *shrinks* the build: 28s against 37s unoptimized,
+# because opt-level 1 hands the backend far less IR to chew through than a
+# literal translation does. `opt-level = 2` was measured too and is not worth
+# it — 38s to build for 17.5s, trading 10s of build for 3s of check and blurrier
+# backtraces.
+#
+# `debug-assertions` are unaffected by this and stay on, so overflow checks and
+# every `debug_assert!` still fire.
+opt-level = 1
 debug = "line-tables-only"
