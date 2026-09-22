@@ -615,6 +615,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  use bazel
   do test result caching and/or build caching. Maybe with sccache?
   can handoff leverage event streaming to start filling sections while discovery is still ongoing?
   have handoff print started at and elapsed until now per stage so I can see where we are at easier

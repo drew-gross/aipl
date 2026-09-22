@@ -347,7 +347,7 @@ fn bare_name(name: &str) -> String {
 }
 
 /// What remediation a discovery run calls for.
-#[derive(Default)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct Plan {
     /// A section mismatch, or a *missing* required section (what a brand-new
     /// case reports — `fill_expected` creates one that isn't there, so a new

@@ -56,7 +56,16 @@
 //!    the remediation steps rewrite that is compiled in rather than read at run
 //!    time. Its own labelled step purely so the timing report attributes that
 //!    compile to the thing that caused it instead of to the final run.
-//! 6. Final run confirms green against the live (promoted) artifacts.
+//! 6. Final run confirms green against the live (promoted) artifacts —
+//!    *scoped*, when the remediation was confined to section refills, to those
+//!    refilled cases plus every test that is not a per-case test. A case this
+//!    skips passed in the discovery run and has read-for-read identical inputs
+//!    since, so re-running it re-establishes nothing, and per-case tests are the
+//!    bulk of the suite (864 of 1240, each ~0.9s of process and setup overhead
+//!    for ~0.6s of work). Measured at 173s against 388s unscoped.
+//!    A regenerated artifact or `#[test]` list is an input to cases that did
+//!    *not* re-run, so either falls back to the full suite — see
+//!    [`final_run_scope_from`], which states the whole argument.
 //!
 //! # Test runner
 //!
@@ -82,6 +91,7 @@ mod discovery;
 mod machine;
 mod runner;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use runner::{Cmd, Output, Runner, BOLD, DIM, GREEN, OFF};
@@ -132,6 +142,107 @@ fn nextest() -> Cmd {
         .args(["nextest", "run", "--color", "never", "--no-fail-fast"])
         .args(ALL_TESTS)
         .json()
+}
+
+/// The whole suite minus the per-case tests not named in `keep`: everything
+/// outside the `cases` binary, plus exactly those case tests.
+fn nextest_scoped(keep: &[String]) -> Cmd {
+    Cmd::new("cargo")
+        .args(["nextest", "run", "--color", "never", "--no-fail-fast"])
+        .args(ALL_TESTS)
+        .args(["-E", &scoped_filter_expr(keep)])
+        .json()
+}
+
+/// The filterset for [`nextest_scoped`].
+///
+/// Phrased as *keep* rather than *skip* only because the keep list is the short
+/// one; the safety property is the leading `not binary(=cases)`, which runs
+/// every test that is not a per-case test whatever this gate knows about it. A
+/// newly added non-case test, or one handoff has never heard of, is therefore
+/// run by default — the direction a gate has to fail in.
+///
+/// `every_case_has_a_test` lives in the `cases` binary but is not a per-case
+/// test (it compares the checked-in list against the tree), so it is named back
+/// in explicitly.
+fn scoped_filter_expr(keep: &[String]) -> String {
+    let mut expr = String::from("not binary(=cases) or test(=every_case_has_a_test)");
+    for name in keep {
+        expr.push_str(" or test(=");
+        expr.push_str(name);
+        expr.push(')');
+    }
+    expr
+}
+
+/// The per-case `#[test]` names, keyed by the display path each was generated
+/// from — `cases/arrays/nonempty` → `cases_arrays_nonempty`.
+///
+/// Parsed out of the checked-in `tests/support/case_tests.rs` rather than
+/// re-derived by mangling the path here. The mangling is the *generator's* rule,
+/// and a second copy of it in this crate would be a rule that can drift: the
+/// generated file already states the mapping, so this reads it. An unreadable
+/// file yields an empty map, which [`final_run_scope`] treats as "don't narrow".
+fn case_test_names(repo: &Path) -> HashMap<String, String> {
+    let path = repo.join("tests/support/case_tests.rs");
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    case_test_names_from(&text)
+}
+
+/// [`case_test_names`] over the file's text: one `name = "display/path",` entry
+/// per line inside the `case_tests!` block.
+fn case_test_names_from(text: &str) -> HashMap<String, String> {
+    text.lines()
+        .filter_map(|line| {
+            let (name, rest) = line.trim().split_once(" = \"")?;
+            let display = rest.split_once('"')?.0;
+            Some((display.to_string(), name.to_string()))
+        })
+        .collect()
+}
+
+/// The per-case tests the final run has to re-execute, or `None` when the run
+/// must not be narrowed at all.
+fn final_run_scope(repo: &Path, plan: &discovery::Plan) -> Option<Vec<String>> {
+    final_run_scope_from(&case_test_names(repo), plan)
+}
+
+/// [`final_run_scope`] against an already-read name map.
+///
+/// The narrowing is sound exactly when every input a *skipped* case reads is
+/// byte-identical to what it read during the discovery run that passed it.
+/// Three things could break that, and each is a `None` here:
+///
+/// - **`need_ir`** — step 5 rewrote `dogfood.clif`, which every case compiles
+///   against. (Step 1b's promotion is fine: it happens *before* discovery, so
+///   the discovery run is already against the new artifact.)
+/// - **`need_case_tests`** — the case list was regenerated, so cases exist that
+///   discovery never executed, and the test binary was rebuilt.
+/// - **an unmappable case** — a refilled path with no `#[test]` name means this
+///   function and the generator disagree about the corpus, and guessing is
+///   worse than running everything.
+///
+/// What is *not* a hazard, and is the reason this is worth doing at all: a
+/// refill rewrites only a case's own trailing `--- section ---` blocks, and
+/// `aipl_parser::parse_with_allows` strips those from every file it parses —
+/// imports included. So refilling `ty.aipl`'s `--- performance ---` cannot
+/// change what `grammar_aipl.aipl` compiles to, even though it imports it.
+/// `fill_docs` is likewise harmless: nothing under `docs/` is a case input, and
+/// the test that reads it is not a per-case test, so it runs regardless.
+fn final_run_scope_from(
+    names: &HashMap<String, String>,
+    plan: &discovery::Plan,
+) -> Option<Vec<String>> {
+    if plan.need_ir || plan.need_case_tests || names.is_empty() {
+        return None;
+    }
+    plan.fail_cases
+        .iter()
+        .map(|case| {
+            let display = case.strip_suffix(".aipl").unwrap_or(case);
+            names.get(display).cloned()
+        })
+        .collect()
 }
 
 /// Build every test target without running anything.
@@ -663,7 +774,24 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
 
     // --- 6. Final confirmation against the live artifacts ------------------
 
-    if !r.step("nextest (final)", nextest()) {
+    // Scoped to what the remediation above could possibly have changed, when it
+    // can be (see `final_run_scope`). Every case this skips passed in the
+    // discovery run and has read-for-read identical inputs since, so re-running
+    // it re-establishes nothing — and it is the bulk of the suite: 864 of 1240
+    // tests are per-case, each paying ~0.9s of process and setup overhead for
+    // ~0.6s of work.
+    let scope = final_run_scope(&repo, &plan);
+    let (label, cmd) = match &scope {
+        Some(keep) => (
+            format!(
+                "nextest (final — scoped to {} refilled case(s))",
+                keep.len()
+            ),
+            nextest_scoped(keep),
+        ),
+        None => ("nextest (final)".to_string(), nextest()),
+    };
+    if !r.step(&label, cmd) {
         r.save_out();
         let detail = failure_excerpt(&r.out);
         r.fail("nextest (final — regeneration didn't settle)", &detail);
@@ -688,6 +816,12 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
     }
     if plan.need_docs {
         eprintln!("  regenerated the checked-in docs site");
+    }
+    if let Some(keep) = &scope {
+        eprintln!(
+            "{DIM}  (final run scoped to {} refilled case(s) + every non-case test){OFF}",
+            keep.len()
+        );
     }
     if plan.behavioral_changed {
         eprintln!(
@@ -803,6 +937,95 @@ fn repo_root() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A `Plan` with only the fields the scope decision reads set.
+    fn plan_with(fail_cases: &[&str]) -> discovery::Plan {
+        discovery::Plan {
+            need_fill: true,
+            fail_cases: fail_cases.iter().map(|c| (*c).to_string()).collect(),
+            ..Default::default()
+        }
+    }
+
+    const GENERATED: &str = r#"
+// @generated by `cargo test --test cases -- --ignored fill_case_tests`.
+case_tests! {
+    cases_arrays_nonempty = "cases/arrays/nonempty",
+    crates_aipl_codegen_src_walker = "crates/aipl-codegen/src/walker",
+    examples_hello = "examples/hello",
+}
+"#;
+
+    #[test]
+    fn reads_the_generated_case_test_mapping() {
+        let names = case_test_names_from(GENERATED);
+        assert_eq!(names.len(), 3);
+        assert_eq!(
+            names.get("cases/arrays/nonempty").map(String::as_str),
+            Some("cases_arrays_nonempty")
+        );
+        // A hyphenated directory still maps through the generator's own name.
+        assert_eq!(
+            names
+                .get("crates/aipl-codegen/src/walker")
+                .map(String::as_str),
+            Some("crates_aipl_codegen_src_walker")
+        );
+        // The header comment and the `case_tests! {` line are not entries.
+        assert!(!names.contains_key("@generated"));
+    }
+
+    #[test]
+    fn scopes_the_final_run_to_the_refilled_cases() {
+        let names = case_test_names_from(GENERATED);
+        let plan = plan_with(&["cases/arrays/nonempty.aipl", "examples/hello.aipl"]);
+        let keep = final_run_scope_from(&names, &plan).expect("narrowable");
+        assert_eq!(keep, ["cases_arrays_nonempty", "examples_hello"]);
+    }
+
+    #[test]
+    fn refuses_to_scope_when_a_skipped_case_could_have_changed() {
+        let names = case_test_names_from(GENERATED);
+
+        // A regenerated artifact is an input to *every* case.
+        let mut ir = plan_with(&["cases/arrays/nonempty.aipl"]);
+        ir.need_ir = true;
+        assert_eq!(final_run_scope_from(&names, &ir), None);
+
+        // A regenerated `#[test]` list means cases discovery never ran.
+        let mut listed = plan_with(&["cases/arrays/nonempty.aipl"]);
+        listed.need_case_tests = true;
+        assert_eq!(final_run_scope_from(&names, &listed), None);
+
+        // A case with no `#[test]` name: this gate and the generator disagree.
+        let unknown = plan_with(&["cases/arrays/nonempty.aipl", "cases/who/knows.aipl"]);
+        assert_eq!(final_run_scope_from(&names, &unknown), None);
+
+        // No mapping to read at all.
+        let empty = HashMap::new();
+        assert_eq!(
+            final_run_scope_from(&empty, &plan_with(&["cases/arrays/nonempty.aipl"])),
+            None
+        );
+    }
+
+    #[test]
+    fn the_scoped_filter_runs_every_non_case_test() {
+        // The leading arm is what makes an unrecognized test run rather than be
+        // skipped; `every_case_has_a_test` is named back in because it lives in
+        // the `cases` binary without being a per-case test.
+        let expr = scoped_filter_expr(&["cases_arrays_nonempty".to_string()]);
+        assert_eq!(
+            expr,
+            "not binary(=cases) or test(=every_case_has_a_test) \
+             or test(=cases_arrays_nonempty)"
+        );
+        // Nothing refilled still confirms the whole non-case half of the suite.
+        assert_eq!(
+            scoped_filter_expr(&[]),
+            "not binary(=cases) or test(=every_case_has_a_test)"
+        );
+    }
 
     #[test]
     fn reads_the_formatter_summary() {

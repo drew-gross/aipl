@@ -12,8 +12,13 @@ dependency order and pays for the expensive regeneration steps only when a test
 run proves they're needed: `cargo fmt` + `aipl fmt` the corpus, a discovery
 run, then (only if that surfaced fillable staleness) scoped
 `fill_expected` refills of exactly the mismatched cases and the staged
-dogfood-IR regen/validate/promote flow, then a final run. It exits 0 on
-green (printing what it refilled/regenerated and flagging behavioral-output
+dogfood-IR regen/validate/promote flow, then a final run. That final run is
+**scoped** when the only remediation was section refills — it re-runs the
+refilled cases plus every test that is not a per-case test, since a case it
+skips passed during discovery and has read-for-read identical inputs since
+(measured: 173s against 388s). Regenerating the IR or the `#[test]` list
+changes an input to cases that did not re-run, so either falls back to the
+full suite. It exits 0 on green (printing what it refilled/regenerated and flagging behavioral-output
 changes to review in the git diff), or stops with a pointed message naming the
 step and why on any failure a refill can't fix.
 
