@@ -464,15 +464,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 12803
-deallocations: 12803
-reallocations: 2088
-bytes allocated: 1271761
-instructions executed: 2645754
-binary size: 423064
-  code: 277684
+allocations: 12495
+deallocations: 12495
+reallocations: 1902
+bytes allocated: 1253687
+instructions executed: 2681493
+binary size: 424248
+  code: 278708
   data: 6012
-  metadata: 139368
+  metadata: 139528
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -770,7 +770,7 @@ functions:
     bytes: 952
   __m13__match_then$CalcTok$Calc:
     calls: 206
-    bytes: 2804
+    bytes: 2816
   __m13__parse$CalcTok$Calc:
     calls: 42
     bytes: 284
@@ -779,7 +779,7 @@ functions:
     bytes: 352
   __m13__parse_prepared$CalcTok$Calc:
     calls: 53
-    bytes: 6504
+    bytes: 6476
   __m13__pruned$CalcTok$Calc:
     calls: 0
     bytes: 1236
@@ -818,7 +818,7 @@ functions:
     bytes: 376
   __m1__own_token_text:
     calls: 308
-    bytes: 1248
+    bytes: 2256
   __m1__show:
     calls: 12
     bytes: 2968
@@ -842,7 +842,7 @@ functions:
     bytes: 32
   __m2__climb_precs$CalcTok$tail:
     calls: 12
-    bytes: 1460
+    bytes: 1448
   __m2__first_precs$CalcTok:
     calls: 0
     bytes: 32
@@ -887,7 +887,7 @@ functions:
     bytes: 580
   __m3__desugar_rule$CalcTok:
     calls: 832
-    bytes: 12004
+    bytes: 12048
   __m3__failure_message:
     calls: 7
     bytes: 488
@@ -1057,7 +1057,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 69265
+    calls: 70189
     bytes: (external)
   aipl_array_new:
     calls: 3395
@@ -1066,10 +1066,10 @@ functions:
     calls: 1680
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3337
+    calls: 3148
     bytes: (external)
   aipl_array_with_cap:
-    calls: 799
+    calls: 491
     bytes: (external)
   aipl_assert:
     calls: 51

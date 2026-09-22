@@ -73,10 +73,10 @@ deallocations: 16689
 reallocations: 2158
 bytes allocated: 1031946
 instructions executed: 5455188
-binary size: 249968
-  code: 164216
+binary size: 250000
+  code: 164244
   data: 1876
-  metadata: 83876
+  metadata: 83880
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -200,7 +200,7 @@ functions:
     bytes: 1904
   __m12__finalize_template$__m1__SexpKind:
     calls: 0
-    bytes: 4008
+    bytes: 4004
   __m12__float_len:
     calls: 0
     bytes: 824
@@ -287,7 +287,7 @@ functions:
     bytes: 952
   __m14__match_then$__m1__SexpKind$Sexp:
     calls: 0
-    bytes: 2804
+    bytes: 2816
   __m14__parse$__m1__SexpKind$Sexp:
     calls: 6
     bytes: 284
@@ -296,7 +296,7 @@ functions:
     bytes: 352
   __m14__parse_prepared$__m1__SexpKind$Sexp:
     calls: 6
-    bytes: 6696
+    bytes: 6672
   __m14__pruned$__m1__SexpKind$Sexp:
     calls: 0
     bytes: 1236
@@ -371,7 +371,7 @@ functions:
     bytes: 580
   __m4__desugar_rule$__m1__SexpKind:
     calls: 42
-    bytes: 12004
+    bytes: 12048
   __m4__group_styles$__m1__SexpKind:
     calls: 0
     bytes: 32

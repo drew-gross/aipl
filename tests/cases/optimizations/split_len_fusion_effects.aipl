@@ -1,0 +1,48 @@
+import { len, print, split } from builtins;
+
+// Fusion is refused when it would change what the program does: an effect
+// anywhere in the expression means the pass declines, and the ordinary
+// split-then-count runs. The separator here is computed by something that
+// prints, so `split(..).len()` cannot be fused; the `functions:` list shows the
+// array `split` still builds (`aipl_array_new`), and the output shows the print
+// landing where the source put it.
+fn noisy_sep() !prints -> str {
+    print("sep");
+    "\n"
+}
+
+fn main() !prints {
+    print(`{"a\nb\nc".split(noisy_sep()).len()}`);
+}
+--- stdout ---
+sep
+3
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 121
+instructions executed: 76
+binary size: 1664
+  code: 600
+  data: 1
+  metadata: 1063
+functions:
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 396

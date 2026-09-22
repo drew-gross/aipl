@@ -10,7 +10,9 @@ import { lines } from "./lines.aipl";
 
 pub fn assert_loc(src: str, span: Span) -> str {
     // Splitting on "\n" always yields (newline count + 1) parts, so the
-    // prefix's line count is just its number of lines.
+    // prefix's line count is just its number of lines. No array is built for
+    // it: the fusion pass collapses `lines().len()` into `split_len`, the
+    // counting pass alone — this runs once per assertion over the whole prefix.
     let line = src[..span.start].lines().len();
     let text = src[span].trim();
     `input:{line}: {text}`
@@ -27,15 +29,15 @@ pub fn assert_loc(src: str, span: Span) -> str {
     assert(assert_loc("", Span { start: 0, end: 0 }) == "input:1: ");
 })
 --- performance ---
-allocations: 28
-deallocations: 28
+allocations: 22
+deallocations: 22
 reallocations: 0
-bytes allocated: 1918
-instructions executed: 749
-binary size: 4840
-  code: 2108
+bytes allocated: 1510
+instructions executed: 725
+binary size: 4768
+  code: 2076
   data: 579
-  metadata: 2153
+  metadata: 2113
 functions:
   __test$assert_loc:
     calls: 1
@@ -43,12 +45,6 @@ functions:
   __to_str_u64:
     calls: 6
     bytes: 204
-  aipl_array_dec:
-    calls: 6
-    bytes: (external)
-  aipl_array_new:
-    calls: 6
-    bytes: (external)
   aipl_assert:
     calls: 6
     bytes: (external)
@@ -69,7 +65,7 @@ functions:
     bytes: (external)
   assert_loc:
     calls: 6
-    bytes: 592
+    bytes: 560
   main:
     calls: 1
     bytes: 108

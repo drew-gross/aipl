@@ -744,10 +744,10 @@ deallocations: 2325
 reallocations: 217
 bytes allocated: 186475
 instructions executed: 300720
-binary size: 256840
-  code: 165328
+binary size: 256888
+  code: 165372
   data: 6076
-  metadata: 85436
+  metadata: 85440
 functions:
   __arr_drop_Item:
     calls: 69
@@ -892,7 +892,7 @@ functions:
     bytes: 580
   __m8__desugar_rule$FKind:
     calls: 44
-    bytes: 12004
+    bytes: 12048
   __m8__failure_message:
     calls: 2
     bytes: 488

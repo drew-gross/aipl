@@ -767,8 +767,8 @@ deallocations: 1579
 reallocations: 352
 bytes allocated: 184735
 instructions executed: 243904
-binary size: 168112
-  code: 111000
+binary size: 168144
+  code: 111032
   data: 4004
   metadata: 53108
 functions:
@@ -852,7 +852,7 @@ functions:
     bytes: 580
   __m1__desugar_rule$Tok:
     calls: 240
-    bytes: 12004
+    bytes: 12048
   __m1__group_styles$Tok:
     calls: 0
     bytes: 32
@@ -1002,7 +1002,7 @@ functions:
     bytes: 32
   climb_precs$Tok$tail:
     calls: 92
-    bytes: 1460
+    bytes: 1448
   ebnf$Tok$Node:
     calls: 6
     bytes: 3604

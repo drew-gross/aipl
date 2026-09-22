@@ -517,8 +517,8 @@ deallocations: 22173
 reallocations: 3287
 bytes allocated: 2833155
 instructions executed: 5530884
-binary size: 462312
-  code: 302640
+binary size: 462328
+  code: 302656
   data: 8564
   metadata: 151108
 functions:
@@ -728,7 +728,7 @@ functions:
     bytes: 1904
   __m11__finalize_template$JsonTok:
     calls: 0
-    bytes: 4008
+    bytes: 4004
   __m11__float_len:
     calls: 322
     bytes: 824
@@ -818,7 +818,7 @@ functions:
     bytes: 952
   __m13__match_then$JsonTok$Json:
     calls: 158
-    bytes: 2804
+    bytes: 2816
   __m13__parse$JsonTok$Json:
     calls: 34
     bytes: 284
@@ -827,7 +827,7 @@ functions:
     bytes: 352
   __m13__parse_prepared$JsonTok$Json:
     calls: 57
-    bytes: 6696
+    bytes: 6672
   __m13__pruned$JsonTok$Json:
     calls: 0
     bytes: 1236
@@ -887,7 +887,7 @@ functions:
     bytes: 32
   __m2__climb_precs$JsonTok$tail:
     calls: 26
-    bytes: 1460
+    bytes: 1448
   __m2__first_precs$JsonTok:
     calls: 0
     bytes: 32
@@ -932,7 +932,7 @@ functions:
     bytes: 580
   __m3__desugar_rule$JsonTok:
     calls: 2310
-    bytes: 12004
+    bytes: 12048
   __m3__failure_message:
     calls: 8
     bytes: 488

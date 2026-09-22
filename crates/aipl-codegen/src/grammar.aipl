@@ -1074,10 +1074,10 @@ deallocations: 754
 reallocations: 101
 bytes allocated: 94897
 instructions executed: 78861
-binary size: 164232
-  code: 101688
+binary size: 164280
+  code: 101732
   data: 6660
-  metadata: 55884
+  metadata: 55888
 functions:
   __arr_drop_ListStyle:
     calls: 46
@@ -1243,7 +1243,7 @@ functions:
     bytes: 580
   desugar_rule$Kind:
     calls: 89
-    bytes: 12004
+    bytes: 12048
   echo:
     calls: 0
     bytes: 28

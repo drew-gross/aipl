@@ -331,7 +331,7 @@ fn sink_here(e: Expr, blocked: &HashSet<String>) -> Expr {
 
 /// Whether `name` occurs *free* in `e` — an occurrence under a binder that
 /// re-introduces the same name belongs to that binder, not to ours.
-fn mentions_free(e: &Expr, name: &str) -> bool {
+pub(crate) fn mentions_free(e: &Expr, name: &str) -> bool {
     match &e.kind {
         ExprKind::Ident(n) => n == name,
         ExprKind::Let(n, _, value, body) | ExprKind::LetMut(n, _, value, body) => {

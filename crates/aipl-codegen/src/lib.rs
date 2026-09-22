@@ -4445,6 +4445,7 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_list_files", aipl_list_files as *const u8);
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_str_split", aipl_str_split as *const u8);
+    jit_builder.symbol("aipl_str_split_len", str24::aipl_str_split_len as *const u8);
     jit_builder.symbol("aipl_str_join", aipl_str_join as *const u8);
     jit_builder.symbol("aipl_arr_drop_str", str24::aipl_arr_drop_str as *const u8);
     jit_builder.symbol(
@@ -7800,6 +7801,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_arr_load_bit"
         | "aipl_write_string_to_file"
         | "aipl_str_split"
+        | "aipl_str_split_len"
         | "aipl_read_file_to_string"
         | "aipl_rec_alloc"
         | "aipl_write_i64"
@@ -8010,6 +8012,7 @@ fn register_builtins(
     const SIG_REGS: &[(Callee, &str)] = &[
         (Callee::Print, "aipl_print"),
         (Callee::Split, "aipl_str_split"),
+        (Callee::SplitLen, "aipl_str_split_len"),
         (Callee::ReadFileToString, "aipl_read_file_to_string"),
         (Callee::WriteStringToFile, "aipl_write_string_to_file"),
         (Callee::ListFiles, "aipl_list_files"),
@@ -9187,6 +9190,37 @@ fn drop_scope<M: Module>(
             Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
         };
         emit_drop(builder, module, builtins, structs, v, &t.ty);
+    }
+}
+
+/// Release every live scope at an early exit — a `return`, a `?` that
+/// propagates, a tail call — **innermost first**, the order normal exit
+/// unwinds them in.
+///
+/// The order is load-bearing. A `match` arm's payload bindings are addresses
+/// *into* the scrutinee's block (`bind_match_arm` reads them in place), and the
+/// scrutinee can be a binding an outer scope owns outright — a parameter a
+/// fresh temporary was moved into, say. Releasing the outer scope first can
+/// then free that block, and the payload releases that follow read their
+/// 24-byte `str` (or box pointer) out of freed memory: at best the count they
+/// should have dropped stays up, at worst they free something else. Every
+/// early exit used to walk outermost-first, and a heap `str` payload matched
+/// under a tail call leaked exactly that way (`cases/tail_calls/moved_payload`).
+fn release_all_scopes<M: Module>(
+    builder: &mut FunctionBuilder,
+    module: &mut M,
+    builtins: &Builtins,
+    structs: &HashMap<String, TypeDef>,
+    scopes: &[Vec<Tracked>],
+) {
+    for scope in scopes.iter().rev() {
+        for t in scope {
+            let v = match t.owned {
+                Owned::Value(v) => v,
+                Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
+            };
+            emit_drop(builder, module, builtins, structs, v, &t.ty);
+        }
     }
 }
 
@@ -14871,15 +14905,7 @@ fn compile_call<M: Module>(
         && sret_size(cx.ret_ty, structs).is_none()
         && is_unit(cx.ret_ty) == is_unit(&info.return_ty)
     {
-        for scope in scopes.iter() {
-            for t in scope {
-                let v = match t.owned {
-                    Owned::Value(v) => v,
-                    Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
-                };
-                emit_drop(builder, module, builtins, structs, v, &t.ty);
-            }
-        }
+        release_all_scopes(builder, module, builtins, structs, scopes);
         builder.ins().return_call(local_callee, &call_args);
         // Unreachable continuation: the enclosing `if`/`match` arm still emits
         // its merge jump (and the epilogue its return), which compile into here
@@ -18572,15 +18598,7 @@ fn compile_expr_inner<M: Module>(
             if needs_drop(cx.ret_ty, structs) && !move_owned_temp(scopes, mark, ret_val) {
                 emit_retain(builder, module, builtins, structs, ret_val, cx.ret_ty);
             }
-            for scope in scopes.iter() {
-                for t in scope {
-                    let v = match t.owned {
-                        Owned::Value(v) => v,
-                        Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
-                    };
-                    emit_drop(builder, module, builtins, structs, v, &t.ty);
-                }
-            }
+            release_all_scopes(builder, module, builtins, structs, scopes);
             if is_unit(cx.ret_ty) {
                 builder.ins().return_(&[]);
             } else if sret_size(cx.ret_ty, structs).is_some() {
@@ -20756,15 +20774,7 @@ fn compile_expr_inner<M: Module>(
                 if cx.in_test {
                     builtins.call_void(module, builder, "aipl_test_fail_none", &[]);
                 }
-                for scope in scopes.iter() {
-                    for t in scope {
-                        let v = match t.owned {
-                            Owned::Value(v) => v,
-                            Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
-                        };
-                        emit_drop(builder, module, builtins, structs, v, &t.ty);
-                    }
-                }
+                release_all_scopes(builder, module, builtins, structs, scopes);
                 if cx.in_test {
                     // The synthesized test body returns unit — nothing to store.
                     builder.ins().return_(&[]);
@@ -20890,30 +20900,14 @@ fn compile_expr_inner<M: Module>(
                 let fail_id = test_fail_func(module, cx, &err_in_ty);
                 let fref = module.declare_func_in_func(fail_id, builder.func);
                 builder.ins().call(fref, &[err_val]);
-                for scope in scopes.iter() {
-                    for t in scope {
-                        let v = match t.owned {
-                            Owned::Value(v) => v,
-                            Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
-                        };
-                        emit_drop(builder, module, builtins, structs, v, &t.ty);
-                    }
-                }
+                release_all_scopes(builder, module, builtins, structs, scopes);
                 builder.ins().return_(&[]);
             } else if cx.error_main {
                 // `?` in `fn main() -> !Error`: print `error: <msg>` and exit 1.
                 // Read the err payload (borrowed) before the scope drop frees it.
                 let msg = component(builder, rptr, OPT_VALUE_OFFSET, &err_in_ty, structs);
                 builtins.call_void(module, builder, "aipl_print_error", &[msg]);
-                for scope in scopes.iter() {
-                    for t in scope {
-                        let v = match t.owned {
-                            Owned::Value(v) => v,
-                            Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
-                        };
-                        emit_drop(builder, module, builtins, structs, v, &t.ty);
-                    }
-                }
+                release_all_scopes(builder, module, builtins, structs, scopes);
                 let one = builder.ins().iconst(types::I64, 1);
                 builder.ins().return_(&[one]);
             } else {
@@ -20926,15 +20920,7 @@ fn compile_expr_inner<M: Module>(
                 if !owned_temp {
                     emit_retain(builder, module, builtins, structs, rptr, cx.ret_ty);
                 }
-                for scope in scopes.iter() {
-                    for t in scope {
-                        let v = match t.owned {
-                            Owned::Value(v) => v,
-                            Owned::Slot(slot) => slot_value(builder, slot, &t.ty),
-                        };
-                        emit_drop(builder, module, builtins, structs, v, &t.ty);
-                    }
-                }
+                release_all_scopes(builder, module, builtins, structs, scopes);
                 let sret = cx.sret.expect("result-returning fn has an sret pointer");
                 copy_composite(builder, sret, rptr, cx.ret_ty, structs);
                 builder.ins().return_(&[]);

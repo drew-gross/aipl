@@ -1,0 +1,130 @@
+import {
+    join,
+    less_than as <,
+    map,
+    print,
+    wrapping_add as +,
+    wrapping_increment as ++,
+    wrapping_mul_assign as *=,
+} from builtins;
+
+// An early exit releases every live scope before control leaves — and it has to
+// release them innermost first, the order ordinary exit unwinds them in. This
+// is the shape that told the difference.
+//
+// `eval` is a tail-call participant (its `"^"` arm hands off to `pow`), so its
+// `self` is a reference of its own — and `main` passes a *fresh* `Bin`, which is
+// moved in outright: `eval`'s release of `self` is the one that frees the block.
+// The arm's `op` is a heap `str` read in place out of that block (a `map_join`
+// result — the fused `map(..).join()` — is heap-backed even at one byte, where a
+// literal would be inline and have nothing to release). Released outermost
+// first, `self` went before `op`, and `op`'s release then read its pointer out
+// of freed memory and never reached the buffer: one allocation leaked per `^`.
+// The `--- performance ---` section is the assertion — allocations and
+// deallocations agree.
+variant Calc = Num(i64) | Bin(str, Calc, Calc)
+
+fn pow(base: i64, exp: i64) -> i64 {
+    if (exp < 0) {
+        return 0;
+    };
+    mut acc: i64 = 1;
+    mut i: i64 = 0;
+    while (i < exp) {
+        set acc *= base;
+        set i++;
+    }
+    acc
+}
+
+fn eval(self: Calc) -> i64 {
+    match (self) {
+        Num(v) => v,
+        Bin(op, l, r) => {
+            let a = l.eval();
+            let b = r.eval();
+            match (op) {
+                "+" => a + b,
+                // A tail call: the release runs here, with `op` still borrowed
+                // from `self`'s block.
+                "^" => pow(a, b),
+                _ => 0,
+            }
+        },
+    }
+}
+
+// A heap-backed operator string, as the compiler's own grammars build theirs.
+fn op(parts: str[]) -> str { parts.map(|p| p).join() }
+
+fn main() !prints {
+    print(`{Bin(op(["^"]), Num(2), Num(3)).eval()}`);
+    print(`{Bin(op(["+"]), Num(2), Num(3)).eval()}`);
+    print(`{Bin(op(["^"]), Bin(op(["^"]), Num(2), Num(2)), Num(2)).eval()}`);
+}
+--- stdout ---
+8
+5
+16
+--- performance ---
+allocations: 22
+deallocations: 22
+reallocations: 0
+bytes allocated: 1228
+instructions executed: 1750
+binary size: 7832
+  code: 4492
+  data: 33
+  metadata: 3307
+functions:
+  __rec_drop_Calc:
+    calls: 11
+    bytes: 96
+  __to_str_i64:
+    calls: 3
+    bytes: 204
+  aipl_array_dec:
+    calls: 20
+    bytes: (external)
+  aipl_array_new:
+    calls: 4
+    bytes: (external)
+  aipl_i64_len:
+    calls: 6
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 11
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 27
+    bytes: (external)
+  aipl_rec_dec_weak:
+    calls: 8
+    bytes: (external)
+  aipl_rec_inc_strong:
+    calls: 16
+    bytes: (external)
+  aipl_rec_inc_weak:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 3
+    bytes: (external)
+  eval:
+    calls: 0
+    bytes: 32
+  eval$tail:
+    calls: 11
+    bytes: 504
+  main:
+    calls: 1
+    bytes: 2040
+  op:
+    calls: 4
+    bytes: 1452
+  pow:
+    calls: 0
+    bytes: 36
+  pow$tail:
+    calls: 3
+    bytes: 128

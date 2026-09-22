@@ -1074,6 +1074,22 @@ pub(crate) fn for_each_split(s: Str, sep: Str, f: &mut impl FnMut(Str)) {
     f(s.slice(start, hay_len));
 }
 
+/// `s.split(sep).len()` without the array: the count pass of `split` on its
+/// own, over the same splitter, so it can never disagree with the array's
+/// length — `n` separators give `n + 1`, and an empty separator gives `1`.
+/// Written by the compiler's operation-fusion pass for that chain, where the
+/// receiver is the source prefix an `assert` location is computed from and the
+/// array of every line before it was built only to be counted. Borrows both,
+/// like every entry point here, and allocates nothing.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_split_len(s: *const Str, sep: *const Str) -> i64 {
+    let mut count = 0i64;
+    for_each_split(unsafe { read(s) }, unsafe { read(sep) }, &mut |_| {
+        count += 1
+    });
+    count
+}
+
 /// Which separator goes in the gap *before* part `i` of `len`, given the three
 /// `join` takes. `sep` is the ordinary one; `final_sep` goes in the last gap and
 /// `only_sep` in the sole gap of a two-part join, which is the same gap seen two

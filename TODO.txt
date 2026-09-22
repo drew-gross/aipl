@@ -459,7 +459,6 @@ optimizations:
       }; -> should be a match (src[i..step.end]) { "{" -> set depth++, "}" -> set depth--', _ -> {} }
 
   operation fusion:
-    .lines().len() should fuse
     for line in v.lines() should fuse
     can we make a fully general v.foo().len() fusion? Maybe by monomorphizing?
     to_str().len() should fuse to a a new, super simple/fast function that just computes and returns an int

@@ -246,11 +246,11 @@ allocations: 142
 deallocations: 142
 reallocations: 6
 bytes allocated: 10177
-instructions executed: 9789
-binary size: 101616
-  code: 65572
+instructions executed: 9781
+binary size: 101464
+  code: 65488
   data: 2731
-  metadata: 33313
+  metadata: 33245
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -392,13 +392,13 @@ functions:
     bytes: 488
   ident_name:
     calls: 2
-    bytes: 2928
+    bytes: 2884
   is_binder_name:
     calls: 11
     bytes: 244
   is_ident:
     calls: 3
-    bytes: 2804
+    bytes: 2764
   is_plain_binder:
     calls: 4
     bytes: 436

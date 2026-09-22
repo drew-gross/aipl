@@ -1,0 +1,76 @@
+import { join, len, print, split, split_len } from builtins;
+
+// Operation fusion: `s.split(sep).len()` collapses into `split_len`, which runs
+// `split`'s counting pass and stops there — instead of building an array of
+// every part (a retained view each) only for it to be counted and dropped.
+//
+// The site that matters is `src.lines().len()`: `lines` is `split("\n")`, and
+// it reaches the pass inlined, with its parameter bound ahead of the body
+// (`let self: str = src; split(self, "\n")`). The pass looks under that binding
+// for the chain, which is what `line_of` below proves — a user function of the
+// same shape fuses exactly as the direct spelling does.
+//
+// The `functions:` list is the evidence: six strings counted, but one
+// `aipl_array_new` — the array `first_and_count` binds and reads twice, which
+// therefore has to exist — and no array for the other five.
+
+fn lines(self: str) -> str[] { self.split("\n") }
+
+// Fused, through the inlined `lines`: the shape the compiler's own `assert_loc`
+// computes an assertion's line number with.
+fn line_of(src: str, at: u64) -> u64 { src[..at].lines().len() }
+
+// Fused, spelled directly.
+fn parts(s: str, sep: str) -> u64 { s.split(sep).len() }
+
+// Not fused: the array is bound in between and read twice, so it has to exist.
+fn first_and_count(s: str) -> str {
+    let ps = s.split("\n");
+    `{ps.join(sep="|")} {ps.len()}`
+}
+
+fn main() !prints {
+    let src = "let a = 1;\nlet b = 2;\nassert(a + b == 3);\n";
+    print(`{line_of(src, 22)}`);
+    print(`{parts("a--b--c", "--")}`);
+    // An empty separator never matches: the whole string is the one part.
+    print(`{parts("abc", "")}`);
+    print(first_and_count("first\nsecond"));
+    // The fused builtin is importable too, and answers the same as the chain.
+    print(`{"x\ny\n".split_len("\n")} {"x\ny\n".split("\n").len()}`);
+}
+--- stdout ---
+3
+3
+1
+first|second 2
+3 3
+--- performance ---
+allocations: 12
+deallocations: 12
+reallocations: 0
+bytes allocated: 573
+instructions executed: 401
+binary size: 4120
+  code: 2152
+  data: 59
+  metadata: 1909
+functions:
+  __to_str_u64:
+    calls: 6
+    bytes: 204
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 12
+    bytes: (external)
+  aipl_write_u64:
+    calls: 6
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1948

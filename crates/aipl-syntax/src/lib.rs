@@ -2460,6 +2460,12 @@ struct __builtin_ExecResult { stdout: str, stderr: str, exit_code: i64 }
 fn __builtin_print(self: str) !prints {}
 // Split on each occurrence of `sep`, returning the parts (slices/views of `self`).
 fn __builtin_split(self: str, sep: str) -> str[] { [] }
+// `self.split(sep).len()` without building the parts: how many there would be,
+// which is one more than the occurrences of `sep` (an empty `sep` never
+// matches, so it gives 1). Written by the compiler's operation-fusion pass for
+// that chain — `src.lines().len()` is a newline count with no array behind it;
+// also callable directly.
+fn __builtin_split_len(self: str, sep: str) -> u64 { 0 }
 // Concatenate the parts with `sep` between consecutive elements.
 // Flatten a sequence of sequences, placing a separator between consecutive
 // parts: `[[1,2],[3]].join(sep=0)` is `[1,2,0,3]`. Generic in the *element*

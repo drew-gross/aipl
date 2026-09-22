@@ -44,6 +44,7 @@ pub enum Callee {
     // ---- importable builtins: `import { name } from builtins;` ----
     Print,
     Split,
+    SplitLen,
     Join,
     Intersperse,
     TupleWindows,
@@ -226,6 +227,7 @@ impl Callee {
     pub const IMPORTABLE: &'static [Callee] = &[
         Callee::Print,
         Callee::Split,
+        Callee::SplitLen,
         Callee::Join,
         Callee::Intersperse,
         Callee::TupleWindows,
@@ -373,6 +375,7 @@ impl Callee {
         match self {
             Callee::Print => "__builtin_print",
             Callee::Split => "__builtin_split",
+            Callee::SplitLen => "__builtin_split_len",
             Callee::Join => "__builtin_join",
             Callee::Intersperse => "__builtin_intersperse",
             Callee::TupleWindows => "__builtin_tuple_windows",

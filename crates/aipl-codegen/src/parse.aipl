@@ -1711,8 +1711,8 @@ deallocations: 5908
 reallocations: 1407
 bytes allocated: 685068
 instructions executed: 1505647
-binary size: 743976
-  code: 450676
+binary size: 743992
+  code: 450692
   data: 12156
   metadata: 281144
 functions:
@@ -1961,7 +1961,7 @@ functions:
     bytes: 580
   __m3__desugar_rule$Tok:
     calls: 583
-    bytes: 12004
+    bytes: 12048
   __m3__failure_message:
     calls: 49
     bytes: 488
@@ -2015,7 +2015,7 @@ functions:
     bytes: 1148
   __m4__step_result$Tok:
     calls: 989
-    bytes: 9188
+    bytes: 9192
   __m4__template_scan$Tok:
     calls: 0
     bytes: 2824
@@ -2240,7 +2240,7 @@ functions:
     bytes: 952
   match_then$Tok$Node:
     calls: 63
-    bytes: 2804
+    bytes: 2816
   parse$Tok$Node:
     calls: 10
     bytes: 284
@@ -2249,7 +2249,7 @@ functions:
     bytes: 352
   parse_prepared$Tok$Node:
     calls: 100
-    bytes: 5012
+    bytes: 4988
   parsed:
     calls: 10
     bytes: 328
@@ -2267,7 +2267,7 @@ functions:
     bytes: 44
   rule_labels$Tok$Node$tail:
     calls: 146
-    bytes: 4812
+    bytes: 4792
   rule_nullable$Tok:
     calls: 0
     bytes: 36
