@@ -249,10 +249,10 @@ deallocations: 20804
 reallocations: 2974
 bytes allocated: 4448897
 instructions executed: 9048501
-binary size: 5603776
-  code: 3710768
+binary size: 5603304
+  code: 3710416
   data: 11506
-  metadata: 1881502
+  metadata: 1881382
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -653,6 +653,12 @@ functions:
   __builtin_value_or$bool:
     calls: 52
     bytes: 24
+  __ctor$__m23__AiplTok$Name:
+    calls: 42
+    bytes: 104
+  __ctor$__m5__Ast$Name:
+    calls: 0
+    bytes: 192
   __eq___m36__FmtKind:
     calls: 5
     bytes: 64
@@ -814,26 +820,20 @@ functions:
     bytes: 91844
   __m23__aipl_rules$lambda0:
     calls: 0
-    bytes: 136
+    bytes: 144
   __m23__aipl_rules$lambda1:
-    calls: 42
-    bytes: 104
+    calls: 2
+    bytes: 164
   __m23__aipl_rules$lambda2:
     calls: 0
     bytes: 144
   __m23__aipl_rules$lambda3:
-    calls: 2
+    calls: 6
     bytes: 164
   __m23__aipl_rules$lambda4:
     calls: 0
-    bytes: 144
-  __m23__aipl_rules$lambda5:
-    calls: 6
-    bytes: 164
-  __m23__aipl_rules$lambda6:
-    calls: 0
     bytes: 48
-  __m23__aipl_rules$lambda7:
+  __m23__aipl_rules$lambda5:
     calls: 2
     bytes: 64
   __m23__char_lit_emit:
@@ -1394,12 +1394,6 @@ functions:
   __m4__aipl_grammar:
     calls: 4
     bytes: 176616
-  __m4__aipl_grammar$lambda0:
-    calls: 0
-    bytes: 216
-  __m4__aipl_grammar$lambda1:
-    calls: 0
-    bytes: 192
   __m4__aipl_parse_file:
     calls: 4
     bytes: 8392

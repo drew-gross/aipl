@@ -60,10 +60,10 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 241
 instructions executed: 770
-binary size: 6056
-  code: 3968
+binary size: 5616
+  code: 3636
   data: 1
-  metadata: 2087
+  metadata: 1979
 functions:
   __arr_drop_Rule$TokA:
     calls: 1
@@ -77,6 +77,15 @@ functions:
   __arr_retain_Rule$TokB:
     calls: 0
     bytes: 164
+  __ctor$TokA$IdentA:
+    calls: 1
+    bytes: 96
+  __ctor$TokA$NumA:
+    calls: 1
+    bytes: 76
+  __ctor$TokB$WordB:
+    calls: 1
+    bytes: 96
   __to_str_i64:
     calls: 1
     bytes: 204
@@ -95,21 +104,3 @@ functions:
   main:
     calls: 1
     bytes: 2508
-  main$lambda0:
-    calls: 0
-    bytes: 128
-  main$lambda1:
-    calls: 1
-    bytes: 96
-  main$lambda2:
-    calls: 0
-    bytes: 76
-  main$lambda3:
-    calls: 1
-    bytes: 76
-  main$lambda4:
-    calls: 0
-    bytes: 128
-  main$lambda5:
-    calls: 1
-    bytes: 96

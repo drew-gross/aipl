@@ -516,6 +516,7 @@ case_tests! {
     cases_optimizations_move_last_use = "cases/optimizations/move_last_use",
     cases_optimizations_owned_param_shared_result = "cases/optimizations/owned_param_shared_result",
     cases_optimizations_read_only_builtin_args = "cases/optimizations/read_only_builtin_args",
+    cases_optimizations_shared_ctor_wrapper = "cases/optimizations/shared_ctor_wrapper",
     cases_optimizations_sink_effects_stay_put = "cases/optimizations/sink_effects_stay_put",
     cases_optimizations_sink_into_branch = "cases/optimizations/sink_into_branch",
     cases_optimizations_sink_past_trailing_statements = "cases/optimizations/sink_past_trailing_statements",

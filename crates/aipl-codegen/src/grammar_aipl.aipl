@@ -4600,10 +4600,10 @@ deallocations: 2097365
 reallocations: 295775
 bytes allocated: 387614874
 instructions executed: 574190772
-binary size: 5046584
-  code: 3310448
+binary size: 5046400
+  code: 3310312
   data: 56396
-  metadata: 1679740
+  metadata: 1679692
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 18
@@ -5004,6 +5004,12 @@ functions:
   __builtin_value_or$bool:
     calls: 13568
     bytes: 24
+  __ctor$__m1__Ast$Name:
+    calls: 2
+    bytes: 192
+  __ctor$__m21__AiplTok$Name:
+    calls: 917
+    bytes: 104
   __eq___builtin_Span:
     calls: 1
     bytes: 104
@@ -5111,26 +5117,20 @@ functions:
     bytes: 6072
   __m21__aipl_rules$lambda0:
     calls: 0
-    bytes: 136
+    bytes: 144
   __m21__aipl_rules$lambda1:
-    calls: 917
-    bytes: 104
+    calls: 0
+    bytes: 164
   __m21__aipl_rules$lambda2:
     calls: 0
     bytes: 144
   __m21__aipl_rules$lambda3:
-    calls: 0
+    calls: 12
     bytes: 164
   __m21__aipl_rules$lambda4:
     calls: 0
-    bytes: 144
-  __m21__aipl_rules$lambda5:
-    calls: 12
-    bytes: 164
-  __m21__aipl_rules$lambda6:
-    calls: 0
     bytes: 48
-  __m21__aipl_rules$lambda7:
+  __m21__aipl_rules$lambda5:
     calls: 4
     bytes: 64
   __m21__char_lit_emit:
@@ -5862,9 +5862,6 @@ functions:
   items:
     calls: 354
     bytes: 116272
-  items$lambda0:
-    calls: 2
-    bytes: 192
   join_spans:
     calls: 101
     bytes: 172

@@ -1485,10 +1485,10 @@ deallocations: 415
 reallocations: 90
 bytes allocated: 66104
 instructions executed: 375419
-binary size: 2539472
-  code: 1701700
+binary size: 2537152
+  code: 1700068
   data: 11620
-  metadata: 826152
+  metadata: 825464
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1529,6 +1529,18 @@ functions:
   __builtin_int_parse$lambda1:
     calls: 67
     bytes: 140
+  __ctor$Kind$Block:
+    calls: 2
+    bytes: 96
+  __ctor$Kind$Ident:
+    calls: 43
+    bytes: 96
+  __ctor$Kind$Raw:
+    calls: 1
+    bytes: 96
+  __ctor$Kind$Str:
+    calls: 7
+    bytes: 96
   __eq_Kind:
     calls: 113
     bytes: 632
@@ -1556,12 +1568,6 @@ functions:
   __test$keep_skipped:
     calls: 1
     bytes: 25356
-  __test$keep_skipped$lambda0:
-    calls: 0
-    bytes: 128
-  __test$keep_skipped$lambda1:
-    calls: 10
-    bytes: 96
   __test$lex:
     calls: 1
     bytes: 1578000
@@ -1576,76 +1582,28 @@ functions:
     bytes: 1048
   __test$lex$lambda0:
     calls: 0
-    bytes: 128
-  __test$lex$lambda1:
-    calls: 33
-    bytes: 96
-  __test$lex$lambda10:
-    calls: 0
     bytes: 48
-  __test$lex$lambda11:
+  __test$lex$lambda1:
     calls: 1
     bytes: 64
-  __test$lex$lambda12:
-    calls: 0
-    bytes: 48
-  __test$lex$lambda13:
-    calls: 10
-    bytes: 64
-  __test$lex$lambda14:
-    calls: 0
-    bytes: 48
-  __test$lex$lambda15:
-    calls: 3
-    bytes: 64
-  __test$lex$lambda16:
-    calls: 0
-    bytes: 48
-  __test$lex$lambda17:
-    calls: 2
-    bytes: 64
-  __test$lex$lambda18:
-    calls: 0
-    bytes: 128
-  __test$lex$lambda19:
-    calls: 2
-    bytes: 96
   __test$lex$lambda2:
     calls: 0
-    bytes: 128
-  __test$lex$lambda20:
-    calls: 0
-    bytes: 128
-  __test$lex$lambda21:
-    calls: 2
-    bytes: 96
-  __test$lex$lambda22:
-    calls: 0
-    bytes: 128
-  __test$lex$lambda23:
-    calls: 1
-    bytes: 96
+    bytes: 48
   __test$lex$lambda3:
-    calls: 2
-    bytes: 96
+    calls: 10
+    bytes: 64
   __test$lex$lambda4:
     calls: 0
-    bytes: 128
+    bytes: 48
   __test$lex$lambda5:
-    calls: 1
-    bytes: 96
+    calls: 3
+    bytes: 64
   __test$lex$lambda6:
     calls: 0
-    bytes: 128
+    bytes: 48
   __test$lex$lambda7:
-    calls: 1
-    bytes: 96
-  __test$lex$lambda8:
-    calls: 0
-    bytes: 128
-  __test$lex$lambda9:
-    calls: 1
-    bytes: 96
+    calls: 2
+    bytes: 64
   __test$lex$nonempty_str:
     calls: 2
     bytes: 1836

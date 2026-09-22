@@ -77,6 +77,33 @@ const INSTANTIATION_LIMIT: usize = 10_000;
 /// so no inference is needed. A *nullary* constructor is untouched — a bare
 /// `Empty` is already a value, not a function — and any binding in scope with
 /// the constructor's name shadows it, like everywhere else.
+/// The shared function a constructor of a non-generic variant lowers to.
+struct CtorWrapper {
+    /// The synthesized top-level function's name.
+    fn_name: String,
+    /// The payload types, which are its parameter types.
+    payload: Vec<Type>,
+    /// The variant it constructs, which is its return type.
+    variant: String,
+}
+
+/// [`lower_ctor_refs`]'s state: what a constructor reference may become, and
+/// which of those were reached.
+struct Lcr<'a> {
+    /// Payload types per payload-carrying constructor, keyed by the loader's
+    /// `Case@Variant`.
+    ctors: &'a HashMap<String, Vec<Type>>,
+    /// The one shared wrapper each constructor of a *non-generic* variant
+    /// lowers to, keyed the same way. A generic template is absent: its
+    /// wrapper would have to be generic too, and a generic function has no
+    /// single address to pass as a value — so those keep the per-reference
+    /// lambda, whose types monomorphization pins per instance.
+    wrappers: &'a HashMap<String, CtorWrapper>,
+    /// Which wrappers a reference actually reached. Only these are emitted, so
+    /// a program that never passes a constructor as a value gains nothing.
+    used: std::cell::RefCell<HashSet<String>>,
+}
+
 pub fn lower_ctor_refs(program: &Program) -> Program {
     // Payload-carrying constructors: name → payload types (arity >= 1). Keyed by
     // both the bare case name and the loader's variant-qualified form
@@ -98,7 +125,33 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
     if ctors.is_empty() {
         return program.clone();
     }
-    let items = program
+    // A constructor of a non-generic variant is a function with one address, so
+    // every reference to it can share one. Building the table up front (rather
+    // than on demand) keeps the walk below a pure rewrite.
+    let mut wrappers: HashMap<String, CtorWrapper> = HashMap::new();
+    for item in &program.items {
+        if let Item::Variant(v) = item {
+            if !v.type_vars.is_empty() {
+                continue;
+            }
+            for c in v.cases.iter().filter(|c| !c.payload.is_empty()) {
+                wrappers.insert(
+                    format!("{}@{}", c.name, v.name),
+                    CtorWrapper {
+                        fn_name: aipl_syntax::ctor_wrapper_name(&v.name, &c.name),
+                        payload: c.payload_tys(),
+                        variant: v.name.clone(),
+                    },
+                );
+            }
+        }
+    }
+    let lcr = Lcr {
+        ctors: &ctors,
+        wrappers: &wrappers,
+        used: std::cell::RefCell::new(HashSet::new()),
+    };
+    let items: Vec<Item> = program
         .items
         .iter()
         .map(|item| match item {
@@ -111,7 +164,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
                     .params
                     .iter()
                     .map(|p| Param {
-                        default: p.default.as_ref().map(|d| lcr_expr(d, &ctors, &mut scope)),
+                        default: p.default.as_ref().map(|d| lcr_expr(d, &lcr, &mut scope)),
                         ..p.clone()
                     })
                     .collect();
@@ -120,11 +173,11 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
                         params,
                         ..f.sig.clone()
                     },
-                    body: lcr_expr(&f.body, &ctors, &mut scope),
+                    body: lcr_expr(&f.body, &lcr, &mut scope),
                     test_body: f
                         .test_body
                         .as_ref()
-                        .map(|tb| lcr_expr(tb, &ctors, &mut scope)),
+                        .map(|tb| lcr_expr(tb, &lcr, &mut scope)),
                     ..f.clone()
                 })
             }
@@ -139,7 +192,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
                         default: fd
                             .default
                             .as_ref()
-                            .map(|d| lcr_expr(d, &ctors, &mut Vec::new())),
+                            .map(|d| lcr_expr(d, &lcr, &mut Vec::new())),
                         ..fd.clone()
                     })
                     .collect(),
@@ -159,7 +212,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
                                 default: slot
                                     .default
                                     .as_ref()
-                                    .map(|d| lcr_expr(d, &ctors, &mut Vec::new())),
+                                    .map(|d| lcr_expr(d, &lcr, &mut Vec::new())),
                                 ..slot.clone()
                             })
                             .collect(),
@@ -171,16 +224,72 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
             Item::Import(_) => item.clone(),
         })
         .collect();
+    // The wrappers the walk reached, in a deterministic order: two runs of the
+    // compiler over one program must emit the same items in the same order, and
+    // a `HashSet`'s iteration order is neither.
+    let mut reached: Vec<String> = lcr.used.into_inner().into_iter().collect();
+    reached.sort();
+    let items = items
+        .into_iter()
+        .chain(
+            reached
+                .iter()
+                .map(|k| Item::Fn(ctor_wrapper_fn(&wrappers[k], k))),
+        )
+        .collect();
     Program {
         items,
         sources: program.sources.clone(),
     }
 }
 
+/// The function a shared constructor wrapper is: `fn __ctor$V$C(__ctor0: T0,
+/// ..) -> V { C(__ctor0, ..) }`. Private, effect-free and non-generic, which is
+/// what a function passed as a value has to be.
+///
+/// Spans are empty: the function is synthesized, not written, and a diagnostic
+/// inside it would have nowhere useful to point. Every reference to the
+/// constructor keeps its own span, on the `Ident` that names this.
+fn ctor_wrapper_fn(w: &CtorWrapper, ctor: &str) -> Function {
+    let params: Vec<Param> = w
+        .payload
+        .iter()
+        .enumerate()
+        .map(|(i, ty)| Param {
+            name: format!("__ctor{i}"),
+            ty: ty.clone(),
+            mutable: false,
+            arity: Arity::One,
+            default: None,
+            implicit_some: false,
+        })
+        .collect();
+    let args: Vec<Expr> = (0..w.payload.len())
+        .map(|i| Expr::new(ExprKind::Ident(format!("__ctor{i}")), 0..0))
+        .collect();
+    Function {
+        name: w.fn_name.clone(),
+        is_pub: false,
+        sig: Signature {
+            type_vars: Vec::new(),
+            params,
+            effects: Vec::new(),
+            return_ty: Some(Type::Named(w.variant.clone())),
+        },
+        body: Expr::new(
+            ExprKind::Call(Callee::User(ctor.to_string()), args, false),
+            0..0,
+        ),
+        test_body: None,
+        test_fns: Vec::new(),
+        doc: None,
+    }
+}
+
 /// [`lower_ctor_refs`]'s expression walk. `scope` is the stack of bindings in
 /// scope (a name is pushed for the subexpressions it covers and popped after),
 /// so a shadowed constructor name is left alone.
-fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String>) -> Expr {
+fn lcr_expr(e: &Expr, lcr: &Lcr<'_>, scope: &mut Vec<String>) -> Expr {
     use ExprKind as K;
     // `rebuilt`, not `new`: this is the same expression with a lowered kind, so
     // it keeps the spans the parser recorded on it (`Expr::value_span`).
@@ -191,14 +300,21 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
         K::Shim(effect, bindings, body) => rw(K::Shim(
             effect.clone(),
             bindings.clone(),
-            Box::new(lcr_expr(body, ctors, scope)),
+            Box::new(lcr_expr(body, lcr, scope)),
         )),
         K::Ident(name) => {
-            let Some(payload) = ctors.get(name.as_str()) else {
+            let Some(payload) = lcr.ctors.get(name.as_str()) else {
                 return e.clone();
             };
             if scope.iter().any(|s| s == name) {
                 return e.clone();
+            }
+            // One shared wrapper where there can be one: the reference becomes
+            // a plain call to it, and every other reference to the same
+            // constructor becomes the same call. See `Lcr::wrappers`.
+            if let Some(w) = lcr.wrappers.get(name.as_str()) {
+                lcr.used.borrow_mut().insert(name.clone());
+                return rw(K::Ident(w.fn_name.clone()));
             }
             // `Circle` → `|__ctor0: T0, ..| Circle(__ctor0, ..)`, every piece
             // carrying the reference's span.
@@ -223,23 +339,23 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
         K::Num(_) | K::Bool(_) | K::Str(_) | K::Char(_) | K::None | K::Unit => e.clone(),
         K::Call(name, args, method) => rw(K::Call(
             name.clone(),
-            args.iter().map(|a| lcr_expr(a, ctors, scope)).collect(),
+            args.iter().map(|a| lcr_expr(a, lcr, scope)).collect(),
             *method,
         )),
         K::ArrayLit(xs) => rw(K::ArrayLit(
-            xs.iter().map(|x| lcr_expr(x, ctors, scope)).collect(),
+            xs.iter().map(|x| lcr_expr(x, lcr, scope)).collect(),
         )),
         K::SetLit(xs, o) => rw(K::SetLit(
-            xs.iter().map(|x| lcr_expr(x, ctors, scope)).collect(),
+            xs.iter().map(|x| lcr_expr(x, lcr, scope)).collect(),
             *o,
         )),
         K::TupleLit(xs) => rw(K::TupleLit(
-            xs.iter().map(|x| lcr_expr(x, ctors, scope)).collect(),
+            xs.iter().map(|x| lcr_expr(x, lcr, scope)).collect(),
         )),
         K::DictLit(pairs) => rw(K::DictLit(
             pairs
                 .iter()
-                .map(|(k, v)| (lcr_expr(k, ctors, scope), lcr_expr(v, ctors, scope)))
+                .map(|(k, v)| (lcr_expr(k, lcr, scope), lcr_expr(v, lcr, scope)))
                 .collect(),
         )),
         K::Construct(name, inits) => rw(K::Construct(
@@ -247,27 +363,27 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
             inits
                 .iter()
                 .map(|init| FieldInit {
-                    value: lcr_expr(&init.value, ctors, scope),
+                    value: lcr_expr(&init.value, lcr, scope),
                     ..init.clone()
                 })
                 .collect(),
         )),
         K::Seq(a, b) => rw(K::Seq(
-            Box::new(lcr_expr(a, ctors, scope)),
-            Box::new(lcr_expr(b, ctors, scope)),
+            Box::new(lcr_expr(a, lcr, scope)),
+            Box::new(lcr_expr(b, lcr, scope)),
         )),
         K::Index(a, b) => rw(K::Index(
-            Box::new(lcr_expr(a, ctors, scope)),
-            Box::new(lcr_expr(b, ctors, scope)),
+            Box::new(lcr_expr(a, lcr, scope)),
+            Box::new(lcr_expr(b, lcr, scope)),
         )),
         K::While(a, b) => rw(K::While(
-            Box::new(lcr_expr(a, ctors, scope)),
-            Box::new(lcr_expr(b, ctors, scope)),
+            Box::new(lcr_expr(a, lcr, scope)),
+            Box::new(lcr_expr(b, lcr, scope)),
         )),
         K::Let(name, ty, val, body) => {
-            let val = lcr_expr(val, ctors, scope);
+            let val = lcr_expr(val, lcr, scope);
             scope.push(name.clone());
-            let body = lcr_expr(body, ctors, scope);
+            let body = lcr_expr(body, lcr, scope);
             scope.pop();
             rw(K::Let(
                 name.clone(),
@@ -277,9 +393,9 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
             ))
         }
         K::LetMut(name, ty, val, body) => {
-            let val = lcr_expr(val, ctors, scope);
+            let val = lcr_expr(val, lcr, scope);
             scope.push(name.clone());
-            let body = lcr_expr(body, ctors, scope);
+            let body = lcr_expr(body, lcr, scope);
             scope.pop();
             rw(K::LetMut(
                 name.clone(),
@@ -289,29 +405,29 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
             ))
         }
         K::For(var, iter, body) => {
-            let iter = lcr_expr(iter, ctors, scope);
+            let iter = lcr_expr(iter, lcr, scope);
             scope.push(var.clone());
-            let body = lcr_expr(body, ctors, scope);
+            let body = lcr_expr(body, lcr, scope);
             scope.pop();
             rw(K::For(var.clone(), Box::new(iter), Box::new(body)))
         }
         K::Assign(lhs, val, body) => rw(K::Assign(
-            Box::new(lcr_expr(lhs, ctors, scope)),
-            Box::new(lcr_expr(val, ctors, scope)),
-            Box::new(lcr_expr(body, ctors, scope)),
+            Box::new(lcr_expr(lhs, lcr, scope)),
+            Box::new(lcr_expr(val, lcr, scope)),
+            Box::new(lcr_expr(body, lcr, scope)),
         )),
         K::If(c, t, f) => rw(K::If(
-            Box::new(lcr_expr(c, ctors, scope)),
-            Box::new(lcr_expr(t, ctors, scope)),
-            Box::new(lcr_expr(f, ctors, scope)),
+            Box::new(lcr_expr(c, lcr, scope)),
+            Box::new(lcr_expr(t, lcr, scope)),
+            Box::new(lcr_expr(f, lcr, scope)),
         )),
-        K::Neg(x) => rw(K::Neg(Box::new(lcr_expr(x, ctors, scope)))),
-        K::Field(x, f) => rw(K::Field(Box::new(lcr_expr(x, ctors, scope)), f.clone())),
-        K::Try(x) => rw(K::Try(Box::new(lcr_expr(x, ctors, scope)))),
-        K::Return(x) => rw(K::Return(Box::new(lcr_expr(x, ctors, scope)))),
+        K::Neg(x) => rw(K::Neg(Box::new(lcr_expr(x, lcr, scope)))),
+        K::Field(x, f) => rw(K::Field(Box::new(lcr_expr(x, lcr, scope)), f.clone())),
+        K::Try(x) => rw(K::Try(Box::new(lcr_expr(x, lcr, scope)))),
+        K::Return(x) => rw(K::Return(Box::new(lcr_expr(x, lcr, scope)))),
         K::KwArg(name, x, fwd) => rw(K::KwArg(
             name.clone(),
-            Box::new(lcr_expr(x, ctors, scope)),
+            Box::new(lcr_expr(x, lcr, scope)),
             *fwd,
         )),
         K::Spread(..) => unreachable!("array spreads are desugared by the loader"),
@@ -319,14 +435,14 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
             for p in params {
                 scope.push(p.name.clone());
             }
-            let body = lcr_expr(body, ctors, scope);
+            let body = lcr_expr(body, lcr, scope);
             for _ in params {
                 scope.pop();
             }
             rw(K::Lambda(params.clone(), Box::new(body)))
         }
         K::Match(scrutinee, arms) => {
-            let scrutinee = lcr_expr(scrutinee, ctors, scope);
+            let scrutinee = lcr_expr(scrutinee, lcr, scope);
             let arms = arms
                 .iter()
                 .map(|arm| {
@@ -334,7 +450,7 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
                     for b in &bindings {
                         scope.push(b.clone());
                     }
-                    let body = lcr_expr(&arm.body, ctors, scope);
+                    let body = lcr_expr(&arm.body, lcr, scope);
                     for _ in &bindings {
                         scope.pop();
                     }
@@ -347,12 +463,12 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
             rw(K::Match(Box::new(scrutinee), arms))
         }
         K::IfLet(arm, scrutinee, else_b) => {
-            let scrutinee = lcr_expr(scrutinee, ctors, scope);
+            let scrutinee = lcr_expr(scrutinee, lcr, scope);
             let bindings = arm.pattern.bindings();
             for b in &bindings {
                 scope.push(b.clone());
             }
-            let body = lcr_expr(&arm.body, ctors, scope);
+            let body = lcr_expr(&arm.body, lcr, scope);
             for _ in &bindings {
                 scope.pop();
             }
@@ -360,7 +476,7 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
                 body,
                 ..(**arm).clone()
             };
-            let else_b = lcr_expr(else_b, ctors, scope);
+            let else_b = lcr_expr(else_b, lcr, scope);
             rw(K::IfLet(
                 Box::new(arm),
                 Box::new(scrutinee),
@@ -368,9 +484,9 @@ fn lcr_expr(e: &Expr, ctors: &HashMap<String, Vec<Type>>, scope: &mut Vec<String
             ))
         }
         K::Slice(a, b, c) => rw(K::Slice(
-            Box::new(lcr_expr(a, ctors, scope)),
-            Box::new(lcr_expr(b, ctors, scope)),
-            c.as_ref().map(|c| Box::new(lcr_expr(c, ctors, scope))),
+            Box::new(lcr_expr(a, lcr, scope)),
+            Box::new(lcr_expr(b, lcr, scope)),
+            c.as_ref().map(|c| Box::new(lcr_expr(c, lcr, scope))),
         )),
     }
 }

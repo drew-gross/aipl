@@ -3344,10 +3344,10 @@ deallocations: 101061
 reallocations: 16523
 bytes allocated: 20378957
 instructions executed: 54995993
-binary size: 16834280
-  code: 10790092
+binary size: 16833808
+  code: 10789740
   data: 38012
-  metadata: 6006176
+  metadata: 6006056
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -3745,6 +3745,12 @@ functions:
   __builtin_value_or$bool:
     calls: 27
     bytes: 24
+  __ctor$__m22__AiplTok$Name:
+    calls: 433
+    bytes: 104
+  __ctor$__m8__Ast$Name:
+    calls: 0
+    bytes: 192
   __eq_FmtKind:
     calls: 1556
     bytes: 64
@@ -3942,26 +3948,20 @@ functions:
     bytes: 91844
   __m22__aipl_rules$lambda0:
     calls: 0
-    bytes: 136
+    bytes: 144
   __m22__aipl_rules$lambda1:
-    calls: 433
-    bytes: 104
+    calls: 7
+    bytes: 164
   __m22__aipl_rules$lambda2:
     calls: 0
     bytes: 144
   __m22__aipl_rules$lambda3:
-    calls: 7
+    calls: 10
     bytes: 164
   __m22__aipl_rules$lambda4:
     calls: 0
-    bytes: 144
-  __m22__aipl_rules$lambda5:
-    calls: 10
-    bytes: 164
-  __m22__aipl_rules$lambda6:
-    calls: 0
     bytes: 48
-  __m22__aipl_rules$lambda7:
+  __m22__aipl_rules$lambda5:
     calls: 1
     bytes: 64
   __m22__char_lit_emit:
@@ -4168,12 +4168,6 @@ functions:
   __m6__trim_end_while$lam$__builtin_is_space:
     calls: 546
     bytes: 400
-  __m7__aipl_grammar$lambda0:
-    calls: 0
-    bytes: 216
-  __m7__aipl_grammar$lambda1:
-    calls: 0
-    bytes: 192
   __m7__angles:
     calls: 33
     bytes: 376

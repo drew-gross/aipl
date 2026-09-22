@@ -75,6 +75,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  there are lots of functions in binaries with zero calls. Maybe due to inlining? They mostly shouldn't show up in the binary.
   tuple_slot_names should be a range->map I think?
   Mk/TryMk should maybe have single-kid variants? Or Kids+ variants? Or maybe Build should have a OneKid variant?
   make Rule =='able again, maybe by separating the refuse renderers from the rule structure? Since the problem is that it contains a function. Or maybe make functions == comparable?
@@ -568,6 +569,7 @@ allocator:
   make own allocator
 
 perfmon:
+  show call-sites of each function in the final binary
   show regression and improvements
   improve it in some way that it allows you to prove that an optimzation did or did not happen
   add tests that specifically exercise perf

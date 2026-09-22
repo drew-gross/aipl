@@ -177,10 +177,10 @@ deallocations: 5622
 reallocations: 331
 bytes allocated: 467200
 instructions executed: 1386338
-binary size: 238176
-  code: 175888
+binary size: 237984
+  code: 175752
   data: 3336
-  metadata: 58952
+  metadata: 58896
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -230,6 +230,9 @@ functions:
   __builtin_int_parse$lambda1:
     calls: 0
     bytes: 140
+  __ctor$__m6__AiplTok$Name:
+    calls: 0
+    bytes: 104
   __m10__trim_prefix:
     calls: 0
     bytes: 252
@@ -286,10 +289,10 @@ functions:
     bytes: 1628
   __m6__aipl_rules$lambda0:
     calls: 0
-    bytes: 136
+    bytes: 144
   __m6__aipl_rules$lambda1:
     calls: 0
-    bytes: 104
+    bytes: 164
   __m6__aipl_rules$lambda2:
     calls: 0
     bytes: 144
@@ -298,14 +301,8 @@ functions:
     bytes: 164
   __m6__aipl_rules$lambda4:
     calls: 0
-    bytes: 144
-  __m6__aipl_rules$lambda5:
-    calls: 0
-    bytes: 164
-  __m6__aipl_rules$lambda6:
-    calls: 0
     bytes: 48
-  __m6__aipl_rules$lambda7:
+  __m6__aipl_rules$lambda5:
     calls: 0
     bytes: 64
   __m6__char_lit_emit:

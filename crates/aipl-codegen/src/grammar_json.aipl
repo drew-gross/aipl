@@ -508,10 +508,10 @@ deallocations: 22173
 reallocations: 3287
 bytes allocated: 2833155
 instructions executed: 5528207
-binary size: 462360
-  code: 302644
+binary size: 460464
+  code: 301592
   data: 8596
-  metadata: 151120
+  metadata: 150276
 functions:
   __arr_drop_Json:
     calls: 125
@@ -690,6 +690,18 @@ functions:
   __builtin_value_or$bool:
     calls: 774
     bytes: 24
+  __ctor$Json$Array:
+    calls: 13
+    bytes: 112
+  __ctor$Json$Number:
+    calls: 21
+    bytes: 92
+  __ctor$Json$Object:
+    calls: 14
+    bytes: 112
+  __ctor$JsonTok$Str:
+    calls: 67
+    bytes: 96
   __eq_Json:
     calls: 46
     bytes: 404
@@ -1148,73 +1160,31 @@ functions:
     bytes: 7984
   json_grammar$lambda0:
     calls: 0
-    bytes: 96
+    bytes: 188
   json_grammar$lambda1:
     calls: 0
-    bytes: 96
-  json_grammar$lambda10:
-    calls: 0
-    bytes: 96
-  json_grammar$lambda11:
-    calls: 14
-    bytes: 112
-  json_grammar$lambda12:
-    calls: 0
-    bytes: 96
-  json_grammar$lambda13:
-    calls: 13
-    bytes: 112
-  json_grammar$lambda14:
-    calls: 0
     bytes: 188
-  json_grammar$lambda15:
-    calls: 11
-    bytes: 216
-  json_grammar$lambda16:
-    calls: 0
-    bytes: 116
-  json_grammar$lambda17:
-    calls: 21
-    bytes: 92
-  json_grammar$lambda18:
-    calls: 0
-    bytes: 124
-  json_grammar$lambda19:
-    calls: 5
-    bytes: 164
   json_grammar$lambda2:
     calls: 0
-    bytes: 96
+    bytes: 124
   json_grammar$lambda3:
     calls: 0
-    bytes: 96
+    bytes: 124
   json_grammar$lambda4:
     calls: 0
     bytes: 188
   json_grammar$lambda5:
-    calls: 0
-    bytes: 188
+    calls: 11
+    bytes: 216
   json_grammar$lambda6:
     calls: 0
-    bytes: 116
+    bytes: 124
   json_grammar$lambda7:
-    calls: 0
-    bytes: 116
-  json_grammar$lambda8:
-    calls: 0
-    bytes: 124
-  json_grammar$lambda9:
-    calls: 0
-    bytes: 124
+    calls: 5
+    bytes: 164
   lex_json:
     calls: 58
     bytes: 6700
-  lex_json$lambda0:
-    calls: 0
-    bytes: 128
-  lex_json$lambda1:
-    calls: 67
-    bytes: 96
   lower_member:
     calls: 24
     bytes: 1660

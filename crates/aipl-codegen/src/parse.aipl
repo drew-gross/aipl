@@ -1757,10 +1757,10 @@ deallocations: 6048
 reallocations: 1436
 bytes allocated: 702644
 instructions executed: 1541796
-binary size: 764576
-  code: 462704
+binary size: 763536
+  code: 462000
   data: 12892
-  metadata: 288980
+  metadata: 288644
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1906,6 +1906,12 @@ functions:
   __builtin_value_or$bool:
     calls: 195
     bytes: 24
+  __ctor$Tok$Num:
+    calls: 55
+    bytes: 96
+  __ctor$Tok$Word:
+    calls: 88
+    bytes: 96
   __eq_Node:
     calls: 13
     bytes: 136
@@ -2113,18 +2119,6 @@ functions:
   __test$parse$trivia_rules:
     calls: 3
     bytes: 3368
-  __test$parse$trivia_rules$lambda0:
-    calls: 0
-    bytes: 128
-  __test$parse$trivia_rules$lambda1:
-    calls: 5
-    bytes: 96
-  __test$parse$trivia_rules$lambda2:
-    calls: 0
-    bytes: 128
-  __test$parse$trivia_rules$lambda3:
-    calls: 0
-    bytes: 96
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -2329,18 +2323,6 @@ functions:
   tok_rules:
     calls: 100
     bytes: 2736
-  tok_rules$lambda0:
-    calls: 0
-    bytes: 128
-  tok_rules$lambda1:
-    calls: 83
-    bytes: 96
-  tok_rules$lambda2:
-    calls: 0
-    bytes: 128
-  tok_rules$lambda3:
-    calls: 55
-    bytes: 96
   tok_text$Tok$Node:
     calls: 211
     bytes: 904

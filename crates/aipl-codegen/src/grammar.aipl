@@ -1090,10 +1090,10 @@ deallocations: 754
 reallocations: 101
 bytes allocated: 94897
 instructions executed: 78861
-binary size: 179280
-  code: 109620
+binary size: 164296
+  code: 101732
   data: 6668
-  metadata: 62992
+  metadata: 55896
 functions:
   __arr_drop_ListStyle:
     calls: 46
@@ -1119,10 +1119,10 @@ functions:
   __arr_retain_Rule$Kind:
     calls: 28
     bytes: 116
-  __builtin_find_index$str$lam$__test$link$lambda8:
+  __builtin_find_index$str$lam$__test$link$lambda0:
     calls: 1
     bytes: 416
-  __builtin_find_index$str$lam$__test$link$lambda9:
+  __builtin_find_index$str$lam$__test$link$lambda1:
     calls: 1
     bytes: 416
   __builtin_find_index$str$lam$link$Kind$Node$lambda0:
@@ -1143,6 +1143,9 @@ functions:
   __builtin_try_map$Rule$Kind$Rule$Kind$ParseError$lam$desugar_rule$Kind:
     calls: 6
     bytes: 508
+  __ctor$Node$List:
+    calls: 0
+    bytes: 112
   __eq_ListStyle:
     calls: 10
     bytes: 232
@@ -1173,246 +1176,6 @@ functions:
   __test$link:
     calls: 1
     bytes: 47540
-  __test$link$lambda0:
-    calls: 0
-    bytes: 96
-  __test$link$lambda1:
-    calls: 0
-    bytes: 96
-  __test$link$lambda10:
-    calls: 0
-    bytes: 96
-  __test$link$lambda11:
-    calls: 0
-    bytes: 96
-  __test$link$lambda12:
-    calls: 0
-    bytes: 96
-  __test$link$lambda13:
-    calls: 0
-    bytes: 96
-  __test$link$lambda14:
-    calls: 0
-    bytes: 96
-  __test$link$lambda15:
-    calls: 0
-    bytes: 96
-  __test$link$lambda16:
-    calls: 0
-    bytes: 96
-  __test$link$lambda17:
-    calls: 0
-    bytes: 96
-  __test$link$lambda18:
-    calls: 0
-    bytes: 96
-  __test$link$lambda19:
-    calls: 0
-    bytes: 96
-  __test$link$lambda2:
-    calls: 0
-    bytes: 96
-  __test$link$lambda20:
-    calls: 0
-    bytes: 96
-  __test$link$lambda21:
-    calls: 0
-    bytes: 96
-  __test$link$lambda22:
-    calls: 0
-    bytes: 96
-  __test$link$lambda23:
-    calls: 0
-    bytes: 112
-  __test$link$lambda24:
-    calls: 0
-    bytes: 96
-  __test$link$lambda25:
-    calls: 0
-    bytes: 112
-  __test$link$lambda26:
-    calls: 0
-    bytes: 96
-  __test$link$lambda27:
-    calls: 0
-    bytes: 112
-  __test$link$lambda28:
-    calls: 0
-    bytes: 96
-  __test$link$lambda29:
-    calls: 0
-    bytes: 112
-  __test$link$lambda3:
-    calls: 0
-    bytes: 96
-  __test$link$lambda30:
-    calls: 0
-    bytes: 96
-  __test$link$lambda31:
-    calls: 0
-    bytes: 112
-  __test$link$lambda32:
-    calls: 0
-    bytes: 96
-  __test$link$lambda33:
-    calls: 0
-    bytes: 112
-  __test$link$lambda34:
-    calls: 0
-    bytes: 96
-  __test$link$lambda35:
-    calls: 0
-    bytes: 96
-  __test$link$lambda36:
-    calls: 0
-    bytes: 96
-  __test$link$lambda37:
-    calls: 0
-    bytes: 112
-  __test$link$lambda38:
-    calls: 0
-    bytes: 96
-  __test$link$lambda39:
-    calls: 0
-    bytes: 96
-  __test$link$lambda4:
-    calls: 0
-    bytes: 96
-  __test$link$lambda40:
-    calls: 0
-    bytes: 96
-  __test$link$lambda41:
-    calls: 0
-    bytes: 96
-  __test$link$lambda42:
-    calls: 0
-    bytes: 96
-  __test$link$lambda43:
-    calls: 0
-    bytes: 112
-  __test$link$lambda44:
-    calls: 0
-    bytes: 96
-  __test$link$lambda45:
-    calls: 0
-    bytes: 112
-  __test$link$lambda46:
-    calls: 0
-    bytes: 96
-  __test$link$lambda47:
-    calls: 0
-    bytes: 96
-  __test$link$lambda48:
-    calls: 0
-    bytes: 96
-  __test$link$lambda49:
-    calls: 0
-    bytes: 96
-  __test$link$lambda5:
-    calls: 0
-    bytes: 112
-  __test$link$lambda50:
-    calls: 0
-    bytes: 96
-  __test$link$lambda51:
-    calls: 0
-    bytes: 112
-  __test$link$lambda52:
-    calls: 0
-    bytes: 96
-  __test$link$lambda53:
-    calls: 0
-    bytes: 112
-  __test$link$lambda54:
-    calls: 0
-    bytes: 96
-  __test$link$lambda55:
-    calls: 0
-    bytes: 96
-  __test$link$lambda56:
-    calls: 0
-    bytes: 96
-  __test$link$lambda57:
-    calls: 0
-    bytes: 112
-  __test$link$lambda58:
-    calls: 0
-    bytes: 96
-  __test$link$lambda59:
-    calls: 0
-    bytes: 96
-  __test$link$lambda6:
-    calls: 0
-    bytes: 96
-  __test$link$lambda60:
-    calls: 0
-    bytes: 96
-  __test$link$lambda61:
-    calls: 0
-    bytes: 112
-  __test$link$lambda62:
-    calls: 0
-    bytes: 96
-  __test$link$lambda63:
-    calls: 0
-    bytes: 96
-  __test$link$lambda64:
-    calls: 0
-    bytes: 96
-  __test$link$lambda65:
-    calls: 0
-    bytes: 112
-  __test$link$lambda66:
-    calls: 0
-    bytes: 96
-  __test$link$lambda67:
-    calls: 0
-    bytes: 96
-  __test$link$lambda68:
-    calls: 0
-    bytes: 96
-  __test$link$lambda69:
-    calls: 0
-    bytes: 112
-  __test$link$lambda7:
-    calls: 0
-    bytes: 112
-  __test$link$lambda70:
-    calls: 0
-    bytes: 96
-  __test$link$lambda71:
-    calls: 0
-    bytes: 96
-  __test$link$lambda72:
-    calls: 0
-    bytes: 96
-  __test$link$lambda73:
-    calls: 0
-    bytes: 112
-  __test$link$lambda74:
-    calls: 0
-    bytes: 96
-  __test$link$lambda75:
-    calls: 0
-    bytes: 96
-  __test$link$lambda76:
-    calls: 0
-    bytes: 96
-  __test$link$lambda77:
-    calls: 0
-    bytes: 112
-  __test$link$lambda78:
-    calls: 0
-    bytes: 96
-  __test$link$lambda79:
-    calls: 0
-    bytes: 96
-  __test$link$lambda80:
-    calls: 0
-    bytes: 96
-  __test$link$lambda81:
-    calls: 0
-    bytes: 112
   __test$link$shown_rule$Kind$Node:
     calls: 13
     bytes: 1008

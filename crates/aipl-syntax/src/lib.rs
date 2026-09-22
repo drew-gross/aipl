@@ -3821,6 +3821,20 @@ pub const DESTRUCTURE_BASE_PREFIX: &str = "__spat$";
 /// out of it — the two ends of one desugaring, like [`SPREAD_BASE_PREFIX`].
 pub const CTOR_PARAM_PREFIX: &str = "__ctor";
 
+/// Name prefix of the shared function `aipl_mono::lower_ctor_refs` synthesizes
+/// for a payload-carrying constructor of a *non-generic* variant, so that every
+/// reference to it becomes one address rather than a lambda apiece. The other
+/// end of that desugaring is [`ctor_wrapper_name`] and [`ctor_ref_case`].
+pub const CTOR_WRAPPER_PREFIX: &str = "__ctor$";
+
+/// The shared wrapper function's name for case `case` of variant `variant`.
+/// Neither name can contain a `$` at this stage — a variant is named by its
+/// template, and only monomorphization introduces `Instance$Arg` — so the two
+/// halves split back apart unambiguously.
+pub fn ctor_wrapper_name(variant: &str, case: &str) -> String {
+    format!("{CTOR_WRAPPER_PREFIX}{variant}${case}")
+}
+
 /// The `(case, variant)` a constructor *reference* names, if `e` is one.
 ///
 /// Two shapes reach here, because a reference is lowered differently by arity: a
@@ -3835,7 +3849,16 @@ pub const CTOR_PARAM_PREFIX: &str = "__ctor";
 /// the value, or the constructor function that `xs.map(Circle)` relies on.
 pub fn ctor_ref_case(e: &ast::Expr) -> Option<(&str, &str)> {
     let qualified = match &e.kind {
-        ast::ExprKind::Ident(n) => n.as_str(),
+        ast::ExprKind::Ident(n) => {
+            // The shared wrapper is what a constructor used as a *value*
+            // lowers to, so a `Case<V>` position reads the case back out of
+            // its name exactly as it does out of the lambda a generic
+            // variant's constructor still becomes.
+            if let Some(rest) = n.strip_prefix(CTOR_WRAPPER_PREFIX) {
+                return rest.split_once('$').map(|(v, c)| (c, v));
+            }
+            n.as_str()
+        }
         ast::ExprKind::Lambda(params, body) => {
             let ast::ExprKind::Call(name, args, _) = &body.kind else {
                 return None;

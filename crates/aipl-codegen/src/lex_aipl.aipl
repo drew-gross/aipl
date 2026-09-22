@@ -926,10 +926,10 @@ deallocations: 288
 reallocations: 67
 bytes allocated: 421509
 instructions executed: 1657750
-binary size: 634368
-  code: 431024
+binary size: 634184
+  code: 430888
   data: 10612
-  metadata: 192732
+  metadata: 192684
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -979,6 +979,9 @@ functions:
   __builtin_int_parse$lambda1:
     calls: 5
     bytes: 140
+  __ctor$AiplTok$Name:
+    calls: 19
+    bytes: 104
   __eq_AiplTok:
     calls: 74
     bytes: 600
@@ -1128,26 +1131,20 @@ functions:
     bytes: 91844
   aipl_rules$lambda0:
     calls: 0
-    bytes: 136
+    bytes: 144
   aipl_rules$lambda1:
-    calls: 19
-    bytes: 104
+    calls: 3
+    bytes: 164
   aipl_rules$lambda2:
     calls: 0
     bytes: 144
   aipl_rules$lambda3:
-    calls: 3
+    calls: 2
     bytes: 164
   aipl_rules$lambda4:
     calls: 0
-    bytes: 144
-  aipl_rules$lambda5:
-    calls: 2
-    bytes: 164
-  aipl_rules$lambda6:
-    calls: 0
     bytes: 48
-  aipl_rules$lambda7:
+  aipl_rules$lambda5:
     calls: 4
     bytes: 64
   aipl_test_begin:

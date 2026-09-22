@@ -37,11 +37,11 @@ allocations: 13
 deallocations: 13
 reallocations: 8
 bytes allocated: 840
-instructions executed: 1958
-binary size: 8608
-  code: 4684
-  data: 620
-  metadata: 3304
+instructions executed: 1966
+binary size: 8496
+  code: 4532
+  data: 625
+  metadata: 3339
 functions:
   __arr_drop_Shape:
     calls: 12
@@ -63,9 +63,12 @@ functions:
     bytes: 996
   __test$pair_up:
     calls: 1
-    bytes: 1032
+    bytes: 552
+  aipl_arr_inc:
+    calls: 2
+    bytes: (external)
   aipl_array_dec:
-    calls: 15
+    calls: 17
     bytes: (external)
   aipl_array_new:
     calls: 6
@@ -94,3 +97,6 @@ functions:
   main:
     calls: 1
     bytes: 240
+  pair_up$lam$__ctor$Shape$Rect:
+    calls: 2
+    bytes: 328

@@ -45,11 +45,14 @@ deallocations: 2
 reallocations: 0
 bytes allocated: 144
 instructions executed: 542
-binary size: 4112
-  code: 1672
+binary size: 4016
+  code: 1612
   data: 369
-  metadata: 2071
+  metadata: 2035
 functions:
+  __ctor$Tok$Int:
+    calls: 1
+    bytes: 60
   __eq_i64$arr:
     calls: 1
     bytes: 296
@@ -66,18 +69,12 @@ functions:
     calls: 1
     bytes: 8
   __test$probe$lambda1:
-    calls: 0
-    bytes: 60
-  __test$probe$lambda2:
     calls: 1
     bytes: 8
-  __test$probe$lambda4:
-    calls: 1
-    bytes: 60
-  __test$probe$lambda5:
+  __test$probe$lambda3:
     calls: 1
     bytes: 8
-  __test$probe$map9$own0:
+  __test$probe$map7$own0:
     calls: 1
     bytes: 288
   aipl_arr_inc:

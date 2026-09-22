@@ -277,10 +277,10 @@ deallocations: 6690
 reallocations: 935
 bytes allocated: 641670
 instructions executed: 1504911
-binary size: 407992
-  code: 268696
+binary size: 407280
+  code: 268280
   data: 4940
-  metadata: 134356
+  metadata: 134060
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -456,6 +456,12 @@ functions:
   __builtin_value_or$bool:
     calls: 218
     bytes: 24
+  __ctor$SexpKind$Atom:
+    calls: 68
+    bytes: 96
+  __ctor$__m15__Sexp$List:
+    calls: 13
+    bytes: 112
   __eq___m15__Sexp:
     calls: 21
     bytes: 136
@@ -897,12 +903,6 @@ functions:
   lex_sexp:
     calls: 32
     bytes: 3440
-  lex_sexp$lambda0:
-    calls: 0
-    bytes: 128
-  lex_sexp$lambda1:
-    calls: 68
-    bytes: 96
   lower_item:
     calls: 34
     bytes: 468
@@ -918,15 +918,3 @@ functions:
   sexp_grammar:
     calls: 50
     bytes: 2204
-  sexp_grammar$lambda0:
-    calls: 0
-    bytes: 96
-  sexp_grammar$lambda1:
-    calls: 0
-    bytes: 96
-  sexp_grammar$lambda2:
-    calls: 0
-    bytes: 96
-  sexp_grammar$lambda3:
-    calls: 13
-    bytes: 112
