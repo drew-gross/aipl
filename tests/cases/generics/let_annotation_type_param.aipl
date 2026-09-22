@@ -10,11 +10,15 @@ import { equal as ==, is_empty, less_than as <, print, to_str, value_or } from b
 // to meet `i64`), so building up a `T[]` from `[]` needs the element type
 // stated. The alternative — an empty slice of the input, `self[..0]` — works
 // but reads as a trick.
+//
+// Both loops append with `[..out, x]` rather than `out.push(x)`, and `#[allow]`
+// keeps them: `collect([])` instantiates `T` at the empty literal's `__none__`,
+// which the literal accepts and `push`'s `T: any` does not.
 
 fn collect<T: any>(xs: T[]) -> T[] {
     mut out: T[] = [];
     for (let x : xs) {
-        set out = [..out, x];
+        set out = [..out, x]; #[allow]
     }
     out
 }.test({
@@ -41,7 +45,7 @@ fn filtered<T: any>(xs: T[], keep: (T) -> bool) -> T[] {
     mut out: T[] = [];
     for (let x : xs) {
         if (keep(x)) {
-            set out = [..out, x];
+            set out = [..out, x]; #[allow]
         };
     }
     out

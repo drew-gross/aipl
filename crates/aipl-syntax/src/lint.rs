@@ -35,6 +35,7 @@ mod return_loop_any_all;
 mod return_loop_find_if;
 mod return_loop_find_index;
 mod set_spread_field;
+mod set_spread_push;
 mod slice_from_zero;
 mod slice_to_len;
 mod slice_whole;
@@ -72,6 +73,7 @@ use self::return_loop_any_all::{any_all_names, return_loop_any_all};
 use self::return_loop_find_if::{find_if_name, return_loop_find_if};
 use self::return_loop_find_index::{find_index_name, return_loop_find_index};
 use self::set_spread_field::set_spread_field;
+use self::set_spread_push::{append_names, set_spread_push};
 use self::slice_from_zero::slice_from_zero;
 use self::slice_to_len::slice_to_len;
 use self::slice_whole::slice_whole;
@@ -135,6 +137,12 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     each_expr(program, &mut |e| match_map_ok(e, &mut hits));
     each_expr(program, &mut |e| field_init_shorthand(e, src, &mut hits));
     each_expr(program, &mut |e| set_spread_field(e, src, &mut hits));
+    // The array sibling of the above, and disjoint from it by the kind of
+    // literal the `set` rebuilds from: a struct there, an array here.
+    let appends = append_names(program);
+    each_expr(program, &mut |e| {
+        set_spread_push(e, src, &appends, &mut hits)
+    });
     // Only where this file's `push` is the builtin — see `pipeline_names`,
     // which also reports what `map`/`filter` are called here.
     let pipeline = pipeline_names(program);
@@ -329,6 +337,32 @@ fn pushed_element<'a>(stmt: &'a Expr, acc: &str, push: &str) -> Option<(&'a Expr
         return None;
     }
     Some((&args[1], rest))
+}
+
+/// The binding a `set` target is rooted in: `p` for `p` and for `p.a.b`, and
+/// `None` for anything that is not a place. Shared by the two `set`-rebuild
+/// lints, which ask it the same two questions: what binding is being rebuilt,
+/// and is the target spellable back into the advice at all.
+fn root_name(e: &Expr) -> Option<&str> {
+    match &e.kind {
+        ExprKind::Ident(n) => Some(n),
+        ExprKind::Field(recv, _) => root_name(recv),
+        _ => None,
+    }
+}
+
+/// Whether `e` mentions `name` as a bare identifier anywhere. The singular of
+/// [`mentions_any`], and asked by every lint whose rewrite drops a binding or
+/// splits one statement into several — either way the question is whether some
+/// sub-expression still refers to it.
+fn mentions(e: &Expr, name: &str) -> bool {
+    let mut found = false;
+    each_subexpr(e, &mut |x| {
+        if matches!(&x.kind, ExprKind::Ident(n) if n == name) {
+            found = true;
+        }
+    });
+    found
 }
 
 /// 0-based line number of byte offset `pos` in `src`.

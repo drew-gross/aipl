@@ -1,5 +1,7 @@
 use crate::ast::{Expr, ExprKind};
-use crate::{each_subexpr, Error};
+use crate::Error;
+
+use super::{mentions, root_name};
 
 /// `set p = P { ..p, x: 1 };` — a binding rebuilt from itself only to replace
 /// a field. `set p.x = 1;` is the field store spelled as one: it names the
@@ -60,23 +62,4 @@ pub(super) fn set_spread_field(e: &Expr, src: &str, hits: &mut Vec<Error>) {
         ),
         spread.value.span.clone(),
     ));
-}
-
-/// The binding a `set` target is rooted in: `p` for `p` and for `p.a.b`.
-fn root_name(e: &Expr) -> Option<&str> {
-    match &e.kind {
-        ExprKind::Ident(n) => Some(n),
-        ExprKind::Field(recv, _) => root_name(recv),
-        _ => None,
-    }
-}
-
-fn mentions(e: &Expr, name: &str) -> bool {
-    let mut found = false;
-    each_subexpr(e, &mut |x| {
-        if matches!(&x.kind, ExprKind::Ident(n) if n == name) {
-            found = true;
-        }
-    });
-    found
 }

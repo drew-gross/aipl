@@ -41,6 +41,7 @@ import {
     count_while,
     drop_last,
     equal as ==,
+    extend,
     filter,
     first,
     is_empty,
@@ -50,6 +51,7 @@ import {
     less_than as <,
     logical_and as &&,
     map,
+    push,
     split,
     value_or,
     wrapping_add as +,
@@ -408,10 +410,10 @@ pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
     for (let it : merge_runs(items_of(rules, esc_scope))) {
         if (it.named) {
             let name = entry_name(it.scope);
-            set entries = [..entries, Entry { name, pats: [it.pat] }];
-            set pats = [..pats, Include(name)];
+            set entries.push(Entry { name, pats: [it.pat] });
+            set pats.push(Include(name));
         } else {
-            set pats = [..pats, it.pat];
+            set pats.push(it.pat);
         };
     }
     Expansion { pats, entries }
@@ -492,10 +494,10 @@ fn merge_runs(items: Item[]) -> Item[] {
         match (rest.first()) {
             some(it) => {
                 if (n == 1) {
-                    set out = [..out, it];
+                    set out.push(it);
                 } else {
                     let re = rest[..n].map(|x| x.re).join(sep="|");
-                    set out = [..out, Item { ..it, re, pat: Match(re, it.scope) }];
+                    set out.push(Item { ..it, re, pat: Match(re, it.scope) });
                 };
             },
             none => {},
@@ -572,16 +574,15 @@ pub fn word_pat(words: str[], scope: str) -> Pat {
 pub fn tm_json(Tm { note, name, scope_name, file_types, top, repo }) -> str {
     mut fields = [fld("$schema", json_str(SCHEMA()))];
     if (note.is_nonempty()) {
-        set fields = [..fields, fld("comment", json_str(note))];
+        set fields.push(fld("comment", json_str(note)));
     };
-    set fields = [
-        ..fields,
+    set fields.extend([
         fld("name", json_str(name)),
         fld("scopeName", json_str(scope_name)),
         fld("fileTypes", inline_arr(file_types.map(json_str))),
         arr_fld("patterns", top.map(pat_json)),
         obj_fld("repository", repo.map(entry_json)),
-    ];
+    ]);
     `{obj_of(fields)}\n`
 }.test({
     let g = Tm {
@@ -626,7 +627,7 @@ fn pat_json(p: Pat) -> str {
         Match(re, scope) => {
             mut fields = [fld("match", json_str(re))];
             if (scope.is_nonempty()) {
-                set fields = [..fields, fld("name", json_str(scope))];
+                set fields.push(fld("name", json_str(scope)));
             };
             obj_of(fields)
         },
@@ -634,16 +635,16 @@ fn pat_json(p: Pat) -> str {
         Region(begin, end, inner, scope, begin_scope, content_scope) => {
             mut fields = [fld("begin", json_str(begin)), fld("end", json_str(end))];
             if (scope.is_nonempty()) {
-                set fields = [..fields, fld("name", json_str(scope))];
+                set fields.push(fld("name", json_str(scope)));
             };
             if (begin_scope.is_nonempty()) {
-                set fields = [..fields, caps_fld("beginCaptures", [begin_scope], 0)];
+                set fields.push(caps_fld("beginCaptures", [begin_scope], 0));
             };
             if (content_scope.is_nonempty()) {
-                set fields = [..fields, fld("contentName", json_str(content_scope))];
+                set fields.push(fld("contentName", json_str(content_scope)));
             };
             if (inner.is_nonempty()) {
-                set fields = [..fields, arr_fld("patterns", inner.map(pat_json))];
+                set fields.push(arr_fld("patterns", inner.map(pat_json)));
             };
             obj_of(fields)
         },
@@ -683,7 +684,7 @@ fn caps_fld(key: str, scopes: str[], base: u64) -> str {
     mut entries: str[] = [];
     for (let i, scope : scopes) {
         let n = base + i;
-        set entries = [..entries, `"{n}": {ob()} "name": {json_str(scope)} {cb()}`];
+        set entries.push(`"{n}": {ob()} "name": {json_str(scope)} {cb()}`);
     }
     obj_fld(key, entries)
 }
@@ -727,15 +728,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 975
-deallocations: 975
-reallocations: 33
-bytes allocated: 74784
-instructions executed: 124912
-binary size: 144296
-  code: 92868
+allocations: 971
+deallocations: 971
+reallocations: 38
+bytes allocated: 74528
+instructions executed: 124517
+binary size: 137416
+  code: 89172
   data: 5320
-  metadata: 46108
+  metadata: 42924
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -744,7 +745,7 @@ functions:
     calls: 7
     bytes: 172
   __arr_drop_Pat:
-    calls: 33
+    calls: 30
     bytes: 116
   __arr_drop___m3__TokenRule$Kind:
     calls: 2
@@ -756,7 +757,7 @@ functions:
     calls: 15
     bytes: 172
   __arr_retain_Pat:
-    calls: 8
+    calls: 5
     bytes: 116
   __arr_retain___m3__TokenRule$Kind:
     calls: 0
@@ -826,7 +827,7 @@ functions:
     bytes: 7828
   __test$tm_json:
     calls: 1
-    bytes: 6104
+    bytes: 5180
   __test$word_pat:
     calls: 1
     bytes: 2196
@@ -836,26 +837,29 @@ functions:
   aipl_arr_elem_ptr:
     calls: 15
     bytes: (external)
+  aipl_arr_extend:
+    calls: 1
+    bytes: (external)
   aipl_arr_inc:
-    calls: 117
+    calls: 47
     bytes: (external)
   aipl_arr_reserve:
-    calls: 13
+    calls: 1
     bytes: (external)
   aipl_arr_slice:
     calls: 12
     bytes: (external)
   aipl_array_dec:
-    calls: 561
+    calls: 487
     bytes: (external)
   aipl_array_new:
-    calls: 55
+    calls: 56
     bytes: (external)
   aipl_array_push:
-    calls: 1
+    calls: 9
     bytes: (external)
   aipl_array_push_mut:
-    calls: 27
+    calls: 17
     bytes: (external)
   aipl_array_with_cap:
     calls: 6
@@ -867,10 +871,10 @@ functions:
     calls: 76
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 184
+    calls: 180
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 108
+    calls: 104
     bytes: (external)
   aipl_test_begin:
     calls: 10
@@ -886,7 +890,7 @@ functions:
     bytes: 1900
   caps_fld:
     calls: 0
-    bytes: 1332
+    bytes: 1076
   char_class_body:
     calls: 17
     bytes: 1476
@@ -919,10 +923,10 @@ functions:
     bytes: 1804
   pat_json:
     calls: 2
-    bytes: 4648
+    bytes: 3376
   re_escape:
     calls: 42
     bytes: 2368
   rule_pats$Kind:
     calls: 2
-    bytes: 12728
+    bytes: 11484

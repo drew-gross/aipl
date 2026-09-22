@@ -172,15 +172,15 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 5677
-deallocations: 5677
-reallocations: 293
-bytes allocated: 472744
-instructions executed: 1388741
-binary size: 245320
-  code: 179816
+allocations: 5622
+deallocations: 5622
+reallocations: 331
+bytes allocated: 467200
+instructions executed: 1386338
+binary size: 238176
+  code: 175888
   data: 3336
-  metadata: 62168
+  metadata: 58952
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -189,7 +189,7 @@ functions:
     calls: 18
     bytes: 172
   __arr_drop___m1__Pat:
-    calls: 38
+    calls: 22
     bytes: 116
   __arr_drop___m4__TokenRule$__m6__AiplTok:
     calls: 1
@@ -201,7 +201,7 @@ functions:
     calls: 104
     bytes: 172
   __arr_retain___m1__Pat:
-    calls: 34
+    calls: 18
     bytes: 116
   __arr_retain___m4__TokenRule$__m6__AiplTok:
     calls: 0
@@ -241,7 +241,7 @@ functions:
     bytes: 1900
   __m1__caps_fld:
     calls: 4
-    bytes: 1332
+    bytes: 1076
   __m1__char_class_body:
     calls: 13
     bytes: 1476
@@ -274,7 +274,7 @@ functions:
     bytes: 1804
   __m1__pat_json:
     calls: 40
-    bytes: 4648
+    bytes: 3376
   __m1__re_escape:
     calls: 101
     bytes: 2368
@@ -334,7 +334,7 @@ functions:
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 128684
+    bytes: 126284
   __to_str_u64:
     calls: 7
     bytes: 204
@@ -342,28 +342,28 @@ functions:
     calls: 165
     bytes: (external)
   aipl_arr_extend:
-    calls: 2
+    calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 509
+    calls: 95
     bytes: (external)
   aipl_arr_reserve:
-    calls: 81
+    calls: 3
     bytes: (external)
   aipl_arr_slice:
     calls: 26
     bytes: (external)
   aipl_array_dec:
-    calls: 2218
+    calls: 1749
     bytes: (external)
   aipl_array_new:
-    calls: 203
+    calls: 204
     bytes: (external)
   aipl_array_push:
-    calls: 4
+    calls: 27
     bytes: (external)
   aipl_array_push_mut:
-    calls: 195
+    calls: 173
     bytes: (external)
   aipl_array_with_cap:
     calls: 17
@@ -375,10 +375,10 @@ functions:
     calls: 183
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1007
+    calls: 871
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 824
+    calls: 688
     bytes: (external)
   aipl_test_begin:
     calls: 1

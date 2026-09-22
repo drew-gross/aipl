@@ -1,0 +1,93 @@
+import { equal as ==, extend, print, push, to_str } from builtins;
+
+// `#[allow]` keeps the rebuild form — the escape hatch every lint carries. The
+// marker goes on the line holding the `..self` spread, which is where this lint
+// points; it is always one line, so it takes a trailing marker and keeps it
+// through `aipl fmt`.
+fn rebuilt(mut self: i64[]) {
+    set self = [..self, 3]; #[allow]
+}
+
+fn joined(mut self: i64[], more: i64[]) {
+    set self = [..self, ..more]; #[allow]
+}
+
+// The rewrites the lint asks for, so each pair of spellings is checked side by
+// side and proven to agree.
+fn appended(mut self: i64[]) {
+    set self.push(3);
+}
+
+fn extended(mut self: i64[], more: i64[]) {
+    set self.extend(more);
+}
+
+fn main() !prints {
+    mut a = [1, 2];
+    mut b = [1, 2];
+    set a.rebuilt();
+    set b.appended();
+    print(to_str(a == b));
+    mut c = [1, 2];
+    mut d = [1, 2];
+    set c.joined([8, 9]);
+    set d.extended([8, 9]);
+    print(to_str(c == d));
+    print(to_str(a));
+    print(to_str(c));
+}
+--- stdout ---
+true
+true
+[1, 2, 3]
+[1, 2, 8, 9]
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 333
+instructions executed: 1583
+binary size: 5752
+  code: 2884
+  data: 211
+  metadata: 2657
+functions:
+  __eq_i64$arr:
+    calls: 2
+    bytes: 296
+  __to_str_bool:
+    calls: 2
+    bytes: 232
+  __to_str_i64$arr:
+    calls: 2
+    bytes: 708
+  aipl_arr_extend:
+    calls: 2
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 16
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 3
+    bytes: (external)
+  aipl_array_dec:
+    calls: 30
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 2
+    bytes: (external)
+  aipl_i64_len:
+    calls: 14
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 11
+    bytes: (external)
+  aipl_write_i64:
+    calls: 7
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1648

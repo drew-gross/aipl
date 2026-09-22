@@ -1,18 +1,7 @@
 use crate::ast::{Expr, ExprKind};
 use crate::Error;
 
-use super::{pushed_element, quote};
-
-/// Whether `e` mentions the binding `acc` anywhere.
-fn mentions(e: &Expr, acc: &str) -> bool {
-    let mut hit = false;
-    crate::each_subexpr(e, &mut |x| {
-        if matches!(&x.kind, ExprKind::Ident(n) if n == acc) {
-            hit = true;
-        }
-    });
-    hit
-}
+use super::{mentions, pushed_element, quote};
 
 /// One element of the rewritten literal. A spread stays a spread — the seed may
 /// itself be a literal holding one (`[..a, 3]`), and its elements come across

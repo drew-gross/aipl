@@ -75,6 +75,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  tuple_slot_names should be a range->map I think?
   Mk/TryMk should maybe have single-kid variants? Or Kids+ variants? Or maybe Build should have a OneKid variant?
   make Rule =='able again, maybe by separating the refuse renderers from the rule structure? Since the problem is that it contains a function. Or maybe make functions == comparable?
   bind_fields_mut looks like it can be a zip->reverse->for, also maybe mutable can default to false and then bind_fields doens't need to exist (or only it exists)
@@ -615,6 +616,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  merge tests of similar things into the same file for less process overhead
   use bazel
   do test result caching and/or build caching. Maybe with sccache?
   can handoff leverage event streaming to start filling sections while discovery is still ongoing?

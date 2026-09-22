@@ -1,0 +1,63 @@
+import { len, print, to_str, wrapping_add as + } from builtins;
+
+struct Bag { hits: i64[] }
+
+// `set out = [..out, x]` rebuilds `out` from itself to append one element.
+// `set out.push(x)` says just that. A spread in the tail appends a whole array
+// rather than one element, so it is `extend`; a field path is a place like a
+// bare name, so it works the same way. Neither name is imported here, so the
+// advice says to import the one it uses.
+fn grow(mut out: i64[], more: i64[]) {
+    set out = [..out, 1];
+    set out = [..out, 2, 3];
+    set out = [..out, ..more];
+}
+
+fn stash(mut self: Bag, x: i64) {
+    set self.hits = [..self.hits, x];
+}
+
+// Not flagged: a prepend and a rebuild from a *different* array are not
+// appends, and a multi-element rewrite whose elements read the target would see
+// it grow between the two pushes.
+fn other(mut out: u64[], xs: u64[]) {
+    set out = [0, ..out];
+    set out = [..xs, 9];
+    set out = [..out, out.len(), out.len()];
+}
+
+fn main() !prints {
+    mut xs = [1];
+    set xs.grow([2]);
+    print(to_str(xs));
+    mut b = Bag { hits: [] };
+    set b.stash(1 + 1);
+    print(to_str(b));
+    mut us: u64[] = [1];
+    set us.other([2]);
+    print(to_str(us));
+}
+--- errors ---
+error: this "set" rebuilds "out" from itself only to append to it — append in place: "set out.push(1);", importing `push` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_set_spread_push.aipl:11:18
+   |
+11 |     set out = [..out, 1];
+   |                  ^^^
+
+error: this "set" rebuilds "out" from itself only to append to it — append each in place: "set out.push(2); set out.push(3);", importing `push` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_set_spread_push.aipl:12:18
+   |
+12 |     set out = [..out, 2, 3];
+   |                  ^^^
+
+error: this "set" rebuilds "out" from itself only to append to it — append in place: "set out.extend(more);", importing `extend` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_set_spread_push.aipl:13:18
+   |
+13 |     set out = [..out, ..more];
+   |                  ^^^
+
+error: this "set" rebuilds "self.hits" from itself only to append to it — append in place: "set self.hits.push(x);", importing `push` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_set_spread_push.aipl:17:24
+   |
+17 |     set self.hits = [..self.hits, x];
+   |                        ^^^^^^^^^
