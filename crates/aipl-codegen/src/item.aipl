@@ -17,17 +17,28 @@ struct ImportName { name: str, alias: str?, span: Span }
 struct ImportDecl { names: ImportName[], source: ImportSource }
 
 # One declared parameter. `ty` is the type the *body* sees, which is not always
-# the one written: a variadic `x: T*` stores the sequence type, and a `k?: T`
-# stores `T?` with `implicit_some` recording that the call site passes a bare
-# `T`.
-struct Param {
-    name: str,
-    ty: Ty,
-    mutable: bool,
-    variadic: bool,
-    default: Expr?,
-    implicit_some: bool,
-}
+# the one written: a variadic `x: T*` / `x: T+` stores the sequence type, and a
+# `k?: T` stores `T?` with `implicit_some` recording that the call site passes
+# a bare `T`.
+struct Param { name: str, ty: Ty, mutable: bool, arity: Arity, default: Expr?, implicit_some: bool }
+
+# How many arguments a parameter takes at a call site: one, or — for a
+# variadic — zero or more (`T*`) or one or more (`T+`). Mirrors
+# `aipl_syntax::ast::Arity`.
+variant Arity = One | ZeroOrMore | OneOrMore
+
+# The marker written after a parameter's type: nothing, `*` or `+`.
+pub fn arity_marker(self: Arity) -> str {
+    match (self) {
+        One => "",
+        ZeroOrMore => "*",
+        OneOrMore => "+",
+    }
+}.test({
+    assert(One.arity_marker() == "");
+    assert(ZeroOrMore.arity_marker() == "*");
+    assert(OneOrMore.arity_marker() == "+");
+})
 
 struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], return_ty: Ty? }
 
@@ -134,8 +145,7 @@ fn show_type_param(self: TypeParam) -> str { `{self.name}: {self.bound.show_boun
 fn show_param(self: Param) -> str {
     let prefix = if (self.mutable) { "mut " } else { "" };
     let opt = if (self.implicit_some) { "?" } else { "" };
-    let star = if (self.variadic) { "*" } else { "" };
-    `{prefix}{self.name}{opt}: {self.ty.show_ty()}{star}{show_default(self.default)}`
+    `{prefix}{self.name}{opt}: {self.ty.show_ty()}{self.arity.arity_marker()}{show_default(self.default)}`
 }
 
 fn show_default(self: Expr?) -> str { self.map(|e| ` = {e.show_expr()}`).value_or("") }
@@ -182,11 +192,11 @@ allocations: 18
 deallocations: 18
 reallocations: 2
 bytes allocated: 1338
-instructions executed: 1453
-binary size: 92840
-  code: 65380
-  data: 239
-  metadata: 27221
+instructions executed: 1543
+binary size: 93936
+  code: 65936
+  data: 423
+  metadata: 27577
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -239,6 +249,9 @@ functions:
   __rec_drop___m5__Ty:
     calls: 1
     bytes: 476
+  __test$arity_marker:
+    calls: 1
+    bytes: 364
   __test$show_item:
     calls: 1
     bytes: 1980
@@ -255,7 +268,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_assert:
-    calls: 2
+    calls: 5
     bytes: (external)
   aipl_rec_alloc:
     calls: 1
@@ -267,17 +280,17 @@ functions:
     calls: 2
     bytes: (external)
   aipl_test_begin:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_end:
-    calls: 1
+    calls: 2
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 108
+    bytes: 180
   opt_marker:
     calls: 0
     bytes: 188
@@ -292,7 +305,7 @@ functions:
     bytes: 384
   show_fn:
     calls: 0
-    bytes: 8648
+    bytes: 8768
   show_item:
     calls: 2
     bytes: 8548

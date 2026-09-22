@@ -50,7 +50,7 @@ fn one_param(
     // A parameter the parser introduced for a pattern the user already wrote.
     if p.name == "self"
         || p.mutable
-        || p.variadic
+        || p.arity.is_variadic()
         || p.default.is_some()
         || p.name.starts_with("__")
     {

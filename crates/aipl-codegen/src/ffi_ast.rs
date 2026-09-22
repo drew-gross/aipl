@@ -137,7 +137,7 @@ fn param(v: &FfiValue) -> R<ast::Param> {
         name: text(field(v, "name")?)?,
         ty: ty(field(v, "ty")?)?,
         mutable: flag(field(v, "mutable")?)?,
-        variadic: flag(field(v, "variadic")?)?,
+        arity: arity(field(v, "arity")?)?,
         default: maybe(field(v, "default")?, expr)?,
         implicit_some: flag(field(v, "implicit_some")?)?,
     })
@@ -147,6 +147,16 @@ fn type_param(v: &FfiValue) -> R<ast::TypeParam> {
     Ok(ast::TypeParam {
         name: text(field(v, "name")?)?,
         bound: bound(field(v, "bound")?)?,
+    })
+}
+
+fn arity(v: &FfiValue) -> R<ast::Arity> {
+    let (case, _) = variant(v)?;
+    Ok(match case {
+        "One" => ast::Arity::One,
+        "ZeroOrMore" => ast::Arity::ZeroOrMore,
+        "OneOrMore" => ast::Arity::OneOrMore,
+        other => return Err(unknown("Arity", other)),
     })
 }
 

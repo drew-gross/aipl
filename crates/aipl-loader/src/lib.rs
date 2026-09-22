@@ -880,7 +880,7 @@ fn rewrite_item(
                             name: p.name.clone(),
                             ty: rewrite_type(&p.ty, view, &f.sig.type_vars),
                             mutable: p.mutable,
-                            variadic: p.variadic,
+                            arity: p.arity,
                             default: p
                                 .default
                                 .as_ref()

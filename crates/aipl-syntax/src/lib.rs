@@ -613,6 +613,34 @@ pub mod ast {
         pub doc: Option<String>,
     }
 
+    /// How many arguments a parameter takes at a call site — see
+    /// [`Param::arity`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Arity {
+        /// An ordinary parameter: one argument of its type.
+        One,
+        /// `T*`: zero or more elements.
+        ZeroOrMore,
+        /// `T+`: one or more elements.
+        OneOrMore,
+    }
+
+    impl Arity {
+        /// Whether the parameter takes a sequence of arguments at all.
+        pub fn is_variadic(self) -> bool {
+            !matches!(self, Arity::One)
+        }
+
+        /// The marker written after the type: nothing, `*` or `+`.
+        pub fn marker(self) -> &'static str {
+            match self {
+                Arity::One => "",
+                Arity::ZeroOrMore => "*",
+                Arity::OneOrMore => "+",
+            }
+        }
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Param {
         pub name: String,
@@ -621,15 +649,19 @@ pub mod ast {
         /// parameter (only valid on the first parameter, named `self`). Such a
         /// function returns nothing and is called as `v.f(...)`.
         pub mutable: bool,
-        /// `true` for a variadic ("zero or more") parameter written `T*`. The
-        /// stored `ty` is the *sequence type* the body sees — `str` when the
-        /// element `T` is `char`, otherwise `T[]` — and the element type is
-        /// recoverable from it (`str` → `char`, `Array(e)` → `e`). At a call
-        /// site such a parameter also accepts a single element `T` (wrapped to a
-        /// one-item sequence) or an optional `T?` (empty/one-item sequence); the
-        /// normalization to the sequence type happens in codegen. The body is
-        /// unaffected — it just sees a plain `ty`.
-        pub variadic: bool,
+        /// How many arguments the parameter takes: exactly one, or — for a
+        /// variadic written `T*` (zero or more) or `T+` (one or more) — a
+        /// sequence of them. For a variadic the stored `ty` is the *sequence
+        /// type* the body sees — `str` when the element `T` is `char`,
+        /// otherwise `T[]`, refined to `T[] without []` for `T+` — and the
+        /// element type is recoverable from it (`str` → `char`, `Array(e)` →
+        /// `e`). At a call site a `T*` also accepts a single element `T`
+        /// (wrapped to a one-item sequence) or an optional `T?` (empty/one-item
+        /// sequence); a `T+` accepts a single element or a `T[] without []`,
+        /// the two shapes that cannot be empty. The normalization to the
+        /// sequence type happens in codegen. The body is unaffected — it just
+        /// sees a plain `ty`.
+        pub arity: Arity,
         /// `Some(expr)` for a *keyword* parameter, written `k: T = expr`: having
         /// a default is exactly what makes a parameter a keyword parameter.
         /// Keyword parameters must come after every positional parameter, may

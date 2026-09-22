@@ -1721,6 +1721,20 @@
 
 
 
+        <section class="item" id="item-nonempty_seq_ty">
+          <h3>
+            <a class="anchor" href="#item-nonempty_seq_ty">nonempty_seq_ty</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn nonempty_seq_ty(elem: Ty) -&#62; Ty</code></pre>
+
+          <div class="doc"><p><code>x: T+</code> stores the sequence type refined to what the body may rely on: <code>T[] without []</code>. A <code>char+</code> stays <code>str</code>, since a <code>str</code> has no refinement to take yet — the call site is still held to one element or more.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_fn_body">
           <h3>
             <a class="anchor" href="#item-lower_fn_body">lower_fn_body</a>

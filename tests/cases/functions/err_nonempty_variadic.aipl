@@ -1,0 +1,58 @@
+import { filter, greater_than as >, len, wrapping_add as + } from builtins;
+
+// What a `T+` refuses: the shapes that may be empty — an optional, a plain
+// array (whatever its value), the empty literal — on a concrete and on a
+// generic signature.
+fn count(self: i64+) -> u64 { self.len() }
+
+fn total<T: any>(self: T[], more: T+) -> u64 { self.len() + more.len() }
+
+fn optional() -> u64 { count(some(1)) }
+
+fn plain_array(xs: i64[]) -> u64 { count(xs) }
+
+fn plain_result() -> u64 { count([1, 2].filter(|x| x > 5)) }
+
+fn empty_literal() -> u64 { count([]) }
+
+fn generic_optional() -> u64 { total([1], none) }
+
+fn generic_plain_array(xs: i64[]) -> u64 { total([1], xs) }
+
+fn main() {}
+--- errors ---
+error: fn "count" arg 0: variadic parameter expects i64[] without [] or i64 — at least one element, so no optional and no array that may be empty, got i64?
+  --> ./tests/cases/functions/err_nonempty_variadic.aipl:10:30
+   |
+10 | fn optional() -> u64 { count(some(1)) }
+   |                              ^^^^^^^
+
+error: fn "count" arg 0: variadic parameter expects i64[] without [] or i64 — at least one element, so no optional and no array that may be empty, got i64[]
+  --> ./tests/cases/functions/err_nonempty_variadic.aipl:12:42
+   |
+12 | fn plain_array(xs: i64[]) -> u64 { count(xs) }
+   |                                          ^^
+
+error: fn "count" arg 0: variadic parameter expects i64[] without [] or i64 — at least one element, so no optional and no array that may be empty, got i64[]
+  --> ./tests/cases/functions/err_nonempty_variadic.aipl:14:34
+   |
+14 | fn plain_result() -> u64 { count([1, 2].filter(|x| x > 5)) }
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: fn "count" arg 0: variadic parameter expects i64[] without [] or i64 — at least one element, so no optional and no array that may be empty, got []
+  --> ./tests/cases/functions/err_nonempty_variadic.aipl:16:35
+   |
+16 | fn empty_literal() -> u64 { count([]) }
+   |                                   ^^
+
+error: fn "total" arg 1: variadic parameter expects i64[] without [] or i64 — at least one element, so no optional and no array that may be empty, got none
+  --> ./tests/cases/functions/err_nonempty_variadic.aipl:18:43
+   |
+18 | fn generic_optional() -> u64 { total([1], none) }
+   |                                           ^^^^
+
+error: fn "total" arg 1: variadic parameter expects i64[] without [] or i64 — at least one element, so no optional and no array that may be empty, got i64[]
+  --> ./tests/cases/functions/err_nonempty_variadic.aipl:20:55
+   |
+20 | fn generic_plain_array(xs: i64[]) -> u64 { total([1], xs) }
+   |                                                       ^^

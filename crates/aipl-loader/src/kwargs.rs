@@ -39,8 +39,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
 use aipl_syntax::ast::{
-    Callee, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Param, Program,
-    Signature, Type, VariantCase, VariantDecl,
+    Arity, Callee, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Param,
+    Program, Signature, Type, VariantCase, VariantDecl,
 };
 use aipl_syntax::{Error, Span};
 
@@ -324,7 +324,7 @@ fn case_params(c: &VariantCase) -> Vec<Param> {
                 .unwrap_or_else(|| format!("{}{i}", aipl_syntax::CASE_SLOT_PREFIX)),
             ty: slot.ty.clone(),
             mutable: false,
-            variadic: false,
+            arity: Arity::One,
             default: slot.default.clone(),
             implicit_some: slot.implicit_some,
         })

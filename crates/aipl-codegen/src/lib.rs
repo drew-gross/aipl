@@ -76,6 +76,7 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use aipl_syntax::{
     ast::{
+        Arity,
         BinOp,
         Callee,
         ConcreteType,
@@ -6870,7 +6871,7 @@ fn with_cli_args_main(program: &Program) -> Result<(Program, bool), Error> {
                 name: "__cli_args".to_string(),
                 ty: injected_cli_args_ty(),
                 mutable: false,
-                variadic: false,
+                arity: Arity::One,
                 default: None,
                 implicit_some: false,
             }),

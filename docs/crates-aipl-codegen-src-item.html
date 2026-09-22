@@ -96,7 +96,54 @@
           </h3>
           <pre class="signature"><code>struct Param</code></pre>
 
-          <div class="doc"><p>One declared parameter. <code>ty</code> is the type the *body* sees, which is not always the one written: a variadic <code>x: T*</code> stores the sequence type, and a <code>k?: T</code> stores <code>T?</code> with <code>implicit_some</code> recording that the call site passes a bare <code>T</code>.</p></div>
+          <div class="doc"><p>One declared parameter. <code>ty</code> is the type the *body* sees, which is not always the one written: a variadic <code>x: T*</code> / <code>x: T+</code> stores the sequence type, and a <code>k?: T</code> stores <code>T?</code> with <code>implicit_some</code> recording that the call site passes a bare <code>T</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Arity">
+          <h3>
+            <a class="anchor" href="#item-Arity">Arity</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Arity</code></pre>
+
+          <div class="doc"><p>How many arguments a parameter takes at a call site: one, or — for a variadic — zero or more (<code>T*</code>) or one or more (<code>T+</code>). Mirrors <code>aipl_syntax::ast::Arity</code>.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-One"><code>One</code>
+
+
+            </li>
+
+            <li id="item-ZeroOrMore"><code>ZeroOrMore</code>
+
+
+            </li>
+
+            <li id="item-OneOrMore"><code>OneOrMore</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-arity_marker">
+          <h3>
+            <a class="anchor" href="#item-arity_marker">arity_marker</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn arity_marker(self: Arity) -&#62; str</code></pre>
+
+          <div class="doc"><p>The marker written after a parameter's type: nothing, <code>*</code> or <code>+</code>.</p></div>
 
 
         </section>

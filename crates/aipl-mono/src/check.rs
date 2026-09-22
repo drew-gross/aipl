@@ -24,8 +24,8 @@ use std::collections::{HashMap, HashSet};
 use aipl_syntax::ast;
 use aipl_syntax::ast::Bound;
 use aipl_syntax::ast::{
-    BinOp, Callee, Exclusion, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm,
-    Pattern, Primitive, Program, Signature, StructDecl, Type, VariantDecl,
+    Arity, BinOp, Callee, Exclusion, Expr, ExprKind, FieldInit, Function, Item, LambdaParam,
+    MatchArm, Pattern, Primitive, Program, Signature, StructDecl, Type, VariantDecl,
 };
 use aipl_syntax::{
     binop_spelling, is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr,
@@ -4099,26 +4099,18 @@ impl Cx<'_> {
             let mut atys = Vec::with_capacity(args.len());
             for (i, (arg, p)) in args.iter().zip(&params).enumerate() {
                 let pty = &p.ty;
-                if p.variadic {
+                if p.arity.is_variadic() {
                     // A variadic `T*` parameter accepts its sequence type, a
                     // single element, or an optional element — codegen
                     // normalizes whichever form to the sequence. Synthesize the
-                    // argument's type, then accept any of the three shapes.
+                    // argument's type, then accept any of the three shapes. A
+                    // `T+` accepts only the two that cannot be empty (see
+                    // `nonempty_variadic_accepts`). The sequence type is the
+                    // literal's context either way: `[1, 2]` for a `T+` takes
+                    // the refined type on sight, as it would for a binding.
                     let aty = self.check_arg(arg, None, env, effects, "variadic argument")?;
-                    if !variadic_accepts(&aty, pty) {
-                        let elem = variadic_elem(pty);
-                        return Err(Error::at(
-                            format!(
-                                "fn {:?} arg {i}: variadic parameter expects {}, {}, or {}?, got {}",
-                                display(name),
-                                tyname(pty),
-                                tyname(&elem),
-                                tyname(&elem),
-                                tyname(&aty)
-                            ),
-                            arg.span.clone(),
-                        ));
-                    }
+                    let aty = self.flex_int(arg, &aty, pty)?;
+                    self.check_variadic_arg(&aty, p.arity, pty, name, i, arg.span.clone())?;
                     atys.push(aty);
                 } else {
                     atys.push(self.check_arg(
@@ -4163,7 +4155,15 @@ impl Cx<'_> {
             // equally pass one bare `T` or a `T?`, and codegen normalizes. So
             // `[[1], [2]].join(sep=0)` is a single separator element, not a
             // shape error.
-            let variadic = sig.params.get(i).is_some_and(|p| p.variadic);
+            let variadic = sig.params.get(i).is_some_and(|p| p.arity.is_variadic());
+            // A `T+`'s literal argument takes the refinement its context offers
+            // (see the concrete path above); with `T` still open the element
+            // types are left to the ordinary synthesis.
+            let aty = if variadic {
+                self.flex_int(arg, &aty, pty)?
+            } else {
+                aty
+            };
             if !variadic && !shape_fits(pty, &aty) {
                 // Phrase the receiver as a receiver. `a.map(f)` and `map(a, f)`
                 // are one AST, so there is no call *form* to read — but a first
@@ -4192,6 +4192,16 @@ impl Cx<'_> {
             }
             self.bind_field(pty, &aty, &vars, &mut map);
             atys[i] = aty;
+        }
+        // A `T+` argument has to be one of the two shapes that cannot be empty.
+        // Judged after pass 1 so that a `T` another argument pinned is known —
+        // `f('a', "bc")` for `f(x: T, rest: T+)` is a `str` against a `char`
+        // sequence, which may be empty, not one `str` element.
+        for (i, (arg, p)) in args.iter().zip(&sig.params).enumerate() {
+            if p.arity == Arity::OneOrMore {
+                let seq = subst_vars(&p.ty, &map, &vars);
+                self.check_variadic_arg(&atys[i], p.arity, &seq, name, i, arg.span.clone())?;
+            }
         }
         // Pass 2: function-typed arguments — check against the substituted type.
         for (i, (arg, pty)) in args.iter().zip(&params).enumerate() {
@@ -4275,6 +4285,48 @@ impl Cx<'_> {
                 self.resolve_generic_ty(&ret)
             }
         }
+    }
+
+    /// Refuse an argument of type `aty` that a variadic parameter of `arity`
+    /// and sequence type `seq` does not take — see [`variadic_accepts`] and
+    /// [`nonempty_variadic_accepts`]. `i` is the argument's position, for the
+    /// message.
+    fn check_variadic_arg(
+        &self,
+        aty: &Type,
+        arity: Arity,
+        seq: &Type,
+        name: &str,
+        i: usize,
+        span: Span,
+    ) -> Result<(), Error> {
+        let elem = variadic_elem(seq);
+        let (ok, expects) = match arity {
+            Arity::One => unreachable!("only a variadic parameter is checked here"),
+            Arity::ZeroOrMore => (
+                variadic_accepts(aty, seq),
+                format!("{}, {}, or {}?", tyname(seq), tyname(&elem), tyname(&elem)),
+            ),
+            Arity::OneOrMore => (
+                nonempty_variadic_accepts(aty, seq),
+                format!(
+                    "{} or {} — at least one element, so no optional and no array that may be empty",
+                    tyname(seq),
+                    tyname(&elem)
+                ),
+            ),
+        };
+        if ok {
+            return Ok(());
+        }
+        Err(Error::at(
+            format!(
+                "fn {:?} arg {i}: variadic parameter expects {expects}, got {}",
+                display(name),
+                tyname(aty)
+            ),
+            span,
+        ))
     }
 
     /// Check one call argument against its expected parameter type (when known).
@@ -5146,19 +5198,50 @@ fn variadic_elem(seq: &Type) -> Type {
     match seq {
         Type::Primitive(Primitive::Str) => Type::Primitive(Primitive::Char),
         Type::Array(e) => (**e).clone(),
+        // A `T+`'s sequence is refined; its element is the base's.
+        Type::Without(base, _) => variadic_elem(base),
         // The parser only builds `str` / `T[]` sequence types; fall back to the
         // seq itself so acceptance still type-checks for any stray shape.
         other => other.clone(),
     }
 }
 
-/// Whether `arg` is acceptable for a variadic parameter whose sequence type is
+/// Whether `arg` is acceptable for a `T*` parameter whose sequence type is
 /// `seq`: the sequence itself, a single element, or an optional element.
 fn variadic_accepts(arg: &Type, seq: &Type) -> bool {
     let elem = variadic_elem(seq);
     coerce(arg, seq).is_ok()
         || coerce(arg, &elem).is_ok()
         || coerce(arg, &Type::Optional(Box::new(elem))).is_ok()
+}
+
+/// Whether `arg` is acceptable for a `T+` parameter whose sequence type is
+/// `seq` (a `T[] without []`, or `str` for a `char+`): a sequence the type
+/// system knows is non-empty, or a single element. What is refused is exactly
+/// what may be empty — an optional, and any value the sequence's *base* would
+/// take (`T[]`, and `str` for a `char` sequence). An argument that is itself
+/// abstract — a type variable, or `_` — is let through, as `shape_fits` does.
+fn nonempty_variadic_accepts(arg: &Type, seq: &Type) -> bool {
+    if is_typevar(arg) || is_unknown(arg) {
+        return true;
+    }
+    if matches!(arg, Type::Without(..)) {
+        return coerce(arg, seq).is_ok();
+    }
+    if matches!(arg, Type::Optional(_)) {
+        return false;
+    }
+    let base = unrefined(seq);
+    if mentions_typevar(base) {
+        // `T` is still open, so nothing can be compared by type: judge the
+        // shape alone, as `shape_fits` does. A container is the sequence and
+        // may be empty; anything else is one element.
+        return !matches!(arg, Type::Array(_) | Type::Set(..) | Type::Dict(_, _));
+    }
+    if coerce(arg, base).is_ok() {
+        return false;
+    }
+    coerce(arg, &variadic_elem(seq)).is_ok()
 }
 
 /// `actual` fits `expected`, applying the same `none`/empty-array coercions as

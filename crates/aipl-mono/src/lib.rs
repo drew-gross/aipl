@@ -52,7 +52,7 @@ pub use subst::inline_single_use_bindings;
 use aipl_syntax::{
     ast,
     ast::{
-        is_unit, BinOp, Bound, Callee, CaseParam, ConcreteFieldDecl, ConcreteStructDecl,
+        is_unit, Arity, BinOp, Bound, Callee, CaseParam, ConcreteFieldDecl, ConcreteStructDecl,
         ConcreteType, ConcreteVariantCase, ConcreteVariantDecl, Expr, ExprKind, FieldDecl,
         FieldInit, Function, Item, LambdaParam, MatchArm, Param, Pattern, Primitive, Program,
         SeqShape, Signature, StructDecl, Type, TypeParam, VariantCase, VariantDecl,
@@ -1526,7 +1526,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                             name: p.name.clone(),
                             ty,
                             mutable: p.mutable,
-                            variadic: p.variadic,
+                            arity: p.arity,
                             default: p.default.clone(),
                             implicit_some: p.implicit_some,
                         }
@@ -1793,10 +1793,10 @@ fn specialize_variadic(
     // (original name, expression rebuilding the sequence) in parameter order.
     let mut prologues: Vec<(String, Expr)> = Vec::new();
     for (i, p) in params.iter_mut().enumerate() {
-        if !p.variadic {
+        if !p.arity.is_variadic() {
             continue;
         }
-        p.variadic = false;
+        p.arity = Arity::One;
         let elem = variadic_elem_ty(&p.ty);
         let is_char = elem == Type::Primitive(Primitive::Char);
         let orig = p.name.clone();
@@ -1896,7 +1896,7 @@ fn make_concrete(sig: &Signature, type_args: &[Type]) -> (Vec<Param>, Option<Typ
             name: p.name.clone(),
             ty: subst_vars(&p.ty, &map),
             mutable: p.mutable,
-            variadic: p.variadic,
+            arity: p.arity,
             default: p.default.clone(),
             implicit_some: p.implicit_some,
         })
@@ -2464,7 +2464,7 @@ impl Mono<'_> {
                     Some(known) => known,
                     None => self.infer(arg, env)?,
                 };
-                shapes.push(if param.variadic {
+                shapes.push(if param.arity.is_variadic() {
                     variadic_shape(&aty, &param.ty)
                 } else {
                     VShape::Seq
@@ -2526,7 +2526,7 @@ impl Mono<'_> {
                             name: cap.clone(),
                             ty: ct.clone(),
                             mutable: false,
-                            variadic: false,
+                            arity: Arity::One,
                             default: None,
                             implicit_some: false,
                         });
@@ -2746,7 +2746,7 @@ impl Mono<'_> {
                 name: p.name.clone(),
                 ty,
                 mutable: p.mutable,
-                variadic: p.variadic,
+                arity: p.arity,
                 default: p.default.clone(),
                 implicit_some: p.implicit_some,
             });
@@ -2847,7 +2847,7 @@ impl Mono<'_> {
                 name: lp.name.clone(),
                 ty: pty.clone(),
                 mutable: false,
-                variadic: false,
+                arity: Arity::One,
                 default: None,
                 implicit_some: false,
             })
@@ -2857,7 +2857,7 @@ impl Mono<'_> {
                 name: cn.clone(),
                 ty: ct.clone(),
                 mutable: false,
-                variadic: false,
+                arity: Arity::One,
                 default: None,
                 implicit_some: false,
             });
@@ -2900,7 +2900,7 @@ impl Mono<'_> {
                 name: cap.clone(),
                 ty: ct.clone(),
                 mutable: false,
-                variadic: false,
+                arity: Arity::One,
                 default: None,
                 implicit_some: false,
             });
@@ -3048,7 +3048,7 @@ impl Mono<'_> {
             name: "$arr".to_string(),
             ty: Type::Array(Box::new(elem.clone())),
             mutable: false,
-            variadic: false,
+            arity: Arity::One,
             default: None,
             implicit_some: false,
         }];
@@ -3356,7 +3356,7 @@ impl Mono<'_> {
             name: "$arr".to_string(),
             ty: arr_ty.clone(),
             mutable: false,
-            variadic: false,
+            arity: Arity::One,
             default: None,
             implicit_some: false,
         }];
@@ -3680,7 +3680,7 @@ impl Mono<'_> {
                 name: "$a".to_string(),
                 ty: Type::Array(Box::new(elem_a.clone())),
                 mutable: false,
-                variadic: false,
+                arity: Arity::One,
                 default: None,
                 implicit_some: false,
             },
@@ -3688,7 +3688,7 @@ impl Mono<'_> {
                 name: "$b".to_string(),
                 ty: Type::Array(Box::new(elem_b.clone())),
                 mutable: false,
-                variadic: false,
+                arity: Arity::One,
                 default: None,
                 implicit_some: false,
             },
@@ -3701,7 +3701,7 @@ impl Mono<'_> {
                 name: cap.clone(),
                 ty: ct.clone(),
                 mutable: false,
-                variadic: false,
+                arity: Arity::One,
                 default: None,
                 implicit_some: false,
             });
@@ -4097,7 +4097,7 @@ impl Mono<'_> {
             name: "$arr".to_string(),
             ty: Type::Array(Box::new(elem.clone())),
             mutable: false,
-            variadic: false,
+            arity: Arity::One,
             default: None,
             implicit_some: false,
         }];
@@ -4390,7 +4390,10 @@ impl Mono<'_> {
             (
                 sig.type_var_names(),
                 sig.params.iter().map(|p| p.ty.clone()).collect::<Vec<_>>(),
-                sig.params.iter().map(|p| p.variadic).collect::<Vec<_>>(),
+                sig.params
+                    .iter()
+                    .map(|p| p.arity.is_variadic())
+                    .collect::<Vec<_>>(),
                 sig.return_ty.clone(),
             )
         };
@@ -4556,7 +4559,11 @@ impl Mono<'_> {
         let Type::TypeVar(v) = &p.ty else {
             return None;
         };
-        if !lit_pinned.contains(v) || p.variadic || p.mutable || self.mutating.contains(gname) {
+        if !lit_pinned.contains(v)
+            || p.arity.is_variadic()
+            || p.mutable
+            || self.mutating.contains(gname)
+        {
             return None;
         }
         if subst::assigns_to(&self.generics.get(gname)?.body, &p.name) {
@@ -5564,7 +5571,7 @@ impl Mono<'_> {
                 // per-shape specialization a concrete one gets; without it
                 // every instance was the sequence form and a bare element was
                 // rejected by codegen's argument check.
-                variadic: if p.variadic {
+                variadic: if p.arity.is_variadic() {
                     atys.get(i).map_or(VShape::Seq, |a| {
                         variadic_shape(a, &subst_vars(&p.ty, &tmap))
                     })
@@ -6671,7 +6678,7 @@ impl Mono<'_> {
                         .iter()
                         .enumerate()
                         .map(|(i, p)| {
-                            if p.variadic {
+                            if p.arity.is_variadic() {
                                 atys.get(i)
                                     .map_or(VShape::Seq, |a| variadic_shape(a, &p.ty))
                             } else {
@@ -7676,7 +7683,7 @@ fn normalize(f: &Function) -> Result<Generic, Error> {
             name: p.name.clone(),
             ty,
             mutable: p.mutable,
-            variadic: p.variadic,
+            arity: p.arity,
             default: p.default.clone(),
             implicit_some: p.implicit_some,
         });
@@ -8752,7 +8759,7 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
                         f.sig
                             .params
                             .iter()
-                            .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic),
+                            .any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
                         &f.body,
                         &f.name,
                     ) =>
@@ -8937,7 +8944,7 @@ fn is_inline_candidate(
         && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
         && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
         && is_inline_shape(
-            f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.variadic),
+            f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _)) || p.arity.is_variadic()),
             &f.body,
             &f.name,
         )

@@ -1,8 +1,8 @@
 //! Integration tests for the parser.
 
 use aipl::ast::{
-    BinOp, Bound, Callee, Expr, ExprKind, FieldDecl, FieldInit, ImportSource, Item, MatchArm,
-    Param, Primitive, Program, StructDecl, Type, TypeParam,
+    Arity, BinOp, Bound, Callee, Expr, ExprKind, FieldDecl, FieldInit, ImportSource, Item,
+    MatchArm, Param, Primitive, Program, StructDecl, Type, TypeParam,
 };
 /// Parse, first installing the (idempotent) parser hooks the dogfooded
 /// section-header / raw-string helpers require — there's no native fallback.
@@ -120,7 +120,7 @@ fn function_with_one_param() {
             name: "x".into(),
             ty: i64_ty(),
             mutable: false,
-            variadic: false,
+            arity: Arity::One,
             default: None,
             implicit_some: false,
         }]

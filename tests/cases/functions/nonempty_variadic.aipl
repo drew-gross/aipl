@@ -1,0 +1,107 @@
+import {
+    ensure_nonempty,
+    equal as ==,
+    nonempty_first,
+    nonempty_last,
+    print,
+    to_str,
+    wrapping_increment as ++,
+} from builtins;
+
+// A `T+` parameter is a variadic that takes one element or more. Inside the
+// body it is the non-empty sequence — `T[] without []` — so the ends are
+// there for the taking. At a call site it accepts a single element or a
+// `T[] without []`: the two shapes that cannot be empty. An optional and a
+// plain array are refused, however they were built — see `err_nonempty_variadic`.
+fn first_and_last(self: i64+) -> str { `{self.nonempty_first()}..{self.nonempty_last()}` }.test({
+    assert(first_and_last(7) == "7..7"); // a single element -> [7]
+    assert(first_and_last([1, 2, 3]) == "1..3"); // a literal with an element in it
+    let ne: i64[] without [] = [4, 5];
+    assert(ne.first_and_last() == "4..5"); // a refined binding, as-is
+})
+
+// Generic too: `T` is pinned by the receiver, and the variadic agrees with it.
+fn total<T: any>(self: T[], more: T+) -> u64 {
+    mut n: u64 = 0;
+    for (let _ : self) {
+        set n++;
+    }
+    for (let _ : more) {
+        set n++;
+    }
+    n
+}
+
+// A `char+` is a `str` in the body (a `str` takes no refinement yet), and its
+// call site is still held to one char or more.
+fn wrap(self: str, around: char+) -> str { `{around}{self}{around}` }
+
+fn main() !prints {
+    print(to_str(total([1, 2], 3)));
+    print(to_str(total([1, 2], [3, 4])));
+    print(wrap("x", '*'));
+    let stars: char[] without [] = ['*', '*'];
+    print(wrap("x", stars));
+    // The runtime road in: `ensure_nonempty` hands back the shape `T+` takes.
+    let xs = [9, 8, 7];
+    match (xs.ensure_nonempty()) {
+        some(ne) => print(ne.first_and_last()),
+        none => print("empty"),
+    };
+}
+--- stdout ---
+3
+4
+*x*
+**x**
+9..7
+--- performance ---
+allocations: 11
+deallocations: 11
+reallocations: 0
+bytes allocated: 636
+instructions executed: 692
+binary size: 5872
+  code: 3152
+  data: 153
+  metadata: 2567
+functions:
+  __builtin_nonempty_first$i64:
+    calls: 0
+    bytes: 32
+  __builtin_nonempty_first$i64$tail:
+    calls: 1
+    bytes: 288
+  __builtin_nonempty_last$i64:
+    calls: 0
+    bytes: 32
+  __builtin_nonempty_last$i64$tail:
+    calls: 1
+    bytes: 284
+  __to_str_i64:
+    calls: 2
+    bytes: 204
+  __to_str_u64:
+    calls: 2
+    bytes: 204
+  aipl_array_dec:
+    calls: 3
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2108
