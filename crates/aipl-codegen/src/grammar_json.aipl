@@ -39,6 +39,7 @@ import {
     Const,
     Grammar,
     Inline,
+    Kid,
     Kids,
     Literal as Lit,
     Many,
@@ -122,20 +123,10 @@ fn json_rules() -> TokenRule<JsonTok>[] {
 //
 // A production whose value *is* one of its constructors names the constructor
 // (`Kids(Object)`); one that is a one-liner over its text is a lambda at the
-// production, taking its parameter type from `Build`'s payload. Only a lowering
-// with something to say — a child to unwrap, a key to read off a leaf — gets a
-// name of its own.
-
-# The single alternative that matched, unwrapped. Every branch of `value` is a
-# rule *reference*, so exactly one interior child arrives.
-fn lower_value(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
-    kids
-        .first()
-        .value_or_err(ParseError {
-            message: "a JSON value matched no alternative",
-            span: node.span(),
-        })
-}
+// production, taking its parameter type from `Build`'s payload; one that is
+// whichever alternative matched is `Kid(|v: Json| v)`, the pass-through. Only a
+// lowering with something to say — a key to read off a leaf — gets a name of
+// its own, and only `lower_member` has that much to say.
 
 # A member's value is its one interior child; its key is the string token in
 # front of the `:`, which is a *leaf* and so has no lowered value — the node's
@@ -210,7 +201,7 @@ pub fn json_grammar() -> Grammar<JsonTok, Json> {
             Production {
                 name: "value",
                 rule: r_value,
-                build: TryMk(lower_value),
+                build: Kid(|v: Json| v),
                 expect_as: "a JSON value",
                 layout: Inline,
             },
@@ -291,7 +282,7 @@ pub fn json_cst(src: str) -> Cst!ParseError {
 
     // The tree the eight productions build. Every alternative of `value` is a
     // rule *reference*, so a value is always a `value` node wrapping the node
-    // that matched — which is what gives `lower_value` its single child. The
+    // that matched — which is what lets `value` lower with `Kid`. The
     // `~ ` leaves are recorded whitespace, sitting in front of the token that
     // follows them.
     assert(
@@ -512,15 +503,15 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
 # braces — is a list breaking or not breaking, which the layouts decide.
 fn json_space(l: str, r: str) -> bool { l == ":" }
 --- performance ---
-allocations: 22173
-deallocations: 22173
+allocations: 22342
+deallocations: 22342
 reallocations: 3287
-bytes allocated: 2833155
-instructions executed: 5530884
-binary size: 462296
-  code: 302632
-  data: 8564
-  metadata: 151100
+bytes allocated: 2841267
+instructions executed: 5567372
+binary size: 464528
+  code: 303976
+  data: 8596
+  metadata: 151956
 functions:
   __arr_drop_Json:
     calls: 125
@@ -646,7 +637,7 @@ functions:
     calls: 684
     bytes: 404
   __builtin_find_map$__m1__Cst$__builtin_Span$lam$__m1__first_leaf:
-    calls: 0
+    calls: 169
     bytes: 364
   __builtin_intersperse$__m5__Doc:
     calls: 48
@@ -682,7 +673,7 @@ functions:
     calls: 304
     bytes: 1072
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
-    calls: 0
+    calls: 169
     bytes: 440
   __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam$__m13__lower_node$JsonTok$Json$lambda0:
     calls: 166
@@ -788,7 +779,7 @@ functions:
     bytes: 364
   __m13__lower_node$JsonTok$Json:
     calls: 166
-    bytes: 4604
+    bytes: 5812
   __m13__match_group$JsonTok$Json:
     calls: 297
     bytes: 5084
@@ -819,6 +810,9 @@ functions:
   __m13__match_then$JsonTok$Json:
     calls: 158
     bytes: 2816
+  __m13__only_kid$Json:
+    calls: 71
+    bytes: 776
   __m13__parse$JsonTok$Json:
     calls: 34
     bytes: 284
@@ -844,7 +838,7 @@ functions:
     calls: 1
     bytes: 652
   __m1__first_leaf:
-    calls: 0
+    calls: 240
     bytes: 788
   __m1__flat_kids:
     calls: 0
@@ -853,7 +847,7 @@ functions:
     calls: 193
     bytes: 1108
   __m1__last_leaf:
-    calls: 0
+    calls: 240
     bytes: 788
   __m1__leaves:
     calls: 0
@@ -868,7 +862,7 @@ functions:
     calls: 34
     bytes: 2968
   __m1__span:
-    calls: 0
+    calls: 71
     bytes: 252
   __m1__token_leaves:
     calls: 0
@@ -1068,17 +1062,23 @@ functions:
   aipl_arr_drop_arr:
     calls: 56
     bytes: (external)
+  aipl_arr_elem_ptr:
+    calls: 169
+    bytes: (external)
   aipl_arr_extend:
     calls: 9823
     bytes: (external)
   aipl_arr_inc:
-    calls: 86682
+    calls: 87226
     bytes: (external)
   aipl_arr_reserve:
     calls: 12674
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 394
+    bytes: (external)
+  aipl_arr_reverse:
+    calls: 169
     bytes: (external)
   aipl_arr_slice:
     calls: 84
@@ -1087,7 +1087,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 121903
+    calls: 122616
     bytes: (external)
   aipl_array_new:
     calls: 3996
@@ -1108,13 +1108,13 @@ functions:
     calls: 10707
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 72506
+    calls: 72915
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 4068
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 61799
+    calls: 62208
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 4068
@@ -1157,64 +1157,76 @@ functions:
     bytes: 7996
   json_grammar$lambda0:
     calls: 0
-    bytes: 96
+    bytes: 48
   json_grammar$lambda1:
     calls: 0
-    bytes: 96
+    bytes: 48
   json_grammar$lambda10:
     calls: 0
-    bytes: 96
+    bytes: 124
   json_grammar$lambda11:
-    calls: 14
-    bytes: 112
-  json_grammar$lambda12:
-    calls: 0
-    bytes: 96
-  json_grammar$lambda13:
-    calls: 13
-    bytes: 112
-  json_grammar$lambda14:
-    calls: 0
-    bytes: 188
-  json_grammar$lambda15:
-    calls: 11
-    bytes: 216
-  json_grammar$lambda16:
-    calls: 0
-    bytes: 116
-  json_grammar$lambda17:
-    calls: 21
-    bytes: 92
-  json_grammar$lambda18:
     calls: 0
     bytes: 124
+  json_grammar$lambda12:
+    calls: 0
+    bytes: 48
+  json_grammar$lambda13:
+    calls: 71
+    bytes: 48
+  json_grammar$lambda14:
+    calls: 0
+    bytes: 96
+  json_grammar$lambda15:
+    calls: 14
+    bytes: 112
+  json_grammar$lambda16:
+    calls: 0
+    bytes: 96
+  json_grammar$lambda17:
+    calls: 13
+    bytes: 112
+  json_grammar$lambda18:
+    calls: 0
+    bytes: 188
   json_grammar$lambda19:
-    calls: 5
-    bytes: 164
+    calls: 11
+    bytes: 216
   json_grammar$lambda2:
     calls: 0
     bytes: 96
+  json_grammar$lambda20:
+    calls: 0
+    bytes: 116
+  json_grammar$lambda21:
+    calls: 21
+    bytes: 92
+  json_grammar$lambda22:
+    calls: 0
+    bytes: 124
+  json_grammar$lambda23:
+    calls: 5
+    bytes: 164
   json_grammar$lambda3:
     calls: 0
     bytes: 96
   json_grammar$lambda4:
     calls: 0
-    bytes: 188
+    bytes: 96
   json_grammar$lambda5:
     calls: 0
-    bytes: 188
+    bytes: 96
   json_grammar$lambda6:
     calls: 0
-    bytes: 116
+    bytes: 188
   json_grammar$lambda7:
     calls: 0
-    bytes: 116
+    bytes: 188
   json_grammar$lambda8:
     calls: 0
-    bytes: 124
+    bytes: 116
   json_grammar$lambda9:
     calls: 0
-    bytes: 124
+    bytes: 116
   lex_json:
     calls: 58
     bytes: 6700
@@ -1227,9 +1239,6 @@ functions:
   lower_member:
     calls: 24
     bytes: 1660
-  lower_value:
-    calls: 71
-    bytes: 832
   main:
     calls: 1
     bytes: 464

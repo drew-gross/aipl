@@ -249,10 +249,10 @@ deallocations: 20804
 reallocations: 2974
 bytes allocated: 4448897
 instructions executed: 9048597
-binary size: 5600184
-  code: 3708680
-  data: 11418
-  metadata: 1880086
+binary size: 5673192
+  code: 3757092
+  data: 11506
+  metadata: 1904594
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -949,7 +949,7 @@ functions:
     bytes: 364
   __m32__lower_node$__m23__AiplTok$__m5__Ast:
     calls: 15
-    bytes: 102184
+    bytes: 145480
   __m32__match_group$__m23__AiplTok$__m5__Ast:
     calls: 24
     bytes: 5084
@@ -980,6 +980,9 @@ functions:
   __m32__match_then$__m23__AiplTok$__m5__Ast:
     calls: 133
     bytes: 2816
+  __m32__only_kid$__m5__Ast:
+    calls: 0
+    bytes: 14724
   __m32__parse$__m23__AiplTok$__m5__Ast:
     calls: 4
     bytes: 424
@@ -1535,9 +1538,6 @@ functions:
   __m4__lower_args:
     calls: 0
     bytes: 6088
-  __m4__lower_arm_body:
-    calls: 0
-    bytes: 6096
   __m4__lower_assign_stmt:
     calls: 0
     bytes: 46292
@@ -1616,9 +1616,6 @@ functions:
   __m4__lower_item:
     calls: 2
     bytes: 60756
-  __m4__lower_kw_stmt:
-    calls: 0
-    bytes: 6260
   __m4__lower_lambda:
     calls: 0
     bytes: 13236
@@ -1628,9 +1625,6 @@ functions:
   __m4__lower_let_stmt:
     calls: 0
     bytes: 232
-  __m4__lower_loop_body:
-    calls: 0
-    bytes: 6096
   __m4__lower_loop_inner:
     calls: 0
     bytes: 35268
@@ -1736,6 +1730,9 @@ functions:
   __m4__patterns:
     calls: 8
     bytes: 31940
+  __m4__patterns$lambda0:
+    calls: 0
+    bytes: 2948
   __m4__pipes:
     calls: 16
     bytes: 376
@@ -1754,6 +1751,12 @@ functions:
   __m4__statements:
     calls: 8
     bytes: 106408
+  __m4__statements$lambda0:
+    calls: 0
+    bytes: 2948
+  __m4__statements$lambda1:
+    calls: 0
+    bytes: 2948
   __m4__tuple_slot_names:
     calls: 0
     bytes: 548

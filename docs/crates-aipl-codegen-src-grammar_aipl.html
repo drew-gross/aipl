@@ -1034,20 +1034,6 @@
 
 
 
-        <section class="item" id="item-lower_kw_stmt">
-          <h3>
-            <a class="anchor" href="#item-lower_kw_stmt">lower_kw_stmt</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lower_kw_stmt(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
-
-          <div class="doc"><p><code>kw_stmt</code> — the six statement productions behind one name, so a block's choice between a statement and an expression stays a single-token decision.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-as_stmt">
           <h3>
             <a class="anchor" href="#item-as_stmt">as_stmt</a>
@@ -1287,20 +1273,6 @@
 
 
 
-        <section class="item" id="item-lower_loop_body">
-          <h3>
-            <a class="anchor" href="#item-lower_loop_body">lower_loop_body</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lower_loop_body(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
-
-          <div class="doc"><p><code>loop_body</code> — deliberately *not* repaired the way <code>block</code> is. A loop body's value is discarded, so no diagnostic ever points at its synthetic <code>0</code>; and its empty span is load-bearing elsewhere: the loop lints recognize the body's tail by exactly that (<code>is_block_tail</code> in <code>aipl-syntax</code>'s lint driver), which is how they know a body holds one statement and nothing after it. Giving the <code>0</code> a location switched every one of them off.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-lower_loop_inner">
           <h3>
             <a class="anchor" href="#item-lower_loop_inner">lower_loop_inner</a>
@@ -1309,20 +1281,6 @@
           <pre class="signature"><code>fn lower_loop_inner(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>loop_inner</code> — a loop body admits no trailing expression, so every expression in it is an <code>expr;</code> statement and the body's own value is never read. An at-end body is a synthetic <code>0</code>, matching the loop expression's own result.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lower_arm_body">
-          <h3>
-            <a class="anchor" href="#item-lower_arm_body">lower_arm_body</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn lower_arm_body(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
 
 
         </section>

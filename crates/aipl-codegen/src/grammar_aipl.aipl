@@ -188,6 +188,7 @@ import {
     Fn,
     Grammar,
     Inline,
+    Kid,
     ListStyle,
     Literal as Lit,
     Many,
@@ -820,9 +821,21 @@ fn statements() -> Production<AiplTok, Ast>[] {
         p("block", block, TryMk(lower_block)),
         p("block_body", block_body, TryMk(lower_block_body)),
         p("block_tail", block_tail, TryMk(lower_block_tail)),
-        p("loop_body", loop_body, TryMk(lower_loop_body)),
+        // `loop_body` passes its `loop_inner` through, and is deliberately
+        // *not* repaired the way `block` is. A loop body's value is discarded,
+        // so no diagnostic ever points at the synthetic `0` an empty one
+        // lowers to; and that `0`'s empty span is load-bearing elsewhere: the
+        // loop lints recognize the body's tail by exactly it (`is_block_tail`
+        // in `aipl-syntax`'s lint driver), which is how they know a body holds
+        // one statement and nothing after it. Giving the `0` a location
+        // switched every one of them off.
+        p("loop_body", loop_body, Kid(|v: Ast| v)),
         p("loop_inner", loop_inner, TryMk(lower_loop_inner)),
-        pl("kw_stmt", kw_stmt, "a statement", TryMk(lower_kw_stmt)),
+        // `kw_stmt` is the six statement productions behind one name, so a
+        // block's choice between a statement and an expression stays a
+        // single-token decision. Every alternative is a reference, so the node
+        // is exactly the statement that matched.
+        pl("kw_stmt", kw_stmt, "a statement", Kid(|v: Ast| v)),
         p("let_stmt", let_stmt, TryMk(lower_let_stmt)),
         p("mut_stmt", mut_stmt, TryMk(lower_mut_stmt)),
         p("assign_stmt", assign_stmt, TryMk(lower_assign_stmt)),
@@ -1094,7 +1107,7 @@ fn patterns() -> Production<AiplTok, Ast>[] {
 
     [
         p("match_arm", match_arm, TryMk(lower_match_arm)),
-        p("arm_body", arm_body, TryMk(lower_arm_body)),
+        p("arm_body", arm_body, Kid(|v: Ast| v)),
         pl("pattern", pattern, "a pattern", TryMk(lower_pattern)),
         p("ctor_payload", ctor_payload, TryMk(lower_ctor_payload)),
     ]
@@ -1792,13 +1805,6 @@ fn binder_names(toks: str[]) -> str[] { toks.filter(|w| !binder_punct().contains
 
 fn binder_punct() -> str[] { ["let", "mut", "for", "(", ")", "{", "}", ",", "=", ";", ":"] }
 
-# `kw_stmt` — the six statement productions behind one name, so a block's choice
-# between a statement and an expression stays a single-token decision.
-fn lower_kw_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
-    let sp = node.span();
-    ok(kid(kids, 0, sp)?)
-}
-
 fn as_stmt(v: Ast, span: Span) -> Stmt!ParseError {
     if (let AStmt(st) = v) {
         return ok(st);
@@ -2185,17 +2191,6 @@ fn lower_return_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     ok(AStmt(SReturn(value, span)))
 }
 
-# `loop_body` — deliberately *not* repaired the way `block` is. A loop body's
-# value is discarded, so no diagnostic ever points at its synthetic `0`; and its
-# empty span is load-bearing elsewhere: the loop lints recognize the body's tail
-# by exactly that (`is_block_tail` in `aipl-syntax`'s lint driver), which is how
-# they know a body holds one statement and nothing after it. Giving the `0` a
-# location switched every one of them off.
-fn lower_loop_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
-    let sp = node.span();
-    ok(AExpr(kid_expr(kids, 0, sp)?))
-}
-
 # `loop_inner` — a loop body admits no trailing expression, so every expression
 # in it is an `expr;` statement and the body's own value is never read. An
 # at-end body is a synthetic `0`, matching the loop expression's own result.
@@ -2215,11 +2210,6 @@ fn lower_loop_inner(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 }
 
 // ---------- lowering: match arms ----------
-
-fn lower_arm_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
-    let sp = node.span();
-    ok(AExpr(kid_expr(kids, 0, sp)?))
-}
 
 # `match_arm` — one written arm becomes one *or more* arms: an alternation
 # `A | B => body` expands here into one arm per pattern, so no later stage ever
@@ -4611,11 +4601,11 @@ allocations: 2097540
 deallocations: 2097540
 reallocations: 295775
 bytes allocated: 387623274
-instructions executed: 574255803
-binary size: 5043264
-  code: 3308584
-  data: 56308
-  metadata: 1678372
+instructions executed: 574250873
+binary size: 5116272
+  code: 3356996
+  data: 56396
+  metadata: 1702880
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 18
@@ -5261,7 +5251,7 @@ functions:
     bytes: 364
   __m30__lower_node$__m21__AiplTok$__m1__Ast:
     calls: 2712
-    bytes: 102184
+    bytes: 145480
   __m30__match_group$__m21__AiplTok$__m1__Ast:
     calls: 12557
     bytes: 5084
@@ -5292,6 +5282,9 @@ functions:
   __m30__match_then$__m21__AiplTok$__m1__Ast:
     calls: 29101
     bytes: 2816
+  __m30__only_kid$__m1__Ast:
+    calls: 56
+    bytes: 14724
   __m30__parse$__m21__AiplTok$__m1__Ast:
     calls: 232
     bytes: 424
@@ -5647,7 +5640,7 @@ functions:
     calls: 1208239
     bytes: (external)
   aipl_arr_inc:
-    calls: 6279464
+    calls: 6279408
     bytes: (external)
   aipl_arr_reserve:
     calls: 1256584
@@ -5665,7 +5658,7 @@ functions:
     calls: 39
     bytes: (external)
   aipl_array_dec:
-    calls: 9451258
+    calls: 9451202
     bytes: (external)
   aipl_array_new:
     calls: 218284
@@ -5704,13 +5697,13 @@ functions:
     calls: 1338931
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 7136706
+    calls: 7136656
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 408655
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5797480
+    calls: 5797430
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 408655
@@ -5773,7 +5766,7 @@ functions:
     calls: 6
     bytes: 5444
   as_expr:
-    calls: 1394
+    calls: 1369
     bytes: 5552
   as_exprs:
     calls: 81
@@ -5878,10 +5871,10 @@ functions:
     calls: 101
     bytes: 172
   kid:
-    calls: 2062
+    calls: 2006
     bytes: 20880
   kid_expr:
-    calls: 1208
+    calls: 1183
     bytes: 3052
   lambda_of:
     calls: 3
@@ -5910,9 +5903,6 @@ functions:
   lower_args:
     calls: 40
     bytes: 6088
-  lower_arm_body:
-    calls: 17
-    bytes: 6096
   lower_assign_stmt:
     calls: 15
     bytes: 46292
@@ -5991,9 +5981,6 @@ functions:
   lower_item:
     calls: 36
     bytes: 60756
-  lower_kw_stmt:
-    calls: 31
-    bytes: 6260
   lower_lambda:
     calls: 3
     bytes: 13236
@@ -6003,9 +5990,6 @@ functions:
   lower_let_stmt:
     calls: 8
     bytes: 232
-  lower_loop_body:
-    calls: 8
-    bytes: 6096
   lower_loop_inner:
     calls: 15
     bytes: 35052
@@ -6120,6 +6104,9 @@ functions:
   patterns:
     calls: 708
     bytes: 22560
+  patterns$lambda0:
+    calls: 17
+    bytes: 2948
   pipes:
     calls: 1416
     bytes: 376
@@ -6141,6 +6128,12 @@ functions:
   statements:
     calls: 708
     bytes: 67548
+  statements$lambda0:
+    calls: 8
+    bytes: 2948
+  statements$lambda1:
+    calls: 31
+    bytes: 2948
   tuple_slot_names:
     calls: 3
     bytes: 548

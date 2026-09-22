@@ -745,6 +745,20 @@
 
 
 
+        <section class="item" id="item-only_kid">
+          <h3>
+            <a class="anchor" href="#item-only_kid">only_kid</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn only_kid&#60;A: any&#62;(vals: A[], span: Span) -&#62; A!ParseError</code></pre>
+
+          <div class="doc"><p>The single lowered child a <code>Kid</code> lowering declared, or a refusal naming what the node actually matched. Reaching this is a grammar bug rather than a bad program — the rule and its <code>build</code> disagree about the production's shape — so the message says both sides and leaves it there. A lowering that reads a child is the one place that disagreement can surface, and saying it once here is what spares every <code>Kid</code> lowering from checking.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-tok_rules">
           <h3>
             <a class="anchor" href="#item-tok_rules">tok_rules</a>

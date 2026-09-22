@@ -243,12 +243,19 @@ variant Refusal = Msg(str) | Fn((str) -> str)
 
 # How a production's matched node becomes a value of the caller's AST type `A`.
 #
-# Three shapes, by what the lowering reads — the whole node, its children, or
-# its text — each in a total form and a `Try` form that can refuse with a
-# `ParseError` the driver passes straight through (a literal that overflows, a
-# duplicate key). A lowering is declared with exactly what it uses and the
-# failure it can have: a total one returns its `A` bare, so no `ok(..)` wraps
-# a value that could not be anything else.
+# Four shapes, by what the lowering reads — the whole node, its children, its
+# one child, or its text — each in a total form and a `Try` form that can refuse
+# with a `ParseError` the driver passes straight through (a literal that
+# overflows, a duplicate key). A lowering is declared with exactly what it uses
+# and the failure it can have: a total one returns its `A` bare, so no `ok(..)`
+# wraps a value that could not be anything else.
+#
+# Declaring the child *count* is what `Kid` adds over `Kids`: a production that
+# is exactly one other thing — an alternation between named productions, a
+# pass-through, a grouping — takes the child itself rather than an array it
+# would have to index. The driver refuses a node that matched any other number,
+# so the mismatch between a rule and its lowering is named once, in one place,
+# instead of in every lowering that reaches for a child that might not be there.
 #
 # Every arm carries an `A` (a function returning one, or the value itself), so
 # each pins the type parameter on its own; a payload-free arm could not, which
@@ -272,6 +279,14 @@ variant Build<A: any> =
     | Kids((A[]) -> A)
     # `Kids` for a lowering that can refuse.
     | TryKids((A[]) -> A!ParseError)
+    # The one child, for a production whose rule guarantees exactly one — the
+    # child itself, not a one-element array. `Kid(|v: Ast| v)` is the
+    # pass-through a production that only names alternatives wants; it is the
+    # one arm whose lambda must annotate its parameter, since a payload of
+    # `(A) -> A` has nothing in it to infer `A` *from*.
+    | Kid((A) -> A)
+    # `Kid` for a lowering that can refuse.
+    | TryKid((A) -> A!ParseError)
     # Only the node's token text (`token_text`, the matched tokens run
     # together) — a leaf-only node whose value is its spelling.
     | Text((str) -> A)
@@ -1074,9 +1089,9 @@ deallocations: 754
 reallocations: 101
 bytes allocated: 94897
 instructions executed: 78861
-binary size: 164280
+binary size: 164288
   code: 101732
-  data: 6660
+  data: 6668
   metadata: 55888
 functions:
   __arr_drop_ListStyle:

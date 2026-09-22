@@ -254,7 +254,7 @@
           </h3>
           <pre class="signature"><code>variant Build&#60;A: any&#62;</code></pre>
 
-          <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>.</p><p>Three shapes, by what the lowering reads — the whole node, its children, or its text — each in a total form and a <code>Try</code> form that can refuse with a <code>ParseError</code> the driver passes straight through (a literal that overflows, a duplicate key). A lowering is declared with exactly what it uses and the failure it can have: a total one returns its <code>A</code> bare, so no <code>ok(..)</code> wraps a value that could not be anything else.</p><p>Every arm carries an <code>A</code> (a function returning one, or the value itself), so each pins the type parameter on its own; a payload-free arm could not, which is why there is no <code>NoLower</code>.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so a lowering is a named top-level <code>fn lower_x(..)</code>, a constructor (<code>Kids(Object)</code>), or a lambda that reads only its parameters — whose types it takes from the arm's payload, so <code>Text(|t| Bool(t == &quot;true&quot;))</code> needs no annotation. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar *parses*, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
+          <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>.</p><p>Four shapes, by what the lowering reads — the whole node, its children, its one child, or its text — each in a total form and a <code>Try</code> form that can refuse with a <code>ParseError</code> the driver passes straight through (a literal that overflows, a duplicate key). A lowering is declared with exactly what it uses and the failure it can have: a total one returns its <code>A</code> bare, so no <code>ok(..)</code> wraps a value that could not be anything else.</p><p>Declaring the child *count* is what <code>Kid</code> adds over <code>Kids</code>: a production that is exactly one other thing — an alternation between named productions, a pass-through, a grouping — takes the child itself rather than an array it would have to index. The driver refuses a node that matched any other number, so the mismatch between a rule and its lowering is named once, in one place, instead of in every lowering that reaches for a child that might not be there.</p><p>Every arm carries an <code>A</code> (a function returning one, or the value itself), so each pins the type parameter on its own; a payload-free arm could not, which is why there is no <code>NoLower</code>.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so a lowering is a named top-level <code>fn lower_x(..)</code>, a constructor (<code>Kids(Object)</code>), or a lambda that reads only its parameters — whose types it takes from the arm's payload, so <code>Text(|t| Bool(t == &quot;true&quot;))</code> needs no annotation. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar *parses*, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
 
 
           <ul class="cases">
@@ -283,6 +283,20 @@
             <li id="item-TryKids"><code>TryKids((A[]) -&#62; A!ParseError)</code>
 
               <div class="doc"><p><code>Kids</code> for a lowering that can refuse.</p></div>
+
+
+            </li>
+
+            <li id="item-Kid"><code>Kid((A) -&#62; A)</code>
+
+              <div class="doc"><p>The one child, for a production whose rule guarantees exactly one — the child itself, not a one-element array. <code>Kid(|v: Ast| v)</code> is the pass-through a production that only names alternatives wants; it is the one arm whose lambda must annotate its parameter, since a payload of <code>(A) -&gt; A</code> has nothing in it to infer <code>A</code> *from*.</p></div>
+
+
+            </li>
+
+            <li id="item-TryKid"><code>TryKid((A) -&#62; A!ParseError)</code>
+
+              <div class="doc"><p><code>Kid</code> for a lowering that can refuse.</p></div>
 
 
             </li>
@@ -417,7 +431,7 @@
             <a class="anchor" href="#item-show_style">show_style</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_style(__spat$25065: ListStyle) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_style(__spat$26013: ListStyle) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
 

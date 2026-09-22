@@ -469,10 +469,10 @@ deallocations: 12495
 reallocations: 1902
 bytes allocated: 1253687
 instructions executed: 2680963
-binary size: 424272
-  code: 278700
-  data: 6012
-  metadata: 139560
+binary size: 427312
+  code: 280684
+  data: 6100
+  metadata: 140528
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -740,7 +740,7 @@ functions:
     bytes: 364
   __m13__lower_node$CalcTok$Calc:
     calls: 447
-    bytes: 4604
+    bytes: 5812
   __m13__match_group$CalcTok$Calc:
     calls: 0
     bytes: 5084
@@ -771,6 +771,9 @@ functions:
   __m13__match_then$CalcTok$Calc:
     calls: 206
     bytes: 2816
+  __m13__only_kid$Calc:
+    calls: 0
+    bytes: 776
   __m13__parse$CalcTok$Calc:
     calls: 42
     bytes: 284

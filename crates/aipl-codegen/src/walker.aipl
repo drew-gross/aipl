@@ -3344,10 +3344,10 @@ deallocations: 101061
 reallocations: 16523
 bytes allocated: 20378957
 instructions executed: 54996257
-binary size: 16861912
-  code: 10808364
+binary size: 16847560
+  code: 10798756
   data: 38012
-  metadata: 6015536
+  metadata: 6010792
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -4300,9 +4300,6 @@ functions:
   __m7__lower_args:
     calls: 0
     bytes: 6088
-  __m7__lower_arm_body:
-    calls: 0
-    bytes: 6096
   __m7__lower_assign_stmt:
     calls: 0
     bytes: 46292
@@ -4381,9 +4378,6 @@ functions:
   __m7__lower_item:
     calls: 0
     bytes: 60756
-  __m7__lower_kw_stmt:
-    calls: 0
-    bytes: 6260
   __m7__lower_lambda:
     calls: 0
     bytes: 13236
@@ -4393,9 +4387,6 @@ functions:
   __m7__lower_let_stmt:
     calls: 0
     bytes: 232
-  __m7__lower_loop_body:
-    calls: 0
-    bytes: 6096
   __m7__lower_loop_inner:
     calls: 0
     bytes: 35268
@@ -4501,6 +4492,9 @@ functions:
   __m7__patterns:
     calls: 22
     bytes: 31940
+  __m7__patterns$lambda0:
+    calls: 0
+    bytes: 2948
   __m7__pipes:
     calls: 44
     bytes: 376
@@ -4519,6 +4513,12 @@ functions:
   __m7__statements:
     calls: 22
     bytes: 106408
+  __m7__statements$lambda0:
+    calls: 0
+    bytes: 2948
+  __m7__statements$lambda1:
+    calls: 0
+    bytes: 2948
   __m7__tuple_slot_names:
     calls: 0
     bytes: 548

@@ -2,21 +2,21 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
-; entry parse_test_section_header 473 str -> str?
-; entry strip_test_sections 514 str -> str
-; entry split_test_sections 513 str -> __tuple$str$str
+; entry parse_test_section_header 471 str -> str?
+; entry strip_test_sections 512 str -> str
+; entry split_test_sections 511 str -> __tuple$str$str
 ; entry assert_loc 60 str __builtin_Span -> str
 ; entry caret_block 67 str __builtin_Span str -> str
 ; entry fill_or_add_section_file 147 str str str -> unit!Error
-; entry normalize_output 445 str -> str
-; entry int_fits 368 i64 str -> bool
-; entry is_operator_name 369 str -> bool
-; entry lex_aipl 412 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
-; entry lex_aipl_stripped 414 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry normalize_output 442 str -> str
+; entry int_fits 365 i64 str -> bool
+; entry is_operator_name 366 str -> bool
+; entry lex_aipl 409 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry lex_aipl_stripped 411 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
 ; entry find_files 148 str str -> str[]!Error
 ; entry companion_files 69 str -> __m25__Companion[]!str
-; entry parse_spec 470 str -> __m26__Spec!str
-; entry aipl_parse_file 329 str -> __m27__ParsedFile!__m39__ParseError
+; entry parse_spec 468 str -> __m26__Spec!str
+; entry aipl_parse_file 326 str -> __m27__ParsedFile!__m39__ParseError
 ; entry format_source 172 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
@@ -205,110 +205,111 @@
 ; data 83 __str_5c59747d40f86d6c 1b00000000000000ffffffffffffff7f74726976696120686173206e6f206c6f77657265642076616c7565
 ; data 84 __str_ddd940a60ddfce2b 1c00000000000000ffffffffffffff7f612067726f757020686173206e6f206c6f77657265642076616c7565
 ; data 85 __str_2b0fe6c0424cd434 1d00000000000000ffffffffffffff7f756e7465726d696e617465642074656d706c617465206c69746572616c
-; data 86 __str_39820510d7a4c5fa 2b00000000000000ffffffffffffff7f756e7465726d696e617465642074656d706c617465206c69746572616c20696e746572706f6c6174696f6e
-; data 87 __str_1c82f8072c1c6936 3c00000000000000ffffffffffffff7f612072657065746974696f6e206d61746368656420656d70747920696e7075742c20776869636820776f756c642072657065617420666f7265766572
-; data 88 __tostr_lit_0 0500000000000000ffffffffffffff7f537061636500
-; data 89 __tostr_lit_1 0b00000000000000ffffffffffffff7f4c696e65436f6d6d656e7400
-; data 90 __tostr_lit_2 0c00000000000000ffffffffffffff7f426c6f636b436f6d6d656e7400
-; data 91 __tostr_lit_3 0b00000000000000ffffffffffffff7f416c6c6f774d61726b657200
-; data 92 __tostr_lit_4 0a00000000000000ffffffffffffff7f446f63436f6d6d656e7400
-; data 93 __tostr_lit_5 0100000000000000ffffffffffffff7f2800
-; data 94 __tostr_lit_6 0100000000000000ffffffffffffff7f2900
-; data 95 __tostr_lit_7 0400000000000000ffffffffffffff7f4e616d6500
-; data 96 __tostr_lit_8 0100000000000000ffffffffffffff7f2800
-; data 97 __tostr_lit_9 0100000000000000ffffffffffffff7f2900
-; data 98 __tostr_lit_10 0600000000000000ffffffffffffff7f496e744c697400
-; data 99 __tostr_lit_11 0100000000000000ffffffffffffff7f2800
-; data 100 __tostr_lit_12 0100000000000000ffffffffffffff7f2900
-; data 101 __tostr_lit_13 0600000000000000ffffffffffffff7f5374724c697400
-; data 102 __tostr_lit_14 0100000000000000ffffffffffffff7f2800
-; data 103 __tostr_lit_15 0200000000000000ffffffffffffff7f2c2000
-; data 104 __tostr_lit_16 0600000000000000ffffffffffffff7f51756f74656400
-; data 105 __tostr_lit_17 0c00000000000000ffffffffffffff7f547269706c6551756f74656400
-; data 106 __tostr_lit_18 0800000000000000ffffffffffffff7f4261636b7469636b00
-; data 107 __tostr_lit_19 0e00000000000000ffffffffffffff7f547269706c654261636b7469636b00
-; data 108 __tostr_lit_20 0100000000000000ffffffffffffff7f2900
-; data 109 __tostr_lit_21 0700000000000000ffffffffffffff7f43686172546f6b00
-; data 110 __tostr_lit_22 0100000000000000ffffffffffffff7f2800
-; data 111 __tostr_lit_23 0100000000000000ffffffffffffff7f2900
-; data 112 __tostr_lit_24 0c00000000000000ffffffffffffff7f54656d706c6174654865616400
-; data 113 __tostr_lit_25 0100000000000000ffffffffffffff7f2800
-; data 114 __tostr_lit_26 0100000000000000ffffffffffffff7f2900
-; data 115 __tostr_lit_27 0b00000000000000ffffffffffffff7f54656d706c6174654d696400
-; data 116 __tostr_lit_28 0100000000000000ffffffffffffff7f2800
-; data 117 __tostr_lit_29 0100000000000000ffffffffffffff7f2900
-; data 118 __tostr_lit_30 0c00000000000000ffffffffffffff7f54656d706c6174655461696c00
-; data 119 __tostr_lit_31 0100000000000000ffffffffffffff7f2800
-; data 120 __tostr_lit_32 0100000000000000ffffffffffffff7f2900
-; data 121 __tostr_lit_33 0f00000000000000ffffffffffffff7f52617754656d706c6174654865616400
-; data 122 __tostr_lit_34 0100000000000000ffffffffffffff7f2800
-; data 123 __tostr_lit_35 0100000000000000ffffffffffffff7f2900
-; data 124 __tostr_lit_36 0e00000000000000ffffffffffffff7f52617754656d706c6174654d696400
-; data 125 __tostr_lit_37 0100000000000000ffffffffffffff7f2800
-; data 126 __tostr_lit_38 0100000000000000ffffffffffffff7f2900
-; data 127 __tostr_lit_39 0f00000000000000ffffffffffffff7f52617754656d706c6174655461696c00
-; data 128 __tostr_lit_40 0100000000000000ffffffffffffff7f2800
-; data 129 __tostr_lit_41 0100000000000000ffffffffffffff7f2900
-; data 130 __tostr_lit_42 0400000000000000ffffffffffffff7f5472756500
-; data 131 __tostr_lit_43 0500000000000000ffffffffffffff7f46616c736500
-; data 132 __tostr_lit_44 0400000000000000ffffffffffffff7f4e6f6e6500
-; data 133 __tostr_lit_45 0200000000000000ffffffffffffff7f466e00
-; data 134 __tostr_lit_46 0300000000000000ffffffffffffff7f4c657400
-; data 135 __tostr_lit_47 0300000000000000ffffffffffffff7f4d757400
-; data 136 __tostr_lit_48 0300000000000000ffffffffffffff7f53657400
-; data 137 __tostr_lit_49 0300000000000000ffffffffffffff7f50756200
-; data 138 __tostr_lit_50 0600000000000000ffffffffffffff7f496d706f727400
-; data 139 __tostr_lit_51 0400000000000000ffffffffffffff7f46726f6d00
-; data 140 __tostr_lit_52 0200000000000000ffffffffffffff7f417300
-; data 141 __tostr_lit_53 0300000000000000ffffffffffffff7f466f7200
-; data 142 __tostr_lit_54 0500000000000000ffffffffffffff7f5768696c6500
-; data 143 __tostr_lit_55 0500000000000000ffffffffffffff7f4d6174636800
-; data 144 __tostr_lit_56 0600000000000000ffffffffffffff7f52657475726e00
-; data 145 __tostr_lit_57 0400000000000000ffffffffffffff7f5368696d00
-; data 146 __tostr_lit_58 0600000000000000ffffffffffffff7f53747275637400
-; data 147 __tostr_lit_59 0700000000000000ffffffffffffff7f56617269616e7400
-; data 148 __tostr_lit_60 0200000000000000ffffffffffffff7f496600
-; data 149 __tostr_lit_61 0400000000000000ffffffffffffff7f456c736500
-; data 150 __tostr_lit_62 0800000000000000ffffffffffffff7f4275696c74696e7300
-; data 151 __tostr_lit_63 0700000000000000ffffffffffffff7f576974686f757400
-; data 152 __tostr_lit_64 0400000000000000ffffffffffffff7f4571457100
-; data 153 __tostr_lit_65 0200000000000000ffffffffffffff7f4e6500
-; data 154 __tostr_lit_66 0500000000000000ffffffffffffff7f4172726f7700
-; data 155 __tostr_lit_67 0800000000000000ffffffffffffff7f4661744172726f7700
-; data 156 __tostr_lit_68 0600000000000000ffffffffffffff7f416e64416e6400
-; data 157 __tostr_lit_69 0400000000000000ffffffffffffff7f4f724f7200
-; data 158 __tostr_lit_70 0400000000000000ffffffffffffff7f5069706500
-; data 159 __tostr_lit_71 0600000000000000ffffffffffffff7f446f74446f7400
-; data 160 __tostr_lit_72 0c00000000000000ffffffffffffff7f506c7573506c7573506c757300
-; data 161 __tostr_lit_73 0800000000000000ffffffffffffff7f506c7573506c757300
-; data 162 __tostr_lit_74 0a00000000000000ffffffffffffff7f4d696e75734d696e757300
-; data 163 __tostr_lit_75 0600000000000000ffffffffffffff7f506c7573457100
-; data 164 __tostr_lit_76 0700000000000000ffffffffffffff7f4d696e7573457100
-; data 165 __tostr_lit_77 0600000000000000ffffffffffffff7f53746172457100
-; data 166 __tostr_lit_78 0700000000000000ffffffffffffff7f536c617368457100
-; data 167 __tostr_lit_79 0200000000000000ffffffffffffff7f457100
-; data 168 __tostr_lit_80 0200000000000000ffffffffffffff7f4c7400
-; data 169 __tostr_lit_81 0200000000000000ffffffffffffff7f4c6500
-; data 170 __tostr_lit_82 0200000000000000ffffffffffffff7f477400
-; data 171 __tostr_lit_83 0200000000000000ffffffffffffff7f476500
-; data 172 __tostr_lit_84 0400000000000000ffffffffffffff7f42616e6700
-; data 173 __tostr_lit_85 0400000000000000ffffffffffffff7f506c757300
-; data 174 __tostr_lit_86 0500000000000000ffffffffffffff7f4d696e757300
-; data 175 __tostr_lit_87 0400000000000000ffffffffffffff7f5374617200
-; data 176 __tostr_lit_88 0500000000000000ffffffffffffff7f536c61736800
-; data 177 __tostr_lit_89 0700000000000000ffffffffffffff7f50657263656e7400
-; data 178 __tostr_lit_90 0600000000000000ffffffffffffff7f506572696f6400
-; data 179 __tostr_lit_91 0500000000000000ffffffffffffff7f436f6d6d6100
-; data 180 __tostr_lit_92 0500000000000000ffffffffffffff7f436f6c6f6e00
-; data 181 __tostr_lit_93 0400000000000000ffffffffffffff7f53656d6900
-; data 182 __tostr_lit_94 0800000000000000ffffffffffffff7f5175657374696f6e00
-; data 183 __tostr_lit_95 0400000000000000ffffffffffffff7f4861736800
-; data 184 __tostr_lit_96 0600000000000000ffffffffffffff7f4c506172656e00
-; data 185 __tostr_lit_97 0600000000000000ffffffffffffff7f52506172656e00
-; data 186 __tostr_lit_98 0600000000000000ffffffffffffff7f4c427261636500
-; data 187 __tostr_lit_99 0600000000000000ffffffffffffff7f52427261636500
-; data 188 __tostr_lit_100 0800000000000000ffffffffffffff7f4c427261636b657400
-; data 189 __tostr_lit_101 0800000000000000ffffffffffffff7f52427261636b657400
+; data 86 __str_d7f3eca3f468e0e4 4200000000000000ffffffffffffff7f6120604b696460206c6f776572696e672077616e74732065786163746c79206f6e65206368696c643b20746869732070726f64756374696f6e206d61746368656420
+; data 87 __str_39820510d7a4c5fa 2b00000000000000ffffffffffffff7f756e7465726d696e617465642074656d706c617465206c69746572616c20696e746572706f6c6174696f6e
+; data 88 __str_1c82f8072c1c6936 3c00000000000000ffffffffffffff7f612072657065746974696f6e206d61746368656420656d70747920696e7075742c20776869636820776f756c642072657065617420666f7265766572
+; data 89 __tostr_lit_0 0500000000000000ffffffffffffff7f537061636500
+; data 90 __tostr_lit_1 0b00000000000000ffffffffffffff7f4c696e65436f6d6d656e7400
+; data 91 __tostr_lit_2 0c00000000000000ffffffffffffff7f426c6f636b436f6d6d656e7400
+; data 92 __tostr_lit_3 0b00000000000000ffffffffffffff7f416c6c6f774d61726b657200
+; data 93 __tostr_lit_4 0a00000000000000ffffffffffffff7f446f63436f6d6d656e7400
+; data 94 __tostr_lit_5 0100000000000000ffffffffffffff7f2800
+; data 95 __tostr_lit_6 0100000000000000ffffffffffffff7f2900
+; data 96 __tostr_lit_7 0400000000000000ffffffffffffff7f4e616d6500
+; data 97 __tostr_lit_8 0100000000000000ffffffffffffff7f2800
+; data 98 __tostr_lit_9 0100000000000000ffffffffffffff7f2900
+; data 99 __tostr_lit_10 0600000000000000ffffffffffffff7f496e744c697400
+; data 100 __tostr_lit_11 0100000000000000ffffffffffffff7f2800
+; data 101 __tostr_lit_12 0100000000000000ffffffffffffff7f2900
+; data 102 __tostr_lit_13 0600000000000000ffffffffffffff7f5374724c697400
+; data 103 __tostr_lit_14 0100000000000000ffffffffffffff7f2800
+; data 104 __tostr_lit_15 0200000000000000ffffffffffffff7f2c2000
+; data 105 __tostr_lit_16 0600000000000000ffffffffffffff7f51756f74656400
+; data 106 __tostr_lit_17 0c00000000000000ffffffffffffff7f547269706c6551756f74656400
+; data 107 __tostr_lit_18 0800000000000000ffffffffffffff7f4261636b7469636b00
+; data 108 __tostr_lit_19 0e00000000000000ffffffffffffff7f547269706c654261636b7469636b00
+; data 109 __tostr_lit_20 0100000000000000ffffffffffffff7f2900
+; data 110 __tostr_lit_21 0700000000000000ffffffffffffff7f43686172546f6b00
+; data 111 __tostr_lit_22 0100000000000000ffffffffffffff7f2800
+; data 112 __tostr_lit_23 0100000000000000ffffffffffffff7f2900
+; data 113 __tostr_lit_24 0c00000000000000ffffffffffffff7f54656d706c6174654865616400
+; data 114 __tostr_lit_25 0100000000000000ffffffffffffff7f2800
+; data 115 __tostr_lit_26 0100000000000000ffffffffffffff7f2900
+; data 116 __tostr_lit_27 0b00000000000000ffffffffffffff7f54656d706c6174654d696400
+; data 117 __tostr_lit_28 0100000000000000ffffffffffffff7f2800
+; data 118 __tostr_lit_29 0100000000000000ffffffffffffff7f2900
+; data 119 __tostr_lit_30 0c00000000000000ffffffffffffff7f54656d706c6174655461696c00
+; data 120 __tostr_lit_31 0100000000000000ffffffffffffff7f2800
+; data 121 __tostr_lit_32 0100000000000000ffffffffffffff7f2900
+; data 122 __tostr_lit_33 0f00000000000000ffffffffffffff7f52617754656d706c6174654865616400
+; data 123 __tostr_lit_34 0100000000000000ffffffffffffff7f2800
+; data 124 __tostr_lit_35 0100000000000000ffffffffffffff7f2900
+; data 125 __tostr_lit_36 0e00000000000000ffffffffffffff7f52617754656d706c6174654d696400
+; data 126 __tostr_lit_37 0100000000000000ffffffffffffff7f2800
+; data 127 __tostr_lit_38 0100000000000000ffffffffffffff7f2900
+; data 128 __tostr_lit_39 0f00000000000000ffffffffffffff7f52617754656d706c6174655461696c00
+; data 129 __tostr_lit_40 0100000000000000ffffffffffffff7f2800
+; data 130 __tostr_lit_41 0100000000000000ffffffffffffff7f2900
+; data 131 __tostr_lit_42 0400000000000000ffffffffffffff7f5472756500
+; data 132 __tostr_lit_43 0500000000000000ffffffffffffff7f46616c736500
+; data 133 __tostr_lit_44 0400000000000000ffffffffffffff7f4e6f6e6500
+; data 134 __tostr_lit_45 0200000000000000ffffffffffffff7f466e00
+; data 135 __tostr_lit_46 0300000000000000ffffffffffffff7f4c657400
+; data 136 __tostr_lit_47 0300000000000000ffffffffffffff7f4d757400
+; data 137 __tostr_lit_48 0300000000000000ffffffffffffff7f53657400
+; data 138 __tostr_lit_49 0300000000000000ffffffffffffff7f50756200
+; data 139 __tostr_lit_50 0600000000000000ffffffffffffff7f496d706f727400
+; data 140 __tostr_lit_51 0400000000000000ffffffffffffff7f46726f6d00
+; data 141 __tostr_lit_52 0200000000000000ffffffffffffff7f417300
+; data 142 __tostr_lit_53 0300000000000000ffffffffffffff7f466f7200
+; data 143 __tostr_lit_54 0500000000000000ffffffffffffff7f5768696c6500
+; data 144 __tostr_lit_55 0500000000000000ffffffffffffff7f4d6174636800
+; data 145 __tostr_lit_56 0600000000000000ffffffffffffff7f52657475726e00
+; data 146 __tostr_lit_57 0400000000000000ffffffffffffff7f5368696d00
+; data 147 __tostr_lit_58 0600000000000000ffffffffffffff7f53747275637400
+; data 148 __tostr_lit_59 0700000000000000ffffffffffffff7f56617269616e7400
+; data 149 __tostr_lit_60 0200000000000000ffffffffffffff7f496600
+; data 150 __tostr_lit_61 0400000000000000ffffffffffffff7f456c736500
+; data 151 __tostr_lit_62 0800000000000000ffffffffffffff7f4275696c74696e7300
+; data 152 __tostr_lit_63 0700000000000000ffffffffffffff7f576974686f757400
+; data 153 __tostr_lit_64 0400000000000000ffffffffffffff7f4571457100
+; data 154 __tostr_lit_65 0200000000000000ffffffffffffff7f4e6500
+; data 155 __tostr_lit_66 0500000000000000ffffffffffffff7f4172726f7700
+; data 156 __tostr_lit_67 0800000000000000ffffffffffffff7f4661744172726f7700
+; data 157 __tostr_lit_68 0600000000000000ffffffffffffff7f416e64416e6400
+; data 158 __tostr_lit_69 0400000000000000ffffffffffffff7f4f724f7200
+; data 159 __tostr_lit_70 0400000000000000ffffffffffffff7f5069706500
+; data 160 __tostr_lit_71 0600000000000000ffffffffffffff7f446f74446f7400
+; data 161 __tostr_lit_72 0c00000000000000ffffffffffffff7f506c7573506c7573506c757300
+; data 162 __tostr_lit_73 0800000000000000ffffffffffffff7f506c7573506c757300
+; data 163 __tostr_lit_74 0a00000000000000ffffffffffffff7f4d696e75734d696e757300
+; data 164 __tostr_lit_75 0600000000000000ffffffffffffff7f506c7573457100
+; data 165 __tostr_lit_76 0700000000000000ffffffffffffff7f4d696e7573457100
+; data 166 __tostr_lit_77 0600000000000000ffffffffffffff7f53746172457100
+; data 167 __tostr_lit_78 0700000000000000ffffffffffffff7f536c617368457100
+; data 168 __tostr_lit_79 0200000000000000ffffffffffffff7f457100
+; data 169 __tostr_lit_80 0200000000000000ffffffffffffff7f4c7400
+; data 170 __tostr_lit_81 0200000000000000ffffffffffffff7f4c6500
+; data 171 __tostr_lit_82 0200000000000000ffffffffffffff7f477400
+; data 172 __tostr_lit_83 0200000000000000ffffffffffffff7f476500
+; data 173 __tostr_lit_84 0400000000000000ffffffffffffff7f42616e6700
+; data 174 __tostr_lit_85 0400000000000000ffffffffffffff7f506c757300
+; data 175 __tostr_lit_86 0500000000000000ffffffffffffff7f4d696e757300
+; data 176 __tostr_lit_87 0400000000000000ffffffffffffff7f5374617200
+; data 177 __tostr_lit_88 0500000000000000ffffffffffffff7f536c61736800
+; data 178 __tostr_lit_89 0700000000000000ffffffffffffff7f50657263656e7400
+; data 179 __tostr_lit_90 0600000000000000ffffffffffffff7f506572696f6400
+; data 180 __tostr_lit_91 0500000000000000ffffffffffffff7f436f6d6d6100
+; data 181 __tostr_lit_92 0500000000000000ffffffffffffff7f436f6c6f6e00
+; data 182 __tostr_lit_93 0400000000000000ffffffffffffff7f53656d6900
+; data 183 __tostr_lit_94 0800000000000000ffffffffffffff7f5175657374696f6e00
+; data 184 __tostr_lit_95 0400000000000000ffffffffffffff7f4861736800
+; data 185 __tostr_lit_96 0600000000000000ffffffffffffff7f4c506172656e00
+; data 186 __tostr_lit_97 0600000000000000ffffffffffffff7f52506172656e00
+; data 187 __tostr_lit_98 0600000000000000ffffffffffffff7f4c427261636500
+; data 188 __tostr_lit_99 0600000000000000ffffffffffffff7f52427261636500
+; data 189 __tostr_lit_100 0800000000000000ffffffffffffff7f4c427261636b657400
+; data 190 __tostr_lit_101 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m10__assert_loc
-; source-fingerprint 16883138059005578761
+; source-fingerprint 10520653021264248989
