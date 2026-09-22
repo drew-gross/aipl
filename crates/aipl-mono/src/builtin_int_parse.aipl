@@ -25,7 +25,7 @@ import {
 # doesn't fit an i64. The full range parses, including i64::MIN. Callable
 # as a method: `s.int_parse()`.
 pub fn int_parse(self: str) -> i64? {
-    let neg = self.starts_with("-");
+    let neg = self.starts_with('-');
     let body = if (neg) { self.drop_first() } else { self };
     if (body.is_empty()) {
         return none;
@@ -110,9 +110,9 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 20133
-binary size: 9760
-  code: 4544
+instructions executed: 20013
+binary size: 9776
+  code: 4560
   data: 1824
   metadata: 3392
 functions:
@@ -136,7 +136,7 @@ functions:
     bytes: (external)
   int_parse:
     calls: 24
-    bytes: 1080
+    bytes: 1096
   int_parse$lambda1:
     calls: 128
     bytes: 140

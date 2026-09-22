@@ -2612,17 +2612,22 @@ fn __builtin_trim(self: str) -> str { self }
 fn __builtin_repeat(self: str, n: u64) -> str { "" }
 // True if every byte is ASCII whitespace (or the string is empty).
 fn __builtin_is_whitespace(self: char) -> bool { false }
-// True if `self` begins / ends with the argument — `str` bytes or `T[]`
-// elements (the empty pattern always matches). A str receiver is dispatched in
-// the checker / codegen (the `T[]` signature doesn't unify with `str`).
-fn __builtin_starts_with<T: any>(self: T[], prefix: T[]) -> bool { false }
-fn __builtin_ends_with<T: any>(self: T[], suffix: T[]) -> bool { false }
+// True if `self` begins / ends with the pattern — `str` bytes or `T[]`
+// elements. The pattern is variadic: the sequence (a `str` for a `str`
+// receiver), one element, or an optional element; the empty pattern — `""`,
+// `[]`, `none` — always matches. Pass a single `char` when that is what is
+// being asked (`s.starts_with('#')`, not a one-char str): the char shape is one
+// byte compare in the runtime, where a one-char `str` is a window compare. A str
+// receiver is dispatched in the checker / codegen (the `T[]` signature doesn't
+// unify with `str`).
+fn __builtin_starts_with<T: any>(self: T[], prefix: T*) -> bool { false }
+fn __builtin_ends_with<T: any>(self: T[], suffix: T*) -> bool { false }
 // `self[at..].starts_with(prefix)` without building the slice: the same answer,
 // comparing in place from `at`. `at` clamps like a slice bound, so an `at` past
 // the end matches only the empty pattern. The pattern is variadic exactly as
 // `starts_with`'s, and dispatched with it in the checker / codegen. Written by
 // the compiler's operation-fusion pass; also callable directly.
-fn __builtin_starts_with_at<T: any>(self: T[], prefix: T[], at: u64) -> bool { false }
+fn __builtin_starts_with_at<T: any>(self: T[], prefix: T*, at: u64) -> bool { false }
 // True if `self` contains the needle: a `T[]` (or `str`) needle matches as a
 // contiguous subsequence (substring), a `T` (or `char`) as a single element,
 // and a `T?` as its element when `some` — a `none` needle is nothing to find,

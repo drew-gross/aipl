@@ -3343,11 +3343,11 @@ allocations: 101061
 deallocations: 101061
 reallocations: 16523
 bytes allocated: 20378957
-instructions executed: 54996540
-binary size: 16862328
-  code: 10808736
+instructions executed: 54996257
+binary size: 16861912
+  code: 10808364
   data: 38012
-  metadata: 6015580
+  metadata: 6015536
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -3627,7 +3627,7 @@ functions:
     bytes: 364
   __builtin_int_parse:
     calls: 31
-    bytes: 1080
+    bytes: 1096
   __builtin_int_parse$lambda1:
     calls: 31
     bytes: 140
@@ -4041,7 +4041,7 @@ functions:
     bytes: 988
   __m25__process_raw_string:
     calls: 20
-    bytes: 664
+    bytes: 640
   __m26__trim_prefix:
     calls: 62
     bytes: 252
@@ -4131,7 +4131,7 @@ functions:
     bytes: 272
   __m34__block_ok:
     calls: 14
-    bytes: 804
+    bytes: 736
   __m34__encode:
     calls: 14
     bytes: 2068
@@ -4149,7 +4149,7 @@ functions:
     bytes: 400
   __m34__requote:
     calls: 16
-    bytes: 4272
+    bytes: 4232
   __m34__reswap:
     calls: 0
     bytes: 2804
@@ -4272,7 +4272,7 @@ functions:
     bytes: 143552
   __m7__field_name:
     calls: 0
-    bytes: 888
+    bytes: 868
   __m7__for_chain:
     calls: 0
     bytes: 3928
@@ -4308,7 +4308,7 @@ functions:
     bytes: 46292
   __m7__lower_atom:
     calls: 0
-    bytes: 139124
+    bytes: 138992
   __m7__lower_base_ty:
     calls: 0
     bytes: 13396
@@ -4329,7 +4329,7 @@ functions:
     bytes: 6088
   __m7__lower_case_param:
     calls: 0
-    bytes: 26880
+    bytes: 26840
   __m7__lower_construct_fields:
     calls: 0
     bytes: 25128
@@ -4416,7 +4416,7 @@ functions:
     bytes: 29744
   __m7__lower_pattern:
     calls: 0
-    bytes: 64140
+    bytes: 64096
   __m7__lower_postfix:
     calls: 0
     bytes: 18288
@@ -4476,7 +4476,7 @@ functions:
     bytes: 23748
   __m7__lower_variant_decl$filter6$own0:
     calls: 0
-    bytes: 468
+    bytes: 448
   __m7__lower_while_stmt:
     calls: 0
     bytes: 6568

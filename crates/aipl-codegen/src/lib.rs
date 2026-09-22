@@ -4421,6 +4421,14 @@ fn new_jit_module() -> Result<JITModule, Error> {
         str24::aipl_str_starts_with_at as *const u8,
     );
     jit_builder.symbol("aipl_str_ends_with", str24::aipl_str_ends_with as *const u8);
+    jit_builder.symbol(
+        "aipl_str_starts_with_char",
+        str24::aipl_str_starts_with_char as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl_str_ends_with_char",
+        str24::aipl_str_ends_with_char as *const u8,
+    );
     jit_builder.symbol("aipl_str_reverse", str24::aipl_str_reverse as *const u8);
     jit_builder.symbol("aipl_str_sort", str24::aipl_str_sort as *const u8);
     jit_builder.symbol("aipl_str_repeat", str24::aipl_str_repeat as *const u8);
@@ -7803,6 +7811,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_str_eq"
         | "aipl_str_starts_with"
         | "aipl_str_ends_with"
+        | "aipl_str_ends_with_char"
         | "aipl_str_contains"
         | "aipl_str_data"
         | "aipl_arr_load_bit"
@@ -7814,6 +7823,7 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_write_i64"
         | "aipl_write_u64" => (2, Ret::Word),
         "aipl_str_starts_with_at"
+        | "aipl_str_starts_with_char"
         | "aipl_arr_elem_ptr"
         | "aipl_write_bytes"
         | "aipl_array_new"
@@ -14419,6 +14429,29 @@ fn emit_char_to_str<M: Module>(
     return cx.builtins.call(module, builder, "aipl_char_to_str", &[c]);
 }
 
+/// `s.starts_with(c)` / `s.starts_with_at(c, at)` / `s.ends_with(c)` for a
+/// `str` receiver and a single `char` `c` — the `SeqShape::Elem`
+/// monomorphization on a string, and the `some(c)` half of the optional one.
+/// One runtime call that compares the one byte in place; the char is never
+/// widened to a one-char `str`. Borrows `s`.
+fn emit_str_starts_ends_char<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    builtins: &Builtins,
+    s: Value,
+    c: Value,
+    end: SeEnd,
+    at: Option<Value>,
+) -> Value {
+    match end {
+        SeEnd::Starts | SeEnd::At => {
+            let at = at.unwrap_or_else(|| builder.ins().iconst(types::I64, 0));
+            builtins.call(module, builder, "aipl_str_starts_with_char", &[s, c, at])
+        }
+        SeEnd::Ends => builtins.call(module, builder, "aipl_str_ends_with_char", &[s, c]),
+    }
+}
+
 /// `arr.starts_with(x)` / `arr.starts_with_at(x, at)` / `arr.ends_with(x)` for a
 /// single element `x` of type `elem` — the `SeqShape::Elem` monomorphization.
 /// True iff the element `end` selects — the first, the one at `at`, or the last
@@ -16420,58 +16453,59 @@ fn compile_call_expr<M: Module>(
                 // `char*` pattern. These runtimes *borrow* both refs — they read
                 // bytes and keep nothing, and the caller holds its own references
                 // across the call — so no pre-inc is paid (see `emit_char_at`).
-                // For the optional shape `none` matches (a `""` prefix/suffix);
-                // `some(c)` compares the 1-char string, materialized inline with
-                // no allocation.
+                // A `char` pattern is one byte compare in the runtime
+                // (`aipl_str_starts_with_char` / `aipl_str_ends_with_char`),
+                // never a one-char `str` — the shape `s.starts_with('#')` is
+                // written for. For the optional shape `none` matches (a `""`
+                // prefix/suffix); `some(c)` compares the 1-char string,
+                // materialized inline with no allocation.
                 let sym = match end {
                     SeEnd::Starts => "aipl_str_starts_with",
                     SeEnd::At => "aipl_str_starts_with_at",
                     SeEnd::Ends => "aipl_str_ends_with",
                 };
-                // The 1-char-or-whole `str` pattern to compare directly, or
-                // `None` for the optional shape (handled with a tag branch).
-                let pat: Option<Value> = match shape {
-                    SeShape::Seq => Some(pat_v),
-                    SeShape::Elem => Some(emit_char_to_str(module, builder, cx, pat_v)),
-                    SeShape::Opt => None,
-                };
-                if let Some(pat) = pat {
-                    let mut call_args = vec![recv, pat];
-                    call_args.extend(at);
-                    builtins.call(module, builder, sym, &call_args)
-                } else {
-                    // Optional `char?`: `none` → true; `some(c)` → str compare.
-                    let res = i64_slot(builder);
-                    let tag = builder
-                        .ins()
-                        .load(types::I64, MemFlagsData::trusted(), pat_v, 0);
-                    let is_some = builder.ins().icmp_imm_s(IntCC::NotEqual, tag, 0);
-                    let some_b = builder.create_block();
-                    let none_b = builder.create_block();
-                    let merge = builder.create_block();
-                    builder.ins().brif(is_some, some_b, &[], none_b, &[]);
-                    builder.switch_to_block(none_b);
-                    builder.seal_block(none_b);
-                    let one = builder.ins().iconst(types::I64, 1);
-                    builder.ins().stack_store(types::I64, one, res, 0);
-                    builder.ins().jump(merge, &[]);
-                    builder.switch_to_block(some_b);
-                    builder.seal_block(some_b);
-                    let cv = builder.ins().load(
-                        types::I64,
-                        MemFlagsData::trusted(),
-                        pat_v,
-                        OPT_VALUE_OFFSET as i32,
-                    );
-                    let s = emit_char_to_str(module, builder, cx, cv);
-                    let mut call_args = vec![recv, s];
-                    call_args.extend(at);
-                    let r = builtins.call(module, builder, sym, &call_args);
-                    builder.ins().stack_store(types::I64, r, res, 0);
-                    builder.ins().jump(merge, &[]);
-                    builder.switch_to_block(merge);
-                    builder.seal_block(merge);
-                    builder.ins().stack_load(types::I64, types::I64, res, 0)
+                match shape {
+                    SeShape::Seq => {
+                        let mut call_args = vec![recv, pat_v];
+                        call_args.extend(at);
+                        builtins.call(module, builder, sym, &call_args)
+                    }
+                    SeShape::Elem => {
+                        emit_str_starts_ends_char(module, builder, builtins, recv, pat_v, end, at)
+                    }
+                    SeShape::Opt => {
+                        // Optional `char?`: `none` → true; `some(c)` → the same
+                        // byte compare a bare `char` gets.
+                        let res = i64_slot(builder);
+                        let tag = builder
+                            .ins()
+                            .load(types::I64, MemFlagsData::trusted(), pat_v, 0);
+                        let is_some = builder.ins().icmp_imm_s(IntCC::NotEqual, tag, 0);
+                        let some_b = builder.create_block();
+                        let none_b = builder.create_block();
+                        let merge = builder.create_block();
+                        builder.ins().brif(is_some, some_b, &[], none_b, &[]);
+                        builder.switch_to_block(none_b);
+                        builder.seal_block(none_b);
+                        let one = builder.ins().iconst(types::I64, 1);
+                        builder.ins().stack_store(types::I64, one, res, 0);
+                        builder.ins().jump(merge, &[]);
+                        builder.switch_to_block(some_b);
+                        builder.seal_block(some_b);
+                        let cv = builder.ins().load(
+                            types::I64,
+                            MemFlagsData::trusted(),
+                            pat_v,
+                            OPT_VALUE_OFFSET as i32,
+                        );
+                        let r =
+                            emit_str_starts_ends_char(module, builder, builtins, recv, cv, end, at);
+                        builder.ins().stack_store(types::I64, r, res, 0);
+                        builder.ins().jump(merge, &[]);
+                        builder.switch_to_block(merge);
+                        builder.seal_block(merge);
+                        builder.ins().stack_load(types::I64, types::I64, res, 0)
+                    }
                 }
             } else {
                 // `T[]` pattern — element-wise structural compare. Borrows both

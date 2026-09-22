@@ -378,6 +378,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         | "aipl_str_cmp"
         | "aipl_str_starts_with"
         | "aipl_str_ends_with"
+        | "aipl_str_ends_with_char"
         | "aipl_str_contains"
         | "aipl_char_at"
         | "aipl_str_data" => sig(2, true),
@@ -391,7 +392,7 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_list_files" => sig(1, true),
         "aipl_char_to_str" => sig(2, false),
         "aipl_execute_program" => sig(3, false),
-        "aipl_str_starts_with_at" => sig(3, true),
+        "aipl_str_starts_with_at" | "aipl_str_starts_with_char" => sig(3, true),
         "aipl_str_slice" => sig(4, false),
         other => panic!("unknown builtin import symbol {other:?}"),
     }

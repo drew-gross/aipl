@@ -26,7 +26,7 @@ variant Work = WNil | WCons(str, Work)
 fn fits(budget: u64, work: Work) -> bool {
     match (work) {
         WNil => true,
-        WCons(s, rest) => if (s.ends_with("!")) { budget > 0 } else { fits_atom(budget, s, rest) },
+        WCons(s, rest) => if (s.ends_with('!')) { budget > 0 } else { fits_atom(budget, s, rest) },
     }
 }
 
@@ -77,11 +77,11 @@ allocations: 150007
 deallocations: 150007
 reallocations: 0
 bytes allocated: 10800297
-instructions executed: 31500283
-binary size: 4704
-  code: 2324
+instructions executed: 29700283
+binary size: 4680
+  code: 2292
   data: 47
-  metadata: 2333
+  metadata: 2341
 functions:
   __rec_drop_Work:
     calls: 150003
@@ -112,7 +112,7 @@ functions:
     bytes: 36
   fits$tail:
     calls: 300003
-    bytes: 404
+    bytes: 372
   fits_after:
     calls: 0
     bytes: 40

@@ -619,6 +619,20 @@ pub(crate) fn ends_with(s: Str, suffix: Str) -> bool {
     s.len() >= suffix.len() && starts_with_at(s, suffix, s.len() - suffix.len())
 }
 
+/// `starts_with_at` for a one-char pattern: whether the byte at `at` is `c`.
+/// The pattern is never materialized — a `char` argument to `starts_with` is
+/// one byte compare, not a one-char `str` and a window compare — and past the
+/// end there is no byte, so nothing matches (the empty pattern is the only one
+/// that would, and a char is not it).
+pub(crate) fn starts_with_char_at(s: Str, c: u8, at: usize) -> bool {
+    char_at(s, at) == Some(c)
+}
+
+/// `ends_with` for a one-char pattern: whether the last byte is `c`.
+pub(crate) fn ends_with_char(s: Str, c: u8) -> bool {
+    s.len() > 0 && char_at(s, s.len() - 1) == Some(c)
+}
+
 // ---------- In-place append (`STR_REPR.md` stage 2) ----------
 
 /// Capacity for an append that has to allocate: enough for what is being
@@ -1223,6 +1237,24 @@ pub(crate) extern "C" fn aipl_str_ends_with(s: *const Str, suffix: *const Str) -
     i64::from(ends_with(unsafe { read(s) }, unsafe { read(suffix) }))
 }
 
+/// The `char`-shaped `starts_with` / `starts_with_at` (`at` is 0 for the
+/// former): the byte at `at` is `c`. `at` clamps at zero like a slice bound;
+/// past the end there is no byte, so the answer is no.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_starts_with_char(s: *const Str, c: i64, at: i64) -> i64 {
+    i64::from(starts_with_char_at(
+        unsafe { read(s) },
+        c as u8,
+        at.max(0) as usize,
+    ))
+}
+
+/// The `char`-shaped `ends_with`: the last byte is `c`.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_ends_with_char(s: *const Str, c: i64) -> i64 {
+    i64::from(ends_with_char(unsafe { read(s) }, c as u8))
+}
+
 #[no_mangle]
 pub(crate) extern "C" fn aipl_str_contains(s: *const Str, needle: *const Str) -> i64 {
     i64::from(contains(unsafe { read(s) }, unsafe { read(needle) }))
@@ -1749,6 +1781,38 @@ mod tests {
             assert_eq!(char_at(s, src.len() + 10), None, "{what} well past the end");
         }
         assert_eq!(char_at(Str::empty(), 0), None);
+    }
+
+    #[test]
+    fn char_shaped_prefix_and_suffix_read_every_representation() {
+        let src = "indexable string, long enough for a buffer";
+        for (what, s) in variants(src) {
+            assert!(starts_with_char_at(s, b'i', 0), "{what}");
+            assert!(!starts_with_char_at(s, b'n', 0), "{what}");
+            assert!(starts_with_char_at(s, b'n', 1), "{what} at 1");
+            assert!(
+                !starts_with_char_at(s, b'r', src.len()),
+                "{what} past the end"
+            );
+            assert!(ends_with_char(s, b'r'), "{what}");
+            assert!(!ends_with_char(s, b'e'), "{what}");
+        }
+        // Nothing matches in the empty string — a char is not the empty pattern.
+        assert!(!starts_with_char_at(Str::empty(), b'x', 0));
+        assert!(!ends_with_char(Str::empty(), b'x'));
+        // The C entry clamps a negative offset to the start, as a slice does.
+        assert_eq!(
+            aipl_str_starts_with_char(&from_bytes(b"hello"), i64::from(b'h'), -1),
+            1
+        );
+        assert_eq!(
+            aipl_str_starts_with_char(&from_bytes(b"hello"), i64::from(b'o'), 99),
+            0
+        );
+        assert_eq!(
+            aipl_str_ends_with_char(&from_bytes(b"hello"), i64::from(b'o')),
+            1
+        );
     }
 
     #[test]

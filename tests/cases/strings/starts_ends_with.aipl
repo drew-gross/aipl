@@ -12,16 +12,22 @@ import {
 // pattern always matches; a pattern longer than `s` never does. A view (long
 // slice) works as a receiver too.
 //
+// A one-char question is asked with a `char`, not a one-char `str`: the char
+// shape is a single byte compare in the runtime, where a `str` pattern is a
+// window compare — `is_dotfile` below is the shape to copy.
+//
 // `s.starts_with_at(p, i)` is `s[i..].starts_with(p)` without building the
 // slice — the answer the fusion pass rewrites that shape into (see
 // `cases/optimizations/slice_starts_with_fusion`), and callable directly.
-fn is_dotfile(name: str) -> bool { name.starts_with(".") && !name.ends_with("/") }.test({
+fn is_dotfile(name: str) -> bool { name.starts_with('.') && !name.ends_with('/') }.test({
     assert("hello".starts_with("he")); // common prefix
     assert("hello".starts_with("hello")); // whole string
     assert("hello".starts_with("")); // empty prefix always matches
     assert(!"hello".starts_with("el")); // not a prefix
     assert(!"hi".starts_with("hello")); // pattern longer than source
     assert(!"".starts_with("x")); // empty source, non-empty pattern
+    assert(!"".starts_with('x')); // ..and the char shape has no byte to read
+    assert(!"".ends_with('x'));
     assert("".starts_with("")); // both empty
 
     assert("hello".ends_with("lo")); // common suffix
@@ -56,6 +62,8 @@ fn is_dotfile(name: str) -> bool { name.starts_with(".") && !name.ends_with("/")
     // starts from the beginning.
     assert("hello".starts_with_at("", 99));
     assert(!"hello".starts_with_at("o", 99));
+    assert(!"hello".starts_with_at('o', 99)); // the char shape clamps the same way
+    assert("hello".starts_with_at('h', -1));
     assert("hello".starts_with_at("he", -1));
     // Variadic here too, and it reads a view receiver like the others.
     assert("hello".starts_with_at('l', 2));
@@ -71,17 +79,17 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 963
-binary size: 11040
-  code: 4884
-  data: 1952
-  metadata: 4204
+instructions executed: 1015
+binary size: 11488
+  code: 4872
+  data: 2176
+  metadata: 4440
 functions:
   __test$is_dotfile:
     calls: 1
-    bytes: 4776
+    bytes: 4764
   aipl_assert:
-    calls: 35
+    calls: 39
     bytes: (external)
   aipl_test_begin:
     calls: 1

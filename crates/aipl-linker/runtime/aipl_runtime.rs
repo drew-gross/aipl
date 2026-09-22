@@ -170,6 +170,7 @@ mod builtin_calls {
         b"aipl_str_contains\0",
         b"aipl_str_data\0",
         b"aipl_str_ends_with\0",
+        b"aipl_str_ends_with_char\0",
         b"aipl_str_eq\0",
         b"aipl_str_hash\0",
         b"aipl_str_iter_init\0",
@@ -183,6 +184,7 @@ mod builtin_calls {
         b"aipl_str_split\0",
         b"aipl_str_starts_with\0",
         b"aipl_str_starts_with_at\0",
+        b"aipl_str_starts_with_char\0",
         b"aipl_test_begin\0",
         b"aipl_test_end\0",
         b"aipl_test_fail\0",
@@ -253,31 +255,33 @@ mod builtin_calls {
     pub const AIPL_STR_CONTAINS: usize = 51;
     pub const AIPL_STR_DATA: usize = 52;
     pub const AIPL_STR_ENDS_WITH: usize = 53;
-    pub const AIPL_STR_EQ: usize = 54;
-    pub const AIPL_STR_HASH: usize = 55;
-    pub const AIPL_STR_ITER_INIT: usize = 56;
-    pub const AIPL_STR_ITER_NEXT: usize = 57;
-    pub const AIPL_STR_JOIN: usize = 58;
-    pub const AIPL_STR_LEN: usize = 59;
-    pub const AIPL_STR_REPEAT: usize = 60;
-    pub const AIPL_STR_REVERSE: usize = 61;
-    pub const AIPL_STR_SLICE: usize = 62;
-    pub const AIPL_STR_SORT: usize = 63;
-    pub const AIPL_STR_SPLIT: usize = 64;
-    pub const AIPL_STR_STARTS_WITH: usize = 65;
-    pub const AIPL_STR_STARTS_WITH_AT: usize = 66;
-    pub const AIPL_TEST_BEGIN: usize = 67;
-    pub const AIPL_TEST_END: usize = 68;
-    pub const AIPL_TEST_FAIL: usize = 69;
-    pub const AIPL_TEST_FAIL_NONE: usize = 70;
-    pub const AIPL_TEST_SUMMARY: usize = 71;
-    pub const AIPL_TRIM: usize = 72;
-    pub const AIPL_TRIM_MUT: usize = 73;
-    pub const AIPL_U64_LEN: usize = 74;
-    pub const AIPL_WRITE_BYTES: usize = 75;
-    pub const AIPL_WRITE_I64: usize = 76;
-    pub const AIPL_WRITE_STRING_TO_FILE: usize = 77;
-    pub const AIPL_WRITE_U64: usize = 78;
+    pub const AIPL_STR_ENDS_WITH_CHAR: usize = 54;
+    pub const AIPL_STR_EQ: usize = 55;
+    pub const AIPL_STR_HASH: usize = 56;
+    pub const AIPL_STR_ITER_INIT: usize = 57;
+    pub const AIPL_STR_ITER_NEXT: usize = 58;
+    pub const AIPL_STR_JOIN: usize = 59;
+    pub const AIPL_STR_LEN: usize = 60;
+    pub const AIPL_STR_REPEAT: usize = 61;
+    pub const AIPL_STR_REVERSE: usize = 62;
+    pub const AIPL_STR_SLICE: usize = 63;
+    pub const AIPL_STR_SORT: usize = 64;
+    pub const AIPL_STR_SPLIT: usize = 65;
+    pub const AIPL_STR_STARTS_WITH: usize = 66;
+    pub const AIPL_STR_STARTS_WITH_AT: usize = 67;
+    pub const AIPL_STR_STARTS_WITH_CHAR: usize = 68;
+    pub const AIPL_TEST_BEGIN: usize = 69;
+    pub const AIPL_TEST_END: usize = 70;
+    pub const AIPL_TEST_FAIL: usize = 71;
+    pub const AIPL_TEST_FAIL_NONE: usize = 72;
+    pub const AIPL_TEST_SUMMARY: usize = 73;
+    pub const AIPL_TRIM: usize = 74;
+    pub const AIPL_TRIM_MUT: usize = 75;
+    pub const AIPL_U64_LEN: usize = 76;
+    pub const AIPL_WRITE_BYTES: usize = 77;
+    pub const AIPL_WRITE_I64: usize = 78;
+    pub const AIPL_WRITE_STRING_TO_FILE: usize = 79;
+    pub const AIPL_WRITE_U64: usize = 80;
 }
 
 // ---------- Per-AIPL-function call counts (instrumented build only) ----------

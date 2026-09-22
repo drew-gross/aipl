@@ -540,11 +540,11 @@ allocations: 626
 deallocations: 626
 reallocations: 8
 bytes allocated: 40594
-instructions executed: 167295
-binary size: 80488
-  code: 47668
+instructions executed: 167049
+binary size: 80336
+  code: 47564
   data: 7993
-  metadata: 24827
+  metadata: 24779
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 20
@@ -575,7 +575,7 @@ functions:
     bytes: 3012
   __m4__process_raw_string:
     calls: 9
-    bytes: 2756
+    bytes: 2760
   __m8__trim_prefix:
     calls: 18
     bytes: 252
@@ -671,7 +671,7 @@ functions:
     bytes: 272
   block_ok:
     calls: 46
-    bytes: 804
+    bytes: 736
   brace_escaped:
     calls: 18
     bytes: 1888
@@ -701,7 +701,7 @@ functions:
     bytes: 1956
   requote:
     calls: 22
-    bytes: 2492
+    bytes: 2452
   reswap:
     calls: 4
     bytes: 932

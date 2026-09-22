@@ -1484,11 +1484,11 @@ allocations: 415
 deallocations: 415
 reallocations: 90
 bytes allocated: 66104
-instructions executed: 375484
-binary size: 2539408
-  code: 1701684
+instructions executed: 375419
+binary size: 2539472
+  code: 1701700
   data: 11620
-  metadata: 826104
+  metadata: 826152
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1525,7 +1525,7 @@ functions:
     bytes: 356
   __builtin_int_parse:
     calls: 13
-    bytes: 1080
+    bytes: 1096
   __builtin_int_parse$lambda1:
     calls: 67
     bytes: 140

@@ -1317,7 +1317,7 @@ fn lower_suffix(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # have a second way to name their fields. A negative index is refused, as it is
 # by gazelle: the `Int` matcher claims the sign, so `p.-1` does lex.
 fn field_name(name: str, span: Span) -> str!ParseError {
-    if (name.starts_with("-")) {
+    if (name.starts_with('-')) {
         return err(ParseError { message: "tuple index must be a non-negative integer", span });
     };
     match (name.int_parse()) {
@@ -1375,10 +1375,10 @@ fn lower_atom(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     if (head == "|") {
         return ok(AExpr(lambda_of(kids, tsp, sp)?));
     };
-    if (head.starts_with(`"`) || head.starts_with("`")) {
+    if (head.starts_with('"') || head.starts_with('`')) {
         return ok(AExpr(at(Str(str_lit_value(head)), tsp)));
     };
-    if (head.starts_with("'")) {
+    if (head.starts_with('\'')) {
         let c = char_lit_value(head).value_or_err(ParseError {
             message: "a char literal holds exactly one character",
             span: sp,
@@ -2331,10 +2331,10 @@ fn lower_pattern(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let head = toks
         .first()
         .value_or_err(ParseError { message: "a pattern matched no token", span: sp })?;
-    if (head.starts_with(`"`) || head.starts_with("`")) {
+    if (head.starts_with('"') || head.starts_with('`')) {
         return ok(APat(PatStr(str_lit_value(head))));
     };
-    if (head.starts_with("'")) {
+    if (head.starts_with('\'')) {
         let c = char_lit_value(head).value_or_err(ParseError {
             message: "a char pattern holds exactly one character",
             span: sp,
@@ -2874,7 +2874,7 @@ fn doc_lines_between(src: str, node: Cst, lo: u64, hi: u64) -> str[] {
         .own_tokens()
         .filter(|t| lo <= t.start && t.start < hi)
         .map(|t| src[t])
-        .filter(|t| t.starts_with("#"))
+        .filter(|t| t.starts_with('#'))
 }
 
 # `variant_case` — the name and the payload slots as children. Its docs are
@@ -2895,8 +2895,8 @@ fn lower_variant_case(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 fn lower_case_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let own = node.own_texts(src);
-    let doc = doc_block(own.filter(|t| t.starts_with("#")));
-    let toks = own.filter(|t| !t.starts_with("#"));
+    let doc = doc_block(own.filter(|t| t.starts_with('#')));
+    let toks = own.filter(|t| !t.starts_with('#'));
     let written = as_ty(kid(kids, 0, sp)?, sp)?;
     if (toks.is_empty()) {
         return ok(ACaseParam(CaseParam {
@@ -4611,11 +4611,11 @@ allocations: 2097540
 deallocations: 2097540
 reallocations: 295775
 bytes allocated: 387623274
-instructions executed: 574263540
-binary size: 5043464
-  code: 3308848
+instructions executed: 574255803
+binary size: 5043264
+  code: 3308584
   data: 56308
-  metadata: 1678308
+  metadata: 1678372
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 18
@@ -4877,7 +4877,7 @@ functions:
     bytes: 364
   __builtin_int_parse:
     calls: 494
-    bytes: 1080
+    bytes: 1096
   __builtin_int_parse$lambda1:
     calls: 462
     bytes: 140
@@ -5222,7 +5222,7 @@ functions:
     bytes: 988
   __m24__process_raw_string:
     calls: 1
-    bytes: 664
+    bytes: 640
   __m25__trim_prefix:
     calls: 68
     bytes: 252
@@ -5858,7 +5858,7 @@ functions:
     bytes: 89564
   field_name:
     calls: 8
-    bytes: 888
+    bytes: 868
   for_chain:
     calls: 4
     bytes: 3380
@@ -5918,7 +5918,7 @@ functions:
     bytes: 46292
   lower_atom:
     calls: 283
-    bytes: 139124
+    bytes: 138992
   lower_base_ty:
     calls: 135
     bytes: 13396
@@ -5939,7 +5939,7 @@ functions:
     bytes: 6088
   lower_case_param:
     calls: 10
-    bytes: 26880
+    bytes: 26840
   lower_construct_fields:
     calls: 5
     bytes: 25128
@@ -6026,7 +6026,7 @@ functions:
     bytes: 29744
   lower_pattern:
     calls: 87
-    bytes: 64140
+    bytes: 64096
   lower_postfix:
     calls: 278
     bytes: 18288
@@ -6086,7 +6086,7 @@ functions:
     bytes: 23748
   lower_variant_decl$filter6$own0:
     calls: 14
-    bytes: 468
+    bytes: 448
   lower_while_stmt:
     calls: 2
     bytes: 6568

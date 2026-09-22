@@ -78,9 +78,9 @@ allocations: 8
 deallocations: 8
 reallocations: 0
 bytes allocated: 672
-instructions executed: 2388
-binary size: 10456
-  code: 6800
+instructions executed: 2368
+binary size: 10472
+  code: 6816
   data: 51
   metadata: 3605
 functions:
@@ -89,7 +89,7 @@ functions:
     bytes: 268
   __builtin_int_parse:
     calls: 4
-    bytes: 1080
+    bytes: 1096
   __builtin_int_parse$lambda1:
     calls: 4
     bytes: 140
