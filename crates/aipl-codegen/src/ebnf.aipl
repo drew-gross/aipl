@@ -57,6 +57,7 @@ import {
     logical_not as !,
     logical_or as ||,
     map,
+    saturating_sub as -,
     to_array,
     to_set,
     try_map,
@@ -64,7 +65,6 @@ import {
     union_all,
     value_or,
     value_or_err,
-    wrapping_sub as -,
     zip_with,
 } from builtins;
 import {
@@ -325,13 +325,8 @@ fn render_list<K: variant>(
 
     // One `sep item` pair is already spelled by the leading item, so the
     // repetition carries one fewer than the minimum — and one fewer than the
-    // maximum, for the same reason.
-    let inner_max = max.map(|m| m - 1);
-    let pairs = if (min == 0) {
-        rep_suffix(min, inner_max)
-    } else {
-        rep_suffix(min - 1, inner_max)
-    };
+    // maximum, for the same reason. A zero minimum stays zero: `-` saturates.
+    let pairs = rep_suffix(min - 1, max.map(|m| m - 1));
     let core = `{it} ({s} {it}){pairs}`;
     let led = if (leading_sep) { `{s}? {core}` } else { core };
     let body = if (trailing_sep) { `{led} {s}?` } else { led };
@@ -766,11 +761,11 @@ allocations: 1579
 deallocations: 1579
 reallocations: 352
 bytes allocated: 184735
-instructions executed: 243904
-binary size: 168144
-  code: 111032
+instructions executed: 243902
+binary size: 168120
+  code: 111012
   data: 4004
-  metadata: 53108
+  metadata: 53104
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -1035,7 +1030,7 @@ functions:
     bytes: 5572
   render_rule$Tok:
     calls: 101
-    bytes: 12832
+    bytes: 12812
   rep_suffix:
     calls: 14
     bytes: 1708

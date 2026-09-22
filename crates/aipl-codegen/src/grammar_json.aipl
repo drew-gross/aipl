@@ -517,10 +517,10 @@ deallocations: 22173
 reallocations: 3287
 bytes allocated: 2833155
 instructions executed: 5530884
-binary size: 462328
-  code: 302656
+binary size: 462296
+  code: 302632
   data: 8564
-  metadata: 151108
+  metadata: 151100
 functions:
   __arr_drop_Json:
     calls: 125
@@ -908,7 +908,7 @@ functions:
     bytes: 5572
   __m2__render_rule$JsonTok:
     calls: 30
-    bytes: 12872
+    bytes: 12848
   __m2__rep_suffix:
     calls: 2
     bytes: 1708
