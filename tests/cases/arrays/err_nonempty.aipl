@@ -1,0 +1,43 @@
+import { filter, greater_than as >, nonempty_first, nonempty_last } from builtins;
+
+// The ways into `T[] without []` that the checker refuses: an empty literal, a
+// plain array (which may be empty, whatever its value), a function's plain
+// result, and a `without []` on something that is not an array at all.
+fn empty_literal() -> i64 {
+    let xs: i64[] without [] = [];
+    xs.nonempty_first()
+}
+
+fn plain_array(xs: i64[]) -> i64 { xs.nonempty_first() }
+
+fn plain_result() -> i64 {
+    let xs: i64[] without [] = [1, 2].filter(|x| x > 5);
+    xs.nonempty_last()
+}
+
+fn not_an_array() -> i64 {
+    let n: i64 without [] = 5;
+    n
+}
+
+fn main() {}
+--- errors ---
+error: binding "xs" is declared i64[] without [], but its value is []
+ --> ./tests/cases/arrays/err_nonempty.aipl:7:32
+  |
+7 |     let xs: i64[] without [] = [];
+  |                                ^^
+
+error: nonempty_first expects a non-empty array (a `T[] without []`), got i64[]
+  --> ./tests/cases/arrays/err_nonempty.aipl:11:36
+   |
+11 | fn plain_array(xs: i64[]) -> i64 { xs.nonempty_first() }
+   |                                    ^^
+
+error: binding "xs" is declared i64[] without [], but its value is i64[]
+  --> ./tests/cases/arrays/err_nonempty.aipl:14:32
+   |
+14 |     let xs: i64[] without [] = [1, 2].filter(|x| x > 5);
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: fn "not_an_array": `without []` excludes the empty array, and i64 is not an array type

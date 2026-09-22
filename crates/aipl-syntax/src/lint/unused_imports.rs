@@ -155,9 +155,10 @@ fn collect_ty_names(ty: &Type, out: &mut HashSet<String>) {
                 collect_ty_names(a, out);
             }
         }
-        Type::Optional(inner) | Type::Array(inner) | Type::Set(inner, _) => {
-            collect_ty_names(inner, out)
-        }
+        Type::Optional(inner)
+        | Type::Array(inner)
+        | Type::Set(inner, _)
+        | Type::Without(inner, _) => collect_ty_names(inner, out),
         Type::Dict(k, v) | Type::Result(k, v) => {
             collect_ty_names(k, out);
             collect_ty_names(v, out);

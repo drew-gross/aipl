@@ -58,7 +58,7 @@
           "name": "keyword.control.import.aipl"
         },
         {
-          "match": "\\bfor\\b|\\bwhile\\b|\\bmatch\\b|\\breturn\\b|\\bshim\\b|\\bstruct\\b|\\bvariant\\b|\\bif\\b|\\belse\\b|\\bbuiltins\\b",
+          "match": "\\bfor\\b|\\bwhile\\b|\\bmatch\\b|\\breturn\\b|\\bshim\\b|\\bstruct\\b|\\bvariant\\b|\\bif\\b|\\belse\\b|\\bbuiltins\\b|\\bwithout\\b",
           "name": "keyword.control.aipl"
         },
         {

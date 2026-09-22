@@ -1,0 +1,73 @@
+import { equal as ==, len, wrapping_sub as - } from builtins;
+
+// The AIPL implementation of the `nonempty_last` builtin (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`); `nonempty_first`'s mirror, and `last`
+// for an array the type system knows is not empty. The `none` arm recurses
+// for the reason `nonempty_first`'s does.
+# The last element of a non-empty array — the element itself, not a `T?`,
+# because a `T[] without []` has one. `last` is the same question for an array
+# that may be empty.
+pub fn nonempty_last<T: any>(self: T[] without []) -> T {
+    match (self[self.len() - 1]) {
+        some(v) => v,
+        none => self.nonempty_last(),
+    }
+}.test({
+    let xs: i64[] without [] = [1, 2, 3];
+    assert(xs.nonempty_last() == 3);
+    assert(nonempty_last(xs) == 3); // free-call form
+    let one: str[] without [] = ["only"];
+    assert(one.nonempty_last() == "only");
+    let cs: char[] without [] = ['a', 'b'];
+    assert(cs.nonempty_last() == 'b');
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 56
+instructions executed: 323
+binary size: 3760
+  code: 1644
+  data: 268
+  metadata: 1848
+functions:
+  __test$nonempty_last:
+    calls: 1
+    bytes: 544
+  aipl_array_dec:
+    calls: 3
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_assert:
+    calls: 4
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 116
+  nonempty_last$char:
+    calls: 0
+    bytes: 40
+  nonempty_last$char$tail:
+    calls: 1
+    bytes: 196
+  nonempty_last$i64:
+    calls: 0
+    bytes: 32
+  nonempty_last$i64$tail:
+    calls: 2
+    bytes: 284
+  nonempty_last$str:
+    calls: 1
+    bytes: 432

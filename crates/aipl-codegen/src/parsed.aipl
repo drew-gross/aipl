@@ -104,10 +104,10 @@ deallocations: 40
 reallocations: 2
 bytes allocated: 2853
 instructions executed: 2277
-binary size: 72256
-  code: 47796
+binary size: 73264
+  code: 48496
   data: 1268
-  metadata: 23192
+  metadata: 23500
 functions:
   __arr_drop___m1__Expr:
     calls: 0
@@ -156,7 +156,7 @@ functions:
     bytes: 1396
   __m4__show_ty:
     calls: 1
-    bytes: 5064
+    bytes: 5572
   __m4__show_tys:
     calls: 0
     bytes: 1396
@@ -171,7 +171,7 @@ functions:
     bytes: 72
   __rec_drop___m4__Ty:
     calls: 4
-    bytes: 408
+    bytes: 476
   __test$resolve_body:
     calls: 1
     bytes: 3548
@@ -228,7 +228,7 @@ functions:
     bytes: (external)
   construct_ty_name:
     calls: 4
-    bytes: 2792
+    bytes: 2916
   main:
     calls: 1
     bytes: 112

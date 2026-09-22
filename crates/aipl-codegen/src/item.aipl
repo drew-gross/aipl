@@ -183,10 +183,10 @@ deallocations: 18
 reallocations: 2
 bytes allocated: 1338
 instructions executed: 1453
-binary size: 92016
-  code: 64804
+binary size: 92840
+  code: 65380
   data: 239
-  metadata: 26973
+  metadata: 27221
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -232,13 +232,13 @@ functions:
     bytes: 1396
   __m5__show_ty:
     calls: 1
-    bytes: 5064
+    bytes: 5572
   __m5__show_tys:
     calls: 0
     bytes: 1396
   __rec_drop___m5__Ty:
     calls: 1
-    bytes: 408
+    bytes: 476
   __test$show_item:
     calls: 1
     bytes: 1980

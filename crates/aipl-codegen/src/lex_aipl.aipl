@@ -110,6 +110,7 @@ variant AiplTok =
     | If
     | Else
     | Builtins
+    | Without
     | EqEq
     | Ne
     | Arrow
@@ -527,6 +528,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         kw("if", If, s_keyword()),
         kw("else", Else, s_keyword()),
         kw("builtins", Builtins, s_keyword()),
+        kw("without", Without, s_keyword()),
         kw("true", True, s_constant()),
         kw("false", False, s_constant()),
         kw("none", None, s_constant()),
@@ -685,6 +687,21 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
             atok("if else builtins iffy", Else, 3..7),
             atok("if else builtins iffy", Builtins, 8..16),
             atok("if else builtins iffy", Name("iffy"), 17..21),
+        ],
+        trivia: [],
+    });
+
+    // `without` is the type-refinement keyword (`T[] without []`); like the
+    // rest it stops at an identifier boundary.
+    assert(lex_aipl("i64[] without [] withoutx")? == LexResult {
+        tokens: [
+            atok("i64[] without [] withoutx", Name("i64"), 0..3),
+            atok("i64[] without [] withoutx", LBracket, 3..4),
+            atok("i64[] without [] withoutx", RBracket, 4..5),
+            atok("i64[] without [] withoutx", Without, 6..13),
+            atok("i64[] without [] withoutx", LBracket, 14..15),
+            atok("i64[] without [] withoutx", RBracket, 15..16),
+            atok("i64[] without [] withoutx", Name("withoutx"), 17..25),
         ],
         trivia: [],
     });
@@ -904,30 +921,30 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     });
 })
 --- performance ---
-allocations: 277
-deallocations: 277
-reallocations: 61
-bytes allocated: 401925
-instructions executed: 1476273
-binary size: 576296
-  code: 392400
-  data: 9964
-  metadata: 173932
+allocations: 288
+deallocations: 288
+reallocations: 67
+bytes allocated: 421509
+instructions executed: 1657794
+binary size: 634288
+  code: 431004
+  data: 10612
+  metadata: 192672
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
     bytes: 140
   __arr_drop___m1__Token$AiplTok:
-    calls: 161
+    calls: 171
     bytes: 388
   __arr_drop___m1__TokenRule$AiplTok:
-    calls: 30
+    calls: 31
     bytes: 832
   __arr_retain___m1__StepResult$AiplTok:
     calls: 2
     bytes: 140
   __arr_retain___m1__Token$AiplTok:
-    calls: 78
+    calls: 85
     bytes: 388
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
@@ -936,13 +953,13 @@ functions:
     calls: 24
     bytes: 304
   __builtin_count_while$char$lam$__m1__lex_step$AiplTok$lambda1:
-    calls: 50
+    calls: 55
     bytes: 312
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 4
     bytes: 268
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
-    calls: 41
+    calls: 45
     bytes: 280
   __builtin_count_while$char$s0$lam$__m1__to_eol_len$lambda0:
     calls: 0
@@ -963,28 +980,28 @@ functions:
     calls: 5
     bytes: 140
   __eq_AiplTok:
-    calls: 67
+    calls: 74
     bytes: 600
   __eq_StrStyle:
     calls: 9
     bytes: 64
   __eq___builtin_Span:
-    calls: 72
+    calls: 79
     bytes: 104
   __eq___m1__LexError:
     calls: 5
     bytes: 128
   __eq___m1__LexResult$AiplTok:
-    calls: 24
+    calls: 25
     bytes: 120
   __eq___m1__SpanStr:
-    calls: 67
+    calls: 74
     bytes: 128
   __eq___m1__Token$AiplTok:
-    calls: 67
+    calls: 74
     bytes: 120
   __eq___m1__Token$AiplTok$arr:
-    calls: 49
+    calls: 51
     bytes: 284
   __eq_str$arr:
     calls: 4
@@ -993,10 +1010,10 @@ functions:
     calls: 3
     bytes: 744
   __m1__between_len:
-    calls: 37
+    calls: 41
     bytes: 800
   __m1__delimited_len:
-    calls: 66
+    calls: 74
     bytes: 1904
   __m1__finalize_template$AiplTok:
     calls: 6
@@ -1008,31 +1025,31 @@ functions:
     calls: 2
     bytes: 1896
   __m1__lex$AiplTok:
-    calls: 30
+    calls: 31
     bytes: 1196
   __m1__lex_step$AiplTok:
-    calls: 106
+    calls: 116
     bytes: 27352
   __m1__nested_len:
-    calls: 71
+    calls: 78
     bytes: 1148
   __m1__step_result$AiplTok:
-    calls: 2436
+    calls: 2858
     bytes: 14264
   __m1__template_scan$AiplTok:
     calls: 6
     bytes: 2824
   __m1__template_step$AiplTok:
-    calls: 52
+    calls: 60
     bytes: 444
   __m1__to_eol_len:
     calls: 0
     bytes: 52
   __m1__to_eol_len$tail:
-    calls: 141
+    calls: 155
     bytes: 268
   __m1__to_eol_unless_len:
-    calls: 68
+    calls: 75
     bytes: 368
   __m2__unescape:
     calls: 34
@@ -1060,7 +1077,7 @@ functions:
     bytes: 2244
   __test$lex_aipl:
     calls: 1
-    bytes: 180968
+    bytes: 218096
   __test$lex_aipl_stripped:
     calls: 1
     bytes: 7168
@@ -1080,19 +1097,19 @@ functions:
     calls: 0
     bytes: 836
   aipl_arr_extend:
-    calls: 218
+    calls: 238
     bytes: (external)
   aipl_arr_inc:
-    calls: 10521
+    calls: 12285
     bytes: (external)
   aipl_arr_reserve:
-    calls: 218
+    calls: 238
     bytes: (external)
   aipl_array_dec:
-    calls: 15856
+    calls: 18487
     bytes: (external)
   aipl_array_new:
-    calls: 145
+    calls: 154
     bytes: (external)
   aipl_array_push:
     calls: 31
@@ -1104,16 +1121,16 @@ functions:
     calls: 16
     bytes: (external)
   aipl_assert:
-    calls: 51
+    calls: 52
     bytes: (external)
   aipl_rules:
-    calls: 30
-    bytes: 90368
+    calls: 31
+    bytes: 91844
   aipl_rules$lambda0:
     calls: 0
     bytes: 136
   aipl_rules$lambda1:
-    calls: 17
+    calls: 19
     bytes: 104
   aipl_rules$lambda2:
     calls: 0

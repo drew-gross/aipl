@@ -247,10 +247,10 @@ deallocations: 142
 reallocations: 6
 bytes allocated: 10177
 instructions executed: 9781
-binary size: 101464
-  code: 65488
+binary size: 102208
+  code: 65996
   data: 2731
-  metadata: 33245
+  metadata: 33481
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -296,7 +296,7 @@ functions:
     bytes: 628
   __m3__show_ty:
     calls: 0
-    bytes: 5064
+    bytes: 5572
   __m3__show_tys:
     calls: 0
     bytes: 1396

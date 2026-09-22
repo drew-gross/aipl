@@ -315,6 +315,7 @@ utilities:
 
 skills:
   make an "add lint" skill that describes how to lint against a reimplementation
+  make a "likely reruns" skill that describes when to preemptively run which tests to refill and avoid extra runs of handoff (note: better caching may make this partly unnecessary)
 
 format:
   exclude if expressions from being on same line as function it's result is passed to

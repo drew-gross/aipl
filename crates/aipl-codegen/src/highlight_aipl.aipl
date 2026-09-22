@@ -172,15 +172,15 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 5643
-deallocations: 5643
+allocations: 5677
+deallocations: 5677
 reallocations: 293
-bytes allocated: 469677
-instructions executed: 1383064
-binary size: 243232
-  code: 178092
+bytes allocated: 472744
+instructions executed: 1388741
+binary size: 245304
+  code: 179796
   data: 3336
-  metadata: 61804
+  metadata: 62172
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -198,7 +198,7 @@ functions:
     calls: 2
     bytes: 148
   __arr_retain___m1__Item:
-    calls: 103
+    calls: 104
     bytes: 172
   __arr_retain___m1__Pat:
     calls: 34
@@ -264,7 +264,7 @@ functions:
     calls: 170
     bytes: 2224
   __m1__matcher_pat:
-    calls: 77
+    calls: 78
     bytes: 6684
   __m1__obj_fld:
     calls: 5
@@ -276,7 +276,7 @@ functions:
     calls: 40
     bytes: 4648
   __m1__re_escape:
-    calls: 100
+    calls: 101
     bytes: 2368
   __m2__indent:
     calls: 140
@@ -330,16 +330,16 @@ functions:
     calls: 0
     bytes: 2756
   __rec_drop___m1__Pat:
-    calls: 181
+    calls: 183
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 126980
+    bytes: 128684
   __to_str_u64:
     calls: 7
     bytes: 204
   aipl_arr_elem_ptr:
-    calls: 163
+    calls: 165
     bytes: (external)
   aipl_arr_extend:
     calls: 2
@@ -354,7 +354,7 @@ functions:
     calls: 26
     bytes: (external)
   aipl_array_dec:
-    calls: 2214
+    calls: 2218
     bytes: (external)
   aipl_array_new:
     calls: 203
@@ -363,7 +363,7 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_push_mut:
-    calls: 194
+    calls: 195
     bytes: (external)
   aipl_array_with_cap:
     calls: 17
@@ -372,13 +372,13 @@ functions:
     calls: 15
     bytes: (external)
   aipl_rec_alloc:
-    calls: 181
+    calls: 183
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 1000
+    calls: 1007
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 819
+    calls: 824
     bytes: (external)
   aipl_test_begin:
     calls: 1

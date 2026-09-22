@@ -24,6 +24,18 @@ variant Ty =
     | Tuple(Ty[])
     | Generic(str, Ty[])
     | Any
+    | Without(Ty, Exclusion)
+
+# What a `T without X` type leaves out — the `X`. One case per value the checker
+# knows how to exclude; today that is the empty array literal, `[]`.
+variant Exclusion = EmptyArray
+
+# The excluded value as the user writes it after `without`.
+pub fn show_exclusion(self: Exclusion) -> str {
+    match (self) {
+        EmptyArray => "[]",
+    }
+}.test({ assert(EmptyArray.show_exclusion() == "[]") })
 
 # How a set orders its elements: `#{T}` promises no order, `#>{T}` walks
 # largest first, `#<{T}` smallest first. The two ordered forms require an `ord`
@@ -64,6 +76,7 @@ pub fn show_ty(self: Ty) -> str {
         Fn(ps, r) => `Fn([{show_tys(ps)}], {r.show_ty()})`,
         Tuple(ts) => `Tuple({show_tys(ts)})`,
         Generic(n, args) => `Generic({n}, {show_tys(args)})`,
+        Without(t, x) => `Without({t.show_ty()}, {x.show_exclusion()})`,
     }
 }.test({
     let i64_ty: Ty = Primitive(I64);
@@ -79,6 +92,7 @@ pub fn show_ty(self: Ty) -> str {
     assert(Set(i64_ty, Desc).show_ty() == "Set(i64, Desc)");
     assert(Set(Primitive(Str), Asc).show_ty() == "Set(str, Asc)");
     assert(TypeVar("T").show_ty() == "TypeVar(T)");
+    assert(Without(Array(i64_ty), EmptyArray).show_ty() == "Without(Array(i64), [])");
 })
 
 # The elements of a type list, comma-separated. An empty list renders empty,
@@ -90,15 +104,15 @@ pub fn show_tys(self: Ty[]) -> str { self.map(show_ty).join(sep=", ") }.test({
     assert([Primitive(I64), Named("P")].show_tys() == "i64, P");
 })
 --- performance ---
-allocations: 70
-deallocations: 70
+allocations: 78
+deallocations: 78
 reallocations: 2
-bytes allocated: 5134
-instructions executed: 4619
-binary size: 21392
-  code: 12292
-  data: 1334
-  metadata: 7766
+bytes allocated: 5806
+instructions executed: 4946
+binary size: 23304
+  code: 13328
+  data: 1551
+  metadata: 8425
 functions:
   __arr_drop_Ty:
     calls: 5
@@ -107,14 +121,14 @@ functions:
     calls: 0
     bytes: 116
   __rec_drop_Ty:
-    calls: 25
-    bytes: 408
+    calls: 27
+    bytes: 476
   __test$show_order:
     calls: 1
     bytes: 396
   __test$show_ty:
     calls: 1
-    bytes: 3792
+    bytes: 4068
   __test$show_tys:
     calls: 1
     bytes: 760
@@ -128,38 +142,38 @@ functions:
     calls: 5
     bytes: (external)
   aipl_assert:
-    calls: 18
+    calls: 20
     bytes: (external)
   aipl_rec_alloc:
-    calls: 25
+    calls: 27
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 46
+    calls: 50
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 11
+    calls: 13
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 21
+    calls: 23
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 11
+    calls: 13
     bytes: (external)
   aipl_test_begin:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 244
+    bytes: 428
   show_ty:
-    calls: 31
-    bytes: 5064
+    calls: 34
+    bytes: 5572
   show_tys:
     calls: 6
     bytes: 1396

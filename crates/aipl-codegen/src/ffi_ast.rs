@@ -265,7 +265,16 @@ fn ty(v: &FfiValue) -> R<ast::Type> {
             each(at(payload, 1, case)?, ty)?,
         ),
         "Any" => T::Any,
+        "Without" => T::Without(one(0)?, exclusion(at(payload, 1, case)?)?),
         other => return Err(unknown("Ty", other)),
+    })
+}
+
+fn exclusion(v: &FfiValue) -> R<ast::Exclusion> {
+    let (case, _) = variant(v)?;
+    Ok(match case {
+        "EmptyArray" => ast::Exclusion::EmptyArray,
+        other => return Err(unknown("Exclusion", other)),
     })
 }
 

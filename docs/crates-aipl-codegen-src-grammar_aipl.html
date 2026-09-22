@@ -2309,6 +2309,20 @@
 
 
 
+        <section class="item" id="item-as_exclusion">
+          <h3>
+            <a class="anchor" href="#item-as_exclusion">as_exclusion</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn as_exclusion(v: Ast, span: Span) -&#62; Exclusion!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
         <section class="item" id="item-kid">
           <h3>
             <a class="anchor" href="#item-kid">kid</a>
@@ -2330,7 +2344,7 @@
           </h3>
           <pre class="signature"><code>fn tuple_ty(ts: Ty[], example: str, span: Span) -&#62; Ty!ParseError</code></pre>
 
-          <div class="doc"><p>A parenthesized list used as a tuple. Gazelle validates the arity in its build action rather than in the grammar, for the reason this one does: <code>(A)</code> and <code>()</code> are parenthesized lists that parse, and only what follows them says whether they were meant as a tuple or as a function type's parameters. <code>example</code> completes the advice with the suffix that was actually written.</p></div>
+          <div class="doc"><p>A parenthesized list used as a tuple — or, with one element, as a grouping: <code>(T[] without [])?</code> is how a refined type takes a suffix, since <code>without</code> binds looser than any. Gazelle validates the arity in its build action rather than in the grammar, for the reason this one does: <code>(A)</code> and <code>()</code> are parenthesized lists that parse, and only what follows them says whether they were meant as a tuple or as a function type's parameters. <code>example</code> completes the advice with the suffix that was actually written.</p></div>
 
 
         </section>
@@ -2358,7 +2372,35 @@
           </h3>
           <pre class="signature"><code>fn lower_ty(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>ty</code> — the eight alternatives, told apart by their left child's <code>Ast</code> case and by the tokens this node matched itself.</p><p><code>!E</code> is the one alternative with no left operand at all: a result whose ok side is unit, which is why a single child under a <code>!</code> lowers to <code>TyResult(TyUnit, ..)</code>.</p></div>
+          <div class="doc"><p><code>ty</code> — a head, refined by the <code>without</code> clause when one followed it. The clause's child count is what says whether it did: the head alone, or the head and what it excludes.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_exclusion">
+          <h3>
+            <a class="anchor" href="#item-lower_exclusion">lower_exclusion</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_exclusion(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>exclusion</code> — what a <code>without</code> clause leaves out. The one form today is <code>[]</code>, so the tokens are not consulted: matching the production is knowing which.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_ty_head">
+          <h3>
+            <a class="anchor" href="#item-lower_ty_head">lower_ty_head</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_ty_head(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>ty_head</code> — the eight alternatives, told apart by their left child's <code>Ast</code> case and by the tokens this node matched itself.</p><p><code>!E</code> is the one alternative with no left operand at all: a result whose ok side is unit, which is why a single child under a <code>!</code> lowers to <code>TyResult(TyUnit, ..)</code>.</p></div>
 
 
         </section>

@@ -3703,6 +3703,7 @@ fn marshal_lex(
             "If" => K::If,
             "Else" => K::Else,
             "Builtins" => K::Builtins,
+            "Without" => K::Without,
             "EqEq" => K::EqEq,
             "Ne" => K::Ne,
             "Arrow" => K::Arrow,
@@ -3964,10 +3965,15 @@ fn compile_program<M: Module>(
     // `check_program` is the synthesized builtin decls followed by the real
     // program; take back the second half, now stamped. `check` neither reorders
     // nor adds items, so the tail lines up by construction.
-    let program = &Program {
+    let mut program = Program {
         items: checked.items[checked.items.len() - program.items.len()..].to_vec(),
         sources: checked.sources.clone(),
     };
+    // The checker is the last pass that cares about a `without` refinement:
+    // it has verified every value entering one, and from here on a
+    // `T[] without []` is the `T[]` it is at runtime (see `Type::Without`).
+    aipl_syntax::erase_refinements(&mut program);
+    let program = &program;
 
     // Optimization: inline single-use private functions (a no-op unless the
     // program has a `main` — see `inline_single_use`). Runs on the checked source

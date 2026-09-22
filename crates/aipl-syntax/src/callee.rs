@@ -59,6 +59,15 @@ pub enum Callee {
     CountIsNotEqual,
     First,
     Last,
+    NonemptyFirst,
+    NonemptyLast,
+    EnsureNonempty,
+    /// `assume_nonempty(self: T[]) -> T[] without []` — the refinement granted
+    /// without a test. Internal: only `ensure_nonempty`'s source may call it,
+    /// behind the `is_nonempty` check that makes it sound. Erased with the
+    /// refinement it introduces (`erase_refinements`), so no pass past the
+    /// checker ever sees it.
+    AssumeNonempty,
     DropFirst,
     DropLast,
     DropN,
@@ -242,6 +251,10 @@ impl Callee {
         Callee::CountIsNotEqual,
         Callee::First,
         Callee::Last,
+        Callee::NonemptyFirst,
+        Callee::NonemptyLast,
+        Callee::EnsureNonempty,
+        Callee::AssumeNonempty,
         Callee::DropFirst,
         Callee::DropLast,
         Callee::DropN,
@@ -390,6 +403,10 @@ impl Callee {
             Callee::CountIsNotEqual => "__builtin_count_is_not_equal",
             Callee::First => "__builtin_first",
             Callee::Last => "__builtin_last",
+            Callee::NonemptyFirst => "__builtin_nonempty_first",
+            Callee::NonemptyLast => "__builtin_nonempty_last",
+            Callee::EnsureNonempty => "__builtin_ensure_nonempty",
+            Callee::AssumeNonempty => "__builtin_assume_nonempty",
             Callee::DropFirst => "__builtin_drop_first",
             Callee::DropLast => "__builtin_drop_last",
             Callee::DropN => "__builtin_drop_n",

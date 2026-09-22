@@ -463,7 +463,10 @@ pub mod ast {
             | Type::NoneLiteralArg
             | Type::ConcatStr => false,
             Type::Any => true,
-            Type::Array(inner) | Type::Optional(inner) | Type::Set(inner, _) => ty_mentions_any(inner),
+            Type::Array(inner)
+            | Type::Optional(inner)
+            | Type::Set(inner, _)
+            | Type::Without(inner, _) => ty_mentions_any(inner),
             Type::Dict(k, v) => ty_mentions_any(k) || ty_mentions_any(v),
             Type::Result(ok, err) => ty_mentions_any(ok) || ty_mentions_any(err),
             Type::Fn(params, ret) => params.iter().any(ty_mentions_any) || ty_mentions_any(ret),
@@ -928,6 +931,38 @@ pub mod ast {
         /// the type of a scalar value flowing to a `str` parameter; decays to
         /// a plain `str` once it's placed into any other container/context.
         ConcatStr,
+        /// `T without X` — the base type `T` *refined*: every value of `T`
+        /// except the one the [`Exclusion`] names. `i64[] without []` is a
+        /// non-empty array of `i64`.
+        ///
+        /// A refinement is a type-system fact only. At runtime a
+        /// `T[] without []` is exactly a `T[]` — same block, same layout — so a
+        /// refined value is usable wherever its base is wanted (the checker's
+        /// `coerce` peels the refinement), while the reverse needs proof: a
+        /// literal the checker can see is not the excluded value, or a builtin
+        /// that tests for it at runtime (`ensure_nonempty`). Nothing past the
+        /// checker sees the variant: [`crate::erase_refinements`] rewrites every
+        /// refined type to its base before monomorphization, which is what
+        /// keeps the representation-level passes honest about there being no
+        /// second representation.
+        Without(Box<Type>, Exclusion),
+    }
+
+    /// What a `T without X` type leaves out — the `X`. One case per value the
+    /// checker knows how to exclude; today that is the empty array literal.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum Exclusion {
+        /// `[]` — the empty array.
+        EmptyArray,
+    }
+
+    impl Exclusion {
+        /// The excluded value as the user writes it after `without`.
+        pub fn spelling(self) -> &'static str {
+            match self {
+                Exclusion::EmptyArray => "[]",
+            }
+        }
     }
 
     /// A type with every abstraction resolved — what exists *after*
@@ -988,6 +1023,10 @@ pub mod ast {
                 Type::EmptyArrayArg => ConcreteType::EmptyArrayArg,
                 Type::NoneLiteralArg => ConcreteType::NoneLiteralArg,
                 Type::ConcatStr => ConcreteType::ConcatStr,
+                // A refinement has its base's representation, and by the time
+                // anything asks for a concrete type it has been erased anyway
+                // (see `erase_refinements`).
+                Type::Without(base, _) => base.to_concrete()?,
                 Type::Optional(i) => ConcreteType::Optional(Box::new(i.to_concrete()?)),
                 Type::Array(i) => ConcreteType::Array(Box::new(i.to_concrete()?)),
                 Type::Set(i, o) => ConcreteType::Set(Box::new(i.to_concrete()?), *o),
@@ -1952,6 +1991,21 @@ pub fn flex_fit(
             }
             _ => Ok(None),
         },
+        // `T without X`: a literal that is visibly not `X` takes the refined
+        // type — the one way into a refinement that needs no runtime test.
+        // The literal itself still flexes against the base (`let xs: u8[]
+        // without [] = [200]`), and keeps its own type where nothing flexed, so
+        // an element of the wrong type is still caught by the ordinary check
+        // that follows: the refinement is granted, not the base.
+        Type::Without(base, exclusion) => match exclusion {
+            ast::Exclusion::EmptyArray => match &e.kind {
+                K::ArrayLit(elems) if !elems.is_empty() => {
+                    let base_ty = flex_fit(e, ety, base)?.unwrap_or_else(|| ety.clone());
+                    Ok(Some(Type::Without(Box::new(base_ty), *exclusion)))
+                }
+                _ => Ok(None),
+            },
+        },
         _ => Ok(None),
     }
 }
@@ -2629,12 +2683,17 @@ fn __builtin_count_is_equal<T: any>(self: T[], x: T, limit: u64) -> bool { false
 fn __builtin_count_is_not_equal<T: any>(self: T[], x: T, limit: u64) -> bool { false }
 fn __builtin_first<T: any>(self: T[]) -> T? { none }
 fn __builtin_last<T: any>(self: T[]) -> T? { none }
+// The refinement `T[] without []` granted without a test — see
+// `Callee::AssumeNonempty`. A signature only: the checker types the call, and
+// `erase_refinements` then replaces it with its argument, which is what it is
+// at runtime.
+fn __builtin_assume_nonempty<T: any>(self: T[]) -> T[] without [] { __builtin_assume_nonempty(self) }
 fn __builtin_drop_first<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_last<T: any>(self: T[]) -> T[] { self }
 fn __builtin_drop_n<T: any>(self: T[], n: u64) -> T[] { self }
 fn __builtin_drop_last_n<T: any>(self: T[], n: u64) -> T[] { self }
 // NOTE: `all`, `count_while`, `count_if`, `find_if`, `find_index`, `find_map`, `map_find_if`, `map_join`,
-// `reverse_find_map`,
+// `reverse_find_map`, `nonempty_first`, `nonempty_last`, `ensure_nonempty`,
 // `is_all_whitespace`, `is_some_and`, `int_parse`, `trim_while`, `try_map`,
 // `tuple_windows`, `union_all`, `value_or`, and `value_or_err` are
 // *not* declared here — they're implemented in AIPL (`aipl-mono/src/builtin_*.aipl`),
@@ -2882,11 +2941,16 @@ pub fn raw_type_name(t: &Type) -> String {
         // an `any` normalized to has no name to show, so it renders as `any`.
         Type::TypeVar(v) if v.is_empty() => "any".into(),
         Type::TypeVar(v) => v.clone(),
-        Type::Optional(inner) => format!("{}?", raw_type_name(inner)),
-        Type::Array(inner) => format!("{}[]", raw_type_name(inner)),
+        Type::Optional(inner) => format!("{}?", suffix_operand(inner, raw_type_name)),
+        Type::Array(inner) => format!("{}[]", suffix_operand(inner, raw_type_name)),
         Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), raw_type_name(inner)),
         Type::Dict(k, v) => format!("#{{{}: {}}}", raw_type_name(k), raw_type_name(v)),
-        Type::Result(ok, err) => format!("{}!{}", raw_type_name(ok), raw_type_name(err)),
+        Type::Result(ok, err) => format!(
+            "{}!{}",
+            suffix_operand(ok, raw_type_name),
+            suffix_operand(err, raw_type_name)
+        ),
+        Type::Without(base, x) => format!("{} without {}", raw_type_name(base), x.spelling()),
         Type::Fn(params, ret) => {
             let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
             format!("({ps}) -> {}", raw_type_name(ret))
@@ -2907,6 +2971,17 @@ pub fn raw_type_name(t: &Type) -> String {
     }
 }
 
+/// A type as the operand of a postfix `?`/`[]`/`!E`: parenthesized when it is
+/// a `without` refinement, which binds looser than every suffix — so the
+/// rendering of `(T[] without [])?` reads back as the type it is, rather than as
+/// `T[] without []?`, which the grammar refuses.
+fn suffix_operand(t: &Type, render: fn(&Type) -> String) -> String {
+    match t {
+        Type::Without(..) => format!("({})", render(t)),
+        _ => render(t),
+    }
+}
+
 pub fn type_name(t: &Type) -> String {
     match t {
         Type::Unit => "()".into(),
@@ -2917,11 +2992,16 @@ pub fn type_name(t: &Type) -> String {
         // an `any` normalized to has no name to show, so it renders as `any`.
         Type::TypeVar(v) if v.is_empty() => "any".into(),
         Type::TypeVar(v) => v.clone(),
-        Type::Optional(inner) => format!("{}?", type_name(inner)),
-        Type::Array(inner) => format!("{}[]", type_name(inner)),
+        Type::Optional(inner) => format!("{}?", suffix_operand(inner, type_name)),
+        Type::Array(inner) => format!("{}[]", suffix_operand(inner, type_name)),
         Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), type_name(inner)),
         Type::Dict(k, v) => format!("#{{{}: {}}}", type_name(k), type_name(v)),
-        Type::Result(ok, err) => format!("{}!{}", type_name(ok), type_name(err)),
+        Type::Result(ok, err) => format!(
+            "{}!{}",
+            suffix_operand(ok, type_name),
+            suffix_operand(err, type_name)
+        ),
+        Type::Without(base, x) => format!("{} without {}", type_name(base), x.spelling()),
         Type::Fn(params, ret) => {
             let ps = params.iter().map(type_name).collect::<Vec<_>>().join(", ");
             format!("({ps}) -> {}", type_name(ret))
@@ -3005,8 +3085,10 @@ pub fn is_none_literal_arg(t: &Type) -> bool {
 /// not yet decided as part of the language a program can reach. `reserve` is
 /// what `map_join` sizes its buffer with; whether a user should size their
 /// own is an open question, and until it is answered the loader refuses the
-/// import anywhere else ([`is_internal_builtin`]).
-pub const INTERNAL_BUILTINS: &[Callee] = &[Callee::Reserve];
+/// import anywhere else ([`is_internal_builtin`]). `assume_nonempty` grants a
+/// `T[] without []` with no test; `ensure_nonempty` is the one caller that
+/// has made the test, and nothing else gets to skip it.
+pub const INTERNAL_BUILTINS: &[Callee] = &[Callee::Reserve, Callee::AssumeNonempty];
 
 /// Whether `callee` is one of [`INTERNAL_BUILTINS`].
 pub fn is_internal_builtin(callee: &Callee) -> bool {
@@ -3183,7 +3265,7 @@ fn promote_ty(ty: &mut ast::Type, vars: &[String]) {
         | T::EmptyArrayArg
         | T::NoneLiteralArg
         | T::ConcatStr => {}
-        T::Optional(i) | T::Array(i) | T::Set(i, _) => promote_ty(i, vars),
+        T::Optional(i) | T::Array(i) | T::Set(i, _) | T::Without(i, _) => promote_ty(i, vars),
         T::Dict(a, b) | T::Result(a, b) => {
             promote_ty(a, vars);
             promote_ty(b, vars);
@@ -3223,6 +3305,172 @@ fn promote_in_expr(e: &mut ast::Expr, vars: &[String]) {
     }
     for child in each_subexpr_mut(e) {
         promote_in_expr(child, vars);
+    }
+}
+
+/// The type under any `without` refinement — `T[]` for `T[] without []`, and
+/// `t` itself when it carries none. What a refined value *is* at runtime, and
+/// so the type to ask structural questions of: whether it can be indexed,
+/// walked, sliced, matched against `[..]` patterns.
+pub fn unrefined(t: &Type) -> &Type {
+    match t {
+        Type::Without(base, _) => unrefined(base),
+        _ => t,
+    }
+}
+
+/// `t` with every refinement, at any depth, replaced by its base:
+/// `(T[] without [])?` becomes `T[]?`. See [`erase_refinements`].
+pub fn erase_refinement_ty(t: &Type) -> Type {
+    use ast::Type as T;
+    match t {
+        T::Without(base, _) => erase_refinement_ty(base),
+        T::Unit
+        | T::Primitive(_)
+        | T::Named(_)
+        | T::TypeVar(_)
+        | T::Any
+        | T::NoneInner
+        | T::EmptyArrayArg
+        | T::NoneLiteralArg
+        | T::ConcatStr => t.clone(),
+        T::Case(v) => T::Case(Box::new(erase_refinement_ty(v))),
+        T::Optional(i) => T::Optional(Box::new(erase_refinement_ty(i))),
+        T::Array(i) => T::Array(Box::new(erase_refinement_ty(i))),
+        T::Set(i, o) => T::Set(Box::new(erase_refinement_ty(i)), *o),
+        T::Dict(k, v) => T::Dict(
+            Box::new(erase_refinement_ty(k)),
+            Box::new(erase_refinement_ty(v)),
+        ),
+        T::Result(a, b) => T::Result(
+            Box::new(erase_refinement_ty(a)),
+            Box::new(erase_refinement_ty(b)),
+        ),
+        T::Fn(ps, r) => T::Fn(
+            ps.iter().map(erase_refinement_ty).collect(),
+            Box::new(erase_refinement_ty(r)),
+        ),
+        T::Tuple(es) => T::Tuple(es.iter().map(erase_refinement_ty).collect()),
+        T::Generic(n, args) => {
+            T::Generic(n.clone(), args.iter().map(erase_refinement_ty).collect())
+        }
+    }
+}
+
+/// Every `without` refinement in `program` replaced by its base type — in
+/// signatures, field and payload declarations, `let`/`mut` annotations, lambda
+/// parameters, and the types the checker stamped on expressions — and every
+/// `assume_nonempty(x)` call, which only introduced one, replaced by `x`.
+///
+/// A refinement is a promise the checker has finished verifying by the time it
+/// hands the program on, and it is not a representation: `T[] without []` is
+/// laid out, retained and dropped exactly as `T[]` is. Erasing it here is what
+/// lets monomorphization and codegen match on the base types alone, without an
+/// arm apiece for a distinction that makes no difference to them.
+pub fn erase_refinements(program: &mut ast::Program) {
+    each_type_mut(program, &mut |t| *t = erase_refinement_ty(t));
+    each_body_mut(program, &mut erase_assumptions);
+}
+
+/// [`erase_refinements`] for the `assume_nonempty` calls in one expression
+/// tree: each becomes its argument.
+fn erase_assumptions(e: &mut ast::Expr) {
+    for child in each_subexpr_mut(e) {
+        erase_assumptions(child);
+    }
+    if let ast::ExprKind::Call(Callee::AssumeNonempty, args, _) = &mut e.kind {
+        if args.len() == 1 {
+            *e = args.pop().expect("one argument");
+        }
+    }
+}
+
+/// Every type written or recorded in `program`, mutably: the places
+/// [`promote_type_vars`] visits, plus each expression's stamped [`Expr::ty`].
+fn each_type_mut(program: &mut ast::Program, f: &mut impl FnMut(&mut Type)) {
+    for item in &mut program.items {
+        match item {
+            ast::Item::Fn(func) => {
+                for p in &mut func.sig.params {
+                    f(&mut p.ty);
+                }
+                if let Some(r) = &mut func.sig.return_ty {
+                    f(r);
+                }
+            }
+            ast::Item::Struct(s) => {
+                for fd in &mut s.fields {
+                    f(&mut fd.ty);
+                }
+            }
+            ast::Item::Variant(v) => {
+                for case in &mut v.cases {
+                    for slot in &mut case.payload {
+                        f(&mut slot.ty);
+                    }
+                }
+            }
+            ast::Item::Import(_) => {}
+        }
+    }
+    each_body_mut(program, &mut |e| each_type_in_expr_mut(e, f));
+}
+
+/// Every expression tree in `program`, mutably: function bodies and test
+/// bodies, and the default expressions of struct fields and variant payloads.
+fn each_body_mut(program: &mut ast::Program, f: &mut impl FnMut(&mut ast::Expr)) {
+    for item in &mut program.items {
+        match item {
+            ast::Item::Fn(func) => {
+                f(&mut func.body);
+                if let Some(t) = &mut func.test_body {
+                    f(t);
+                }
+            }
+            ast::Item::Struct(s) => {
+                for fd in &mut s.fields {
+                    if let Some(d) = &mut fd.default {
+                        f(d);
+                    }
+                }
+            }
+            ast::Item::Variant(v) => {
+                for case in &mut v.cases {
+                    for slot in &mut case.payload {
+                        if let Some(d) = &mut slot.default {
+                            f(d);
+                        }
+                    }
+                }
+            }
+            ast::Item::Import(_) => {}
+        }
+    }
+}
+
+/// [`each_type_mut`] within one expression tree.
+fn each_type_in_expr_mut(e: &mut ast::Expr, f: &mut impl FnMut(&mut Type)) {
+    use ast::ExprKind as K;
+    if let Some(t) = &mut e.ty {
+        f(t);
+    }
+    match &mut e.kind {
+        K::Let(_, ty, _, _) | K::LetMut(_, ty, _, _) => {
+            if let Some(t) = ty {
+                f(t);
+            }
+        }
+        K::Lambda(params, _) => {
+            for p in params {
+                if let Some(t) = &mut p.ty {
+                    f(t);
+                }
+            }
+        }
+        _ => {}
+    }
+    for child in each_subexpr_mut(e) {
+        each_type_in_expr_mut(child, f);
     }
 }
 
@@ -3476,7 +3724,9 @@ pub fn mentions_typevar(t: &ast::Type) -> bool {
     use ast::Type as T;
     match t {
         T::TypeVar(_) | T::Any => true,
-        T::Case(v) | T::Optional(v) | T::Array(v) | T::Set(v, _) => mentions_typevar(v),
+        T::Case(v) | T::Optional(v) | T::Array(v) | T::Set(v, _) | T::Without(v, _) => {
+            mentions_typevar(v)
+        }
         T::Dict(k, v) | T::Result(k, v) => mentions_typevar(k) || mentions_typevar(v),
         T::Fn(ps, r) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
         T::Tuple(es) | T::Generic(_, es) => es.iter().any(mentions_typevar),

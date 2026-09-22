@@ -24,12 +24,12 @@ use std::collections::{HashMap, HashSet};
 use aipl_syntax::ast;
 use aipl_syntax::ast::Bound;
 use aipl_syntax::ast::{
-    BinOp, Callee, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm, Pattern,
-    Primitive, Program, Signature, StructDecl, Type, VariantDecl,
+    BinOp, Callee, Exclusion, Expr, ExprKind, FieldInit, Function, Item, LambdaParam, MatchArm,
+    Pattern, Primitive, Program, Signature, StructDecl, Type, VariantDecl,
 };
 use aipl_syntax::{
     binop_spelling, is_array_elem, is_dict_key, is_error, is_none_inner, is_set_elem, is_str_repr,
-    type_name, Error, Span,
+    type_name, unrefined, Error, Span,
 };
 
 /// A lambda body's type with its error side filled in from a `?` the body
@@ -83,6 +83,9 @@ pub(crate) fn mangle_type(ty: &Type) -> String {
         // so instance names generated before and after this split agree.
         Type::TypeVar(v) => format!("{}{v}", TYPEVAR.replace('$', "_")),
         Type::Array(e) => format!("arr_{}", mangle_type(e)),
+        // A refinement shares its base's layout, so a synthetic type holding
+        // one is the synthetic type holding the base.
+        Type::Without(base, _) => mangle_type(base),
         Type::Optional(e) => format!("opt_{}", mangle_type(e)),
         Type::Set(e, o) => format!("{}_{}", set_mangle(*o), mangle_type(e)),
         Type::Dict(k, v) => format!("dict_{}_{}", mangle_type(k), mangle_type(v)),
@@ -1636,6 +1639,21 @@ impl Cx<'_> {
             // An array element may additionally be a set or a dict, which an
             // optional core and a dict value may not — see `check_array_elem_ty`.
             Type::Array(inner) => self.check_array_elem_ty(inner, type_params, ctx),
+            // `T without X`: the base is a type in its own right, and the
+            // exclusion has to be a value the base could hold — `[]` excludes
+            // something only from an array. A type parameter is let through as
+            // it is for `Case<V>`: whether it lands on an array is settled at
+            // instantiation.
+            Type::Without(base, exclusion) => {
+                self.check_ty(base, type_params, ctx)?;
+                match (exclusion, aipl_syntax::unrefined(base)) {
+                    (Exclusion::EmptyArray, Type::Array(_) | Type::TypeVar(_)) => Ok(()),
+                    (Exclusion::EmptyArray, other) => Err(Error::msg(format!(
+                        "{ctx}: `without []` excludes the empty array, and {} is not an array type",
+                        tyname(other)
+                    ))),
+                }
+            }
             // Optional core types: a scalar, `str`, a nested array, or an
             // optional (`T??`) — never a struct.
             Type::Optional(inner) => self.check_elem_ty(inner, type_params, ctx),
@@ -1864,6 +1882,12 @@ impl Cx<'_> {
             Type::Any | Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg => Ok(()),
             // A concat-str has the `str` runtime representation.
             Type::ConcatStr => Ok(()),
+            // A refined element is its base laid out in the slot — `check_ty`
+            // is what validates the refinement itself.
+            Type::Without(base, _) => {
+                self.check_ty(t, type_params, ctx)?;
+                self.check_elem_ty(base, type_params, ctx)
+            }
             Type::Named(n) => {
                 if type_params.iter().any(|tp| tp == n)
                     || self.has_struct(n)
@@ -2197,7 +2221,10 @@ impl Cx<'_> {
                 return Ok(Type::Tuple(tys));
             }
         }
-        self.check_expr(scrut, env, effects)
+        // A refined scrutinee is matched as its base: the patterns an array
+        // takes are the patterns a non-empty array takes.
+        let st = self.check_expr(scrut, env, effects)?;
+        Ok(unrefined(&st).clone())
     }
 
     /// Type a nested pattern against `ty`: the binders it introduces, each with
@@ -2706,8 +2733,10 @@ impl Cx<'_> {
     /// the `recv[span]` Span-index sugar): a `str` slices to `str`, an array
     /// (including `char[]`) to its own type.
     fn slice_receiver_ty(&self, ot: &Type, span: Span) -> Result<Type, Error> {
-        match ot {
-            Type::Primitive(Primitive::Str) | Type::Array(_) => Ok(ot.clone()),
+        // A slice of a non-empty array may well be empty, so the refinement
+        // does not survive slicing: the result is the base type.
+        match unrefined(ot) {
+            Type::Primitive(Primitive::Str) | Type::Array(_) => Ok(unrefined(ot).clone()),
             other => Err(Error::at(
                 format!("cannot slice a value of type {}", tyname(other)),
                 span,
@@ -3049,7 +3078,7 @@ impl Cx<'_> {
             }
             ExprKind::For(_var, iter, body) => {
                 let it = self.check_expr(iter, env, effects)?;
-                let elem = match &it {
+                let elem = match unrefined(&it) {
                     // A set shares the array heap block (see `is_heap` in
                     // `aipl-codegen`), so iterating one is iterating its
                     // elements. No order is promised: a set is unordered, and the
@@ -3210,7 +3239,7 @@ impl Cx<'_> {
                     return self.slice_receiver_ty(&ot, obj.span.clone());
                 }
                 expect_len_operand(&it, "array index", idx.span.clone())?;
-                let elem = match ot {
+                let elem = match unrefined(&ot).clone() {
                     Type::Array(inner) => *inner,
                     // `s[i]` on a `str` is the byte at `i` as a `char?`.
                     Type::Primitive(Primitive::Str) => Type::Primitive(Primitive::Char),
@@ -3773,7 +3802,7 @@ impl Cx<'_> {
                     args[0].span.clone(),
                 ));
             }
-            if let Type::Array(inner) = &t {
+            if let Type::Array(inner) = unrefined(&t) {
                 if is_set_elem(inner) || is_abstract_scalar_ty(inner, &[]) || is_typevar(inner) {
                     return Ok(Type::Set(
                         inner.clone(),
@@ -3894,7 +3923,8 @@ impl Cx<'_> {
             let pat = self.check_expr(&args[1], env, effects)?;
             // The variadic sequence type per receiver: `str` for a string,
             // `T[]` for an array (its own type).
-            let seq = if is_str_repr(&recv) {
+            let recv = unrefined(&recv);
+            let seq = if is_str_repr(recv) {
                 Some(Type::Primitive(Primitive::Str))
             } else if matches!(recv, Type::Array(_)) {
                 Some(recv.clone())
@@ -4798,6 +4828,13 @@ fn shape_fits(pty: &Type, aty: &Type) -> bool {
     {
         return true;
     }
+    // A refined parameter is the one shape only a refined argument fits: the
+    // refinement is the whole point of declaring it. Every other parameter
+    // shape sees a refined argument as its base, which is what it is at runtime.
+    if let Type::Without(_, px) = pty {
+        return matches!(aty, Type::Without(_, ax) if ax == px);
+    }
+    let aty = unrefined(aty);
     match pty {
         // An array parameter accepts the whole container family, not just an
         // array. `str` and `char[]` share a representation, so a string receiver
@@ -4831,6 +4868,7 @@ fn shape_fits(pty: &Type, aty: &Type) -> bool {
 /// is free to choose.
 fn shape_name(pty: &Type) -> &'static str {
     match pty {
+        Type::Without(_, Exclusion::EmptyArray) => "a non-empty array (a `T[] without []`)",
         Type::Array(_) => "an array",
         Type::Optional(_) => "an optional",
         Type::Set(..) => "a set",
@@ -4920,7 +4958,9 @@ fn is_context_typed(t: &Type) -> bool {
     match t {
         Type::Any | Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg => true,
         Type::Case(v) => is_context_typed(v),
-        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => is_context_typed(i),
+        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) | Type::Without(i, _) => {
+            is_context_typed(i)
+        }
         Type::Dict(k, v) => is_context_typed(k) || is_context_typed(v),
         Type::Result(a, b) => is_context_typed(a) || is_context_typed(b),
         Type::Fn(ps, r) => ps.iter().any(is_context_typed) || is_context_typed(r),
@@ -4971,7 +5011,9 @@ fn mentions_typevar(t: &Type) -> bool {
     match t {
         Type::TypeVar(_) => true,
         Type::Case(v) => mentions_typevar(v),
-        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => mentions_typevar(i),
+        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) | Type::Without(i, _) => {
+            mentions_typevar(i)
+        }
         Type::Dict(k, v) => mentions_typevar(k) || mentions_typevar(v),
         Type::Result(a, b) => mentions_typevar(a) || mentions_typevar(b),
         Type::Fn(ps, r) => ps.iter().any(mentions_typevar) || mentions_typevar(r),
@@ -5020,6 +5062,7 @@ fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
         | Type::NoneLiteralArg
         | Type::ConcatStr => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_typevars(inner, type_params))),
+        Type::Without(base, x) => Type::Without(Box::new(subst_typevars(base, type_params)), *x),
         Type::Set(inner, o) => Type::Set(Box::new(subst_typevars(inner, type_params)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(subst_typevars(k, type_params)),
@@ -5074,6 +5117,11 @@ fn tyname(t: &Type) -> String {
         // generic instance (`Token$AiplTok`) carries internal mangling — render
         // it back to source-like form for diagnostics.
         Type::Named(n) => aipl_syntax::demangle_named(n),
+        // The type of a bare `none` / `[]` is the literal: naming the placeholder
+        // element (`__none__[]`) would send the reader looking for a type they
+        // never wrote.
+        Type::Optional(inner) if is_none_inner(inner) => "none".to_string(),
+        Type::Array(inner) if is_none_inner(inner) => "[]".to_string(),
         Type::Optional(inner) => format!("{}?", tyname(inner)),
         Type::Array(inner) => format!("{}[]", tyname(inner)),
         Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), tyname(inner)),
@@ -5173,6 +5221,18 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
     // e.g. `some(some(none))` (`__none__???`) fits `i64???`.
     if is_none_inner(actual) || is_none_inner(expected) {
         return Ok(());
+    }
+    // A refinement (`T[] without []`) is its base at runtime, so a refined value
+    // goes wherever the base does. The other direction is where the refinement
+    // *means* something, and there is no coercion into it: the value has to be
+    // shown not to be the excluded one, which only a literal (`flex_fit`) or a
+    // runtime test (`ensure_nonempty`) does. Two refinements agree when they
+    // exclude the same thing from bases that coerce.
+    match (actual, expected) {
+        (Type::Without(a, xa), Type::Without(e, xe)) if xa == xe => return coerce(a, e),
+        (Type::Without(a, _), _) => return coerce(a, expected),
+        (_, Type::Without(..)) => return Err(()),
+        _ => {}
     }
     // `Error` is `str` under the hood (for now), so the two coerce freely either
     // way: a string error message makes an `Error`, and an `Error` is usable
@@ -5320,6 +5380,13 @@ fn merge(a: Type, b: Type) -> Type {
         (Type::Array(x), Type::Array(y)) => {
             Type::Array(Box::new(merge((**x).clone(), (**y).clone())))
         }
+        // Two arms that both exclude the same value still do; one that does
+        // not leaves the branch at the base type.
+        (Type::Without(x, xa), Type::Without(y, xb)) if xa == xb => {
+            Type::Without(Box::new(merge((**x).clone(), (**y).clone())), *xa)
+        }
+        (Type::Without(x, _), _) => merge((**x).clone(), b),
+        (_, Type::Without(y, _)) => merge(a, (**y).clone()),
         (Type::Set(x, ox), Type::Set(y, oy)) => Type::Set(
             Box::new(merge((**x).clone(), (**y).clone())),
             // The empty literal and the context placeholder have no order of
@@ -5414,6 +5481,10 @@ pub(crate) fn collect_var_bindings(
         (Type::TypeVar(v), a) if vars.contains(v.as_str()) => {
             map.entry(v.clone()).or_insert_with(|| a.clone());
         }
+        // A refinement carries no variables of its own: `T[] without []` pins
+        // `T` exactly as `T[]` does, from either side.
+        (Type::Without(p, _), a) => collect_var_bindings(p, a, vars, map),
+        (p, Type::Without(a, _)) => collect_var_bindings(p, a, vars, map),
         (Type::Case(p), Type::Case(a)) => collect_var_bindings(p, a, vars, map),
         // A bare `none`/empty `[]` argument carries no element type (`__none__`),
         // so it can't pin the variable — leave it for another argument to fix.
@@ -5487,6 +5558,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Ty
         | Type::NoneLiteralArg
         | Type::ConcatStr => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_vars(inner, map, vars))),
+        Type::Without(base, x) => Type::Without(Box::new(subst_vars(base, map, vars)), *x),
         Type::Set(inner, o) => Type::Set(Box::new(subst_vars(inner, map, vars)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(subst_vars(k, map, vars)),

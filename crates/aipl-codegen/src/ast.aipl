@@ -57,7 +57,7 @@ import {
 } from "./parsed.aipl";
 import { Pat as PatNode } from "./pat.aipl";
 import { Suffix as SuffixNode, Try } from "./suffix.aipl";
-import { Ty as TyNode, Unit } from "./ty.aipl";
+import { Exclusion as ExclusionNode, Ty as TyNode, Unit } from "./ty.aipl";
 
 # The one type every `build` in `grammar_aipl.aipl` returns, whatever the
 # production is about — `Build<A>` pins a single `A` for a whole grammar, so a
@@ -75,6 +75,7 @@ import { Ty as TyNode, Unit } from "./ty.aipl";
 variant Ast =
     | Ty(TyNode)
     | Tys(TyNode[])
+    | Exclusion(ExclusionNode)
     | Pat(PatNode)
     | Payload(PatNode[], bool)
     | Expr(ExprNode)
@@ -112,6 +113,7 @@ pub fn ast_case_name(self: Ast) -> str {
     match (self) {
         Ty(..) => "a type",
         Tys(..) => "a list of types",
+        Exclusion(..) => "a `without` exclusion",
         Pat(..) => "a pattern",
         Payload(..) => "a constructor payload",
         Expr(..) => "an expression",
@@ -154,10 +156,10 @@ deallocations: 3
 reallocations: 0
 bytes allocated: 240
 instructions executed: 162
-binary size: 5624
-  code: 2720
+binary size: 5712
+  code: 2788
   data: 221
-  metadata: 2683
+  metadata: 2703
 functions:
   __rec_drop___m2__Expr:
     calls: 1
@@ -167,7 +169,7 @@ functions:
     bytes: 1260
   __rec_drop___m5__Ty:
     calls: 1
-    bytes: 408
+    bytes: 476
   __test$ast_case_name:
     calls: 1
     bytes: 900

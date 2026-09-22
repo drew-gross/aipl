@@ -922,7 +922,35 @@
           </h3>
           <pre class="signature"><code>fn ty(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p>A type. Handles the three shapes the grammar allows at this level: a bare <code>!E</code> void-ok result, a parenthesized function/tuple type, and a base type optionally followed by <code>!E</code>.</p></div>
+          <div class="doc"><p>A type. Handles the three shapes the grammar allows at this level: a bare <code>!E</code> void-ok result, a parenthesized function/tuple type, and a base type optionally followed by <code>!E</code> — any of which may then be refined by a trailing <code>without ..</code> clause.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-ty_head">
+          <h3>
+            <a class="anchor" href="#item-ty_head">ty_head</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn ty_head(self: W) -&#62; WDoc!FmtError</code></pre>
+
+          <div class="doc"><p>A type before any <code>without</code> clause — see <code>ty</code>.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-exclusion">
+          <h3>
+            <a class="anchor" href="#item-exclusion">exclusion</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn exclusion(self: W) -&#62; WDoc!FmtError</code></pre>
+
+          <div class="doc"><p>What a <code>without</code> clause excludes. The one value the grammar knows today is the empty array, <code>[]</code>, written against itself.</p></div>
 
 
         </section>
@@ -1466,7 +1494,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$53420: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$54087: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 

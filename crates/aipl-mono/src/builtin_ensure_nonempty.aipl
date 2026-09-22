@@ -1,0 +1,72 @@
+import { assume_nonempty, equal as ==, is_nonempty, is_some, nonempty_first } from builtins;
+
+// The AIPL implementation of the `ensure_nonempty` builtin (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`): the runtime road into `T[] without []`.
+// A literal with an element in it takes the refined type on sight; every
+// other array has to be tested, and this is where the test lives.
+//
+// `assume_nonempty` is the internal builtin that grants the refinement without
+// a test, and the `is_nonempty` guard here is what makes granting it sound.
+// The checker erases both the refinement and the call once it has verified the
+// program, so the whole thing costs one length check and no copy.
+# `some(self)` as a `T[] without []` when the array has an element, `none` when
+# it is empty. How an array of unknown length becomes one `nonempty_first` /
+# `nonempty_last` accept: `match (xs.ensure_nonempty()) { some(ne) => .., none
+# => .. }`.
+pub fn ensure_nonempty<T: any>(self: T[]) -> (T[] without [])? {
+    if (self.is_nonempty()) { some(self.assume_nonempty()) } else { none }
+}.test({
+    assert([1, 2].ensure_nonempty().is_some());
+    assert(ensure_nonempty(["a"]).is_some()); // free-call form
+    let e: i64[] = [];
+    assert(e.ensure_nonempty() == none);
+    // The refined array is the same array.
+    match ([7, 8].ensure_nonempty()) {
+        some(ne) => assert(ne.nonempty_first() == 7),
+        none => assert(false),
+    };
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 56
+instructions executed: 253
+binary size: 3632
+  code: 1460
+  data: 363
+  metadata: 1809
+functions:
+  __builtin_nonempty_first$i64:
+    calls: 0
+    bytes: 32
+  __builtin_nonempty_first$i64$tail:
+    calls: 1
+    bytes: 288
+  __test$ensure_nonempty:
+    calls: 1
+    bytes: 1020
+  aipl_arr_inc:
+    calls: 4
+    bytes: (external)
+  aipl_array_dec:
+    calls: 6
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_assert:
+    calls: 4
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 120

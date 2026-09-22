@@ -1,0 +1,80 @@
+import { equal as == } from builtins;
+
+// The AIPL implementation of the `nonempty_first` builtin (see
+// `AIPL_BUILTIN_SOURCES` in `lib.rs`); `first` for an array the type system
+// knows is not empty.
+//
+// A refined array is a plain array at runtime, so indexing it still yields an
+// optional, and the `none` arm has to be written even though the type says it
+// cannot be taken. It recurses: there is no value of `T` to invent, and a call
+// that can never happen is the honest spelling of "unreachable" until the
+// language has one. (The loader resolves the call to the canonical name when
+// this file is loaded as the builtin — see `flatten`'s pass 1.)
+# The first element of a non-empty array — the element itself, not a `T?`,
+# because a `T[] without []` has one. `first` is the same question for an
+# array that may be empty.
+pub fn nonempty_first<T: any>(self: T[] without []) -> T {
+    match (self[0]) {
+        some(v) => v,
+        none => self.nonempty_first(),
+    }
+}.test({
+    let xs: i64[] without [] = [1, 2, 3];
+    assert(xs.nonempty_first() == 1);
+    assert(nonempty_first(xs) == 1); // free-call form
+    let one: str[] without [] = ["only"];
+    assert(one.nonempty_first() == "only");
+    // The literal itself carries the refinement.
+    let cs: char[] without [] = ['a', 'b'];
+    assert(cs.nonempty_first() == 'a');
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 56
+instructions executed: 298
+binary size: 3736
+  code: 1608
+  data: 277
+  metadata: 1851
+functions:
+  __test$nonempty_first:
+    calls: 1
+    bytes: 544
+  aipl_array_dec:
+    calls: 3
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_assert:
+    calls: 4
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 116
+  nonempty_first$char:
+    calls: 0
+    bytes: 40
+  nonempty_first$char$tail:
+    calls: 1
+    bytes: 164
+  nonempty_first$i64:
+    calls: 0
+    bytes: 32
+  nonempty_first$i64$tail:
+    calls: 2
+    bytes: 288
+  nonempty_first$str:
+    calls: 1
+    bytes: 424

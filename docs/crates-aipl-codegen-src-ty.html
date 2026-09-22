@@ -101,7 +101,49 @@
 
             </li>
 
+            <li id="item-Without"><code>Without(Ty, Exclusion)</code>
+
+
+            </li>
+
           </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-Exclusion">
+          <h3>
+            <a class="anchor" href="#item-Exclusion">Exclusion</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Exclusion</code></pre>
+
+          <div class="doc"><p>What a <code>T without X</code> type leaves out — the <code>X</code>. One case per value the checker knows how to exclude; today that is the empty array literal, <code>[]</code>.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-EmptyArray"><code>EmptyArray</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-show_exclusion">
+          <h3>
+            <a class="anchor" href="#item-show_exclusion">show_exclusion</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn show_exclusion(self: Exclusion) -&#62; str</code></pre>
+
+          <div class="doc"><p>The excluded value as the user writes it after <code>without</code>.</p></div>
+
 
         </section>
 

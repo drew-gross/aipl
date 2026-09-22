@@ -1,0 +1,135 @@
+import {
+    ensure_nonempty,
+    equal as ==,
+    first,
+    len,
+    map,
+    nonempty_first,
+    nonempty_last,
+    print,
+    to_str,
+    value_or,
+} from builtins;
+
+// `T[] without []` — an array the type system knows is not empty.
+//
+// At runtime it is a `T[]`: the same block, so a refined array goes anywhere
+// an array does. The refinement buys `nonempty_first`/`nonempty_last`, which
+// hand back the element rather than a `T?`. There are two ways in: a literal
+// with an element in it takes the refined type on sight, and
+// `ensure_nonempty` tests any other array at runtime.
+fn main() !prints {
+    let xs: i64[] without [] = [3, 1, 2];
+    print(xs.nonempty_first().to_str());
+    print(xs.nonempty_last().to_str());
+    print(head(xs).to_str());
+    print(one().nonempty_last().to_str());
+
+    // A refined array is an ordinary array everywhere one is wanted: passed
+    // to a `T[]` parameter, indexed, walked, measured, compared.
+    print(describe(xs));
+    print(xs.first().to_str());
+    print(xs[1].to_str());
+    print(xs.len().to_str());
+    for (let x : xs) {
+        print(x.to_str());
+    }
+    print((xs == [3, 1, 2]).to_str());
+
+    // `ensure_nonempty` is the runtime road in.
+    print(last_or(["b", "a"], "empty"));
+    let none_of_them: str[] = [];
+    print(last_or(none_of_them, "empty"));
+}
+
+fn head(ne: i64[] without []) -> i64 { ne.nonempty_first() }
+
+// A literal with an element in it is visibly not `[]`, so it returns as the
+// refined type without any test.
+fn one() -> i64[] without [] { [1] }
+
+fn describe(ys: i64[]) -> str { `{ys.len()} elements` }
+
+fn last_or(names: str[], fallback: str) -> str {
+    names.ensure_nonempty().map(nonempty_last).value_or(fallback)
+}
+--- stdout ---
+3
+2
+3
+1
+3 elements
+some(3)
+some(1)
+3
+3
+1
+2
+true
+a
+empty
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 0
+bytes allocated: 387
+instructions executed: 1091
+binary size: 7528
+  code: 4064
+  data: 247
+  metadata: 3217
+functions:
+  __builtin_nonempty_first$i64:
+    calls: 0
+    bytes: 32
+  __builtin_nonempty_first$i64$tail:
+    calls: 2
+    bytes: 288
+  __builtin_nonempty_last$i64:
+    calls: 0
+    bytes: 32
+  __builtin_nonempty_last$i64$tail:
+    calls: 2
+    bytes: 284
+  __builtin_nonempty_last$str:
+    calls: 1
+    bytes: 432
+  __eq_i64$arr:
+    calls: 1
+    bytes: 296
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_i64:
+    calls: 7
+    bytes: 204
+  __to_str_i64$opt:
+    calls: 2
+    bytes: 388
+  __to_str_u64:
+    calls: 2
+    bytes: 204
+  aipl_array_dec:
+    calls: 5
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_i64_len:
+    calls: 18
+    bytes: (external)
+  aipl_u64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 5
+    bytes: (external)
+  aipl_write_i64:
+    calls: 9
+    bytes: (external)
+  aipl_write_u64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1672

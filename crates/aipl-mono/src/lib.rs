@@ -536,7 +536,11 @@ pub(crate) fn tuple_template_vars(name: &str) -> Vec<TypeParam> {
 fn ty_has_var(t: &Type) -> bool {
     match t {
         Type::TypeVar(_) => true,
-        Type::Case(i) | Type::Optional(i) | Type::Array(i) | Type::Set(i, _) => ty_has_var(i),
+        Type::Case(i)
+        | Type::Optional(i)
+        | Type::Array(i)
+        | Type::Set(i, _)
+        | Type::Without(i, _) => ty_has_var(i),
         Type::Dict(a, b) | Type::Result(a, b) => ty_has_var(a) || ty_has_var(b),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(ty_has_var),
         Type::Fn(ps, r) => ps.iter().any(ty_has_var) || ty_has_var(r),
@@ -603,6 +607,7 @@ fn lt_ty(
         }
         Type::TypeVar(v) => Type::TypeVar(v.clone()),
         Type::Array(inner) => Type::Array(Box::new(lt_ty(inner, fields_map, order))),
+        Type::Without(base, x) => Type::Without(Box::new(lt_ty(base, fields_map, order)), *x),
         Type::Set(inner, o) => Type::Set(Box::new(lt_ty(inner, fields_map, order)), *o),
         Type::Optional(inner) => Type::Optional(Box::new(lt_ty(inner, fields_map, order))),
         Type::Dict(k, v) => Type::Dict(
@@ -812,6 +817,7 @@ fn subst_type_params(t: &Type, map: &HashMap<String, Type>) -> Type {
         Type::Named(_) => t.clone(),
         Type::Optional(i) => Type::Optional(Box::new(subst_type_params(i, map))),
         Type::Array(i) => Type::Array(Box::new(subst_type_params(i, map))),
+        Type::Without(b, x) => Type::Without(Box::new(subst_type_params(b, map)), *x),
         Type::Set(i, o) => Type::Set(Box::new(subst_type_params(i, map)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(subst_type_params(k, map)),
@@ -7061,6 +7067,9 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::CountIsNotEqual, "builtin_count_is_not_equal.aipl"),
     (Callee::First, "builtin_first.aipl"),
     (Callee::Last, "builtin_last.aipl"),
+    (Callee::NonemptyFirst, "builtin_nonempty_first.aipl"),
+    (Callee::NonemptyLast, "builtin_nonempty_last.aipl"),
+    (Callee::EnsureNonempty, "builtin_ensure_nonempty.aipl"),
     (Callee::DropFirst, "builtin_drop_first.aipl"),
     (Callee::DropLast, "builtin_drop_last.aipl"),
     (Callee::DropN, "builtin_drop_n.aipl"),
@@ -7103,6 +7112,20 @@ fn load_aipl_builtin_fn(src: &str) -> (Function, Vec<StructDecl>) {
     }
     let func = func.expect("an AIPL-implemented builtin source declares its builtin as pub fn");
     (func, templates)
+}
+
+/// `f` with its refinements erased — [`aipl_syntax::erase_refinements`] for a
+/// single function, which is the unit a builtin source is loaded as.
+fn erased_fn(f: &Function) -> Function {
+    let mut program = Program {
+        items: vec![Item::Fn(f.clone())],
+        sources: Vec::new(),
+    };
+    aipl_syntax::erase_refinements(&mut program);
+    match program.items.pop() {
+        Some(Item::Fn(f)) => f,
+        _ => unreachable!("erasure rewrites types, not items"),
+    }
 }
 
 /// One [`AIPL_BUILTIN_SOURCES`] entry, loaded on first use: the generic
@@ -7150,7 +7173,13 @@ fn aipl_builtin(canonical: &str) -> Option<&'static AiplBuiltin> {
         let src = std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("AIPL builtin source {path:?}: {e}"));
         let (f, templates) = load_aipl_builtin_fn(&src);
-        let generic = normalize(&f).expect("AIPL-implemented builtin signatures normalize");
+        // The template mono specializes is a post-checker artifact, so it takes
+        // the same erasure the user's program gets after `check` (see
+        // `erase_refinements`): a `T[] without []` parameter is a `T[]` to it.
+        // The declaration handed to the checker keeps the refinement — that is
+        // where `nonempty_first` refusing a plain array comes from.
+        let generic =
+            normalize(&erased_fn(&f)).expect("AIPL-implemented builtin signatures normalize");
         let mut decl = f;
         decl.name = canonical.to_string();
         decl.test_body = None;
@@ -7731,6 +7760,10 @@ fn normalize_param_ty(
         Type::Array(inner) => Ok(Type::Array(Box::new(normalize_inner(
             inner, type_vars, counter,
         )))),
+        Type::Without(base, x) => Ok(Type::Without(
+            Box::new(normalize_param_ty(base, type_vars, counter, fname)?),
+            *x,
+        )),
         Type::Set(inner, o) => Ok(Type::Set(
             Box::new(normalize_inner(inner, type_vars, counter)),
             *o,
@@ -7794,6 +7827,9 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
             Type::Optional(Box::new(normalize_inner(inner, type_vars, counter)))
         }
         Type::Array(inner) => Type::Array(Box::new(normalize_inner(inner, type_vars, counter))),
+        Type::Without(base, x) => {
+            Type::Without(Box::new(normalize_inner(base, type_vars, counter)), *x)
+        }
         Type::Set(inner, o) => Type::Set(Box::new(normalize_inner(inner, type_vars, counter)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(normalize_inner(k, type_vars, counter)),
@@ -7973,6 +8009,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
                 Type::Array(Box::new(i))
             }
         }
+        Type::Without(base, x) => Type::Without(Box::new(subst_vars(base, map)), *x),
         Type::Set(inner, o) => Type::Set(Box::new(subst_vars(inner, map)), *o),
         Type::Dict(k, v) => Type::Dict(Box::new(subst_vars(k, map)), Box::new(subst_vars(v, map))),
         Type::Result(ok, err) => {
@@ -8019,9 +8056,10 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
         // not the type parameter `T`.
         Type::TypeVar(n) => n == name,
         Type::Named(_) => false,
-        Type::Optional(inner) | Type::Array(inner) | Type::Set(inner, _) => {
-            ty_mentions(inner, name)
-        }
+        Type::Optional(inner)
+        | Type::Array(inner)
+        | Type::Set(inner, _)
+        | Type::Without(inner, _) => ty_mentions(inner, name),
         Type::Dict(k, v) => ty_mentions(k, name) || ty_mentions(v, name),
         Type::Result(ok, err) => ty_mentions(ok, name) || ty_mentions(err, name),
         Type::Fn(ps, ret) => ps.iter().any(|p| ty_mentions(p, name)) || ty_mentions(ret, name),
@@ -8045,9 +8083,10 @@ fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
         | Type::ConcatStr => false,
         Type::TypeVar(v) => vars.contains(v.as_str()),
         Type::Named(_) => false,
-        Type::Optional(inner) | Type::Array(inner) | Type::Set(inner, _) => {
-            ty_contains_var(inner, vars)
-        }
+        Type::Optional(inner)
+        | Type::Array(inner)
+        | Type::Set(inner, _)
+        | Type::Without(inner, _) => ty_contains_var(inner, vars),
         Type::Dict(k, v) => ty_contains_var(k, vars) || ty_contains_var(v, vars),
         Type::Result(ok, err) => ty_contains_var(ok, vars) || ty_contains_var(err, vars),
         Type::Fn(ps, ret) => {
@@ -8631,7 +8670,9 @@ fn mentions_abstract_type(ty: &Type) -> bool {
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
         | Type::ConcatStr => true,
-        Type::Optional(t) | Type::Array(t) | Type::Set(t, _) => mentions_abstract_type(t),
+        Type::Optional(t) | Type::Array(t) | Type::Set(t, _) | Type::Without(t, _) => {
+            mentions_abstract_type(t)
+        }
         Type::Dict(k, v) | Type::Result(k, v) => {
             mentions_abstract_type(k) || mentions_abstract_type(v)
         }

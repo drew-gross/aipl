@@ -85,6 +85,7 @@ pub enum LexedTokenKind {
     If,
     Else,
     Builtins,
+    Without,
     EqEq,
     Ne,
     Arrow,
@@ -526,7 +527,8 @@ fn classify_lexed(k: &LexedTokenKind) -> TokenKind {
         | K::Match
         | K::Return
         | K::Shim
-        | K::Builtins => TokenKind::Keyword,
+        | K::Builtins
+        | K::Without => TokenKind::Keyword,
         K::True | K::False | K::None => TokenKind::Constant,
         K::Name(s) => match s.as_str() {
             "bool" | "char" | "str" | "any" => TokenKind::BuiltinType,

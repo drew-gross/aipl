@@ -388,7 +388,20 @@ impl Loader {
                     Item::Variant(v) => (v.name.clone(), true),
                     Item::Import(_) => unreachable!("imports stripped during load"),
                 };
-                let mangled = mangle(is_root, file.index, &name);
+                // Loaded as the builtin it implements (`load_builtin_impl_str`),
+                // the file's `pub fn` *is* `__builtin_<name>`: mono registers it
+                // under that name, so a reference to it from inside the file — a
+                // recursive call, the one shape a builtin body has for an arm the
+                // type system rules out — has to resolve to it. On disk under
+                // `aipl check` the same function is a local item and resolves as
+                // one, tests included.
+                let canonical = match item {
+                    Item::Fn(f) if self.builtin_impl && f.is_pub => {
+                        Callee::importable(&name).map(|c| c.name().to_string())
+                    }
+                    _ => None,
+                };
+                let mangled = canonical.unwrap_or_else(|| mangle(is_root, file.index, &name));
                 if view.insert(name.clone(), mangled).is_some() {
                     return Err(Error::msg(format!(
                         "{}: duplicate top-level item \"{name}\"",
@@ -998,6 +1011,7 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
         }
         Type::Optional(inner) => Type::Optional(Box::new(rewrite_type(inner, view, type_vars))),
         Type::Array(inner) => Type::Array(Box::new(rewrite_type(inner, view, type_vars))),
+        Type::Without(base, x) => Type::Without(Box::new(rewrite_type(base, view, type_vars)), *x),
         Type::Set(inner, o) => Type::Set(Box::new(rewrite_type(inner, view, type_vars)), *o),
         Type::Dict(k, v) => Type::Dict(
             Box::new(rewrite_type(k, view, type_vars)),
