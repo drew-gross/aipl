@@ -717,14 +717,10 @@ variant Tok = Num(str) | Name(str) | Punct
 
 variant Node = Leaf(str) | List(Node[])
 
-# The trivial lowering every fixture production passes: `Build` has no
-# payload-free arm to mean "nothing to lower".
-fn keep(kids: Node[]) -> Node { List(kids) }
-
 fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> {
     name,
     rule,
-    build: Kids(keep),
+    build: Kids(List),
     layout: Inline,
 }
 
@@ -762,10 +758,10 @@ deallocations: 1579
 reallocations: 352
 bytes allocated: 184735
 instructions executed: 243902
-binary size: 168120
-  code: 111012
+binary size: 179984
+  code: 117268
   data: 4004
-  metadata: 53104
+  metadata: 58712
 functions:
   __arr_drop_First$Tok:
     calls: 37
@@ -887,9 +883,135 @@ functions:
   __test$ebnf:
     calls: 1
     bytes: 13712
+  __test$ebnf$lambda0:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda1:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda10:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda11:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda12:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda13:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda14:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda15:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda16:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda17:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda18:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda19:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda2:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda20:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda21:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda22:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda23:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda24:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda25:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda26:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda27:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda28:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda29:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda3:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda30:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda31:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda4:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda5:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda6:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda7:
+    calls: 0
+    bytes: 112
+  __test$ebnf$lambda8:
+    calls: 0
+    bytes: 96
+  __test$ebnf$lambda9:
+    calls: 0
+    bytes: 112
   __test$first_sets:
     calls: 1
     bytes: 4904
+  __test$first_sets$lambda0:
+    calls: 0
+    bytes: 96
+  __test$first_sets$lambda1:
+    calls: 0
+    bytes: 112
+  __test$first_sets$lambda2:
+    calls: 0
+    bytes: 96
+  __test$first_sets$lambda3:
+    calls: 0
+    bytes: 112
+  __test$first_sets$lambda4:
+    calls: 0
+    bytes: 96
+  __test$first_sets$lambda5:
+    calls: 0
+    bytes: 112
+  __test$first_sets$lambda6:
+    calls: 0
+    bytes: 96
+  __test$first_sets$lambda7:
+    calls: 0
+    bytes: 112
+  __test$first_sets$lambda8:
+    calls: 0
+    bytes: 96
+  __test$first_sets$lambda9:
+    calls: 0
+    bytes: 112
   __test$rule_first:
     calls: 1
     bytes: 5036
@@ -1013,9 +1135,66 @@ functions:
   fixture:
     calls: 2
     bytes: 5352
-  keep:
+  fixture$lambda0:
+    calls: 0
+    bytes: 96
+  fixture$lambda1:
+    calls: 0
+    bytes: 96
+  fixture$lambda10:
+    calls: 0
+    bytes: 96
+  fixture$lambda11:
     calls: 0
     bytes: 112
+  fixture$lambda12:
+    calls: 0
+    bytes: 96
+  fixture$lambda13:
+    calls: 0
+    bytes: 112
+  fixture$lambda14:
+    calls: 0
+    bytes: 96
+  fixture$lambda15:
+    calls: 0
+    bytes: 112
+  fixture$lambda16:
+    calls: 0
+    bytes: 96
+  fixture$lambda17:
+    calls: 0
+    bytes: 112
+  fixture$lambda18:
+    calls: 0
+    bytes: 96
+  fixture$lambda19:
+    calls: 0
+    bytes: 112
+  fixture$lambda2:
+    calls: 0
+    bytes: 96
+  fixture$lambda3:
+    calls: 0
+    bytes: 96
+  fixture$lambda4:
+    calls: 0
+    bytes: 96
+  fixture$lambda5:
+    calls: 0
+    bytes: 96
+  fixture$lambda6:
+    calls: 0
+    bytes: 96
+  fixture$lambda7:
+    calls: 0
+    bytes: 96
+  fixture$lambda8:
+    calls: 0
+    bytes: 96
+  fixture$lambda9:
+    calls: 0
+    bytes: 96
   linked_first_sets$Tok$Node:
     calls: 6
     bytes: 996

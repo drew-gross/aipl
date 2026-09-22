@@ -574,7 +574,7 @@ fn items() -> Production<AiplTok, Ast>[] {
         pl("item", item, "an item", TryMk(lower_item)),
         p("import_decl", import_decl, TryMk(lower_import_decl)),
         pl("import_name", import_name, "an import name", TryMk(lower_import_name)),
-        p("operator", operator, Text(lower_operator)),
+        p("operator", operator, Text(AName)),
         p("function", function, TryMk(lower_function)),
         pl("effect", effect, "an effect", Mk(lower_effect)),
         p("type_params", type_params, TryMk(lower_type_params)),
@@ -2544,8 +2544,6 @@ fn lower_import_name(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     let name = toks[0].value_or("");
     ok(AImportName(ImportName { name, alias: none, span: name_span }))
 }
-
-fn lower_operator(text: str) -> Ast { AName(text) }
 
 fn lower_effect(src: str, node: Cst, kids: Ast[]) -> Ast {
     AName(node.own_texts(src)[1].value_or(""))
@@ -5864,6 +5862,9 @@ functions:
   items:
     calls: 354
     bytes: 116272
+  items$lambda0:
+    calls: 2
+    bytes: 192
   join_spans:
     calls: 101
     bytes: 172
@@ -5999,9 +6000,6 @@ functions:
   lower_op_value:
     calls: 1
     bytes: 1716
-  lower_operator:
-    calls: 2
-    bytes: 192
   lower_param:
     calls: 18
     bytes: 29744

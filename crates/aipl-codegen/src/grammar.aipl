@@ -244,27 +244,35 @@ variant Refusal = Msg(str) | Fn((str) -> str)
 # How a production's matched node becomes a value of the caller's AST type `A`.
 #
 # Four shapes, by what the lowering reads — the whole node, its children, its
-# one child, or its text — each in a total form and a `Try` form that can refuse
-# with a `ParseError` the driver passes straight through (a literal that
-# overflows, a duplicate key). A lowering is declared with exactly what it uses
-# and the failure it can have: a total one returns its `A` bare, so no `ok(..)`
-# wraps a value that could not be anything else.
+# one child, or its text. All but `Kid` come in a total form and a `Try` form
+# that can refuse with a `ParseError` the driver passes straight through (a
+# literal that overflows, a duplicate key); `Kid` hands its child back
+# unchanged, so it has nothing to refuse. A lowering is declared with exactly
+# what it uses and the failure it can have: a total one returns its `A` bare, so
+# no `ok(..)` wraps a value that could not be anything else.
 #
 # Declaring the child *count* is what `Kid` adds over `Kids`: a production that
 # is exactly one other thing — an alternation between named productions, a
-# pass-through, a grouping — takes the child itself rather than an array it
-# would have to index. The driver refuses a node that matched any other number,
-# so the mismatch between a rule and its lowering is named once, in one place,
-# instead of in every lowering that reaches for a child that might not be there.
+# pass-through, a grouping — *is* its child, rather than a one-element array a
+# lowering would have to index. The driver refuses a node that matched any other
+# number, so the mismatch between a rule and its lowering is named once, in one
+# place, instead of in every lowering that reaches for a child that might not be
+# there.
 #
-# Every arm carries an `A` (a function returning one, or the value itself), so
-# each pins the type parameter on its own; a payload-free arm could not, which
-# is why there is no `NoLower`.
+# Every arm but `Kid` carries an `A` — a function returning one, or the value
+# itself — and so pins the type parameter on its own. `Kid` carries nothing and
+# takes `A` from where it is written: the `Production` field, the `Grammar`
+# around that, the enclosing function's return type. That search is what lets
+# `Build` have a payload-free arm at all; until it existed there was no way to
+# write one, which is why there is still no `NoLower`-style arm on anything else.
 #
 # Function values are non-capturing and non-generic (`check.rs`), so a lowering
 # is a named top-level `fn lower_x(..)`, a constructor (`Kids(Object)`), or a
 # lambda that reads only its parameters — whose types it takes from the arm's
-# payload, so `Text(|t| Bool(t == "true"))` needs no annotation. They also can't
+# payload, so `Text(|t| Bool(t == "true"))` needs no annotation. A production
+# whose value *is* its children under one case wants that constructor and
+# nothing around it — `Kids(List)`, never a `fn keep(kids) { List(kids) }`
+# wrapper, which is only the constructor spelled out longhand. They also can't
 # be compared with `==`, which is why the tests below assert on what a grammar
 # *parses*, never on a grammar value — the same constraint `lexer.aipl` lives
 # with.
@@ -281,13 +289,8 @@ variant Build<A: any> =
     | TryKids((A[]) -> A!ParseError)
     # The one child, unchanged, for a production whose rule guarantees exactly
     # one — the pass-through a production that only names alternatives wants.
-    #
-    # The one arm that carries no `A`, and so the one that cannot pin the type
-    # parameter itself: it takes it from the `Production` field it is written
-    # in, which takes it from the `Grammar` around that, which takes it from the
-    # enclosing function's return type. Nothing else in `Build` depends on that
-    # search, so if a future arm needs a lowering *function* over the one child,
-    # it carries one and pins `A` the way every other arm does.
+    # Should some grammar ever need a *function* over that child, it goes in a
+    # new arm carrying one, which pins `A` the way every other arm does.
     | Kid
     # Only the node's token text (`token_text`, the matched tokens run
     # together) — a leaf-only node whose value is its spelling.
@@ -827,11 +830,11 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     let r_item: Rule<Kind> = OneOf([Term(Atom), Named("list")]);
     let g: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "list", rule: r_list, build: Kids(keep), layout: Inline },
+            Production { name: "list", rule: r_list, build: Kids(List), layout: Inline },
             Production {
                 name: "item",
                 rule: r_item,
-                build: Kids(keep),
+                build: Kids(List),
                 expect_as: "an item",
                 layout: Inline,
             },
@@ -859,35 +862,35 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // Every rule shape carries its reference, and every one is rewritten.
     let shapes: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "a", rule: Maybe(Named("a")), build: Kids(keep), layout: Inline },
+            Production { name: "a", rule: Maybe(Named("a")), build: Kids(List), layout: Inline },
             Production {
                 name: "b",
                 rule: Many(Named("a"), sep=Literal(",")),
-                build: Kids(keep),
+                build: Kids(List),
                 layout: Inline,
             },
             Production {
                 name: "c",
                 rule: Climb(Named("a"), [Prec { power: 1, right: false, ops: ["+"] }]),
-                build: Kids(keep),
+                build: Kids(List),
                 layout: Inline,
             },
             Production {
                 name: "d",
                 rule: Many(Named("b"), min=1),
-                build: Kids(keep),
+                build: Kids(List),
                 layout: Inline,
             },
             Production {
                 name: "e",
                 rule: Then([Named("a"), Refuse(Msg("no"))]),
-                build: Kids(keep),
+                build: Kids(List),
                 layout: Inline,
             },
             Production {
                 name: "f",
                 rule: Then([Named("a"), Refuse(Fn(echo))]),
-                build: Kids(keep),
+                build: Kids(List),
                 layout: Inline,
             },
         ],
@@ -909,7 +912,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // An unresolved reference is a grammar error, named in the message.
     let bad: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "a", rule: Named("missing"), build: Kids(keep), layout: Inline },
+            Production { name: "a", rule: Named("missing"), build: Kids(List), layout: Inline },
         ],
     };
     assert(link(bad) == err(ParseError { message: `no rule named "missing"`, span: 0..0 }));
@@ -917,8 +920,8 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // So is a duplicate name — the typo that otherwise reads as a working grammar.
     let dup: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "a", rule: Literal("x"), build: Kids(keep), layout: Inline },
-            Production { name: "a", rule: Literal("y"), build: Kids(keep), layout: Inline },
+            Production { name: "a", rule: Literal("x"), build: Kids(List), layout: Inline },
+            Production { name: "a", rule: Literal("y"), build: Kids(List), layout: Inline },
         ],
     };
     assert(link(dup) == err(ParseError { message: `duplicate rule name "a"`, span: 0..0 }));
@@ -949,8 +952,8 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     );
     let nests: Grammar<Kind, Node> = Grammar {
         prods: [
-            Production { name: "p", rule: outer, build: Kids(keep), layout: Inline },
-            Production { name: "q", rule: q_rule, build: Kids(keep), layout: Inline },
+            Production { name: "p", rule: outer, build: Kids(List), layout: Inline },
+            Production { name: "q", rule: q_rule, build: Kids(List), layout: Inline },
         ],
     };
     let ns = link(nests)?;
@@ -992,7 +995,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
         nested_in=(Literal("("), Literal(")")),
     );
     let short_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: sugar, build: Kids(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: sugar, build: Kids(List), layout: Inline }],
     };
     assert(link(short_g)?.groups == [ListStyle { sep: ",", trailing: false }]);
 
@@ -1000,14 +1003,14 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // the shorthand says "a bracket pair holding one thing" without restating it.
     let single: Rule<Kind> = Many(Term(Atom), min=1, max=1, nested_in=(Literal("("), Literal(")")));
     let single_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: single, build: Kids(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: single, build: Kids(List), layout: Inline }],
     };
     assert(link(single_g)?.groups == [ListStyle { sep: "", wraps: false }]);
 
     // A maximum below the minimum is a rule that could never match.
     let backwards: Rule<Kind> = Many(Term(Atom), min=2, max=1);
     let back_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: backwards, build: Kids(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: backwards, build: Kids(List), layout: Inline }],
     };
     assert(link(back_g) == err(ParseError {
         message: "a repetition's max must be at least its min, got min=2, max=1",
@@ -1023,7 +1026,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
         sorted=true,
     );
     let keyed_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: keyed, build: Kids(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: keyed, build: Kids(List), layout: Inline }],
     };
     assert(link(keyed_g)?.groups == [ListStyle { sorted: true }]);
 
@@ -1031,7 +1034,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
     // `spaced` is the one thing the `Many` cannot answer for itself.
     let words: Rule<Kind> = Many(Term(Atom), nested_in=(Literal("{"), Literal("}")), spaced=true);
     let words_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: words, build: Kids(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: words, build: Kids(List), layout: Inline }],
     };
     assert(link(words_g)?.groups == [ListStyle { sep: "", spaced: true }]);
 
@@ -1046,7 +1049,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
         nested_in=(Literal("("), Literal(")")),
     );
     let odd_g: Grammar<Kind, Node> = Grammar {
-        prods: [Production { name: "a", rule: odd_sep, build: Kids(keep), layout: Inline }],
+        prods: [Production { name: "a", rule: odd_sep, build: Kids(List), layout: Inline }],
     };
     assert(link(odd_g) == err(ParseError {
         message: "a bracketed list's separator must be a literal, so the printer can write it back",
@@ -1060,7 +1063,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
             Production {
                 name: "a",
                 rule: Many(Named("nope"), min=1, max=1, nested_in=(Literal("("), Literal(")"))),
-                build: Kids(keep),
+                build: Kids(List),
                 layout: Inline,
             },
         ],
@@ -1079,10 +1082,6 @@ variant Kind = Atom(str) | Open | Close
 
 variant Node = Leaf(str) | List(Node[])
 
-# The trivial lowering a production with nothing to lower passes, and all these
-# fixtures need: `Build` has no payload-free arm to mean "don't".
-fn keep(kids: Node[]) -> Node { List(kids) }
-
 # A message function for the `Refuse(Fn(..))` fixtures: what was matched, back.
 fn echo(matched: str) -> str { matched }
 --- performance ---
@@ -1091,10 +1090,10 @@ deallocations: 754
 reallocations: 101
 bytes allocated: 94897
 instructions executed: 78861
-binary size: 164288
-  code: 101732
+binary size: 179280
+  code: 109620
   data: 6668
-  metadata: 55888
+  metadata: 62992
 functions:
   __arr_drop_ListStyle:
     calls: 46
@@ -1120,10 +1119,10 @@ functions:
   __arr_retain_Rule$Kind:
     calls: 28
     bytes: 116
-  __builtin_find_index$str$lam$__test$link$lambda0:
+  __builtin_find_index$str$lam$__test$link$lambda8:
     calls: 1
     bytes: 416
-  __builtin_find_index$str$lam$__test$link$lambda1:
+  __builtin_find_index$str$lam$__test$link$lambda9:
     calls: 1
     bytes: 416
   __builtin_find_index$str$lam$link$Kind$Node$lambda0:
@@ -1174,6 +1173,246 @@ functions:
   __test$link:
     calls: 1
     bytes: 47540
+  __test$link$lambda0:
+    calls: 0
+    bytes: 96
+  __test$link$lambda1:
+    calls: 0
+    bytes: 96
+  __test$link$lambda10:
+    calls: 0
+    bytes: 96
+  __test$link$lambda11:
+    calls: 0
+    bytes: 96
+  __test$link$lambda12:
+    calls: 0
+    bytes: 96
+  __test$link$lambda13:
+    calls: 0
+    bytes: 96
+  __test$link$lambda14:
+    calls: 0
+    bytes: 96
+  __test$link$lambda15:
+    calls: 0
+    bytes: 96
+  __test$link$lambda16:
+    calls: 0
+    bytes: 96
+  __test$link$lambda17:
+    calls: 0
+    bytes: 96
+  __test$link$lambda18:
+    calls: 0
+    bytes: 96
+  __test$link$lambda19:
+    calls: 0
+    bytes: 96
+  __test$link$lambda2:
+    calls: 0
+    bytes: 96
+  __test$link$lambda20:
+    calls: 0
+    bytes: 96
+  __test$link$lambda21:
+    calls: 0
+    bytes: 96
+  __test$link$lambda22:
+    calls: 0
+    bytes: 96
+  __test$link$lambda23:
+    calls: 0
+    bytes: 112
+  __test$link$lambda24:
+    calls: 0
+    bytes: 96
+  __test$link$lambda25:
+    calls: 0
+    bytes: 112
+  __test$link$lambda26:
+    calls: 0
+    bytes: 96
+  __test$link$lambda27:
+    calls: 0
+    bytes: 112
+  __test$link$lambda28:
+    calls: 0
+    bytes: 96
+  __test$link$lambda29:
+    calls: 0
+    bytes: 112
+  __test$link$lambda3:
+    calls: 0
+    bytes: 96
+  __test$link$lambda30:
+    calls: 0
+    bytes: 96
+  __test$link$lambda31:
+    calls: 0
+    bytes: 112
+  __test$link$lambda32:
+    calls: 0
+    bytes: 96
+  __test$link$lambda33:
+    calls: 0
+    bytes: 112
+  __test$link$lambda34:
+    calls: 0
+    bytes: 96
+  __test$link$lambda35:
+    calls: 0
+    bytes: 96
+  __test$link$lambda36:
+    calls: 0
+    bytes: 96
+  __test$link$lambda37:
+    calls: 0
+    bytes: 112
+  __test$link$lambda38:
+    calls: 0
+    bytes: 96
+  __test$link$lambda39:
+    calls: 0
+    bytes: 96
+  __test$link$lambda4:
+    calls: 0
+    bytes: 96
+  __test$link$lambda40:
+    calls: 0
+    bytes: 96
+  __test$link$lambda41:
+    calls: 0
+    bytes: 96
+  __test$link$lambda42:
+    calls: 0
+    bytes: 96
+  __test$link$lambda43:
+    calls: 0
+    bytes: 112
+  __test$link$lambda44:
+    calls: 0
+    bytes: 96
+  __test$link$lambda45:
+    calls: 0
+    bytes: 112
+  __test$link$lambda46:
+    calls: 0
+    bytes: 96
+  __test$link$lambda47:
+    calls: 0
+    bytes: 96
+  __test$link$lambda48:
+    calls: 0
+    bytes: 96
+  __test$link$lambda49:
+    calls: 0
+    bytes: 96
+  __test$link$lambda5:
+    calls: 0
+    bytes: 112
+  __test$link$lambda50:
+    calls: 0
+    bytes: 96
+  __test$link$lambda51:
+    calls: 0
+    bytes: 112
+  __test$link$lambda52:
+    calls: 0
+    bytes: 96
+  __test$link$lambda53:
+    calls: 0
+    bytes: 112
+  __test$link$lambda54:
+    calls: 0
+    bytes: 96
+  __test$link$lambda55:
+    calls: 0
+    bytes: 96
+  __test$link$lambda56:
+    calls: 0
+    bytes: 96
+  __test$link$lambda57:
+    calls: 0
+    bytes: 112
+  __test$link$lambda58:
+    calls: 0
+    bytes: 96
+  __test$link$lambda59:
+    calls: 0
+    bytes: 96
+  __test$link$lambda6:
+    calls: 0
+    bytes: 96
+  __test$link$lambda60:
+    calls: 0
+    bytes: 96
+  __test$link$lambda61:
+    calls: 0
+    bytes: 112
+  __test$link$lambda62:
+    calls: 0
+    bytes: 96
+  __test$link$lambda63:
+    calls: 0
+    bytes: 96
+  __test$link$lambda64:
+    calls: 0
+    bytes: 96
+  __test$link$lambda65:
+    calls: 0
+    bytes: 112
+  __test$link$lambda66:
+    calls: 0
+    bytes: 96
+  __test$link$lambda67:
+    calls: 0
+    bytes: 96
+  __test$link$lambda68:
+    calls: 0
+    bytes: 96
+  __test$link$lambda69:
+    calls: 0
+    bytes: 112
+  __test$link$lambda7:
+    calls: 0
+    bytes: 112
+  __test$link$lambda70:
+    calls: 0
+    bytes: 96
+  __test$link$lambda71:
+    calls: 0
+    bytes: 96
+  __test$link$lambda72:
+    calls: 0
+    bytes: 96
+  __test$link$lambda73:
+    calls: 0
+    bytes: 112
+  __test$link$lambda74:
+    calls: 0
+    bytes: 96
+  __test$link$lambda75:
+    calls: 0
+    bytes: 96
+  __test$link$lambda76:
+    calls: 0
+    bytes: 96
+  __test$link$lambda77:
+    calls: 0
+    bytes: 112
+  __test$link$lambda78:
+    calls: 0
+    bytes: 96
+  __test$link$lambda79:
+    calls: 0
+    bytes: 96
+  __test$link$lambda80:
+    calls: 0
+    bytes: 96
+  __test$link$lambda81:
+    calls: 0
+    bytes: 112
   __test$link$shown_rule$Kind$Node:
     calls: 13
     bytes: 1008
@@ -1273,9 +1512,6 @@ functions:
   group_styles$Kind$tail:
     calls: 210
     bytes: 3104
-  keep:
-    calls: 0
-    bytes: 112
   link$Kind$Node:
     calls: 15
     bytes: 2480

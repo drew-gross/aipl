@@ -254,7 +254,7 @@
           </h3>
           <pre class="signature"><code>variant Build&#60;A: any&#62;</code></pre>
 
-          <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>.</p><p>Four shapes, by what the lowering reads — the whole node, its children, its one child, or its text — each in a total form and a <code>Try</code> form that can refuse with a <code>ParseError</code> the driver passes straight through (a literal that overflows, a duplicate key). A lowering is declared with exactly what it uses and the failure it can have: a total one returns its <code>A</code> bare, so no <code>ok(..)</code> wraps a value that could not be anything else.</p><p>Declaring the child *count* is what <code>Kid</code> adds over <code>Kids</code>: a production that is exactly one other thing — an alternation between named productions, a pass-through, a grouping — takes the child itself rather than an array it would have to index. The driver refuses a node that matched any other number, so the mismatch between a rule and its lowering is named once, in one place, instead of in every lowering that reaches for a child that might not be there.</p><p>Every arm carries an <code>A</code> (a function returning one, or the value itself), so each pins the type parameter on its own; a payload-free arm could not, which is why there is no <code>NoLower</code>.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so a lowering is a named top-level <code>fn lower_x(..)</code>, a constructor (<code>Kids(Object)</code>), or a lambda that reads only its parameters — whose types it takes from the arm's payload, so <code>Text(|t| Bool(t == &quot;true&quot;))</code> needs no annotation. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar *parses*, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
+          <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>.</p><p>Four shapes, by what the lowering reads — the whole node, its children, its one child, or its text. All but <code>Kid</code> come in a total form and a <code>Try</code> form that can refuse with a <code>ParseError</code> the driver passes straight through (a literal that overflows, a duplicate key); <code>Kid</code> hands its child back unchanged, so it has nothing to refuse. A lowering is declared with exactly what it uses and the failure it can have: a total one returns its <code>A</code> bare, so no <code>ok(..)</code> wraps a value that could not be anything else.</p><p>Declaring the child *count* is what <code>Kid</code> adds over <code>Kids</code>: a production that is exactly one other thing — an alternation between named productions, a pass-through, a grouping — *is* its child, rather than a one-element array a lowering would have to index. The driver refuses a node that matched any other number, so the mismatch between a rule and its lowering is named once, in one place, instead of in every lowering that reaches for a child that might not be there.</p><p>Every arm but <code>Kid</code> carries an <code>A</code> — a function returning one, or the value itself — and so pins the type parameter on its own. <code>Kid</code> carries nothing and takes <code>A</code> from where it is written: the <code>Production</code> field, the <code>Grammar</code> around that, the enclosing function's return type. That search is what lets <code>Build</code> have a payload-free arm at all; until it existed there was no way to write one, which is why there is still no <code>NoLower</code>-style arm on anything else.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so a lowering is a named top-level <code>fn lower_x(..)</code>, a constructor (<code>Kids(Object)</code>), or a lambda that reads only its parameters — whose types it takes from the arm's payload, so <code>Text(|t| Bool(t == &quot;true&quot;))</code> needs no annotation. A production whose value *is* its children under one case wants that constructor and nothing around it — <code>Kids(List)</code>, never a <code>fn keep(kids) { List(kids) }</code> wrapper, which is only the constructor spelled out longhand. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar *parses*, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
 
 
           <ul class="cases">
@@ -289,7 +289,7 @@
 
             <li id="item-Kid"><code>Kid</code>
 
-              <div class="doc"><p>The one child, unchanged, for a production whose rule guarantees exactly one — the pass-through a production that only names alternatives wants.</p><p>The one arm that carries no <code>A</code>, and so the one that cannot pin the type parameter itself: it takes it from the <code>Production</code> field it is written in, which takes it from the <code>Grammar</code> around that, which takes it from the enclosing function's return type. Nothing else in <code>Build</code> depends on that search, so if a future arm needs a lowering *function* over the one child, it carries one and pins <code>A</code> the way every other arm does.</p></div>
+              <div class="doc"><p>The one child, unchanged, for a production whose rule guarantees exactly one — the pass-through a production that only names alternatives wants. Should some grammar ever need a *function* over that child, it goes in a new arm carrying one, which pins <code>A</code> the way every other arm does.</p></div>
 
 
             </li>
@@ -424,7 +424,7 @@
             <a class="anchor" href="#item-show_style">show_style</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_style(__spat$26194: ListStyle) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_style(__spat$26485: ListStyle) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
 
@@ -602,20 +602,6 @@
           <pre class="signature"><code>fn link_rules&#60;K: variant&#62;(rs: Rule&#60;K&#62;[], names: str[], base: u64) -&#62; Rule&#60;K&#62;[]!ParseError</code></pre>
 
           <div class="doc"><p>Each rule in <code>rs</code>, linked, with <code>base</code> advancing past the groups each one holds.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-keep">
-          <h3>
-            <a class="anchor" href="#item-keep">keep</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn keep(kids: Node[]) -&#62; Node</code></pre>
-
-          <div class="doc"><p>The trivial lowering a production with nothing to lower passes, and all these fixtures need: <code>Build</code> has no payload-free arm to mean &quot;don't&quot;.</p></div>
 
 
         </section>

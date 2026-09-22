@@ -3344,10 +3344,10 @@ deallocations: 101061
 reallocations: 16523
 bytes allocated: 20378957
 instructions executed: 54995993
-binary size: 16834000
-  code: 10789876
+binary size: 16834280
+  code: 10790092
   data: 38012
-  metadata: 6006112
+  metadata: 6006176
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -4168,6 +4168,12 @@ functions:
   __m6__trim_end_while$lam$__builtin_is_space:
     calls: 546
     bytes: 400
+  __m7__aipl_grammar$lambda0:
+    calls: 0
+    bytes: 216
+  __m7__aipl_grammar$lambda1:
+    calls: 0
+    bytes: 192
   __m7__angles:
     calls: 33
     bytes: 376
@@ -4399,9 +4405,6 @@ functions:
   __m7__lower_op_value:
     calls: 0
     bytes: 1716
-  __m7__lower_operator:
-    calls: 0
-    bytes: 192
   __m7__lower_param:
     calls: 0
     bytes: 29744

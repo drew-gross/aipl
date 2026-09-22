@@ -2,22 +2,22 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
-; entry parse_test_section_header 470 str -> str?
-; entry strip_test_sections 511 str -> str
-; entry split_test_sections 510 str -> __tuple$str$str
+; entry parse_test_section_header 467 str -> str?
+; entry strip_test_sections 508 str -> str
+; entry split_test_sections 507 str -> __tuple$str$str
 ; entry assert_loc 60 str __builtin_Span -> str
 ; entry caret_block 67 str __builtin_Span str -> str
-; entry fill_or_add_section_file 147 str str str -> unit!Error
-; entry normalize_output 442 str -> str
-; entry int_fits 365 i64 str -> bool
-; entry is_operator_name 366 str -> bool
-; entry lex_aipl 409 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
-; entry lex_aipl_stripped 411 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
-; entry find_files 148 str str -> str[]!Error
+; entry fill_or_add_section_file 146 str str str -> unit!Error
+; entry normalize_output 439 str -> str
+; entry int_fits 362 i64 str -> bool
+; entry is_operator_name 363 str -> bool
+; entry lex_aipl 406 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry lex_aipl_stripped 408 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry find_files 147 str str -> str[]!Error
 ; entry companion_files 69 str -> __m25__Companion[]!str
-; entry parse_spec 467 str -> __m26__Spec!str
-; entry aipl_parse_file 326 str -> __m27__ParsedFile!__m39__ParseError
-; entry format_source 172 str u64 -> str!__m46__FmtError
+; entry parse_spec 464 str -> __m26__Spec!str
+; entry aipl_parse_file 323 str -> __m27__ParsedFile!__m39__ParseError
+; entry format_source 171 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m19__LexResult$__m20__AiplTok 16 tokens@0:__m19__Token$__m20__AiplTok[] trivia@8:__m19__Token$__m20__AiplTok[]
@@ -312,4 +312,4 @@
 ; data 190 __tostr_lit_101 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m10__assert_loc
-; source-fingerprint 11770679276265829683
+; source-fingerprint 16298278244174122671
