@@ -56,6 +56,7 @@ case_tests! {
     cases_arrays_push_push_growth = "cases/arrays/push/push_growth",
     cases_arrays_push_push_in_place = "cases/arrays/push/push_in_place",
     cases_arrays_push_push_in_place_amortized = "cases/arrays/push/push_in_place_amortized",
+    cases_arrays_push_push_none_element = "cases/arrays/push/push_none_element",
     cases_arrays_push_aliased_array = "cases/arrays/push_aliased_array",
     cases_arrays_reverse = "cases/arrays/reverse",
     cases_arrays_slice = "cases/arrays/slice",

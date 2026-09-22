@@ -1,0 +1,110 @@
+import { equal as ==, is_empty, print, push, to_str } from builtins;
+
+// An untyped `[]` has element type `__none__`, and a generic instantiated at
+// one carries it all the way through the body: in `collect([])`, `T` *is*
+// `__none__`, so `xs` is a `__none__[]` and `x` is a `__none__`.
+//
+// A value of that type can only be produced by code that cannot run — the only
+// sources are an empty container's element and a bare `none`'s payload — so the
+// loop below never executes at `T = __none__`. It still has to compile, and it
+// does: the slot is an ordinary 8-byte word with no-op drop and retain, which
+// is what `is_storable_elem` in aipl-codegen says and what the array-literal
+// spread has always done. The two spellings of an append agree.
+fn collect<T: any>(xs: T[]) -> T[] {
+    mut out: T[] = []; #[allow]
+    for (let x : xs) {
+        set out.push(x);
+    }
+    out
+}.test({
+    assert(collect([]).is_empty());
+    assert(collect([1, 2]) == [1, 2]);
+})
+
+fn rebuilt<T: any>(xs: T[]) -> T[] {
+    mut out: T[] = []; #[allow]
+    for (let x : xs) {
+        set out = [..out, x]; #[allow]
+    }
+    out
+}.test({
+    assert(rebuilt([]).is_empty());
+    assert(rebuilt([1, 2]) == [1, 2]);
+})
+
+// An array literal holding a `__none__` is the same story: the `some` arm is
+// unreachable at `T = __none__`, because a `__none__[]` is always empty.
+fn first_only<T: any>(xs: T[]) -> T[] {
+    match (xs[0]) {
+        some(x) => [x],
+        none => xs, #[allow]
+    }
+}.test({
+    assert(first_only([]).is_empty());
+    assert(first_only([7, 8]) == [7]);
+})
+
+fn main() !prints {
+    print(to_str(collect([]) == rebuilt([])));
+    print(to_str(collect([1, 2])));
+    print(to_str(first_only(["a", "b"])));
+    print(to_str(first_only([])));
+}
+--- stdout ---
+true
+[1, 2]
+["a"]
+[]
+--- performance ---
+allocations: 7
+deallocations: 7
+reallocations: 1
+bytes allocated: 257
+instructions executed: 880
+binary size: 7392
+  code: 4000
+  data: 292
+  metadata: 3100
+functions:
+  __eq_none$arr:
+    calls: 1
+    bytes: 32
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_i64$arr:
+    calls: 1
+    bytes: 708
+  __to_str_none$arr:
+    calls: 1
+    bytes: 180
+  __to_str_str$arr:
+    calls: 1
+    bytes: 828
+  aipl_arr_inc:
+    calls: 1
+    bytes: (external)
+  aipl_array_dec:
+    calls: 8
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_array_push:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 2
+    bytes: (external)
+  aipl_i64_len:
+    calls: 4
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 2
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2020

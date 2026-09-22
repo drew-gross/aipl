@@ -45,14 +45,10 @@ pub(super) fn append_names(program: &Program) -> AppendNames {
 /// the whole set of targets: `push` writes the grown array back into the place
 /// it was given, and only a name or a field path off one is a place.
 ///
-/// The one thing it cannot check is the element type. Lints run before the
-/// checker, and `push` is declared `fn __builtin_push<T: any>(mut self: T[], x:
-/// T)` where a literal's spread carries no such bound — so in a generic
-/// instantiated at the empty literal's `__none__` the rebuild compiles and the
-/// append does not (`collect([])` in
-/// `tests/cases/generics/let_annotation_type_param.aipl` is the case that does
-/// it). `#[allow]` is the answer there, as it is for
-/// [`push_loop_pipeline`](super::push_loop_pipeline())'s own blind spot.
+/// There is no blind spot about the element type. The two spellings store the
+/// same things — `is_storable_elem` in `aipl-codegen` answers for both — right
+/// down to the untyped-empty `__none__` a generic instantiated at `[]` carries,
+/// which `push` used to refuse and the spread did not.
 ///
 /// Two shapes are left alone. The spread must be the **first** element and must
 /// be the target itself — `[x, ..out]` prepends and `[..other, x]` starts from

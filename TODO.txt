@@ -362,7 +362,6 @@ lint:
   push-in-loop lint should fire even when the array being pushed into doesn't start empty (it should recommend let v = [init, ...pushed])
   move the tests for each lint into the file for that lint
   find_if with modification should be find_if().map() (once T? supports map)
-  lint to require use of [...foo(), bar] syntax instead of mut v = foo(); v.push.
   the "or append #[allow]" text is non-DRY: DRY it up.
   match with same arm val should use Case1 | Case2 => arm_val
   match none -> err(...) should lint to value_or_err

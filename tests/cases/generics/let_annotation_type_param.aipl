@@ -1,4 +1,4 @@
-import { equal as ==, is_empty, less_than as <, print, to_str, value_or } from builtins;
+import { equal as ==, is_empty, less_than as <, print, push, to_str, value_or } from builtins;
 
 // A `let`/`mut` annotation may name the enclosing function's type parameter:
 // `mut out: T[] = [];`. Monomorphization substitutes type variables into a
@@ -11,14 +11,15 @@ import { equal as ==, is_empty, less_than as <, print, to_str, value_or } from b
 // stated. The alternative — an empty slice of the input, `self[..0]` — works
 // but reads as a trick.
 //
-// Both loops append with `[..out, x]` rather than `out.push(x)`, and `#[allow]`
-// keeps them: `collect([])` instantiates `T` at the empty literal's `__none__`,
-// which the literal accepts and `push`'s `T: any` does not.
+// Both loops are spelled out rather than written as pipelines, because the seed
+// is the whole point of the case — `#[allow]` keeps them. `collect([])` also
+// instantiates `T` at the empty literal's `__none__`, which `push` stores like any
+// other 8-byte element (see `is_storable_elem` in aipl-codegen).
 
 fn collect<T: any>(xs: T[]) -> T[] {
-    mut out: T[] = [];
+    mut out: T[] = []; #[allow]
     for (let x : xs) {
-        set out = [..out, x]; #[allow]
+        set out.push(x);
     }
     out
 }.test({
@@ -42,10 +43,10 @@ fn first_or<T: any>(xs: T[], fallback: T) -> T {
 // The instance's own `T` is what's substituted, even when the generic is
 // reached through a function-typed parameter (a different specialization path).
 fn filtered<T: any>(xs: T[], keep: (T) -> bool) -> T[] {
-    mut out: T[] = [];
+    mut out: T[] = []; #[allow]
     for (let x : xs) {
         if (keep(x)) {
-            set out = [..out, x]; #[allow]
+            set out.push(x);
         };
     }
     out
@@ -65,15 +66,15 @@ fn main() !prints {
 7
 [1, 2]
 --- performance ---
-allocations: 12
-deallocations: 12
-reallocations: 0
-bytes allocated: 538
-instructions executed: 1767
-binary size: 7224
-  code: 3744
+allocations: 8
+deallocations: 8
+reallocations: 4
+bytes allocated: 306
+instructions executed: 1557
+binary size: 5912
+  code: 3060
   data: 331
-  metadata: 3149
+  metadata: 2521
 functions:
   __to_str_i64:
     calls: 1
@@ -84,17 +85,14 @@ functions:
   __to_str_str$arr:
     calls: 1
     bytes: 828
-  aipl_arr_inc:
-    calls: 35
-    bytes: (external)
-  aipl_arr_reserve:
-    calls: 7
-    bytes: (external)
   aipl_array_dec:
-    calls: 46
+    calls: 7
     bytes: (external)
   aipl_array_new:
     calls: 1
+    bytes: (external)
+  aipl_array_push:
+    calls: 3
     bytes: (external)
   aipl_array_push_mut:
     calls: 7
@@ -110,4 +108,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 2004
+    bytes: 1320

@@ -9507,6 +9507,30 @@ fn is_composite(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
     abi_is_composite(Abi::active(), ty, structs)
 }
 
+/// Whether `ty` may occupy an array element slot, post-monomorphization. This
+/// is the concrete counterpart of `is_valid_elem` in `aipl-mono`, which decides
+/// the same question abstractly, and the two must agree: a program the checker
+/// accepted is not supposed to be refused by codegen.
+///
+/// It is [`is_array_elem`] — the 8-byte value types — plus the three cases that
+/// predicate cannot answer on its own: an optional and a declared struct, which
+/// need the struct table, and `__none__`.
+///
+/// `__none__` is the element type of an array that is provably empty (an
+/// untyped `[]`, or a generic instantiated at one), so a *value* of it can only
+/// be produced in code that cannot run. Its slot is an ordinary 8-byte word
+/// with no-op drop and retain, which is exactly how the spread intrinsics
+/// (`__aipl_arr_reserve` / `_append` / `_concat`) have always grown a
+/// `__none__[]`. Refusing it here was the one place the two disagreed, and it
+/// showed up as `set out = [..out, x];` compiling where `set out.push(x);` did
+/// not — the same append, in the same generic, at `T = __none__`.
+fn is_storable_elem(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
+    is_array_elem(ty)
+        || is_none_inner(ty)
+        || matches!(ty, ConcreteType::Optional(_))
+        || matches!(ty, ConcreteType::Named(n) if structs.contains_key(n))
+}
+
 /// Whether `ty` is a *boxed* (recursive) declared type — its values are 8-byte
 /// pointers to a refcounted heap payload. See the "Recursive (boxed) type
 /// runtime" section.
@@ -17498,10 +17522,7 @@ fn compile_call_expr<M: Module>(
             // An empty array (`__none__` element) takes its element type from
             // the first pushed value; otherwise the value must match.
             let result_elem = if elem_was_none {
-                let ok = is_array_elem(&x_ty)
-                    || matches!(&x_ty, ConcreteType::Optional(_))
-                    || matches!(&x_ty, ConcreteType::Named(n) if structs.contains_key(n));
-                if !ok {
+                if !is_storable_elem(&x_ty, structs) {
                     return Err(Error::at(
                         format!(
                             "\"push\" element must be an integer (i8..i64, u8..u64), bool, char, str, or an array, got {}",
@@ -20365,10 +20386,7 @@ fn compile_expr_inner<M: Module>(
                 let (v, mut t) = compile_expr(module, builder, cx, scopes, el)?;
                 match &elem_ty {
                     None => {
-                        let ok = is_array_elem(&t)
-                            || matches!(&t, ConcreteType::Optional(_))
-                            || matches!(&t, ConcreteType::Named(n) if structs.contains_key(n));
-                        if !ok {
+                        if !is_storable_elem(&t, structs) {
                             return Err(Error::at(
                                 format!(
                                     "array elements must be an integer (i8..i64, u8..u64), bool, char, str, or an array, got {}",
