@@ -3047,18 +3047,15 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
 /// from source. Kept current by the `dogfood_ir` test (regenerate with
 /// `fill_dogfood_ir`).
 ///
-/// This is a *path*, resolved at compile time from the manifest directory, and
-/// the file is read at run time — by the author helpers that regenerate and
-/// verify it, and by `build.rs`, which lowers it into the prebuilt object.
-/// Nothing reads it on the ordinary run path any more; the machine code it
-/// describes is already in the binary.
+/// Nothing reads this on the ordinary run path, and nothing checks it in: the
+/// IR is a *working-tree intermediate*. It is what the artifact is generated
+/// as, what the staged-IR workflow JITs through [`DOGFOOD_IR_ENV`] to validate a
+/// candidate, and what `promote_staged_ir` compiles into the checked-in
+/// `dogfood.o`. The machine code it describes is already in the binary.
 ///
-/// It is not `include_str!`d into this crate. Doing that made every `.clif`
-/// regeneration a source change to a 16k-line crate, rebuilding it, everything
-/// downstream, and all 12 test binaries. `build.rs` does re-run when the
-/// artifact changes — that is what keeps the prebuilt object honest — so a
-/// regeneration is no longer free, but it costs a build-script run and a relink
-/// (~55s measured) rather than a recompile of the world.
+/// The path is still named because the staged intermediate sits beside it
+/// (`dogfood.clif.staged`), and because a regeneration writes the IR here when
+/// asked for it explicitly.
 pub const DOGFOOD_CLIF_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/dogfood.clif");
 /// The checked-in artifact's filename, for the `dogfood_ir` test.
 pub const DOGFOOD_CLIF_FILE: &str = "dogfood.clif";
@@ -3098,16 +3095,32 @@ const DOGFOOD_MANIFEST: &str = include_str!(concat!(env!("OUT_DIR"), "/dogfood.m
 include!(concat!(env!("OUT_DIR"), "/prebuilt.rs"));
 
 pub use aipl_artifact::fingerprint as artifact_fingerprint;
+pub use aipl_artifact::{
+    emit_object, manifest_with_fingerprint, source_fingerprint, ArtifactFiles, DOGFOOD,
+};
 
-/// The fingerprint of the artifact `<file>` (e.g. `"dogfood.clif"`) that this
-/// binary's prebuilt object was built from, or `None` if there is no such
-/// artifact. Compared against the checked-in file by a test — see
-/// [`artifact_fingerprint`].
-pub fn prebuilt_fingerprint(clif_file: &str) -> Option<u64> {
+/// The source fingerprint the artifact named `<name>` (e.g. `"dogfood"`) was
+/// linked into this binary carrying, or `None` if there is no such artifact.
+///
+/// It comes from the checked-in manifest's `; source-fingerprint` line, which
+/// records the CLIF the object was compiled from — so comparing it against a
+/// freshly generated artifact is what tells a test whether the object in this
+/// binary is still current with the AIPL sources. See [`artifact_fingerprint`].
+pub fn prebuilt_fingerprint(name: &str) -> Option<u64> {
     PREBUILT_FINGERPRINTS
         .iter()
-        .find(|(f, _)| *f == clif_file)
+        .find(|(f, _)| *f == name)
         .map(|(_, h)| *h)
+}
+
+/// [`dogfood_engine`], for the artifact tests.
+///
+/// Public so `checked_in_ir_loads_and_runs` can call every entry on the engine
+/// this process would really use — which, now that the artifact is checked in
+/// already compiled, means the object linked into the binary rather than a JIT
+/// of some text standing in for it.
+pub fn dogfood_compilation() -> Compilation {
+    dogfood_engine()
 }
 
 /// The dogfood engine for this process: the prebuilt object normally, or a

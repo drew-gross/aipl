@@ -1,66 +1,68 @@
-//! Compile the checked-in dogfood CLIF artifact into machine code **at build
-//! time**, so a normal `aipl` run never re-does that work.
+//! Link the **checked-in compiled dogfood artifact** into this crate, so a
+//! normal `aipl` run pays no Cranelift cost at all.
 //!
 //! The compiler dogfoods AIPL: parsing (and formatting) call into AIPL
-//! functions through the FFI, and those functions live as checked-in Cranelift
-//! IR in `src/dogfood.clif`. Linking it at process start
-//! meant every invocation re-parsed several megabytes of IR and re-lowered ~470
-//! functions to identical machine code — around 200ms before `aipl check` could
-//! look at its first byte of input, paid again by every one of the hundreds of
-//! subprocesses a test run spawns.
+//! functions through the FFI. Those functions are checked in already compiled —
+//! `src/dogfood.o`, the native object, beside `src/dogfood.manifest`, the
+//! `;`-comment header the runtime marshals against. This script archives the
+//! object, links it in, and generates the `extern` declarations that reach it.
 //!
-//! So we do it once, here, into an object file linked into the binary. The
-//! declaration order that makes an artifact link is subtle and shared with the
-//! run-time path, so it lives in `aipl-artifact` and both callers use it; all
-//! that differs is the module type and the fact that entry points need real
-//! exported symbols here.
+//! **Why the object and not the IR.** Linking the IR at process start meant
+//! every invocation re-parsed tens of megabytes and re-lowered ~470 functions to
+//! identical machine code — ~200ms before `aipl check` saw its first byte, paid
+//! again by every one of the hundreds of subprocesses a test run spawns. Lowering
+//! it *here* fixed that but moved the cost onto every build that touched the
+//! artifact (~20s of Cranelift, on top of an unavoidable relink). Checking in the
+//! object removes it from both: nothing lowers the artifact except the command
+//! that regenerates it (`dogfood_ir::promote_staged_ir`, via
+//! `aipl_artifact::emit_object`), and the repository carries 7 MB of object
+//! instead of 40 MB of text.
 //!
-//! Three things come out of this, into `OUT_DIR`:
+//! The IR has not gone anywhere — it is still what the artifact is *generated*
+//! as, and still what the staged-IR workflow validates through
+//! `AIPL_DOGFOOD_IR` (`Compilation::from_artifact` JITs it). It is simply a
+//! working-tree intermediate now rather than a checked-in file. The manifest's
+//! `; source-fingerprint` line is what still ties the checked-in object to the
+//! AIPL sources it came from; `checked_in_ir_is_current` regenerates the IR in
+//! memory and compares against it.
 //!
-//! * `libaipl_prebuilt.a` — one object per artifact, archived and linked in.
+//! Two things come out of this, into `OUT_DIR`:
+//!
+//! * `libaipl_prebuilt.a` — the checked-in object, archived and linked in.
 //! * `prebuilt.rs` — the generated `extern` declarations and name→address
 //!   tables, `include!`d by `lib.rs`.
-//! * `<artifact>.manifest` — the artifact's `;`-comment header alone, which the
-//!   runtime still needs for FFI signatures and struct layouts. Carrying just
-//!   the header keeps the multi-megabyte IR bodies out of the binary.
-//!
-//! The JIT path stays exactly where it was, and is what `AIPL_DOGFOOD_IR`
-//! selects — so the staged-IR workflow can still validate
-//! candidate IR across the corpus without a rebuild.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use cranelift::codegen::settings::{self, Configurable};
-use cranelift_object::{ObjectBuilder, ObjectModule};
+use aipl_artifact::{ArtifactFiles, DOGFOOD};
 
-/// The artifacts to prebuild: the `.clif` under `src/`, and the prefix its
-/// exported entry symbols get (a namespace of their own in the archive). One
-/// today; the loop below is written for the list so a second costs a line.
-const ARTIFACTS: &[(&str, &str)] = &[("dogfood", "__aipl_pre_dogfood__")];
+/// The artifacts to link. One today; the loop below is written for the list so
+/// a second costs an entry.
+const ARTIFACTS: &[ArtifactFiles] = &[DOGFOOD];
 
 fn main() {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
     let src_dir =
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR")).join("src");
 
-    // Cranelift lowers for the machine it is told about, and the checked-in IR
+    // The checked-in object is lowered for the host, and the IR it came from
     // already names host calling conventions (`apple_aarch64`, …) in its
-    // signatures — so this only makes sense building for the host. Cross-compiling
-    // would need the artifacts regenerated for the target anyway; say so plainly
-    // rather than emitting an object full of wrong-ABI calls.
+    // signatures — so this only makes sense building for the host.
+    // Cross-compiling needs the artifact regenerated on that target anyway; say
+    // so plainly rather than linking an object full of wrong-ABI calls.
     let host = std::env::var("HOST").expect("HOST");
     let target = std::env::var("TARGET").expect("TARGET");
     assert_eq!(
         host, target,
-        "the prebuilt dogfood object is lowered for the host; cross-compiling to \
-         {target} needs the checked-in .clif regenerated on that target"
+        "the checked-in dogfood object is lowered for the host; cross-compiling to \
+         {target} needs the artifact regenerated on that target \
+         (cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir)"
     );
 
     let mut objects = Vec::new();
-    // Which artifact each object was built from, so a test can catch a prebuilt
-    // object that has drifted from the checked-in `.clif`.
+    // Which artifact each object was built from, so a test can catch a linked
+    // object that has drifted from the AIPL sources.
     let mut fingerprints = String::new();
     let mut generated = String::from(
         "// @generated by build.rs — the prebuilt dogfood entry points.\n\
@@ -68,73 +70,58 @@ fn main() {
          // under a per-artifact prefix, paired with the FFI name callers use.\n",
     );
 
-    for (name, prefix) in ARTIFACTS {
-        let clif = src_dir.join(format!("{name}.clif"));
-        println!("cargo:rerun-if-changed={}", clif.display());
-        let text = std::fs::read_to_string(&clif)
-            .unwrap_or_else(|e| panic!("read {}: {e}", clif.display()));
+    for a in ARTIFACTS {
+        let object = src_dir.join(a.object);
+        let manifest_path = src_dir.join(a.manifest);
+        println!("cargo:rerun-if-changed={}", object.display());
+        println!("cargo:rerun-if-changed={}", manifest_path.display());
 
-        let manifest = aipl_artifact::parse_manifest(&text)
-            .unwrap_or_else(|e| panic!("{name}.clif manifest: {e}"));
+        let manifest_text = std::fs::read_to_string(&manifest_path).unwrap_or_else(|e| {
+            panic!(
+                "read {}: {e}\nRegenerate the artifact with: \
+                 cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir",
+                manifest_path.display()
+            )
+        });
+        let manifest = aipl_artifact::parse_manifest(&manifest_text)
+            .unwrap_or_else(|e| panic!("{}: {e}", a.manifest));
+        assert!(
+            object.exists(),
+            "missing {} — regenerate the artifact with: \
+             cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir",
+            object.display()
+        );
 
         // The runtime reads FFI signatures and struct layouts back out of the
-        // header, so hand it the header and nothing else.
-        std::fs::write(
-            out_dir.join(format!("{name}.manifest")),
-            manifest_header(&text),
-        )
-        .unwrap_or_else(|e| panic!("write {name}.manifest: {e}"));
-
-        let exports: HashMap<u32, String> = manifest
-            .entries
-            .iter()
-            .map(|e| (e.id, format!("{prefix}{}", e.name)))
-            .collect();
-
-        let mut module = object_module(name);
-        aipl_artifact::link_artifact(
-            &text,
-            &manifest,
-            &mut module,
-            &aipl_artifact::LinkNames {
-                // Local, so the several hundred non-entry functions neither
-                // collide between the two artifacts nor show up in the binary's
-                // symbol table.
-                local_prefix: "__aipl_pre_fn",
-                exports,
-            },
-        )
-        .unwrap_or_else(|e| panic!("link {name}.clif: {e}"));
-
-        let bytes = module
-            .finish()
-            .emit()
-            .unwrap_or_else(|e| panic!("emit {name} object: {e}"));
-        let obj = out_dir.join(format!("aipl_pre_{name}.o"));
-        std::fs::write(&obj, bytes).unwrap_or_else(|e| panic!("write {}: {e}", obj.display()));
-        objects.push(obj);
+        // header, and `lib.rs` `include_str!`s it from OUT_DIR.
+        std::fs::write(out_dir.join(format!("{}.manifest", a.name)), &manifest_text)
+            .unwrap_or_else(|e| panic!("write {}.manifest: {e}", a.name));
+        objects.push(object);
 
         generated.push_str("extern \"C\" {\n");
         for e in &manifest.entries {
-            generated.push_str(&format!("    fn {prefix}{}();\n", e.name));
+            generated.push_str(&format!("    fn {}{}();\n", a.prefix, e.name));
         }
         generated.push_str("}\n");
         generated.push_str(&format!(
             "static {}_PREBUILT: &[(&str, PrebuiltFn)] = &[\n",
-            name.to_uppercase()
+            a.name.to_uppercase()
         ));
         for e in &manifest.entries {
             generated.push_str(&format!(
-                "    ({:?}, {prefix}{} as PrebuiltFn),\n",
-                e.name, e.name
+                "    ({:?}, {}{} as PrebuiltFn),\n",
+                e.name, a.prefix, e.name
             ));
         }
         generated.push_str("];\n");
-        fingerprints.push_str(&format!(
-            "    ({:?}, {}u64),\n",
-            format!("{name}.clif"),
-            aipl_artifact::fingerprint(&text)
-        ));
+        let fp = aipl_artifact::source_fingerprint(&manifest_text).unwrap_or_else(|| {
+            panic!(
+                "{} carries no `{}` line — regenerate the artifact",
+                a.manifest,
+                aipl_artifact::SOURCE_FINGERPRINT_PREFIX.trim()
+            )
+        });
+        fingerprints.push_str(&format!("    ({:?}, {fp}u64),\n", a.name));
     }
     generated.push_str(&format!(
         "static PREBUILT_FINGERPRINTS: &[(&str, u64)] = &[\n{fingerprints}];\n"
@@ -151,39 +138,6 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", out_dir.display());
     println!("cargo:rustc-link-lib=static=aipl_prebuilt");
     println!("cargo:rerun-if-changed=build.rs");
-}
-
-/// The artifact's leading `;`-comment block. Everything the manifest carries
-/// precedes the CLIF bodies, which carry `;` comments of their own — so the
-/// header is exactly the text up to the first `function ` line.
-fn manifest_header(text: &str) -> String {
-    let end = text
-        .lines()
-        .position(|l| l.trim_start().starts_with("function "))
-        .unwrap_or_else(|| panic!("artifact has no `function` lines"));
-    let mut out: String = text.lines().take(end).collect::<Vec<_>>().join("\n");
-    out.push('\n');
-    out
-}
-
-fn object_module(name: &str) -> ObjectModule {
-    let mut flags = settings::builder();
-    // Matches the JIT's `host_isa`, except for PIC: this object is linked into a
-    // position-independent executable, so its calls into the runtime have to go
-    // through the usual indirection rather than assume a fixed address.
-    flags.set("use_colocated_libcalls", "false").expect("flag");
-    flags.set("is_pic", "true").expect("flag");
-    let isa = cranelift_native::builder()
-        .unwrap_or_else(|msg| panic!("host machine not supported: {msg}"))
-        .finish(settings::Flags::new(flags))
-        .unwrap_or_else(|e| panic!("isa: {e}"));
-    let builder = ObjectBuilder::new(
-        isa,
-        format!("aipl_pre_{name}"),
-        cranelift_module::default_libcall_names(),
-    )
-    .unwrap_or_else(|e| panic!("object builder: {e}"));
-    ObjectModule::new(builder)
 }
 
 /// Bundle the objects into a static archive with the toolchain's `ar`.

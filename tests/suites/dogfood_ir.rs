@@ -1,29 +1,40 @@
-//! The compiler dogfoods AIPL by running one checked-in Cranelift IR artifact
-//! (`crates/aipl-codegen/src/dogfood.clif`, compiled from every `.aipl` file
-//! listed in [`DOGFOOD_SOURCES`]), not by recompiling the dogfooded `.aipl`
-//! sources on every build. That decouples "can the compiler run" from "can the
-//! compiler compile itself": a mid-change frontend that can't compile the
-//! dogfooded sources still links and runs the checked-in IR.
+//! The compiler dogfoods AIPL by running one checked-in artifact, compiled from
+//! every `.aipl` file listed in [`DOGFOOD_SOURCES`], rather than by recompiling
+//! those sources on every build. That decouples "can the compiler run" from "can
+//! the compiler compile itself": a mid-change frontend that cannot compile the
+//! dogfooded sources still links and runs the checked-in artifact.
+//!
+//! **What is checked in is the compiled object**, `dogfood.o`, beside
+//! `dogfood.manifest` — the `;`-comment header carrying the FFI signatures and
+//! struct layouts the runtime marshals against, plus a `; source-fingerprint`
+//! line naming the IR it was built from. The Cranelift IR itself is a
+//! *working-tree intermediate*: it is what the artifact is generated as, and
+//! what the staged workflow JITs to validate a candidate, but it is not stored.
+//! That keeps 40 MB of generated text out of every revision (the object is
+//! ~7 MB) and means no build has to lower it.
 //!
 //! This mirrors the `--- performance ---` model in `tests/cases.rs`:
-//!   - [`checked_in_ir_is_current`] (normal test) regenerates the artifact from
-//!     source via the live frontend and asserts it matches the checked-in
-//!     `.clif`. It only passes when the frontend is healthy — a mismatch
-//!     mid-iteration is the *intended* signal, not a dogfood-path regression.
-//!   - [`fill_dogfood_ir`] (`#[ignore]` author helper) regenerates the artifact,
-//!     loads it back and sanity-calls every entry (so we never check in IR that
-//!     won't link or run), writes `dogfood.clif`, then fails intentionally so
-//!     the regenerated diff is reviewed before committing.
+//!   - [`checked_in_ir_is_current`] (normal test) regenerates the IR from source
+//!     via the live frontend and checks its fingerprint against the one the
+//!     manifest records. It only passes when the frontend is healthy — a
+//!     mismatch mid-iteration is the *intended* signal, not a dogfood-path
+//!     regression.
+//!   - [`fill_dogfood_ir`] (`#[ignore]` author helper) regenerates the IR, loads
+//!     it back and sanity-calls every entry (so we never check in an artifact
+//!     that won't link or run), compiles and writes `dogfood.o` plus its
+//!     manifest, then fails intentionally so the result is reviewed before
+//!     committing.
 //!
 //! Authoring workflow: break the frontend freely (the compiler still runs off the
-//! checked-in IR) → fix it → `cargo test --test dogfood --
-//! --ignored dogfood_ir::fill_dogfood_ir` → full `cargo test` (exercises the new IR end-to-end and this
-//! verify test confirms the match) → commit, or revert `dogfood.clif` if
-//! anything is off.
+//! checked-in object) → fix it → `cargo test --test dogfood --
+//! --ignored dogfood_ir::fill_dogfood_ir` → full `cargo test` (exercises the new
+//! artifact end-to-end and this verify test confirms the match) → commit, or
+//! revert `dogfood.o` and `dogfood.manifest` if anything is off.
 
 use aipl::codegen::{
-    generate_dogfood_artifact, read_dogfood_sources, source_refs, Compilation, DOGFOOD_CLIF_FILE,
-    DOGFOOD_ENTRIES, DOGFOOD_IR_ENV, DOGFOOD_SOURCE_FILES,
+    emit_object, generate_dogfood_artifact, manifest_with_fingerprint, read_dogfood_sources,
+    source_refs, ArtifactFiles, Compilation, DOGFOOD, DOGFOOD_CLIF_FILE, DOGFOOD_ENTRIES,
+    DOGFOOD_IR_ENV, DOGFOOD_SOURCE_FILES,
 };
 use aipl::FfiValue;
 use std::path::PathBuf;
@@ -55,6 +66,10 @@ fn validate_staged_corpus_cmd() -> String {
 /// still loop over the list, so a second costs an entry here and nothing else.
 struct Artifact {
     file: &'static str,
+    /// The compiled files this artifact is checked in as — the object the build
+    /// links, and the manifest header beside it. The `.clif` the two are
+    /// generated from is a working-tree intermediate, not a checked-in file.
+    files: ArtifactFiles,
     env: &'static str,
     /// The artifact's `.aipl` module names; the sources themselves are read
     /// from disk (`read_dogfood_sources`) at the point of use, so editing one
@@ -65,6 +80,7 @@ struct Artifact {
 
 const ARTIFACTS: &[Artifact] = &[Artifact {
     file: DOGFOOD_CLIF_FILE,
+    files: DOGFOOD,
     env: DOGFOOD_IR_ENV,
     sources: DOGFOOD_SOURCE_FILES,
     entries: DOGFOOD_ENTRIES,
@@ -74,14 +90,46 @@ fn src_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("crates/aipl-codegen/src")
 }
 
-/// Path to a checked-in `.clif` artifact.
-fn artifact_path_of(a: &Artifact) -> PathBuf {
-    src_dir().join(a.file)
-}
-
 /// Path to a staged (candidate) `.clif.staged` artifact.
 fn staged_path_of(a: &Artifact) -> PathBuf {
     src_dir().join(format!("{}.staged", a.file))
+}
+
+/// Path to the checked-in compiled object.
+fn object_path_of(a: &Artifact) -> PathBuf {
+    src_dir().join(a.files.object)
+}
+
+/// Path to the checked-in manifest header.
+fn manifest_path_of(a: &Artifact) -> PathBuf {
+    src_dir().join(a.files.manifest)
+}
+
+/// Compile `text` and write the two checked-in files, returning whether either
+/// changed.
+///
+/// "Changed" is compared on content rather than assumed, because the object's
+/// mtime is a build input: rewriting identical bytes would re-archive it,
+/// relink every test binary and — on macOS — queue each for Gatekeeper's
+/// first-exec scan, which is ten minutes of nothing. The gate reads the
+/// `(unchanged)` this produces and skips its rebuild step.
+fn write_compiled_of(a: &Artifact, text: &str) -> bool {
+    let (bytes, header) = emit_object(text, a.files.name, a.files.prefix)
+        .unwrap_or_else(|e| panic!("compile {}: {e}", a.file));
+    let manifest = manifest_with_fingerprint(&header, text);
+    let obj_path = object_path_of(a);
+    let man_path = manifest_path_of(a);
+    let obj_same = std::fs::read(&obj_path).is_ok_and(|old| old == bytes);
+    let man_same = std::fs::read_to_string(&man_path).is_ok_and(|old| lf(&old) == lf(&manifest));
+    if !obj_same {
+        std::fs::write(&obj_path, &bytes)
+            .unwrap_or_else(|e| panic!("write {}: {e}", obj_path.display()));
+    }
+    if !man_same {
+        std::fs::write(&man_path, &manifest)
+            .unwrap_or_else(|e| panic!("write {}: {e}", man_path.display()));
+    }
+    !(obj_same && man_same)
 }
 
 /// An artifact's override path, if a staged-IR validation run set its env var.
@@ -90,13 +138,6 @@ fn ir_override(a: &Artifact) -> Option<PathBuf> {
         Ok(p) if !p.is_empty() => Some(PathBuf::from(p)),
         _ => None,
     }
-}
-
-/// The artifact this run should verify against: the env override when set (a
-/// staged-IR validation run — the compiler is itself linking that file, so the
-/// source-vs-artifact checks must target it too), else the live checked-in one.
-fn active_path_of(a: &Artifact) -> PathBuf {
-    ir_override(a).unwrap_or_else(|| artifact_path_of(a))
 }
 
 /// A dogfood source failed the combined frontend. Pin the offender by parsing
@@ -161,7 +202,12 @@ fn lf(s: &str) -> String {
 fn sanity_check_of(a: &Artifact, artifact: &str) {
     let comp = Compilation::from_artifact(artifact)
         .unwrap_or_else(|e| panic!("load regenerated {}: {e}", a.file));
+    sanity_check_entries(a, &comp);
+}
 
+/// [`sanity_check_of`] against an already-built engine, whichever way it was
+/// built — a JIT link of candidate text, or the object linked into this binary.
+fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
     // The formatter, on messy input on purpose, so this proves the walker
     // round-trips rather than merely returning something — and with a trailing
     // section, which the pipeline carries through untouched.
@@ -492,58 +538,88 @@ fn sanity_check_of(a: &Artifact, artifact: &str) {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The checked-in artifact must still be what the AIPL sources compile to.
+///
+/// The IR itself is not checked in — the object is — so this compares
+/// *fingerprints* rather than text: regenerate the IR in memory, hash it, and
+/// check it against the `; source-fingerprint` line the manifest carries. That
+/// is the same invariant the old text comparison enforced, without keeping 40 MB
+/// of generated IR in the repository. Regeneration is deterministic, which is
+/// what makes a hash comparison sound; a mismatch means the sources moved.
 #[test]
 fn checked_in_ir_is_current() {
     aipl::install_parser_hooks();
     for a in ARTIFACTS {
         let generated = generate_for(a);
-        // In a staged-IR validation run the compiler is linking the staged file,
-        // so "current with source" must be checked against *that* file — the
-        // live `.clif` is intentionally behind until promotion.
-        let path = active_path_of(a);
-        let checked_in = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+        // In a staged-IR validation run the compiler is linking the staged
+        // `.clif`, so "current with source" must be checked against *that* —
+        // the checked-in object is intentionally behind until promotion.
+        if let Some(staged) = ir_override(a) {
+            let text = std::fs::read_to_string(&staged).unwrap_or_else(|e| {
+                panic!(
+                    "missing staged IR {}: {e}\nGenerate it with: {FILL_STAGED_CMD}",
+                    staged.display()
+                )
+            });
+            // IR is too large to print on error, so don't use assert_eq!
+            assert!(
+                lf(&generated) == lf(&text),
+                "staged IR {} is stale. Regenerate with: {FILL_STAGED_CMD}",
+                staged.display()
+            );
+            continue;
+        }
+        let path = manifest_path_of(a);
+        let manifest = std::fs::read_to_string(&path).unwrap_or_else(|e| {
             panic!(
-                "missing IR {}: {e}\nGenerate it with: {FILL_CMD}",
+                "missing manifest {}: {e}\nGenerate it with: {FILL_CMD}",
                 path.display()
             )
         });
-        // IR is too large to print on error, so don't use assert_eq!
-        assert!(
-            lf(&generated) == lf(&checked_in),
-            "IR {} is stale. Regenerate with: {FILL_CMD}",
-            path.display()
+        let recorded = aipl::codegen::source_fingerprint(&manifest).unwrap_or_else(|| {
+            panic!(
+                "{} carries no source fingerprint. Regenerate with: {FILL_CMD}",
+                path.display()
+            )
+        });
+        assert_eq!(
+            aipl::codegen::artifact_fingerprint(&generated),
+            recorded,
+            "the checked-in artifact is stale — the AIPL sources no longer compile \
+             to the IR {} was built from. Regenerate with: {FILL_CMD}",
+            a.files.object
         );
     }
 }
 
-/// The prebuilt object in this binary must have been built from the checked-in
-/// `.clif` — not an older copy of it.
+/// The object linked into this binary must be the one checked in — not an
+/// older copy of it.
 ///
 /// Ordinary runs execute the dogfood entries straight out of the binary
-/// (`Compilation::from_prebuilt`), so a stale object means the compiler is
-/// quietly parsing with superseded AIPL while `checked_in_ir_is_current` still
-/// reports the artifact as fine. Cargo is supposed to make this impossible —
-/// `build.rs` lists both artifacts as `rerun-if-changed` inputs — and this test
-/// is here to make the failure loud rather than to distrust it.
+/// (`Compilation::from_prebuilt`), so a stale link means the compiler is quietly
+/// parsing with superseded AIPL while `checked_in_ir_is_current` still reports
+/// the artifact as fine. Cargo is supposed to make this impossible — `build.rs`
+/// lists the object and its manifest as `rerun-if-changed` inputs — and this
+/// test is here to make the failure loud rather than to distrust it.
 ///
-/// Compares against the *live* artifact even under a staged run: the object was
-/// built from the live file, and the staged one deliberately hasn't been
+/// Compares against the *checked-in* manifest even under a staged run: the
+/// linked object came from it, and the staged candidate deliberately hasn't been
 /// promoted yet.
 #[test]
 fn prebuilt_object_matches_checked_in_ir() {
     for a in ARTIFACTS {
-        let path = artifact_path_of(a);
-        let text = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("missing IR {}: {e}", path.display()));
-        let built = aipl::codegen::prebuilt_fingerprint(a.file)
-            .unwrap_or_else(|| panic!("no prebuilt object for {}", a.file));
+        let path = manifest_path_of(a);
+        let manifest = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("missing manifest {}: {e}", path.display()));
+        let checked_in = aipl::codegen::source_fingerprint(&manifest)
+            .unwrap_or_else(|| panic!("{} carries no source fingerprint", path.display()));
+        let linked = aipl::codegen::prebuilt_fingerprint(a.files.name)
+            .unwrap_or_else(|| panic!("no prebuilt object for {}", a.files.name));
         assert_eq!(
-            built,
-            aipl::codegen::artifact_fingerprint(&text),
-            "the prebuilt object for {} was built from a different version of it \
-             than the one checked in. Rebuild (`cargo build`) to pick up the \
-             current artifact.",
-            a.file
+            linked, checked_in,
+            "the object linked into this binary is not the one checked in as {}. \
+             Rebuild (`cargo build`) to pick up the current artifact.",
+            a.files.object
         );
     }
 }
@@ -556,14 +632,11 @@ fn prebuilt_object_matches_checked_in_ir() {
 fn checked_in_ir_loads_and_runs() {
     aipl::install_parser_hooks();
     for a in ARTIFACTS {
-        let path = active_path_of(a);
-        let checked_in = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-            panic!(
-                "missing IR {}: {e}\nGenerate it with: {FILL_CMD}",
-                path.display()
-            )
-        });
-        sanity_check_of(a, &checked_in);
+        // The engine this process would really use: the linked object normally,
+        // or the JIT of the staged `.clif` under a validation run. Stronger than
+        // the text round-trip this used to do — it exercises the artifact as
+        // shipped rather than a fresh compile of something equal to it.
+        sanity_check_entries(a, &aipl::codegen::dogfood_compilation());
     }
 }
 
@@ -703,9 +776,14 @@ fn no_staged_ir_pending() {
 }
 
 /// Generate staged (candidate) IR from source — writes `dogfood.clif.staged`
-/// next to the live `dogfood.clif`. Sanity-checks the artifact before writing
-/// so only working IR is staged. Intentionally fails so the diff is reviewed
-/// before promoting.
+/// beside the checked-in object. Sanity-checks it before writing so only working
+/// IR is staged. Intentionally fails so the candidate is validated before
+/// promoting.
+///
+/// The staged candidate stays *IR*, not an object: the corpus validation run
+/// points `AIPL_DOGFOOD_IR` at it and the compiler JITs it, which is the whole
+/// point of staging — the object in the binary was built from the live artifact
+/// and cannot speak for a candidate.
 ///
 /// See CLAUDE.md for the full staged IR workflow.
 #[test]
@@ -757,9 +835,10 @@ fn validate_staged_ir() {
     );
 }
 
-/// Promote staged IR to live: validates `dogfood.clif.staged`, copies it to the
-/// live `dogfood.clif`, then deletes the staged file. Intentionally fails so the
-/// resulting diff is reviewed and the suite is re-run before committing.
+/// Promote staged IR to live: validates `dogfood.clif.staged`, *compiles* it to
+/// the checked-in `dogfood.o` and manifest, then deletes the staged file.
+/// Intentionally fails so the result is reviewed and the suite re-run before
+/// committing.
 ///
 /// See CLAUDE.md for the full staged IR workflow.
 #[test]
@@ -774,32 +853,27 @@ fn promote_staged_ir() {
             )
         });
         sanity_check_of(a, &artifact);
-        let live = artifact_path_of(a);
-        // A candidate identical to the live artifact is not written: the file's
-        // mtime is a build input (`build.rs` lowers it into the prebuilt object
-        // on `rerun-if-changed`), so rewriting the same bytes would recompile
-        // `aipl-codegen`, relink every test binary, and — on macOS — queue each
-        // for Gatekeeper's first-exec scan, ten minutes of nothing. The gate
-        // reads the `(unchanged)` and skips its rebuild step.
-        let unchanged = std::fs::read_to_string(&live).is_ok_and(|l| lf(&l) == lf(&artifact));
-        if !unchanged {
-            std::fs::write(&live, &artifact)
-                .unwrap_or_else(|e| panic!("write live {}: {e}", live.display()));
-        }
+        // Promotion is a *compile*: the staged `.clif` is the candidate, and
+        // what gets checked in is the object it lowers to plus the manifest
+        // header beside it. The IR itself is not stored — see `write_compiled_of`
+        // and the manifest's `source-fingerprint` line, which is what still ties
+        // the artifact to its AIPL sources.
+        let changed = write_compiled_of(a, &artifact);
         std::fs::remove_file(&staged)
             .unwrap_or_else(|e| panic!("remove staged {}: {e}", staged.display()));
-        if unchanged {
+        let live = object_path_of(a);
+        if changed {
+            eprintln!("promoted {} → {}", staged.display(), live.display());
+        } else {
             eprintln!(
                 "promoted {} → {} (unchanged: identical to the live artifact)",
                 staged.display(),
                 live.display()
             );
-        } else {
-            eprintln!("promoted {} → {}", staged.display(), live.display());
         }
     }
     panic!(
-        "promote_staged_ir updated the live .clif files — review the diff,\n\
+        "promote_staged_ir updated the checked-in artifact — review the diff,\n\
          then run `cargo test` to confirm the suite is green before committing."
     );
 }
@@ -810,15 +884,13 @@ fn fill_dogfood_ir() {
     aipl::install_parser_hooks();
     for a in ARTIFACTS {
         let artifact = generate_for(a);
-        // Never write IR that won't link or run.
+        // Never write an artifact that won't link or run.
         sanity_check_of(a, &artifact);
-        let path = artifact_path_of(a);
-        std::fs::write(&path, &artifact)
-            .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
-        eprintln!("wrote {}", path.display());
+        write_compiled_of(a, &artifact);
+        eprintln!("wrote {}", object_path_of(a).display());
     }
     panic!(
-        "fill_dogfood_ir regenerated the checked-in IR — review the diff, \
+        "fill_dogfood_ir regenerated the checked-in artifact — review the diff, \
          then re-run the suite normally to confirm it's green."
     );
 }

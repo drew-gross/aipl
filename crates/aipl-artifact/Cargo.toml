@@ -12,6 +12,8 @@ license = "MIT"
 [dependencies]
 cranelift = { workspace = true }
 cranelift-module = { workspace = true }
+cranelift-native = { workspace = true }
+cranelift-object = { workspace = true }
 cranelift-reader = { workspace = true }
 
 [lib]

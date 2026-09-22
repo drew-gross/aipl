@@ -4,3 +4,9 @@
 # local worktrees out.
 /.claude/settings.local.json
 /.claude/worktrees/
+
+# The dogfood IR is a working-tree intermediate: what is checked in is the
+# compiled `dogfood.o` beside its manifest. Regenerating or staging the IR
+# leaves these behind, and neither belongs in a commit.
+/crates/aipl-codegen/src/*.clif
+/crates/aipl-codegen/src/*.clif.staged

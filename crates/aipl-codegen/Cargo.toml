@@ -39,14 +39,11 @@ path = "src/lib.rs"
 [lints]
 workspace = true
 
-# The build script links the checked-in dogfood artifacts into an object; it
-# needs the same cranelift pieces the crate itself does.
+# The build script reads the checked-in dogfood artifacts and archives them.
+# The cranelift pieces that lowering needs live in `aipl-artifact`, which owns
+# the one implementation the build script and the regeneration helpers share.
 [build-dependencies]
 aipl-artifact = { workspace = true }
-cranelift = { workspace = true }
-cranelift-module = { workspace = true }
-cranelift-native = { workspace = true }
-cranelift-object = { workspace = true }
 
 [dev-dependencies]
 # TEMPORARY (STR_REPR.md ABI spike): cross-target ISA lookup. Delete with abi_spike.rs.

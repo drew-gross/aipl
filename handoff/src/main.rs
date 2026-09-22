@@ -19,7 +19,7 @@
 //!    goes after `cargo fmt` (which can invalidate what it built) and before
 //!    `format_corpus` (which, since the dogfooded `.aipl` sources became
 //!    run-time reads, no longer can).
-//! 1b. If any dogfooded `.aipl` is newer than `dogfood.clif`,
+//! 1b. If any dogfooded `.aipl` is newer than the checked-in `dogfood.o`,
 //!    regenerate and promote the artifact *before* anything runs against it.
 //!    A stale artifact does not fail tidily — the compiler runs on it, so the
 //!    fresh Rust half and the stale AIPL half disagree and misbehave wherever
@@ -213,7 +213,7 @@ fn final_run_scope(repo: &Path, plan: &discovery::Plan) -> Option<Vec<String>> {
 /// byte-identical to what it read during the discovery run that passed it.
 /// Three things could break that, and each is a `None` here:
 ///
-/// - **`need_ir`** — step 5 rewrote `dogfood.clif`, which every case compiles
+/// - **`need_ir`** — step 5 rewrote `dogfood.o`, which every case compiles
 ///   against. (Step 1b's promotion is fine: it happens *before* discovery, so
 ///   the discovery run is already against the new artifact.)
 /// - **`need_case_tests`** — the case list was regenerated, so cases exist that
@@ -277,7 +277,9 @@ fn ir_is_behind_sources(repo: &Path) -> bool {
             .and_then(|m| m.modified())
             .ok()
     };
-    let Some(artifact) = artifact("dogfood.clif") else {
+    // The checked-in artifact is the compiled object; the `.clif` it was
+    // generated from is a working-tree intermediate that need not exist.
+    let Some(artifact) = artifact("dogfood.o") else {
         return false;
     };
     let Ok(entries) = std::fs::read_dir(&dir) else {
@@ -541,7 +543,7 @@ or discard it
     // `--no-fail-fast` so this executes *every* test and reports all remediable
     // staleness in one pass. Stopping at the first failure would be actively
     // wrong here: a change that makes both the per-case `--- performance ---`
-    // sections and `dogfood.clif` stale would cancel inside `cases`, `need_ir`
+    // sections and the dogfood artifact stale would cancel inside `cases`, `need_ir`
     // would stay false, the staged-IR regen (step 5) would be skipped, and the
     // final run would then fail on `checked_in_ir_is_current` with the IR never
     // regenerated. Running everything surfaces both together.
@@ -756,9 +758,9 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
     //
     // Nothing else in steps 3-5 invalidates the build. `fill_expected` rewrites
     // case `.aipl` files, read at run time. `promote_staged_ir` rewrites
-    // dogfood.clif, also read at run time (DOGFOOD_CLIF_PATH is a compile-time
-    // *path*, not `include_str!`d text) — that used to cost ~730s here, all of
-    // it rebuilding the test binaries, which is why it's a path now. Nor does
+    // dogfood.o, which `build.rs` archives and links — so promoting *does*
+    // invalidate the link, and step 1b rebuilds when it wrote a changed object.
+    // (The artifact used to be `include_str!`d IR, which cost ~730s here.) Nor does
     // the staged-IR corpus run above: the `.staged` file is read through
     // AIPL_DOGFOOD_IR.
     if plan.need_case_tests

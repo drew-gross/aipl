@@ -28,8 +28,10 @@
 use std::collections::{BTreeMap, HashMap};
 
 use cranelift::codegen::ir::UserFuncName;
+use cranelift::codegen::settings::{self, Configurable};
 use cranelift::prelude::{types, AbiParam, Signature};
 use cranelift_module::{DataDescription, FuncId, Linkage, Module};
+use cranelift_object::{ObjectBuilder, ObjectModule};
 
 /// A `; struct` or `; variant` manifest line, handed back unparsed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -415,4 +417,144 @@ pub fn fingerprint(text: &str) -> u64 {
         h = h.wrapping_mul(0x0000_0100_0000_01b3);
     }
     h
+}
+
+/// The artifact's leading `;`-comment block: everything up to the first CLIF
+/// `function` line.
+///
+/// This is the half of an artifact the *runtime* needs — FFI signatures, struct
+/// and variant layouts, the entry list — as against the megabytes of IR bodies,
+/// which become machine code and are never read again. Splitting them is what
+/// lets the compiled object be the checked-in artifact while the part a human
+/// reviews stays diffable text.
+pub fn manifest_header(text: &str) -> Result<String, String> {
+    let end = text
+        .lines()
+        .position(|l| l.trim_start().starts_with("function "))
+        .ok_or_else(|| "artifact has no `function` lines".to_string())?;
+    let mut out: String = text.lines().take(end).collect::<Vec<_>>().join("\n");
+    out.push('\n');
+    Ok(out)
+}
+
+/// The `;` line recording which CLIF text an object was compiled from — see
+/// [`fingerprint`]. Written into the checked-in manifest by the regeneration
+/// helpers and read back by the test that asks whether the artifact is current
+/// with its AIPL sources.
+pub const SOURCE_FINGERPRINT_PREFIX: &str = "; source-fingerprint ";
+
+/// The fingerprint [`SOURCE_FINGERPRINT_PREFIX`] records, or `None` when the
+/// manifest carries no such line.
+pub fn source_fingerprint(manifest_text: &str) -> Option<u64> {
+    manifest_text
+        .lines()
+        .find_map(|l| l.trim().strip_prefix(SOURCE_FINGERPRINT_PREFIX))
+        .and_then(|v| v.trim().parse().ok())
+}
+
+/// Compile artifact `text` to a native object, plus the manifest header that
+/// goes with it.
+///
+/// The one place CLIF becomes machine code for the *checked-in* artifact. It
+/// used to live in `aipl-codegen`'s `build.rs`, which ran it on every build that
+/// touched the artifact; now the object is checked in and this runs only when
+/// the artifact is regenerated, so the cost moved from every developer's build
+/// to the one command that rewrites it.
+///
+/// `name` namespaces the object; `prefix` is prepended to each entry's exported
+/// symbol. Non-entry functions are emitted `Local`, so the several hundred of
+/// them neither collide nor reach the final binary's symbol table.
+pub fn emit_object(text: &str, name: &str, prefix: &str) -> Result<(Vec<u8>, String), String> {
+    let manifest = parse_manifest(text)?;
+    let header = manifest_header(text)?;
+    let exports: HashMap<u32, String> = manifest
+        .entries
+        .iter()
+        .map(|e| (e.id, format!("{prefix}{}", e.name)))
+        .collect();
+    let mut module = object_module(name)?;
+    link_artifact(
+        text,
+        &manifest,
+        &mut module,
+        &LinkNames {
+            local_prefix: "__aipl_pre_fn",
+            exports,
+        },
+    )?;
+    let bytes = module
+        .finish()
+        .emit()
+        .map_err(|e| format!("emit {name} object: {e}"))?;
+    Ok((bytes, header))
+}
+
+/// The [`ObjectModule`] [`emit_object`] lowers into.
+///
+/// Matches the JIT's ISA except for PIC: this object is linked into a
+/// position-independent executable, so its calls into the runtime go through
+/// the usual indirection rather than assuming a fixed address. Host-only —
+/// the artifact's signatures already name host calling conventions, so an
+/// object lowered for anything else would be full of wrong-ABI calls.
+fn object_module(name: &str) -> Result<ObjectModule, String> {
+    let mut flags = settings::builder();
+    flags
+        .set("use_colocated_libcalls", "false")
+        .map_err(|e| format!("flag: {e}"))?;
+    flags
+        .set("is_pic", "true")
+        .map_err(|e| format!("flag: {e}"))?;
+    let isa = cranelift_native::builder()
+        .map_err(|msg| format!("host machine not supported: {msg}"))?
+        .finish(settings::Flags::new(flags))
+        .map_err(|e| format!("isa: {e}"))?;
+    let builder = ObjectBuilder::new(
+        isa,
+        format!("aipl_pre_{name}"),
+        cranelift_module::default_libcall_names(),
+    )
+    .map_err(|e| format!("object builder: {e}"))?;
+    Ok(ObjectModule::new(builder))
+}
+
+/// A checked-in compiled artifact: the two files it lives in, and the symbol
+/// namespace its entries are exported under.
+///
+/// Named here, in the crate the build script and the regeneration helpers both
+/// depend on, because the two sides have to agree exactly: the object is
+/// emitted with `prefix`-ed export symbols by one and declared `extern` under
+/// the same names by the other, and a mismatch is a link error rather than
+/// anything a reader could diagnose.
+pub struct ArtifactFiles {
+    /// Names the object module, and the `<name>.manifest` the build emits.
+    pub name: &'static str,
+    /// Prepended to each entry's exported symbol.
+    pub prefix: &'static str,
+    /// The compiled object, checked in.
+    pub object: &'static str,
+    /// The `;`-comment header, checked in beside it — the reviewable half.
+    pub manifest: &'static str,
+}
+
+/// The one artifact today: the dogfooded parser, formatter and helpers.
+pub const DOGFOOD: ArtifactFiles = ArtifactFiles {
+    name: "dogfood",
+    prefix: "__aipl_pre_dogfood__",
+    object: "dogfood.o",
+    manifest: "dogfood.manifest",
+};
+
+/// The manifest to check in beside an object: the artifact's header plus the
+/// [`SOURCE_FINGERPRINT_PREFIX`] line recording which CLIF text it was compiled
+/// from.
+///
+/// That line is what lets the artifact still be checked against its AIPL
+/// sources once the IR itself is no longer stored: the test regenerates the
+/// CLIF in memory, fingerprints it, and compares — the same invariant as
+/// comparing the text, without keeping 40 MB of it in the repository.
+pub fn manifest_with_fingerprint(header: &str, clif_text: &str) -> String {
+    format!(
+        "{header}{SOURCE_FINGERPRINT_PREFIX}{}\n",
+        fingerprint(clif_text)
+    )
 }

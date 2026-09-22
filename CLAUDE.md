@@ -582,7 +582,16 @@ the failure list.
 
 Any change that affects how the compiler generates Cranelift IR (new builtins,
 type layout changes, codegen restructuring, etc.) also invalidates the checked-in
-`*.clif` artifacts. Use the staged IR workflow instead of calling `fill_dogfood_ir`
+dogfood artifact.
+
+**What is checked in is the compiled object.** `crates/aipl-codegen/src/dogfood.o`
+(~7 MB) is the artifact, beside `dogfood.manifest` — the `;`-comment header the
+runtime marshals against, carrying a `; source-fingerprint` line naming the IR it
+was built from. The IR itself is a working-tree intermediate: it is generated,
+staged and validated, then compiled and discarded, so 40 MB of generated text no
+longer lands in every revision. `checked_in_ir_is_current` regenerates the IR in
+memory and compares fingerprints; a `.clif` in `crates/aipl-codegen/src/` is
+gitignored. Use the staged IR workflow instead of calling `fill_dogfood_ir`
 directly — it lets you validate candidate IR before it becomes the live IR the
 compiler runs on.
 
