@@ -1,0 +1,15 @@
+// A constant is substituted into each use, so there is no point at which a
+// computation would run.
+fn two() -> i64 { 2 }
+
+let VALUE = two();
+
+fn main() {
+    let x = VALUE;
+}
+--- errors ---
+error: a top-level constant stands for a literal, and "VALUE" is given something to evaluate — a constant is substituted into each use, so there is no point at which a computation would run
+ --> ./tests/cases/constants/err_computed_value.aipl:5:13
+  |
+5 | let VALUE = two();
+  |             ^^^^^

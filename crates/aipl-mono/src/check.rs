@@ -1197,6 +1197,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
             Item::Fn(f) => {
                 sigs.insert(f.name.clone(), f.sig.clone());
             }
+            Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
             Item::Import(_) => {}
         }
     }

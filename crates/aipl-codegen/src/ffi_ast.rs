@@ -110,7 +110,19 @@ fn item(v: &FfiValue) -> R<ast::Item> {
         "Struct" => ast::Item::Struct(struct_decl(at(payload, 0, case)?)?),
         "Variant" => ast::Item::Variant(variant_decl(at(payload, 0, case)?)?),
         "Import" => ast::Item::Import(import_decl(at(payload, 0, case)?)?),
+        "Const" => ast::Item::Const(const_decl(at(payload, 0, case)?)?),
         other => return Err(unknown("Item", other)),
+    })
+}
+
+fn const_decl(v: &FfiValue) -> R<ast::ConstDecl> {
+    Ok(ast::ConstDecl {
+        name: text(field(v, "name")?)?,
+        is_pub: flag(field(v, "is_pub")?)?,
+        ty: maybe(field(v, "ty")?, ty)?,
+        value: expr(field(v, "value")?)?,
+        doc: maybe(field(v, "doc")?, text)?,
+        span: span(field(v, "span")?)?,
     })
 }
 

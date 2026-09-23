@@ -483,6 +483,7 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
             aipl::ast::Item::Fn(f) => (&f.name, &f.doc),
             aipl::ast::Item::Struct(s) => (&s.name, &s.doc),
             aipl::ast::Item::Variant(v) => (&v.name, &v.doc),
+            aipl::ast::Item::Const(c) => (&c.name, &c.doc),
             aipl::ast::Item::Import(_) => continue,
         };
         if let Some(doc) = doc {

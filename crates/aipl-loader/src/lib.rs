@@ -386,6 +386,7 @@ impl Loader {
                     Item::Fn(f) => (f.name.clone(), f.is_pub),
                     Item::Struct(s) => (s.name.clone(), true),
                     Item::Variant(v) => (v.name.clone(), true),
+                    Item::Const(c) => (c.name.clone(), c.is_pub),
                     Item::Import(_) => unreachable!("imports stripped during load"),
                 };
                 // Loaded as the builtin it implements (`load_builtin_impl_str`),
@@ -605,9 +606,18 @@ impl Loader {
                         }
                     }
                 }
+                if let Item::Const(c) = item {
+                    check_const(c)?;
+                }
                 merged.push(rewrite_item(item, view, &ctor_cases, is_root)?);
             }
         }
+        // Every reference is a final global name by now, so a constant's uses
+        // are exactly the `Ident`s naming it — a local can never collide,
+        // because a local keeps the name the author wrote and a constant has
+        // been mangled. Substituting here rather than in any later pass is what
+        // keeps constants out of the checker, mono and codegen entirely.
+        let merged = substitute_constants(merged);
         // Resolve keyword arguments (and fill omitted keyword parameters from
         // their defaults) now that every reference is a final global name —
         // after this, calls are fully positional and no `ExprKind::KwArg`
@@ -630,6 +640,135 @@ impl Loader {
             items: merged,
             sources,
         })
+    }
+}
+
+/// A top-level constant must be ALL_CAPS and stand for a literal.
+///
+/// Both rules exist to keep a substituted use readable at the site that reads
+/// it: ALL_CAPS says "this name is not a binding from around here", and a
+/// literal is the only value that can be spliced without an evaluation order to
+/// argue about. A negative number is a literal too — the parser builds it as a
+/// `Neg` around one, which is the one non-leaf shape allowed through.
+fn check_const(c: &aipl_syntax::ast::ConstDecl) -> Result<(), Error> {
+    if !is_screaming_snake_case(&c.name) {
+        return Err(Error::at(
+            format!(
+                "a top-level constant is named in ALL_CAPS: write {:?} as {:?}",
+                c.name,
+                to_screaming_snake_case(&c.name)
+            ),
+            c.span.clone(),
+        ));
+    }
+    if !is_const_literal(&c.value) {
+        return Err(Error::at(
+            format!(
+                "a top-level constant stands for a literal, and {:?} is given something to \
+                 evaluate — a constant is substituted into each use, so there is no point at \
+                 which a computation would run",
+                c.name
+            ),
+            c.value.span.clone(),
+        ));
+    }
+    Ok(())
+}
+
+/// At least one letter, and no lowercase: `MAX`, `S_KEYWORD`, `HTTP_2`.
+fn is_screaming_snake_case(name: &str) -> bool {
+    name.chars().any(|ch| ch.is_ascii_uppercase())
+        && !name.chars().any(|ch| ch.is_ascii_lowercase())
+}
+
+/// `name` as it would be written in ALL_CAPS, for the diagnostic above.
+fn to_screaming_snake_case(name: &str) -> String {
+    let mut out = String::new();
+    for (i, ch) in name.chars().enumerate() {
+        if ch.is_ascii_uppercase() && i > 0 && !out.ends_with('_') {
+            out.push('_');
+        }
+        out.push(ch.to_ascii_uppercase());
+    }
+    out
+}
+
+/// Whether `e` is a literal a constant may stand for.
+fn is_const_literal(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Num(_)
+        | ExprKind::Bool(_)
+        | ExprKind::Str(_)
+        | ExprKind::Char(_)
+        | ExprKind::Unit => true,
+        // `-1` is a literal with a sign on it.
+        ExprKind::Neg(inner) => matches!(inner.kind, ExprKind::Num(_)),
+        _ => false,
+    }
+}
+
+/// Replace every use of a top-level constant with the literal it stands for,
+/// and drop the declarations.
+fn substitute_constants(items: Vec<Item>) -> Vec<Item> {
+    let values: HashMap<String, Expr> = items
+        .iter()
+        .filter_map(|i| match i {
+            Item::Const(c) => Some((c.name.clone(), c.value.clone())),
+            _ => None,
+        })
+        .collect();
+    let mut items: Vec<Item> = items
+        .into_iter()
+        .filter(|i| !matches!(i, Item::Const(_)))
+        .collect();
+    if values.is_empty() {
+        return items;
+    }
+    for item in &mut items {
+        for e in item_exprs_mut(item) {
+            splice_constants(e, &values);
+        }
+    }
+    items
+}
+
+/// Every expression an item holds, mutably: a function's body, its test body
+/// and its keyword-parameter defaults, and the field / payload defaults of a
+/// struct or variant. A default is spliced into call sites, so a constant used
+/// in one has to be substituted here like any other use.
+fn item_exprs_mut(item: &mut Item) -> Vec<&mut Expr> {
+    let mut out = Vec::new();
+    match item {
+        Item::Fn(f) => {
+            out.extend(f.sig.params.iter_mut().filter_map(|p| p.default.as_mut()));
+            out.push(&mut f.body);
+            out.extend(f.test_body.as_mut());
+        }
+        Item::Struct(s) => out.extend(s.fields.iter_mut().filter_map(|f| f.default.as_mut())),
+        Item::Variant(v) => out.extend(
+            v.cases
+                .iter_mut()
+                .flat_map(|c| c.payload.iter_mut())
+                .filter_map(|slot| slot.default.as_mut()),
+        ),
+        // Dropped just above; an import declares no expression.
+        Item::Const(_) | Item::Import(_) => {}
+    }
+    out
+}
+
+/// `e` with each `Ident` naming a constant replaced by that constant's literal.
+/// The literal keeps the *use site's* span, so a diagnostic about the value
+/// points at where it was written rather than at the declaration.
+fn splice_constants(e: &mut Expr, values: &HashMap<String, Expr>) {
+    if let ExprKind::Ident(name) = &e.kind {
+        if let Some(lit) = values.get(name.as_str()) {
+            e.kind = lit.kind.clone();
+            return;
+        }
+    }
+    for kid in aipl_syntax::each_subexpr_mut(e) {
+        splice_constants(kid, values);
     }
 }
 
@@ -976,6 +1115,14 @@ fn rewrite_item(
                     },
                 })
                 .collect(),
+        }),
+        // A constant's value is a literal, which names nothing to resolve; only
+        // its own name is rewritten to the global it becomes, and its
+        // annotation may name an imported type.
+        Item::Const(c) => Item::Const(aipl_syntax::ast::ConstDecl {
+            name: view.get(&c.name).cloned().unwrap_or_else(|| c.name.clone()),
+            ty: c.ty.as_ref().map(|t| rewrite_type(t, view, &[])),
+            ..c.clone()
         }),
         Item::Import(_) => unreachable!("imports stripped during load"),
     })

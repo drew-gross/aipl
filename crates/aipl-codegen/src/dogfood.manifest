@@ -2,21 +2,21 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
-; entry parse_test_section_header 468 str -> str?
-; entry strip_test_sections 509 str -> str
-; entry split_test_sections 508 str -> __tuple$str$str
+; entry parse_test_section_header 460 str -> str?
+; entry strip_test_sections 501 str -> str
+; entry split_test_sections 500 str -> __tuple$str$str
 ; entry assert_loc 60 str __builtin_Span -> str
 ; entry caret_block 67 str __builtin_Span str -> str
 ; entry fill_or_add_section_file 146 str str str -> unit!Error
-; entry normalize_output 440 str -> str
-; entry int_fits 363 i64 str -> bool
-; entry is_operator_name 364 str -> bool
-; entry lex_aipl 407 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
-; entry lex_aipl_stripped 409 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry normalize_output 432 str -> str
+; entry int_fits 364 i64 str -> bool
+; entry is_operator_name 365 str -> bool
+; entry lex_aipl 399 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry lex_aipl_stripped 401 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
 ; entry find_files 147 str str -> str[]!Error
 ; entry companion_files 69 str -> __m25__Companion[]!str
-; entry parse_spec 465 str -> __m26__Spec!str
-; entry aipl_parse_file 324 str -> __m27__ParsedFile!__m39__ParseError
+; entry parse_spec 457 str -> __m26__Spec!str
+; entry aipl_parse_file 325 str -> __m27__ParsedFile!__m39__ParseError
 ; entry format_source 171 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
@@ -31,7 +31,7 @@
 ; struct __m26__Entry 48 path@0:str contents@24:str
 ; struct __m27__ParsedFile 16 program@0:__m36__Program allows@8:__builtin_Span[]
 ; struct __m36__Program 8 items@0:__m36__Item[]
-; variant __m36__Item 80 Fn(8:__m36__Function) Struct(8:__m36__StructDecl) Variant(8:__m36__VariantDecl) Import(8:__m36__ImportDecl)
+; variant __m36__Item 112 Fn(8:__m36__Function) Struct(8:__m36__StructDecl) Variant(8:__m36__VariantDecl) Import(8:__m36__ImportDecl) Const(8:__m36__ConstDecl)
 ; struct __m36__Function 136 boxed name@0:str is_pub@24:bool sig@32:__m36__Signature body@72:__m31__Expr test_body@80:__m31__Expr? test_fns@96:__m36__Function[] doc@104:str?
 ; struct __m36__Signature 40 type_vars@0:__m36__TypeParam[] params@8:__m36__Param[] effects@16:str[] return_ty@24:__m30__Ty?
 ; struct __m36__TypeParam 32 name@0:str bound@24:__m35__Bound
@@ -57,6 +57,7 @@
 ; struct __m36__ImportDecl 56 names@0:__m36__ImportName[] source@8:__m36__ImportSource
 ; struct __m36__ImportName 72 name@0:str alias@24:str? span@56:__builtin_Span
 ; variant __m36__ImportSource 48 Path(8:str,32:__builtin_Span) Builtins(8:__builtin_Span)
+; struct __m36__ConstDecl 104 name@0:str is_pub@24:bool ty@32:__m30__Ty? value@48:__m31__Expr doc@56:str? span@88:__builtin_Span
 ; struct __m39__ParseError 40 message@0:str span@24:__builtin_Span
 ; struct __m46__FmtError 40 message@0:str span@24:__builtin_Span
 ; import 0 aipl_arr_drop_arr
@@ -166,17 +167,17 @@
 ; data 44 __str_01f10c4c806ca255 3f00000000000000ffffffffffffff7f6162636465666768696a6b6c6d6e6f707172737475767778797a4142434445464748494a4b4c4d4e4f505152535455565758595a5f30313233343536373839
 ; data 45 __str_dda4c368b1d99744 1d00000000000000ffffffffffffff7f696e7465676572206c69746572616c206f766572666c6f777320693634
 ; data 46 __str_3891c788f0ed2360 2f00000000000000ffffffffffffff7f63686172206c69746572616c206d75737420636f6e7461696e2065786163746c79206f6e6520636861726163746572
-; data 47 __str_ba081c7d0ddcb8fa 1b00000000000000ffffffffffffff7f6b6579776f72642e636f6e74726f6c2e696d706f72742e6169706c
-; data 48 __str_787f5feed631247c 1d00000000000000ffffffffffffff7f636f6e7374616e742e6e756d657269632e696e74656765722e6169706c
-; data 49 __str_61427c3db3e5ae4f 1900000000000000ffffffffffffff7f737472696e672e71756f7465642e646f75626c652e6169706c
-; data 50 __str_dd73197667854ed0 1900000000000000ffffffffffffff7f737472696e672e71756f7465642e73696e676c652e6169706c
-; data 51 __str_e37eb258ea9aad3a 1f00000000000000ffffffffffffff7f636f6d6d656e742e6c696e652e646f63756d656e746174696f6e2e6169706c
-; data 52 __str_03e458c1087e839f 1e00000000000000ffffffffffffff7f636f6d6d656e742e6c696e652e646f75626c652d736c6173682e6169706c
-; data 53 __str_6fdfc79f7e6566cf 1a00000000000000ffffffffffffff7f756e7465726d696e6174656420626c6f636b20636f6d6d656e74
-; data 54 __str_bee5f0b9b922fbcf 1700000000000000ffffffffffffff7f636f6d6d656e742e6c696e652e616c6c6f772e6169706c
-; data 55 __str_ecfc9ae86f90161d 1f00000000000000ffffffffffffff7f756e7465726d696e617465642072617720737472696e67206c69746572616c
-; data 56 __str_15d1c1de76242ecb 1b00000000000000ffffffffffffff7f756e7465726d696e6174656420737472696e67206c69746572616c
-; data 57 __str_01b30526512e7c9a 1900000000000000ffffffffffffff7f756e7465726d696e617465642063686172206c69746572616c
+; data 47 __str_03e458c1087e839f 1e00000000000000ffffffffffffff7f636f6d6d656e742e6c696e652e646f75626c652d736c6173682e6169706c
+; data 48 __str_6fdfc79f7e6566cf 1a00000000000000ffffffffffffff7f756e7465726d696e6174656420626c6f636b20636f6d6d656e74
+; data 49 __str_bee5f0b9b922fbcf 1700000000000000ffffffffffffff7f636f6d6d656e742e6c696e652e616c6c6f772e6169706c
+; data 50 __str_e37eb258ea9aad3a 1f00000000000000ffffffffffffff7f636f6d6d656e742e6c696e652e646f63756d656e746174696f6e2e6169706c
+; data 51 __str_ba081c7d0ddcb8fa 1b00000000000000ffffffffffffff7f6b6579776f72642e636f6e74726f6c2e696d706f72742e6169706c
+; data 52 __str_787f5feed631247c 1d00000000000000ffffffffffffff7f636f6e7374616e742e6e756d657269632e696e74656765722e6169706c
+; data 53 __str_ecfc9ae86f90161d 1f00000000000000ffffffffffffff7f756e7465726d696e617465642072617720737472696e67206c69746572616c
+; data 54 __str_61427c3db3e5ae4f 1900000000000000ffffffffffffff7f737472696e672e71756f7465642e646f75626c652e6169706c
+; data 55 __str_15d1c1de76242ecb 1b00000000000000ffffffffffffff7f756e7465726d696e6174656420737472696e67206c69746572616c
+; data 56 __str_01b30526512e7c9a 1900000000000000ffffffffffffff7f756e7465726d696e617465642063686172206c69746572616c
+; data 57 __str_dd73197667854ed0 1900000000000000ffffffffffffff7f737472696e672e71756f7465642e73696e676c652e6169706c
 ; data 58 __str_28fb5721436a5533 2d00000000000000ffffffffffffff7f756e7465726d696e6174656420747269706c652d6261636b7469636b2074656d706c617465206c69746572616c
 ; data 59 __str_a65b87e0b87b3dfc 2d00000000000000ffffffffffffff7f696e636f6d706c657465206573636170652073657175656e63653a205c20617420656e64206f6620696e707574
 ; data 60 __str_942f91447d86f935 1900000000000000ffffffffffffff7f756e6b6e6f776e206573636170652073657175656e6365205c
@@ -193,7 +194,7 @@
 ; data 71 __str_60a827d44c868214 2f00000000000000ffffffffffffff7f3b206769766520746865206c69746572616c2069747320747970652c206f722072657475726e206120737472756374
 ; data 72 __str_e276b7953364d122 1a00000000000000ffffffffffffff7f4142434445464748494a4b4c4d4e4f505152535455565758595a
 ; data 73 __str_a33742f0d557add7 4200000000000000ffffffffffffff7f666f726d61747465723a20636f6d6d656e7420776173206e6f74206361727269656420696e746f20746865206f75747075742028666f726d61747465722062756729
-; data 74 __str_0c87e9706c80f444 3f00000000000000ffffffffffffff7f666f726d61747465723a20657870656374656420616e206974656d2028666e2f7374727563742f76617269616e742f696d706f7274292c20666f756e642022
+; data 74 __str_d0f5677eaa05257e 4300000000000000ffffffffffffff7f666f726d61747465723a20657870656374656420616e206974656d2028666e2f7374727563742f76617269616e742f6c65742f696d706f7274292c20666f756e642022
 ; data 75 __str_9d964e2f2ec8a6c6 2a00000000000000ffffffffffffff7f666f726d61747465723a20657870656374656420616e2065787072657373696f6e2c20666f756e642022
 ; data 76 __str_1566feaeb8f7c9b0 3800000000000000ffffffffffffff7f666f726d61747465723a20756e7465726d696e617465642074656d706c617465206c69746572616c20696e20746f6b656e2073747265616d
 ; data 77 __str_041f485e569c645e 1700000000000000ffffffffffffff7f6e6f2070726f64756374696f6e20617420696e64657820
@@ -312,4 +313,4 @@
 ; data 190 __tostr_lit_101 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m10__assert_loc
-; source-fingerprint 3481542328337978161
+; source-fingerprint 7812707792136189610

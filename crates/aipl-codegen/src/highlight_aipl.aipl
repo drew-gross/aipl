@@ -44,7 +44,7 @@ import {
     tm_json,
     word_pat,
 } from "./highlight.aipl";
-import { aipl_rules, ident_cont, ident_start, s_punct } from "./lex_aipl.aipl";
+import { S_PUNCT, aipl_rules, ident_cont, ident_start } from "./lex_aipl.aipl";
 import { CharRun } from "./lexer.aipl";
 
 # AIPL's TextMate grammar as `.tmLanguage.json` text — what
@@ -86,7 +86,7 @@ pub fn aipl_tmlanguage() -> str {
         repo: [
             Entry { name: "main", pats: main },
             Entry { name: "section-tail", pats: [section_tail()] },
-            brace_group_entry(s_punct()),
+            brace_group_entry(S_PUNCT),
             ..entries,
         ],
     })

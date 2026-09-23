@@ -1279,6 +1279,20 @@
 
 
 
+        <section class="item" id="item-const_item">
+          <h3>
+            <a class="anchor" href="#item-const_item">const_item</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn const_item(self: W) -&#62; WDoc!FmtError</code></pre>
+
+          <div class="doc"><p><code>pub let NAME: T = &lt;literal&gt;;</code> — one line, always: the value is a literal, so there is nothing here that could want breaking.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-fn_item">
           <h3>
             <a class="anchor" href="#item-fn_item">fn_item</a>
@@ -1494,7 +1508,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$54017: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$55053: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 

@@ -1,0 +1,35 @@
+import { print } from builtins;
+import { SHARED } from "./scopes.aipl";
+
+// A constant is importable exactly as a `pub fn` is — it rides the same
+// per-file view — and a private one is not.
+fn main() !prints {
+    print(SHARED);
+}
+--- file: scopes.aipl ---
+import { len } from builtins;
+
+pub let SHARED = "shared";
+
+// Private to this file, and used here — so the export check has something to
+// distinguish from `SHARED` rather than an unused declaration.
+let PRIVATE = "private";
+
+pub fn private_len() -> u64 { PRIVATE.len() }
+--- stdout ---
+shared
+
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 12
+binary size: 600
+  code: 80
+  data: 1
+  metadata: 519
+functions:
+  main:
+    calls: 1
+    bytes: 80

@@ -186,7 +186,6 @@ math:
 
 syntax:
   str without "" should work
-  allows top-level const vars so that s_keyword & co. don't need to exist
   field mutation for structs (lint let nullable: First<Tok> = First { ..f, nullable: true };) to set f.nullable = true;
   set x = { set x = a; b } should be illegal: set inside an expression is super weird
   forwarding omittables

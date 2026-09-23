@@ -1,0 +1,12 @@
+// A top-level constant is ALL_CAPS, so a substituted use reads as one.
+let myThing = 1;
+
+fn main() {
+    let x = myThing;
+}
+--- errors ---
+error: a top-level constant is named in ALL_CAPS: write "myThing" as "MY_THING"
+ --> ./tests/cases/constants/err_lowercase_name.aipl:2:5
+  |
+2 | let myThing = 1;
+  |     ^^^^^^^

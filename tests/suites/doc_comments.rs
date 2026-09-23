@@ -30,6 +30,7 @@ fn doc_of(src: &str) -> Option<String> {
         Item::Fn(f) => f.doc,
         Item::Struct(s) => s.doc,
         Item::Variant(v) => v.doc,
+        Item::Const(c) => c.doc,
         Item::Import(_) => None,
     }
 }

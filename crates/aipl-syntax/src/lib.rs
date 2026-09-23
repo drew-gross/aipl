@@ -266,6 +266,34 @@ pub mod ast {
         Struct(StructDecl),
         Variant(VariantDecl),
         Import(ImportDecl),
+        Const(ConstDecl),
+    }
+
+    /// A top-level constant: `pub let NAME: T = <literal>;`.
+    ///
+    /// The value is a literal and nothing else, so a constant needs no
+    /// evaluation order and no initialization pass — the loader substitutes each
+    /// use with the literal itself and drops the declaration, and nothing past
+    /// the loader knows constants exist. That is also why there is no `mut`
+    /// form: a mutable one would need storage, and storage would need all of
+    /// the above.
+    ///
+    /// `name` is ALL_CAPS by rule, which is what keeps a substituted use
+    /// distinguishable from an ordinary binding at the site that reads it.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct ConstDecl {
+        pub name: String,
+        /// Declared `pub`: importable by other files, like a `pub fn`.
+        pub is_pub: bool,
+        /// The written annotation, if any. A literal types itself, so this is
+        /// only ever a narrowing (`let PORT: u16 = 8080;`).
+        pub ty: Option<Type>,
+        /// The literal this name stands for.
+        pub value: Expr,
+        /// The `# ..` doc comment above the declaration.
+        pub doc: Option<String>,
+        /// The name's own span, for diagnostics about the declaration.
+        pub span: Span,
     }
 
     /// `import { foo, bar as baz } from "./util.aipl";` — a request to pull a
@@ -3225,6 +3253,7 @@ pub fn each_expr(program: &ast::Program, f: &mut impl FnMut(&ast::Expr)) {
                     }
                 }
             }
+            ast::Item::Const(c) => each_subexpr(&c.value, f),
             ast::Item::Import(_) => {}
         }
     }
@@ -3279,6 +3308,11 @@ pub fn promote_type_vars(program: &mut ast::Program) {
                             promote_in_expr(d, &vars);
                         }
                     }
+                }
+            }
+            ast::Item::Const(c) => {
+                if let Some(t) = &mut c.ty {
+                    promote_ty(t, &[]);
                 }
             }
             ast::Item::Import(_) => {}
@@ -3447,6 +3481,11 @@ fn each_type_mut(program: &mut ast::Program, f: &mut impl FnMut(&mut Type)) {
                     }
                 }
             }
+            ast::Item::Const(c) => {
+                if let Some(t) = &mut c.ty {
+                    f(t);
+                }
+            }
             ast::Item::Import(_) => {}
         }
     }
@@ -3480,6 +3519,7 @@ fn each_body_mut(program: &mut ast::Program, f: &mut impl FnMut(&mut ast::Expr))
                     }
                 }
             }
+            ast::Item::Const(c) => f(&mut c.value),
             ast::Item::Import(_) => {}
         }
     }

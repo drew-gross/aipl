@@ -221,6 +221,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
                     .collect(),
                 ..v.clone()
             }),
+            Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
             Item::Import(_) => item.clone(),
         })
         .collect();
@@ -571,6 +572,7 @@ pub fn lower_tuples(program: &Program) -> Program {
                     })
                     .collect(),
             }),
+            Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
             Item::Import(_) => item.clone(),
         })
         .collect();
@@ -1479,6 +1481,7 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
                     })
                     .collect::<Result<_, Error>>()?,
             }),
+            Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
             Item::Import(_) => item.clone(),
         };
         items.push(lowered);
@@ -1549,6 +1552,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                 );
                 passthrough.push(item.clone());
             }
+            Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
             Item::Import(_) => passthrough.push(item.clone()),
             Item::Fn(f) => {
                 if f.sig.is_mutating() {
@@ -1906,6 +1910,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             Item::Struct(s) => structs.push(s),
             Item::Variant(v) => variants_out.push(v),
             // Imports are resolved by the loader — codegen never sees them.
+            Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
             Item::Import(_) => {}
             Item::Fn(_) => unreachable!("passthrough never carries a fn item"),
         }

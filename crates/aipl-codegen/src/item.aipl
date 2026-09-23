@@ -69,7 +69,18 @@ struct VariantCase { name: str, doc: str?, payload: CaseParam[] }
 
 struct VariantDecl { name: str, doc: str?, type_vars: TypeParam[], cases: VariantCase[] }
 
-variant Item = Fn(Function) | Struct(StructDecl) | Variant(VariantDecl) | Import(ImportDecl)
+# A top-level `pub let NAME: T = <literal>;`. The loader substitutes each use
+# with the literal and drops the declaration, so nothing past it sees a
+# constant; `span` is the name's, for the diagnostics that check the two rules
+# a constant has — ALL_CAPS, and a literal value.
+struct ConstDecl { name: str, is_pub: bool, ty: Ty?, value: Expr, doc: str?, span: Span }
+
+variant Item =
+    | Fn(Function)
+    | Struct(StructDecl)
+    | Variant(VariantDecl)
+    | Import(ImportDecl)
+    | Const(ConstDecl)
 
 # `aipl_syntax::ast::Program`, less its `sources` map: a single parsed file has
 # none, and the loader fills one in when it flattens several files together.
@@ -102,6 +113,7 @@ pub fn show_item(self: Item) -> str {
         Struct(s) => `{show_doc(s.doc)}struct {s.name}{show_type_params(s.type_vars)}({s.fields.map(show_field_decl).join(sep=", ")})`,
         Variant(v) => `{show_doc(v.doc)}variant {v.name}{show_type_params(v.type_vars)}({v.cases.map(show_case).join(sep=" | ")})`,
         Import(d) => `import [{d.names.map(show_import_name).join(sep=", ")}] from {show_import_source(d.source)}`,
+        Const(c) => `{show_doc(c.doc)}let {c.name}{show_const_ty(c.ty)} = {show_expr(c.value)}`,
     }
 }.test({
     let d = ImportDecl {
@@ -132,6 +144,9 @@ fn show_fn(self: Function) -> str {
 fn effect_marker(self: str) -> str { ` !{self}` }
 
 fn show_doc(self: str?) -> str { self.map(|d| `doc({d}) `).value_or("") }
+
+# A constant's annotation, or nothing when it was not written.
+fn show_const_ty(self: Ty?) -> str { self.map(|t| `: {show_ty(t)}`).value_or("") }
 
 fn show_type_params(self: TypeParam[]) -> str {
     if (self.is_empty()) {
@@ -192,11 +207,11 @@ allocations: 18
 deallocations: 18
 reallocations: 2
 bytes allocated: 1338
-instructions executed: 1543
-binary size: 93936
-  code: 65936
+instructions executed: 1545
+binary size: 96624
+  code: 67748
   data: 423
-  metadata: 27577
+  metadata: 28453
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -254,7 +269,7 @@ functions:
     bytes: 364
   __test$show_item:
     calls: 1
-    bytes: 1980
+    bytes: 2236
   __to_str_i64:
     calls: 0
     bytes: 204
@@ -308,7 +323,7 @@ functions:
     bytes: 8768
   show_item:
     calls: 2
-    bytes: 8548
+    bytes: 10104
   show_type_params:
     calls: 1
     bytes: 2164

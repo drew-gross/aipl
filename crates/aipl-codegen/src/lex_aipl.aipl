@@ -434,32 +434,32 @@ pub fn template_segments(texts: str[]) -> str[] {
 # `highlight_aipl.aipl` — cannot disagree with it. These are TextMate's
 # conventional names, which is what lets an editor theme colour AIPL without
 # knowing anything about AIPL.
-fn s_keyword() -> str { "keyword.control.aipl" }
+let S_KEYWORD = "keyword.control.aipl";
 
-fn s_constant() -> str { "constant.language.aipl" }
+let S_CONSTANT = "constant.language.aipl";
 
 # `import`/`from`/`as` are keywords like any other, but scoped as the
 # import-statement family so a theme can colour a module header on its own.
 # They are consecutive in the table below, so they come out of the highlighter
 # generator as one alternation between the two halves of the keyword run.
-fn s_import() -> str { "keyword.control.import.aipl" }
+let S_IMPORT = "keyword.control.import.aipl";
 
-fn s_name() -> str { "variable.other.aipl" }
+let S_NAME = "variable.other.aipl";
 
-fn s_number() -> str { "constant.numeric.integer.aipl" }
+let S_NUMBER = "constant.numeric.integer.aipl";
 
-fn s_string() -> str { "string.quoted.double.aipl" }
+let S_STRING = "string.quoted.double.aipl";
 
-fn s_char() -> str { "string.quoted.single.aipl" }
+let S_CHAR = "string.quoted.single.aipl";
 
-fn s_operator() -> str { "keyword.operator.aipl" }
+let S_OPERATOR = "keyword.operator.aipl";
 
-pub fn s_punct() -> str { "punctuation.aipl" }
+pub let S_PUNCT = "punctuation.aipl";
 
 # A doc comment is documentation, not an aside — a highlighter paints it like a
 # doc string rather than like a `//` comment, which is what every editor theme
 # already distinguishes.
-fn s_doc() -> str { "comment.line.documentation.aipl" }
+let S_DOC = "comment.line.documentation.aipl";
 
 pub fn aipl_rules() -> TokenRule<AiplTok>[] {
     let three_quotes = `"""`;
@@ -504,38 +504,38 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // `#` also leads a set/dict literal (`#{..}`), an ordered set's
         // `#>{..}` / `#<{..}`, and the `#[allow]` marker above, so the matcher
         // declines those leads and they fall through to the rules that want them.
-        TokenRule { matcher: ToEolUnless("#", "{[<>"), emit: Of(doc_text), scope: s_doc() },
+        TokenRule { matcher: ToEolUnless("#", "{[<>"), emit: Of(doc_text), scope: S_DOC },
         // Keywords and constants, each its own `kw` rule (identifier-boundary
         // matched, so `iffy`/`noneish` stay `Name`s). Order among them is
         // immaterial — the spellings are disjoint — but all must precede the
         // identifier rule. Constants (`true`/`false`/`none`) get their own kinds,
         // a distinct category from keywords, mirroring the Rust lexer.
-        kw("fn", Fn, s_keyword()),
-        kw("let", Let, s_keyword()),
-        kw("mut", Mut, s_keyword()),
-        kw("set", Set, s_keyword()),
-        kw("pub", Pub, s_keyword()),
-        kw("import", Import, s_import()),
-        kw("from", From, s_import()),
-        kw("as", As, s_import()),
-        kw("for", For, s_keyword()),
-        kw("while", While, s_keyword()),
-        kw("match", Match, s_keyword()),
-        kw("return", Return, s_keyword()),
-        kw("shim", Shim, s_keyword()),
-        kw("struct", Struct, s_keyword()),
-        kw("variant", Variant, s_keyword()),
-        kw("if", If, s_keyword()),
-        kw("else", Else, s_keyword()),
-        kw("builtins", Builtins, s_keyword()),
-        kw("without", Without, s_keyword()),
-        kw("true", True, s_constant()),
-        kw("false", False, s_constant()),
-        kw("none", None, s_constant()),
+        kw("fn", Fn, S_KEYWORD),
+        kw("let", Let, S_KEYWORD),
+        kw("mut", Mut, S_KEYWORD),
+        kw("set", Set, S_KEYWORD),
+        kw("pub", Pub, S_KEYWORD),
+        kw("import", Import, S_IMPORT),
+        kw("from", From, S_IMPORT),
+        kw("as", As, S_IMPORT),
+        kw("for", For, S_KEYWORD),
+        kw("while", While, S_KEYWORD),
+        kw("match", Match, S_KEYWORD),
+        kw("return", Return, S_KEYWORD),
+        kw("shim", Shim, S_KEYWORD),
+        kw("struct", Struct, S_KEYWORD),
+        kw("variant", Variant, S_KEYWORD),
+        kw("if", If, S_KEYWORD),
+        kw("else", Else, S_KEYWORD),
+        kw("builtins", Builtins, S_KEYWORD),
+        kw("without", Without, S_KEYWORD),
+        kw("true", True, S_CONSTANT),
+        kw("false", False, S_CONSTANT),
+        kw("none", None, S_CONSTANT),
         TokenRule {
             matcher: CharRun(ident_cont(), first=ident_start()),
             emit: Of(Name),
-            scope: s_name(),
+            scope: S_NAME,
         },
         // Integer literals, signed or unsigned: `Int` matches a digit run with an
         // optional leading `-`, and `int_lit` parses the whole thing (so `-123` is
@@ -546,7 +546,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // Placing `Int` before that operator rule is the whole disambiguation.
         // Consequence: a value minus a number must be spaced (`a - 5`); `a-5` lexes
         // `a` then the literal `-5`.
-        TokenRule { matcher: Int, emit: Try(int_lit), scope: s_number() },
+        TokenRule { matcher: Int, emit: Try(int_lit), scope: S_NUMBER },
         // Raw strings before the plain string rule: `Between` declines (length 0)
         // unless the source opens with `"""`, so a single `"` still falls through
         // to `Delimited` — but a `"""` is claimed here as one raw token rather
@@ -557,13 +557,13 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             matcher: Between(three_quotes, three_quotes),
             emit: Of(|text: str| StrLit(process_raw_string(text), TripleQuoted)),
             unterminated: "unterminated raw string literal",
-            scope: s_string(),
+            scope: S_STRING,
         },
         TokenRule {
             matcher: Delimited(`"`, `ntr\\"`),
             emit: Of(|text: str| StrLit(text.unescape(), Quoted)),
             unterminated: "unterminated string literal",
-            scope: s_string(),
+            scope: S_STRING,
         },
         // Char literals `'x'`/`'\n'`: lexed exactly like a `"..."` string but
         // single-quoted — a `Delimited("'", ..)` scan (escape-aware, so `'\''`
@@ -577,7 +577,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             matcher: Delimited("'", `ntr\\'"`),
             emit: Try(char_lit_emit),
             unterminated: "unterminated char literal",
-            scope: s_char(),
+            scope: S_CHAR,
         },
         // Template literals. Triple-backtick before single (`Template` declines
         // unless the source opens with its delim, so ``` ``` ``` must be claimed
@@ -593,64 +593,64 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             matcher: Template("```", "", dedent_segments),
             emit: OfSeg(raw_tpl_kind),
             unterminated: "unterminated triple-backtick template literal",
-            scope: s_string(),
+            scope: S_STRING,
         },
         TokenRule {
             matcher: Template("`", """\`ntr""", |segs: str[]| segs),
             emit: OfSeg(tpl_kind),
-            scope: s_string(),
+            scope: S_STRING,
         },
         // Operators and punctuation, one `op` rule per spelling, longest first so
         // first-match-wins is maximal munch: the three-char `+++`, then the
         // two-char forms (`==`/`=>` before `=`, `<=`/`>=` before `<`/`>`, `++`
         // before `+`, `||` before `|`, `..` before `.`), then the one-char rest.
-        op("+++", PlusPlusPlus, s_operator()),
-        op("==", EqEq, s_operator()),
-        op("!=", Ne, s_operator()),
-        op("->", Arrow, s_operator()),
-        op("=>", FatArrow, s_operator()),
-        op("&&", AndAnd, s_operator()),
-        op("||", OrOr, s_operator()),
-        op("..", DotDot, s_operator()),
-        op("++", PlusPlus, s_operator()),
+        op("+++", PlusPlusPlus, S_OPERATOR),
+        op("==", EqEq, S_OPERATOR),
+        op("!=", Ne, S_OPERATOR),
+        op("->", Arrow, S_OPERATOR),
+        op("=>", FatArrow, S_OPERATOR),
+        op("&&", AndAnd, S_OPERATOR),
+        op("||", OrOr, S_OPERATOR),
+        op("..", DotDot, S_OPERATOR),
+        op("++", PlusPlus, S_OPERATOR),
         // `--` sits with `++` and, like `-=`, needs no care against `Int`: that
         // matcher takes a `-` only when a *digit* follows it, and here the next
         // character is another `-`. It does mean `a--5` lexes `a`, `--`, `5`
         // where it once lexed `a` then the literal `-5` — the same spacing rule
         // `a - 5` already had.
-        op("--", MinusMinus, s_operator()),
+        op("--", MinusMinus, S_OPERATOR),
         // The compound assignments, each before both the plain operator it
         // accumulates with and the `=` that follows it: `+=` would otherwise
         // lex as `+` then `=`. `-=` needs no such care against `Int` — that
         // matcher takes a `-` only when a *digit* follows it.
-        op("+=", PlusEq, s_operator()),
-        op("-=", MinusEq, s_operator()),
-        op("*=", StarEq, s_operator()),
-        op("/=", SlashEq, s_operator()),
-        op("<=", Le, s_operator()),
-        op(">=", Ge, s_operator()),
-        op("=", Eq, s_operator()),
-        op("<", Lt, s_operator()),
-        op(">", Gt, s_operator()),
-        op("!", Bang, s_operator()),
-        op("+", Plus, s_operator()),
-        op("-", Minus, s_operator()),
-        op("*", Star, s_operator()),
-        op("/", Slash, s_operator()),
-        op("%", Percent, s_operator()),
-        op("|", Pipe, s_operator()),
-        op(".", Period, s_punct()),
-        op(",", Comma, s_punct()),
-        op(":", Colon, s_punct()),
-        op(";", Semi, s_punct()),
-        op("?", Question, s_punct()),
-        op("#", Hash, s_punct()),
-        op("(", LParen, s_punct()),
-        op(")", RParen, s_punct()),
-        op("{", LBrace, s_punct()),
-        op("}", RBrace, s_punct()),
-        op("[", LBracket, s_punct()),
-        op("]", RBracket, s_punct()),
+        op("+=", PlusEq, S_OPERATOR),
+        op("-=", MinusEq, S_OPERATOR),
+        op("*=", StarEq, S_OPERATOR),
+        op("/=", SlashEq, S_OPERATOR),
+        op("<=", Le, S_OPERATOR),
+        op(">=", Ge, S_OPERATOR),
+        op("=", Eq, S_OPERATOR),
+        op("<", Lt, S_OPERATOR),
+        op(">", Gt, S_OPERATOR),
+        op("!", Bang, S_OPERATOR),
+        op("+", Plus, S_OPERATOR),
+        op("-", Minus, S_OPERATOR),
+        op("*", Star, S_OPERATOR),
+        op("/", Slash, S_OPERATOR),
+        op("%", Percent, S_OPERATOR),
+        op("|", Pipe, S_OPERATOR),
+        op(".", Period, S_PUNCT),
+        op(",", Comma, S_PUNCT),
+        op(":", Colon, S_PUNCT),
+        op(";", Semi, S_PUNCT),
+        op("?", Question, S_PUNCT),
+        op("#", Hash, S_PUNCT),
+        op("(", LParen, S_PUNCT),
+        op(")", RParen, S_PUNCT),
+        op("{", LBrace, S_PUNCT),
+        op("}", RBrace, S_PUNCT),
+        op("[", LBracket, S_PUNCT),
+        op("]", RBracket, S_PUNCT),
     ]
 }
 

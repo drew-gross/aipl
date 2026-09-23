@@ -57,6 +57,8 @@ pub enum SymbolKind {
     /// case is what source *mentions*: a constructor call and a match pattern
     /// both name the case, not the variant.
     Case,
+    /// A top-level `let NAME = <literal>;`.
+    Constant,
 }
 
 impl SymbolKind {
@@ -68,6 +70,7 @@ impl SymbolKind {
             SymbolKind::Struct => Some("struct"),
             SymbolKind::Variant => Some("variant"),
             SymbolKind::Case => None,
+            SymbolKind::Constant => Some("let"),
         }
     }
 }
@@ -366,6 +369,21 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                     });
                 }
             }
+            Item::Const(c) => {
+                let Some(name_span) = spans.next_named(SymbolKind::Constant, &c.name) else {
+                    continue;
+                };
+                out.push(Symbol {
+                    name: c.name.clone(),
+                    kind: SymbolKind::Constant,
+                    detail: const_detail(c, src),
+                    doc: c.doc.clone(),
+                    is_pub: c.is_pub,
+                    name_span,
+                    parent: None,
+                    slots: Vec::new(),
+                });
+            }
             Item::Import(_) => {}
         }
     }
@@ -518,6 +536,22 @@ fn fn_detail(f: &aipl_syntax::ast::Function, src: &str) -> String {
         params,
         effects,
         ty(&f.sig.return_ty)
+    )
+}
+
+/// `pub let NAME: T = <literal>` — the declaration as written, with the value
+/// read back out of the source so it reads exactly as the author spelled it.
+fn const_detail(c: &aipl_syntax::ast::ConstDecl, src: &str) -> String {
+    let annotation =
+        c.ty.as_ref()
+            .map(|t| format!(": {}", type_name(t)))
+            .unwrap_or_default();
+    format!(
+        "{}let {}{} = {}",
+        if c.is_pub { "pub " } else { "" },
+        c.name,
+        annotation,
+        &src[c.value.span.start..c.value.span.end]
     )
 }
 

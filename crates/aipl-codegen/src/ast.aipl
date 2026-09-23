@@ -37,6 +37,7 @@ import {
 } from "./expr.aipl";
 import {
     CaseParam as CaseParamNode,
+    ConstDecl,
     FieldDecl as FieldDeclNode,
     Function as FunctionNode,
     ImportDecl,
@@ -106,6 +107,7 @@ variant Ast =
     | Variant(VariantDecl)
     | VariantCase(VariantCaseNode)
     | CaseParam(CaseParamNode)
+    | Const(ConstDecl)
 
 # What a child lowered to, as a noun a refusal can name. Every mismatch here is
 # a lowering bug rather than a bad program — the grammar guarantees the shape —
@@ -144,6 +146,7 @@ pub fn ast_case_name(self: Ast) -> str {
         Variant(..) => "a variant declaration",
         VariantCase(..) => "a variant case",
         CaseParam(..) => "a case parameter",
+        Const(..) => "a constant",
     }
 }.test({
     assert(Ty(Unit).ast_case_name() == "a type");

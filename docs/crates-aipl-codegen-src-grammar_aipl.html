@@ -1567,6 +1567,20 @@
 
 
 
+        <section class="item" id="item-lower_const_decl">
+          <h3>
+            <a class="anchor" href="#item-lower_const_decl">lower_const_decl</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_const_decl(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p><code>import_decl</code> — the names, and where they come from. The source is the token after <code>from</code>, which is the second-to-last this production matched. <code>const_decl</code> — <code>pub let NAME: T = &lt;literal&gt;;</code>. The annotation is a child when one was written, so the value is the last child either way; <code>pub</code> and the name are read off this production's own tokens. The two rules a constant has — ALL_CAPS, and a literal value — are the loader's, which is where a name is resolved and where the substitution that makes them matter happens.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_import_decl">
           <h3>
             <a class="anchor" href="#item-lower_import_decl">lower_import_decl</a>
@@ -1574,7 +1588,7 @@
           </h3>
           <pre class="signature"><code>fn lower_import_decl(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>import_decl</code> — the names, and where they come from. The source is the token after <code>from</code>, which is the second-to-last this production matched.</p></div>
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>

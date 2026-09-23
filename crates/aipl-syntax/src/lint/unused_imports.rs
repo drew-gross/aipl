@@ -75,6 +75,13 @@ fn referenced_names(program: &Program) -> HashSet<String> {
                     }
                 }
             }
+            // A constant's annotation may name an imported type; its value is
+            // a literal, so it names nothing.
+            Item::Const(c) => {
+                if let Some(t) = &c.ty {
+                    collect_ty_names(t, &mut out);
+                }
+            }
             Item::Import(_) => {}
         }
     }

@@ -330,6 +330,7 @@ fn kind_label(kind: SymbolKind) -> &'static str {
         SymbolKind::Struct => "struct",
         SymbolKind::Variant => "variant",
         SymbolKind::Case => "case",
+        SymbolKind::Constant => "let",
     }
 }
 
@@ -339,6 +340,7 @@ fn kind_class(kind: SymbolKind) -> &'static str {
         SymbolKind::Struct => "kind-struct",
         SymbolKind::Variant => "kind-variant",
         SymbolKind::Case => "kind-case",
+        SymbolKind::Constant => "kind-const",
     }
 }
 

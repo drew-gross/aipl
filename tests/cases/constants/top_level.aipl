@@ -1,0 +1,76 @@
+import { print } from builtins;
+
+// A top-level `let NAME = <literal>;` names a literal. The loader substitutes
+// each use with that literal and drops the declaration, so nothing past the
+// loader knows constants exist — which is why the value must *be* a literal
+// (there is no point at which a computation would run) and why there is no
+// `mut` form (a mutable one would need storage).
+//
+// The ALL_CAPS rule is what keeps a substituted use readable at the site that
+// reads it: the name says "not a binding from around here".
+
+# The TextMate scope a keyword is painted with.
+pub let S_KEYWORD: str = "keyword.control.aipl";
+
+let GREETING = "hello";
+
+// The annotation is optional, and narrows: a bare literal would be `i64`.
+let PORT: u16 = 8080;
+
+// A signed literal is a literal.
+let OFFSET = -1;
+
+let ENABLED = true;
+
+let TAB = '\t';
+
+fn shown(port: u16) -> str { `{port}` }
+
+fn main() !prints {
+    print(S_KEYWORD);
+    print(GREETING);
+    print(`{shown(PORT)} {OFFSET} {ENABLED} [{TAB}]`);
+}
+--- stdout ---
+keyword.control.aipl
+hello
+8080 -1 true [	]
+
+--- performance ---
+allocations: 10
+deallocations: 10
+reallocations: 0
+bytes allocated: 674
+instructions executed: 188
+binary size: 3392
+  code: 1600
+  data: 47
+  metadata: 1745
+functions:
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  __to_str_u16:
+    calls: 1
+    bytes: 204
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_u64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 1
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  aipl_write_u64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 960

@@ -248,6 +248,20 @@
 
 
 
+        <section class="item" id="item-ConstDecl">
+          <h3>
+            <a class="anchor" href="#item-ConstDecl">ConstDecl</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ConstDecl</code></pre>
+
+          <div class="doc"><p>A top-level <code>pub let NAME: T = &lt;literal&gt;;</code>. The loader substitutes each use with the literal and drops the declaration, so nothing past it sees a constant; <code>span</code> is the name's, for the diagnostics that check the two rules a constant has — ALL_CAPS, and a literal value.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-Item">
           <h3>
             <a class="anchor" href="#item-Item">Item</a>
@@ -276,6 +290,11 @@
             </li>
 
             <li id="item-Import"><code>Import(ImportDecl)</code>
+
+
+            </li>
+
+            <li id="item-Const"><code>Const(ConstDecl)</code>
 
 
             </li>
@@ -427,6 +446,20 @@
           <pre class="signature"><code>fn show_doc(self: str?) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-show_const_ty">
+          <h3>
+            <a class="anchor" href="#item-show_const_ty">show_const_ty</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn show_const_ty(self: Ty?) -&#62; str</code></pre>
+
+          <div class="doc"><p>A constant's annotation, or nothing when it was not written.</p></div>
 
 
         </section>
