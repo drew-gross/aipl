@@ -1634,6 +1634,17 @@ pub mod ast {
         /// value). Like [`Pattern::Str`] the domain is open, so such a match
         /// must end in a `_` arm.
         Char(u8),
+        /// `[p0, p1, ...]` where at least one element is not a plain binder or
+        /// a literal — `[n, Tok("?"), _, ty]`, `[some(v), none]`. The
+        /// counterpart of [`Pattern::Array`] exactly as [`Pattern::Nested`] is
+        /// of [`Pattern::Ctor`]: an array pattern whose elements *are* all
+        /// plain is the simple form, which is what [`Pattern::normalized`]
+        /// turns it into.
+        ///
+        /// Like the other nested forms it exists from the parser to
+        /// monomorphization only: mono compiles it into a length test plus one
+        /// column per element, so codegen only ever sees [`Pattern::Array`].
+        ArrayNested(Vec<Pattern>),
         /// An array/`str`-destructuring pattern `[e0, e1, ...] => body` (matches a
         /// `str` or array scrutinee by exact length, then, per element position,
         /// either a bound name or a literal-equality check). Each element is a
@@ -1697,9 +1708,9 @@ pub mod ast {
                     Vec::new()
                 }
                 Pattern::Bind(name) => vec![name.clone()],
-                Pattern::Tuple(ps) | Pattern::Nested { args: ps, .. } => {
-                    ps.iter().flat_map(Pattern::bindings).collect()
-                }
+                Pattern::Tuple(ps)
+                | Pattern::Nested { args: ps, .. }
+                | Pattern::ArrayNested(ps) => ps.iter().flat_map(Pattern::bindings).collect(),
             }
         }
 
@@ -1711,6 +1722,7 @@ pub mod ast {
                 Pattern::Str(_)
                 | Pattern::Char(_)
                 | Pattern::Array(_)
+                | Pattern::ArrayNested(_)
                 | Pattern::Wildcard
                 | Pattern::Tuple(_)
                 | Pattern::Int(_)
@@ -1718,13 +1730,42 @@ pub mod ast {
             }
         }
 
+        /// This pattern's elements as sub-patterns, for either array form —
+        /// `None` when it is not an array pattern at all.
+        ///
+        /// The simple [`Pattern::Array`] holds expressions, so its elements are
+        /// read back as the patterns they stand for: an identifier binds (or is
+        /// `_`), a literal matches by value. That is what lets one `match` mix
+        /// the two forms — `[a, b]` beside `[some(v), none]` — which it has to,
+        /// since whether a given arm is plain is a property of that arm alone.
+        pub fn array_elems(&self) -> Option<Vec<Pattern>> {
+            match self {
+                Pattern::ArrayNested(ps) => Some(ps.clone()),
+                Pattern::Array(elems) => elems
+                    .iter()
+                    .map(|e| match &e.kind {
+                        ExprKind::Ident(n) if n == "_" => Some(Pattern::Wildcard),
+                        ExprKind::Ident(n) => Some(Pattern::Bind(n.clone())),
+                        ExprKind::Str(s) => Some(Pattern::Str(s.clone())),
+                        ExprKind::Num(n) => Some(Pattern::Int(*n)),
+                        ExprKind::Char(c) => Some(Pattern::Char(*c)),
+                        // The checker has already refused anything else.
+                        _ => None,
+                    })
+                    .collect(),
+                _ => None,
+            }
+        }
+
         /// Whether this pattern uses any of the nested forms — the ones only the
         /// checker and mono know, which an arm has to be compiled away from.
         pub fn is_nested(&self) -> bool {
             match self {
-                Pattern::Tuple(_) | Pattern::Nested { .. } | Pattern::Int(_) | Pattern::Bind(_) => {
-                    true
-                }
+                Pattern::Tuple(_)
+                | Pattern::Nested { .. }
+                | Pattern::ArrayNested(_)
+                | Pattern::Int(_)
+                | Pattern::Bind(_) => true,
                 Pattern::Ctor { .. }
                 | Pattern::Str(_)
                 | Pattern::Char(_)
@@ -1776,6 +1817,9 @@ pub mod ast {
                 }
                 Pattern::Tuple(ps) => {
                     Pattern::Tuple(ps.into_iter().map(|p| p.normalized(false)).collect())
+                }
+                Pattern::ArrayNested(ps) => {
+                    Pattern::ArrayNested(ps.into_iter().map(|p| p.normalized(false)).collect())
                 }
                 // A bare name the parser could only read as a nullary
                 // constructor is a binder in a nested slot.

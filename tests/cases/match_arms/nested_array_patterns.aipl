@@ -1,0 +1,149 @@
+import { print, to_str, wrapping_add as + } from builtins;
+
+// An array-destructuring arm's elements are ordinary *patterns*, so a position
+// may hold a constructor, a literal or `_` rather than only a binder name. The
+// arms then read as the shapes they match, and the grammar reaches an element
+// through `pattern` exactly as it reaches every other slot.
+//
+// This is to `[a, b]` what `Nested` is to `Ctor`: an array pattern whose
+// elements are all plain binders or literals is unchanged, and lowers to the
+// same simple form it always did — see `array_patterns.aipl` for that one.
+variant Slot = Tok(str) | Sub(i64)
+
+// Length alone tells these apart: the five-position alternative is the one with
+// a default, and nothing has to count anything to find that out.
+fn arity(slots: Slot[]) -> str {
+    match (slots) {
+        [_, _, _, _, _] => "five",
+        [_, _, _] => "three",
+        _ => "other",
+    }
+}
+
+// Two alternatives of the *same* length, told apart by what sits in one
+// position — the case a length test alone cannot settle. A literal nested
+// inside a constructor element works like any other nested literal.
+fn kind(slots: Slot[]) -> str {
+    match (slots) {
+        [Tok("?"), Sub(n)] => `optional {n}`,
+        [Tok(op), Sub(n)] => `{op} {n}`,
+        [Sub(a), Sub(b)] => `pair {a} {b}`,
+        _ => "other",
+    }
+}
+
+// Optional elements, which is the shape a positional match over "this slot was
+// filled or it wasn't" wants.
+fn pick(xs: i64?[]) -> i64 {
+    match (xs) {
+        [some(a), none] => a,
+        [none, some(b)] => b,
+        [some(a), some(b)] => a + b,
+        _ => 0,
+    }
+}
+
+// A binder alongside a constructor element: the binder still binds, and `_`
+// may repeat as it does in every other pattern.
+fn named(slots: Slot[]) -> str {
+    match (slots) {
+        [Tok(name), _, Sub(v), _] => `{name}={v}`,
+        _ => "none",
+    }
+}
+
+// One `match` may mix the two forms: whether an arm is plain is a property of
+// that arm, not of the match, so `[a, b]` sits beside `[Tok("!"), x]` and the
+// plain one catches every length-two value the nested one did not.
+fn mixed(slots: Slot[]) -> str {
+    match (slots) {
+        [Tok("!"), _] => "bang",
+        [_, _] => "two",
+        [_] => "one",
+        _ => "other",
+    }
+}
+
+fn main() !prints {
+    print(arity([Sub(0), Sub(1), Sub(2), Sub(3), Sub(4)]));
+    print(arity([Sub(0), Sub(1), Sub(2)]));
+    print(arity([Sub(0)]));
+
+    print(kind([Tok("?"), Sub(1)]));
+    print(kind([Tok("="), Sub(2)]));
+    print(kind([Sub(3), Sub(4)]));
+    print(kind([Tok("x")]));
+
+    print(pick([some(7), none]).to_str());
+    print(pick([none, some(9)]).to_str());
+    print(pick([some(1), some(2)]).to_str());
+    print(pick([none, none]).to_str());
+
+    print(named([Tok("w"), Tok(":"), Sub(5), Tok(";")]));
+    print(named([Sub(0)]));
+
+    print(mixed([Tok("!"), Sub(0)]));
+    print(mixed([Tok("?"), Sub(0)]));
+    print(mixed([Sub(0)]));
+    print(mixed([]));
+}
+--- stdout ---
+five
+three
+other
+optional 1
+= 2
+pair 3 4
+other
+7
+9
+3
+0
+w=5
+none
+bang
+two
+one
+other
+
+--- performance ---
+allocations: 33
+deallocations: 33
+reallocations: 0
+bytes allocated: 2329
+instructions executed: 2575
+binary size: 22904
+  code: 16208
+  data: 33
+  metadata: 6663
+functions:
+  __arr_drop_Slot:
+    calls: 12
+    bytes: 136
+  __arr_retain_Slot:
+    calls: 0
+    bytes: 136
+  __to_str_i64:
+    calls: 9
+    bytes: 204
+  aipl_array_dec:
+    calls: 16
+    bytes: (external)
+  aipl_array_new:
+    calls: 16
+    bytes: (external)
+  aipl_i64_len:
+    calls: 18
+    bytes: (external)
+  aipl_write_i64:
+    calls: 9
+    bytes: (external)
+  kind:
+    calls: 4
+    bytes: 1944
+  main:
+    calls: 1
+    bytes: 12440
+  named:
+    calls: 2
+    bytes: 1348

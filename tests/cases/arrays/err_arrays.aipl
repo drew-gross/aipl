@@ -10,7 +10,10 @@ import { push, value_or } from builtins;
 //     either one aborts the file before the checker sees it;
 //   - `err_push_char_from_empty` — a *codegen* error (pushing a char would
 //     change the array's representation), and codegen only runs once checking
-//     has passed, so it can never appear next to a check error.
+//     has passed, so it can never appear next to a check error;
+//   - `err_array_pattern_non_literal` — an array pattern's elements are
+//     patterns, so an expression among them is a *parse* error, which aborts
+//     the file before any of these are reached.
 
 // Indexing something that isn't an array.
 fn index_non_array() -> i64 {
@@ -31,14 +34,6 @@ fn match_duplicate(xs: i64[]) -> i64 {
 fn match_elem_type(xs: i64[]) -> i64 {
     match (xs) {
         ["a", "b"] => 1,
-        _ => 0,
-    }
-}
-
-fn match_non_literal(xs: i64[]) -> i64 {
-    let k = 2;
-    match (xs) {
-        [1, k + 1] => 1,
         _ => 0,
     }
 }
@@ -68,43 +63,37 @@ fn push_immutable() -> i64 {
 fn main() {}
 --- errors ---
 error: cannot index a value of type i64
-  --> ./tests/cases/arrays/err_arrays.aipl:18:5
+  --> ./tests/cases/arrays/err_arrays.aipl:21:5
    |
-18 |     x[0].value_or(0)
+21 |     x[0].value_or(0)
    |     ^
 
 error: duplicate match arm
-  --> ./tests/cases/arrays/err_arrays.aipl:26:9
+  --> ./tests/cases/arrays/err_arrays.aipl:29:9
    |
-26 |         [1, 2] => 2,
+29 |         [1, 2] => 2,
    |         ^^^^^^^^^^^
 
 error: array-pattern element: expected i64, got str
-  --> ./tests/cases/arrays/err_arrays.aipl:33:10
+  --> ./tests/cases/arrays/err_arrays.aipl:36:10
    |
-33 |         ["a", "b"] => 1,
+36 |         ["a", "b"] => 1,
    |          ^^^
 
-error: array-pattern elements must be a binding name or a literal
-  --> ./tests/cases/arrays/err_arrays.aipl:41:13
-   |
-41 |         [1, k + 1] => 1,
-   |             ^^^^^
-
 error: non-exhaustive match on an array: add a `_` arm
-  --> ./tests/cases/arrays/err_arrays.aipl:47:5
+  --> ./tests/cases/arrays/err_arrays.aipl:42:5
    |
-47 |     match (xs) {
+42 |     match (xs) {
    |     ^^^^^^^^^^^^
 
 error: the `_` arm must be last (arms after it are unreachable)
-  --> ./tests/cases/arrays/err_arrays.aipl:56:9
+  --> ./tests/cases/arrays/err_arrays.aipl:51:9
    |
-56 |         _ => 0,
+51 |         _ => 0,
    |         ^
 
 error: set: cannot assign to immutable binding "xs" (use "let mut")
-  --> ./tests/cases/arrays/err_arrays.aipl:64:9
+  --> ./tests/cases/arrays/err_arrays.aipl:59:9
    |
-64 |     set xs.push(2);
+59 |     set xs.push(2);
    |         ^^^^^^^^^

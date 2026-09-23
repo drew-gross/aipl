@@ -1329,6 +1329,48 @@
 
 
 
+        <section class="item" id="item-array_pattern">
+          <h3>
+            <a class="anchor" href="#item-array_pattern">array_pattern</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn array_pattern(elems: Pat[], subs: Cst[]) -&#62; Pat</code></pre>
+
+          <div class="doc"><p>An array-destructuring arm's pattern: the simple <code>Array</code> when every element is a plain binder or a literal — the form codegen compiles directly, and the one that carries a span per element — and the nested <code>ArrayNested</code> otherwise. The same split <code>nested_or_ctor</code> makes between <code>Ctor</code> and <code>Nested</code>, for the same reason: an arm written the old way lowers exactly as it always did.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_plain_elem">
+          <h3>
+            <a class="anchor" href="#item-is_plain_elem">is_plain_elem</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_plain_elem(self: Pat) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether an element needs no sub-pattern machinery: a binder name, <code>_</code>, or a literal. A bare name that is *not* a binder — <code>none</code>, or a capitalised case — is a constructor, so it is not plain and forces the nested form, where it means the case rather than a name to bind.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-plain_elem_expr">
+          <h3>
+            <a class="anchor" href="#item-plain_elem_expr">plain_elem_expr</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn plain_elem_expr(self: Pat, span: Span) -&#62; Expr</code></pre>
+
+          <div class="doc"><p>A plain element as the expression the simple <code>Array</code> form holds, spanned where it was written. Total over what <code>is_plain_elem</code> admits; anything else has already taken the nested path.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-arm_span">
           <h3>
             <a class="anchor" href="#item-arm_span">arm_span</a>
@@ -1908,7 +1950,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$117929: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$120045: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

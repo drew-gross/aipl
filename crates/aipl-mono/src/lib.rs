@@ -5147,17 +5147,25 @@ impl Mono<'_> {
     /// checker has already issued.
     fn nested_binders(&self, pattern: &Pattern, ty: &Type) -> Vec<(String, Type)> {
         match pattern {
-            Pattern::Wildcard
-            | Pattern::Int(_)
-            | Pattern::Str(_)
-            | Pattern::Char(_)
-            | Pattern::Array(_) => Vec::new(),
+            Pattern::Wildcard | Pattern::Int(_) | Pattern::Str(_) | Pattern::Char(_) => Vec::new(),
             Pattern::Bind(name) => vec![(name.clone(), ty.clone())],
             Pattern::Tuple(ps) => {
                 let elems = self.tuple_field_tys(ty).unwrap_or_default();
                 ps.iter()
                     .zip(elems)
                     .flat_map(|(p, t)| self.nested_binders(p, &t))
+                    .collect()
+            }
+            Pattern::Array(_) | Pattern::ArrayNested(_) => {
+                let elem = match ty {
+                    Type::Array(e) => (**e).clone(),
+                    _ => Type::Primitive(Primitive::Char), // str, as char[]
+                };
+                pattern
+                    .array_elems()
+                    .unwrap_or_default()
+                    .iter()
+                    .flat_map(|p| self.nested_binders(p, &elem))
                     .collect()
             }
             Pattern::Ctor {
@@ -6504,7 +6512,8 @@ impl Mono<'_> {
                             vec![elem; arm.pattern.bindings().len()]
                         }
                         Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => Vec::new(),
-                        Pattern::Tuple(_)
+                        Pattern::ArrayNested(_)
+                        | Pattern::Tuple(_)
                         | Pattern::Nested { .. }
                         | Pattern::Int(_)
                         | Pattern::Bind(_) => unreachable!("routed to `infer_nested_match`"),
@@ -6568,7 +6577,8 @@ impl Mono<'_> {
                         vec![elem; arm.pattern.bindings().len()]
                     }
                     Pattern::Str(_) | Pattern::Char(_) | Pattern::Wildcard => Vec::new(),
-                    Pattern::Tuple(_)
+                    Pattern::ArrayNested(_)
+                    | Pattern::Tuple(_)
                     | Pattern::Nested { .. }
                     | Pattern::Int(_)
                     | Pattern::Bind(_) => unreachable!("routed to `infer_nested_match`"),
@@ -10772,11 +10782,81 @@ impl MatchTree<'_, '_> {
                 }
                 Ok(out)
             }
+            Pattern::Array(_) | Pattern::ArrayNested(_) => {
+                // Dispatch on length, using the *simple* array pattern — the
+                // form codegen already compiles — one arm per distinct length
+                // among the rows, then a `_` arm for everything else. Each arm
+                // binds its elements to fresh columns and the sub-patterns are
+                // compiled against those, so nothing here has to index an array
+                // or unwrap the optional an index would yield.
+                let elem = match &ty {
+                    Type::Array(e) => (**e).clone(),
+                    _ => Type::Primitive(Primitive::Char), // str, as char[]
+                };
+                // Both array forms take part: whether an arm is plain is a
+                // property of that arm, so one match may hold each.
+                let mut lens: Vec<usize> = Vec::new();
+                for row in &rows {
+                    if let Some(ps) = row.pats[col].array_elems() {
+                        if !lens.contains(&ps.len()) {
+                            lens.push(ps.len());
+                        }
+                    }
+                }
+                let mut arms = Vec::with_capacity(lens.len() + 1);
+                for n in lens {
+                    let sub_cols: Vec<(String, Type)> =
+                        (0..n).map(|_| (self.fresh(), elem.clone())).collect();
+                    let spec: Vec<TreeRow> = rows
+                        .iter()
+                        .filter_map(|row| {
+                            let subs = match row.pats[col].array_elems() {
+                                Some(qs) if qs.len() == n => qs,
+                                Some(_) => return None,
+                                None => match &row.pats[col] {
+                                    Pattern::Wildcard => vec![Pattern::Wildcard; n],
+                                    _ => return None,
+                                },
+                            };
+                            Some(replace_col(row, col, subs))
+                        })
+                        .collect();
+                    let new_cols = splice_cols(cols, col, &sub_cols);
+                    let body = self.compile(spec, &new_cols)?;
+                    arms.push(MatchArm {
+                        pattern: Pattern::Array(
+                            sub_cols.iter().map(|(v, _)| self.ident(v)).collect(),
+                        ),
+                        body,
+                        span: self.span.clone(),
+                    });
+                }
+                // Every other length, and every row that accepts any. An array
+                // column's signature is `Open`, so the checker has already
+                // proved there is a row here; the fallback keeps the generated
+                // `match` total even so, since it has to name a `_` arm.
+                let default: Vec<TreeRow> = rows
+                    .iter()
+                    .filter(|row| matches!(row.pats[col], Pattern::Wildcard))
+                    .map(|row| drop_col(row, col))
+                    .collect();
+                let rest_cols = splice_cols(cols, col, &[]);
+                let body = if default.is_empty() {
+                    self.leaf(&rows[0])
+                } else {
+                    self.compile(default, &rest_cols)?
+                };
+                arms.push(MatchArm {
+                    pattern: Pattern::Wildcard,
+                    body,
+                    span: self.span.clone(),
+                });
+                Ok(Expr::new(
+                    ExprKind::Match(Box::new(self.ident(&var)), arms),
+                    self.span.clone(),
+                ))
+            }
             Pattern::Wildcard | Pattern::Bind(_) => unreachable!("absorbed above"),
-            Pattern::Array(_) => Err(Error::at(
-                "an array pattern cannot nest inside another pattern".to_string(),
-                self.span.clone(),
-            )),
         }
     }
 

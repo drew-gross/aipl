@@ -3362,15 +3362,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 101919
-deallocations: 101919
+allocations: 101983
+deallocations: 101983
 reallocations: 16733
-bytes allocated: 20567949
-instructions executed: 55458002
-binary size: 17350696
-  code: 11132292
+bytes allocated: 20581773
+instructions executed: 55481581
+binary size: 17340824
+  code: 11125688
   data: 38316
-  metadata: 6180088
+  metadata: 6176820
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -3573,6 +3573,9 @@ functions:
   __builtin_all$__m11__Pat$lam$__m11__is_plain_binder:
     calls: 0
     bytes: 264
+  __builtin_all$__m11__Pat$lam$__m7__is_plain_elem:
+    calls: 0
+    bytes: 728
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 174
     bytes: 304
@@ -3723,7 +3726,10 @@ functions:
   __builtin_try_map$__m8__Ast$__m11__Pat$__m14__ParseError$lam$__m7__lower_ctor_payload$lambda2:
     calls: 0
     bytes: 9148
-  __builtin_try_map$__m8__Ast$__m11__Pat$__m14__ParseError$lam$__m7__lower_match_arm$lambda0:
+  __builtin_try_map$__m8__Ast$__m11__Pat$__m14__ParseError$lam$__m7__lower_match_arm$lambda2:
+    calls: 0
+    bytes: 9148
+  __builtin_try_map$__m8__Ast$__m11__Pat$__m14__ParseError$lam$__m7__lower_match_arm$lambda3:
     calls: 0
     bytes: 9148
   __builtin_try_map$__m8__Ast$__m11__Pat$__m14__ParseError$lam$__m7__lower_pattern$lambda2:
@@ -3788,7 +3794,7 @@ functions:
     bytes: 1672
   __m11__binder_name:
     calls: 0
-    bytes: 488
+    bytes: 552
   __m11__ident_name:
     calls: 0
     bytes: 2884
@@ -3800,13 +3806,13 @@ functions:
     bytes: 2764
   __m11__is_plain_binder:
     calls: 0
-    bytes: 436
+    bytes: 488
   __m11__nested_bindings:
     calls: 0
     bytes: 32
   __m11__nested_bindings$tail:
     calls: 0
-    bytes: 756
+    bytes: 812
   __m11__nested_or_ctor:
     calls: 0
     bytes: 616
@@ -3815,10 +3821,10 @@ functions:
     bytes: 32
   __m11__pat_bindings$tail:
     calls: 0
-    bytes: 1048
+    bytes: 1204
   __m11__pat_label:
     calls: 0
-    bytes: 1296
+    bytes: 1428
   __m13__show_ty:
     calls: 0
     bytes: 5572
@@ -3829,13 +3835,13 @@ functions:
     calls: 1701
     bytes: 580
   __m14__desugar_rule$__m22__AiplTok:
-    calls: 19278
+    calls: 19299
     bytes: 12048
   __m14__group_styles$__m22__AiplTok:
     calls: 0
     bytes: 32
   __m14__group_styles$__m22__AiplTok$tail:
-    calls: 69678
+    calls: 69825
     bytes: 3104
   __m14__link$__m22__AiplTok$__m8__Ast:
     calls: 21
@@ -3844,7 +3850,7 @@ functions:
     calls: 1701
     bytes: 596
   __m14__link_rule$__m22__AiplTok:
-    calls: 19278
+    calls: 19299
     bytes: 6984
   __m14__link_rules$__m22__AiplTok:
     calls: 3675
@@ -4187,7 +4193,10 @@ functions:
     bytes: 376
   __m7__arm_span:
     calls: 0
-    bytes: 908
+    bytes: 964
+  __m7__array_pattern:
+    calls: 0
+    bytes: 3428
   __m7__as_arms:
     calls: 0
     bytes: 6064
@@ -4267,7 +4276,7 @@ functions:
     calls: 198
     bytes: 376
   __m7__brackets:
-    calls: 66
+    calls: 88
     bytes: 376
   __m7__concat_call:
     calls: 0
@@ -4412,7 +4421,7 @@ functions:
     bytes: 38404
   __m7__lower_match_arm:
     calls: 0
-    bytes: 36192
+    bytes: 15112
   __m7__lower_mut_stmt:
     calls: 0
     bytes: 232
@@ -4492,7 +4501,7 @@ functions:
     calls: 0
     bytes: 118408
   __m7__nest:
-    calls: 220
+    calls: 198
     bytes: 872
   __m7__nest2:
     calls: 66
@@ -4508,7 +4517,7 @@ functions:
     bytes: 376
   __m7__patterns:
     calls: 22
-    bytes: 33980
+    bytes: 34608
   __m7__pipes:
     calls: 44
     bytes: 376
@@ -4568,12 +4577,12 @@ functions:
     bytes: 72
   __rec_drop___m11__Pat:
     calls: 0
-    bytes: 204
+    bytes: 232
   __rec_drop___m13__Ty:
     calls: 0
     bytes: 476
   __rec_drop___m14__Rule$__m22__AiplTok:
-    calls: 55254
+    calls: 55318
     bytes: 404
   __rec_drop___m15__Cst:
     calls: 205
@@ -4621,7 +4630,7 @@ functions:
     calls: 67049
     bytes: (external)
   aipl_arr_inc:
-    calls: 504742
+    calls: 504889
     bytes: (external)
   aipl_arr_reserve:
     calls: 66612
@@ -4636,7 +4645,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 782929
+    calls: 783076
     bytes: (external)
   aipl_array_new:
     calls: 11069
@@ -4654,19 +4663,19 @@ functions:
     calls: 229
     bytes: (external)
   aipl_rec_alloc:
-    calls: 68693
+    calls: 68757
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 407816
+    calls: 408574
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 23881
+    calls: 23945
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 339123
+    calls: 339817
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 23881
+    calls: 23945
     bytes: (external)
   aipl_test_begin:
     calls: 4

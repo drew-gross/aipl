@@ -76,7 +76,14 @@
 
             <li id="item-Array"><code>Array(Expr[])</code>
 
-              <div class="doc"><p>The destructuring <code>[a, b] =&gt; ..</code> arm. The elements are *expressions*, not patterns — the arm hangs off <code>match_arm</code>, where they are an ordinary <code>args</code> list.</p></div>
+              <div class="doc"><p>The destructuring <code>[a, b] =&gt; ..</code> arm, every element of which is a plain binder name or a literal. The elements are *expressions* rather than patterns because that is the shape codegen compiles directly, and because an expression carries the span a diagnostic about one element wants.</p></div>
+
+
+            </li>
+
+            <li id="item-ArrayNested"><code>ArrayNested(Pat[])</code>
+
+              <div class="doc"><p>The same arm where at least one element is a real sub-pattern — <code>[n, Tok(&quot;?&quot;), _, ty]</code>, <code>[some(v), none]</code>. The counterpart of <code>Array</code> exactly as <code>Nested</code> is of <code>Ctor</code>, and chosen by the same kind of test: <code>array_pattern</code> in <code>grammar_aipl.aipl</code> keeps the simple form whenever every element is plain.</p></div>
 
 
             </li>

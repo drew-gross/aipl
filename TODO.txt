@@ -423,6 +423,7 @@ design:
   apis should express intent
 
 optimizations:
+  turn #{char} into a 256 (or 128?) bit bitfield, and use set contains for is-alpha checking
   for move-in detection:
       need a "last use before overwrite" flag
       also last-use detection for struct fields

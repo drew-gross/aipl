@@ -44,10 +44,17 @@ variant Pat =
     | Str(str)
     # A char literal pattern (`'c' => ..`), against a `char` scrutinee.
     | Char(char)
-    # The destructuring `[a, b] => ..` arm. The elements are *expressions*, not
-    # patterns — the arm hangs off `match_arm`, where they are an ordinary
-    # `args` list.
+    # The destructuring `[a, b] => ..` arm, every element of which is a plain
+    # binder name or a literal. The elements are *expressions* rather than
+    # patterns because that is the shape codegen compiles directly, and because
+    # an expression carries the span a diagnostic about one element wants.
     | Array(Expr[])
+    # The same arm where at least one element is a real sub-pattern —
+    # `[n, Tok("?"), _, ty]`, `[some(v), none]`. The counterpart of `Array`
+    # exactly as `Nested` is of `Ctor`, and chosen by the same kind of test:
+    # `array_pattern` in `grammar_aipl.aipl` keeps the simple form whenever
+    # every element is plain.
+    | ArrayNested(Pat[])
     # `_` — matches anything, binds nothing.
     | Wildcard
     # `(p, q)` — a tuple of sub-patterns, one per element.
@@ -121,6 +128,7 @@ pub fn show_pat(self: Pat) -> str {
         Str(s) => `Str({s})`,
         Char(c) => `Char({c})`,
         Array(elems) => `[{show_exprs(elems)}]`,
+        ArrayNested(ps) => `[{show_pats(ps)}]`,
         Ctor(name, bindings, ignore_payload) => if (ignore_payload) {
             `{name}(..)`
         } else {
@@ -156,6 +164,7 @@ pub fn pat_bindings(self: Pat) -> str[] {
     match (self) {
         Ctor(_, bindings, _) => bindings,
         Array(elems) => elems.filter_map(is_ident, ident_name),
+        ArrayNested(ps) => ps.map(nested_bindings).join(),
         Str(..) | Char(..) | Wildcard | Int(..) => no_names(),
         // A nested slot binds where a bare binder name sits, at any depth.
         Tuple(ps) => ps.map(nested_bindings).join(),
@@ -214,7 +223,7 @@ pub fn pat_label(self: Pat) -> str {
         Nested(name, _) => `"{name}"`,
         Str(..) => "a string pattern",
         Char(..) => "a char pattern",
-        Array(..) => "an array pattern",
+        Array(..) | ArrayNested(..) => "an array pattern",
         Wildcard => `"_"`,
         Tuple(..) => "a tuple pattern",
         Int(..) => "an integer pattern",
@@ -246,11 +255,11 @@ allocations: 142
 deallocations: 142
 reallocations: 6
 bytes allocated: 10177
-instructions executed: 9781
-binary size: 102208
-  code: 65996
-  data: 2731
-  metadata: 33481
+instructions executed: 9862
+binary size: 103352
+  code: 66748
+  data: 2739
+  metadata: 33865
 functions:
   __arr_drop_Pat:
     calls: 9
@@ -302,7 +311,7 @@ functions:
     bytes: 1396
   __rec_drop_Pat:
     calls: 42
-    bytes: 204
+    bytes: 232
   __rec_drop___m1__Expr:
     calls: 6
     bytes: 36
@@ -389,7 +398,7 @@ functions:
     bytes: 1672
   binder_name:
     calls: 2
-    bytes: 488
+    bytes: 552
   ident_name:
     calls: 2
     bytes: 2884
@@ -401,7 +410,7 @@ functions:
     bytes: 2764
   is_plain_binder:
     calls: 4
-    bytes: 436
+    bytes: 488
   main:
     calls: 1
     bytes: 472
@@ -410,7 +419,7 @@ functions:
     bytes: 32
   nested_bindings$tail:
     calls: 5
-    bytes: 756
+    bytes: 812
   nested_or_ctor:
     calls: 4
     bytes: 616
@@ -419,13 +428,13 @@ functions:
     bytes: 32
   pat_bindings$tail:
     calls: 9
-    bytes: 1048
+    bytes: 1204
   pat_label:
     calls: 6
-    bytes: 1296
+    bytes: 1428
   show_pat:
     calls: 22
-    bytes: 2548
+    bytes: 2812
   show_pats:
     calls: 5
     bytes: 1396

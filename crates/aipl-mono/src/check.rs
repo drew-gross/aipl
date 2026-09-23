@@ -2058,7 +2058,11 @@ impl Cx<'_> {
                         .to_string(),
                     arm.span.clone(),
                 )),
-                Pattern::Tuple(_) | Pattern::Nested { .. } | Pattern::Int(_) | Pattern::Bind(_) => {
+                Pattern::Tuple(_)
+                | Pattern::Nested { .. }
+                | Pattern::ArrayNested(_)
+                | Pattern::Int(_)
+                | Pattern::Bind(_) => {
                     unreachable!("a nested pattern is typed by `bind_nested`")
                 }
             };
@@ -2075,7 +2079,11 @@ impl Cx<'_> {
                     "\"match\" on an array expects `[..]` patterns or `_`".to_string(),
                     arm.span.clone(),
                 )),
-                Pattern::Tuple(_) | Pattern::Nested { .. } | Pattern::Int(_) | Pattern::Bind(_) => {
+                Pattern::Tuple(_)
+                | Pattern::Nested { .. }
+                | Pattern::ArrayNested(_)
+                | Pattern::Int(_)
+                | Pattern::Bind(_) => {
                     unreachable!("a nested pattern is typed by `bind_nested`")
                 }
             };
@@ -2090,7 +2098,11 @@ impl Cx<'_> {
                     "\"match\" on a char expects char literals or `_`".to_string(),
                     arm.span.clone(),
                 )),
-                Pattern::Tuple(_) | Pattern::Nested { .. } | Pattern::Int(_) | Pattern::Bind(_) => {
+                Pattern::Tuple(_)
+                | Pattern::Nested { .. }
+                | Pattern::ArrayNested(_)
+                | Pattern::Int(_)
+                | Pattern::Bind(_) => {
                     unreachable!("a nested pattern is typed by `bind_nested`")
                 }
             };
@@ -2109,7 +2121,7 @@ impl Cx<'_> {
                     arm.span.clone(),
                 ))
             }
-            Pattern::Array(_) => {
+            Pattern::Array(_) | Pattern::ArrayNested(_) => {
                 return Err(Error::at(
                     format!("array-literal pattern matches an array, not {}", tyname(st)),
                     arm.span.clone(),
@@ -2293,6 +2305,17 @@ impl Cx<'_> {
         Ok((pat, binders))
     }
 
+    /// The element type a `[..]` pattern's slots match against: an array's
+    /// element, or `char` for a `str`, whose destructuring reads it as one.
+    fn seq_elem_ty(&self, ty: &Type) -> Option<Type> {
+        match ty {
+            Type::Array(e) => Some((**e).clone()),
+            _ if is_str_repr(ty) => Some(Type::Primitive(Primitive::Char)),
+            _ if is_typevar(ty) => Some(ty.clone()),
+            _ => None,
+        }
+    }
+
     fn bind_nested_inner(
         &self,
         pattern: &Pattern,
@@ -2330,11 +2353,31 @@ impl Cx<'_> {
                 }
                 (Pat::Lit(Lit::Char(*c)), Vec::new())
             }
-            Pattern::Array(_) => {
-                return Err(Error::at(
-                    "an array pattern cannot nest inside another pattern".to_string(),
-                    span.clone(),
-                ));
+            Pattern::Array(_) | Pattern::ArrayNested(_) => {
+                let ps = &pattern
+                    .array_elems()
+                    .expect("both array forms answer `array_elems`");
+                let elem = self.seq_elem_ty(ty).ok_or_else(|| {
+                    Error::at(
+                        format!(
+                            "`[..]` pattern matches an array or a str, not {}",
+                            tyname(ty)
+                        ),
+                        span.clone(),
+                    )
+                })?;
+                let mut subs = Vec::with_capacity(ps.len());
+                let mut binders = Vec::new();
+                for sub in ps {
+                    let (pat, bs) = self.bind_nested_inner(sub, &elem, span)?;
+                    subs.push(pat);
+                    binders.extend(bs);
+                }
+                // One synthetic constructor per length: rows of different
+                // lengths never specialize against each other, which is exactly
+                // how `[a]` and `[a, b]` tell two alternatives apart. An array
+                // type's signature is `Open`, so the match still needs a `_`.
+                (Pat::Ctor(patterns::array_ctor(ps.len()), subs), binders)
             }
             Pattern::Tuple(ps) => {
                 let Some(elems) = self.tuple_elems(ty) else {

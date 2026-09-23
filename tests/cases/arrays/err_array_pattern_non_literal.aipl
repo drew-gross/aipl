@@ -1,0 +1,23 @@
+// An array pattern's elements are patterns, so an expression among them is a
+// parse error rather than a check error. `k + 1` is a computation, and a
+// pattern names shapes rather than computing them — the value to match has to
+// be written as a literal.
+//
+// Split out from `err_arrays.aipl` because a parse error aborts the file before
+// the checker runs, so it cannot be reported alongside the check-phase errors
+// that file collects.
+fn match_non_literal(xs: i64[]) -> i64 {
+    let k = 2;
+    match (xs) {
+        [1, k + 1] => 1,
+        _ => 0,
+    }
+}
+
+fn main() {}
+--- errors ---
+error: expected `(`, `,`, `.`, or `]`, found `+`
+  --> ./tests/cases/arrays/err_array_pattern_non_literal.aipl:12:15
+   |
+12 |         [1, k + 1] => 1,
+   |               ^

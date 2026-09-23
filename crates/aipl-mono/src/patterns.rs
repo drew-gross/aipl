@@ -74,6 +74,19 @@ pub(crate) trait TypeInfo {
     fn signature(&self, ty: &Type) -> Signature;
 }
 
+/// The synthetic constructor a `[..]` pattern of `n` elements carries in the
+/// matrix — one per length, so patterns of different lengths never specialize
+/// against each other. The spelling cannot collide with a real case name: a
+/// declared case is an identifier, and this is not one.
+pub(crate) fn array_ctor(n: usize) -> String {
+    format!("[;{n}]")
+}
+
+/// Whether `name` is an [`array_ctor`], and the length it carries.
+pub(crate) fn array_ctor_len(name: &str) -> Option<usize> {
+    name.strip_prefix("[;")?.strip_suffix(']')?.parse().ok()
+}
+
 /// One row of the matrix: a pattern per column.
 pub(crate) type Row = Vec<Pat>;
 
@@ -221,6 +234,16 @@ pub(crate) fn useful(rows: &[Row], q: &[Pat], tys: &[Type], info: &dyn TypeInfo)
 /// unknowns when the type does not know it (the checker has already refused
 /// that pattern; the algorithm just has to keep going).
 fn ctor_types(info: &dyn TypeInfo, ty: &Type, name: &str, arity: usize) -> Vec<Type> {
+    // An array type's signature is `Open` — no finite set of lengths covers it
+    // — so a per-length constructor's slots take their type from the element
+    // directly rather than from the signature.
+    if let Some(n) = array_ctor_len(name) {
+        let elem = match ty {
+            Type::Array(e) => (**e).clone(),
+            _ => Type::Any,
+        };
+        return vec![elem; n];
+    }
     if let Signature::Complete(ctors) = info.signature(ty) {
         if let Some((_, sub)) = ctors.into_iter().find(|(c, _)| c == name) {
             if sub.len() == arity {
@@ -247,6 +270,14 @@ pub(crate) fn render(p: &Pat) -> String {
         Pat::Lit(Lit::Int(n)) => n.to_string(),
         Pat::Lit(Lit::Str(s)) => format!("{s:?}"),
         Pat::Lit(Lit::Char(c)) => format!("'{}'", char::from(*c)),
+        // A `[..]` pattern renders as one, not as the synthetic per-length
+        // constructor it carries in the matrix.
+        Pat::Ctor(name, args) if array_ctor_len(name).is_some() => {
+            format!(
+                "[{}]",
+                args.iter().map(render).collect::<Vec<_>>().join(", ")
+            )
+        }
         Pat::Ctor(name, args) if name == TUPLE => {
             format!(
                 "({})",

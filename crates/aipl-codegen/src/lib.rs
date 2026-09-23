@@ -20107,6 +20107,7 @@ fn compile_expr_inner<M: Module>(
                         // (`infer_nested_match`) before codegen.
                         Pattern::Tuple(_)
                         | Pattern::Nested { .. }
+                        | Pattern::ArrayNested(_)
                         | Pattern::Int(_)
                         | Pattern::Bind(_) => unreachable!("nested pattern reached codegen"),
                         Pattern::Str(lit) => {

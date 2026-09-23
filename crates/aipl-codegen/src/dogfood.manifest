@@ -2,21 +2,21 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
-; entry parse_test_section_header 465 str -> str?
-; entry strip_test_sections 506 str -> str
-; entry split_test_sections 505 str -> __tuple$str$str
+; entry parse_test_section_header 468 str -> str?
+; entry strip_test_sections 509 str -> str
+; entry split_test_sections 508 str -> __tuple$str$str
 ; entry assert_loc 60 str __builtin_Span -> str
 ; entry caret_block 67 str __builtin_Span str -> str
 ; entry fill_or_add_section_file 149 str str str -> unit!Error
-; entry normalize_output 437 str -> str
-; entry int_fits 369 i64 str -> bool
-; entry is_operator_name 370 str -> bool
-; entry lex_aipl 404 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
-; entry lex_aipl_stripped 406 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry normalize_output 440 str -> str
+; entry int_fits 372 i64 str -> bool
+; entry is_operator_name 373 str -> bool
+; entry lex_aipl 407 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry lex_aipl_stripped 409 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
 ; entry find_files 150 str str -> str[]!Error
 ; entry companion_files 69 str -> __m25__Companion[]!str
-; entry parse_spec 462 str -> __m26__Spec!str
-; entry aipl_parse_file 330 str -> __m27__ParsedFile!__m39__ParseError
+; entry parse_spec 465 str -> __m26__Spec!str
+; entry aipl_parse_file 333 str -> __m27__ParsedFile!__m39__ParseError
 ; entry format_source 174 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
@@ -46,7 +46,7 @@
 ; variant __m31__ExprKind 64 boxed Num(8:i64) Bool(8:bool) Str(8:str) Char(8:char) Ident(8:str) Call(8:str,32:__m31__Expr[],40:bool) Neg(8:__m31__Expr) If(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr) Construct(8:str,32:__m31__FieldInit[]) Field(8:__m31__Expr,16:str) Let(8:str,32:__m30__Ty?,48:__m31__Expr,56:__m31__Expr) LetMut(8:str,32:__m30__Ty?,48:__m31__Expr,56:__m31__Expr) Assign(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr) For(8:str,32:__m31__Expr,40:__m31__Expr) While(8:__m31__Expr,16:__m31__Expr) Shim(8:str,32:__tuple$str$str[],40:__m31__Expr) None Match(8:__m31__Expr,16:__m31__MatchArm[]) IfLet(8:__m31__MatchArm,16:__m31__Expr,24:__m31__Expr) ArrayLit(8:__m31__Expr[]) Spread(8:__m31__Expr) SetLit(8:__m31__Expr[],16:__m30__SetOrder) DictLit(8:__tuple$__m31__Expr$__m31__Expr[]) Index(8:__m31__Expr,16:__m31__Expr) Slice(8:__m31__Expr,16:__m31__Expr,24:__m31__Expr?) Try(8:__m31__Expr) Unit Seq(8:__m31__Expr,16:__m31__Expr) Return(8:__m31__Expr) Lambda(8:__m31__LambdaParam[],16:__m31__Expr) TupleLit(8:__m31__Expr[]) KwArg(8:str,32:__m31__Expr,40:bool)
 ; struct __m31__FieldInit 32 boxed name@0:str value@24:__m31__Expr
 ; struct __m31__MatchArm 32 boxed pattern@0:__m32__Pat body@8:__m31__Expr span@16:__builtin_Span
-; variant __m32__Pat 48 boxed Ctor(8:str,32:str[],40:bool) Str(8:str) Char(8:char) Array(8:__m31__Expr[]) Wildcard Tuple(8:__m32__Pat[]) Nested(8:str,32:__m32__Pat[]) Int(8:i64)
+; variant __m32__Pat 48 boxed Ctor(8:str,32:str[],40:bool) Str(8:str) Char(8:char) Array(8:__m31__Expr[]) ArrayNested(8:__m32__Pat[]) Wildcard Tuple(8:__m32__Pat[]) Nested(8:str,32:__m32__Pat[]) Int(8:i64)
 ; struct __tuple$__m31__Expr$__m31__Expr 16 boxed _0@0:__m31__Expr _1@8:__m31__Expr
 ; struct __m31__LambdaParam 56 name@0:str ty@24:__m30__Ty? span@40:__builtin_Span
 ; struct __m36__StructDecl 72 name@0:str doc@24:str? type_vars@56:__m36__TypeParam[] fields@64:__m36__FieldDecl[]
@@ -318,4 +318,4 @@
 ; data 195 __tostr_lit_101 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m10__assert_loc
-; source-fingerprint 13138224968215530119
+; source-fingerprint 9412502456412219502
