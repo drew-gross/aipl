@@ -1,0 +1,81 @@
+import { print, wrapping_add as + } from builtins;
+
+// A `_` arm stands for the cases of a variant not named above it. It is for a
+// match that reads a *few* cases out of a wide variant — the alternative is
+// naming every other case, which past a handful the formatter breaks one per
+// line, back into the arms the alternation replaced.
+//
+// The cost is real and is why this stays a judgement call: a listed case makes
+// the compiler name every match that has to be revisited when the variant
+// grows, and a `_` gives that up. It is right where the default is correct for
+// *any* case that could be added — the `is_*` predicate below asks whether a
+// value is one specific case, and anything else is false however the variant
+// grows — and wrong where a new case would need a decision.
+variant Shape = Circle(i64) | Square(i64) | Point | Tri(i64, i64) | Empty
+
+fn size(s: Shape) -> i64 {
+    match (s) {
+        Circle(r) => r,
+        Tri(a, b) => a + b,
+        _ => 0,
+    }
+}
+
+fn is_point(s: Shape) -> bool {
+    match (s) {
+        Point => true,
+        _ => false,
+    }
+}
+
+// The payload of a named case is still bound; `_` only covers what is left, and
+// binds nothing itself.
+fn widened(s: Shape) -> Shape {
+    match (s) {
+        Circle(r) => Circle(r + 1),
+        _ => s,
+    }
+}
+
+fn main() !prints {
+    print(`{size(Circle(3))} {size(Tri(4, 5))} {size(Square(9))} {size(Point)} {size(Empty)}`);
+    print(`{is_point(Point)} {is_point(Empty)}`);
+    print(`{widened(Circle(1))} {widened(Square(2))}`);
+}
+--- stdout ---
+3 9 0 0 0
+true false
+Circle(2) Square(2)
+
+--- performance ---
+allocations: 21
+deallocations: 21
+reallocations: 0
+bytes allocated: 1232
+instructions executed: 542
+binary size: 6648
+  code: 3376
+  data: 335
+  metadata: 2937
+functions:
+  __to_str_Shape:
+    calls: 2
+    bytes: 1164
+  __to_str_bool:
+    calls: 2
+    bytes: 232
+  __to_str_i64:
+    calls: 5
+    bytes: 204
+  aipl_i64_len:
+    calls: 14
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 8
+    bytes: (external)
+  aipl_write_i64:
+    calls: 7
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1776

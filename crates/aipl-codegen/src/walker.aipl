@@ -547,12 +547,9 @@ fn skip_comment(self: W) -> W { ..self, cpos: self.cpos + 1 }
 fn is_empty_doc(self: Doc) -> bool {
     match (self) {
         Concat(ds) => ds.is_empty(),
-        Text(_) => false,
-        RawBlock(_) => false,
-        IfBroken(_) => false,
-        Indent(_) => false,
-        Group(_, _) => false,
-        Line | SoftLine | HardLine | BlankLine | BreakParent => false,
+        // Nothing else is a `Concat`, however many kinds of `Doc` there come
+        // to be — the question is closed, so `_` costs no future decision.
+        _ => false,
     }
 }
 
@@ -588,13 +585,9 @@ fn drop_trailing_break(self: Doc[]) -> Doc[] {
 fn is_line_break(self: Doc) -> bool {
     match (self) {
         HardLine | BlankLine => true,
-        Concat(_) => false,
-        Text(_) => false,
-        RawBlock(_) => false,
-        IfBroken(_) => false,
-        Indent(_) => false,
-        Group(_, _) => false,
-        Line | SoftLine | BreakParent => false,
+        // Membership in a named pair, so anything else is `false` and stays
+        // `false` as `Doc` grows.
+        _ => false,
     }
 }
 
@@ -3344,10 +3337,10 @@ deallocations: 101061
 reallocations: 16523
 bytes allocated: 20378957
 instructions executed: 54995993
-binary size: 16823608
-  code: 10783444
+binary size: 16816216
+  code: 10778708
   data: 38012
-  metadata: 6002152
+  metadata: 5999496
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -4249,9 +4242,6 @@ functions:
   __m7__binder_names:
     calls: 0
     bytes: 1532
-  __m7__block_tail:
-    calls: 0
-    bytes: 376
   __m7__braces:
     calls: 198
     bytes: 376
@@ -4500,7 +4490,7 @@ functions:
     bytes: 1216
   __m7__repair_block_value:
     calls: 0
-    bytes: 6260
+    bytes: 2616
   __m7__same_bindings:
     calls: 0
     bytes: 2692
@@ -4677,13 +4667,13 @@ functions:
     bytes: 2592
   binop_tail:
     calls: 180
-    bytes: 4128
+    bytes: 3908
   block:
     calls: 62
     bytes: 908
   block_entries:
     calls: 67
-    bytes: 3760
+    bytes: 3536
   block_layout:
     calls: 67
     bytes: 4272
@@ -4731,7 +4721,7 @@ functions:
     bytes: 4928
   drop_trailing_break:
     calls: 0
-    bytes: 912
+    bytes: 640
   err_here:
     calls: 4
     bytes: 864

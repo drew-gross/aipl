@@ -1,0 +1,19 @@
+// Arms are tried top to bottom, so anything after a `_` can never run.
+variant Shape = Circle(i64) | Square(i64) | Point
+
+fn size(s: Shape) -> i64 {
+    match (s) {
+        _ => 0,
+        Circle(r) => r,
+    }
+}
+
+fn main() {
+    let n = size(Point);
+}
+--- errors ---
+error: the `_` arm must be last (arms after it are unreachable)
+ --> ./tests/cases/match_arms/err_wildcard_not_last.aipl:6:9
+  |
+6 |         _ => 0,
+  |         ^

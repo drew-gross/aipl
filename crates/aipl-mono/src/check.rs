@@ -2117,11 +2117,17 @@ impl Cx<'_> {
                     arm.span.clone(),
                 ))
             }
+            // A `_` arm stands for the cases of a *variant* not named above
+            // it, and binds nothing. An optional and a result have two cases
+            // with a name each, so a `_` there hides which one was meant and
+            // saves nothing; they keep listing both.
+            Pattern::Wildcard if self.cases_of(st).is_some() => return Ok(vec![]),
             Pattern::Wildcard => {
                 return Err(Error::at(
                     format!(
-                        "wildcard `_` arms are only for a str/array match; a {} match must list \
-                         every case",
+                        "a `_` arm stands for the cases of a variant not named above it, and {} \
+                         is not a variant — an optional's \"some\"/\"none\" and a result's \
+                         \"ok\"/\"err\" are two cases with a name each, so name them",
                         tyname(st)
                     ),
                     arm.span.clone(),
@@ -2608,6 +2614,28 @@ impl Cx<'_> {
             .map(String::as_str)
             .filter(|c| !seen.contains(c))
             .collect();
+        // A `_` arm covers whatever is left. It has to be last, since arms
+        // after it can never run, and it has to have something left to cover,
+        // or it is dead itself — which is the shape that would otherwise go
+        // quiet the moment someone removes the last case it stood for.
+        if let Some(i) = arms
+            .iter()
+            .position(|a| matches!(a.pattern, Pattern::Wildcard))
+        {
+            if i != arms.len() - 1 {
+                return Err(Error::at(
+                    "the `_` arm must be last (arms after it are unreachable)".to_string(),
+                    arms[i].span.clone(),
+                ));
+            }
+            if missing.is_empty() {
+                return Err(Error::at(
+                    "unreachable `_` arm: every case is already matched above it".to_string(),
+                    arms[i].span.clone(),
+                ));
+            }
+            return Ok(());
+        }
         if !missing.is_empty() {
             return Err(Error::at(
                 format!("non-exhaustive match: missing {}", missing.join(", ")),

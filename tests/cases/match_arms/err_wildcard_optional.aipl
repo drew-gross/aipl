@@ -1,0 +1,20 @@
+import { first } from builtins;
+
+// An optional has two cases and a name for each, so a `_` hides which one was
+// meant and saves nothing. Same for a result's `ok`/`err`.
+fn head_or_zero(xs: i64[]) -> i64 {
+    match (xs.first()) {
+        some(v) => v,
+        _ => 0,
+    }
+}
+
+fn main() {
+    let n = head_or_zero([1]);
+}
+--- errors ---
+error: a `_` arm stands for the cases of a variant not named above it, and i64? is not a variant — an optional's "some"/"none" and a result's "ok"/"err" are two cases with a name each, so name them
+ --> ./tests/cases/match_arms/err_wildcard_optional.aipl:8:9
+  |
+8 |         _ => 0,
+  |         ^

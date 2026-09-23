@@ -542,8 +542,6 @@ optimizations:
 
     D1. Sets and dicts are linear scans. aipl_set_contains (:2614) and dict_find (:2751) walk every element, so building an n-element set or dict is O(n²). There's already an FNV-1a hash (:2600) and a comment at :9584 anticipating "the eventual hash-dict/set use case" — this is the largest asymptotic win available to user programs.
 
-    D2. aipl_arr_reserve only reuses in place at rc == 1 (:2201) — correct, but worth checking how often the corpus's push loops actually hit the fast path versus copying each time.
-
     F. Worth a look, lower confidence
 
     - find_files walks the corpus via the dogfooded engine on every fmt/ffi test — fine, but it's repeated per test binary.
@@ -630,8 +628,6 @@ handoff:
   aipl probably needs streaming for proper tee replacement
   if the only tests that fail are fixable with fill expected on the failing test, no need to run the full suite after, just the fixed tests
   Auto-handle the formatter-grammar bootstrap — Detectable as format failed: + walker.aipl modified, and the recovery is a fixed three-command sequence. CLAUDE.md calls it the one ordering the script can't express; two recurrences in a day says it's worth expressing.
-
-- \{ is a template-literal escape only; inside a plain string it's an error.
 
 optimize enumerate/reverse/right_fold with streams
 "AIPL-implemented builtin sources are valid AIPL" error should include more info

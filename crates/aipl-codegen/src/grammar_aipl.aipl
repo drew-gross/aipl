@@ -1731,18 +1731,8 @@ fn repair_block_value(e: Expr, brace: Span) -> (Expr, Span) {
             let inner = repair_block_value(body, brace);
             (at(Assign(lhs, value, inner.0), e.span), inner.1)
         },
-        // Everything else is the block's tail, so the walk stops here. Spelled
-        // out rather than left to a `_`, which `ExprKind` refuses: a new kind
-        // that *does* pass a value along has to be classified here instead of
-        // being silently taken for the tail. Grouped by meaning across several
-        // arms because one alternation of all 28 runs past the width and the
-        // formatter then breaks it one per line — back to what it replaced.
-        Num(..) | Bool(..) | Str(..) | Char(..) | Ident(..) | Unit | None => block_tail(e, brace),
-        Call(..) | Neg(..) | Field(..) | Index(..) | Slice(..) | Try(..) => block_tail(e, brace),
-        Spread(..) | KwArg(..) | Construct(..) | Lambda(..) => block_tail(e, brace),
-        ArrayLit(..) | SetLit(..) | DictLit(..) | TupleLit(..) => block_tail(e, brace),
-        If(..) | IfLet(..) | Match(..) => block_tail(e, brace),
-        For(..) | While(..) | Return(..) | Shim(..) => block_tail(e, brace),
+        // Everything else is the block's tail, so the walk stops here.
+        _ => block_tail(e, brace),
     }
 }
 
@@ -4617,11 +4607,11 @@ allocations: 2097365
 deallocations: 2097365
 reallocations: 295775
 bytes allocated: 387614874
-instructions executed: 574173660
-binary size: 5036184
-  code: 3304016
+instructions executed: 574172481
+binary size: 5029880
+  code: 3300104
   data: 56396
-  metadata: 1675772
+  metadata: 1673380
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 18
@@ -5653,7 +5643,7 @@ functions:
     calls: 1208239
     bytes: (external)
   aipl_arr_inc:
-    calls: 6278836
+    calls: 6278833
     bytes: (external)
   aipl_arr_reserve:
     calls: 1256584
@@ -5671,7 +5661,7 @@ functions:
     calls: 39
     bytes: (external)
   aipl_array_dec:
-    calls: 9450455
+    calls: 9450452
     bytes: (external)
   aipl_array_new:
     calls: 218284
@@ -6125,7 +6115,7 @@ functions:
     bytes: 1216
   repair_block_value:
     calls: 131
-    bytes: 6260
+    bytes: 2348
   same_bindings:
     calls: 16
     bytes: 2692
