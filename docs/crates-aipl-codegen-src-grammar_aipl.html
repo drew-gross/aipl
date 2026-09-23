@@ -838,6 +838,20 @@
 
 
 
+        <section class="item" id="item-kw_arg">
+          <h3>
+            <a class="anchor" href="#item-kw_arg">kw_arg</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn kw_arg(src: str, kids: Ast[], name: Slot, value: Slot, implicit_some: bool, sp: Span) -&#62; Ast!ParseError</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_op_value">
           <h3>
             <a class="anchor" href="#item-lower_op_value">lower_op_value</a>
@@ -901,7 +915,7 @@
           </h3>
           <pre class="signature"><code>fn lower_field_init(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>field_init</code> — <code>name: value</code>, the shorthand <code>name</code>, or a <code>..base</code> spread. A spread names no field, so it rides as an init with an empty name whose *value* is the spread; the value is what identifies it.</p></div>
+          <div class="doc"><p><code>field_init</code> — <code>name: value</code>, the shorthand <code>name</code>, or a <code>..base</code> spread. A spread names no field, so it rides as an init with an empty name whose *value* is the spread. The three alternatives are three, two and one position, so the shape is what identifies each.</p></div>
 
 
         </section>
@@ -1847,6 +1861,34 @@
 
 
 
+        <section class="item" id="item-slot_kid">
+          <h3>
+            <a class="anchor" href="#item-slot_kid">slot_kid</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_kid(self: Slot, kids: Ast[], span: Span) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p>The lowered child a slot names, or a refusal — <code>kid</code>'s counterpart for a positional match, where a slot that should name a <code>Named</code> reference holds a token instead. A slot carries the child's *index*, so this is <code>kid</code> with the index read off the position rather than written out by hand.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_expr">
+          <h3>
+            <a class="anchor" href="#item-slot_expr">slot_expr</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_expr(self: Slot, kids: Ast[], span: Span) -&#62; Expr!ParseError</code></pre>
+
+          <div class="doc"><p><code>slot_kid</code> as an expression, the way <code>kid_expr</code> is <code>kid</code> as one.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_variant_decl">
           <h3>
             <a class="anchor" href="#item-lower_variant_decl">lower_variant_decl</a>
@@ -1866,7 +1908,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$115192: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$117929: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

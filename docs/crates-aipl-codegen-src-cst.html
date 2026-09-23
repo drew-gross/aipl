@@ -169,6 +169,104 @@
 
 
 
+        <section class="item" id="item-Slot">
+          <h3>
+            <a class="anchor" href="#item-Slot">Slot</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Slot</code></pre>
+
+          <div class="doc"><p>One position of a production's rule, as the match filled it: the token a <code>Lit</code>/<code>Term</code> sub-rule consumed, or the index of the child a <code>Named</code> sub-rule produced — an index into <code>children</code>, and so into the lowered values a <code>build</code> is handed alongside.</p><p>This is the rule read back as a positional list, which is what lets a <code>build</code> *match* the shape it matched rather than reconstruct it. <code>field_decl</code>'s two alternatives are five sub-rules and three, so an arm binding five slots is the one with a default — where counting interior children or searching the token list for an <code>=</code> is the same question asked sideways.</p><p>A slot *names* a position rather than carrying its contents, which is the whole reason this type is not generic. Holding the lowered value instead — <code>Sub(A)</code>, with <code>A</code> the caller's AST — makes every slot a composite carrying a large recursive variant, and the refcount glue for it is generated at every site that touches one: measured, that made the accessor that reads a slot's child ten times the size of the <code>kids</code>-indexing version it replaced, and grew each converted production fivefold. An index costs a word and no glue.</p><p>A slot is one sub-rule only where that sub-rule matches exactly one kid, which is every <code>Lit</code>, <code>Term</code> and <code>Named</code>. A <code>Maybe</code> or a <code>Many</code> contributes as many slots as it matched kids, so a rule holding one does not line up position for position and its <code>build</code> still reads <code>children</code> and <code>tokens</code>.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Tok"><code>Tok(Span)</code>
+
+
+            </li>
+
+            <li id="item-Sub"><code>Sub(u64)</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-slots">
+          <h3>
+            <a class="anchor" href="#item-slots">slots</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn slots(self: Parts) -&#62; Slot[]</code></pre>
+
+          <div class="doc"><p><code>self</code>'s direct kids in source order — the positional view a <code>build</code> matches on in place of deducing its shape.</p><p>Asked for by the builds that want it, off the <code>Parts</code> a <code>Mk</code>/<code>TryMk</code> build already holds, so wanting positions needs no <code>Build</code> case of its own. It is not what <code>parts</code> returns because the interleaving is the one thing <code>parts</code> throws away (it splits the kids two ways, losing the order between them), and recovering it costs a second walk of the direct kids — which most productions have no use for.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-SlotWalk">
+          <h3>
+            <a class="anchor" href="#item-SlotWalk">SlotWalk</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct SlotWalk</code></pre>
+
+          <div class="doc"><p>The slot list being built, and how many interior children have been numbered.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_text">
+          <h3>
+            <a class="anchor" href="#item-slot_text">slot_text</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn slot_text(self: Slot, src: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>The token text of a slot, or <code>&quot;&quot;</code> for a child position — what a <code>build</code> reads a name or a keyword out of a matched position with.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_span">
+          <h3>
+            <a class="anchor" href="#item-slot_span">slot_span</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn slot_span(self: Slot) -&#62; Span?</code></pre>
+
+          <div class="doc"><p>The span of the token at a slot, or <code>none</code> for a child position — whose span is carried by the lowered value, not by the position.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_child">
+          <h3>
+            <a class="anchor" href="#item-slot_child">slot_child</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn slot_child(self: Slot) -&#62; u64?</code></pre>
+
+          <div class="doc"><p>The index into <code>children</code> a slot names, or <code>none</code> when it holds a token. The caller resolves it against the lowered values it was handed; the refusal for a <code>none</code> is its own, since <code>ParseError</code> is declared in <code>grammar.aipl</code>, which imports this file.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-span">
           <h3>
             <a class="anchor" href="#item-span">span</a>
@@ -251,7 +349,7 @@
             <a class="anchor" href="#item-through">through</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn through(self: Span, __spat$4985: Span) -&#62; Span</code></pre>
+          <pre class="signature"><code>fn through(self: Span, __spat$5015: Span) -&#62; Span</code></pre>
 
           <div class="doc"><p>The span from <code>self</code>'s start through the other span's end — what two ends of a node, a first leaf and a last, cover between them. Nothing is checked about the order: a second span that ends before <code>self</code> starts gives a span that ends before it starts, exactly as <code>a.start..b.end</code> spelled out would.</p></div>
 
@@ -338,6 +436,48 @@
           <pre class="signature"><code>fn split_kid(acc: Parts, kid: Cst) -&#62; Parts</code></pre>
 
           <div class="doc"><p>One kid onto the accumulator: a token leaf contributes its span, an interior node contributes itself, trivia contributes nothing, and a group contributes whatever its three runs hold — which is the splice that makes it transparent.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_walk">
+          <h3>
+            <a class="anchor" href="#item-slot_walk">slot_walk</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_walk(node: Cst, acc: SlotWalk) -&#62; SlotWalk</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_walk_kids">
+          <h3>
+            <a class="anchor" href="#item-slot_walk_kids">slot_walk_kids</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_walk_kids(kids: Cst[], acc: SlotWalk) -&#62; SlotWalk</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-slot_walk_kid">
+          <h3>
+            <a class="anchor" href="#item-slot_walk_kid">slot_walk_kid</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn slot_walk_kid(acc: SlotWalk, kid: Cst) -&#62; SlotWalk</code></pre>
+
+          <div class="doc"><p>One kid as its slot. Trivia takes no position — it is not a sub-rule — and a group splices, exactly as it does for <code>parts</code>, so a bracketed repetition's contents take the positions rather than the group taking one. The child numbering therefore matches <code>children</code>, which splices the same way.</p></div>
 
 
         </section>

@@ -1994,7 +1994,7 @@ impl Cx<'_> {
     /// bare-identifier element, in order — matching [`Pattern::bindings`]). A
     /// non-identifier element must be a literal, type-checked for equality
     /// against `elem`; it binds nothing. A binder name may not repeat within one
-    /// pattern.
+    /// pattern, except `_`, which ignores its position rather than naming it.
     fn array_pattern_bind_tys(
         &self,
         elems: &[Expr],
@@ -2006,7 +2006,10 @@ impl Cx<'_> {
         let mut seen: Vec<&str> = Vec::new();
         for e in elems {
             if let ExprKind::Ident(name) = &e.kind {
-                if seen.contains(&name.as_str()) {
+                // `_` is the ignore-this-position binder, not a name, so it may
+                // repeat — as it already may in a constructor or tuple pattern,
+                // and as `Ctor(..)`'s expansion to one `_` per slot produces.
+                if name != "_" && seen.contains(&name.as_str()) {
                     return Err(Error::at(
                         format!("binder {name:?} appears more than once in this pattern"),
                         e.span.clone(),

@@ -27,6 +27,7 @@ import {
     push,
     reverse_find_map,
     value_or,
+    wrapping_increment as ++,
 } from builtins;
 
 # An interior node is `Tree(prod, kids)`; a `Group` is the bracket pair a
@@ -297,6 +298,123 @@ fn split_kid(acc: Parts, kid: Cst) -> Parts {
     a
 }
 
+# One position of a production's rule, as the match filled it: the token a
+# `Lit`/`Term` sub-rule consumed, or the index of the child a `Named` sub-rule
+# produced — an index into `children`, and so into the lowered values a `build`
+# is handed alongside.
+#
+# This is the rule read back as a positional list, which is what lets a `build`
+# *match* the shape it matched rather than reconstruct it. `field_decl`'s two
+# alternatives are five sub-rules and three, so an arm binding five slots is the
+# one with a default — where counting interior children or searching the token
+# list for an `=` is the same question asked sideways.
+#
+# A slot *names* a position rather than carrying its contents, which is the
+# whole reason this type is not generic. Holding the lowered value instead —
+# `Sub(A)`, with `A` the caller's AST — makes every slot a composite carrying a
+# large recursive variant, and the refcount glue for it is generated at every
+# site that touches one: measured, that made the accessor that reads a slot's
+# child ten times the size of the `kids`-indexing version it replaced, and grew
+# each converted production fivefold. An index costs a word and no glue.
+#
+# A slot is one sub-rule only where that sub-rule matches exactly one kid, which
+# is every `Lit`, `Term` and `Named`. A `Maybe` or a `Many` contributes as many
+# slots as it matched kids, so a rule holding one does not line up position for
+# position and its `build` still reads `children` and `tokens`.
+variant Slot = Tok(Span) | Sub(u64)
+
+# `self`'s direct kids in source order — the positional view a `build` matches
+# on in place of deducing its shape.
+#
+# Asked for by the builds that want it, off the `Parts` a `Mk`/`TryMk` build
+# already holds, so wanting positions needs no `Build` case of its own. It is
+# not what `parts` returns because the interleaving is the one thing `parts`
+# throws away (it splits the kids two ways, losing the order between them), and
+# recovering it costs a second walk of the direct kids — which most productions
+# have no use for.
+pub fn slots(self: Parts) -> Slot[] {
+    let empty = SlotWalk { out: [], next: 0 };
+    slot_walk(self.cst, empty).out
+}
+
+# The slot list being built, and how many interior children have been numbered.
+struct SlotWalk { out: Slot[], next: u64 }
+
+fn slot_walk(node: Cst, acc: SlotWalk) -> SlotWalk {
+    mut a = acc;
+    match (node) {
+        Leaf(..) | Trivia(..) => {},
+        Tree(_, kids) => {
+            set a = slot_walk_kids(kids, a);
+        },
+        Group(_, open, body, close) => {
+            set a = slot_walk_kids(open, a);
+            set a = slot_walk_kids(body, a);
+            set a = slot_walk_kids(close, a);
+        },
+    };
+    a
+}
+
+fn slot_walk_kids(kids: Cst[], acc: SlotWalk) -> SlotWalk {
+    mut a = acc;
+    for (let k : kids) {
+        set a = slot_walk_kid(a, k);
+    }
+    a
+}
+
+# One kid as its slot. Trivia takes no position — it is not a sub-rule — and a
+# group splices, exactly as it does for `parts`, so a bracketed repetition's
+# contents take the positions rather than the group taking one. The child
+# numbering therefore matches `children`, which splices the same way.
+fn slot_walk_kid(acc: SlotWalk, kid: Cst) -> SlotWalk {
+    mut a = acc;
+    match (kid) {
+        Trivia(..) => {},
+        Leaf(sp) => {
+            set a.out.push(Tok(sp));
+        },
+        Tree(..) => {
+            set a.out.push(Sub(a.next));
+            set a.next++;
+        },
+        Group(..) => {
+            set a = slot_walk(kid, a);
+        },
+    };
+    a
+}
+
+# The token text of a slot, or `""` for a child position — what a `build` reads
+# a name or a keyword out of a matched position with.
+pub fn slot_text(self: Slot, src: str) -> str {
+    match (self) {
+        Tok(sp) => src[sp],
+        Sub(..) => "",
+    }
+}
+
+# The span of the token at a slot, or `none` for a child position — whose span
+# is carried by the lowered value, not by the position.
+pub fn slot_span(self: Slot) -> Span? {
+    match (self) {
+        Tok(sp) => some(sp),
+        Sub(..) => none,
+    }
+}
+
+# The index into `children` a slot names, or `none` when it holds a token. The
+# caller resolves it against the lowered values it was handed; the refusal for a
+# `none` is its own, since `ParseError` is declared in `grammar.aipl`, which
+# imports this file.
+pub fn slot_child(self: Slot) -> u64? {
+    match (self) {
+        Sub(i) => some(i),
+        Tok(..) => none,
+    }
+}
+
 # The span `self` covers — its tree's, since the parts say nothing about extent.
 pub fn span(self: Parts) -> Span { self.cst.extent() }
 
@@ -413,6 +531,29 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(leaf_parts.children == []);
     assert(Tree(0, []).parts().own_token_text(src) == "");
 
+    // `slots` puts the two lists back in source order, which is what a rule's
+    // positions are: one slot per leaf, one per interior child, trivia skipped.
+    // `nested` is `1`, a space, then a child — two positions, not three.
+    assert(nested.parts().slots() == [Tok(0..1), Sub(0)]);
+
+    // A node of nothing but tokens has no child position at all.
+    assert(t.parts().slots() == [Tok(0..1), Tok(2..3), Tok(4..5)]);
+
+    // Children are numbered in `children` order, so the nth child position
+    // indexes the nth lowered value — what a slot-matching build relies on.
+    let two_kids = Tree(0, [Tree(1, [Leaf(0..1)]), Leaf(1..2), Tree(1, [Leaf(2..3)])]);
+    assert(two_kids.parts().slots() == [Sub(0), Tok(1..2), Sub(1)]);
+
+    // Reading a slot: a token gives its text and its span and names no child, a
+    // child position the reverse.
+    assert(Tok(0..1).slot_text(src) == "1");
+    assert(Tok(0..1).slot_span() == some(0..1));
+    assert(Tok(0..1).slot_child() == none);
+    let child: Slot = Sub(2);
+    assert(child.slot_text(src) == "");
+    assert(child.slot_span() == none);
+    assert(child.slot_child() == some(2));
+
     // The two span accessors a lowering reads off its `Parts`, against the tree's
     // own: `span` is the full extent, `tok_span` the token-tight one, and they
     // differ exactly where an edge is trivia.
@@ -476,21 +617,21 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 274
-deallocations: 274
+allocations: 302
+deallocations: 302
 reallocations: 19
-bytes allocated: 17741
-instructions executed: 41276
-binary size: 58968
-  code: 35356
-  data: 2965
-  metadata: 20647
+bytes allocated: 19629
+instructions executed: 46173
+binary size: 67504
+  code: 40508
+  data: 3573
+  metadata: 23423
 functions:
   __arr_drop_Cst:
-    calls: 34
+    calls: 40
     bytes: 116
   __arr_retain_Cst:
-    calls: 12
+    calls: 16
     bytes: 116
   __builtin_find_map$Cst$__builtin_Span$lam$first_leaf:
     calls: 8
@@ -522,8 +663,14 @@ functions:
   __eq_Cst$arr:
     calls: 11
     bytes: 300
+  __eq_Slot:
+    calls: 8
+    bytes: 136
+  __eq_Slot$arr:
+    calls: 3
+    bytes: 284
   __eq___builtin_Span:
-    calls: 40
+    calls: 46
     bytes: 104
   __eq___builtin_Span$arr:
     calls: 4
@@ -532,11 +679,11 @@ functions:
     calls: 1
     bytes: 364
   __rec_drop_Cst:
-    calls: 60
+    calls: 66
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 12324
+    bytes: 14720
   __test$through:
     calls: 1
     bytes: 388
@@ -547,7 +694,7 @@ functions:
     calls: 125
     bytes: (external)
   aipl_arr_inc:
-    calls: 1024
+    calls: 1240
     bytes: (external)
   aipl_arr_reserve:
     calls: 158
@@ -556,13 +703,13 @@ functions:
     calls: 11
     bytes: (external)
   aipl_array_dec:
-    calls: 1415
+    calls: 1662
     bytes: (external)
   aipl_array_new:
-    calls: 86
+    calls: 92
     bytes: (external)
   aipl_array_push:
-    calls: 31
+    calls: 47
     bytes: (external)
   aipl_array_push_mut:
     calls: 19
@@ -571,16 +718,16 @@ functions:
     calls: 8
     bytes: (external)
   aipl_assert:
-    calls: 46
+    calls: 55
     bytes: (external)
   aipl_rec_alloc:
-    calls: 60
+    calls: 66
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 606
+    calls: 691
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 546
+    calls: 622
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -619,13 +766,22 @@ functions:
     calls: 3
     bytes: 1464
   parts:
-    calls: 12
+    calls: 15
     bytes: 956
   show:
     calls: 23
     bytes: 2968
+  slot_walk:
+    calls: 3
+    bytes: 728
+  slot_walk_kids:
+    calls: 3
+    bytes: 1384
+  slots$own0:
+    calls: 3
+    bytes: 224
   split_kids:
-    calls: 29
+    calls: 32
     bytes: 2284
   text:
     calls: 5

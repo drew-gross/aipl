@@ -138,10 +138,15 @@ import { BraceEntry, Key, Pair, brace_literal } from "./brace_entry.aipl";
 import {
     Cst,
     Parts,
+    Slot,
     extent,
     own_texts,
     own_token_text,
     parts,
+    slot_child,
+    slot_span,
+    slot_text,
+    slots,
     span,
     text,
     tok_span,
@@ -1592,25 +1597,40 @@ fn is_spread(self: Expr) -> bool { if (let Spread(..) = self.kind) { true } else
 # token of their own.
 fn lower_arg(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let toks = node.own_texts(src);
-    if (toks.is_empty()) {
-        return ok(AExpr(kid_expr(kids, 0, sp)?));
-    };
-    let value = kid_expr(kids, 0, sp)?;
-    let head = toks[0].value_or("");
+    match (node.slots()) {
+        // The three pass-through alternatives — an expression, a lambda, a bare
+        // operator — are each a lone `Named`, so each is one position.
+        [x] => ok(AExpr(slot_expr(x, kids, sp)?)),
+        // `..xs`. The `..` carries no meaning of its own, so the node takes the
+        // operand's span and an error points at what is being spread.
+        [_, x] => {
+            let value = slot_expr(x, kids, sp)?;
+            let span = value.span;
+            ok(AExpr(at(Spread(value), span)))
+        },
+        // `k = v`, and `k?= v` forwarding an optional into a `k?: T` parameter.
+        // The `?` is a position of its own, so its presence is the arity — where
+        // reading the second own token asks the same thing by hand.
+        [n, _, x] => kw_arg(src, kids, n, x, false, sp),
+        [n, _, _, x] => kw_arg(src, kids, n, x, true, sp),
+        _ => err(ParseError { message: "an argument matched no alternative", span: sp }),
+    }
+}
 
-    // `..xs`. The `..` carries no meaning of its own, so the node takes the
-    // operand's span and an error points at what is being spread.
-    if (head == "..") {
-        let span = value.span;
-        return ok(AExpr(at(Spread(value), span)));
-    };
-    // `k = v`, or `k?= v` forwarding an optional into a `k?: T` parameter.
-    let name_span = node.tokens
-        .first()
+fn kw_arg(
+    src: str,
+    kids: Ast[],
+    name: Slot,
+    value: Slot,
+    implicit_some: bool,
+    sp: Span,
+) -> Ast!ParseError {
+    let v = slot_expr(value, kids, sp)?;
+    let name_span = name
+        .slot_span()
         .value_or_err(ParseError { message: "a keyword argument has no name", span: sp })?;
-    let span = join_spans(name_span, value.span);
-    ok(AExpr(at(KwArg(head, value, toks[1] == some("?")), span)))
+    let span = join_spans(name_span, v.span);
+    ok(AExpr(at(KwArg(name.slot_text(src), v, implicit_some), span)))
 }
 
 # `op_value` — an operator passed as a value (`apply(2, 3, +)`) is a binary
@@ -1670,23 +1690,30 @@ fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 
 # `field_init` — `name: value`, the shorthand `name`, or a `..base` spread. A
 # spread names no field, so it rides as an init with an empty name whose *value*
-# is the spread; the value is what identifies it.
+# is the spread. The three alternatives are three, two and one position, so the
+# shape is what identifies each.
 fn lower_field_init(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
-    let head = toks[0].value_or("");
-    if (head == "..") {
-        let base = kid_expr(kids, 0, sp)?;
-        let span = base.span;
-        return ok(AFieldInit(FieldInit { name: "", value: at(Spread(base), span) }));
-    };
-    if (kids.is_empty()) {
+    match (node.slots()) {
+        // `..base` — a spread names no field, so it rides as an init with an
+        // empty name whose *value* is the spread.
+        [_, b] => {
+            let base = slot_expr(b, kids, sp)?;
+            let span = base.span;
+            ok(AFieldInit(FieldInit { name: "", value: at(Spread(base), span) }))
+        },
+        [n, _, v] => ok(AFieldInit(FieldInit {
+            name: n.slot_text(src),
+            value: slot_expr(v, kids, sp)?,
+        })),
         // `x` is `x: x`, spanned at the field name.
-        let span = spans.first().value_or(node.tok_span());
-        return ok(AFieldInit(FieldInit { name: head, value: at(Ident(head), span) }));
-    };
-    ok(AFieldInit(FieldInit { name: head, value: kid_expr(kids, 0, sp)? }))
+        [n] => {
+            let name = n.slot_text(src);
+            let span = n.slot_span().value_or(node.tok_span());
+            ok(AFieldInit(FieldInit { name, value: at(Ident(name), span) }))
+        },
+        _ => err(ParseError { message: "a field initialiser matched no alternative", span: sp }),
+    }
 }
 
 fn lower_brace_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
@@ -1696,11 +1723,14 @@ fn lower_brace_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 
 fn lower_entry(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let key = kid_expr(kids, 0, sp)?;
-    if (kids.len() == 1) {
-        return ok(AEntry(Key(key)));
-    };
-    ok(AEntry(Pair(key, kid_expr(kids, 1, sp)?)))
+    // The rule's two alternatives are `Then([expr, ":", expr])` and a bare
+    // `expr` — three positions against one — so the arm that binds three is the
+    // pair. Nothing counts children or looks for the `:`.
+    match (node.slots()) {
+        [k, _, v] => ok(AEntry(Pair(slot_expr(k, kids, sp)?, slot_expr(v, kids, sp)?))),
+        [k] => ok(AEntry(Key(slot_expr(k, kids, sp)?))),
+        _ => err(ParseError { message: "an entry matched no alternative", span: sp }),
+    }
 }
 
 fn lower_shim_binding(src: str, node: Parts, kids: Ast[]) -> Ast {
@@ -2885,12 +2915,42 @@ fn lower_struct_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 
 fn lower_field_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let default = if (kids.len() == 2) { some(kid_expr(kids, 1, sp)?) } else { none };
-    ok(AFieldDecl(FieldDecl {
-        name: node.own_texts(src)[0].value_or(""),
-        ty: as_ty(kid(kids, 0, sp)?, sp)?,
-        default,
-    }))
+    // Five positions is `name: T = default`, three is `name: T` — the rule's
+    // two alternatives, told apart by their own shape. Counting interior
+    // children and reading the first own token are the same question asked
+    // sideways, and an arm per alternative is the rule read back.
+    match (node.slots()) {
+        [n, _, t, _, d] => ok(AFieldDecl(FieldDecl {
+            name: n.slot_text(src),
+            ty: as_ty(slot_kid(t, kids, sp)?, sp)?,
+            default: some(slot_expr(d, kids, sp)?),
+        })),
+        [n, _, t] => ok(AFieldDecl(FieldDecl {
+            name: n.slot_text(src),
+            ty: as_ty(slot_kid(t, kids, sp)?, sp)?,
+            default: none,
+        })),
+        _ => err(ParseError { message: "a field declaration matched no alternative", span: sp }),
+    }
+}
+
+# The lowered child a slot names, or a refusal — `kid`'s counterpart for a
+# positional match, where a slot that should name a `Named` reference holds a
+# token instead. A slot carries the child's *index*, so this is `kid` with the
+# index read off the position rather than written out by hand.
+fn slot_kid(self: Slot, kids: Ast[], span: Span) -> Ast!ParseError {
+    let at = self
+        .slot_child()
+        .value_or_err(ParseError {
+            message: "this position holds a token, not a lowered child",
+            span,
+        })?;
+    kid(kids, at, span)
+}
+
+# `slot_kid` as an expression, the way `kid_expr` is `kid` as one.
+fn slot_expr(self: Slot, kids: Ast[], span: Span) -> Expr!ParseError {
+    as_expr(slot_kid(self, kids, span)?, span)
 }
 
 # `variant_decl` — the name, the type parameters, and the cases. The cases'
@@ -4651,15 +4711,15 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2086180
-deallocations: 2086180
-reallocations: 298426
-bytes allocated: 390306076
-instructions executed: 581328668
-binary size: 5390840
-  code: 3538660
-  data: 56396
-  metadata: 1795784
+allocations: 2086232
+deallocations: 2086232
+reallocations: 298391
+bytes allocated: 390311428
+instructions executed: 581356541
+binary size: 5529576
+  code: 3630116
+  data: 56692
+  metadata: 1842768
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 18
@@ -5513,6 +5573,15 @@ functions:
   __m8__parts:
     calls: 11172
     bytes: 956
+  __m8__slot_walk:
+    calls: 55
+    bytes: 728
+  __m8__slot_walk_kids:
+    calls: 55
+    bytes: 1384
+  __m8__slots:
+    calls: 55
+    bytes: 168
   __m8__split_kids:
     calls: 12453
     bytes: 2284
@@ -5679,7 +5748,7 @@ functions:
     calls: 1179305
     bytes: (external)
   aipl_arr_inc:
-    calls: 6446751
+    calls: 6447983
     bytes: (external)
   aipl_arr_reserve:
     calls: 1201018
@@ -5697,19 +5766,19 @@ functions:
     calls: 37
     bytes: (external)
   aipl_array_dec:
-    calls: 9562174
+    calls: 9563513
     bytes: (external)
   aipl_array_new:
     calls: 193088
     bytes: (external)
   aipl_array_push:
-    calls: 176166
+    calls: 176264
     bytes: (external)
   aipl_array_push_mut:
-    calls: 731174
+    calls: 731137
     bytes: (external)
   aipl_array_with_cap:
-    calls: 40250
+    calls: 40204
     bytes: (external)
   aipl_assert:
     calls: 364
@@ -5736,13 +5805,13 @@ functions:
     calls: 1353765
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 7232213
+    calls: 7232429
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 410935
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5878153
+    calls: 5878369
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 410935
@@ -5916,8 +5985,11 @@ functions:
     calls: 2006
     bytes: 22676
   kid_expr:
-    calls: 1183
+    calls: 1132
     bytes: 3296
+  kw_arg:
+    calls: 2
+    bytes: 7316
   lambda_of:
     calls: 3
     bytes: 652
@@ -5941,7 +6013,7 @@ functions:
     bytes: 3632
   lower_arg:
     calls: 31
-    bytes: 22024
+    bytes: 39700
   lower_args:
     calls: 40
     bytes: 6648
@@ -5989,7 +6061,7 @@ functions:
     bytes: 13284
   lower_entry:
     calls: 9
-    bytes: 13504
+    bytes: 26648
   lower_exclusion:
     calls: 6
     bytes: 6368
@@ -5998,10 +6070,10 @@ functions:
     bytes: 20612
   lower_field_decl:
     calls: 7
-    bytes: 14588
+    bytes: 43448
   lower_field_init:
     calls: 8
-    bytes: 21644
+    bytes: 39980
   lower_fn_attr:
     calls: 8
     bytes: 20720
@@ -6164,6 +6236,12 @@ functions:
   shim_expr:
     calls: 1
     bytes: 2204
+  slot_expr:
+    calls: 51
+    bytes: 3296
+  slot_kid:
+    calls: 58
+    bytes: 548
   statements:
     calls: 708
     bytes: 70828

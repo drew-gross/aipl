@@ -3367,10 +3367,10 @@ deallocations: 101919
 reallocations: 16733
 bytes allocated: 20567949
 instructions executed: 55458002
-binary size: 17211928
-  code: 11040836
-  data: 38020
-  metadata: 6133072
+binary size: 17350696
+  code: 11132292
+  data: 38316
+  metadata: 6180088
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -3873,6 +3873,15 @@ functions:
   __m15__own_token_text:
     calls: 0
     bytes: 1464
+  __m15__slot_walk:
+    calls: 0
+    bytes: 728
+  __m15__slot_walk_kids:
+    calls: 0
+    bytes: 1384
+  __m15__slots:
+    calls: 0
+    bytes: 168
   __m15__tok_span:
     calls: 0
     bytes: 236
@@ -4296,12 +4305,15 @@ functions:
   __m7__kid_expr:
     calls: 0
     bytes: 3296
+  __m7__kw_arg:
+    calls: 0
+    bytes: 7316
   __m7__lambda_of:
     calls: 0
     bytes: 652
   __m7__lower_arg:
     calls: 0
-    bytes: 22024
+    bytes: 39700
   __m7__lower_args:
     calls: 0
     bytes: 6648
@@ -4349,7 +4361,7 @@ functions:
     bytes: 13284
   __m7__lower_entry:
     calls: 0
-    bytes: 13504
+    bytes: 26648
   __m7__lower_exclusion:
     calls: 0
     bytes: 6368
@@ -4358,10 +4370,10 @@ functions:
     bytes: 20612
   __m7__lower_field_decl:
     calls: 0
-    bytes: 14588
+    bytes: 43448
   __m7__lower_field_init:
     calls: 0
-    bytes: 21644
+    bytes: 39980
   __m7__lower_fn_attr:
     calls: 0
     bytes: 20720
@@ -4512,6 +4524,12 @@ functions:
   __m7__shim_expr:
     calls: 0
     bytes: 2204
+  __m7__slot_expr:
+    calls: 0
+    bytes: 3296
+  __m7__slot_kid:
+    calls: 0
+    bytes: 548
   __m7__statements:
     calls: 22
     bytes: 112720
