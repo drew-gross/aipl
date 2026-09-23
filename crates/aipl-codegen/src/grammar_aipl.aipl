@@ -1714,26 +1714,44 @@ fn lower_block(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # per statement in *this* block — nested blocks repair their own, so the total
 # work is one pass over the program rather than one per nesting level.
 fn repair_block_value(e: Expr, brace: Span) -> (Expr, Span) {
-    if (let Seq(head, tail) = e.kind) {
-        let inner = repair_block_value(tail, brace);
-        return (at(Seq(head, inner.0), e.span), inner.1);
-    };
-    if (let Let(name, ty, value, body) = e.kind) {
-        let inner = repair_block_value(body, brace);
-        return (at(Let(name, ty, value, inner.0), e.span), inner.1);
-    };
-    if (let LetMut(name, ty, value, body) = e.kind) {
-        let inner = repair_block_value(body, brace);
-        return (at(LetMut(name, ty, value, inner.0), e.span), inner.1);
-    };
-    if (let Assign(lhs, value, body) = e.kind) {
-        let inner = repair_block_value(body, brace);
-        return (at(Assign(lhs, value, inner.0), e.span), inner.1);
-    };
-    if (e.span.start == e.span.end) {
-        return (at(e.kind, brace), brace);
-    };
-    (e, e.span)
+    match (e.kind) {
+        Seq(head, tail) => {
+            let inner = repair_block_value(tail, brace);
+            (at(Seq(head, inner.0), e.span), inner.1)
+        },
+        Let(name, ty, value, body) => {
+            let inner = repair_block_value(body, brace);
+            (at(Let(name, ty, value, inner.0), e.span), inner.1)
+        },
+        LetMut(name, ty, value, body) => {
+            let inner = repair_block_value(body, brace);
+            (at(LetMut(name, ty, value, inner.0), e.span), inner.1)
+        },
+        Assign(lhs, value, body) => {
+            let inner = repair_block_value(body, brace);
+            (at(Assign(lhs, value, inner.0), e.span), inner.1)
+        },
+        // Everything else is the block's tail, so the walk stops here. Spelled
+        // out rather than left to a `_`, which `ExprKind` refuses: a new kind
+        // that *does* pass a value along has to be classified here instead of
+        // being silently taken for the tail. Grouped by meaning across several
+        // arms because one alternation of all 28 runs past the width and the
+        // formatter then breaks it one per line — back to what it replaced.
+        Num(..) | Bool(..) | Str(..) | Char(..) | Ident(..) | Unit | None => block_tail(e, brace),
+        Call(..) | Neg(..) | Field(..) | Index(..) | Slice(..) | Try(..) => block_tail(e, brace),
+        Spread(..) | KwArg(..) | Construct(..) | Lambda(..) => block_tail(e, brace),
+        ArrayLit(..) | SetLit(..) | DictLit(..) | TupleLit(..) => block_tail(e, brace),
+        If(..) | IfLet(..) | Match(..) => block_tail(e, brace),
+        For(..) | While(..) | Return(..) | Shim(..) => block_tail(e, brace),
+    }
+}
+
+# The block's value, once the walk above has found it. An empty span is the unit
+# value of a block with no trailing expression — the empty production it comes
+# from matched no text — and the block's `{` is the honest location for it.
+# Anything else already knows where it is.
+fn block_tail(e: Expr, brace: Span) -> (Expr, Span) {
+    if (e.span.start == e.span.end) { (at(e.kind, brace), brace) } else { (e, e.span) }
 }
 
 # `block_body` — a statement and the rest of the block, an expression and
@@ -4599,11 +4617,11 @@ allocations: 2097365
 deallocations: 2097365
 reallocations: 295775
 bytes allocated: 387614874
-instructions executed: 574190772
-binary size: 5046400
-  code: 3310312
+instructions executed: 574173660
+binary size: 5036184
+  code: 3304016
   data: 56396
-  metadata: 1679692
+  metadata: 1675772
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 18
@@ -5635,7 +5653,7 @@ functions:
     calls: 1208239
     bytes: (external)
   aipl_arr_inc:
-    calls: 6278845
+    calls: 6278836
     bytes: (external)
   aipl_arr_reserve:
     calls: 1256584
@@ -5653,7 +5671,7 @@ functions:
     calls: 39
     bytes: (external)
   aipl_array_dec:
-    calls: 9450464
+    calls: 9450455
     bytes: (external)
   aipl_array_new:
     calls: 218284
@@ -5692,13 +5710,13 @@ functions:
     calls: 1338931
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 7136162
+    calls: 7135880
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 408655
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5796936
+    calls: 5796654
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 408655
@@ -5820,6 +5838,9 @@ functions:
   binder_names:
     calls: 17
     bytes: 1532
+  block_tail:
+    calls: 85
+    bytes: 376
   braces:
     calls: 6372
     bytes: 376
@@ -6104,7 +6125,7 @@ functions:
     bytes: 1216
   repair_block_value:
     calls: 131
-    bytes: 12932
+    bytes: 6260
   same_bindings:
     calls: 16
     bytes: 2692

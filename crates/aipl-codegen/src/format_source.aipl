@@ -248,11 +248,11 @@ allocations: 20804
 deallocations: 20804
 reallocations: 2974
 bytes allocated: 4448897
-instructions executed: 9048501
-binary size: 5603304
-  code: 3710416
+instructions executed: 9047919
+binary size: 5593104
+  code: 3704120
   data: 11506
-  metadata: 1881382
+  metadata: 1877478
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -1481,6 +1481,9 @@ functions:
   __m4__binder_names:
     calls: 0
     bytes: 1532
+  __m4__block_tail:
+    calls: 2
+    bytes: 376
   __m4__braces:
     calls: 72
     bytes: 376
@@ -1732,7 +1735,7 @@ functions:
     bytes: 1216
   __m4__repair_block_value:
     calls: 2
-    bytes: 12932
+    bytes: 6260
   __m4__same_bindings:
     calls: 0
     bytes: 2692
@@ -1914,13 +1917,13 @@ functions:
     calls: 14308
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 69819
+    calls: 69817
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 4419
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 55511
+    calls: 55509
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 4419

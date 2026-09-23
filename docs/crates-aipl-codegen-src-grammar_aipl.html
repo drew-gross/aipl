@@ -978,6 +978,20 @@
 
 
 
+        <section class="item" id="item-block_tail">
+          <h3>
+            <a class="anchor" href="#item-block_tail">block_tail</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn block_tail(e: Expr, brace: Span) -&#62; (Expr, Span)</code></pre>
+
+          <div class="doc"><p>The block's value, once the walk above has found it. An empty span is the unit value of a block with no trailing expression — the empty production it comes from matched no text — and the block's <code>{</code> is the honest location for it. Anything else already knows where it is.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lower_block_body">
           <h3>
             <a class="anchor" href="#item-lower_block_body">lower_block_body</a>
