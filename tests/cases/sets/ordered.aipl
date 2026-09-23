@@ -66,15 +66,15 @@ true
 ["apple", "fig", "pear"]
 {9223372036854775807, 9223372036854775808, 18446744073709551615}
 --- performance ---
-allocations: 36
-deallocations: 36
+allocations: 35
+deallocations: 35
 reallocations: 0
-bytes allocated: 1787
-instructions executed: 4786
-binary size: 18680
-  code: 11408
+bytes allocated: 1731
+instructions executed: 4737
+binary size: 18448
+  code: 11228
   data: 579
-  metadata: 6693
+  metadata: 6641
 functions:
   __eq_setdesc$i64:
     calls: 1
@@ -90,7 +90,7 @@ functions:
     bytes: 708
   __to_str_setasc$char:
     calls: 1
-    bytes: 700
+    bytes: 572
   __to_str_setasc$i64:
     calls: 1
     bytes: 708
@@ -113,13 +113,13 @@ functions:
     calls: 11
     bytes: (external)
   aipl_array_dec:
-    calls: 25
+    calls: 24
     bytes: (external)
   aipl_array_push_mut:
-    calls: 35
+    calls: 32
     bytes: (external)
   aipl_array_with_cap:
-    calls: 13
+    calls: 12
     bytes: (external)
   aipl_i64_len:
     calls: 40
@@ -128,7 +128,7 @@ functions:
     calls: 5
     bytes: (external)
   aipl_set_insert:
-    calls: 38
+    calls: 35
     bytes: (external)
   aipl_set_union:
     calls: 3
@@ -147,4 +147,4 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 5324
+    bytes: 5272

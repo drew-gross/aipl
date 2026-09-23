@@ -158,17 +158,18 @@ impl CharSet {
     }
 
     /// The highest member at or below `from`, or `None` — descending
-    /// iteration, and the mirror of `next_from`. `from` is a `usize` so a loop
-    /// can pass `member - 1` from member 0 as a wrapped value rather than
-    /// needing a signed counter; anything past the last char clamps.
-    pub(crate) fn prev_from(self, from: usize) -> Option<u8> {
-        if from >= CHARSET_BITS {
-            // A wrapped `0 - 1` means "below the first char": nothing is left.
-            if from > usize::MAX / 2 {
-                return None;
-            }
-            return self.prev_from(CHARSET_BITS - 1);
+    /// iteration, and the mirror of `next_from`. The cursor is signed because a
+    /// descending walk steps to `member - 1`, and from char 0 that is "below
+    /// the first char", not a huge unsigned one. Above the last char clamps.
+    pub(crate) fn prev_from(self, from: i64) -> Option<u8> {
+        if from < 0 {
+            return None;
         }
+        let from = if from >= CHARSET_BITS as i64 {
+            CHARSET_BITS - 1
+        } else {
+            from as usize
+        };
         let mut i = from >> 6;
         let bit = from & 63;
         // The bits at or below `from` within its own word; whole words before.
@@ -298,12 +299,12 @@ mod tests {
         let s = CharSet::from_bytes(b"cab");
         let mut seen = [0u8; 8];
         let mut n = 0;
-        let mut at = 255usize;
+        let mut at = 255i64;
         while let Some(c) = s.prev_from(at) {
             seen[n] = c;
             n += 1;
-            // Stepping below char 0 wraps, which `prev_from` reads as "done".
-            at = (c as usize).wrapping_sub(1);
+            // Stepping below char 0 is what ends the walk.
+            at = c as i64 - 1;
         }
         assert_eq!(&seen[..n], b"cba");
     }
@@ -324,13 +325,15 @@ mod tests {
         assert_eq!(ends.prev_from(255), Some(255));
         assert_eq!(ends.prev_from(254), Some(0));
         assert_eq!(ends.prev_from(0), Some(0));
-        assert_eq!(ends.prev_from(usize::MAX), None);
+        assert_eq!(ends.prev_from(-1), None);
+        // Past the last char clamps rather than answering nothing.
+        assert_eq!(ends.prev_from(999), Some(255));
 
         // Every member is found from its own index, in both directions.
         let all = CharSet::full();
         for c in 0..=255u8 {
             assert_eq!(all.next_from(c as usize), Some(c));
-            assert_eq!(all.prev_from(c as usize), Some(c));
+            assert_eq!(all.prev_from(c as i64), Some(c));
         }
     }
 
@@ -380,5 +383,33 @@ mod tests {
         assert!(cont.contains(b'z') && cont.contains(b'0') && cont.contains(b'_'));
         assert!(!start.contains(b'0'));
         assert!(!cont.contains(b'-') && !cont.contains(b' '));
+    }
+}
+
+// The two entry points a walk over a `#{char}` calls, one per step. Membership,
+// length, equality and union are emitted inline — they are the hot ones, and
+// each is a handful of instructions — but a walk is inherently per-element, so
+// it goes through a call rather than an unrolled four-word scan at every loop
+// site.
+//
+// Both answer -1 for "no more", which is what lets the emitted loop test one
+// signed value instead of carrying a separate done flag.
+
+#[no_mangle]
+pub(crate) extern "C" fn aipl_charset_next(set: *const CharSet, from: i64) -> i64 {
+    let s = unsafe { *set };
+    let from = if from < 0 { 0 } else { from as usize };
+    match s.next_from(from) {
+        Some(c) => c as i64,
+        None => -1,
+    }
+}
+
+#[no_mangle]
+pub(crate) extern "C" fn aipl_charset_prev(set: *const CharSet, from: i64) -> i64 {
+    let s = unsafe { *set };
+    match s.prev_from(from) {
+        Some(c) => c as i64,
+        None => -1,
     }
 }

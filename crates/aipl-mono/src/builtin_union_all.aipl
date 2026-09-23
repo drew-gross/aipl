@@ -40,22 +40,22 @@ pub fn union_all<T: any>(self: #{T}[]) -> #{T} {
     assert([#{true}, #{false}].union_all() == #{false, true});
 })
 --- performance ---
-allocations: 56
-deallocations: 56
+allocations: 51
+deallocations: 51
 reallocations: 0
-bytes allocated: 2637
-instructions executed: 2866
-binary size: 13928
-  code: 7976
+bytes allocated: 2469
+instructions executed: 2928
+binary size: 13384
+  code: 7764
   data: 716
-  metadata: 5236
+  metadata: 4904
 functions:
   __eq_set$bool:
     calls: 1
     bytes: 256
   __eq_set$char:
     calls: 1
-    bytes: 256
+    bytes: 84
   __eq_set$i64:
     calls: 7
     bytes: 256
@@ -64,42 +64,42 @@ functions:
     bytes: 304
   __test$union_all:
     calls: 1
-    bytes: 5980
+    bytes: 5940
   __test$union_all$filter1$own0:
     calls: 1
     bytes: 380
   aipl_arr_drop_arr:
-    calls: 10
+    calls: 9
     bytes: (external)
   aipl_arr_inc:
-    calls: 89
+    calls: 81
     bytes: (external)
   aipl_arr_reserve:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 158
+    calls: 144
     bytes: (external)
   aipl_array_new:
     calls: 10
     bytes: (external)
   aipl_array_push_mut:
-    calls: 69
+    calls: 62
     bytes: (external)
   aipl_array_with_cap:
-    calls: 46
+    calls: 41
     bytes: (external)
   aipl_assert:
     calls: 10
     bytes: (external)
   aipl_set_contains:
-    calls: 90
+    calls: 81
     bytes: (external)
   aipl_set_insert:
-    calls: 73
+    calls: 66
     bytes: (external)
   aipl_set_union:
-    calls: 20
+    calls: 18
     bytes: (external)
   aipl_test_begin:
     calls: 1

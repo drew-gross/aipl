@@ -4511,6 +4511,8 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_arr_elem_ptr", aipl_arr_elem_ptr as *const u8);
     jit_builder.symbol("aipl_arr_load_bit", aipl_arr_load_bit as *const u8);
     jit_builder.symbol("aipl_set_contains", aipl_set_contains as *const u8);
+    jit_builder.symbol("aipl_charset_next", charset::aipl_charset_next as *const u8);
+    jit_builder.symbol("aipl_charset_prev", charset::aipl_charset_prev as *const u8);
     jit_builder.symbol("aipl_set_insert", aipl_set_insert as *const u8);
     jit_builder.symbol("aipl_set_union", aipl_set_union as *const u8);
     jit_builder.symbol("aipl_set_union_mut", aipl_set_union_mut as *const u8);
@@ -7835,6 +7837,8 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_str_contains"
         | "aipl_str_data"
         | "aipl_arr_load_bit"
+        | "aipl_charset_next"
+        | "aipl_charset_prev"
         | "aipl_write_string_to_file"
         | "aipl_str_split"
         | "aipl_str_split_len"
@@ -9463,6 +9467,10 @@ fn needs_drop(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
     match ty {
         // Handled above: a tag owns nothing.
         ConcreteType::Case(_) => false,
+        // A `#{char}` is 32 bytes of bitfield and no pointer: copied rather
+        // than refcounted, so there is nothing to retain and nothing to free.
+        // Ahead of the `Set` arm below, which owns a heap block.
+        _ if is_char_set(ty) => false,
         // `str` (and `Error`, which shares its heap representation) is dropped
         // like a heap pointer; the other primitives own no heap.
         _ if is_str_repr(ty) => true,
@@ -9682,7 +9690,12 @@ fn is_char_array(ty: &ConcreteType) -> bool {
 /// exclusive (see `replace_str_binding`), and let an exclusive binding hold the
 /// value's sole reference so the in-place growth paths can grow it.
 fn mut_binding_owns_slot_ref(ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> bool {
-    matches!(ty, ConcreteType::Set(..) | ConcreteType::Dict(_, _))
+    // A `#{char}` is excluded exactly as `char[]` is below, and for the same
+    // reason: this model is for a binding whose slot holds one *reference* to a
+    // heap block, and neither of those has a block to hold a reference to.
+    // Their bytes are the value, so the slot holds the bytes (`lives_in_slot`).
+    (matches!(ty, ConcreteType::Set(..)) && !is_char_set(ty))
+        || matches!(ty, ConcreteType::Dict(_, _))
         || (matches!(ty, ConcreteType::Array(_)) && !is_char_array(ty))
         || is_boxed(ty, structs)
 }
@@ -9708,12 +9721,6 @@ fn is_str_shaped(ty: &ConcreteType) -> bool {
 /// nothing — is free to do; `#>{char}` scans the other way. So the order a set
 /// carries changes how it is walked, not how it is stored.
 ///
-/// Staged with `charset.rs` and not yet asked by anything: switching a type's
-/// representation is atomic — `abi_elem_size`, `abi_is_composite`, every
-/// `ConcreteType::Set` arm and the four `aipl_set_*` entries have to agree in
-/// one change — so the predicate lands with the layout it names and the arms
-/// that ask it land together.
-#[allow(dead_code)] // staged: asked when `#{char}` switches representation
 fn is_char_set(ty: &ConcreteType) -> bool {
     matches!(ty, ConcreteType::Set(elem, _) if **elem == ConcreteType::Primitive(Primitive::Char))
 }
@@ -9734,7 +9741,7 @@ fn is_char_set(ty: &ConcreteType) -> bool {
 /// rather than deciding for itself: a slot written one way and read the other
 /// is a silent miscompile rather than a crash.
 fn lives_in_slot(ty: &ConcreteType) -> bool {
-    is_str_shaped(ty) || is_inline_optional(ty)
+    is_str_shaped(ty) || is_inline_optional(ty) || is_char_set(ty)
 }
 
 /// An optional of a scalar — `i64?`, `bool?`, `char?`. Sixteen bytes (the tag
@@ -9775,6 +9782,18 @@ fn coerce_empty_to_char_array<M: Module>(
     actual: &ConcreteType,
     expected: &ConcreteType,
 ) -> Value {
+    // The same substitution a `#{char}` needs, and for the same reason: an
+    // empty `#{}` is the shared empty *array* block, and a char set is the
+    // 256-bit bitfield — copying 32 bytes out of an 8-byte block header is what
+    // reading one as the other does. Reached when the literal's own type was
+    // never locked (a generic instance's `mut out: #{T} = #{}`), so the binding
+    // learns the element type from its annotation rather than from the value.
+    // The empty set is what zeroed memory already reads as, and the block it
+    // replaces is static and untracked, so nothing is allocated or released.
+    let is_empty_set = matches!(actual, ConcreteType::Set(inner, _) if is_none_inner(inner));
+    if is_char_set(expected) && is_empty_set {
+        return charset_slot(builder);
+    }
     let is_empty_placeholder = matches!(actual, ConcreteType::Array(inner) if is_none_inner(inner));
     if is_char_array(expected) && is_empty_placeholder {
         builtins.call_void(module, builder, "aipl_array_dec", &[v]);
@@ -10676,6 +10695,119 @@ fn i64_slot(builder: &mut FunctionBuilder) -> StackSlot {
     builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3))
 }
 
+/// How many 64-bit words a `#{char}` is, derived from the shared layout so the
+/// two cannot drift.
+const CHARSET_WORDS: usize = charset::CHARSET_SIZE / 8;
+
+/// A fresh, zeroed `#{char}`: four words of stack, which *is* the empty set —
+/// the representation is chosen so zeroed memory already reads as one.
+fn charset_slot(builder: &mut FunctionBuilder) -> Value {
+    let slot = builder.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        charset::CHARSET_SIZE as u32,
+        3,
+    ));
+    let zero = builder.ins().iconst(types::I64, 0);
+    for w in 0..CHARSET_WORDS {
+        builder
+            .ins()
+            .stack_store(types::I64, zero, slot, (w * 8) as i32);
+    }
+    builder.ins().stack_addr(types::I64, slot, 0)
+}
+
+/// A char-set operand, with the empty-`#{}` placeholder substituted.
+///
+/// An empty set literal is the shared empty *array* block until something gives
+/// it an element type, and a binary operator is one of the things that can:
+/// `#{} == #{'a'}` pairs a placeholder with a char set. The placeholder has no
+/// members and the empty bitfield is what zeroed memory reads as, so the
+/// substitute allocates nothing.
+fn charset_operand(builder: &mut FunctionBuilder, v: Value, ty: &ConcreteType) -> Value {
+    if matches!(ty, ConcreteType::Set(inner, _) if is_none_inner(inner)) {
+        return charset_slot(builder);
+    }
+    v
+}
+
+/// `set.insert(c)` on the bitfield: `words[c >> 6] |= 1 << (c & 63)`.
+///
+/// No membership test and no growth — setting a bit twice is setting it once,
+/// which is why building a char set needs no de-duplication where the
+/// array-backed set pays a scan per insert.
+fn emit_charset_insert(builder: &mut FunctionBuilder, base: Value, c: Value) {
+    let flags = MemFlagsData::trusted();
+    let word = builder.ins().ushr_imm_u(c, 6);
+    let off = builder.ins().imul_imm_u(word, 8);
+    let addr = builder.ins().iadd(base, off);
+    let one = builder.ins().iconst(types::I64, 1);
+    let bit_no = builder.ins().band_imm_u(c, 63);
+    let bit = builder.ins().ishl(one, bit_no);
+    let cur = builder.ins().load(types::I64, flags, addr, 0);
+    let next = builder.ins().bor(cur, bit);
+    builder.ins().store(flags, next, addr, 0);
+}
+
+/// `set.has(c)` on the bitfield, as an i64 0/1: one shift and one mask, with no
+/// bounds test — 256 bits cover `char` totally, so every value indexes a real
+/// bit and there is no out-of-range case to handle.
+fn emit_charset_contains(builder: &mut FunctionBuilder, base: Value, c: Value) -> Value {
+    let flags = MemFlagsData::trusted();
+    let word = builder.ins().ushr_imm_u(c, 6);
+    let off = builder.ins().imul_imm_u(word, 8);
+    let addr = builder.ins().iadd(base, off);
+    let w = builder.ins().load(types::I64, flags, addr, 0);
+    let bit_no = builder.ins().band_imm_u(c, 63);
+    let shifted = builder.ins().ushr(w, bit_no);
+    builder.ins().band_imm_u(shifted, 1)
+}
+
+/// `len(set)` on the bitfield: a popcount per word, summed. Constant work
+/// whatever the membership, where the array-backed set reads a stored length.
+fn emit_charset_len(builder: &mut FunctionBuilder, base: Value) -> Value {
+    let flags = MemFlagsData::trusted();
+    let mut total = builder.ins().iconst(types::I64, 0);
+    for w in 0..CHARSET_WORDS {
+        let word = builder.ins().load(types::I64, flags, base, (w * 8) as i32);
+        let n = builder.ins().popcnt(word);
+        total = builder.ins().iadd(total, n);
+    }
+    total
+}
+
+/// Char-set equality as an i64 0/1: the four words, compared. Two char sets are
+/// equal exactly when their members are — there is no length, no capacity and
+/// no order in the value to differ on, so this needs neither the sizes-equal
+/// test nor the every-element-is-a-member walk the array-backed set does.
+fn emit_charset_eq(builder: &mut FunctionBuilder, a: Value, b: Value) -> Value {
+    let flags = MemFlagsData::trusted();
+    let mut diff = builder.ins().iconst(types::I64, 0);
+    for w in 0..CHARSET_WORDS {
+        let x = builder.ins().load(types::I64, flags, a, (w * 8) as i32);
+        let y = builder.ins().load(types::I64, flags, b, (w * 8) as i32);
+        let d = builder.ins().bxor(x, y);
+        diff = builder.ins().bor(diff, d);
+    }
+    let eq = builder.ins().icmp_imm_s(IntCC::Equal, diff, 0);
+    builder.ins().uextend(types::I64, eq)
+}
+
+/// Set union on the bitfield: four `or`s into a fresh slot, whatever the two
+/// sizes. Neither operand is consumed and the result owns nothing, so none of
+/// the inc/dec the array-backed union needs applies.
+fn emit_charset_union(builder: &mut FunctionBuilder, a: Value, b: Value) -> Value {
+    let flags = MemFlagsData::trusted();
+    let out = charset_slot(builder);
+    for w in 0..CHARSET_WORDS {
+        let off = (w * 8) as i32;
+        let x = builder.ins().load(types::I64, flags, a, off);
+        let y = builder.ins().load(types::I64, flags, b, off);
+        let joined = builder.ins().bor(x, y);
+        builder.ins().store(flags, joined, out, off);
+    }
+    out
+}
+
 /// A stack slot holding one AIPL value of type `ty`, **by value** — sized from
 /// [`elem_size_of`] rather than assumed to be a machine word.
 ///
@@ -11003,6 +11135,9 @@ fn emit_eq_body<M: Module>(
                 builder.seal_block(merge);
                 builder.ins().stack_load(types::I64, types::I64, res, 0)
             }
+        }
+        ConcreteType::Set(elem, _) if **elem == ConcreteType::Primitive(Primitive::Char) => {
+            emit_charset_eq(builder, lv, rv)
         }
         ConcreteType::Set(elem, _) => {
             // Order-independent: same length and every element of the left set is
@@ -11780,6 +11915,10 @@ fn array_drop_fn_addr<M: Module>(
         // nested `char[]` element (e.g. in `char[][]`) is freed the same way
         // a `str` element is, not via the generic array-element drop-fn.
         ConcreteType::Array(_) if is_char_array(elem) => Some(b.id(module, drop_str)),
+        // A `#{char}` is not a block pointer — it is 32 bytes of bitfield
+        // inline in the element — so it has nothing to free. Ahead of the set
+        // arm below, which would dec those bytes as if they addressed a block.
+        _ if is_char_set(elem) => None,
         // A set or a dict *is* an array block (see `is_heap`), so the element
         // drop for a nested array serves them unchanged: it decs each element's
         // block pointer, and that is what one of these is.
@@ -11818,6 +11957,9 @@ fn array_retain_fn_addr<M: Module>(
         ConcreteType::Primitive(Primitive::Str) => Some(b.id(module, "aipl_arr_retain_ptr")),
         // As in `array_drop_fn_addr`: a set or dict element is a block pointer
         // like a nested array's, and `aipl_arr_retain_ptr` incs exactly that.
+        // As in `array_drop_fn_addr`: a char-set element owns nothing, so
+        // there is no reference to take on it.
+        _ if is_char_set(elem) => None,
         ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {
             Some(b.id(module, "aipl_arr_retain_ptr"))
         }
@@ -12512,6 +12654,10 @@ fn emit_render<M: Module>(
         _ if is_char_array(ty) => emit_render_char_array(module, builder, cx, value, sink)?,
         ConcreteType::Array(elem) => {
             emit_render_seq(module, builder, cx, value, elem, sink, b'[', b']')?
+        }
+        ConcreteType::Set(elem, order) if **elem == ConcreteType::Primitive(Primitive::Char) => {
+            let descending = *order == aipl_syntax::ast::SetOrder::Desc;
+            emit_render_charset(module, builder, cx, value, descending, sink)?
         }
         ConcreteType::Set(elem, _) => {
             emit_render_seq(module, builder, cx, value, elem, sink, b'{', b'}')?
@@ -13391,6 +13537,97 @@ fn emit_render_seq<M: Module>(
     builder.switch_to_block(exit);
     builder.seal_block(exit);
     let close_len = emit_lit(module, builder, cx, sink, &[close])?;
+    add_len(builder, len_slot, close_len);
+    Ok(builder
+        .ins()
+        .stack_load(types::I64, types::I64, len_slot, 0))
+}
+
+/// Render a `#{char}` as `{'a', 'b'}` — the shape `emit_render_seq` gives, over
+/// a bit scan instead of an index walk.
+///
+/// Two differences from the index walk, both because the cursor is a *char*
+/// rather than a position: the separator needs a flag of its own (the first
+/// member is whatever the lowest set bit is, not index 0), and the cursor
+/// advances from the member just visited, skipping the gaps.
+fn emit_render_charset<M: Module>(
+    module: &mut M,
+    builder: &mut FunctionBuilder,
+    cx: Cx,
+    set: Value,
+    descending: bool,
+    sink: Sink,
+) -> Result<Value, Error> {
+    let len_slot =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+    let zero = builder.ins().iconst(types::I64, 0);
+    builder.ins().stack_store(types::I64, zero, len_slot, 0);
+    let open_len = emit_lit(module, builder, cx, sink, b"{")?;
+    add_len(builder, len_slot, open_len);
+
+    let cur =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+    let start = builder
+        .ins()
+        .iconst(types::I64, if descending { 255 } else { 0 });
+    builder.ins().stack_store(types::I64, start, cur, 0);
+    let first =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+    let one = builder.ins().iconst(types::I64, 1);
+    builder.ins().stack_store(types::I64, one, first, 0);
+
+    let header = builder.create_block();
+    let body = builder.create_block();
+    let exit = builder.create_block();
+    builder.ins().jump(header, &[]);
+
+    builder.switch_to_block(header);
+    let at = builder.ins().stack_load(types::I64, types::I64, cur, 0);
+    let sym = if descending {
+        "aipl_charset_prev"
+    } else {
+        "aipl_charset_next"
+    };
+    let found = cx.builtins.call(module, builder, sym, &[set, at]);
+    let more = builder
+        .ins()
+        .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, found, 0);
+    builder.ins().brif(more, body, &[], exit, &[]);
+
+    builder.switch_to_block(body);
+    builder.seal_block(body);
+    let is_first = builder.ins().stack_load(types::I64, types::I64, first, 0);
+    let sep_b = builder.create_block();
+    let after_sep = builder.create_block();
+    builder.ins().brif(is_first, after_sep, &[], sep_b, &[]);
+    builder.switch_to_block(sep_b);
+    builder.seal_block(sep_b);
+    let sep = emit_lit(module, builder, cx, sink, b", ")?;
+    add_len(builder, len_slot, sep);
+    builder.ins().jump(after_sep, &[]);
+    builder.switch_to_block(after_sep);
+    builder.seal_block(after_sep);
+    builder.ins().stack_store(types::I64, zero, first, 0);
+
+    let elem_len = emit_render(
+        module,
+        builder,
+        cx,
+        found,
+        &ConcreteType::Primitive(Primitive::Char),
+        sink,
+    )?;
+    add_len(builder, len_slot, elem_len);
+
+    let step = if descending { -1 } else { 1 };
+    let next = builder.ins().iadd_imm_s(found, step);
+    builder.ins().stack_store(types::I64, next, cur, 0);
+    builder.ins().jump(header, &[]);
+    builder.seal_block(header);
+
+    builder.switch_to_block(exit);
+    builder.seal_block(exit);
+    let close_len = emit_lit(module, builder, cx, sink, b"}")?;
     add_len(builder, len_slot, close_len);
     Ok(builder
         .ins()
@@ -16037,7 +16274,9 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let len = if is_str_shaped(&t) {
+            let len = if is_char_set(&t) {
+                emit_charset_len(builder, ptr)
+            } else if is_str_shaped(&t) {
                 // A `str` (or a str-shaped `char[]`, see `is_str_shaped`) stores
                 // no length field (it can be inline/owned/view); `aipl_str_len`
                 // computes the byte length for any representation.
@@ -16871,6 +17110,15 @@ fn compile_call_expr<M: Module>(
                 // so `#{u8(1)}.has(1)` needs no conversion on the `1`.
                 let x_ty = flex_int_ty(&args[1], &x_ty, &elem);
                 expect_type(&x_ty, &elem, "has element", args[1].span.clone())?;
+                // A char set answers from its bitfield: one shift and one mask,
+                // with no spill, no call and no bounds test — 256 bits cover
+                // `char` totally, so every value indexes a real bit.
+                if is_char_set(&set_ty) {
+                    return Ok((
+                        emit_charset_contains(builder, set_ptr, x_v),
+                        ConcreteType::Primitive(Primitive::Bool),
+                    ));
+                }
                 // The runtime reads the queried value through a pointer; spill
                 // it and pass its address. Sized and written by element type
                 // (`value_slot`/`store_array_elem`) rather than as a bare word:
@@ -16928,6 +17176,14 @@ fn compile_call_expr<M: Module>(
             let ConcreteType::Set(elem, order) = &result_ty else {
                 unreachable!()
             };
+            // A char set unions by `or`ing its four words. Nothing is consumed
+            // and nothing is produced that needs freeing, so the balancing
+            // inc/dec below — and the scope track — have nothing to do here.
+            if **elem == ConcreteType::Primitive(Primitive::Char) {
+                let a = charset_operand(builder, a_ptr, &a_ty);
+                let b = charset_operand(builder, b_ptr, &b_ty);
+                return Ok((emit_charset_union(builder, a, b), result_ty.clone()));
+            }
             let drop_fn = array_drop_fn_addr(builder, module, cx, elem);
             let retain_fn = array_retain_fn_addr(builder, module, cx, elem);
             let esz = builder
@@ -18620,12 +18876,23 @@ fn compile_expr<M: Module>(
 ) -> Result<(Value, ConcreteType), Error> {
     let (v, derived) = compile_expr_inner(module, builder, cx, scopes, expr)?;
     let locked = expr.ty.as_ref().and_then(|t| t.to_concrete());
+    let was_placeholder_set =
+        matches!(&derived, ConcreteType::Set(inner, _) if is_none_inner(inner));
     let ty = match &locked {
         Some(locked) if has_placeholder_ty(&derived) && !has_placeholder_ty(locked) => {
             locked.clone()
         }
         _ => derived,
     };
+    // Deciding the type here can decide the *representation* with it. An empty
+    // `#{}` derives the shared empty array block, which is what every other set
+    // is; locked at `#{char}` it is the 256-bit bitfield instead, and reading
+    // one as the other reads a block header as members. The empty set is what
+    // zeroed memory already reads as, so the substitute allocates nothing — and
+    // the block it replaces was static and untracked, so nothing is released.
+    if was_placeholder_set && is_char_set(&ty) {
+        return Ok((charset_slot(builder), ty));
+    }
     Ok((v, ty))
 }
 
@@ -19683,7 +19950,12 @@ fn compile_expr_inner<M: Module>(
                         }
                         _ => None,
                     };
-                    if let (Some(other), false) = (other, is_none_inner(elem)) {
+                    // A char set has no allocation to extend: `union` on it is
+                    // four `or`s into a fresh slot, already as cheap as the
+                    // in-place path is trying to be.
+                    let reusable =
+                        !is_none_inner(elem) && **elem != ConcreteType::Primitive(Primitive::Char);
+                    if let (Some(other), true) = (other, reusable) {
                         let a_ptr = builder.ins().stack_load(types::I64, types::I64, slot, 0);
                         let (b_ptr, b_ty) = compile_expr(module, builder, cx, scopes, other)?;
                         expect_type(&b_ty, &expected_ty, "union operand", other.span.clone())?;
@@ -19794,7 +20066,12 @@ fn compile_expr_inner<M: Module>(
                     // loop iterations, so the outgoing value lives in the very
                     // storage being overwritten.)
                     emit_drop(builder, module, builtins, structs, old, &expected_ty);
-                    store_binding_str(builder, cx, slot, v, structs);
+                    // `store_binding`, not `store_binding_str`: this arm serves
+                    // every value that lives in its slot, and the str-specific
+                    // wrapper would type the slot as a `str` — copying 24 bytes
+                    // where a `#{char}` has 32, and leaving the last word of
+                    // the bitfield holding whatever was there before.
+                    store_binding(builder, cx, slot, v, &expected_ty, structs);
                 }
             } else if is_composite(&expected_ty, structs) && !lives_in_slot(&expected_ty) {
                 // The `!is_str_shaped` guard is the same one `LetMut` needs, for
@@ -19883,6 +20160,15 @@ fn compile_expr_inner<M: Module>(
                 it_ptr
             };
             let reverse = reverse && !is_str_shaped(&it_ty);
+            // A char set is walked by scanning its bits, and the direction is
+            // the order it carries rather than anything the fusion pass did:
+            // `#>{char}` promises the largest first, `#<{char}` the smallest,
+            // and `#{char}` promises nothing and so takes the ascending scan
+            // the representation gives for free.
+            let charset_descending = matches!(
+                &it_ty,
+                ConcreteType::Set(_, aipl_syntax::ast::SetOrder::Desc)
+            ) || (is_char_set(&it_ty) && reverse);
 
             // For a `str` iterable, set up a char cursor: a small codegen-stacked
             // struct the runtime advances byte-by-byte. It streams every
@@ -19910,7 +20196,12 @@ fn compile_expr_inner<M: Module>(
                 8,
                 3,
             ));
-            let start = if reverse {
+            let start = if is_char_set(&it_ty) {
+                // The cursor is a char index, not an element index: the scan
+                // starts past the last char going down, at the first going up.
+                let from = if charset_descending { 255 } else { 0 };
+                builder.ins().iconst(types::I64, from)
+            } else if reverse {
                 load_arr_len(builder, it_ptr)
             } else {
                 builder.ins().iconst(types::I64, 0)
@@ -19939,6 +20230,24 @@ fn compile_expr_inner<M: Module>(
                             .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, byte_i64, 0);
                     builder.ins().brif(more, body_block, &[], exit, &[]);
                     (byte_i64, ConcreteType::Primitive(Primitive::Char))
+                }
+                // A char set is the bitfield, so the walk is a bit scan: each
+                // step asks for the next member at or past the cursor and gets
+                // `-1` when there is none. That one signed test is the whole
+                // loop condition — there is no length to compare against.
+                _ if is_char_set(&it_ty) => {
+                    let sym = if charset_descending {
+                        "aipl_charset_prev"
+                    } else {
+                        "aipl_charset_next"
+                    };
+                    let found = builtins.call(module, builder, sym, &[it_ptr, i]);
+                    let more = builder
+                        .ins()
+                        .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, found, 0);
+                    builder.ins().brif(more, body_block, &[], exit, &[]);
+                    builder.switch_to_block(body_block);
+                    (found, ConcreteType::Primitive(Primitive::Char))
                 }
                 // A set shares the array heap block, so the array walk *is* the
                 // set walk — same length word, same element reads. The order is
@@ -20025,7 +20334,21 @@ fn compile_expr_inner<M: Module>(
                 cx.structs,
                 scopes.pop().expect("for-body scope"),
             );
-            let next = builder.ins().iadd_imm_s(i, if reverse { -1 } else { 1 });
+            // A char set's cursor advances from the member just visited, not
+            // from the index that found it — the scan skips the gaps.
+            let cursor = if is_char_set(&it_ty) { var_value } else { i };
+            let step = if is_char_set(&it_ty) {
+                if charset_descending {
+                    -1
+                } else {
+                    1
+                }
+            } else if reverse {
+                -1
+            } else {
+                1
+            };
+            let next = builder.ins().iadd_imm_s(cursor, step);
             builder.ins().stack_store(types::I64, next, slot, 0);
             builder.ins().jump(header, &[]);
             builder.seal_block(header);
@@ -20606,6 +20929,17 @@ fn compile_expr_inner<M: Module>(
                 vals.push(v);
             }
             let elem = elem_ty.unwrap_or(ConcreteType::NoneInner);
+            // A `#{char}` is the bitfield: a zeroed slot with one bit per
+            // member. No heap block, no per-element insert call, no
+            // de-duplication scan (setting a bit twice is setting it once), and
+            // nothing to track for cleanup — the value carries no pointer.
+            if elem == ConcreteType::Primitive(Primitive::Char) {
+                let base = charset_slot(builder);
+                for v in vals {
+                    emit_charset_insert(builder, base, v);
+                }
+                return Ok((base, ConcreteType::Set(Box::new(elem), *order)));
+            }
             let esz = runtime_elem_size(&elem, structs);
             let esz_v = builder.ins().iconst(types::I64, esz);
             // `str` elements are heap: store the array `str` drop/retain helpers
@@ -21239,6 +21573,11 @@ fn abi_is_composite(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeD
     if is_str_shaped(ty) {
         return abi.str_is_composite();
     }
+    // Thirty-two bytes that live in memory, which is what "composite" already
+    // meant here.
+    if is_char_set(ty) {
+        return true;
+    }
     matches!(ty, ConcreteType::Optional(_) | ConcreteType::Result(_, _))
         || matches!(ty, ConcreteType::Named(n) if structs.get(n).is_some_and(|d| !d.boxed()))
 }
@@ -21256,6 +21595,9 @@ fn abi_is_composite(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeD
 fn abi_elem_size(abi: Abi, ty: &ConcreteType, structs: &HashMap<String, TypeDef>) -> i64 {
     match ty {
         _ if is_str_shaped(ty) => abi.str_size(),
+        // A `#{char}` is the 256-bit bitfield — the second type to answer this
+        // with something other than a word.
+        _ if is_char_set(ty) => charset::CHARSET_SIZE as i64,
         ConcreteType::Optional(_) => {
             OPT_VALUE_OFFSET as i64 + abi_elem_size(abi, opt_core(ty), structs)
         }
