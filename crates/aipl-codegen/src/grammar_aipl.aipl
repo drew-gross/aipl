@@ -1335,35 +1335,30 @@ fn lower_postfix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # three bracket forms, and `?` is the whole of the seventh.
 fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
-    let head = toks[0].value_or("");
-    if (head == "?") {
-        return ok(ASuffix(SufTry));
-    };
-    if (head == ".") {
-        let name = toks[1].value_or("");
-        if (kids.is_empty()) {
-            return ok(ASuffix(SufField(field_name(name, sp)?)));
-        };
-        let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a method call")?;
-        return ok(ASuffix(SufMethod(name, args)));
-    };
 
-    // Two own tokens — `[` and `]` — is a plain index. A third is the `..` of a
-    // slice, and which side of the operand it sits on says which end is open.
-    let inner = kid_expr(kids, 0, sp)?;
-    if (toks.len() == 2) {
-        return ok(ASuffix(SufIndex(inner)));
-    };
-    let Span { start } = spans[1].value_or_err(ParseError {
-        message: "a slice has no range",
-        span: sp,
-    })?;
-    if (start < sub_span(node.children, 0, sp).start) {
-        return ok(ASuffix(SufSliceTo(inner)));
-    };
-    ok(ASuffix(SufSliceFrom(inner)))
+    // The seven steps are seven distinct runs of positions, brackets included,
+    // so the shape alone says which one matched. That settles the two slice
+    // forms in particular: `a[..b]` puts its operand third and `a[b..]` second,
+    // where reading it off the source meant comparing the `..`'s start against
+    // the operand's to find which side it sat on.
+    match (node.slots()) {
+        // `?`
+        [Tok(_)] => ok(ASuffix(SufTry)),
+        // `.name`, and `.0` — a tuple slot, which `field_name` spells `_0`.
+        [Tok(_), name] => ok(ASuffix(SufField(field_name(name.slot_text(src), sp)?))),
+        // `.name(args)`
+        [Tok(_), name, Tok(_), Sub(_), Tok(_)] => {
+            let args = no_spread(as_exprs(kid(kids, 0, sp)?, sp)?, "a method call")?;
+            ok(ASuffix(SufMethod(name.slot_text(src), args)))
+        },
+        // `[i]`
+        [Tok(_), Sub(_), Tok(_)] => ok(ASuffix(SufIndex(kid_expr(kids, 0, sp)?))),
+        // `[..e]` — the open end is the left one.
+        [Tok(_), Tok(_), Sub(_), Tok(_)] => ok(ASuffix(SufSliceTo(kid_expr(kids, 0, sp)?))),
+        // `[e..]`
+        [Tok(_), Sub(_), Tok(_), Tok(_)] => ok(ASuffix(SufSliceFrom(kid_expr(kids, 0, sp)?))),
+        _ => err(ParseError { message: "a suffix matched no alternative", span: sp }),
+    }
 }
 
 # `.name` names a field and `.0` a tuple slot, which the AST spells as the field
@@ -2727,10 +2722,13 @@ fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # field list for the body to bind off it.
 fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let toks = node.own_texts(src);
-    let spans = node.tokens;
-    let name_span = spans.first().value_or(node.tok_span());
-    if (toks[1] == some("{")) {
+    let name_span = node.tokens.first().value_or(node.tok_span());
+
+    // `Point { x, y }` — the destructuring form. It is the one alternative
+    // holding a repetition, so its positions do not line up one per sub-rule
+    // and it is recognised by its `{` rather than by its shape.
+    if (node.tokens[1].map(|t| src[t]) == some("{")) {
+        let toks = node.own_texts(src);
         let scrutinee = Param {
             name: `__spat${name_span.start}`,
             ty: TyNamed(toks[0].value_or("")),
@@ -2742,38 +2740,79 @@ fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
         let fields = toks[1..].filter(|w| !binder_punct().contains(w));
         return ok(AParam(ParsedParam { param: scrutinee, fields, span: name_span }));
     };
-    let mutable = toks[0] == some("mut");
-    let at_name: u64 = if (mutable) { 1 } else { 0 };
-    let implicit_some = toks[at_name + 1] == some("?");
-    let arity = if (toks.contains("*")) {
-        ZeroOrMore
-    } else {
-        if (toks.contains("+")) { OneOrMore } else { One }
+
+    // The six named shapes. Every sub-rule is one position, and *which*
+    // positions hold a lowered child is what tells them apart — `name: T*` puts
+    // its type third and `mut name: T` fourth, `name?: T = d` puts its type
+    // fourth where `name: T* = d` puts it third. So no arm counts tokens, hunts
+    // for a `*` or an `=`, or shifts an index past an optional `mut`.
+    match (node.slots()) {
+        // `mut name: T` — leads with the keyword, and takes neither a default
+        // nor a variadic marker.
+        [Tok(_), n, Tok(_), Sub(_)] => named_param(src, kids, n, sp, mutable=true),
+        // `name: T* = d`, `name: T+ = d`
+        [n, Tok(_), Sub(_), v, Tok(_), Sub(_)] => named_param(
+            src,
+            kids,
+            n,
+            sp,
+            marker=v.slot_text(src),
+            has_default=true,
+        ),
+        // `name?: T = d`
+        [n, Tok(_), Tok(_), Sub(_), Tok(_), Sub(_)] => named_param(
+            src,
+            kids,
+            n,
+            sp,
+            implicit_some=true,
+            has_default=true,
+        ),
+        // `name: T = d`
+        [n, Tok(_), Sub(_), Tok(_), Sub(_)] => named_param(src, kids, n, sp, has_default=true),
+        // `name: T*`, `name: T+`
+        [n, Tok(_), Sub(_), v] => named_param(src, kids, n, sp, marker=v.slot_text(src)),
+        // `name: T`
+        [n, Tok(_), Sub(_)] => named_param(src, kids, n, sp),
+        _ => err(ParseError { message: "a parameter matched no alternative", span: sp }),
+    }
+}
+
+# A named parameter, from the pieces its shape supplied: the name token, whether
+# a `mut` or a `?` preceded it, the variadic marker if one was written, and
+# whether a default followed. The type is always the first interior child and a
+# default the second, in every one of the six shapes.
+#
+# The stored type is what the *body* sees: a variadic stores the sequence its
+# elements arrive in, and a `k?: T` stores the `T?` a caller's bare `T` is
+# wrapped into.
+fn named_param(
+    src: str,
+    kids: Ast[],
+    name: Slot,
+    sp: Span,
+    mutable: bool = false,
+    implicit_some: bool = false,
+    has_default: bool = false,
+    marker: str = "",
+) -> Ast!ParseError {
+    let arity = match (marker) {
+        "*" => ZeroOrMore,
+        "+" => OneOrMore,
+        _ => One,
     };
     let written = as_ty(kid(kids, 0, sp)?, sp)?;
-
-    // The stored type is what the *body* sees: a variadic stores the sequence
-    // its elements arrive in, and a `k?: T` stores the `T?` a caller's bare `T`
-    // is wrapped into.
     let ty = match (arity) {
         ZeroOrMore => variadic_seq_ty(written),
         OneOrMore => nonempty_seq_ty(written),
         One => if (implicit_some) { TyOptional(written) } else { written },
     };
-    let default = if (toks.contains("=")) { some(kid_expr(kids, 1, sp)?) } else { none };
-    let param = Param {
-        name: toks[at_name].value_or(""),
-        ty,
-        mutable,
-        arity,
-        default,
-        implicit_some,
-    };
+    let default = if (has_default) { some(kid_expr(kids, 1, sp)?) } else { none };
     let no_fields: str[] = [];
     ok(AParam(ParsedParam {
-        param,
+        param: Param { name: name.slot_text(src), ty, mutable, arity, default, implicit_some },
         fields: no_fields,
-        span: spans[at_name].value_or(node.tok_span()),
+        span: name.slot_span().value_or(sp),
     }))
 }
 
@@ -4159,6 +4198,30 @@ pub fn aipl_parse_file(src: str) -> ParsedFile!ParseError {
 }.test({
     let ParsedFile { program, allows } = aipl_parse_file("fn f() { g(); } #[allow]\n")?;
     assert(program.show_program() == "fn f() = Seq(g(), ())");
+
+    // Every named parameter shape, lowered. The six are six distinct runs of
+    // positions — which position holds the lowered type, and whether one holds
+    // a default — so this is what proves `lower_param` tells them apart by
+    // shape rather than by searching the tokens for a `mut`, a `?` or an `=`.
+    let named = aipl_parse_file(
+        "fn f(a: i64, mut b: i64, c: i64 = 1, d?: i64 = none, e: i64*, g: i64+) { }",
+    )?;
+    let want = "fn f(a: i64, mut b: i64, c: i64 = 1, d?: Optional(i64) = none, e: Array(i64)*, g: Without(Array(i64), [])+) = ()";
+    assert(named.program.show_program() == want);
+
+    // Every postfix step, lowered. The seven are seven distinct runs of
+    // positions, brackets included — in particular `v[..3]` and `v[4..]`, which
+    // differ only in which position holds the operand.
+    let suffixes = aipl_parse_file("fn h(v: i64) { v.a; v.0; v.m(1); v[2]; v[..3]; v[4..]; v?; }")?;
+    let want_suffixes = "fn h(v: i64) = Seq(v.a, Seq(v._0, Seq(v.m(1), Seq(Index(v, 2), Seq(Slice(v, 0, 3), Seq(Slice(v, 4, ), Seq(Try(v), ())))))))";
+    assert(suffixes.program.show_program() == want_suffixes);
+
+    // The seventh shape, the destructuring one, which holds a repetition and so
+    // is the one alternative whose positions do not line up.
+    let destructured = aipl_parse_file("fn g(Point { x, y }) { }")?;
+    assert(
+        destructured.program.show_program() == "fn g(__spat$5: Point) = Let(x, __spat$5.x, Let(y, __spat$5.y, ()))",
+    );
     assert(allows == [16..24]);
 
     // No markers is an empty list, not an absence.
@@ -4765,24 +4828,24 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2087508
-deallocations: 2087508
-reallocations: 298392
-bytes allocated: 390616748
-instructions executed: 581706980
-binary size: 5520080
-  code: 3623768
-  data: 56692
-  metadata: 1839620
+allocations: 2106881
+deallocations: 2106881
+reallocations: 300668
+bytes allocated: 393962945
+instructions executed: 588940749
+binary size: 5986328
+  code: 3931120
+  data: 57652
+  metadata: 1997556
 functions:
   __arr_drop___m11__ParsedParam:
-    calls: 18
+    calls: 26
     bytes: 232
   __arr_drop___m13__Doc:
     calls: 436
     bytes: 116
   __arr_drop___m1__Ast:
-    calls: 2284
+    calls: 2392
     bytes: 3244
   __arr_drop___m20__Item:
     calls: 59
@@ -4794,10 +4857,10 @@ functions:
     calls: 4
     bytes: 140
   __arr_drop___m22__Token$__m21__AiplTok:
-    calls: 5942
+    calls: 6078
     bytes: 388
   __arr_drop___m22__TokenRule$__m21__AiplTok:
-    calls: 708
+    calls: 714
     bytes: 832
   __arr_drop___m2__BraceEntry:
     calls: 5
@@ -4806,7 +4869,7 @@ functions:
     calls: 2673
     bytes: 140
   __arr_drop___m3__Expr:
-    calls: 86
+    calls: 95
     bytes: 116
   __arr_drop___m3__FieldInit:
     calls: 17
@@ -4824,19 +4887,19 @@ functions:
     calls: 23
     bytes: 116
   __arr_drop___m7__ListStyle:
-    calls: 238944
+    calls: 240768
     bytes: 120
   __arr_drop___m7__Prec:
-    calls: 708
+    calls: 714
     bytes: 120
   __arr_drop___m7__Production$__m21__AiplTok$__m1__Ast:
-    calls: 3579
+    calls: 3609
     bytes: 3352
   __arr_drop___m7__Rule$__m21__AiplTok:
-    calls: 243990
+    calls: 245928
     bytes: 116
   __arr_drop___m8__Cst:
-    calls: 27732
+    calls: 28446
     bytes: 116
   __arr_drop___m9__CaseParam:
     calls: 6
@@ -4851,10 +4914,10 @@ functions:
     calls: 4
     bytes: 172
   __arr_drop___m9__Item:
-    calls: 32
+    calls: 35
     bytes: 580
   __arr_drop___m9__Param:
-    calls: 12
+    calls: 15
     bytes: 196
   __arr_drop___m9__TypeParam:
     calls: 3
@@ -4869,13 +4932,13 @@ functions:
     calls: 1
     bytes: 140
   __arr_retain___m11__ParsedParam:
-    calls: 22
+    calls: 35
     bytes: 232
   __arr_retain___m13__Doc:
     calls: 628
     bytes: 116
   __arr_retain___m1__Ast:
-    calls: 2392
+    calls: 2521
     bytes: 3244
   __arr_retain___m20__Item:
     calls: 66
@@ -4887,10 +4950,10 @@ functions:
     calls: 6
     bytes: 140
   __arr_retain___m22__Token$__m21__AiplTok:
-    calls: 5234
+    calls: 5364
     bytes: 388
   __arr_retain___m22__TokenRule$__m21__AiplTok:
-    calls: 25488
+    calls: 25704
     bytes: 832
   __arr_retain___m2__BraceEntry:
     calls: 9
@@ -4899,7 +4962,7 @@ functions:
     calls: 17532
     bytes: 140
   __arr_retain___m3__Expr:
-    calls: 61
+    calls: 70
     bytes: 116
   __arr_retain___m3__FieldInit:
     calls: 16
@@ -4917,19 +4980,19 @@ functions:
     calls: 31
     bytes: 116
   __arr_retain___m7__ListStyle:
-    calls: 57771
+    calls: 58212
     bytes: 120
   __arr_retain___m7__Prec:
     calls: 0
     bytes: 120
   __arr_retain___m7__Production$__m21__AiplTok$__m1__Ast:
-    calls: 24996
+    calls: 25188
     bytes: 3352
   __arr_retain___m7__Rule$__m21__AiplTok:
-    calls: 484176
+    calls: 487872
     bytes: 116
   __arr_retain___m8__Cst:
-    calls: 24802
+    calls: 25443
     bytes: 116
   __arr_retain___m9__CaseParam:
     calls: 10
@@ -4944,10 +5007,10 @@ functions:
     calls: 6
     bytes: 172
   __arr_retain___m9__Item:
-    calls: 35
+    calls: 38
     bytes: 580
   __arr_retain___m9__Param:
-    calls: 16
+    calls: 24
     bytes: 196
   __arr_retain___m9__TypeParam:
     calls: 5
@@ -4983,7 +5046,7 @@ functions:
     calls: 247
     bytes: 324
   __builtin_any$__m7__Prec$lam$__m30__climb$__m21__AiplTok$__m1__Ast$lambda0:
-    calls: 443
+    calls: 456
     bytes: 276
   __builtin_any$__m7__Rule$__m21__AiplTok$lam$__m30__rule_nullable$__m21__AiplTok$lambda1:
     calls: 0
@@ -4995,13 +5058,13 @@ functions:
     calls: 4
     bytes: 396
   __builtin_count_while$char$lam$__m22__lex_step$__m21__AiplTok$lambda1:
-    calls: 2655
+    calls: 2721
     bytes: 312
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
-    calls: 494
+    calls: 514
     bytes: 268
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
-    calls: 2205
+    calls: 2264
     bytes: 280
   __builtin_count_while$char$s0$lam$__m15__dedent$lambda1:
     calls: 0
@@ -5016,31 +5079,31 @@ functions:
     calls: 54
     bytes: 356
   __builtin_find_if$__m3__Expr$lam$is_spread:
-    calls: 35
+    calls: 36
     bytes: 3064
   __builtin_find_if$__m7__Prec$lam$__m30__find_prec$lambda0:
-    calls: 383
+    calls: 397
     bytes: 688
   __builtin_find_index$str$lam$__m30__parse_prepared$__m21__AiplTok$__m1__Ast$lambda0:
-    calls: 354
+    calls: 357
     bytes: 404
   __builtin_find_index$str$lam$__m7__link$__m21__AiplTok$__m1__Ast$lambda0:
-    calls: 23580
+    calls: 23760
     bytes: 404
   __builtin_find_index$str$lam$__m7__link_rule$__m21__AiplTok$lambda0:
-    calls: 74112
+    calls: 74691
     bytes: 404
   __builtin_find_map$__m8__Cst$__builtin_Span$lam$__m8__first_leaf:
-    calls: 6121
+    calls: 6431
     bytes: 364
   __builtin_find_map$__m8__Cst$__builtin_Span$lam$__m8__first_token:
-    calls: 8994
+    calls: 9048
     bytes: 364
   __builtin_int_parse:
-    calls: 494
+    calls: 514
     bytes: 1096
   __builtin_int_parse$lambda1:
-    calls: 462
+    calls: 480
     bytes: 140
   __builtin_intersperse$__m13__Doc:
     calls: 44
@@ -5055,7 +5118,7 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m7__Rule$__m21__AiplTok$__m7__ListStyle$lam$__m7__group_styles$__m21__AiplTok$tail:
-    calls: 152877
+    calls: 154044
     bytes: 1072
   __builtin_map_join$__m8__Cst$__builtin_Span$lam$__m8__leaves:
     calls: 0
@@ -5073,25 +5136,25 @@ functions:
     calls: 8460
     bytes: 940
   __builtin_map_join$__m9__Item$char$s2$s3$s4$rs$lam$__m9__show_item:
-    calls: 30
+    calls: 33
     bytes: 13024
   __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam$__m8__last_leaf:
-    calls: 6974
+    calls: 7416
     bytes: 440
   __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam$__m8__last_token:
-    calls: 9248
+    calls: 9307
     bytes: 440
   __builtin_try_map$__m1__Ast$__m2__BraceEntry$__m7__ParseError$lam$lower_brace_body$lambda0:
     calls: 7
     bytes: 9184
   __builtin_try_map$__m1__Ast$__m3__Expr$__m7__ParseError$lam$lower_args$lambda0:
-    calls: 39
+    calls: 40
     bytes: 9148
   __builtin_try_map$__m1__Ast$__m3__Expr$__m7__ParseError$lam$lower_atom$lambda2:
     calls: 2
     bytes: 9148
   __builtin_try_map$__m1__Ast$__m3__Expr$__m7__ParseError$lam$lower_block_tail$lambda0:
-    calls: 43
+    calls: 50
     bytes: 9148
   __builtin_try_map$__m1__Ast$__m3__Expr$__m7__ParseError$lam$lower_template$lambda0:
     calls: 1
@@ -5148,10 +5211,10 @@ functions:
     calls: 4
     bytes: 9184
   __builtin_try_map$__m1__Ast$__m9__Item$__m7__ParseError$lam$lower_program$lambda0:
-    calls: 32
+    calls: 35
     bytes: 9596
   __builtin_try_map$__m1__Ast$__m9__TypeParam$__m7__ParseError$lam$lower_type_params$lambda0:
-    calls: 47
+    calls: 50
     bytes: 9148
   __builtin_try_map$__m1__Ast$__tuple$str$str$__m7__ParseError$lam$shim_expr$lambda0:
     calls: 1
@@ -5163,19 +5226,19 @@ functions:
     calls: 2592
     bytes: 552
   __builtin_try_map$__m7__Rule$__m21__AiplTok$__m7__Rule$__m21__AiplTok$__m7__ParseError$lam$__m7__desugar_rule$__m21__AiplTok:
-    calls: 68775
+    calls: 69300
     bytes: 508
   __builtin_try_map$__m8__Cst$__m1__Ast$__m7__ParseError$lam$__m30__lower_node$__m21__AiplTok$__m1__Ast$lambda0:
-    calls: 2703
+    calls: 2835
     bytes: 3596
   __builtin_value_or$bool:
-    calls: 13603
+    calls: 14020
     bytes: 24
   __ctor$__m1__Ast$Name:
     calls: 2
     bytes: 192
   __ctor$__m21__AiplTok$Name:
-    calls: 917
+    calls: 946
     bytes: 104
   __eq___builtin_Span:
     calls: 1
@@ -5205,10 +5268,10 @@ functions:
     calls: 5
     bytes: 2916
   __m11__resolve_body:
-    calls: 30
+    calls: 33
     bytes: 780
   __m12__range_bounds:
-    calls: 3
+    calls: 4
     bytes: 3524
   __m13__col_after:
     calls: 220
@@ -5247,10 +5310,10 @@ functions:
     calls: 70
     bytes: 400
   __m19__find_trailing_whitespace:
-    calls: 3
+    calls: 6
     bytes: 588
   __m19__line_end_span:
-    calls: 4
+    calls: 7
     bytes: 176
   __m20__breaks_after:
     calls: 2
@@ -5313,7 +5376,7 @@ functions:
     calls: 22
     bytes: 196
   __m21__int_lit:
-    calls: 180
+    calls: 186
     bytes: 896
   __m21__raw_tpl_kind:
     calls: 2
@@ -5328,10 +5391,10 @@ functions:
     calls: 9
     bytes: 2608
   __m22__between_len:
-    calls: 2025
+    calls: 2078
     bytes: 800
   __m22__delimited_len:
-    calls: 4038
+    calls: 4144
     bytes: 1904
   __m22__finalize_template$__m21__AiplTok:
     calls: 5
@@ -5343,31 +5406,31 @@ functions:
     calls: 6
     bytes: 1896
   __m22__lex$__m21__AiplTok:
-    calls: 354
+    calls: 357
     bytes: 1196
   __m22__lex_step$__m21__AiplTok:
-    calls: 5217
+    calls: 5347
     bytes: 27352
   __m22__nested_len:
-    calls: 3474
+    calls: 3567
     bytes: 1148
   __m22__step_result$__m21__AiplTok:
-    calls: 162254
+    calls: 166621
     bytes: 14264
   __m22__template_scan$__m21__AiplTok:
     calls: 5
     bytes: 2824
   __m22__template_step$__m21__AiplTok:
-    calls: 4019
+    calls: 4125
     bytes: 444
   __m22__to_eol_len:
     calls: 0
     bytes: 52
   __m22__to_eol_len$tail:
-    calls: 6951
+    calls: 7137
     bytes: 268
   __m22__to_eol_unless_len:
-    calls: 3472
+    calls: 3565
     bytes: 368
   __m23__unescape:
     calls: 37
@@ -5385,10 +5448,10 @@ functions:
     calls: 0
     bytes: 356
   __m27__strip_test_sections:
-    calls: 153
+    calls: 156
     bytes: 788
   __m28__parse_test_section_header:
-    calls: 258
+    calls: 261
     bytes: 744
   __m2__brace_literal:
     calls: 7
@@ -5397,64 +5460,64 @@ functions:
     calls: 0
     bytes: 840
   __m30__climb$__m21__AiplTok$__m1__Ast:
-    calls: 580
+    calls: 598
     bytes: 2956
   __m30__error_at$__m21__AiplTok$__m1__Ast:
     calls: 37
     bytes: 4180
   __m30__far_miss:
-    calls: 34492
+    calls: 35584
     bytes: 1084
   __m30__far_unclosed:
     calls: 9
     bytes: 320
   __m30__find_prec:
-    calls: 473
+    calls: 487
     bytes: 204
   __m30__leaf_at$__m21__AiplTok$__m1__Ast:
-    calls: 7658
+    calls: 7880
     bytes: 364
   __m30__lower_node$__m21__AiplTok$__m1__Ast:
-    calls: 2703
+    calls: 2835
     bytes: 133196
   __m30__match_group$__m21__AiplTok$__m1__Ast:
-    calls: 12550
+    calls: 12929
     bytes: 5084
   __m30__match_leading_sep$__m21__AiplTok$__m1__Ast:
     calls: 13
     bytes: 1096
   __m30__match_many$__m21__AiplTok$__m1__Ast:
-    calls: 15053
+    calls: 15498
     bytes: 1160
   __m30__match_maybe$__m21__AiplTok$__m1__Ast:
-    calls: 2259
+    calls: 2327
     bytes: 856
   __m30__match_one_of$__m21__AiplTok$__m1__Ast:
-    calls: 8184
+    calls: 8445
     bytes: 1492
   __m30__match_prod$__m21__AiplTok$__m1__Ast:
-    calls: 14417
+    calls: 14855
     bytes: 56000
   __m30__match_reps$__m21__AiplTok$__m1__Ast:
-    calls: 3415
+    calls: 3498
     bytes: 4144
   __m30__match_rule$__m21__AiplTok$__m1__Ast:
-    calls: 110135
+    calls: 113610
     bytes: 14952
   __m30__match_sep$__m21__AiplTok$__m1__Ast:
-    calls: 1098
+    calls: 1119
     bytes: 952
   __m30__match_then$__m21__AiplTok$__m1__Ast:
-    calls: 29231
+    calls: 30200
     bytes: 2816
   __m30__parse$__m21__AiplTok$__m1__Ast:
-    calls: 232
+    calls: 235
     bytes: 424
   __m30__parse_cst$__m21__AiplTok$__m1__Ast:
-    calls: 345
+    calls: 348
     bytes: 352
   __m30__parse_prepared$__m21__AiplTok$__m1__Ast:
-    calls: 354
+    calls: 357
     bytes: 8080
   __m30__prepare$__m21__AiplTok$__m1__Ast:
     calls: 9
@@ -5484,10 +5547,10 @@ functions:
     calls: 5940
     bytes: 876
   __m30__tok_text$__m21__AiplTok$__m1__Ast:
-    calls: 33799
+    calls: 34880
     bytes: 1712
   __m30__trivia_span$__m21__AiplTok:
-    calls: 1745
+    calls: 1782
     bytes: 1568
   __m31__can_start$__m21__AiplTok:
     calls: 197
@@ -5511,19 +5574,19 @@ functions:
     calls: 4
     bytes: 152
   __m3__show_ann:
-    calls: 30
+    calls: 32
     bytes: 416
   __m3__show_arm:
     calls: 18
     bytes: 476
   __m3__show_call:
-    calls: 63
+    calls: 64
     bytes: 1560
   __m3__show_expr:
-    calls: 517
+    calls: 554
     bytes: 21984
   __m3__show_exprs:
-    calls: 74
+    calls: 75
     bytes: 1396
   __m3__show_field_init:
     calls: 11
@@ -5571,55 +5634,55 @@ functions:
     calls: 13
     bytes: 1396
   __m6__show_ty:
-    calls: 187
+    calls: 199
     bytes: 5572
   __m6__show_tys:
     calls: 16
     bytes: 1396
   __m7__desugar_opt$__m21__AiplTok:
-    calls: 31833
+    calls: 32076
     bytes: 580
   __m7__desugar_rule$__m21__AiplTok:
-    calls: 361167
+    calls: 363924
     bytes: 12048
   __m7__group_styles$__m21__AiplTok:
     calls: 0
     bytes: 32
   __m7__group_styles$__m21__AiplTok$tail:
-    calls: 1306725
+    calls: 1316700
     bytes: 3104
   __m7__link$__m21__AiplTok$__m1__Ast:
-    calls: 393
+    calls: 396
     bytes: 21264
   __m7__link_opt$__m21__AiplTok:
-    calls: 31833
+    calls: 32076
     bytes: 596
   __m7__link_rule$__m21__AiplTok:
-    calls: 361167
+    calls: 363924
     bytes: 6984
   __m7__link_rules$__m21__AiplTok:
-    calls: 68775
+    calls: 69300
     bytes: 604
   __m7__opt_group_styles$__m21__AiplTok:
-    calls: 195321
+    calls: 196812
     bytes: 152
   __m7__prod_names$__m21__AiplTok$__m1__Ast:
-    calls: 747
+    calls: 753
     bytes: 6792
   __m8__extent:
-    calls: 2551
+    calls: 2683
     bytes: 252
   __m8__first_leaf:
-    calls: 8518
+    calls: 8954
     bytes: 788
   __m8__first_token:
-    calls: 18258
+    calls: 18361
     bytes: 760
   __m8__last_leaf:
-    calls: 9371
+    calls: 9939
     bytes: 788
   __m8__last_token:
-    calls: 14043
+    calls: 14133
     bytes: 760
   __m8__leaves:
     calls: 0
@@ -5628,28 +5691,28 @@ functions:
     calls: 375
     bytes: 1236
   __m8__own_token_text:
-    calls: 448
+    calls: 468
     bytes: 1464
   __m8__parts:
-    calls: 11163
+    calls: 11295
     bytes: 956
   __m8__slot_walk:
-    calls: 53
+    calls: 117
     bytes: 728
   __m8__slot_walk_kids:
-    calls: 53
+    calls: 143
     bytes: 1384
   __m8__slots:
-    calls: 53
+    calls: 104
     bytes: 168
   __m8__split_kids:
-    calls: 12444
+    calls: 12609
     bytes: 2284
   __m8__text:
     calls: 10
     bytes: 1460
   __m8__tok_span:
-    calls: 608
+    calls: 634
     bytes: 236
   __m8__token_leaves:
     calls: 0
@@ -5658,7 +5721,7 @@ functions:
     calls: 2772
     bytes: 1160
   __m8__token_span:
-    calls: 4907
+    calls: 4938
     bytes: 288
   __m8__token_text:
     calls: 2
@@ -5670,16 +5733,16 @@ functions:
     calls: 14
     bytes: 3920
   __m9__show_default:
-    calls: 28
+    calls: 36
     bytes: 420
   __m9__show_doc:
-    calls: 56
+    calls: 59
     bytes: 384
   __m9__show_fn:
-    calls: 22
+    calls: 25
     bytes: 8768
   __m9__show_type_params:
-    calls: 32
+    calls: 35
     bytes: 2164
   __rec_drop___m13__Doc:
     calls: 694
@@ -5688,10 +5751,10 @@ functions:
     calls: 1152
     bytes: 84
   __rec_drop___m3__Expr:
-    calls: 761
+    calls: 814
     bytes: 36
   __rec_drop___m3__ExprKind:
-    calls: 630
+    calls: 677
     bytes: 1260
   __rec_drop___m3__FieldInit:
     calls: 17
@@ -5703,22 +5766,22 @@ functions:
     calls: 90
     bytes: 232
   __rec_drop___m6__Ty:
-    calls: 202
+    calls: 214
     bytes: 476
   __rec_drop___m7__Rule$__m21__AiplTok:
-    calls: 1262070
+    calls: 1272144
     bytes: 404
   __rec_drop___m8__Cst:
-    calls: 13568
+    calls: 13928
     bytes: 132
   __rec_drop___m9__Function:
-    calls: 50
+    calls: 56
     bytes: 244
   __rec_drop___tuple$__m3__Expr$__m3__Expr:
     calls: 4
     bytes: 72
   __rec_drop___tuple$__m7__Rule___m21__AiplTok$__m7__Rule___m21__AiplTok:
-    calls: 75996
+    calls: 76605
     bytes: 72
   __test$aipl_node_spans:
     calls: 1
@@ -5731,7 +5794,7 @@ functions:
     bytes: 1580
   __test$aipl_parse_file:
     calls: 1
-    bytes: 1728
+    bytes: 3944
   __test$aipl_parse_report:
     calls: 1
     bytes: 1300
@@ -5793,61 +5856,61 @@ functions:
     calls: 0
     bytes: 836
   __to_str_i64:
-    calls: 104
+    calls: 110
     bytes: 204
   __to_str_u64:
-    calls: 24
+    calls: 25
     bytes: 204
   aipl_arr_drop_arr:
-    calls: 2361
+    calls: 2364
     bytes: (external)
   aipl_arr_elem_ptr:
-    calls: 16327
+    calls: 16841
     bytes: (external)
   aipl_arr_extend:
-    calls: 1179299
+    calls: 1188693
     bytes: (external)
   aipl_arr_inc:
-    calls: 6447828
+    calls: 6555736
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1201002
+    calls: 1210647
     bytes: (external)
   aipl_arr_retain_ptr:
-    calls: 16762
+    calls: 16855
     bytes: (external)
   aipl_arr_reverse:
-    calls: 16222
+    calls: 16723
     bytes: (external)
   aipl_arr_slice:
-    calls: 366
+    calls: 381
     bytes: (external)
   aipl_arr_sort:
     calls: 37
     bytes: (external)
   aipl_array_dec:
-    calls: 9563068
+    calls: 9705318
     bytes: (external)
   aipl_array_new:
-    calls: 193077
+    calls: 194918
     bytes: (external)
   aipl_array_push:
-    calls: 176245
+    calls: 177942
     bytes: (external)
   aipl_array_push_mut:
-    calls: 731120
+    calls: 736133
     bytes: (external)
   aipl_array_with_cap:
     calls: 40204
     bytes: (external)
   aipl_assert:
-    calls: 364
+    calls: 367
     bytes: (external)
   aipl_grammar:
-    calls: 354
+    calls: 357
     bytes: 912
   aipl_i64_len:
-    calls: 208
+    calls: 220
     bytes: (external)
   aipl_node_spans:
     calls: 3
@@ -5856,25 +5919,25 @@ functions:
     calls: 82
     bytes: 384
   aipl_parse_file:
-    calls: 3
+    calls: 6
     bytes: 8904
   aipl_parse_report:
     calls: 8
     bytes: 748
   aipl_rec_alloc:
-    calls: 1355252
+    calls: 1366413
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 7246782
+    calls: 7311120
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 412429
+    calls: 415809
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5891237
+    calls: 5944394
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 412429
+    calls: 415809
     bytes: (external)
   aipl_set_contains:
     calls: 123433
@@ -5898,19 +5961,19 @@ functions:
     calls: 1
     bytes: (external)
   aipl_u64_len:
-    calls: 48
+    calls: 50
     bytes: (external)
   aipl_write_bytes:
-    calls: 134
+    calls: 146
     bytes: (external)
   aipl_write_i64:
-    calls: 104
+    calls: 110
     bytes: (external)
   aipl_write_u64:
-    calls: 24
+    calls: 25
     bytes: (external)
   angles:
-    calls: 1062
+    calls: 1071
     bytes: 376
   arm_span:
     calls: 15
@@ -5937,10 +6000,10 @@ functions:
     calls: 6
     bytes: 5936
   as_expr:
-    calls: 1359
+    calls: 1425
     bytes: 6052
   as_exprs:
-    calls: 81
+    calls: 89
     bytes: 6068
   as_field_decl:
     calls: 7
@@ -5955,7 +6018,7 @@ functions:
     calls: 6
     bytes: 6248
   as_item:
-    calls: 35
+    calls: 38
     bytes: 6848
   as_lambda_param:
     calls: 3
@@ -5967,16 +6030,16 @@ functions:
     calls: 89
     bytes: 6044
   as_program:
-    calls: 32
+    calls: 35
     bytes: 6072
   as_suffix:
-    calls: 17
+    calls: 24
     bytes: 6324
   as_test_block:
     calls: 24
     bytes: 6164
   as_ty:
-    calls: 544
+    calls: 572
     bytes: 6040
   as_type_param:
     calls: 5
@@ -5997,13 +6060,13 @@ functions:
     calls: 17
     bytes: 1532
   block_tail:
-    calls: 85
+    calls: 88
     bytes: 376
   braces:
-    calls: 6372
+    calls: 6426
     bytes: 376
   brackets:
-    calls: 2832
+    calls: 2856
     bytes: 376
   concat_call:
     calls: 2
@@ -6012,7 +6075,7 @@ functions:
     calls: 2
     bytes: 708
   doc_block:
-    calls: 60
+    calls: 63
     bytes: 1644
   else_or_unit:
     calls: 10
@@ -6021,10 +6084,10 @@ functions:
     calls: 77
     bytes: 552
   expressions:
-    calls: 708
+    calls: 714
     bytes: 93916
   field_name:
-    calls: 8
+    calls: 10
     bytes: 868
   for_chain:
     calls: 4
@@ -6039,16 +6102,16 @@ functions:
     calls: 7
     bytes: 572
   items:
-    calls: 354
+    calls: 357
     bytes: 127976
   join_spans:
-    calls: 101
+    calls: 117
     bytes: 172
   kid:
-    calls: 1981
+    calls: 2085
     bytes: 22676
   kid_expr:
-    calls: 1126
+    calls: 1180
     bytes: 3296
   kw_arg:
     calls: 2
@@ -6057,7 +6120,7 @@ functions:
     calls: 3
     bytes: 652
   lex_lossless:
-    calls: 354
+    calls: 357
     bytes: 98280
   lower_aipl_block:
     calls: 36
@@ -6075,31 +6138,31 @@ functions:
     calls: 48
     bytes: 3632
   lower_arg:
-    calls: 29
+    calls: 30
     bytes: 39700
   lower_args:
-    calls: 39
+    calls: 40
     bytes: 6648
   lower_assign_stmt:
     calls: 15
     bytes: 48312
   lower_atom:
-    calls: 281
+    calls: 294
     bytes: 150680
   lower_base_ty:
-    calls: 135
+    calls: 142
     bytes: 13688
   lower_binding:
     calls: 11
     bytes: 52676
   lower_block:
-    calls: 78
+    calls: 81
     bytes: 7116
   lower_block_body:
-    calls: 115
+    calls: 125
     bytes: 72312
   lower_block_tail:
-    calls: 43
+    calls: 50
     bytes: 6648
   lower_brace_body:
     calls: 7
@@ -6129,7 +6192,7 @@ functions:
     calls: 6
     bytes: 6368
   lower_expr:
-    calls: 294
+    calls: 307
     bytes: 20612
   lower_field_decl:
     calls: 7
@@ -6141,13 +6204,13 @@ functions:
     calls: 8
     bytes: 20720
   lower_fn_body:
-    calls: 36
+    calls: 39
     bytes: 28720
   lower_for_stmt:
     calls: 6
     bytes: 31256
   lower_function:
-    calls: 31
+    calls: 34
     bytes: 55036
   lower_if:
     calls: 10
@@ -6159,7 +6222,7 @@ functions:
     calls: 6
     bytes: 29032
   lower_item:
-    calls: 36
+    calls: 39
     bytes: 81380
   lower_lambda:
     calls: 3
@@ -6183,16 +6246,16 @@ functions:
     calls: 1
     bytes: 1664
   lower_param:
-    calls: 18
-    bytes: 30728
+    calls: 26
+    bytes: 182644
   lower_pattern:
     calls: 89
     bytes: 69664
   lower_postfix:
-    calls: 276
+    calls: 289
     bytes: 19492
   lower_program:
-    calls: 32
+    calls: 35
     bytes: 6656
   lower_return_stmt:
     calls: 1
@@ -6204,8 +6267,8 @@ functions:
     calls: 4
     bytes: 17636
   lower_suffix:
-    calls: 19
-    bytes: 53324
+    calls: 26
+    bytes: 187992
   lower_template:
     calls: 1
     bytes: 9304
@@ -6219,13 +6282,13 @@ functions:
     calls: 5
     bytes: 20264
   lower_ty:
-    calls: 146
+    calls: 153
     bytes: 56088
   lower_ty_core:
-    calls: 136
+    calls: 143
     bytes: 67772
   lower_ty_head:
-    calls: 150
+    calls: 157
     bytes: 158556
   lower_ty_parens:
     calls: 21
@@ -6234,10 +6297,10 @@ functions:
     calls: 6
     bytes: 21616
   lower_type_params:
-    calls: 47
+    calls: 50
     bytes: 6648
   lower_unary:
-    calls: 279
+    calls: 292
     bytes: 20012
   lower_variant_case:
     calls: 14
@@ -6257,38 +6320,41 @@ functions:
   match_expr:
     calls: 7
     bytes: 118408
+  named_param:
+    calls: 24
+    bytes: 18552
   nest:
-    calls: 6372
+    calls: 6426
     bytes: 872
   nest2:
-    calls: 2124
+    calls: 2142
     bytes: 1056
   nest3:
-    calls: 2832
+    calls: 2856
     bytes: 1152
   no_spread:
-    calls: 35
+    calls: 36
     bytes: 572
   node_spans:
     calls: 4230
     bytes: 756
   p:
-    calls: 28674
+    calls: 28917
     bytes: 3748
   parens:
-    calls: 11328
+    calls: 11424
     bytes: 376
   patterns:
-    calls: 708
+    calls: 714
     bytes: 24456
   pipes:
-    calls: 1416
+    calls: 1428
     bytes: 376
   qualified_name:
     calls: 62
     bytes: 1216
   repair_block_value:
-    calls: 131
+    calls: 141
     bytes: 2348
   same_bindings:
     calls: 16
@@ -6300,13 +6366,13 @@ functions:
     calls: 1
     bytes: 2204
   slot_expr:
-    calls: 49
+    calls: 50
     bytes: 3296
   slot_kid:
-    calls: 56
+    calls: 57
     bytes: 548
   statements:
-    calls: 708
+    calls: 714
     bytes: 70828
   tuple_slot_names:
     calls: 3
@@ -6315,10 +6381,10 @@ functions:
     calls: 15
     bytes: 952
   types:
-    calls: 708
+    calls: 714
     bytes: 39476
   variadic_seq_ty:
-    calls: 5
+    calls: 7
     bytes: 1012
   wrap_stmt:
     calls: 31

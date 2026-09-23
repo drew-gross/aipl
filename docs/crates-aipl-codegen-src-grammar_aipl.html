@@ -1735,6 +1735,20 @@
 
 
 
+        <section class="item" id="item-named_param">
+          <h3>
+            <a class="anchor" href="#item-named_param">named_param</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn named_param(src: str, kids: Ast[], name: Slot, sp: Span, mutable: bool = false, implicit_some: bool = false, has_default: bool = false, marker: str = &#34;&#34;) -&#62; Ast!ParseError</code></pre>
+
+          <div class="doc"><p>A named parameter, from the pieces its shape supplied: the name token, whether a <code>mut</code> or a <code>?</code> preceded it, the variadic marker if one was written, and whether a default followed. The type is always the first interior child and a default the second, in every one of the six shapes.</p><p>The stored type is what the *body* sees: a variadic stores the sequence its elements arrive in, and a <code>k?: T</code> stores the <code>T?</code> a caller's bare <code>T</code> is wrapped into.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-variadic_seq_ty">
           <h3>
             <a class="anchor" href="#item-variadic_seq_ty">variadic_seq_ty</a>
@@ -1950,7 +1964,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$120045: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$122276: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

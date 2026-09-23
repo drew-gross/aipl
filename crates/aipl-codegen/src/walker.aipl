@@ -2227,8 +2227,13 @@ fn pattern(self: W) -> WDoc!FmtError {
         let b = self.bump();
         return ok(WDoc { w: b.w, doc: Text(b.text) });
     };
+
+    // An array-destructuring pattern. Its elements are *patterns* — the grammar
+    // reaches them through `pattern` like every other slot — so a constructor
+    // element (`[Tok(..), n]`) lays out as one rather than being walked as a
+    // call argument, which is what an expression walk would make of it.
     if (self.peek_text() == "[") {
-        let elems = self.bump().w.call_args_until("]", [])?;
+        let elems = self.bump().w.pattern_list("]", [])?;
         let closed = elems.w.expect("]")?.w;
         return ok(WDoc { w: closed, doc: comma_list_docs(elems.docs, Brackets) });
     };
@@ -3367,10 +3372,10 @@ deallocations: 101983
 reallocations: 16733
 bytes allocated: 20581773
 instructions executed: 55481581
-binary size: 17340824
-  code: 11125688
-  data: 38316
-  metadata: 6176820
+binary size: 17802176
+  code: 11430824
+  data: 38420
+  metadata: 6332932
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -4430,7 +4435,7 @@ functions:
     bytes: 1664
   __m7__lower_param:
     calls: 0
-    bytes: 30728
+    bytes: 182644
   __m7__lower_pattern:
     calls: 0
     bytes: 69664
@@ -4451,7 +4456,7 @@ functions:
     bytes: 17636
   __m7__lower_suffix:
     calls: 0
-    bytes: 53324
+    bytes: 187992
   __m7__lower_template:
     calls: 0
     bytes: 9304
@@ -4500,6 +4505,9 @@ functions:
   __m7__match_expr:
     calls: 0
     bytes: 118408
+  __m7__named_param:
+    calls: 0
+    bytes: 18552
   __m7__nest:
     calls: 198
     bytes: 872
