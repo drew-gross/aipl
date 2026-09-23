@@ -360,6 +360,15 @@ mod str24 {
     include!("../../aipl-codegen/src/str24.rs");
 }
 
+// STAGED the same way: the 256-bit `#{char}` value. Shared from the start
+// rather than mirrored later, so the two runtimes cannot drift apart while it
+// is being wired up — the same reasoning as `str24` above, and cheaper here
+// because a char set has no allocator to ask about.
+#[allow(dead_code)] // staged: wired up when `#{char}` switches representation
+mod charset {
+    include!("../../aipl-codegen/src/charset.rs");
+}
+
 // The array layout — block, representation tags, view blocks — shared the
 // same way and for the same reason; see the file's own header.
 mod array_layout {

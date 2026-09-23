@@ -25,6 +25,13 @@ pub mod ffi_ast;
 mod str24;
 mod str24_host;
 
+// STAGED, the same way and for the same reason: the 256-bit `#{char}` value,
+// proven on its own before codegen switches the type over to it. Shared
+// verbatim with the AOT runtime, so `no_std`-safe — which costs nothing, since
+// a char set never allocates.
+#[allow(dead_code)] // staged: wired up when `#{char}` switches representation
+mod charset;
+
 // The array layout — block, representation tags, view blocks — shared with
 // the AOT runtime the same way; see the file's own header.
 mod array_layout;
@@ -9689,6 +9696,25 @@ fn mut_binding_owns_slot_ref(ty: &ConcreteType, structs: &HashMap<String, TypeDe
 /// `char[]` value flowing through them.
 fn is_str_shaped(ty: &ConcreteType) -> bool {
     is_str_repr(ty) || is_char_array(ty)
+}
+
+/// Whether `ty` is a set of `char` — the type whose representation is the
+/// 256-bit inline bitfield in `charset.rs` rather than the array heap block
+/// every other set shares.
+///
+/// True for all three orders. A bit scan visits members in ascending `char`
+/// order, which is what `#<{char}` promises and what `#{char}` — promising
+/// nothing — is free to do; `#>{char}` scans the other way. So the order a set
+/// carries changes how it is walked, not how it is stored.
+///
+/// Staged with `charset.rs` and not yet asked by anything: switching a type's
+/// representation is atomic — `abi_elem_size`, `abi_is_composite`, every
+/// `ConcreteType::Set` arm and the four `aipl_set_*` entries have to agree in
+/// one change — so the predicate lands with the layout it names and the arms
+/// that ask it land together.
+#[allow(dead_code)] // staged: asked when `#{char}` switches representation
+fn is_char_set(ty: &ConcreteType) -> bool {
+    matches!(ty, ConcreteType::Set(elem, _) if **elem == ConcreteType::Primitive(Primitive::Char))
 }
 
 /// A bare `[]` literal has no element type to infer from, so it's built as the

@@ -76,6 +76,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  match_arm parser in patterns looks like it can be simpler, the => arm_body part is non-DRY
+  fn nest and fn one have a lot of overlap
   link should return a Grammar without Named, rule_first and rule_labels should use it
   sep_spelling should use _ matches
   there are lots of functions in binaries with zero calls. Maybe due to inlining? They mostly shouldn't show up in the binary.
