@@ -8163,6 +8163,7 @@ fn env_load(
     builder: &mut FunctionBuilder,
     name: &str,
     env: &Env,
+    structs: &HashMap<String, TypeDef>,
     span: Span,
 ) -> Result<(Value, ConcreteType), Error> {
     let binding = env
@@ -8183,9 +8184,9 @@ fn env_load(
             // changes underneath the next `set`. Copying restores the tagged
             // behaviour exactly; the refcount is untouched (this is a borrow,
             // like the load it replaces).
-            let v = if is_str_shaped(&ty) {
+            let v = if lives_in_slot(&ty) {
                 let src = builder.ins().stack_addr(types::I64, *slot, 0);
-                copy_str_value(builder, src)
+                copy_slot_value(builder, src, elem_size_of(&ty, structs) as u32)
             } else {
                 builder.ins().stack_load(types::I64, types::I64, *slot, 0)
             };
@@ -9715,6 +9716,43 @@ fn is_str_shaped(ty: &ConcreteType) -> bool {
 #[allow(dead_code)] // staged: asked when `#{char}` switches representation
 fn is_char_set(ty: &ConcreteType) -> bool {
     matches!(ty, ConcreteType::Set(elem, _) if **elem == ConcreteType::Primitive(Primitive::Char))
+}
+
+/// Whether a binding of type `ty` holds the value's **bytes** in its slot,
+/// rather than an address to bytes that live somewhere else.
+///
+/// This is a question about *representation*, and it is deliberately not
+/// `is_str_shaped`. The two coincide today because the wide `str`/`char[]` is
+/// the only value whose bytes are the value — but "goes through the string
+/// runtime" and "lives in its slot" are different questions, and a type can
+/// answer yes to the second and no to the first. Conflating them is what made
+/// the `str` widening touch thirty sites that had nothing to do with strings.
+///
+/// Asked by exactly three functions — [`binding_slot`] sizes the storage,
+/// [`store_binding`] writes it, [`slot_value`] reads it — and by nothing else.
+/// They must agree, and they agree by construction because each one asks *this*
+/// rather than deciding for itself: a slot written one way and read the other
+/// is a silent miscompile rather than a crash.
+fn lives_in_slot(ty: &ConcreteType) -> bool {
+    is_str_shaped(ty) || is_inline_optional(ty)
+}
+
+/// An optional of a scalar — `i64?`, `bool?`, `char?`. Sixteen bytes (the tag
+/// and the payload), owning no heap, and so a value whose bytes *are* the
+/// value, exactly as a wide `str`'s are.
+///
+/// It is a composite, so before this it was held the way every composite is:
+/// the binding's slot carried a pointer to a buffer kept elsewhere. Letting it
+/// live in the slot drops that indirection — and, more to the point here, means
+/// the in-slot machinery is exercised by a type the corpus uses on nearly every
+/// page rather than by one that appears in two files.
+///
+/// `str?` is deliberately excluded: its payload owns a heap reference, so the
+/// binding's slot would own one too, and the retain/release protocol for that
+/// is the pointer model's, not this one's.
+fn is_inline_optional(ty: &ConcreteType) -> bool {
+    matches!(ty, ConcreteType::Optional(inner)
+        if matches!(**inner, ConcreteType::Primitive(p) if p != Primitive::Str))
 }
 
 /// A bare `[]` literal has no element type to infer from, so it's built as the
@@ -12127,14 +12165,18 @@ enum Sink {
 /// Word-by-word rather than through `copy_composite` so it needs no `structs`
 /// map: a `str`'s size is fixed by the representation, not by a layout table.
 fn copy_str_value(builder: &mut FunctionBuilder, src: Value) -> Value {
-    let slot = builder.create_sized_stack_slot(StackSlotData::new(
-        StackSlotKind::ExplicitSlot,
-        str24::STR_SIZE as u32,
-        3,
-    ));
+    copy_slot_value(builder, src, str24::STR_SIZE as u32)
+}
+
+/// [`copy_str_value`] for a value of any size: `size` bytes from `src` into a
+/// fresh slot, whose address is the copy. The snapshot every in-slot value
+/// needs when it is read out of storage something else can overwrite.
+fn copy_slot_value(builder: &mut FunctionBuilder, src: Value, size: u32) -> Value {
+    let slot =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, size, 3));
     let dst = builder.ins().stack_addr(types::I64, slot, 0);
     let flags = MemFlagsData::trusted();
-    for off in (0..str24::STR_SIZE as i32).step_by(8) {
+    for off in (0..size as i32).step_by(8) {
         let w = builder.ins().load(types::I64, flags, src, off);
         builder.ins().store(flags, w, dst, off);
     }
@@ -12158,7 +12200,7 @@ fn copy_str_value(builder: &mut FunctionBuilder, src: Value) -> Value {
 /// that releases an old value around a writeback has to release it first — see
 /// the `push`/`extend` char paths.
 fn slot_value(builder: &mut FunctionBuilder, slot: StackSlot, ty: &ConcreteType) -> Value {
-    if is_str_shaped(ty) {
+    if lives_in_slot(ty) {
         builder.ins().stack_addr(types::I64, slot, 0)
     } else {
         builder.ins().stack_load(types::I64, types::I64, slot, 0)
@@ -12241,6 +12283,27 @@ fn store_binding_str(
     );
 }
 
+/// The stack slot a `mut` binding of type `ty` lives in — the third of the
+/// three that must agree with [`store_binding`] and [`slot_value`], and the one
+/// that used to be written out at its call site.
+///
+/// A value that [`lives_in_slot`] needs room for its whole self; everything
+/// else needs one word, because the slot holds a *pointer* to storage kept
+/// elsewhere — an sret buffer, an array's elements, a heap block.
+fn binding_slot(
+    builder: &mut FunctionBuilder,
+    ty: &ConcreteType,
+    structs: &HashMap<String, TypeDef>,
+) -> StackSlot {
+    if lives_in_slot(ty) {
+        value_slot(builder, ty, structs)
+    } else {
+        // 8-byte slot, 8-byte aligned: fits any i64/bool/char, and any value
+        // the binding holds a pointer to.
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3))
+    }
+}
+
 /// [`store_binding_str`] for a binding of any type: the value's 24 bytes when it
 /// is a wide `str`/`char[]`, one word otherwise. Mirrors [`slot_value`], and the
 /// two must agree — a slot written one way and read the other is a silent
@@ -12254,7 +12317,7 @@ fn store_binding(
     structs: &HashMap<String, TypeDef>,
 ) {
     let _ = cx;
-    if !is_str_shaped(ty) {
+    if !lives_in_slot(ty) {
         builder.ins().stack_store(types::I64, v, slot, 0);
         return;
     }
@@ -14758,7 +14821,7 @@ fn compile_indirect_call<M: Module>(
             span.clone(),
         ));
     }
-    let (callee_addr, _) = env_load(builder, name, env, span.clone())?;
+    let (callee_addr, _) = env_load(builder, name, env, structs, span.clone())?;
     let mut arg_values = Vec::with_capacity(args.len());
     let mut arg_fresh = Vec::with_capacity(args.len());
     for (idx, (arg, expected)) in args.iter().zip(ptys).enumerate() {
@@ -14929,7 +14992,7 @@ fn compile_call<M: Module>(
         // of a `?`-unwrapped result — which the caller will still release. So
         // a borrow is retained into a *copy* of its own, and the copy is what
         // the callee gets to consume.
-        let v = if p.owned && !moved && is_composite(&p.ty, structs) && !is_str_shaped(&p.ty) {
+        let v = if p.owned && !moved && is_composite(&p.ty, structs) && !lives_in_slot(&p.ty) {
             let copy = value_slot(builder, &p.ty, structs);
             let copy_addr = builder.ins().stack_addr(types::I64, copy, 0);
             copy_composite(builder, copy_addr, *v, &p.ty, structs);
@@ -17275,7 +17338,7 @@ fn compile_call_expr<M: Module>(
                         scopes.last_mut().expect("scope").push(Tracked::new(v, &t));
                         (v, t)
                     } else {
-                        env_load(builder, name, env, span.clone())?
+                        env_load(builder, name, env, structs, span.clone())?
                     }
                 }
             }
@@ -18744,7 +18807,7 @@ fn compile_expr_inner<M: Module>(
             // a value (`let f = inc;`) — its value is the function's code
             // address, materialized with `func_addr`.
             if env.contains_key(name) {
-                env_load(builder, name, env, span.clone())?
+                env_load(builder, name, env, structs, span.clone())?
             } else if let Some((vname, tag, fields)) = variant_ctor(structs, name) {
                 compile_variant(
                     module,
@@ -18773,7 +18836,7 @@ fn compile_expr_inner<M: Module>(
                 );
                 (addr, ty)
             } else {
-                env_load(builder, name, env, span.clone())?
+                env_load(builder, name, env, structs, span.clone())?
             }
         }
         ExprKind::None => {
@@ -19218,7 +19281,7 @@ fn compile_expr_inner<M: Module>(
             // read keeps borrowing, as it always has.
             let v = if needs_drop(&t, structs)
                 && is_composite(&t, structs)
-                && !is_str_shaped(&t)
+                && !lives_in_slot(&t)
                 && !is_boxed(&t, structs)
                 && !fresh_storage
                 && aipl_mono::moves_binding(name, body)
@@ -19273,25 +19336,13 @@ fn compile_expr_inner<M: Module>(
             // (see `coerce_empty_to_char_array`); bindings did not.
             let v = coerce_empty_to_char_array(builder, module, builtins, scopes, v, &actual, &t);
             reject_unit_binding(&t, name, value.span.clone())?;
-            // 8-byte slot, 8-byte aligned: fits any i64/bool/char, and any heap
-            // value the binding holds a *pointer* to — which is every composite
-            // (a struct binding deliberately points at its value; see the `set`
-            // arm's sret-buffer note).
-            //
-            // The one exception is a wide `str`/`char[]`, which lives *in* the
-            // slot as its whole 24 bytes rather than being pointed at. Only that
-            // case widens: broadening it to every composite silently switched
-            // struct bindings from pointer-holding to value-holding, and the
-            // rest of the code still read them the old way.
-            let slot = if is_str_shaped(&t) {
-                value_slot(builder, &t, structs)
-            } else {
-                builder.create_sized_stack_slot(StackSlotData::new(
-                    StackSlotKind::ExplicitSlot,
-                    8,
-                    3,
-                ))
-            };
+            // Which storage the binding gets is `lives_in_slot`'s answer, asked
+            // in one place so the sizing cannot disagree with the store and the
+            // load. Broadening it to *every* composite is what silently
+            // switched struct bindings from pointer-holding to value-holding
+            // while the rest of the code still read them the old way — which is
+            // the disagreement `binding_slot` exists to make unrepresentable.
+            let slot = binding_slot(builder, &t, structs);
             store_binding(builder, cx, slot, v, &t, structs);
             // In-place mutation optimization: a heap binding initialized from a
             // fresh literal (an array literal, or a `str` literal for `set s =
@@ -19358,7 +19409,7 @@ fn compile_expr_inner<M: Module>(
             // binding that is only read has no use for a block of its own.
             let v = if exclusive
                 && (owned_move || moved_binding)
-                && !is_str_shaped(&t)
+                && !lives_in_slot(&t)
                 && mut_binding_owns_slot_ref(&t, structs)
                 && aipl_mono::assigns_binding(name, body)
             {
@@ -19381,10 +19432,10 @@ fn compile_expr_inner<M: Module>(
             };
             // Stored again below for the str-shaped slot; a tagged binding's
             // slot takes the (possibly new) pointer here.
-            if !is_str_shaped(&t) {
+            if !lives_in_slot(&t) {
                 builder.ins().stack_store(types::I64, v, slot, 0);
             }
-            if is_str_shaped(&t) {
+            if lives_in_slot(&t) {
                 // A `str` binding's slot owns one reference to its current
                 // value, released once at scope exit by this slot-track. `set`
                 // preserves the invariant (release the old value, own the new),
@@ -19457,7 +19508,7 @@ fn compile_expr_inner<M: Module>(
                     .last_mut()
                     .expect("scope")
                     .push(Tracked::slot(slot, &t));
-            } else if is_composite(&t, structs) && !is_str_shaped(&t) {
+            } else if is_composite(&t, structs) && !lives_in_slot(&t) {
                 // The `!is_str_shaped` guard matters only under the wide `str`,
                 // where `is_composite` starts answering *true* for `str`/`char[]`
                 // — they travel by address like any other composite. Their
@@ -19680,7 +19731,7 @@ fn compile_expr_inner<M: Module>(
             // too. Testing `is_str_repr` let a `char[]` skip both halves — it
             // neither took ownership of the incoming value nor released the
             // outgoing one — so every reassignment leaked the value it replaced.
-            let old = if is_str_shaped(&expected_ty) || arr_slot_ref {
+            let old = if lives_in_slot(&expected_ty) || arr_slot_ref {
                 Some(slot_value(builder, slot, &expected_ty))
             } else {
                 None
@@ -19745,7 +19796,7 @@ fn compile_expr_inner<M: Module>(
                     emit_drop(builder, module, builtins, structs, old, &expected_ty);
                     store_binding_str(builder, cx, slot, v, structs);
                 }
-            } else if is_composite(&expected_ty, structs) && !is_str_shaped(&expected_ty) {
+            } else if is_composite(&expected_ty, structs) && !lives_in_slot(&expected_ty) {
                 // The `!is_str_shaped` guard is the same one `LetMut` needs, for
                 // the same reason: under the wide `str`, `is_composite` starts
                 // answering *true* for `str`/`char[]`, and this arm's ownership

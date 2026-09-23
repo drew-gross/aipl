@@ -44,9 +44,9 @@ allocations: 20
 deallocations: 20
 reallocations: 1
 bytes allocated: 952
-instructions executed: 1969
-binary size: 9640
-  code: 5360
+instructions executed: 1972
+binary size: 9648
+  code: 5368
   data: 375
   metadata: 3905
 functions:
@@ -58,7 +58,7 @@ functions:
     bytes: 140
   __builtin_tuple_windows$i64:
     calls: 2
-    bytes: 368
+    bytes: 376
   __to_str___tuple$str$str$opt:
     calls: 1
     bytes: 796
