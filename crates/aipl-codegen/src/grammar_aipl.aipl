@@ -137,12 +137,14 @@ import { Any as BoundAny, Variant as BoundVariant, bound_from_name } from "./bou
 import { BraceEntry, Key, Pair, brace_literal } from "./brace_entry.aipl";
 import {
     Cst,
-    nodes,
+    Parts,
+    extent,
     own_texts,
     own_token_text,
-    own_tokens,
+    parts,
     span,
     text,
+    tok_span,
     token_span,
 } from "./cst.aipl";
 import { Doc, print } from "./doc.aipl";
@@ -1178,12 +1180,20 @@ fn join_spans(a: Span, b: Span) -> Span {
 # The span a lowered node takes: this node's *tokens*, with the trivia in front
 # of the first one left out. `span` reaches back over that trivia, which is what
 # losslessness needs and the opposite of what a diagnostic wants.
-fn tok_span(self: Cst) -> Span { self.token_span().value_or(self.span()) }
+# The tight token span of an interior child, which a lowering holds as a bare
+# `Cst` rather than as the `Parts` its own node arrives as. The counterpart of
+# `tok_span`, which answers the same question about the node itself.
+fn child_span(self: Cst) -> Span {
+    match (self.token_span()) {
+        some(sp) => sp,
+        none => self.extent(),
+    }
+}
 
 # The token span of interior child `i`, for the nodes whose parts want their own
 # spans — a match arm's pattern, one step of a postfix chain.
 fn sub_span(subs: Cst[], i: u64, fallback: Span) -> Span {
-    subs[i].map(tok_span).value_or(fallback)
+    subs[i].map(child_span).value_or(fallback)
 }
 
 fn as_expr(v: Ast, span: Span) -> Expr!ParseError {
@@ -1257,7 +1267,7 @@ fn kid_expr(kids: Ast[], i: u64, span: Span) -> Expr!ParseError {
 # `expr` — the `Climb` node. A bare operand climbed to itself has one interior
 # child and no token of its own; an application has two children with its
 # operator as a direct leaf between them.
-fn lower_expr(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_expr(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let lhs = kid_expr(kids, 0, sp)?;
     if (kids.len() != 2) {
@@ -1281,7 +1291,7 @@ fn lower_expr(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `unary` — `-x`, `!x`, or the postfix it wraps. Unary `-` is the one operator
 # with no named builtin to resolve to, so it stays a node of its own; `!` is an
 # ordinary call like every other operator.
-fn lower_unary(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_unary(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let inner = kid_expr(kids, 0, sp)?;
     let tsp = node.tok_span();
@@ -1297,9 +1307,9 @@ fn lower_unary(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 
 # `postfix` — an atom and the run of suffixes applied to it, left to right, each
 # step spanning from the atom's start to that suffix's end.
-fn lower_postfix(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_postfix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let subs = node.nodes();
+    let subs = node.children;
     mut e = kid_expr(kids, 0, sp)?;
     for (let i, k : kids[1..]) {
         let suf = as_suffix(k, sp)?;
@@ -1311,10 +1321,10 @@ fn lower_postfix(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 
 # `suffix` — the seven postfix steps. `.` opens the three member forms, `[` the
 # three bracket forms, and `?` is the whole of the seventh.
-fn lower_suffix(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let head = toks[0].value_or("");
     if (head == "?") {
         return ok(ASuffix(SufTry));
@@ -1338,7 +1348,7 @@ fn lower_suffix(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         message: "a slice has no range",
         span: sp,
     })?;
-    if (start < sub_span(node.nodes(), 0, sp).start) {
+    if (start < sub_span(node.children, 0, sp).start) {
         return ok(ASuffix(SufSliceTo(inner)));
     };
     ok(ASuffix(SufSliceFrom(inner)))
@@ -1361,7 +1371,7 @@ fn field_name(name: str, span: Span) -> str!ParseError {
 # `atom` — the twenty alternatives, dispatched on the first token each matched.
 # The template is the one alternative that matches no token of its own, which is
 # what identifies it without a comparison.
-fn lower_atom(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_atom(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
     if (toks.is_empty()) {
@@ -1462,9 +1472,9 @@ fn match_expr(kids: Ast[], tsp: Span, sp: Span) -> Expr!ParseError {
 
 # `shim <effect> { op = f, .. } { body }`. Spanned over `shim <effect>` rather
 # than over the whole form: the body's span is empty when it ends in a `;`.
-fn shim_expr(src: str, node: Cst, kids: Ast[], sp: Span) -> Expr!ParseError {
+fn shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let last = kids.len() - 1;
     let body = kid_expr(kids, last, sp)?;
     let binds = kids[..last].try_map(|k| as_bind(k, sp))?;
@@ -1477,10 +1487,10 @@ fn shim_expr(src: str, node: Cst, kids: Ast[], sp: Span) -> Expr!ParseError {
 # `if (..) { .. }` and `if (let p = e) { .. }`, with or without an `else`. Both
 # are written in two places — an atom, and the tail of an `else` — and gazelle
 # builds them identically wherever they appear, so this does too.
-fn lower_if(src: str, node: Cst, kids: Ast[]) -> Expr!ParseError {
+fn lower_if(src: str, node: Parts, kids: Ast[]) -> Expr!ParseError {
     let sp = node.span();
     let tsp = node.tok_span();
-    let subs = node.nodes();
+    let subs = node.children;
     if (node.own_texts(src).contains("let")) {
         let arm = MatchArm {
             pattern: as_pat(kid(kids, 0, sp)?, sp)?,
@@ -1505,9 +1515,9 @@ fn else_or_unit(kids: Ast[], i: u64, tsp: Span, sp: Span) -> Expr!ParseError {
 
 # `else_branch` — a block, or another `if` in the else position. The block form
 # is the one with no token of its own.
-fn lower_else_branch(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_else_branch(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    if (node.own_tokens().is_empty()) {
+    if (node.tokens.is_empty()) {
         return ok(AExpr(kid_expr(kids, 0, sp)?));
     };
     ok(AExpr(lower_if(src, node, kids)?))
@@ -1516,7 +1526,7 @@ fn lower_else_branch(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `template` — the head, the interpolations, the tail. The segments are decoded
 # together (`template_segments`), because a raw template is de-dented as one
 # block and a segment cannot be read on its own.
-fn lower_template(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_template(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let segs = template_segments(node.own_texts(src));
     let exprs = kids.try_map(|k| as_expr(k, sp))?;
@@ -1557,7 +1567,7 @@ fn concat_call(a: Expr, b: Expr) -> Expr {
 
 # `args` — the comma-separated list every call, array literal and array pattern
 # is built on.
-fn lower_args(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_args(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     ok(AExprs(kids.try_map(|k| as_expr(k, sp))?))
 }
@@ -1580,7 +1590,7 @@ fn is_spread(self: Expr) -> bool { if (let Spread(..) = self.kind) { true } else
 # `arg` — a spread, a keyword argument, or an ordinary expression. The three
 # pass-through alternatives (an expression, a lambda, a bare operator) match no
 # token of their own.
-fn lower_arg(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_arg(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
     if (toks.is_empty()) {
@@ -1596,8 +1606,7 @@ fn lower_arg(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         return ok(AExpr(at(Spread(value), span)));
     };
     // `k = v`, or `k?= v` forwarding an optional into a `k?: T` parameter.
-    let name_span = node
-        .own_tokens()
+    let name_span = node.tokens
         .first()
         .value_or_err(ParseError { message: "a keyword argument has no name", span: sp })?;
     let span = join_spans(name_span, value.span);
@@ -1607,7 +1616,7 @@ fn lower_arg(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `op_value` — an operator passed as a value (`apply(2, 3, +)`) is a binary
 # lambda whose body is that operator's call, which reuses every lambda mechanism
 # and leaves the operator gated like any other use.
-fn lower_op_value(src: str, node: Cst, kids: Ast[]) -> Ast {
+fn lower_op_value(src: str, node: Parts, kids: Ast[]) -> Ast {
     let tsp = node.tok_span();
     let body = at(
         Call(node.own_token_text(src), [at(Ident("lhs"), tsp), at(Ident("rhs"), tsp)], false),
@@ -1622,7 +1631,7 @@ fn lower_op_value(src: str, node: Cst, kids: Ast[]) -> Ast {
 
 # `lambda` — `|a, b| body`, or the no-parameter `|| body`. The `||` is one
 # token, so its presence is what says the parameter list is empty.
-fn lower_lambda(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_lambda(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
 
     // The *first* token, not the run of them: `|x|` matches two `|` tokens, and
@@ -1646,10 +1655,10 @@ fn lambda_of(kids: Ast[], span: Span, sp: Span) -> Expr!ParseError {
     ok(at(Lambda(kids[..last].try_map(|k| as_lambda_param(k, sp))?, body), span))
 }
 
-fn lower_lambda_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let name_span = spans.first().value_or(node.tok_span());
     let name = toks[0].value_or("");
     if (kids.is_empty()) {
@@ -1662,10 +1671,10 @@ fn lower_lambda_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `field_init` — `name: value`, the shorthand `name`, or a `..base` spread. A
 # spread names no field, so it rides as an init with an empty name whose *value*
 # is the spread; the value is what identifies it.
-fn lower_field_init(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_field_init(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let head = toks[0].value_or("");
     if (head == "..") {
         let base = kid_expr(kids, 0, sp)?;
@@ -1680,12 +1689,12 @@ fn lower_field_init(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     ok(AFieldInit(FieldInit { name: head, value: kid_expr(kids, 0, sp)? }))
 }
 
-fn lower_brace_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_brace_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     ok(AEntries(kids.try_map(|k| as_entry(k, sp))?))
 }
 
-fn lower_entry(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_entry(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let key = kid_expr(kids, 0, sp)?;
     if (kids.len() == 1) {
@@ -1694,7 +1703,7 @@ fn lower_entry(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     ok(AEntry(Pair(key, kid_expr(kids, 1, sp)?)))
 }
 
-fn lower_shim_binding(src: str, node: Cst, kids: Ast[]) -> Ast {
+fn lower_shim_binding(src: str, node: Parts, kids: Ast[]) -> Ast {
     let toks = node.own_texts(src);
     AShimBind(toks[0].value_or(""), toks[2].value_or(""))
 }
@@ -1706,9 +1715,9 @@ fn lower_shim_binding(src: str, node: Cst, kids: Ast[]) -> Ast {
 // ordinary `Expr` like everything else here. The fold itself is `wrap_stmt`,
 // which lives with the statements below.
 
-fn lower_block(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_block(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let brace = node.own_tokens().first().value_or(node.tok_span());
+    let brace = node.tokens.first().value_or(node.tok_span());
     let repaired = repair_block_value(kid_expr(kids, 0, sp)?, brace);
     ok(AExpr(Expr { ..repaired.0, value_span: repaired.1 }))
 }
@@ -1765,7 +1774,7 @@ fn block_tail(e: Expr, brace: Span) -> (Expr, Span) {
 
 # `block_body` — a statement and the rest of the block, an expression and
 # whatever the `;` after it decided, or nothing at all.
-fn lower_block_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_block_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
 
     // Empty: the block's value is unit. Its span is empty too — gazelle repairs
@@ -1797,7 +1806,7 @@ fn lower_block_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `block_tail` — the `; rest` that turns the expression before it into a
 # statement, as a list so that "nothing followed" and "this followed" are the
 # empty and one-element cases of one shape.
-fn lower_block_tail(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_block_tail(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     ok(AExprs(kids.try_map(|k| as_expr(k, sp))?))
 }
@@ -1842,20 +1851,20 @@ fn as_stmt(v: Ast, span: Span) -> Stmt!ParseError {
 # `let_stmt` — the plain binding, the annotated one, and the two destructuring
 # forms. The token after the name says which: `(` opens a tuple pattern, `{` a
 # struct pattern, `:` an annotation.
-fn lower_let_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_let_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     lower_binding(src, node, kids, false)
 }
 
 # `mut_stmt` — the same three shapes a `let` has, less the tuple pattern, which
 # `mut` does not take.
-fn lower_mut_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_mut_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     lower_binding(src, node, kids, true)
 }
 
-fn lower_binding(src: str, node: Cst, kids: Ast[], mutable: bool) -> Ast!ParseError {
+fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let names = binder_names(toks);
 
     // `let (a, b) = e;` — a tuple pattern, spanned at its value like the struct
@@ -1904,10 +1913,10 @@ fn lower_binding(src: str, node: Cst, kids: Ast[], mutable: bool) -> Ast!ParseEr
 # `set p.xs = p.xs.push(x)`. The field-path store itself is not desugared here:
 # the rewrite into nested constructs needs the structs' field lists, which only
 # mono's `infer` knows.
-fn lower_assign_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let name = toks[1].value_or("");
     let name_span = spans[1].value_or(node.tok_span());
 
@@ -1970,10 +1979,10 @@ fn compound_ops() -> str[] { ["+=", "-=", "*=", "/="] }
 # and the indexed tuple-destructuring one. A `(` after the `let` opens the tuple
 # form, a `(` after the first name's comma the indexed tuple form; otherwise the
 # number of names says whether an index was written.
-fn lower_for_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let names = binder_names(toks);
     let iterable = kid_expr(kids, 0, sp)?;
     let body = kid_expr(kids, 1, sp)?;
@@ -2203,7 +2212,7 @@ fn for_chain(
 # `while (cond) { body }`. No keyword or paren token carries a span of its own,
 # so the statement is spanned from its condition through its body — the same
 # choice `for` makes with its loop variable.
-fn lower_while_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_while_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let cond = kid_expr(kids, 0, sp)?;
     let body = kid_expr(kids, 1, sp)?;
@@ -2211,7 +2220,7 @@ fn lower_while_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     ok(AStmt(SWhile(cond, body, span)))
 }
 
-fn lower_return_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_return_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let value = kid_expr(kids, 0, sp)?;
     let span = value.span;
@@ -2221,7 +2230,7 @@ fn lower_return_stmt(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `loop_inner` — a loop body admits no trailing expression, so every expression
 # in it is an `expr;` statement and the body's own value is never read. An
 # at-end body is a synthetic `0`, matching the loop expression's own result.
-fn lower_loop_inner(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_loop_inner(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     if (kids.is_empty()) {
         return ok(AExpr(at(Num(0), 0..0)));
@@ -2242,7 +2251,7 @@ fn lower_loop_inner(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `A | B => body` expands here into one arm per pattern, so no later stage ever
 # sees an or-pattern. The body is shared, which is what makes the
 # same-bindings check below necessary.
-fn lower_match_arm(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_match_arm(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let tsp = node.tok_span();
     let last = kids.len() - 1;
@@ -2254,7 +2263,7 @@ fn lower_match_arm(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
         let checked = no_spread(elems, "an array pattern")?;
         return ok(AArms([MatchArm { pattern: PatArray(checked), body, span: tsp }]));
     };
-    let subs = node.nodes();
+    let subs = node.children;
     let heads = same_bindings(kids[..last].try_map(|k| as_pat(k, sp))?, subs, tsp)?;
     mut arms: MatchArm[] = [];
     for (let i, pat : heads) {
@@ -2326,7 +2335,7 @@ fn qualified_name(toks: str[], head: str) -> str {
 # says the case carries a payload this arm does not read. The `..` alternative
 # has no child and is read off this node's own token; the other's slots are its
 # `pattern` children.
-fn lower_ctor_payload(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_ctor_payload(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let no_slots: Pat[] = [];
     if (node.own_texts(src).first() == some("..")) {
@@ -2342,7 +2351,7 @@ fn lower_ctor_payload(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `.` (present or not) settle the rest. `_` lexes as an ordinary identifier, so
 # the wildcard arrives here as a nullary name and is recognised by spelling —
 # and only when nullary, since `_(x)` is a constructor named `_` to gazelle too.
-fn lower_pattern(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_pattern(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
     let head = toks
@@ -2462,7 +2471,7 @@ fn as_case_param(v: Ast, span: Span) -> CaseParam!ParseError {
 
 # `program` — every item in the file. A single parsed file has no merged-source
 # map; the loader fills one in when it flattens several files together.
-fn lower_program(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_program(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     ok(AProgram(Program { items: kids.try_map(|k| as_item(k, sp))? }))
 }
@@ -2470,7 +2479,7 @@ fn lower_program(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `item` — a declaration and the `# ..` lines in front of it. The lines are this
 # production's own tokens, which is what makes documentation attach here rather
 # than in each declaration.
-fn lower_item(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_item(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let docs = doc_block(node.own_texts(src));
     let decl = kid(kids, 0, sp)?;
@@ -2490,7 +2499,7 @@ fn lower_item(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     if (docs.is_some()) {
         return err(ParseError {
             message: "an import cannot be documented — `# ..` lines attach to a declaration, and this one is above an `import`",
-            span: node.own_tokens().first().value_or(node.tok_span()),
+            span: node.tokens.first().value_or(node.tok_span()),
         });
     };
     ok(AItem(ItemImport(d)))
@@ -2514,10 +2523,10 @@ fn doc_block(lines: str[]) -> str? {
 # are read off this production's own tokens. The two rules a constant has —
 # ALL_CAPS, and a literal value — are the loader's, which is where a name is
 # resolved and where the substitution that makes them matter happens.
-fn lower_const_decl(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_const_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let is_pub = toks[0] == some("pub");
     let at_name: u64 = if (is_pub) { 2 } else { 1 };
     let annotated = kids.len() == 2;
@@ -2535,10 +2544,10 @@ fn lower_const_decl(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     }))
 }
 
-fn lower_import_decl(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_import_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let names = kids.try_map(|k| as_import_name(k, sp))?;
     let i = toks.len() - 2;
     let text = toks[i].value_or("");
@@ -2580,10 +2589,10 @@ fn bare_operator_import(op: str) -> str {
 # `import_name` — a name, or an aliased name. The span covers the *exported*
 # name, which is where an "is not exported" error points. A bare operator never
 # gets here: the grammar refuses it before lowering.
-fn lower_import_name(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_import_name(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let name_span = spans.first().value_or(node.tok_span());
     if (toks[1] == some("as")) {
         let name = toks[0].value_or("");
@@ -2601,20 +2610,20 @@ fn lower_import_name(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     ok(AImportName(ImportName { name, alias: none, span: name_span }))
 }
 
-fn lower_effect(src: str, node: Cst, kids: Ast[]) -> Ast {
+fn lower_effect(src: str, node: Parts, kids: Ast[]) -> Ast {
     AName(node.own_texts(src)[1].value_or(""))
 }
 
-fn lower_type_params(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_type_params(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     ok(ATypeParams(kids.try_map(|k| as_type_param(k, sp))?))
 }
 
 # `type_param` — `name`, `name: bound`, or `name: variant`. A bare name takes
 # the `any` bound, which almost every generic uses.
-fn lower_type_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_type_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let name = toks[0].value_or("");
     if (toks.len() == 1) {
         return ok(ATypeParam(TypeParam { name, bound: BoundAny }));
@@ -2633,10 +2642,10 @@ fn lower_type_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `param` — the seven shapes. The destructuring one is the only one that is not
 # simply a parameter: it introduces a scrutinee the caller never named and a
 # field list for the body to bind off it.
-fn lower_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let name_span = spans.first().value_or(node.tok_span());
     if (toks[1] == some("{")) {
         let scrutinee = Param {
@@ -2707,21 +2716,21 @@ fn nonempty_seq_ty(elem: Ty) -> Ty {
 
 # `fn_body` — a value block, or the struct-literal shorthand, whose type name
 # comes from the declared return type rather than from the source.
-fn lower_fn_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_fn_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let child = kid(kids, 0, sp)?;
     if (let AFieldInits(fields) = child) {
-        return ok(ABody(PConstruct(fields, sub_span(node.nodes(), 0, node.tok_span()))));
+        return ok(ABody(PConstruct(fields, sub_span(node.children, 0, node.tok_span()))));
     };
     ok(ABody(PBlock(as_expr(child, sp)?)))
 }
 
 # `construct_fields` — the shorthand body's field list. Its first field is
 # spelled by the alternative that matched; the rest are ordinary `field_init`s.
-fn lower_construct_fields(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_construct_fields(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let head = toks[0].value_or("");
     let name_span = spans.first().value_or(node.tok_span());
 
@@ -2749,10 +2758,10 @@ fn lower_construct_fields(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # production; what is checked here is that the name matches it. Every
 # string-argument attribute is refused, which is the whole reason that
 # alternative parses: so each can be refused *by name*.
-fn lower_fn_attr(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_fn_attr(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
-    let spans = node.own_tokens();
+    let spans = node.tokens;
     let name = toks[1].value_or("");
     let name_span = spans[1].value_or(node.tok_span());
     if (kids.is_empty()) {
@@ -2790,9 +2799,9 @@ fn lower_fn_attr(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 
 # `test_block` — the braces around a `test_body`: the chain's value is located
 # the way `block` does it, and the functions ride along.
-fn lower_test_block(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_test_block(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let brace = node.own_tokens().first().value_or(node.tok_span());
+    let brace = node.tokens.first().value_or(node.tok_span());
     let TestBlock { fns, body } = as_test_block(kid(kids, 0, sp)?, sp)?;
     let repaired = repair_block_value(body.value_or(at(Unit, 0..0)), brace);
     ok(ATestBlock(TestBlock { fns, body: some(Expr { ..repaired.0, value_span: repaired.1 }) }))
@@ -2802,14 +2811,14 @@ fn lower_test_block(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # which is set aside rather than folded into the chain. A `pub` helper, or one
 # carrying a `.test` of its own, is refused: the block is the only place the
 # function exists, so neither could mean anything.
-fn lower_test_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_test_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     if (kids.is_empty()) {
         return ok(ATestBlock(TestBlock { fns: [], body: none }));
     };
     if (let AFunction(f) = kid(kids, 0, sp)?) {
         // The refusals point at the declaration — the first child node.
-        let fn_span = node.nodes().first().map(tok_span).value_or(sp);
+        let fn_span = node.children.first().map(child_span).value_or(sp);
         if (f.is_pub) {
             return err(ParseError {
                 message: `a function inside a \`.test\` block cannot be \`pub\`: "{f.name}" exists only for that test`,
@@ -2842,7 +2851,7 @@ fn lower_test_body(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 
 # `test_tail` — `block_tail`'s twin: nothing followed (the expression before it
 # was the value), or the rest of the block, which is a chain even when empty.
-fn lower_test_tail(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_test_tail(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     if (kids.is_empty()) {
         return ok(ATestBlock(TestBlock { fns: [], body: none }));
@@ -2862,7 +2871,7 @@ fn unknown_attr(name: str) -> str {
     `unknown function attribute "{name}"; only \`.test(\{ .. })\` is supported`
 }
 
-fn lower_struct_decl(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_struct_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     ok(AStruct(StructDecl {
         name: node.own_texts(src)[1].value_or(""),
@@ -2874,7 +2883,7 @@ fn lower_struct_decl(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
     }))
 }
 
-fn lower_field_decl(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_field_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let default = if (kids.len() == 2) { some(kid_expr(kids, 1, sp)?) } else { none };
     ok(AFieldDecl(FieldDecl {
@@ -2888,14 +2897,14 @@ fn lower_field_decl(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `# ..` lines are this node's own tokens (they ride with the `|` separator, see
 # the rule), so each case is given the lines written between the previous case
 # and itself here, where both are in hand.
-fn lower_variant_decl(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_variant_decl(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let case_nodes = node.nodes()[1..];
+    let case_nodes = node.children[1..];
     mut cases: VariantCase[] = [];
     mut after = sp.start;
     for (let i, k : kids[1..]) {
         let c = as_variant_case(k, sp)?;
-        let at = case_nodes[i].map(tok_span).value_or(sp);
+        let at = case_nodes[i].map(child_span).value_or(sp);
         set cases.push(VariantCase {
             ..c,
             doc: doc_block(doc_lines_between(src, node, after, at.start)),
@@ -2913,17 +2922,13 @@ fn lower_variant_decl(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # The `# ..` lines among `node`'s own tokens that start in `lo..hi` — the run
 # written above the case starting at `hi`, since between two cases there is
 # nothing but those lines and the `|`.
-fn doc_lines_between(src: str, node: Cst, lo: u64, hi: u64) -> str[] {
-    node
-        .own_tokens()
-        .filter(|t| lo <= t.start && t.start < hi)
-        .map(|t| src[t])
-        .filter(|t| t.starts_with('#'))
+fn doc_lines_between(src: str, Parts { tokens }, lo: u64, hi: u64) -> str[] {
+    tokens.filter(|t| lo <= t.start && t.start < hi).map(|t| src[t]).filter(|t| t.starts_with('#'))
 }
 
 # `variant_case` — the name and the payload slots as children. Its docs are
 # filled in by `lower_variant_decl`, which holds them.
-fn lower_variant_case(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_variant_case(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     ok(AVariantCase(VariantCase {
         name: node.own_texts(src)[0].value_or(""),
@@ -2936,7 +2941,7 @@ fn lower_variant_case(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # any `# ..` lines of its own. `k?: T` stores the `T?` a match arm binds, with
 # the `none` that was written as its default. The doc lines are the node's own
 # tokens too, in front of the slot's; they are told apart by their marker.
-fn lower_case_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_case_param(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let own = node.own_texts(src);
     let doc = doc_block(own.filter(|t| t.starts_with('#')));
@@ -2961,7 +2966,7 @@ fn lower_case_param(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # lowered to rather than by position: a type parameter list, some parameters,
 # some effects, a return type, a body and some attributes all arrive in one
 # list, and each is a different `Ast` case.
-fn lower_function(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_function(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
     let is_pub = toks[0] == some("pub");
@@ -4095,7 +4100,7 @@ pub fn aipl_parse_error(src: str) -> ParseError? {
 # Every interior node's token span under `t`, itself included, depth first.
 fn node_spans(t: Cst) -> u64[] {
     let own: u64[] = t.token_span().map(|sp| [sp.start, sp.end]).value_or([]);
-    [..own, ..t.nodes().map(node_spans).join()]
+    [..own, ..t.parts().children.map(node_spans).join()]
 }
 
 #
@@ -4522,7 +4527,7 @@ fn named_ty(name: str) -> Ty {
 # `ty` — a head, refined by the `without` clause when one followed it. The
 # clause's child count is what says whether it did: the head alone, or the head
 # and what it excludes.
-fn lower_ty(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let head = as_ty(kid(kids, 0, sp)?, sp)?;
     match (kids[1]) {
@@ -4533,7 +4538,7 @@ fn lower_ty(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 
 # `exclusion` — what a `without` clause leaves out. The one form today is `[]`,
 # so the tokens are not consulted: matching the production is knowing which.
-fn lower_exclusion(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_exclusion(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     ok(AExclusion(EmptyArray))
 }
 
@@ -4542,7 +4547,7 @@ fn lower_exclusion(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 #
 # `!E` is the one alternative with no left operand at all: a result whose ok side
 # is unit, which is why a single child under a `!` lowers to `TyResult(TyUnit, ..)`.
-fn lower_ty_head(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_ty_head(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let ops = node.own_token_text(src);
     let head = kid(kids, 0, sp)?;
@@ -4576,7 +4581,7 @@ fn lower_ty_head(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `ty_parens` — the parenthesized list every `(`-led type form opens with. It is
 # the one production whose value is a list rather than a type, and that is what
 # `lower_ty` reads to tell those forms from the unparenthesized ones.
-fn lower_ty_parens(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_ty_parens(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     ok(ATys(kids.try_map(|k| as_ty(k, sp))?))
 }
@@ -4585,21 +4590,17 @@ fn lower_ty_parens(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # `i64?[]` is an array of optionals and `i64[]?` an optional array. The suffixes
 # are literals inside a `Many` and so are this node's own tokens; `[` contributes
 # nothing and `]` is what closes an array suffix.
-fn lower_base_ty(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_base_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let core = as_ty(kid(kids, 0, sp)?, sp)?;
-    ok(ATy(
-        node
-            .own_tokens()
-            .left_fold(
-                core,
-                |t: Ty, tok: Span| match (src[tok]) {
-                    "?" => TyOptional(t),
-                    "]" => TyArray(t),
-                    _ => t,
-                },
-            ),
-    ))
+    ok(ATy(node.tokens.left_fold(
+        core,
+        |t: Ty, tok: Span| match (src[tok]) {
+            "?" => TyOptional(t),
+            "]" => TyArray(t),
+            _ => t,
+        },
+    )))
 }
 
 # `ty_core` — `#{K: V}`, `#{T}`, `Name<A, B>` and a bare `Name`. The `#` is what
@@ -4610,10 +4611,9 @@ fn lower_base_ty(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
 # case of a variant, carrying no payload. Spelled out here for the reason
 # gazelle spells it out — so nothing downstream has to know that one base name
 # is special.
-fn lower_ty_core(src: str, node: Cst, kids: Ast[]) -> Ast!ParseError {
+fn lower_ty_core(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
-    let head_tok = node
-        .own_tokens()
+    let head_tok = node.tokens
         .first()
         .value_or_err(ParseError { message: "a type core matched no token", span: sp })?;
     let head = src[head_tok];
@@ -4651,15 +4651,15 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2117370
-deallocations: 2117370
-reallocations: 299920
-bytes allocated: 391778348
-instructions executed: 583375187
-binary size: 5409016
-  code: 3553396
+allocations: 2086180
+deallocations: 2086180
+reallocations: 298426
+bytes allocated: 390306076
+instructions executed: 581328668
+binary size: 5390840
+  code: 3538660
   data: 56396
-  metadata: 1799224
+  metadata: 1795784
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 18
@@ -4722,7 +4722,7 @@ functions:
     calls: 243990
     bytes: 116
   __arr_drop___m8__Cst:
-    calls: 63890
+    calls: 27754
     bytes: 116
   __arr_drop___m9__CaseParam:
     calls: 6
@@ -4815,7 +4815,7 @@ functions:
     calls: 484176
     bytes: 116
   __arr_retain___m8__Cst:
-    calls: 45677
+    calls: 24815
     bytes: 116
   __arr_retain___m9__CaseParam:
     calls: 10
@@ -4874,7 +4874,7 @@ functions:
   __builtin_any$__m7__Rule$__m21__AiplTok$lam$__m30__rule_nullable$__m21__AiplTok$lambda1$tail:
     calls: 162
     bytes: 380
-  __builtin_any$__m9__Function$lam$lower_fn_attr$lambda3:
+  __builtin_any$__m9__Function$lam$lower_fn_attr$lambda2:
     calls: 4
     bytes: 396
   __builtin_count_while$char$lam$__m22__lex_step$__m21__AiplTok$lambda1:
@@ -4952,12 +4952,6 @@ functions:
   __builtin_map_join$__m8__Cst$__builtin_Span$lam$__m8__token_leaves$tail:
     calls: 1543
     bytes: 1040
-  __builtin_map_join$__m8__Cst$__m8__Cst$lam$__m8__splice:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m8__Cst$__m8__Cst$lam$__m8__splice$tail:
-    calls: 16932
-    bytes: 1572
   __builtin_map_join$__m8__Cst$u64$lam$node_spans:
     calls: 8460
     bytes: 940
@@ -4994,16 +4988,16 @@ functions:
   __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam$lower_construct_fields$lambda3:
     calls: 1
     bytes: 9148
+  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam$lower_construct_fields$lambda4:
+    calls: 4
+    bytes: 9148
   __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam$lower_construct_fields$lambda5:
     calls: 4
     bytes: 9148
   __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam$lower_construct_fields$lambda6:
-    calls: 4
-    bytes: 9148
-  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam$lower_construct_fields$lambda7:
     calls: 0
     bytes: 9148
-  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam$lower_construct_fields$lambda8:
+  __builtin_try_map$__m1__Ast$__m3__FieldInit$__m7__ParseError$lam$lower_construct_fields$lambda7:
     calls: 0
     bytes: 9148
   __builtin_try_map$__m1__Ast$__m3__LambdaParam$__m7__ParseError$lam$lambda_of$lambda0:
@@ -5018,7 +5012,7 @@ functions:
   __builtin_try_map$__m1__Ast$__m4__Pat$__m7__ParseError$lam$lower_pattern$lambda2:
     calls: 11
     bytes: 9148
-  __builtin_try_map$__m1__Ast$__m6__Ty$__m7__ParseError$lam$lower_ty_core$lambda3:
+  __builtin_try_map$__m1__Ast$__m6__Ty$__m7__ParseError$lam$lower_ty_core$lambda2:
     calls: 7
     bytes: 9148
   __builtin_try_map$__m1__Ast$__m6__Ty$__m7__ParseError$lam$lower_ty_parens$lambda0:
@@ -5039,7 +5033,7 @@ functions:
   __builtin_try_map$__m1__Ast$__m9__TypeParam$__m7__ParseError$lam$lower_type_params$lambda0:
     calls: 47
     bytes: 9148
-  __builtin_try_map$__m1__Ast$__tuple$str$str$__m7__ParseError$lam$shim_expr$lambda1:
+  __builtin_try_map$__m1__Ast$__tuple$str$str$__m7__ParseError$lam$shim_expr$lambda0:
     calls: 1
     bytes: 9156
   __builtin_try_map$__m7__Production$__m21__AiplTok$__m1__Ast$__m31__First<AiplTok>$__m7__ParseError$lam$__m31__linked_first_sets$__m21__AiplTok$__m1__Ast$lambda2:
@@ -5054,9 +5048,6 @@ functions:
   __builtin_try_map$__m8__Cst$__m1__Ast$__m7__ParseError$lam$__m30__lower_node$__m21__AiplTok$__m1__Ast$lambda0:
     calls: 2712
     bytes: 3596
-  __builtin_value_or$__builtin_Span:
-    calls: 0
-    bytes: 96
   __builtin_value_or$bool:
     calls: 13618
     bytes: 24
@@ -5305,7 +5296,7 @@ functions:
     bytes: 364
   __m30__lower_node$__m21__AiplTok$__m1__Ast:
     calls: 2712
-    bytes: 133032
+    bytes: 133196
   __m30__match_group$__m21__AiplTok$__m1__Ast:
     calls: 12560
     bytes: 5084
@@ -5495,18 +5486,15 @@ functions:
   __m7__prod_names$__m21__AiplTok$__m1__Ast:
     calls: 747
     bytes: 6792
+  __m8__extent:
+    calls: 2560
+    bytes: 252
   __m8__first_leaf:
     calls: 8561
     bytes: 788
   __m8__first_token:
     calls: 18267
     bytes: 760
-  __m8__flat_kids:
-    calls: 0
-    bytes: 32
-  __m8__flat_kids$tail:
-    calls: 13828
-    bytes: 1108
   __m8__last_leaf:
     calls: 9414
     bytes: 788
@@ -5519,21 +5507,21 @@ functions:
   __m8__leaves$tail:
     calls: 375
     bytes: 1236
-  __m8__nodes$filter1$own0:
-    calls: 11487
-    bytes: 376
   __m8__own_token_text:
     calls: 450
-    bytes: 1448
-  __m8__own_tokens:
-    calls: 1110
-    bytes: 920
-  __m8__span:
-    calls: 2560
-    bytes: 252
+    bytes: 1464
+  __m8__parts:
+    calls: 11172
+    bytes: 956
+  __m8__split_kids:
+    calls: 12453
+    bytes: 2284
   __m8__text:
     calls: 10
     bytes: 1460
+  __m8__tok_span:
+    calls: 612
+    bytes: 236
   __m8__token_leaves:
     calls: 0
     bytes: 32
@@ -5688,13 +5676,13 @@ functions:
     calls: 16365
     bytes: (external)
   aipl_arr_extend:
-    calls: 1217833
+    calls: 1179305
     bytes: (external)
   aipl_arr_inc:
-    calls: 6318426
+    calls: 6446751
     bytes: (external)
   aipl_arr_reserve:
-    calls: 1267625
+    calls: 1201018
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 16762
@@ -5709,19 +5697,19 @@ functions:
     calls: 37
     bytes: (external)
   aipl_array_dec:
-    calls: 9510419
+    calls: 9562174
     bytes: (external)
   aipl_array_new:
-    calls: 219014
+    calls: 193088
     bytes: (external)
   aipl_array_push:
-    calls: 162929
+    calls: 176166
     bytes: (external)
   aipl_array_push_mut:
-    calls: 733361
+    calls: 731174
     bytes: (external)
   aipl_array_with_cap:
-    calls: 41815
+    calls: 40250
     bytes: (external)
   aipl_assert:
     calls: 364
@@ -5748,13 +5736,13 @@ functions:
     calls: 1353765
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 7211210
+    calls: 7232213
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 410935
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5857150
+    calls: 5878153
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 410935
@@ -5797,7 +5785,7 @@ functions:
     bytes: 376
   arm_span:
     calls: 15
-    bytes: 1004
+    bytes: 908
   as_arms:
     calls: 14
     bytes: 6064
@@ -5953,181 +5941,181 @@ functions:
     bytes: 3632
   lower_arg:
     calls: 31
-    bytes: 22740
+    bytes: 22024
   lower_args:
     calls: 40
-    bytes: 6596
+    bytes: 6648
   lower_assign_stmt:
     calls: 15
-    bytes: 49040
+    bytes: 48312
   lower_atom:
     calls: 283
-    bytes: 150208
+    bytes: 150680
   lower_base_ty:
     calls: 135
-    bytes: 14416
+    bytes: 13688
   lower_binding:
     calls: 11
-    bytes: 53428
+    bytes: 52676
   lower_block:
     calls: 78
-    bytes: 7904
+    bytes: 7116
   lower_block_body:
     calls: 115
-    bytes: 72148
+    bytes: 72312
   lower_block_tail:
     calls: 43
-    bytes: 6596
+    bytes: 6648
   lower_brace_body:
     calls: 7
-    bytes: 6596
+    bytes: 6648
   lower_case_param:
     calls: 10
-    bytes: 28868
+    bytes: 29028
   lower_const_decl:
     calls: 0
-    bytes: 16228
+    bytes: 15420
   lower_construct_fields:
     calls: 5
-    bytes: 26656
+    bytes: 25936
   lower_ctor_payload:
     calls: 20
-    bytes: 13708
+    bytes: 13792
   lower_effect:
     calls: 2
-    bytes: 928
+    bytes: 940
   lower_else_branch:
     calls: 4
-    bytes: 14100
+    bytes: 13284
   lower_entry:
     calls: 9
-    bytes: 13416
+    bytes: 13504
   lower_exclusion:
     calls: 6
     bytes: 6368
   lower_expr:
     calls: 296
-    bytes: 20596
+    bytes: 20612
   lower_field_decl:
     calls: 7
-    bytes: 14472
+    bytes: 14588
   lower_field_init:
     calls: 8
-    bytes: 22392
+    bytes: 21644
   lower_fn_attr:
     calls: 8
-    bytes: 21468
+    bytes: 20720
   lower_fn_body:
     calls: 36
-    bytes: 28820
+    bytes: 28720
   lower_for_stmt:
     calls: 6
-    bytes: 32068
+    bytes: 31256
   lower_function:
     calls: 31
-    bytes: 54940
+    bytes: 55036
   lower_if:
     calls: 10
-    bytes: 18848
+    bytes: 18880
   lower_import_decl:
     calls: 4
-    bytes: 15304
+    bytes: 14524
   lower_import_name:
     calls: 6
-    bytes: 29816
+    bytes: 29032
   lower_item:
     calls: 36
-    bytes: 82032
+    bytes: 81380
   lower_lambda:
     calls: 3
-    bytes: 14252
+    bytes: 14292
   lower_lambda_param:
     calls: 3
-    bytes: 21800
+    bytes: 21076
   lower_let_stmt:
     calls: 8
     bytes: 232
   lower_loop_inner:
     calls: 15
-    bytes: 38140
+    bytes: 38276
   lower_match_arm:
     calls: 17
-    bytes: 36016
+    bytes: 36192
   lower_mut_stmt:
     calls: 3
     bytes: 232
   lower_op_value:
     calls: 1
-    bytes: 1716
+    bytes: 1664
   lower_param:
     calls: 18
-    bytes: 31536
+    bytes: 30728
   lower_pattern:
     calls: 87
-    bytes: 69408
+    bytes: 69664
   lower_postfix:
     calls: 278
-    bytes: 19548
+    bytes: 19492
   lower_program:
     calls: 32
-    bytes: 6604
+    bytes: 6656
   lower_return_stmt:
     calls: 1
-    bytes: 6776
+    bytes: 6828
   lower_shim_binding:
     calls: 1
-    bytes: 1344
+    bytes: 1364
   lower_struct_decl:
     calls: 4
-    bytes: 17480
+    bytes: 17636
   lower_suffix:
     calls: 19
-    bytes: 53856
+    bytes: 53324
   lower_template:
     calls: 1
-    bytes: 9316
+    bytes: 9304
   lower_test_block:
     calls: 7
-    bytes: 14836
+    bytes: 14080
   lower_test_body:
     calls: 17
-    bytes: 139336
+    bytes: 139348
   lower_test_tail:
     calls: 5
-    bytes: 20168
+    bytes: 20264
   lower_ty:
     calls: 146
-    bytes: 56028
+    bytes: 56088
   lower_ty_core:
     calls: 136
-    bytes: 68456
+    bytes: 67772
   lower_ty_head:
     calls: 150
-    bytes: 158300
+    bytes: 158556
   lower_ty_parens:
     calls: 21
-    bytes: 6596
+    bytes: 6648
   lower_type_param:
     calls: 6
-    bytes: 22568
+    bytes: 21616
   lower_type_params:
     calls: 47
-    bytes: 6596
+    bytes: 6648
   lower_unary:
     calls: 281
-    bytes: 20004
+    bytes: 20012
   lower_variant_case:
     calls: 14
-    bytes: 7516
+    bytes: 7584
   lower_variant_decl:
     calls: 6
-    bytes: 25596
-  lower_variant_decl$filter6$own0:
+    bytes: 24720
+  lower_variant_decl$filter5$own0:
     calls: 14
     bytes: 448
   lower_while_stmt:
     calls: 2
-    bytes: 7076
+    bytes: 7144
   main:
     calls: 1
     bytes: 1300
@@ -6148,7 +6136,7 @@ functions:
     bytes: 572
   node_spans:
     calls: 4230
-    bytes: 660
+    bytes: 756
   p:
     calls: 28674
     bytes: 3748
@@ -6169,13 +6157,13 @@ functions:
     bytes: 2348
   same_bindings:
     calls: 16
-    bytes: 2692
+    bytes: 2492
   seq:
     calls: 16
     bytes: 264
   shim_expr:
     calls: 1
-    bytes: 3072
+    bytes: 2204
   statements:
     calls: 708
     bytes: 70828

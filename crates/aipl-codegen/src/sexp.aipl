@@ -68,15 +68,15 @@ fn depth(self: Sexp) -> u64 {
     }
 }
 --- performance ---
-allocations: 16689
-deallocations: 16689
-reallocations: 2158
-bytes allocated: 1031946
-instructions executed: 5455188
-binary size: 250552
-  code: 164684
+allocations: 12956
+deallocations: 12956
+reallocations: 1344
+bytes allocated: 872290
+instructions executed: 5278404
+binary size: 251256
+  code: 164988
   data: 1964
-  metadata: 83904
+  metadata: 84304
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -91,7 +91,7 @@ functions:
     calls: 6
     bytes: 604
   __arr_drop___m2__Cst:
-    calls: 7911
+    calls: 3342
     bytes: 116
   __arr_drop___m4__ListStyle:
     calls: 18
@@ -115,7 +115,7 @@ functions:
     calls: 0
     bytes: 604
   __arr_retain___m2__Cst:
-    calls: 5035
+    calls: 2136
     bytes: 116
   __arr_retain___m4__ListStyle:
     calls: 6
@@ -162,12 +162,6 @@ functions:
   __builtin_map_join$__m2__Cst$__builtin_Span$lam$__m2__token_leaves$tail:
     calls: 16
     bytes: 1040
-  __builtin_map_join$__m2__Cst$__m2__Cst$lam$__m2__splice:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m2__Cst$__m2__Cst$lam$__m2__splice$tail:
-    calls: 2886
-    bytes: 1572
   __builtin_map_join$__m4__Rule$__m1__SexpKind$__m4__ListStyle$lam$__m4__group_styles$__m1__SexpKind:
     calls: 0
     bytes: 44
@@ -263,7 +257,7 @@ functions:
     bytes: 364
   __m14__lower_node$__m1__SexpKind$Sexp:
     calls: 836
-    bytes: 5460
+    bytes: 6572
   __m14__match_group$__m1__SexpKind$Sexp:
     calls: 820
     bytes: 5084
@@ -320,28 +314,22 @@ functions:
     bytes: 652
   __m1__lower_item:
     calls: 426
-    bytes: 468
+    bytes: 508
   __m1__parse_sexp:
     calls: 6
     bytes: 5596
+  __m2__extent:
+    calls: 0
+    bytes: 252
   __m2__first_leaf:
     calls: 0
     bytes: 788
-  __m2__flat_kids:
-    calls: 0
-    bytes: 32
-  __m2__flat_kids$tail:
-    calls: 1246
-    bytes: 1108
   __m2__last_leaf:
     calls: 0
     bytes: 788
-  __m2__nodes$filter1$own0:
-    calls: 836
-    bytes: 376
-  __m2__span:
-    calls: 0
-    bytes: 252
+  __m2__split_kids:
+    calls: 2066
+    bytes: 2284
   __m2__token_leaves:
     calls: 0
     bytes: 32
@@ -412,25 +400,25 @@ functions:
     calls: 6
     bytes: (external)
   aipl_arr_extend:
-    calls: 6418
+    calls: 2634
     bytes: (external)
   aipl_arr_inc:
-    calls: 144597
+    calls: 161235
     bytes: (external)
   aipl_arr_reserve:
-    calls: 10558
+    calls: 3054
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 836
     bytes: (external)
   aipl_array_dec:
-    calls: 181279
+    calls: 184312
     bytes: (external)
   aipl_array_new:
-    calls: 5875
+    calls: 3362
     bytes: (external)
   aipl_array_push:
-    calls: 1694
+    calls: 3360
     bytes: (external)
   aipl_array_push_mut:
     calls: 2341
@@ -445,13 +433,13 @@ functions:
     calls: 2675
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 38012
+    calls: 42559
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 72
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 35337
+    calls: 39884
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 72

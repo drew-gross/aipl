@@ -32,7 +32,7 @@ import {
     value_or_err,
     wrapping_sub as -,
 } from builtins;
-import { Cst, show, span, text, token_leaves } from "./cst.aipl";
+import { Cst, Parts, show, span, text } from "./cst.aipl";
 import { ebnf, show_first_sets } from "./ebnf.aipl";
 import { render_cst } from "./format.aipl";
 import {
@@ -129,11 +129,10 @@ fn json_rules() -> TokenRule<JsonTok>[] {
 // its own, and only `lower_member` has that much to say.
 
 # A member's value is its one interior child; its key is the string token in
-# front of the `:`, which is a *leaf* and so has no lowered value — the node's
-# first token leaf is where it is read from.
-fn lower_member(src: str, node: Cst, kids: Json[]) -> Json!ParseError {
-    let key = node
-        .token_leaves()
+# front of the `:`, which is a *leaf* and so has no lowered value — the first of
+# the node's own tokens is where it is read from.
+fn lower_member(src: str, node: Parts, kids: Json[]) -> Json!ParseError {
+    let key = node.tokens
         .first()
         .value_or_err(ParseError { message: "a member has no key", span: node.span() })?;
     let value = kids
@@ -503,15 +502,15 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
 # braces — is a list breaking or not breaking, which the layouts decide.
 fn json_space(l: str, r: str) -> bool { l == ":" }
 --- performance ---
-allocations: 22173
-deallocations: 22173
-reallocations: 3287
-bytes allocated: 2833155
-instructions executed: 5528207
-binary size: 460464
-  code: 301592
+allocations: 21446
+deallocations: 21446
+reallocations: 3218
+bytes allocated: 2794115
+instructions executed: 5463227
+binary size: 461224
+  code: 301932
   data: 8596
-  metadata: 150276
+  metadata: 150696
 functions:
   __arr_drop_Json:
     calls: 125
@@ -526,7 +525,7 @@ functions:
     calls: 58
     bytes: 604
   __arr_drop___m1__Cst:
-    calls: 1900
+    calls: 1300
     bytes: 116
   __arr_drop___m2__First$JsonTok:
     calls: 10
@@ -565,7 +564,7 @@ functions:
     calls: 0
     bytes: 604
   __arr_retain___m1__Cst:
-    calls: 1534
+    calls: 1181
     bytes: 116
   __arr_retain___m2__First$JsonTok:
     calls: 56
@@ -658,14 +657,8 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves$tail:
-    calls: 1946
+    calls: 1777
     bytes: 1040
-  __builtin_map_join$__m1__Cst$__m1__Cst$lam$__m1__splice:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m1__Cst$__m1__Cst$lam$__m1__splice$tail:
-    calls: 301
-    bytes: 1572
   __builtin_map_join$__m3__Rule$JsonTok$__m3__ListStyle$lam$__m3__group_styles$JsonTok:
     calls: 0
     bytes: 44
@@ -791,7 +784,7 @@ functions:
     bytes: 364
   __m13__lower_node$JsonTok$Json:
     calls: 166
-    bytes: 5460
+    bytes: 6572
   __m13__match_group$JsonTok$Json:
     calls: 297
     bytes: 5084
@@ -846,15 +839,12 @@ functions:
   __m14__line_at:
     calls: 1
     bytes: 652
+  __m1__extent:
+    calls: 0
+    bytes: 252
   __m1__first_leaf:
     calls: 0
     bytes: 788
-  __m1__flat_kids:
-    calls: 0
-    bytes: 32
-  __m1__flat_kids$tail:
-    calls: 193
-    bytes: 1108
   __m1__last_leaf:
     calls: 0
     bytes: 788
@@ -864,20 +854,17 @@ functions:
   __m1__leaves$tail:
     calls: 76
     bytes: 1236
-  __m1__nodes$filter1$own0:
-    calls: 166
-    bytes: 376
   __m1__show:
     calls: 34
     bytes: 2968
-  __m1__span:
-    calls: 0
-    bytes: 252
+  __m1__split_kids:
+    calls: 247
+    bytes: 2284
   __m1__token_leaves:
     calls: 0
     bytes: 32
   __m1__token_leaves$tail:
-    calls: 3342
+    calls: 3051
     bytes: 1160
   __m1__token_text:
     calls: 37
@@ -1072,13 +1059,13 @@ functions:
     calls: 56
     bytes: (external)
   aipl_arr_extend:
-    calls: 9823
+    calls: 8743
     bytes: (external)
   aipl_arr_inc:
-    calls: 86611
+    calls: 88495
     bytes: (external)
   aipl_arr_reserve:
-    calls: 12674
+    calls: 10952
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 394
@@ -1090,13 +1077,13 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 121832
+    calls: 121413
     bytes: (external)
   aipl_array_new:
-    calls: 3996
+    calls: 3428
     bytes: (external)
   aipl_array_push:
-    calls: 2251
+    calls: 2562
     bytes: (external)
   aipl_array_push_mut:
     calls: 5741
@@ -1111,13 +1098,13 @@ functions:
     calls: 10707
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 72435
+    calls: 72575
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 4068
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 61728
+    calls: 61868
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 4068
@@ -1187,7 +1174,7 @@ functions:
     bytes: 6700
   lower_member:
     calls: 24
-    bytes: 1660
+    bytes: 1736
   main:
     calls: 1
     bytes: 464

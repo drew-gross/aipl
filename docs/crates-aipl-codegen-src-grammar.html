@@ -259,14 +259,14 @@
 
           <ul class="cases">
 
-            <li id="item-Mk"><code>Mk((str, Cst, A[]) -&#62; A)</code>
+            <li id="item-Mk"><code>Mk((str, Parts, A[]) -&#62; A)</code>
 
-              <div class="doc"><p>The general form: the source text, the node itself, and the already- lowered values of its interior children (<code>nodes</code>, in match order).</p></div>
+              <div class="doc"><p>The general form: the source text, the node itself, and the already- lowered values of its interior children (<code>Parts.children</code>, in match order).</p><p>The node arrives as a <code>Parts</code> rather than a bare <code>Cst</code>: the two lists a lowering reads off it — its interior children and its own token spans — come precomputed, from the one walk <code>lower_node</code> already has to do to find the children it recurses into. See <code>Parts</code> in <code>cst.aipl</code>.</p></div>
 
 
             </li>
 
-            <li id="item-TryMk"><code>TryMk((str, Cst, A[]) -&#62; A!ParseError)</code>
+            <li id="item-TryMk"><code>TryMk((str, Parts, A[]) -&#62; A!ParseError)</code>
 
               <div class="doc"><p><code>Mk</code> for a lowering that can refuse what it matched.</p></div>
 
@@ -424,7 +424,7 @@
             <a class="anchor" href="#item-show_style">show_style</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_style(__spat$26485: ListStyle) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_style(__spat$26811: ListStyle) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
 

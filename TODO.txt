@@ -75,6 +75,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  link should return a Grammar without Named, rule_first and rule_labels should use it
+  sep_spelling should use _ matches
   there are lots of functions in binaries with zero calls. Maybe due to inlining? They mostly shouldn't show up in the binary.
   tuple_slot_names should be a range->map I think?
   Mk/TryMk should maybe have single-kid variants? Or Kids+ variants? Or maybe Build should have a OneKid variant?
@@ -184,7 +186,23 @@ HOF:
 
 math:
 
+grammer ideas:
+  2. Make flat_kids a push-loop regardless of #1. kids.map(splice).join() is K+1 allocations to produce one list; a mut out loop is 1.
+
+  3. Indexed accessors — own_token_at(i) / own_text_at(src, i) — for the ~15 sites that read only the head and never want the list. Descends, stops, allocates nothing. Partly subsumed by #1 wherever nodes() is needed anyway.
+
+  4. Put the token kind on the leaf. This is the real answer to "should be token comparisons". Leaf(Span) → Leaf(Span, K), making Cst<K> generic — which is consistent with the rest of the pipeline: Rule<K>, Production<K, A>, Grammar<K, A> are all parameterized, and Cst is the one type that isn't, which is exactly why the kind gets thrown away. Then lower_atom becomes match (node.own_kind(0)) { If => .., Match => .., LParen => .. } — exhaustive, so a new token forces a decision at each site, and a typo'd "mathc" becomes a compile error instead of a silently-dead branch. AiplTok already carries Name(str), IntLit(i64), StrLit(str, StrStyle), so sites like lower_shim_binding destructure instead of slicing src at all. Be clear-eyed though: measured, this is ~12%, not 4×. Do it for the "classify once, then match" discipline your own CLAUDE.md argues for; don't do it expecting a speedup.
+
+  The deeper framing is that the pipeline re-derives at lowering time what the parse already decided: Literal("if") proved the token is if, and then the build asks toks[0] == "if". The other way to stop re-deriving is to split the mega-alternatives into named productions so the tree shape names the alternative and there's no dispatch at all — but that's more productions and more CST nodes, so it likely loses on allocation.
+
+  Two things I found next door, both bigger wins than the comparisons
+
+  5. match_spelling allocates a label on every failed literal match. parse.aipl:417 builds the template  `\`{s}\ `` before calling miss, and far_miss discards it immediately whenever pos < far.pos — which is the common case under PEG backtracking. link already rewrites the grammar (names → indices, groups collected); interning the rendered label there makes this free.
+
+  6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
+
 syntax:
+  link_rule does some weird stuff to prevent the formatter from breaking the tuples. Also it should match on the tuple probably
   str without "" should work
   field mutation for structs (lint let nullable: First<Tok> = First { ..f, nullable: true };) to set f.nullable = true;
   set x = { set x = a; b } should be illegal: set inside an expression is super weird
@@ -326,6 +344,7 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  tok_span should be value_or, with a lint (but also should make sure inlining and code sinking doens't result in the argument being actually evaluated)
   merge_runs should use out.push()
   template_segments should maybe accept str[] without []
   delimited_len can probably use without [] somehow or other

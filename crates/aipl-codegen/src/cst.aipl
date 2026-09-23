@@ -18,15 +18,13 @@
 // `tests/cases/variants/recursive_through_array.aipl`.
 import {
     Span,
-    case_of,
     equal as ==,
-    filter,
-    filter_map,
     find_map,
     is_empty,
     join,
     len,
     map,
+    push,
     reverse_find_map,
     value_or,
 } from builtins;
@@ -159,17 +157,22 @@ fn last_token(self: Cst) -> Span? {
 # `text` and not this one is what reconstructs source.
 pub fn token_text(self: Cst, src: str) -> str { self.token_leaves().map(|sp| src[sp]).join() }
 
-# The span `self` covers: its first leaf's start through its last leaf's end.
+# The extent `self` covers: its first leaf's start through its last leaf's end.
 # A node with no leaves at all — an interior node for a production that matched
 # empty input, which `Maybe` and a zero-minimum `Many` can both produce — has no
 # extent, and reports the empty `0..0`.
+#
+# Named `extent` rather than `span` because `span` is what a lowering asks its
+# `Node` for, and AIPL has no overloading. This is the tree's own answer, which
+# the `Parts` one delegates to; trivia at either edge is counted in, so
+# `token_span` is what lines up with another parser's spans.
 #
 # By descent, like `token_span`, and for the same reason: this is asked at
 # every node a lowering visits, and collecting every leaf beneath each of them
 # is quadratic in the tree. A block is a right-recursive chain one node deep
 # per statement, so on the largest compiler sources that was most of the
 # lowering's time.
-pub fn span(self: Cst) -> Span {
+pub fn extent(self: Cst) -> Span {
     match (self.first_leaf(), self.last_leaf()) {
         (some(f), some(l)) => f.through(l),
         _ => 0..0,
@@ -213,79 +216,112 @@ fn last_leaf(self: Cst) -> Span? {
     }
 }
 
-# The interior children of `self` — its kids with the leaves dropped. This is
-# the child list a production's `build` is lowered against, so its order and
-# length are part of the contract between a grammar and its lowering functions:
-# one entry per `Named` reference the rule matched, in the order it matched them.
+# What a `Mk`/`TryMk` lowering is handed: the node that matched, and the two
+# lists every lowering reads off it — its interior children and its own token
+# spans — already computed.
 #
-# A leaf is dropped because the lowering pass has nothing to hand `build` for one
-# — it has no lowered value, and its text is reachable from the node's own span.
-# A `Group` never reaches the test: `flat_kids` splices it away first, which is
-# what makes a group transparent.
-pub fn nodes(self: Cst) -> Cst[] { self.flat_kids().filter(|k| k.case_of() == Tree) }
+# They are precomputed because they used to be three separate walks of the same
+# kids. `lower_node` asked for the children, then the `build` asked for the own
+# tokens, and more than half of them asked for the own *texts* as well; each ask
+# rebuilt the flattened kid list from scratch, and rebuilt it by allocating a
+# one-element array per kid and joining them. One walk fills both lists, and
+# measured against the old shape on a nine-kid node it is a little under four
+# times faster.
+#
+# `cst` is the node itself, for the accessors that have to descend — `span`,
+# `tok_span`, `text`. Those stay lazy: each is asked at most once per lowering,
+# so precomputing them would only move the same work earlier, and the ones that
+# walk the whole subtree would then be paid by the lowerings that never ask.
+struct Parts { cst: Cst, children: Cst[], tokens: Span[] }
 
-# The direct kids of `self` with every group spliced in place — the one function
-# that makes a group transparent, and what `nodes` and `own_tokens` are both
-# written against. A group's three runs concatenate in source order, and a group
-# nested directly inside another flattens with it.
-fn flat_kids(self: Cst) -> Cst[] {
+# `self` as the `Parts` a lowering is handed: one walk of its direct kids,
+# splitting them into the interior children and the token leaves.
+#
+# The two lists are the pair a production's `build` is written against, and
+# between them they are everything the node matched *directly*:
+#
+#   - `children` is one entry per `Named` reference the rule matched, in the
+#     order it matched them — the order and length are part of the contract
+#     between a grammar and its lowering functions. Leaves are dropped because
+#     the lowering pass has nothing to hand `build` for one: a leaf has no
+#     lowered value, and its text is reachable from the node's own span.
+#   - `tokens` is the node's direct token leaves — where a lowering reads an
+#     operator or a keyword. A `Climb` node's two operands arrive as interior
+#     children and the operator between them is a direct leaf, so `tokens` is
+#     the operator and nothing else, where `token_text` would hand back the
+#     whole expression's tokens run together.
+#
+# Trivia is dropped from both. A `Group` is spliced in place rather than
+# recorded — that splice is the one thing making a group transparent, so a
+# production that gained a bracket pair hands its `build` the children it had
+# before — and a group nested directly inside another flattens with it.
+pub fn parts(self: Cst) -> Parts {
+    let empty = Parts { cst: self, children: [], tokens: [] };
     match (self) {
-        Leaf(..) | Trivia(..) => [],
-        Tree(_, kids) => kids.map(splice).join(),
-        Group(_, open, body, close) => [
-            ..open.map(splice).join(),
-            ..body.map(splice).join(),
-            ..close.map(splice).join(),
-        ],
+        Leaf(..) | Trivia(..) => empty,
+        Tree(_, kids) => split_kids(kids, empty),
+        Group(_, open, body, close) => split_kids(close, split_kids(body, split_kids(open, empty))),
     }
 }
 
-# One kid as the kids it stands for: a group as its contents, anything else as
-# itself.
-fn splice(self: Cst) -> Cst[] {
-    match (self) {
-        Group(..) => self.flat_kids(),
-        Leaf(..) | Trivia(..) | Tree(..) => [self],
+# `kids` split onto `acc`, in source order. The accumulator is a whole `Parts`
+# rather than the two lists on their own so that one value threads through the
+# loop and through a group's recursion.
+fn split_kids(kids: Cst[], acc: Parts) -> Parts {
+    mut a = acc;
+    for (let k : kids) {
+        set a = split_kid(a, k);
     }
+    a
 }
 
-# The token leaves `self` matched *directly* — one level down, not recursed
-# into. The mirror of `nodes`: that one is a node's direct branches, this its
-# direct leaves, and between them they are everything the node itself matched.
-#
-# This is what a lowering function reads an operator or a keyword from. A
-# `Climb` node's two operands arrive as interior children and the operator
-# between them is a direct leaf, so `own_token_text` is the operator and nothing
-# else — where `token_text` would hand back the whole expression's tokens run
-# together. Trivia is dropped here as it is there.
-pub fn own_tokens(self: Cst) -> Span[] { self.flat_kids().filter_map(is_leaf, leaf_span) }
+# One kid onto the accumulator: a token leaf contributes its span, an interior
+# node contributes itself, trivia contributes nothing, and a group contributes
+# whatever its three runs hold — which is the splice that makes it transparent.
+fn split_kid(acc: Parts, kid: Cst) -> Parts {
+    mut a = acc;
+    match (kid) {
+        Trivia(..) => {},
+        Leaf(sp) => {
+            set a.tokens.push(sp);
+        },
+        Tree(..) => {
+            set a.children.push(kid);
+        },
+        Group(_, open, body, close) => {
+            set a = split_kids(open, a);
+            set a = split_kids(body, a);
+            set a = split_kids(close, a);
+        },
+    };
+    a
+}
+
+# The span `self` covers — its tree's, since the parts say nothing about extent.
+pub fn span(self: Parts) -> Span { self.cst.extent() }
+
+# The span `self`'s *tokens* cover, falling back to its full extent when it
+# matched no token at all. The span a lowering hands to the AST node it builds,
+# and the one it blames in an error: token-tight, so it lines up with what
+# another parser would report rather than reaching back over leading trivia.
+pub fn tok_span(self: Parts) -> Span {
+    // Not `value_or(self.cst.extent())`: an argument is evaluated whether or not
+    // the optional needs it, and this fallback is a second descent of the tree.
+    match (self.cst.token_span()) {
+        some(sp) => sp,
+        none => self.cst.extent(),
+    }
+}
 
 # This node's own tokens as their text, one string per token. A `str` is a view
 # into `src`, so this costs no more than the spans do, and a lowering that asks
 # "which token is second?" gets a string to compare rather than a span to look
 # up.
-pub fn own_texts(self: Cst, src: str) -> str[] { self.own_tokens().map(|t| src[t]) }
+pub fn own_texts(self: Parts, src: str) -> str[] { self.tokens.map(|t| src[t]) }
 
 # The source text of `self`'s direct token leaves, run together with nothing
 # between them — the operator of a binary node, the keyword that opened a form.
-pub fn own_token_text(self: Cst, src: str) -> str { self.own_texts(src).join() }
-
-# Whether `self` is a token leaf: not an interior node, and not trivia.
-fn is_leaf(self: Cst) -> bool {
-    match (self) {
-        Leaf(..) => true,
-        Tree(..) | Trivia(..) | Group(..) => false,
-    }
-}
-
-# The span of a leaf, for `own_tokens`'s `filter_map`. A non-leaf never reaches
-# it (the filter runs first), and reports the empty span rather than failing.
-fn leaf_span(self: Cst) -> Span {
-    match (self) {
-        Leaf(sp) => sp,
-        Trivia(..) | Tree(..) | Group(..) => 0..0,
-    }
-}
+pub fn own_token_text(self: Parts, src: str) -> str { self.own_texts(src).join() }
 
 # `self` rendered as an S-expression against the grammar's production names
 # (`prod_names`), for tests and for reading a tree by eye: a leaf as its source
@@ -317,17 +353,17 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
 
     // What counts as an interior child: a `Tree` does, a `Leaf` and a
     // `Trivia` do not.
-    assert(Tree(0, [Leaf(0..1), t, Trivia(1..2)]).nodes() == [t]);
+    assert(Tree(0, [Leaf(0..1), t, Trivia(1..2)]).parts().children == [t]);
 
     // `token_span` is `span` with the trivia at either edge left out. They agree
     // here because `t` opens and closes on a token...
-    assert(t.span() == 0..5);
+    assert(t.extent() == 0..5);
     assert(t.token_span() == some(0..5));
 
     // ...and disagree the moment one edge is trivia, which is the whole reason
     // the tight one exists: another parser's spans start at the token.
     let padded = Tree(1, [Trivia(0..1), Leaf(1..2), Trivia(2..3)]);
-    assert(padded.span() == 0..3);
+    assert(padded.extent() == 0..3);
     assert(padded.token_span() == some(1..2));
 
     // A node holding no token has no token span — an interior node for a
@@ -338,11 +374,11 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // Losslessness: the leaves tile the source, so the text comes back whole.
     assert(t.text(src) == src);
     assert(t.leaves().len() == 5);
-    assert(t.span() == 0..5);
+    assert(t.extent() == 0..5);
 
     // A leaf is its own text and its own span.
     assert(Leaf(2..3).text(src) == "+");
-    assert(Trivia(1..2).span() == 1..2);
+    assert(Trivia(1..2).extent() == 1..2);
 
     // `token_text` is `text` with the trivia dropped — the spelling a lowering
     // function reads, rather than the bytes a formatter reproduces.
@@ -355,27 +391,38 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // place, so the parent still reconstructs the whole source.
     let nested = Tree(0, [Leaf(0..1), Trivia(1..2), Tree(1, [Leaf(2..3), Leaf(3..5)])]);
     assert(nested.text(src) == src);
-    assert(nested.span() == 0..5);
-    assert(nested.nodes().len() == 1);
-    // `nodes` is one level deep and drops leaves: three kids, one interior.
-    assert(nested.nodes() == [Tree(1, [Leaf(2..3), Leaf(3..5)])]);
+    assert(nested.extent() == 0..5);
 
-    // `own_tokens` is the mirror — one level deep, leaves only — so between them
-    // they are everything `nested` matched directly. The interior child's own
-    // leaves belong to it, not to the parent, which is what separates this from
-    // `token_leaves`.
-    assert(nested.own_tokens() == [0..1]);
-    assert(nested.own_token_text(src) == "1");
+    // `parts` is one walk one level deep, splitting the kids two ways: the
+    // interior children, and the token leaves. Between them they are everything
+    // `nested` matched directly — the interior child's own leaves belong to it,
+    // not to the parent, which is what separates `tokens` from `token_leaves`.
+    let np = nested.parts();
+    assert(np.children == [Tree(1, [Leaf(2..3), Leaf(3..5)])]);
+    assert(np.tokens == [0..1]);
+    assert(np.own_texts(src) == ["1"]);
+    assert(np.own_token_text(src) == "1");
     // (the last leaf spans `" 2"`, hence the space this one keeps)
     assert(nested.token_text(src) == "1+ 2");
-    assert(t.own_tokens() == [0..1, 2..3, 4..5]);
-    assert(Leaf(0..1).own_tokens() == []);
-    assert(Tree(0, []).own_token_text(src) == "");
-    assert(t.nodes() == []);
-    assert(Leaf(0..1).nodes() == []);
+    assert(t.parts().tokens == [0..1, 2..3, 4..5]);
+    assert(t.parts().children == []);
+
+    // A leaf has no kids at all, so both lists are empty.
+    let leaf_parts = Leaf(0..1).parts();
+    assert(leaf_parts.tokens == []);
+    assert(leaf_parts.children == []);
+    assert(Tree(0, []).parts().own_token_text(src) == "");
+
+    // The two span accessors a lowering reads off its `Parts`, against the tree's
+    // own: `span` is the full extent, `tok_span` the token-tight one, and they
+    // differ exactly where an edge is trivia.
+    assert(padded.parts().span() == 0..3);
+    assert(padded.parts().tok_span() == 1..2);
+    // With no token at all there is nothing tight to report, so it falls back.
+    assert(blank.parts().tok_span() == 0..1);
 
     // A node that matched nothing has no extent rather than a bogus one.
-    assert(Tree(0, []).span() == 0..0);
+    assert(Tree(0, []).extent() == 0..0);
     assert(Tree(0, []).text(src) == "");
 
     let names = ["expr", "term"];
@@ -410,53 +457,47 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     // Losslessness holds through a group exactly as through a node: the three
     // runs contribute their leaves in source order.
     assert(outer.text(gs) == gs);
-    assert(grp.span() == 0..7);
+    assert(grp.extent() == 0..7);
     assert(grp.token_text(gs) == "(1+2)");
 
     // Transparency: the group is not itself a child, and what it holds is. The
     // `*` between the two groups is a direct leaf of the parent, and the two
     // bracketed expressions are its two interior children — exactly what the
     // same tree written with `Then` and no group would have handed a `build`.
-    assert(outer.nodes() == [inner, Tree(1, [Leaf(11..12)])]);
-    assert(outer.own_token_text(gs) == "()*()");
+    assert(outer.parts().children == [inner, Tree(1, [Leaf(11..12)])]);
+    assert(outer.parts().own_token_text(gs) == "()*()");
 
     // A group directly inside a group flattens with it, so nesting the brackets
     // does not nest the child list.
     let doubled = Tree(0, [Group(0, [Leaf(0..1)], [grp], [Leaf(6..7)])]);
-    assert(doubled.nodes() == [inner]);
+    assert(doubled.parts().children == [inner]);
 
     // A group renders as its own brackets, having no production name to print.
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 356
-deallocations: 356
-reallocations: 30
-bytes allocated: 21181
-instructions executed: 45129
-binary size: 59720
-  code: 36456
-  data: 2717
-  metadata: 20547
+allocations: 274
+deallocations: 274
+reallocations: 19
+bytes allocated: 17741
+instructions executed: 41276
+binary size: 58968
+  code: 35356
+  data: 2965
+  metadata: 20647
 functions:
   __arr_drop_Cst:
-    calls: 138
+    calls: 34
     bytes: 116
   __arr_retain_Cst:
-    calls: 88
+    calls: 12
     bytes: 116
   __builtin_find_map$Cst$__builtin_Span$lam$first_leaf:
-    calls: 6
+    calls: 8
     bytes: 364
   __builtin_find_map$Cst$__builtin_Span$lam$first_token:
-    calls: 3
+    calls: 5
     bytes: 364
-  __builtin_map_join$Cst$Cst$lam$splice:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$Cst$Cst$lam$splice$tail:
-    calls: 46
-    bytes: 1572
   __builtin_map_join$Cst$__builtin_Span$lam$leaves:
     calls: 0
     bytes: 44
@@ -470,10 +511,10 @@ functions:
     calls: 12
     bytes: 1040
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_leaf:
-    calls: 6
+    calls: 8
     bytes: 440
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_token:
-    calls: 2
+    calls: 3
     bytes: 440
   __eq_Cst:
     calls: 23
@@ -482,58 +523,64 @@ functions:
     calls: 11
     bytes: 300
   __eq___builtin_Span:
-    calls: 37
+    calls: 40
     bytes: 104
   __eq___builtin_Span$arr:
     calls: 4
     bytes: 284
+  __eq_str$arr:
+    calls: 1
+    bytes: 364
   __rec_drop_Cst:
-    calls: 61
+    calls: 60
     bytes: 132
   __test$show:
     calls: 1
-    bytes: 13340
+    bytes: 12324
   __test$through:
     calls: 1
     bytes: 388
   aipl_arr_elem_ptr:
-    calls: 9
-    bytes: (external)
-  aipl_arr_extend:
-    calls: 236
-    bytes: (external)
-  aipl_arr_inc:
-    calls: 775
-    bytes: (external)
-  aipl_arr_reserve:
-    calls: 318
-    bytes: (external)
-  aipl_arr_reverse:
-    calls: 8
-    bytes: (external)
-  aipl_array_dec:
-    calls: 1407
-    bytes: (external)
-  aipl_array_new:
-    calls: 149
-    bytes: (external)
-  aipl_array_push_mut:
-    calls: 28
-    bytes: (external)
-  aipl_array_with_cap:
     calls: 13
     bytes: (external)
+  aipl_arr_extend:
+    calls: 125
+    bytes: (external)
+  aipl_arr_inc:
+    calls: 1024
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 158
+    bytes: (external)
+  aipl_arr_reverse:
+    calls: 11
+    bytes: (external)
+  aipl_array_dec:
+    calls: 1415
+    bytes: (external)
+  aipl_array_new:
+    calls: 86
+    bytes: (external)
+  aipl_array_push:
+    calls: 31
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 19
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 8
+    bytes: (external)
   aipl_assert:
-    calls: 43
+    calls: 46
     bytes: (external)
   aipl_rec_alloc:
-    calls: 61
+    calls: 60
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 569
+    calls: 606
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 508
+    calls: 546
     bytes: (external)
   aipl_test_begin:
     calls: 2
@@ -544,23 +591,20 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  extent:
+    calls: 9
+    bytes: 252
   first_leaf:
-    calls: 12
+    calls: 16
     bytes: 788
   first_token:
-    calls: 7
-    bytes: 760
-  flat_kids:
-    calls: 0
-    bytes: 32
-  flat_kids$tail:
-    calls: 20
-    bytes: 1108
-  last_leaf:
     calls: 12
+    bytes: 760
+  last_leaf:
+    calls: 16
     bytes: 788
   last_token:
-    calls: 5
+    calls: 8
     bytes: 760
   leaves:
     calls: 0
@@ -571,21 +615,24 @@ functions:
   main:
     calls: 1
     bytes: 168
-  nodes$filter1$own0:
-    calls: 7
-    bytes: 376
   own_token_text:
     calls: 3
-    bytes: 2256
+    bytes: 1464
+  parts:
+    calls: 12
+    bytes: 956
   show:
     calls: 23
     bytes: 2968
-  span:
-    calls: 7
-    bytes: 252
+  split_kids:
+    calls: 29
+    bytes: 2284
   text:
     calls: 5
     bytes: 1460
+  tok_span:
+    calls: 2
+    bytes: 236
   token_leaves:
     calls: 0
     bytes: 32
@@ -593,7 +640,7 @@ functions:
     calls: 38
     bytes: 1160
   token_span:
-    calls: 3
+    calls: 5
     bytes: 288
   token_text:
     calls: 5

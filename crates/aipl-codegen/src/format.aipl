@@ -51,7 +51,7 @@ import {
     wrapping_add as +,
     wrapping_increment as ++,
 } from builtins;
-import { Cst, Group, Leaf, Tree, Trivia, span, token_leaves } from "./cst.aipl";
+import { Cst, Group, Leaf, Tree, Trivia, extent, token_leaves } from "./cst.aipl";
 import {
     Concat,
     Doc,
@@ -138,7 +138,7 @@ fn fmt_node<K: variant, A: any>(
         Tree(i, kids) => {
             let layout = g.prods[i].value_or_err(ParseError {
                 message: `no production at index {i}`,
-                span: node.span(),
+                span: node.extent(),
             })?.layout;
             let ps = pieces(g, src, kids, space)?;
             ok(match (layout) {
@@ -839,15 +839,15 @@ functions:
   __eq_str$arr:
     calls: 10
     bytes: 364
+  __m1__extent:
+    calls: 1
+    bytes: 252
   __m1__first_leaf:
     calls: 1
     bytes: 788
   __m1__last_leaf:
     calls: 0
     bytes: 788
-  __m1__span:
-    calls: 1
-    bytes: 252
   __m1__token_leaves:
     calls: 0
     bytes: 32

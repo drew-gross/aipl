@@ -27,7 +27,7 @@
 // production, and a `Grammar` tying them together. Nothing else — the parse
 // itself is `parse.aipl`'s, unmodified.
 import { equal as ==, first, map_err, map_ok } from builtins;
-import { Cst, show, text, token_text } from "./cst.aipl";
+import { Cst, Parts, show, text, token_text } from "./cst.aipl";
 import { ebnf, show_first_sets } from "./ebnf.aipl";
 import { render_cst } from "./format.aipl";
 import {
@@ -73,10 +73,10 @@ fn sexp_rules() -> TokenRule<SexpKind>[] {
 # An `item` is one of its two alternatives, told apart by whether it got an
 # interior child: the `list` branch lowered one, and the `Atom` branch matched a
 # bare token, whose spelling is the node's own text with trivia dropped.
-fn lower_item(src: str, node: Cst, kids: Sexp[]) -> Sexp {
+fn lower_item(src: str, Parts { cst }, kids: Sexp[]) -> Sexp {
     match (kids.first()) {
         some(inner) => inner,
-        none => AtomNode(node.token_text(src)),
+        none => AtomNode(cst.token_text(src)),
     }
 }
 
@@ -272,15 +272,15 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 6690
-deallocations: 6690
-reallocations: 935
-bytes allocated: 641670
-instructions executed: 1504911
-binary size: 407280
-  code: 268280
+allocations: 6508
+deallocations: 6508
+reallocations: 911
+bytes allocated: 633302
+instructions executed: 1494878
+binary size: 407976
+  code: 268584
   data: 4940
-  metadata: 134060
+  metadata: 134452
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -295,7 +295,7 @@ functions:
     calls: 33
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 746
+    calls: 517
     bytes: 116
   __arr_drop___m2__First$SexpKind:
     calls: 7
@@ -334,7 +334,7 @@ functions:
     calls: 38
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 637
+    calls: 495
     bytes: 116
   __arr_retain___m2__First$SexpKind:
     calls: 14
@@ -426,12 +426,6 @@ functions:
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves$tail:
     calls: 775
     bytes: 1040
-  __builtin_map_join$__m1__Cst$__m1__Cst$lam$__m1__splice:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m1__Cst$__m1__Cst$lam$__m1__splice$tail:
-    calls: 112
-    bytes: 1572
   __builtin_map_join$__m3__Rule$SexpKind$__m3__ListStyle$lam$__m3__group_styles$SexpKind:
     calls: 0
     bytes: 44
@@ -548,7 +542,7 @@ functions:
     bytes: 364
   __m13__lower_node$SexpKind$__m15__Sexp:
     calls: 47
-    bytes: 5460
+    bytes: 6572
   __m13__match_group$SexpKind$__m15__Sexp:
     calls: 78
     bytes: 5084
@@ -606,15 +600,12 @@ functions:
   __m15__render_sexp:
     calls: 0
     bytes: 1684
+  __m1__extent:
+    calls: 0
+    bytes: 252
   __m1__first_leaf:
     calls: 0
     bytes: 788
-  __m1__flat_kids:
-    calls: 0
-    bytes: 32
-  __m1__flat_kids$tail:
-    calls: 60
-    bytes: 1108
   __m1__last_leaf:
     calls: 0
     bytes: 788
@@ -624,15 +615,12 @@ functions:
   __m1__leaves$tail:
     calls: 23
     bytes: 1236
-  __m1__nodes$filter1$own0:
-    calls: 47
-    bytes: 376
   __m1__show:
     calls: 41
     bytes: 2968
-  __m1__span:
-    calls: 0
-    bytes: 252
+  __m1__split_kids:
+    calls: 86
+    bytes: 2284
   __m1__token_leaves:
     calls: 0
     bytes: 32
@@ -826,13 +814,13 @@ functions:
     calls: 30
     bytes: (external)
   aipl_arr_extend:
-    calls: 3216
+    calls: 2964
     bytes: (external)
   aipl_arr_inc:
-    calls: 27276
+    calls: 28110
     bytes: (external)
   aipl_arr_reserve:
-    calls: 4176
+    calls: 3766
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 143
@@ -841,13 +829,13 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 38789
+    calls: 39087
     bytes: (external)
   aipl_array_new:
-    calls: 1537
+    calls: 1382
     bytes: (external)
   aipl_array_push:
-    calls: 948
+    calls: 1033
     bytes: (external)
   aipl_array_push_mut:
     calls: 1274
@@ -862,13 +850,13 @@ functions:
     calls: 2524
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 19078
+    calls: 19254
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 1164
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 16554
+    calls: 16730
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 1164
@@ -905,7 +893,7 @@ functions:
     bytes: 3440
   lower_item:
     calls: 34
-    bytes: 468
+    bytes: 508
   main:
     calls: 1
     bytes: 320

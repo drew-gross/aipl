@@ -127,42 +127,70 @@
 
 
 
+        <section class="item" id="item-extent">
+          <h3>
+            <a class="anchor" href="#item-extent">extent</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn extent(self: Cst) -&#62; Span</code></pre>
+
+          <div class="doc"><p>The extent <code>self</code> covers: its first leaf's start through its last leaf's end. A node with no leaves at all — an interior node for a production that matched empty input, which <code>Maybe</code> and a zero-minimum <code>Many</code> can both produce — has no extent, and reports the empty <code>0..0</code>.</p><p>Named <code>extent</code> rather than <code>span</code> because <code>span</code> is what a lowering asks its <code>Node</code> for, and AIPL has no overloading. This is the tree's own answer, which the <code>Parts</code> one delegates to; trivia at either edge is counted in, so <code>token_span</code> is what lines up with another parser's spans.</p><p>By descent, like <code>token_span</code>, and for the same reason: this is asked at every node a lowering visits, and collecting every leaf beneath each of them is quadratic in the tree. A block is a right-recursive chain one node deep per statement, so on the largest compiler sources that was most of the lowering's time.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-Parts">
+          <h3>
+            <a class="anchor" href="#item-Parts">Parts</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct Parts</code></pre>
+
+          <div class="doc"><p>What a <code>Mk</code>/<code>TryMk</code> lowering is handed: the node that matched, and the two lists every lowering reads off it — its interior children and its own token spans — already computed.</p><p>They are precomputed because they used to be three separate walks of the same kids. <code>lower_node</code> asked for the children, then the <code>build</code> asked for the own tokens, and more than half of them asked for the own *texts* as well; each ask rebuilt the flattened kid list from scratch, and rebuilt it by allocating a one-element array per kid and joining them. One walk fills both lists, and measured against the old shape on a nine-kid node it is a little under four times faster.</p><p><code>cst</code> is the node itself, for the accessors that have to descend — <code>span</code>, <code>tok_span</code>, <code>text</code>. Those stay lazy: each is asked at most once per lowering, so precomputing them would only move the same work earlier, and the ones that walk the whole subtree would then be paid by the lowerings that never ask.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-parts">
+          <h3>
+            <a class="anchor" href="#item-parts">parts</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn parts(self: Cst) -&#62; Parts</code></pre>
+
+          <div class="doc"><p><code>self</code> as the <code>Parts</code> a lowering is handed: one walk of its direct kids, splitting them into the interior children and the token leaves.</p><p>The two lists are the pair a production's <code>build</code> is written against, and between them they are everything the node matched *directly*:</p><p>- <code>children</code> is one entry per <code>Named</code> reference the rule matched, in the order it matched them — the order and length are part of the contract between a grammar and its lowering functions. Leaves are dropped because the lowering pass has nothing to hand <code>build</code> for one: a leaf has no lowered value, and its text is reachable from the node's own span. - <code>tokens</code> is the node's direct token leaves — where a lowering reads an operator or a keyword. A <code>Climb</code> node's two operands arrive as interior children and the operator between them is a direct leaf, so <code>tokens</code> is the operator and nothing else, where <code>token_text</code> would hand back the whole expression's tokens run together.</p><p>Trivia is dropped from both. A <code>Group</code> is spliced in place rather than recorded — that splice is the one thing making a group transparent, so a production that gained a bracket pair hands its <code>build</code> the children it had before — and a group nested directly inside another flattens with it.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-span">
           <h3>
             <a class="anchor" href="#item-span">span</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn span(self: Cst) -&#62; Span</code></pre>
+          <pre class="signature"><code>pub fn span(self: Parts) -&#62; Span</code></pre>
 
-          <div class="doc"><p>The span <code>self</code> covers: its first leaf's start through its last leaf's end. A node with no leaves at all — an interior node for a production that matched empty input, which <code>Maybe</code> and a zero-minimum <code>Many</code> can both produce — has no extent, and reports the empty <code>0..0</code>.</p><p>By descent, like <code>token_span</code>, and for the same reason: this is asked at every node a lowering visits, and collecting every leaf beneath each of them is quadratic in the tree. A block is a right-recursive chain one node deep per statement, so on the largest compiler sources that was most of the lowering's time.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-nodes">
-          <h3>
-            <a class="anchor" href="#item-nodes">nodes</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn nodes(self: Cst) -&#62; Cst[]</code></pre>
-
-          <div class="doc"><p>The interior children of <code>self</code> — its kids with the leaves dropped. This is the child list a production's <code>build</code> is lowered against, so its order and length are part of the contract between a grammar and its lowering functions: one entry per <code>Named</code> reference the rule matched, in the order it matched them.</p><p>A leaf is dropped because the lowering pass has nothing to hand <code>build</code> for one — it has no lowered value, and its text is reachable from the node's own span. A <code>Group</code> never reaches the test: <code>flat_kids</code> splices it away first, which is what makes a group transparent.</p></div>
+          <div class="doc"><p>The span <code>self</code> covers — its tree's, since the parts say nothing about extent.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-own_tokens">
+        <section class="item" id="item-tok_span">
           <h3>
-            <a class="anchor" href="#item-own_tokens">own_tokens</a>
+            <a class="anchor" href="#item-tok_span">tok_span</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn own_tokens(self: Cst) -&#62; Span[]</code></pre>
+          <pre class="signature"><code>pub fn tok_span(self: Parts) -&#62; Span</code></pre>
 
-          <div class="doc"><p>The token leaves <code>self</code> matched *directly* — one level down, not recursed into. The mirror of <code>nodes</code>: that one is a node's direct branches, this its direct leaves, and between them they are everything the node itself matched.</p><p>This is what a lowering function reads an operator or a keyword from. A <code>Climb</code> node's two operands arrive as interior children and the operator between them is a direct leaf, so <code>own_token_text</code> is the operator and nothing else — where <code>token_text</code> would hand back the whole expression's tokens run together. Trivia is dropped here as it is there.</p></div>
+          <div class="doc"><p>The span <code>self</code>'s *tokens* cover, falling back to its full extent when it matched no token at all. The span a lowering hands to the AST node it builds, and the one it blames in an error: token-tight, so it lines up with what another parser would report rather than reaching back over leading trivia.</p></div>
 
 
         </section>
@@ -174,7 +202,7 @@
             <a class="anchor" href="#item-own_texts">own_texts</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn own_texts(self: Cst, src: str) -&#62; str[]</code></pre>
+          <pre class="signature"><code>pub fn own_texts(self: Parts, src: str) -&#62; str[]</code></pre>
 
           <div class="doc"><p>This node's own tokens as their text, one string per token. A <code>str</code> is a view into <code>src</code>, so this costs no more than the spans do, and a lowering that asks &quot;which token is second?&quot; gets a string to compare rather than a span to look up.</p></div>
 
@@ -188,7 +216,7 @@
             <a class="anchor" href="#item-own_token_text">own_token_text</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn own_token_text(self: Cst, src: str) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn own_token_text(self: Parts, src: str) -&#62; str</code></pre>
 
           <div class="doc"><p>The source text of <code>self</code>'s direct token leaves, run together with nothing between them — the operator of a binary node, the keyword that opened a form.</p></div>
 
@@ -223,7 +251,7 @@
             <a class="anchor" href="#item-through">through</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn through(self: Span, __spat$5016: Span) -&#62; Span</code></pre>
+          <pre class="signature"><code>fn through(self: Span, __spat$4985: Span) -&#62; Span</code></pre>
 
           <div class="doc"><p>The span from <code>self</code>'s start through the other span's end — what two ends of a node, a first leaf and a last, cover between them. Nothing is checked about the order: a second span that ends before <code>self</code> starts gives a span that ends before it starts, exactly as <code>a.start..b.end</code> spelled out would.</p></div>
 
@@ -288,56 +316,28 @@
 
 
 
-        <section class="item" id="item-flat_kids">
+        <section class="item" id="item-split_kids">
           <h3>
-            <a class="anchor" href="#item-flat_kids">flat_kids</a>
+            <a class="anchor" href="#item-split_kids">split_kids</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn flat_kids(self: Cst) -&#62; Cst[]</code></pre>
+          <pre class="signature"><code>fn split_kids(kids: Cst[], acc: Parts) -&#62; Parts</code></pre>
 
-          <div class="doc"><p>The direct kids of <code>self</code> with every group spliced in place — the one function that makes a group transparent, and what <code>nodes</code> and <code>own_tokens</code> are both written against. A group's three runs concatenate in source order, and a group nested directly inside another flattens with it.</p></div>
+          <div class="doc"><p><code>kids</code> split onto <code>acc</code>, in source order. The accumulator is a whole <code>Parts</code> rather than the two lists on their own so that one value threads through the loop and through a group's recursion.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-splice">
+        <section class="item" id="item-split_kid">
           <h3>
-            <a class="anchor" href="#item-splice">splice</a>
+            <a class="anchor" href="#item-split_kid">split_kid</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn splice(self: Cst) -&#62; Cst[]</code></pre>
+          <pre class="signature"><code>fn split_kid(acc: Parts, kid: Cst) -&#62; Parts</code></pre>
 
-          <div class="doc"><p>One kid as the kids it stands for: a group as its contents, anything else as itself.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-is_leaf">
-          <h3>
-            <a class="anchor" href="#item-is_leaf">is_leaf</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn is_leaf(self: Cst) -&#62; bool</code></pre>
-
-          <div class="doc"><p>Whether <code>self</code> is a token leaf: not an interior node, and not trivia.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-leaf_span">
-          <h3>
-            <a class="anchor" href="#item-leaf_span">leaf_span</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn leaf_span(self: Cst) -&#62; Span</code></pre>
-
-          <div class="doc"><p>The span of a leaf, for <code>own_tokens</code>'s <code>filter_map</code>. A non-leaf never reaches it (the filter runs first), and reports the empty span rather than failing.</p></div>
+          <div class="doc"><p>One kid onto the accumulator: a token leaf contributes its span, an interior node contributes itself, trivia contributes nothing, and a group contributes whatever its three runs hold — which is the splice that makes it transparent.</p></div>
 
 
         </section>

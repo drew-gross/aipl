@@ -48,7 +48,7 @@ import {
     wrapping_mul_assign as *=,
     wrapping_sub as -,
 } from builtins;
-import { Cst, own_token_text, show, span, text } from "./cst.aipl";
+import { Cst, Parts, own_token_text, show, span, text } from "./cst.aipl";
 import { ebnf, show_first_sets } from "./ebnf.aipl";
 import { render_cst } from "./format.aipl";
 import {
@@ -104,7 +104,7 @@ fn calc_rules() -> TokenRule<CalcTok>[] {
 # A `Climb` node is either a bare atom that climbed to itself — one interior
 # child, no operator — or an application: two interior children with the
 # operator as a direct leaf between them.
-fn lower_expr(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
+fn lower_expr(src: str, node: Parts, kids: Calc[]) -> Calc!ParseError {
     let lhs = kids
         .first()
         .value_or_err(ParseError { message: "an expression matched nothing", span: node.span() })?;
@@ -120,7 +120,7 @@ fn lower_expr(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
 
 # `-` then a unary, or a bare atom. The two are told apart by whether this node
 # matched a `-` of its own: the atom branch matches no token directly at all.
-fn lower_unary(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
+fn lower_unary(src: str, node: Parts, kids: Calc[]) -> Calc!ParseError {
     let inner = kids
         .first()
         .value_or_err(ParseError {
@@ -139,7 +139,7 @@ fn lower_unary(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
 #
 # The one `build` here that can fail: a literal too big for an `i64`. It is a
 # lowering error, not a parse error, and `parse` hands it back unchanged.
-fn lower_atom(src: str, node: Cst, kids: Calc[]) -> Calc!ParseError {
+fn lower_atom(src: str, node: Parts, kids: Calc[]) -> Calc!ParseError {
     match (kids.first()) {
         some(inner) => ok(inner),
         none => {
@@ -464,15 +464,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 12495
-deallocations: 12495
-reallocations: 1902
-bytes allocated: 1253687
-instructions executed: 2680963
-binary size: 425576
-  code: 279556
+allocations: 10716
+deallocations: 10716
+reallocations: 1853
+bytes allocated: 1167383
+instructions executed: 2527718
+binary size: 425296
+  code: 279172
   data: 6100
-  metadata: 139920
+  metadata: 140024
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -487,7 +487,7 @@ functions:
     calls: 54
     bytes: 544
   __arr_drop___m1__Cst:
-    calls: 3129
+    calls: 1438
     bytes: 116
   __arr_drop___m2__First$CalcTok:
     calls: 13
@@ -526,7 +526,7 @@ functions:
     calls: 0
     bytes: 544
   __arr_retain___m1__Cst:
-    calls: 2270
+    calls: 1402
     bytes: 116
   __arr_retain___m2__First$CalcTok:
     calls: 31
@@ -627,12 +627,6 @@ functions:
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves$tail:
     calls: 322
     bytes: 1040
-  __builtin_map_join$__m1__Cst$__m1__Cst$lam$__m1__splice:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m1__Cst$__m1__Cst$lam$__m1__splice$tail:
-    calls: 755
-    bytes: 1572
   __builtin_map_join$__m3__Rule$CalcTok$__m3__ListStyle$lam$__m3__group_styles$CalcTok:
     calls: 0
     bytes: 44
@@ -740,7 +734,7 @@ functions:
     bytes: 364
   __m13__lower_node$CalcTok$Calc:
     calls: 447
-    bytes: 5460
+    bytes: 6572
   __m13__match_group$CalcTok$Calc:
     calls: 0
     bytes: 5084
@@ -795,15 +789,12 @@ functions:
   __m14__line_at:
     calls: 0
     bytes: 652
+  __m1__extent:
+    calls: 2
+    bytes: 252
   __m1__first_leaf:
     calls: 4
     bytes: 788
-  __m1__flat_kids:
-    calls: 0
-    bytes: 32
-  __m1__flat_kids$tail:
-    calls: 755
-    bytes: 1108
   __m1__last_leaf:
     calls: 4
     bytes: 788
@@ -813,18 +804,15 @@ functions:
   __m1__leaves$tail:
     calls: 31
     bytes: 1236
-  __m1__nodes$filter1$own0:
-    calls: 447
-    bytes: 376
   __m1__own_token_text:
     calls: 308
-    bytes: 2256
+    bytes: 1464
   __m1__show:
     calls: 12
     bytes: 2968
-  __m1__span:
-    calls: 2
-    bytes: 252
+  __m1__split_kids:
+    calls: 447
+    bytes: 2284
   __m1__token_leaves:
     calls: 0
     bytes: 32
@@ -1039,13 +1027,13 @@ functions:
     calls: 2
     bytes: (external)
   aipl_arr_extend:
-    calls: 5244
+    calls: 3309
     bytes: (external)
   aipl_arr_inc:
-    calls: 49776
+    calls: 54121
     bytes: (external)
   aipl_arr_reserve:
-    calls: 7282
+    calls: 4145
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 290
@@ -1057,19 +1045,19 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 70189
+    calls: 70629
     bytes: (external)
   aipl_array_new:
-    calls: 3395
+    calls: 2050
     bytes: (external)
   aipl_array_push:
-    calls: 1680
+    calls: 2309
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3148
+    calls: 2959
     bytes: (external)
   aipl_array_with_cap:
-    calls: 491
+    calls: 183
     bytes: (external)
   aipl_assert:
     calls: 51
@@ -1081,13 +1069,13 @@ functions:
     calls: 4114
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 32794
+    calls: 32467
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 519
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 28680
+    calls: 28353
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 519
@@ -1142,13 +1130,13 @@ functions:
     bytes: 2508
   lower_atom:
     calls: 121
-    bytes: 1212
+    bytes: 1252
   lower_expr:
     calls: 186
-    bytes: 1560
+    bytes: 1604
   lower_unary:
     calls: 135
-    bytes: 1100
+    bytes: 1160
   main:
     calls: 1
     bytes: 460

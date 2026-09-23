@@ -190,7 +190,7 @@
             <a class="anchor" href="#item-lower_expr">lower_expr</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_expr(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_expr(src: str, node: Parts, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
 
           <div class="doc"><p>A <code>Climb</code> node is either a bare atom that climbed to itself — one interior child, no operator — or an application: two interior children with the operator as a direct leaf between them.</p></div>
 
@@ -204,7 +204,7 @@
             <a class="anchor" href="#item-lower_unary">lower_unary</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_unary(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_unary(src: str, node: Parts, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
 
           <div class="doc"><p><code>-</code> then a unary, or a bare atom. The two are told apart by whether this node matched a <code>-</code> of its own: the atom branch matches no token directly at all.</p></div>
 
@@ -218,7 +218,7 @@
             <a class="anchor" href="#item-lower_atom">lower_atom</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_atom(src: str, node: Cst, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_atom(src: str, node: Parts, kids: Calc[]) -&#62; Calc!ParseError</code></pre>
 
           <div class="doc"><p>A parenthesized expression lowered one interior child, and a literal lowered none — so the absence of a child is what says &quot;this is a number&quot;, and its text is the node's own.</p><p>The one <code>build</code> here that can fail: a literal too big for an <code>i64</code>. It is a lowering error, not a parse error, and <code>parse</code> hands it back unchanged.</p></div>
 

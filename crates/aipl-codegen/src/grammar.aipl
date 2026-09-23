@@ -49,7 +49,7 @@ import {
     wrapping_add as +,
     wrapping_add_assign as +=,
 } from builtins;
-import { Cst } from "./cst.aipl";
+import { Parts } from "./cst.aipl";
 
 # Why a parse failed: a message, and the span of the offending source (absolute
 # into the parsed string — slice it to show the offender, or hand it to
@@ -278,10 +278,15 @@ variant Refusal = Msg(str) | Fn((str) -> str)
 # with.
 variant Build<A: any> =
     # The general form: the source text, the node itself, and the already-
-    # lowered values of its interior children (`nodes`, in match order).
-    | Mk((str, Cst, A[]) -> A)
+    # lowered values of its interior children (`Parts.children`, in match order).
+    #
+    # The node arrives as a `Parts` rather than a bare `Cst`: the two lists a
+    # lowering reads off it — its interior children and its own token spans —
+    # come precomputed, from the one walk `lower_node` already has to do to find
+    # the children it recurses into. See `Parts` in `cst.aipl`.
+    | Mk((str, Parts, A[]) -> A)
     # `Mk` for a lowering that can refuse what it matched.
-    | TryMk((str, Cst, A[]) -> A!ParseError)
+    | TryMk((str, Parts, A[]) -> A!ParseError)
     # Only the children — a node that is its children regrouped
     # (`Object(kids)`).
     | Kids((A[]) -> A)

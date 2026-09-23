@@ -124,7 +124,7 @@
           </h3>
           <pre class="signature"><code>pub fn lower&#60;K: variant, A: any&#62;(src: str, node: Cst, g: Grammar&#60;K, A&#62;) -&#62; A!ParseError</code></pre>
 
-          <div class="doc"><p>Lowers a parsed tree to the caller's AST by calling each node's production <code>build</code>, depth first: a node's children are lowered before it, and only its *interior* children are passed (<code>nodes</code>) — a leaf has no lowered value, and its text is reachable from the node's own span.</p><p>Fails with whatever a <code>build</code> refused with, unchanged.</p></div>
+          <div class="doc"><p>Lowers a parsed tree to the caller's AST by calling each node's production <code>build</code>, depth first: a node's children are lowered before it, and only its *interior* children are passed (<code>Parts.children</code>) — a leaf has no lowered value, and its text is reachable from the node's own span.</p><p>Fails with whatever a <code>build</code> refused with, unchanged.</p></div>
 
 
         </section>
@@ -792,7 +792,7 @@
             <a class="anchor" href="#item-build_node">build_node</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn build_node(src: str, node: Cst, kids: Node[]) -&#62; Node</code></pre>
+          <pre class="signature"><code>fn build_node(src: str, __spat$76465: Parts, kids: Node[]) -&#62; Node</code></pre>
 
           <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
 

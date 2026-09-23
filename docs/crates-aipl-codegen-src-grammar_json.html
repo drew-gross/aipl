@@ -206,9 +206,9 @@
             <a class="anchor" href="#item-lower_member">lower_member</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_member(src: str, node: Cst, kids: Json[]) -&#62; Json!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_member(src: str, node: Parts, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-          <div class="doc"><p>A member's value is its one interior child; its key is the string token in front of the <code>:</code>, which is a *leaf* and so has no lowered value — the node's first token leaf is where it is read from.</p></div>
+          <div class="doc"><p>A member's value is its one interior child; its key is the string token in front of the <code>:</code>, which is a *leaf* and so has no lowered value — the first of the node's own tokens is where it is read from.</p></div>
 
 
         </section>

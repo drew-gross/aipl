@@ -376,14 +376,14 @@
 
 
 
-        <section class="item" id="item-tok_span">
+        <section class="item" id="item-child_span">
           <h3>
-            <a class="anchor" href="#item-tok_span">tok_span</a>
+            <a class="anchor" href="#item-child_span">child_span</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn tok_span(self: Cst) -&#62; Span</code></pre>
+          <pre class="signature"><code>fn child_span(self: Cst) -&#62; Span</code></pre>
 
-          <div class="doc"><p>The span a lowered node takes: this node's *tokens*, with the trivia in front of the first one left out. <code>span</code> reaches back over that trivia, which is what losslessness needs and the opposite of what a diagnostic wants.</p></div>
+          <div class="doc"><p>The span a lowered node takes: this node's *tokens*, with the trivia in front of the first one left out. <code>span</code> reaches back over that trivia, which is what losslessness needs and the opposite of what a diagnostic wants. The tight token span of an interior child, which a lowering holds as a bare <code>Cst</code> rather than as the <code>Parts</code> its own node arrives as. The counterpart of <code>tok_span</code>, which answers the same question about the node itself.</p></div>
 
 
         </section>
@@ -549,7 +549,7 @@
             <a class="anchor" href="#item-lower_expr">lower_expr</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_expr(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_expr(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>expr</code> — the <code>Climb</code> node. A bare operand climbed to itself has one interior child and no token of its own; an application has two children with its operator as a direct leaf between them.</p></div>
 
@@ -563,7 +563,7 @@
             <a class="anchor" href="#item-lower_unary">lower_unary</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_unary(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_unary(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>unary</code> — <code>-x</code>, <code>!x</code>, or the postfix it wraps. Unary <code>-</code> is the one operator with no named builtin to resolve to, so it stays a node of its own; <code>!</code> is an ordinary call like every other operator.</p></div>
 
@@ -577,7 +577,7 @@
             <a class="anchor" href="#item-lower_postfix">lower_postfix</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_postfix(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_postfix(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>postfix</code> — an atom and the run of suffixes applied to it, left to right, each step spanning from the atom's start to that suffix's end.</p></div>
 
@@ -591,7 +591,7 @@
             <a class="anchor" href="#item-lower_suffix">lower_suffix</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_suffix(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_suffix(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>suffix</code> — the seven postfix steps. <code>.</code> opens the three member forms, <code>[</code> the three bracket forms, and <code>?</code> is the whole of the seventh.</p></div>
 
@@ -619,7 +619,7 @@
             <a class="anchor" href="#item-lower_atom">lower_atom</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_atom(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_atom(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>atom</code> — the twenty alternatives, dispatched on the first token each matched. The template is the one alternative that matches no token of its own, which is what identifies it without a comparison.</p></div>
 
@@ -647,7 +647,7 @@
             <a class="anchor" href="#item-shim_expr">shim_expr</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn shim_expr(src: str, node: Cst, kids: Ast[], sp: Span) -&#62; Expr!ParseError</code></pre>
+          <pre class="signature"><code>fn shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p><code>shim &lt;effect&gt; { op = f, .. } { body }</code>. Spanned over <code>shim &lt;effect&gt;</code> rather than over the whole form: the body's span is empty when it ends in a <code>;</code>.</p></div>
 
@@ -661,7 +661,7 @@
             <a class="anchor" href="#item-lower_if">lower_if</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_if(src: str, node: Cst, kids: Ast[]) -&#62; Expr!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_if(src: str, node: Parts, kids: Ast[]) -&#62; Expr!ParseError</code></pre>
 
           <div class="doc"><p><code>if (..) { .. }</code> and <code>if (let p = e) { .. }</code>, with or without an <code>else</code>. Both are written in two places — an atom, and the tail of an <code>else</code> — and gazelle builds them identically wherever they appear, so this does too.</p></div>
 
@@ -689,7 +689,7 @@
             <a class="anchor" href="#item-lower_else_branch">lower_else_branch</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_else_branch(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_else_branch(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>else_branch</code> — a block, or another <code>if</code> in the else position. The block form is the one with no token of its own.</p></div>
 
@@ -703,7 +703,7 @@
             <a class="anchor" href="#item-lower_template">lower_template</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_template(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_template(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>template</code> — the head, the interpolations, the tail. The segments are decoded together (<code>template_segments</code>), because a raw template is de-dented as one block and a segment cannot be read on its own.</p></div>
 
@@ -787,7 +787,7 @@
             <a class="anchor" href="#item-lower_args">lower_args</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_args(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_args(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>args</code> — the comma-separated list every call, array literal and array pattern is built on.</p></div>
 
@@ -829,7 +829,7 @@
             <a class="anchor" href="#item-lower_arg">lower_arg</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_arg(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_arg(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>arg</code> — a spread, a keyword argument, or an ordinary expression. The three pass-through alternatives (an expression, a lambda, a bare operator) match no token of their own.</p></div>
 
@@ -843,7 +843,7 @@
             <a class="anchor" href="#item-lower_op_value">lower_op_value</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_op_value(src: str, node: Cst, kids: Ast[]) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn lower_op_value(src: str, node: Parts, kids: Ast[]) -&#62; Ast</code></pre>
 
           <div class="doc"><p><code>op_value</code> — an operator passed as a value (<code>apply(2, 3, +)</code>) is a binary lambda whose body is that operator's call, which reuses every lambda mechanism and leaves the operator gated like any other use.</p></div>
 
@@ -857,7 +857,7 @@
             <a class="anchor" href="#item-lower_lambda">lower_lambda</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_lambda(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_lambda(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>lambda</code> — <code>|a, b| body</code>, or the no-parameter <code>|| body</code>. The <code>||</code> is one token, so its presence is what says the parameter list is empty.</p></div>
 
@@ -885,7 +885,7 @@
             <a class="anchor" href="#item-lower_lambda_param">lower_lambda_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_lambda_param(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_lambda_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -899,7 +899,7 @@
             <a class="anchor" href="#item-lower_field_init">lower_field_init</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_field_init(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_field_init(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>field_init</code> — <code>name: value</code>, the shorthand <code>name</code>, or a <code>..base</code> spread. A spread names no field, so it rides as an init with an empty name whose *value* is the spread; the value is what identifies it.</p></div>
 
@@ -913,7 +913,7 @@
             <a class="anchor" href="#item-lower_brace_body">lower_brace_body</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_brace_body(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_brace_body(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -927,7 +927,7 @@
             <a class="anchor" href="#item-lower_entry">lower_entry</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_entry(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_entry(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -941,7 +941,7 @@
             <a class="anchor" href="#item-lower_shim_binding">lower_shim_binding</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_shim_binding(src: str, node: Cst, kids: Ast[]) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn lower_shim_binding(src: str, node: Parts, kids: Ast[]) -&#62; Ast</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -955,7 +955,7 @@
             <a class="anchor" href="#item-lower_block">lower_block</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_block(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_block(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -997,7 +997,7 @@
             <a class="anchor" href="#item-lower_block_body">lower_block_body</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_block_body(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_block_body(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>block_body</code> — a statement and the rest of the block, an expression and whatever the <code>;</code> after it decided, or nothing at all.</p></div>
 
@@ -1011,7 +1011,7 @@
             <a class="anchor" href="#item-lower_block_tail">lower_block_tail</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_block_tail(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_block_tail(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>block_tail</code> — the <code>; rest</code> that turns the expression before it into a statement, as a list so that &quot;nothing followed&quot; and &quot;this followed&quot; are the empty and one-element cases of one shape.</p></div>
 
@@ -1067,7 +1067,7 @@
             <a class="anchor" href="#item-lower_let_stmt">lower_let_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_let_stmt(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_let_stmt(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>let_stmt</code> — the plain binding, the annotated one, and the two destructuring forms. The token after the name says which: <code>(</code> opens a tuple pattern, <code>{</code> a struct pattern, <code>:</code> an annotation.</p></div>
 
@@ -1081,7 +1081,7 @@
             <a class="anchor" href="#item-lower_mut_stmt">lower_mut_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_mut_stmt(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_mut_stmt(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>mut_stmt</code> — the same three shapes a <code>let</code> has, less the tuple pattern, which <code>mut</code> does not take.</p></div>
 
@@ -1095,7 +1095,7 @@
             <a class="anchor" href="#item-lower_binding">lower_binding</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_binding(src: str, node: Cst, kids: Ast[], mutable: bool) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_binding(src: str, node: Parts, kids: Ast[], mutable: bool) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1109,7 +1109,7 @@
             <a class="anchor" href="#item-lower_assign_stmt">lower_assign_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_assign_stmt(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_assign_stmt(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>assign_stmt</code> — eight alternatives on one target, told apart by the token after it. The target is a name or a <code>.</code>-led field path (<code>p</code>, <code>p.a.b</code>), read off the token run as a <code>Field</code> chain exactly as <code>p.a.b</code> parses in expression position; every form then desugars around that chain the way it does around a bare name, so <code>set p.n++</code> is <code>set p.n = p.n ++ 1</code> and <code>set p.xs.push(x)</code> is <code>set p.xs = p.xs.push(x)</code>. The field-path store itself is not desugared here: the rewrite into nested constructs needs the structs' field lists, which only mono's <code>infer</code> knows.</p></div>
 
@@ -1137,7 +1137,7 @@
             <a class="anchor" href="#item-lower_for_stmt">lower_for_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_for_stmt(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>for_stmt</code> — the plain loop, the indexed one, the tuple-destructuring one, and the indexed tuple-destructuring one. A <code>(</code> after the <code>let</code> opens the tuple form, a <code>(</code> after the first name's comma the indexed tuple form; otherwise the number of names says whether an index was written.</p></div>
 
@@ -1264,7 +1264,7 @@
             <a class="anchor" href="#item-lower_while_stmt">lower_while_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_while_stmt(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_while_stmt(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>while (cond) { body }</code>. No keyword or paren token carries a span of its own, so the statement is spanned from its condition through its body — the same choice <code>for</code> makes with its loop variable.</p></div>
 
@@ -1278,7 +1278,7 @@
             <a class="anchor" href="#item-lower_return_stmt">lower_return_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_return_stmt(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_return_stmt(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1292,7 +1292,7 @@
             <a class="anchor" href="#item-lower_loop_inner">lower_loop_inner</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_loop_inner(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_loop_inner(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>loop_inner</code> — a loop body admits no trailing expression, so every expression in it is an <code>expr;</code> statement and the body's own value is never read. An at-end body is a synthetic <code>0</code>, matching the loop expression's own result.</p></div>
 
@@ -1306,7 +1306,7 @@
             <a class="anchor" href="#item-lower_match_arm">lower_match_arm</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_match_arm(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_match_arm(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>match_arm</code> — one written arm becomes one *or more* arms: an alternation <code>A | B =&gt; body</code> expands here into one arm per pattern, so no later stage ever sees an or-pattern. The body is shared, which is what makes the same-bindings check below necessary.</p></div>
 
@@ -1376,7 +1376,7 @@
             <a class="anchor" href="#item-lower_ctor_payload">lower_ctor_payload</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_ctor_payload(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_ctor_payload(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>ctor_payload</code> — <code>Ctor(p, q)</code> matches each slot against a pattern, <code>Ctor(..)</code> says the case carries a payload this arm does not read. The <code>..</code> alternative has no child and is read off this node's own token; the other's slots are its <code>pattern</code> children.</p></div>
 
@@ -1390,7 +1390,7 @@
             <a class="anchor" href="#item-lower_pattern">lower_pattern</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_pattern(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_pattern(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>pattern</code> — the seven alternatives, told apart by the first token they matched.</p><p>A literal is what its delimiter says it is; everything else opens with an identifier or <code>none</code>, after which the payload child (present or not) and the <code>.</code> (present or not) settle the rest. <code>_</code> lexes as an ordinary identifier, so the wildcard arrives here as a nullary name and is recognised by spelling — and only when nullary, since <code>_(x)</code> is a constructor named <code>_</code> to gazelle too.</p></div>
 
@@ -1530,7 +1530,7 @@
             <a class="anchor" href="#item-lower_program">lower_program</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_program(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_program(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>program</code> — every item in the file. A single parsed file has no merged-source map; the loader fills one in when it flattens several files together.</p></div>
 
@@ -1544,7 +1544,7 @@
             <a class="anchor" href="#item-lower_item">lower_item</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_item(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_item(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>item</code> — a declaration and the <code># ..</code> lines in front of it. The lines are this production's own tokens, which is what makes documentation attach here rather than in each declaration.</p></div>
 
@@ -1572,7 +1572,7 @@
             <a class="anchor" href="#item-lower_const_decl">lower_const_decl</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_const_decl(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_const_decl(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>import_decl</code> — the names, and where they come from. The source is the token after <code>from</code>, which is the second-to-last this production matched. <code>const_decl</code> — <code>pub let NAME: T = &lt;literal&gt;;</code>. The annotation is a child when one was written, so the value is the last child either way; <code>pub</code> and the name are read off this production's own tokens. The two rules a constant has — ALL_CAPS, and a literal value — are the loader's, which is where a name is resolved and where the substitution that makes them matter happens.</p></div>
 
@@ -1586,7 +1586,7 @@
             <a class="anchor" href="#item-lower_import_decl">lower_import_decl</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_import_decl(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_import_decl(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1614,7 +1614,7 @@
             <a class="anchor" href="#item-lower_import_name">lower_import_name</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_import_name(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_import_name(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>import_name</code> — a name, or an aliased name. The span covers the *exported* name, which is where an &quot;is not exported&quot; error points. A bare operator never gets here: the grammar refuses it before lowering.</p></div>
 
@@ -1628,7 +1628,7 @@
             <a class="anchor" href="#item-lower_effect">lower_effect</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_effect(src: str, node: Cst, kids: Ast[]) -&#62; Ast</code></pre>
+          <pre class="signature"><code>fn lower_effect(src: str, node: Parts, kids: Ast[]) -&#62; Ast</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1642,7 +1642,7 @@
             <a class="anchor" href="#item-lower_type_params">lower_type_params</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_type_params(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_type_params(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1656,7 +1656,7 @@
             <a class="anchor" href="#item-lower_type_param">lower_type_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_type_param(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_type_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>type_param</code> — <code>name</code>, <code>name: bound</code>, or <code>name: variant</code>. A bare name takes the <code>any</code> bound, which almost every generic uses.</p></div>
 
@@ -1670,7 +1670,7 @@
             <a class="anchor" href="#item-lower_param">lower_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_param(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>param</code> — the seven shapes. The destructuring one is the only one that is not simply a parameter: it introduces a scrutinee the caller never named and a field list for the body to bind off it.</p></div>
 
@@ -1712,7 +1712,7 @@
             <a class="anchor" href="#item-lower_fn_body">lower_fn_body</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_fn_body(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_fn_body(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>fn_body</code> — a value block, or the struct-literal shorthand, whose type name comes from the declared return type rather than from the source.</p></div>
 
@@ -1726,7 +1726,7 @@
             <a class="anchor" href="#item-lower_construct_fields">lower_construct_fields</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_construct_fields(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_construct_fields(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>construct_fields</code> — the shorthand body's field list. Its first field is spelled by the alternative that matched; the rest are ordinary <code>field_init</code>s.</p></div>
 
@@ -1740,7 +1740,7 @@
             <a class="anchor" href="#item-lower_fn_attr">lower_fn_attr</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_fn_attr(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_fn_attr(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>fn_attr</code> — <code>.test({ .. })</code>, the only one. The argument shape is fixed by the production; what is checked here is that the name matches it. Every string-argument attribute is refused, which is the whole reason that alternative parses: so each can be refused *by name*.</p></div>
 
@@ -1754,7 +1754,7 @@
             <a class="anchor" href="#item-lower_test_block">lower_test_block</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_test_block(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_test_block(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>test_block</code> — the braces around a <code>test_body</code>: the chain's value is located the way <code>block</code> does it, and the functions ride along.</p></div>
 
@@ -1768,7 +1768,7 @@
             <a class="anchor" href="#item-lower_test_body">lower_test_body</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_test_body(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_test_body(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>test_body</code> — <code>block_body</code> with one more alternative: a function declaration, which is set aside rather than folded into the chain. A <code>pub</code> helper, or one carrying a <code>.test</code> of its own, is refused: the block is the only place the function exists, so neither could mean anything.</p></div>
 
@@ -1782,7 +1782,7 @@
             <a class="anchor" href="#item-lower_test_tail">lower_test_tail</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_test_tail(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_test_tail(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>test_tail</code> — <code>block_tail</code>'s twin: nothing followed (the expression before it was the value), or the rest of the block, which is a chain even when empty.</p></div>
 
@@ -1824,7 +1824,7 @@
             <a class="anchor" href="#item-lower_struct_decl">lower_struct_decl</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_struct_decl(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_struct_decl(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1838,7 +1838,7 @@
             <a class="anchor" href="#item-lower_field_decl">lower_field_decl</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_field_decl(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_field_decl(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -1852,7 +1852,7 @@
             <a class="anchor" href="#item-lower_variant_decl">lower_variant_decl</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_variant_decl(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_variant_decl(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>variant_decl</code> — the name, the type parameters, and the cases. The cases' <code># ..</code> lines are this node's own tokens (they ride with the <code>|</code> separator, see the rule), so each case is given the lines written between the previous case and itself here, where both are in hand.</p></div>
 
@@ -1866,7 +1866,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, node: Cst, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$115192: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -1880,7 +1880,7 @@
             <a class="anchor" href="#item-lower_variant_case">lower_variant_case</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_variant_case(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_variant_case(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>variant_case</code> — the name and the payload slots as children. Its docs are filled in by <code>lower_variant_decl</code>, which holds them.</p></div>
 
@@ -1894,7 +1894,7 @@
             <a class="anchor" href="#item-lower_case_param">lower_case_param</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_case_param(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_case_param(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>case_param</code> — a bare type, or a named slot with an optional default, under any <code># ..</code> lines of its own. <code>k?: T</code> stores the <code>T?</code> a match arm binds, with the <code>none</code> that was written as its default. The doc lines are the node's own tokens too, in front of the slot's; they are told apart by their marker.</p></div>
 
@@ -1908,7 +1908,7 @@
             <a class="anchor" href="#item-lower_function">lower_function</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_function(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_function(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>function</code> — the one production whose children are told apart by what they lowered to rather than by position: a type parameter list, some parameters, some effects, a return type, a body and some attributes all arrive in one list, and each is a different <code>Ast</code> case.</p></div>
 
@@ -2356,7 +2356,7 @@
             <a class="anchor" href="#item-lower_ty">lower_ty</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_ty(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_ty(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>ty</code> — a head, refined by the <code>without</code> clause when one followed it. The clause's child count is what says whether it did: the head alone, or the head and what it excludes.</p></div>
 
@@ -2370,7 +2370,7 @@
             <a class="anchor" href="#item-lower_exclusion">lower_exclusion</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_exclusion(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_exclusion(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>exclusion</code> — what a <code>without</code> clause leaves out. The one form today is <code>[]</code>, so the tokens are not consulted: matching the production is knowing which.</p></div>
 
@@ -2384,7 +2384,7 @@
             <a class="anchor" href="#item-lower_ty_head">lower_ty_head</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_ty_head(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_ty_head(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>ty_head</code> — the eight alternatives, told apart by their left child's <code>Ast</code> case and by the tokens this node matched itself.</p><p><code>!E</code> is the one alternative with no left operand at all: a result whose ok side is unit, which is why a single child under a <code>!</code> lowers to <code>TyResult(TyUnit, ..)</code>.</p></div>
 
@@ -2398,7 +2398,7 @@
             <a class="anchor" href="#item-lower_ty_parens">lower_ty_parens</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_ty_parens(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_ty_parens(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>ty_parens</code> — the parenthesized list every <code>(</code>-led type form opens with. It is the one production whose value is a list rather than a type, and that is what <code>lower_ty</code> reads to tell those forms from the unparenthesized ones.</p></div>
 
@@ -2412,7 +2412,7 @@
             <a class="anchor" href="#item-lower_base_ty">lower_base_ty</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_base_ty(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_base_ty(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>base_ty</code> — a core and its <code>?</code>/<code>[]</code> suffix run, applied in source order, so <code>i64?[]</code> is an array of optionals and <code>i64[]?</code> an optional array. The suffixes are literals inside a <code>Many</code> and so are this node's own tokens; <code>[</code> contributes nothing and <code>]</code> is what closes an array suffix.</p></div>
 
@@ -2426,7 +2426,7 @@
             <a class="anchor" href="#item-lower_ty_core">lower_ty_core</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_ty_core(src: str, node: Cst, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
+          <pre class="signature"><code>fn lower_ty_core(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
           <div class="doc"><p><code>ty_core</code> — <code>#{K: V}</code>, <code>#{T}</code>, <code>Name&lt;A, B&gt;</code> and a bare <code>Name</code>. The <code>#</code> is what separates the two brace forms from the two name forms, and after that the child count says which of each pair matched.</p><p><code>Case&lt;V&gt;</code> borrows the generic-application syntax but is a type of its own: one case of a variant, carrying no payload. Spelled out here for the reason gazelle spells it out — so nothing downstream has to know that one base name is special.</p></div>
 

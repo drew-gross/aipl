@@ -71,9 +71,11 @@ import {
     Cst,
     Group,
     Leaf,
+    Parts,
     Tree,
     Trivia,
-    nodes,
+    extent,
+    parts,
     show,
     span,
     text,
@@ -1152,8 +1154,8 @@ pub fn parse_prepared<K: variant, A: any>(
 
 # Lowers a parsed tree to the caller's AST by calling each node's production
 # `build`, depth first: a node's children are lowered before it, and only its
-# *interior* children are passed (`nodes`) — a leaf has no lowered value,
-# and its text is reachable from the node's own span.
+# *interior* children are passed (`Parts.children`) — a leaf has no lowered
+# value, and its text is reachable from the node's own span.
 #
 # Fails with whatever a `build` refused with, unchanged.
 pub fn lower<K: variant, A: any>(src: str, node: Cst, g: Grammar<K, A>) -> A!ParseError {
@@ -1163,19 +1165,23 @@ pub fn lower<K: variant, A: any>(src: str, node: Cst, g: Grammar<K, A>) -> A!Par
 fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]) -> A!ParseError {
     match (node) {
         Tree(i, kids) => {
-            // `nodes` splices groups away, so a production that wraps a bracket
-            // pair hands its `build` the same children it would without one.
-            let vals = node.nodes().try_map(|k| lower_node(src, k, prods))?;
+            // One walk of the direct kids, splitting them into the children to
+            // recurse into and the token spans a `build` reads. It splices
+            // groups away, so a production that wraps a bracket pair hands its
+            // `build` the same children it would without one — and doing it
+            // here is what stops each `build` from rebuilding the same list.
+            let parts = node.parts();
+            let vals = parts.children.try_map(|k| lower_node(src, k, prods))?;
             let Production { build } = prods[i].value_or_err(ParseError {
                 message: `no production at index {i}`,
-                span: node.span(),
+                span: node.extent(),
             })?;
             match (build) {
-                Mk(f) => ok(f(src, node, vals)),
-                TryMk(f) => f(src, node, vals),
+                Mk(f) => ok(f(src, parts, vals)),
+                TryMk(f) => f(src, parts, vals),
                 Kids(f) => ok(f(vals)),
                 TryKids(f) => f(vals),
-                Kid => only_kid(vals, node.span()),
+                Kid => only_kid(vals, node.extent()),
                 Text(f) => ok(f(node.token_text(src))),
                 TryText(f) => f(node.token_text(src)),
                 Const(v) => ok(v),
@@ -1185,7 +1191,10 @@ fn lower_node<K: variant, A: any>(src: str, node: Cst, prods: Production<K, A>[]
         Trivia(span) => err(ParseError { message: "trivia has no lowered value", span }),
         // Unreachable from a tree `parse_cst` built: `nodes` splices every group
         // away before this recurses, so lowering never lands on one.
-        Group(..) => err(ParseError { message: "a group has no lowered value", span: node.span() }),
+        Group(..) => err(ParseError {
+            message: "a group has no lowered value",
+            span: node.extent(),
+        }),
     }
 }
 
@@ -1227,7 +1236,7 @@ pub fn parse<K: variant, A: any>(
     }
 
     // A `build` that always refuses, for the error-propagation assertion.
-    fn refuse(src: str, node: Cst, kids: Node[]) -> Node!ParseError {
+    fn refuse(src: str, node: Parts, kids: Node[]) -> Node!ParseError {
         err(ParseError { message: "refused", span: node.span() })
     }
 
@@ -1733,11 +1742,11 @@ variant Node = Atom(str) | List(Node[])
 
 # The lowering every fixture production uses: a node with no interior children
 # is a leaf carrying its text, anything else a branch carrying its children.
-fn build_node(src: str, node: Cst, kids: Node[]) -> Node {
+fn build_node(src: str, Parts { cst }, kids: Node[]) -> Node {
     if (kids.is_nonempty()) {
         return List(kids);
     };
-    Atom(node.text(src))
+    Atom(cst.text(src))
 }
 
 fn one(name: str, rule: Rule<Tok>) -> Production<Tok, Node> {
@@ -1752,21 +1761,21 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 6048
-deallocations: 6048
-reallocations: 1436
-bytes allocated: 702644
-instructions executed: 1541796
-binary size: 763536
-  code: 462000
+allocations: 5999
+deallocations: 5999
+reallocations: 1430
+bytes allocated: 700524
+instructions executed: 1539726
+binary size: 764312
+  code: 462348
   data: 12892
-  metadata: 288644
+  metadata: 289072
 functions:
   __arr_drop_Node:
     calls: 18
     bytes: 116
   __arr_drop___m1__Cst:
-    calls: 671
+    calls: 594
     bytes: 116
   __arr_drop___m2__First$Tok:
     calls: 82
@@ -1796,7 +1805,7 @@ functions:
     calls: 16
     bytes: 116
   __arr_retain___m1__Cst:
-    calls: 667
+    calls: 626
     bytes: 116
   __arr_retain___m2__First$Tok:
     calls: 150
@@ -1876,12 +1885,6 @@ functions:
   __builtin_map_join$__m1__Cst$__builtin_Span$lam$__m1__token_leaves$tail:
     calls: 5
     bytes: 1040
-  __builtin_map_join$__m1__Cst$__m1__Cst$lam$__m1__splice:
-    calls: 0
-    bytes: 44
-  __builtin_map_join$__m1__Cst$__m1__Cst$lam$__m1__splice$tail:
-    calls: 39
-    bytes: 1572
   __builtin_map_join$__m3__Rule$Tok$__m3__ListStyle$lam$__m3__group_styles$Tok:
     calls: 0
     bytes: 44
@@ -1954,15 +1957,12 @@ functions:
   __eq_set$str$arr:
     calls: 34
     bytes: 300
+  __m1__extent:
+    calls: 3
+    bytes: 252
   __m1__first_leaf:
     calls: 7
     bytes: 788
-  __m1__flat_kids:
-    calls: 0
-    bytes: 32
-  __m1__flat_kids$tail:
-    calls: 27
-    bytes: 1108
   __m1__last_leaf:
     calls: 7
     bytes: 788
@@ -1972,15 +1972,12 @@ functions:
   __m1__leaves$tail:
     calls: 70
     bytes: 1236
-  __m1__nodes$filter1$own0:
-    calls: 24
-    bytes: 376
   __m1__show:
     calls: 228
     bytes: 2968
-  __m1__span:
-    calls: 3
-    bytes: 252
+  __m1__split_kids:
+    calls: 33
+    bytes: 2284
   __m1__text:
     calls: 15
     bytes: 1460
@@ -2109,7 +2106,7 @@ functions:
     bytes: 232
   __test$parse$refuse:
     calls: 1
-    bytes: 348
+    bytes: 392
   __test$parse$shown:
     calls: 73
     bytes: 592
@@ -2135,13 +2132,13 @@ functions:
     calls: 6
     bytes: (external)
   aipl_arr_extend:
-    calls: 2065
+    calls: 1984
     bytes: (external)
   aipl_arr_inc:
-    calls: 32163
+    calls: 32598
     bytes: (external)
   aipl_arr_reserve:
-    calls: 2343
+    calls: 2199
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 425
@@ -2156,13 +2153,13 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 41910
+    calls: 42188
     bytes: (external)
   aipl_array_new:
-    calls: 816
+    calls: 762
     bytes: (external)
   aipl_array_push:
-    calls: 910
+    calls: 954
     bytes: (external)
   aipl_array_push_mut:
     calls: 2337
@@ -2177,13 +2174,13 @@ functions:
     calls: 1894
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 12580
+    calls: 12709
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 346
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 10686
+    calls: 10815
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 346
@@ -2220,7 +2217,7 @@ functions:
     bytes: 1828
   build_node:
     calls: 20
-    bytes: 288
+    bytes: 328
   can_reach$Tok$Node$map1:
     calls: 0
     bytes: 440
@@ -2247,7 +2244,7 @@ functions:
     bytes: 776
   lower_node$Tok$Node:
     calls: 24
-    bytes: 5460
+    bytes: 6572
   main:
     calls: 1
     bytes: 180
