@@ -469,7 +469,6 @@ pub let S_PUNCT = "punctuation.aipl";
 let S_DOC = "comment.line.documentation.aipl";
 
 pub fn aipl_rules() -> TokenRule<AiplTok>[] {
-    let three_quotes = `"""`;
     [
         TokenRule { matcher: CharRun(#{' ', '\t', '\n', '\r'}), emit: Bare(Space), skip: true },
         TokenRule {
@@ -565,7 +564,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // escapes), but a `"""` literal *is* de-dented — done here in the emit via
         // the dogfooded `process_raw_string`, so the token carries its final value.
         TokenRule {
-            matcher: Between(three_quotes, three_quotes),
+            matcher: Between(`"""`, `"""`),
             emit: Of(|text: str| StrLit(process_raw_string(text), TripleQuoted)),
             unterminated: "unterminated raw string literal",
             scope: S_STRING,
@@ -936,11 +935,11 @@ allocations: 288
 deallocations: 288
 reallocations: 67
 bytes allocated: 439365
-instructions executed: 3871840
-binary size: 635448
-  code: 436756
+instructions executed: 3872057
+binary size: 635496
+  code: 436808
   data: 10612
-  metadata: 188080
+  metadata: 188076
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -1139,7 +1138,7 @@ functions:
     bytes: (external)
   aipl_rules:
     calls: 31
-    bytes: 103336
+    bytes: 103388
   aipl_rules$lambda0:
     calls: 0
     bytes: 144

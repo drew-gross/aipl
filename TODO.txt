@@ -81,7 +81,7 @@ misc cleanup:
   Matcher should use doc comments, also Delimited should use named args probably
   unordered set needs some way to convert to array
   class_meta should be a const set
-  three_quotes can be inlined
+  dedent_segments should be able to do better than a join/split. Maybe a process raw string segments?
   rewrite fn ob(), fn re_meta(), etc. to be less insane with escapes
   match_arm parser in patterns looks like it can be simpler, the => arm_body part is non-DRY
   fn nest and fn one have a lot of overlap
@@ -439,6 +439,7 @@ design:
   apis should express intent
 
 optimizations:
+  string interning? replaing let tq = `"""`; f(tq, tq) with f(`"""`, `"""`); was slower, which I wouldn't expect
   ident_start and ident_cont should be constants computed at compile time
   for move-in detection:
       need a "last use before overwrite" flag

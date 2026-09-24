@@ -4832,11 +4832,11 @@ allocations: 2106881
 deallocations: 2106881
 reallocations: 300668
 bytes allocated: 394168577
-instructions executed: 610612269
-binary size: 5987032
-  code: 3937100
+instructions executed: 610614768
+binary size: 5986968
+  code: 3937040
   data: 57652
-  metadata: 1992280
+  metadata: 1992276
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 26
@@ -6121,7 +6121,7 @@ functions:
     bytes: 652
   lex_lossless:
     calls: 357
-    bytes: 109884
+    bytes: 109824
   lower_aipl_block:
     calls: 36
     bytes: 3624

@@ -3371,11 +3371,11 @@ allocations: 101983
 deallocations: 101983
 reallocations: 16733
 bytes allocated: 20692365
-instructions executed: 67971422
-binary size: 17801928
-  code: 11435852
+instructions executed: 67972766
+binary size: 17801976
+  code: 11435904
   data: 38420
-  metadata: 6327656
+  metadata: 6327652
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -3970,7 +3970,7 @@ functions:
     bytes: 6072
   __m22__aipl_rules:
     calls: 192
-    bytes: 103336
+    bytes: 103388
   __m22__aipl_rules$lambda0:
     calls: 0
     bytes: 144
