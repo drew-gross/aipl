@@ -129,10 +129,7 @@ struct Tm {
 # The chars a regex reads specially outside a character class, and so that a
 # literal spelling must escape. `-` is not among them: it is only special
 # *inside* a class (see `class_char`).
-fn re_meta() -> str {
-    let backslash = """\""";
-    `{backslash}.^$|?*+()[]{ob()}{cb()}`
-}
+fn re_meta() -> str { """\.^$|?*+()[]{}""" }
 
 # The chars that must be escaped *inside* `[...]`, where the rules are different
 # and much shorter.
@@ -740,15 +737,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 973
-deallocations: 973
+allocations: 653
+deallocations: 653
 reallocations: 38
-bytes allocated: 74560
-instructions executed: 123770
-binary size: 132496
-  code: 87420
+bytes allocated: 50320
+instructions executed: 118970
+binary size: 131888
+  code: 87008
   data: 5576
-  metadata: 39500
+  metadata: 39304
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -944,7 +941,7 @@ functions:
     bytes: 3376
   re_escape:
     calls: 42
-    bytes: 2368
+    bytes: 1956
   rule_pats$Kind:
     calls: 2
     bytes: 9972
