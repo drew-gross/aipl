@@ -172,15 +172,15 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 4624
-deallocations: 4624
+allocations: 4494
+deallocations: 4494
 reallocations: 331
-bytes allocated: 391932
-instructions executed: 1439993
-binary size: 247456
-  code: 186640
+bytes allocated: 380492
+instructions executed: 1437713
+binary size: 244904
+  code: 184856
   data: 3336
-  metadata: 57480
+  metadata: 56712
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -247,7 +247,7 @@ functions:
     bytes: 1900
   __m1__caps_fld:
     calls: 4
-    bytes: 1076
+    bytes: 788
   __m1__char_class_body:
     calls: 13
     bytes: 1428
@@ -274,13 +274,13 @@ functions:
     bytes: 6868
   __m1__obj_fld:
     calls: 5
-    bytes: 2456
+    bytes: 1900
   __m1__obj_of:
     calls: 31
-    bytes: 1804
+    bytes: 1540
   __m1__pat_json:
     calls: 40
-    bytes: 3376
+    bytes: 3112
   __m1__re_escape:
     calls: 101
     bytes: 1956
@@ -334,7 +334,7 @@ functions:
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 137596
+    bytes: 137184
   __to_str_u64:
     calls: 7
     bytes: 204

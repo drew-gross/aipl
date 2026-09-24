@@ -138,10 +138,6 @@ fn class_meta() -> str {
     `{backslash}[]^-`
 }
 
-fn ob() -> str { "{" }
-
-fn cb() -> str { "}" }
-
 # `s` as a regex matching exactly `s`: every character the engine reads
 # specially is backslash-escaped. Used for a rule's fixed spelling — an
 # operator, a keyword, a delimiter.
@@ -632,7 +628,7 @@ fn SCHEMA() -> str {
 
 fn pat_json(p: Pat) -> str {
     match (p) {
-        Include(name) => `{ob()} "include": "#{name}" {cb()}`,
+        Include(name) => `\{ "include": "#{name}" \}`,
         Match(re, scope) => {
             mut fields = [fld("match", json_str(re))];
             if (scope.is_nonempty()) {
@@ -662,7 +658,7 @@ fn pat_json(p: Pat) -> str {
 
 fn entry_json(Entry { pats, name }) -> str {
     let body = arr_fld("patterns", pats.map(pat_json));
-    `{json_str(name)}: {ob()}\n{body.indent(2)}\n{cb()}`
+    `{json_str(name)}: \{\n{body.indent(2)}\n\}`
 }
 
 # One `"key": value` line, where `value` is already JSON.
@@ -680,10 +676,10 @@ fn arr_fld(key: str, items: str[]) -> str {
 
 fn obj_fld(key: str, entries: str[]) -> str {
     if (entries.is_empty()) {
-        return `{json_str(key)}: {ob()}{cb()}`;
+        return `{json_str(key)}: \{\}`;
     };
     let body = entries.map(|x| x.indent(2)).join(sep=",\n");
-    `{json_str(key)}: {ob()}\n{body}\n{cb()}`
+    `{json_str(key)}: \{\n{body}\n\}`
 }
 
 # `"key": { "<base>": { "name": ".." }, .. }` — the capture-scope map, whose
@@ -693,7 +689,7 @@ fn caps_fld(key: str, scopes: str[], base: u64) -> str {
     mut entries: str[] = [];
     for (let i, scope : scopes) {
         let n = base + i;
-        set entries.push(`"{n}": {ob()} "name": {json_str(scope)} {cb()}`);
+        set entries.push(`"{n}": \{ "name": {json_str(scope)} \}`);
     }
     obj_fld(key, entries)
 }
@@ -702,7 +698,7 @@ fn inline_arr(items: str[]) -> str { `[{items.join(sep=", ")}]` }
 
 fn obj_of(fields: str[]) -> str {
     let body = fields.map(|f| f.indent(2)).join(sep=",\n");
-    `{ob()}\n{body}\n{cb()}`
+    `\{\n{body}\n\}`
 }
 
 # `s` as a JSON string literal, quotes included: backslashes and double quotes
@@ -737,15 +733,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 653
-deallocations: 653
+allocations: 641
+deallocations: 641
 reallocations: 38
-bytes allocated: 50320
-instructions executed: 118970
-binary size: 131888
-  code: 87008
+bytes allocated: 49264
+instructions executed: 118770
+binary size: 129448
+  code: 85332
   data: 5576
-  metadata: 39304
+  metadata: 38540
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -839,7 +835,7 @@ functions:
     bytes: 8380
   __test$tm_json:
     calls: 1
-    bytes: 5180
+    bytes: 4876
   __test$word_pat:
     calls: 1
     bytes: 2196
@@ -905,7 +901,7 @@ functions:
     bytes: 1900
   caps_fld:
     calls: 0
-    bytes: 1076
+    bytes: 788
   char_class_body:
     calls: 17
     bytes: 1428
@@ -932,13 +928,13 @@ functions:
     bytes: 6868
   obj_fld:
     calls: 1
-    bytes: 2456
+    bytes: 1900
   obj_of:
     calls: 2
-    bytes: 1804
+    bytes: 1540
   pat_json:
     calls: 2
-    bytes: 3376
+    bytes: 3112
   re_escape:
     calls: 42
     bytes: 1956
