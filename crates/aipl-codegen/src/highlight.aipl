@@ -54,6 +54,7 @@ import {
     push,
     split,
     to_set,
+    to_str,
     value_or,
     wrapping_add as +,
     wrapping_add_assign as +=,
@@ -175,19 +176,12 @@ fn char_class_body(chars: #{char}) -> str { chars.map(class_char).join() }.test(
 # (so the generated JSON carries no literal newline), the four class
 # metacharacters backslashed, everything else verbatim.
 fn class_char(ch: char) -> str {
-    if (ch == '\n') {
-        return """\n""";
-    };
-    if (ch == '\t') {
-        return """\t""";
-    };
-    if (ch == '\r') {
-        return """\r""";
-    };
-    if (CLASS_META.contains(ch)) {
-        return `\\{ch}`;
-    };
-    `{ch}`
+    match (ch) {
+        '\n' => """\n""",
+        '\t' => """\t""",
+        '\r' => """\r""",
+        _ => if (CLASS_META.contains(ch)) { `\\{ch}` } else { ch.to_str() },
+    }
 }
 
 // ---------- matchers become patterns ----------
@@ -734,11 +728,11 @@ allocations: 549
 deallocations: 549
 reallocations: 38
 bytes allocated: 43422
-instructions executed: 117850
-binary size: 129208
-  code: 85172
+instructions executed: 116635
+binary size: 128920
+  code: 84924
   data: 5592
-  metadata: 38444
+  metadata: 38404
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -901,10 +895,7 @@ functions:
     bytes: 788
   char_class_body:
     calls: 17
-    bytes: 1428
-  class_char:
-    calls: 49
-    bytes: 836
+    bytes: 2016
   entry_name:
     calls: 5
     bytes: 444
