@@ -93,8 +93,11 @@ variant Calc = Lit(i64) | Neg(Calc) | Bin(str, Calc, Calc)
 # invisible to it — `1 -2` would lex as two numbers and parse as nothing.
 fn calc_rules() -> TokenRule<CalcTok>[] {
     [
-        TokenRule { matcher: CharRun(" \t\r\n"), emit: Bare(Punct), trivia: true },
-        TokenRule { matcher: OneChar("+-*/%^()"), emit: Bare(Punct) },
+        TokenRule { matcher: CharRun(#{' ', '\t', '\r', '\n'}), emit: Bare(Punct), trivia: true },
+        TokenRule {
+            matcher: OneChar(#{'+', '-', '*', '/', '%', '^', '(', ')'}),
+            emit: Bare(Punct),
+        },
         TokenRule { matcher: Int, emit: Bare(Num) },
     ]
 }
@@ -467,12 +470,12 @@ fn is_calc_op(self: str) -> bool {
 allocations: 10716
 deallocations: 10716
 reallocations: 1853
-bytes allocated: 1167383
-instructions executed: 2527718
-binary size: 425296
-  code: 279172
+bytes allocated: 1168679
+instructions executed: 2589064
+binary size: 415144
+  code: 273984
   data: 6100
-  metadata: 140024
+  metadata: 135060
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -485,7 +488,7 @@ functions:
     bytes: 128
   __arr_drop___m11__TokenRule$CalcTok:
     calls: 54
-    bytes: 544
+    bytes: 428
   __arr_drop___m1__Cst:
     calls: 1438
     bytes: 116
@@ -524,7 +527,7 @@ functions:
     bytes: 128
   __arr_retain___m11__TokenRule$CalcTok:
     calls: 0
-    bytes: 544
+    bytes: 428
   __arr_retain___m1__Cst:
     calls: 1402
     bytes: 116
@@ -569,7 +572,7 @@ functions:
     bytes: 324
   __builtin_count_while$char$lam$__m11__lex_step$CalcTok$lambda1:
     calls: 156
-    bytes: 312
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 106
     bytes: 268
@@ -674,7 +677,7 @@ functions:
     bytes: 800
   __m11__delimited_len:
     calls: 0
-    bytes: 1904
+    bytes: 1936
   __m11__finalize_template$CalcTok:
     calls: 0
     bytes: 3516
@@ -689,13 +692,13 @@ functions:
     bytes: 1196
   __m11__lex_step$CalcTok:
     calls: 444
-    bytes: 21556
+    bytes: 17024
   __m11__nested_len:
     calls: 0
     bytes: 1148
   __m11__step_result$CalcTok:
     calls: 870
-    bytes: 7444
+    bytes: 6528
   __m11__template_scan$CalcTok:
     calls: 0
     bytes: 2824
@@ -710,7 +713,7 @@ functions:
     bytes: 268
   __m11__to_eol_unless_len:
     calls: 0
-    bytes: 368
+    bytes: 360
   __m13__can_reach$CalcTok$Calc$map1:
     calls: 0
     bytes: 324
@@ -1127,7 +1130,7 @@ functions:
     bytes: 332
   lex_calc:
     calls: 54
-    bytes: 2508
+    bytes: 2980
   lower_atom:
     calls: 121
     bytes: 1252

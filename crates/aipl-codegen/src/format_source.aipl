@@ -247,12 +247,12 @@ fn comment_texts(lexed: LexResult<AiplTok>) -> str[] { lexed.trivia.map(|t| t.te
 allocations: 20914
 deallocations: 20914
 reallocations: 3004
-bytes allocated: 4491017
-instructions executed: 9139639
-binary size: 6568400
-  code: 4348560
+bytes allocated: 4513481
+instructions executed: 11777053
+binary size: 6568192
+  code: 4353632
   data: 11914
-  metadata: 2207926
+  metadata: 2202646
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -316,7 +316,7 @@ functions:
     bytes: 388
   __arr_drop___m24__TokenRule$__m23__AiplTok:
     calls: 43
-    bytes: 832
+    bytes: 716
   __arr_drop___m36__ImportEntry:
     calls: 0
     bytes: 148
@@ -415,7 +415,7 @@ functions:
     bytes: 388
   __arr_retain___m24__TokenRule$__m23__AiplTok:
     calls: 288
-    bytes: 832
+    bytes: 716
   __arr_retain___m36__ImportEntry:
     calls: 0
     bytes: 148
@@ -493,7 +493,7 @@ functions:
     bytes: 348
   __builtin_count_while$char$lam$__m24__lex_step$__m23__AiplTok$lambda1:
     calls: 169
-    bytes: 312
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 4
     bytes: 268
@@ -817,7 +817,7 @@ functions:
     bytes: 6072
   __m23__aipl_rules:
     calls: 39
-    bytes: 91844
+    bytes: 103336
   __m23__aipl_rules$lambda0:
     calls: 0
     bytes: 144
@@ -868,7 +868,7 @@ functions:
     bytes: 800
   __m24__delimited_len:
     calls: 238
-    bytes: 1904
+    bytes: 1936
   __m24__finalize_template$__m23__AiplTok:
     calls: 2
     bytes: 7228
@@ -883,13 +883,13 @@ functions:
     bytes: 1196
   __m24__lex_step$__m23__AiplTok:
     calls: 336
-    bytes: 27352
+    bytes: 22860
   __m24__nested_len:
     calls: 208
     bytes: 1148
   __m24__step_result$__m23__AiplTok:
     calls: 9425
-    bytes: 14264
+    bytes: 13344
   __m24__template_scan$__m23__AiplTok:
     calls: 2
     bytes: 2824
@@ -904,7 +904,7 @@ functions:
     bytes: 268
   __m24__to_eol_unless_len:
     calls: 208
-    bytes: 368
+    bytes: 360
   __m25__unescape:
     calls: 8
     bytes: 1628
@@ -1537,7 +1537,7 @@ functions:
     bytes: 652
   __m4__lex_lossless:
     calls: 4
-    bytes: 6140
+    bytes: 5344
   __m4__lower_arg:
     calls: 0
     bytes: 39700

@@ -104,7 +104,7 @@
             <a class="anchor" href="#item-char_class">char_class</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn char_class(chars: str) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn char_class(chars: #{char}) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
@@ -230,7 +230,7 @@
             <a class="anchor" href="#item-tm_json">tm_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn tm_json(__spat$23760: Tm) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn tm_json(__spat$24092: Tm) -&#62; str</code></pre>
 
           <div class="doc"><p><code>g</code> as the <code>.tmLanguage.json</code> text an editor extension ships: two-space indented, one trailing newline. Generated files are read in diffs, so the layout is fixed and deterministic rather than minified.</p></div>
 
@@ -344,7 +344,7 @@
             <a class="anchor" href="#item-char_class_body">char_class_body</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn char_class_body(chars: str) -&#62; str</code></pre>
+          <pre class="signature"><code>fn char_class_body(chars: #{char}) -&#62; str</code></pre>
 
           <div class="doc"><p>A regex character class accepting exactly the characters of <code>chars</code>, in the order given. Written out literally rather than collapsed into ranges: the class is data, the character set comes from a lexer rule that spells it out too, and a range is only a shorter way to say the same thing.</p></div>
 
@@ -372,7 +372,7 @@
             <a class="anchor" href="#item-escape_pat">escape_pat</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn escape_pat(escapes: str, scope: str) -&#62; Pat</code></pre>
+          <pre class="signature"><code>fn escape_pat(escapes: #{char}, scope: str) -&#62; Pat</code></pre>
 
           <div class="doc"><p>A backslash followed by one of <code>escapes</code> — what a delimited scan treats as an escape rather than as content.</p></div>
 
@@ -386,7 +386,7 @@
             <a class="anchor" href="#item-template_inner">template_inner</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn template_inner(escapes: str, esc_scope: str) -&#62; Pat[]</code></pre>
+          <pre class="signature"><code>fn template_inner(escapes: char[], esc_scope: str) -&#62; Pat[]</code></pre>
 
           <div class="doc"><p>What lies inside a template literal: its escapes and the <code>{ .. }</code> interpolation, which includes the whole language back into itself so an interpolated expression keeps its ordinary scopes. The escapes always include the template's own <code>\{</code>/<code>\}</code> (see <code>Template</code> in <code>lexer.aipl</code>), listed ahead of the interpolation so an escaped brace is painted as one rather than opening it. The brace group comes first inside so a <code>{ .. }</code> *inside* the expression — a set literal, a struct — closes itself rather than the interpolation; see <code>brace_group_entry</code>.</p></div>
 
@@ -512,7 +512,7 @@
             <a class="anchor" href="#item-entry_json">entry_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn entry_json(__spat$26481: Entry) -&#62; str</code></pre>
+          <pre class="signature"><code>fn entry_json(__spat$26813: Entry) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

@@ -16619,6 +16619,43 @@ fn compile_call_expr<M: Module>(
                 Some(ConcreteType::Set(_, o)) if *o != aipl_syntax::ast::SetOrder::Context => *o,
                 _ => aipl_syntax::ast::SetOrder::Unordered,
             };
+            // A `char[]` source is *str-shaped*: its value is the 24-byte
+            // string, not an array block, so the index walk below would read
+            // the string's own words as a length. It is also the only source
+            // that can produce a `#{char}`, so the two cases are one — walk it
+            // with the char cursor, which streams every representation (a rope
+            // leaf by leaf, without materializing), and set a bit per char.
+            //
+            // Nothing is allocated and nothing is tracked: the result is the
+            // bitfield itself, which owns no heap.
+            if elem == ConcreteType::Primitive(Primitive::Char) {
+                let out = charset_slot(builder);
+                let cur = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    iter_state_size(),
+                    3,
+                ));
+                let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);
+                builtins.call_void(module, builder, "aipl_str_iter_init", &[cur_addr, arr_ptr]);
+                let head = builder.create_block();
+                let body = builder.create_block();
+                let done = builder.create_block();
+                builder.ins().jump(head, &[]);
+                builder.switch_to_block(head);
+                let c = emit_str_iter_next(module, builder, builtins, cur_addr);
+                let more = builder
+                    .ins()
+                    .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, c, 0);
+                builder.ins().brif(more, body, &[], done, &[]);
+                builder.switch_to_block(body);
+                builder.seal_block(body);
+                emit_charset_insert(builder, out, c);
+                builder.ins().jump(head, &[]);
+                builder.seal_block(head);
+                builder.switch_to_block(done);
+                builder.seal_block(done);
+                return Ok((out, ConcreteType::Set(Box::new(elem), order)));
+            }
             let esz = runtime_elem_size(&elem, structs);
             let esz_v = builder.ins().iconst(types::I64, esz);
             let drop_fn = array_drop_fn_addr(builder, module, cx, &elem);
@@ -17744,7 +17781,12 @@ fn compile_call_expr<M: Module>(
                 match tail {
                     Some(src) => {
                         let src1 = str_bytes_ptr(module, builder, cx, src);
-                        builtins.call_void(
+                        // `call`, not `call_void`: the entry hands back the
+                        // advanced cursor. It is unused here (each copy's
+                        // destination comes from `dst` directly, as the sibling
+                        // copy above notes), but claiming it returns nothing is
+                        // what the debug assertion in `call_void` catches.
+                        let _ = builtins.call(
                             module,
                             builder,
                             "aipl_write_bytes",

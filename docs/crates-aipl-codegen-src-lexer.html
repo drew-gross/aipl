@@ -196,12 +196,12 @@
 
           <ul class="cases">
 
-            <li id="item-CharRun"><code>CharRun(cont: str, first: str = cont)</code>
+            <li id="item-CharRun"><code>CharRun(cont: #{char}, first: #{char} = cont)</code>
 
 
             </li>
 
-            <li id="item-OneChar"><code>OneChar(str)</code>
+            <li id="item-OneChar"><code>OneChar(#{char})</code>
 
 
             </li>
@@ -211,12 +211,12 @@
 
             </li>
 
-            <li id="item-Keyword"><code>Keyword(str, str)</code>
+            <li id="item-Keyword"><code>Keyword(str, #{char})</code>
 
 
             </li>
 
-            <li id="item-Delimited"><code>Delimited(str, str)</code>
+            <li id="item-Delimited"><code>Delimited(str, #{char})</code>
 
 
             </li>
@@ -241,7 +241,7 @@
 
             </li>
 
-            <li id="item-ToEolUnless"><code>ToEolUnless(marker: str, blocked: str)</code>
+            <li id="item-ToEolUnless"><code>ToEolUnless(marker: str, blocked: #{char})</code>
 
 
             </li>
@@ -472,7 +472,7 @@
             <a class="anchor" href="#item-char_run_len">char_run_len</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn char_run_len(self: str, head: str, cont: str) -&#62; u64</code></pre>
+          <pre class="signature"><code>fn char_run_len(self: str, head: #{char}, cont: #{char}) -&#62; u64</code></pre>
 
           <div class="doc"><p><code>CharRun</code>: length of the maximal run at the start of <code>self</code> — a <code>head</code> char, then <code>cont</code> chars. 0 when the first char isn't in <code>head</code>. (<code>head</code> rather than <code>first</code>, which is now a builtin this file calls.)</p></div>
 
@@ -486,7 +486,7 @@
             <a class="anchor" href="#item-one_char_len">one_char_len</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn one_char_len(self: str, chars: str) -&#62; u64</code></pre>
+          <pre class="signature"><code>fn one_char_len(self: str, chars: #{char}) -&#62; u64</code></pre>
 
           <div class="doc"><p><code>OneChar</code>: 1 when <code>self</code> opens with a char in <code>chars</code>, else 0 — <code>char_run_len</code>'s single-character counterpart, and the reason a rule never has to spell that shape as a run with nothing to continue it. An empty set never matches.</p></div>
 
@@ -514,7 +514,7 @@
             <a class="anchor" href="#item-keyword_len">keyword_len</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn keyword_len(self: str, spelling: str, boundary: str) -&#62; u64</code></pre>
+          <pre class="signature"><code>fn keyword_len(self: str, spelling: str, boundary: #{char}) -&#62; u64</code></pre>
 
           <div class="doc"><p><code>Keyword</code>: the length of <code>spelling</code> when it prefixes <code>self</code>, but only when the char after it is absent (end of source) or outside <code>boundary</code> — a keyword must not end in the middle of an identifier. 0 when it doesn't match (or the char after is a boundary char, as in <code>iffy</code> for <code>if</code>).</p></div>
 
@@ -528,7 +528,7 @@
             <a class="anchor" href="#item-delimited_len">delimited_len</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn delimited_len(self: str, at: u64, delims: str, escapes: str, msg: str) -&#62; u64!LexError</code></pre>
+          <pre class="signature"><code>fn delimited_len(self: str, at: u64, delims: str, escapes: #{char}, msg: str) -&#62; u64!LexError</code></pre>
 
           <div class="doc"><p><code>Delimited</code>: a <code>delims</code> char opens the token, which spans to just past the next occurrence of the same char. ok(0) when the first char isn't a delimiter. With a non-empty <code>escapes</code> set, a backslash escapes its next char: an allowed char is content (an escaped delimiter doesn't close), a disallowed one is a hard error, and so is a backslash with nothing after it — the end of the source cut the escape off. A token still open at the end of the source is a hard error (<code>at</code> is the token's absolute start, so error spans land in the real source).</p></div>
 
@@ -612,7 +612,7 @@
             <a class="anchor" href="#item-to_eol_unless_len">to_eol_unless_len</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn to_eol_unless_len(self: str, marker: str, blocked: str) -&#62; u64</code></pre>
+          <pre class="signature"><code>fn to_eol_unless_len(self: str, marker: str, blocked: #{char}) -&#62; u64</code></pre>
 
           <div class="doc"><p><code>ToEolUnless</code>: <code>to_eol_len</code>, refused when the character right after the marker is one <code>blocked</code> claims. End of input or a newline right after the marker is *not* blocked — an empty comment line is a comment.</p></div>
 
@@ -682,7 +682,7 @@
             <a class="anchor" href="#item-apply_emit">apply_emit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31870: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
+          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31919: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
 
           <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its content string — the matcher-computed <code>value</code> (a delimited string, stripped) when there is one, else the raw matched <code>text</code>. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
 

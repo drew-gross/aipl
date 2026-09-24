@@ -4831,12 +4831,12 @@ fn why(src: str) -> str {
 allocations: 2106881
 deallocations: 2106881
 reallocations: 300668
-bytes allocated: 393962945
-instructions executed: 588940749
-binary size: 5986328
-  code: 3931120
+bytes allocated: 394168577
+instructions executed: 610612269
+binary size: 5987032
+  code: 3937100
   data: 57652
-  metadata: 1997556
+  metadata: 1992280
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 26
@@ -4861,7 +4861,7 @@ functions:
     bytes: 388
   __arr_drop___m22__TokenRule$__m21__AiplTok:
     calls: 714
-    bytes: 832
+    bytes: 716
   __arr_drop___m2__BraceEntry:
     calls: 5
     bytes: 184
@@ -4954,7 +4954,7 @@ functions:
     bytes: 388
   __arr_retain___m22__TokenRule$__m21__AiplTok:
     calls: 25704
-    bytes: 832
+    bytes: 716
   __arr_retain___m2__BraceEntry:
     calls: 9
     bytes: 184
@@ -5059,7 +5059,7 @@ functions:
     bytes: 396
   __builtin_count_while$char$lam$__m22__lex_step$__m21__AiplTok$lambda1:
     calls: 2721
-    bytes: 312
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 514
     bytes: 268
@@ -5395,7 +5395,7 @@ functions:
     bytes: 800
   __m22__delimited_len:
     calls: 4144
-    bytes: 1904
+    bytes: 1936
   __m22__finalize_template$__m21__AiplTok:
     calls: 5
     bytes: 7228
@@ -5410,13 +5410,13 @@ functions:
     bytes: 1196
   __m22__lex_step$__m21__AiplTok:
     calls: 5347
-    bytes: 27352
+    bytes: 22860
   __m22__nested_len:
     calls: 3567
     bytes: 1148
   __m22__step_result$__m21__AiplTok:
     calls: 166621
-    bytes: 14264
+    bytes: 13344
   __m22__template_scan$__m21__AiplTok:
     calls: 5
     bytes: 2824
@@ -5431,7 +5431,7 @@ functions:
     bytes: 268
   __m22__to_eol_unless_len:
     calls: 3565
-    bytes: 368
+    bytes: 360
   __m23__unescape:
     calls: 37
     bytes: 1628
@@ -6121,7 +6121,7 @@ functions:
     bytes: 652
   lex_lossless:
     calls: 357
-    bytes: 98280
+    bytes: 109884
   lower_aipl_block:
     calls: 36
     bytes: 3624

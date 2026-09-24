@@ -12,14 +12,14 @@
     "main": {
       "patterns": [
         {
-          "match": "\\b(fn)\\s+([abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_][abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789]*)",
+          "match": "\\b(fn)\\s+([ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz][0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz]*)",
           "captures": {
             "1": { "name": "keyword.declaration.function.aipl" },
             "2": { "name": "entity.name.function.aipl" }
           }
         },
         {
-          "match": "\\b(struct)\\s+([abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_][abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789]*)",
+          "match": "\\b(struct)\\s+([ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz][0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz]*)",
           "captures": {
             "1": { "name": "keyword.declaration.struct.aipl" },
             "2": { "name": "entity.name.type.struct.aipl" }
@@ -46,7 +46,7 @@
           "name": "comment.line.allow.aipl"
         },
         {
-          "match": "#(?:[^{\\[<>].*)?$",
+          "match": "#(?:[^<>\\[{].*)?$",
           "name": "comment.line.documentation.aipl"
         },
         {
@@ -66,7 +66,7 @@
           "name": "constant.language.aipl"
         },
         {
-          "match": "[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_][abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789]*",
+          "match": "[ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz][0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz]*",
           "name": "variable.other.aipl"
         },
         {
@@ -84,7 +84,7 @@
           "name": "string.quoted.double.aipl",
           "patterns": [
             {
-              "match": "\\\\[ntr\\\\\"]",
+              "match": "\\\\[\"\\\\nrt]",
               "name": "constant.character.escape.aipl"
             }
           ]
@@ -95,7 +95,7 @@
           "name": "string.quoted.single.aipl",
           "patterns": [
             {
-              "match": "\\\\[ntr\\\\'\"]",
+              "match": "\\\\[\"'\\\\nrt]",
               "name": "constant.character.escape.aipl"
             }
           ]
@@ -125,7 +125,7 @@
           "name": "string.quoted.double.aipl",
           "patterns": [
             {
-              "match": "\\\\[\\\\`ntr{}]",
+              "match": "\\\\[\\\\`nrt{}]",
               "name": "constant.character.escape.aipl"
             },
             {

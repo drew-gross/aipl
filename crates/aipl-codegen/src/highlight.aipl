@@ -53,6 +53,7 @@ import {
     map,
     push,
     split,
+    to_set,
     value_or,
     wrapping_add as +,
     wrapping_add_assign as +=,
@@ -160,7 +161,7 @@ pub fn re_escape(s: str) -> str {
     assert(re_escape("") == "");
 })
 
-pub fn char_class(chars: str) -> str { `[{char_class_body(chars)}]` }
+pub fn char_class(chars: #{char}) -> str { `[{char_class_body(chars)}]` }
 
 // The inside of a character class — what `char_class` brackets, and what a
 // *negated* class needs instead (`[^..]`, which is not something bracketing an
@@ -169,15 +170,15 @@ pub fn char_class(chars: str) -> str { `[{char_class_body(chars)}]` }
 # order given. Written out literally rather than collapsed into ranges: the
 # class is data, the character set comes from a lexer rule that spells it out
 # too, and a range is only a shorter way to say the same thing.
-fn char_class_body(chars: str) -> str { chars.map(class_char).join() }.test({
-    assert(char_class("abc") == "[abc]");
-    assert(char_class("0123456789") == "[0123456789]");
+fn char_class_body(chars: #{char}) -> str { chars.map(class_char).join() }.test({
+    assert(char_class(#{'a', 'b', 'c'}) == "[abc]");
+    assert(char_class(#{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}) == "[0123456789]");
     // The four class metacharacters are escaped; nothing else is.
-    assert(char_class("a-z") == """[a\-z]""");
-    assert(char_class("[]") == """[\[\]]""");
-    assert(char_class("^") == """[\^]""");
+    assert(char_class(#{'a', '-', 'z'}) == """[\-az]""");
+    assert(char_class(#{'[', ']'}) == """[\[\]]""");
+    assert(char_class(#{'^'}) == """[\^]""");
     // Whitespace is spelled with the escapes a JSON string can carry verbatim.
-    assert(char_class(" \t\n\r") == """[ \t\n\r]""");
+    assert(char_class(#{' ', '\t', '\n', '\r'}) == """[\t\n\r ]""");
 })
 
 # One character inside a class: the control characters as their regex escapes
@@ -267,20 +268,31 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
 }.test({
     let none_scope = "";
     assert(matcher_pat(Exact("=="), "op", none_scope) == Match("==", "op"));
-    assert(matcher_pat(Keyword("fn", "abc"), "kw", none_scope) == Match("""\bfn\b""", "kw"));
+    assert(matcher_pat(Keyword("fn", #{'a', 'b', 'c'}), "kw", none_scope) == Match(
+        """\bfn\b""",
+        "kw",
+    ));
     // `(` and `)` are literal inside a class, so a class escapes neither.
-    assert(matcher_pat(OneChar("()"), "p", none_scope) == Match("[()]", "p"));
+    assert(matcher_pat(OneChar(#{'(', ')'}), "p", none_scope) == Match("[()]", "p"));
     assert(matcher_pat(ToEol("//"), "c", none_scope) == Match("//.*$", "c"));
     assert(matcher_pat(Int, "n", none_scope) == Match("-?[0-9]+", "n"));
 
     // A run with one class is `+`; a run with a narrower opener is the opener
     // then the rest starred — the identifier shape.
-    assert(matcher_pat(CharRun("ab"), "r", none_scope) == Match("[ab]+", "r"));
-    assert(matcher_pat(CharRun("ab1", first="ab"), "r", none_scope) == Match("[ab][ab1]*", "r"));
+    assert(matcher_pat(CharRun(#{'a', 'b'}), "r", none_scope) == Match("[ab]+", "r"));
+    assert(matcher_pat(CharRun(#{'a', 'b', '1'}, first=#{'a', 'b'}), "r", none_scope) == Match(
+        "[ab][1ab]*",
+        "r",
+    ));
 
     // A delimited scan closes on its own delimiter and carries its escapes.
     let esc: Pat = Match("""\\[nt]""", "esc");
-    assert(matcher_pat(Delimited(`"`, "nt"), "s", "esc") == Region(`"`, `"`, [esc], scope="s"));
+    assert(matcher_pat(Delimited(`"`, #{'n', 't'}), "s", "esc") == Region(
+        `"`,
+        `"`,
+        [esc],
+        scope="s",
+    ));
 
     // A verbatim scan has no inner patterns, and may close on a different
     // delimiter than it opened with.
@@ -326,9 +338,9 @@ pub fn matcher_regex(m: Matcher) -> str? {
     }
 }.test({
     assert(matcher_regex(Exact("->")) == some("->"));
-    assert(matcher_regex(CharRun("ab1", first="ab")) == some("[ab][ab1]*"));
+    assert(matcher_regex(CharRun(#{'a', 'b', '1'}, first=#{'a', 'b'})) == some("[ab][1ab]*"));
     // The four delimiter-scanning matchers have no single-expression form.
-    assert(matcher_regex(Delimited(`"`, "nt")) == none);
+    assert(matcher_regex(Delimited(`"`, #{'n', 't'})) == none);
     assert(matcher_regex(Between("<", ">")) == none);
     assert(matcher_regex(Nested("/*", "*/")) == none);
     assert(matcher_regex(Template("`", "", |segs: str[]| segs)) == none);
@@ -336,7 +348,7 @@ pub fn matcher_regex(m: Matcher) -> str? {
 
 # A backslash followed by one of `escapes` — what a delimited scan treats as an
 # escape rather than as content.
-fn escape_pat(escapes: str, scope: str) -> Pat { Match(`\\\\{char_class(escapes)}`, scope) }
+fn escape_pat(escapes: #{char}, scope: str) -> Pat { Match(`\\\\{char_class(escapes)}`, scope) }
 
 # What lies inside a template literal: its escapes and the `{ .. }`
 # interpolation, which includes the whole language back into itself so an
@@ -346,10 +358,10 @@ fn escape_pat(escapes: str, scope: str) -> Pat { Match(`\\\\{char_class(escapes)
 # it. The brace group comes first inside so a `{ .. }` *inside* the expression —
 # a set literal, a struct — closes itself rather than the interpolation; see
 # `brace_group_entry`.
-fn template_inner(escapes: str, esc_scope: str) -> Pat[] {
+fn template_inner(escapes: char[], esc_scope: str) -> Pat[] {
     let interp: Pat = Region("""\{""", """\}""", [Include("brace-group"), Include("main")]);
-    let braces = "{}";
-    [escape_pat(`{escapes}{braces}`, esc_scope), interp]
+    let braces: char[] = "{}";
+    [escape_pat([..escapes, ..braces].to_set(), esc_scope), interp]
 }
 
 # The repository entry an interpolation nests braces through: a `{ .. }` whose
@@ -421,10 +433,10 @@ pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
     // Consecutive same-scope rules merge, in order, and a differently-scoped
     // rule between them breaks the run.
     let rules: TokenRule<Kind>[] = [
-        TokenRule { matcher: CharRun(" \t"), emit: Bare(Punct), skip: true },
-        TokenRule { matcher: Keyword("fn", "abc"), emit: Bare(Punct), scope: "kw" },
-        TokenRule { matcher: Keyword("let", "abc"), emit: Bare(Punct), scope: "kw" },
-        TokenRule { matcher: Keyword("true", "abc"), emit: Bare(Punct), scope: "const" },
+        TokenRule { matcher: CharRun(#{' ', '\t'}), emit: Bare(Punct), skip: true },
+        TokenRule { matcher: Keyword("fn", #{'a', 'b', 'c'}), emit: Bare(Punct), scope: "kw" },
+        TokenRule { matcher: Keyword("let", #{'a', 'b', 'c'}), emit: Bare(Punct), scope: "kw" },
+        TokenRule { matcher: Keyword("true", #{'a', 'b', 'c'}), emit: Bare(Punct), scope: "const" },
         TokenRule { matcher: Exact("=="), emit: Bare(Punct), scope: "op" },
         TokenRule { matcher: Exact("="), emit: Bare(Punct), scope: "op" },
     ];
@@ -728,15 +740,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 971
-deallocations: 971
+allocations: 973
+deallocations: 973
 reallocations: 38
-bytes allocated: 74528
-instructions executed: 124517
-binary size: 137416
-  code: 89172
-  data: 5320
-  metadata: 42924
+bytes allocated: 74560
+instructions executed: 123770
+binary size: 132496
+  code: 87420
+  data: 5576
+  metadata: 39500
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -749,7 +761,7 @@ functions:
     bytes: 116
   __arr_drop___m3__TokenRule$Kind:
     calls: 2
-    bytes: 544
+    bytes: 428
   __arr_retain_Entry:
     calls: 1
     bytes: 148
@@ -761,7 +773,7 @@ functions:
     bytes: 116
   __arr_retain___m3__TokenRule$Kind:
     calls: 0
-    bytes: 544
+    bytes: 428
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 38
     bytes: 304
@@ -783,6 +795,9 @@ functions:
   __eq_Pat$arr:
     calls: 13
     bytes: 300
+  __eq_set$char:
+    calls: 3
+    bytes: 84
   __eq_str$arr:
     calls: 1
     bytes: 364
@@ -797,7 +812,7 @@ functions:
     bytes: 1948
   __test$char_class_body:
     calls: 1
-    bytes: 1852
+    bytes: 2740
   __test$decl_pat:
     calls: 1
     bytes: 992
@@ -806,7 +821,7 @@ functions:
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 14124
+    bytes: 12948
   __test$matcher_pat$lambda0:
     calls: 0
     bytes: 64
@@ -815,7 +830,7 @@ functions:
     bytes: 64
   __test$matcher_regex:
     calls: 1
-    bytes: 8044
+    bytes: 7552
   __test$matcher_regex$lambda0:
     calls: 0
     bytes: 64
@@ -824,7 +839,7 @@ functions:
     bytes: 1104
   __test$rule_pats:
     calls: 1
-    bytes: 7828
+    bytes: 8380
   __test$tm_json:
     calls: 1
     bytes: 5180
@@ -885,6 +900,9 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
+  aipl_write_bytes:
+    calls: 6
+    bytes: (external)
   arr_fld:
     calls: 2
     bytes: 1900
@@ -893,7 +911,7 @@ functions:
     bytes: 1076
   char_class_body:
     calls: 17
-    bytes: 1476
+    bytes: 1428
   class_char:
     calls: 49
     bytes: 996
@@ -914,7 +932,7 @@ functions:
     bytes: 760
   matcher_pat:
     calls: 26
-    bytes: 6684
+    bytes: 6868
   obj_fld:
     calls: 1
     bytes: 2456
@@ -929,4 +947,4 @@ functions:
     bytes: 2368
   rule_pats$Kind:
     calls: 2
-    bytes: 11484
+    bytes: 9972

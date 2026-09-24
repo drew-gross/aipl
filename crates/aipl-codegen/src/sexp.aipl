@@ -71,12 +71,12 @@ fn depth(self: Sexp) -> u64 {
 allocations: 12956
 deallocations: 12956
 reallocations: 1344
-bytes allocated: 872290
-instructions executed: 5278404
-binary size: 251256
-  code: 164988
+bytes allocated: 872482
+instructions executed: 5467618
+binary size: 241160
+  code: 159824
   data: 1964
-  metadata: 84304
+  metadata: 79372
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -89,7 +89,7 @@ functions:
     bytes: 160
   __arr_drop___m12__TokenRule$__m1__SexpKind:
     calls: 6
-    bytes: 604
+    bytes: 488
   __arr_drop___m2__Cst:
     calls: 3342
     bytes: 116
@@ -113,7 +113,7 @@ functions:
     bytes: 160
   __arr_retain___m12__TokenRule$__m1__SexpKind:
     calls: 0
-    bytes: 604
+    bytes: 488
   __arr_retain___m2__Cst:
     calls: 2136
     bytes: 116
@@ -131,7 +131,7 @@ functions:
     bytes: 276
   __builtin_count_while$char$lam$__m12__lex_step$__m1__SexpKind$lambda1:
     calls: 31
-    bytes: 312
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 0
     bytes: 280
@@ -197,7 +197,7 @@ functions:
     bytes: 800
   __m12__delimited_len:
     calls: 0
-    bytes: 1904
+    bytes: 1936
   __m12__finalize_template$__m1__SexpKind:
     calls: 0
     bytes: 4004
@@ -212,13 +212,13 @@ functions:
     bytes: 1196
   __m12__lex_step$__m1__SexpKind:
     calls: 852
-    bytes: 22604
+    bytes: 18008
   __m12__nested_len:
     calls: 0
     bytes: 1148
   __m12__step_result$__m1__SexpKind:
     calls: 3345
-    bytes: 8488
+    bytes: 7580
   __m12__template_scan$__m1__SexpKind:
     calls: 0
     bytes: 2824
@@ -233,7 +233,7 @@ functions:
     bytes: 268
   __m12__to_eol_unless_len:
     calls: 0
-    bytes: 368
+    bytes: 360
   __m14__can_reach$__m1__SexpKind$Sexp$map1:
     calls: 0
     bytes: 384
@@ -317,7 +317,7 @@ functions:
     bytes: 508
   __m1__parse_sexp:
     calls: 6
-    bytes: 5596
+    bytes: 6148
   __m2__extent:
     calls: 0
     bytes: 252

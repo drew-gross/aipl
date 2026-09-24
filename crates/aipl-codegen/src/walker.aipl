@@ -3370,12 +3370,12 @@ fn at(self: Doc, width: u64) -> str { self.print(width) }
 allocations: 101983
 deallocations: 101983
 reallocations: 16733
-bytes allocated: 20581773
-instructions executed: 55481581
-binary size: 17802176
-  code: 11430824
+bytes allocated: 20692365
+instructions executed: 67971422
+binary size: 17801928
+  code: 11435852
   data: 38420
-  metadata: 6332932
+  metadata: 6327656
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -3463,7 +3463,7 @@ functions:
     bytes: 388
   __arr_drop___m23__TokenRule$__m22__AiplTok:
     calls: 203
-    bytes: 832
+    bytes: 716
   __arr_drop___m8__Ast:
     calls: 0
     bytes: 3244
@@ -3562,7 +3562,7 @@ functions:
     bytes: 388
   __arr_retain___m23__TokenRule$__m22__AiplTok:
     calls: 792
-    bytes: 832
+    bytes: 716
   __arr_retain___m8__Ast:
     calls: 0
     bytes: 3244
@@ -3616,7 +3616,7 @@ functions:
     bytes: 348
   __builtin_count_while$char$lam$__m23__lex_step$__m22__AiplTok$lambda1:
     calls: 1598
-    bytes: 312
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 31
     bytes: 268
@@ -3970,7 +3970,7 @@ functions:
     bytes: 6072
   __m22__aipl_rules:
     calls: 192
-    bytes: 91844
+    bytes: 103336
   __m22__aipl_rules$lambda0:
     calls: 0
     bytes: 144
@@ -4021,7 +4021,7 @@ functions:
     bytes: 800
   __m23__delimited_len:
     calls: 1693
-    bytes: 1904
+    bytes: 1936
   __m23__finalize_template$__m22__AiplTok:
     calls: 2
     bytes: 7228
@@ -4036,13 +4036,13 @@ functions:
     bytes: 1196
   __m23__lex_step$__m22__AiplTok:
     calls: 2659
-    bytes: 27352
+    bytes: 22860
   __m23__nested_len:
     calls: 1490
     bytes: 1148
   __m23__step_result$__m22__AiplTok:
     calls: 69275
-    bytes: 14264
+    bytes: 13344
   __m23__template_scan$__m22__AiplTok:
     calls: 2
     bytes: 2824
@@ -4057,7 +4057,7 @@ functions:
     bytes: 268
   __m23__to_eol_unless_len:
     calls: 1490
-    bytes: 368
+    bytes: 360
   __m24__unescape:
     calls: 17
     bytes: 1628
@@ -4309,7 +4309,7 @@ functions:
     bytes: 2164
   __m7__import_decl_doc:
     calls: 11
-    bytes: 354116
+    bytes: 353276
   __m7__join_spans:
     calls: 0
     bytes: 172

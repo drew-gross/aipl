@@ -26,7 +26,7 @@
 // a token-kind type, a `TokenRule[]` for it, an AST, one `lower_*` per
 // production, and a `Grammar` tying them together. Nothing else — the parse
 // itself is `parse.aipl`'s, unmodified.
-import { equal as ==, first, map_err, map_ok } from builtins;
+import { equal as ==, first, map_err, map_ok, to_set } from builtins;
 import { Cst, Parts, show, text, token_text } from "./cst.aipl";
 import { ebnf, show_first_sets } from "./ebnf.aipl";
 import { render_cst } from "./format.aipl";
@@ -60,13 +60,13 @@ variant SexpKind = Atom(str) | Punct
 # (asserted below). An atom is a run of the usual Lisp symbol characters, which
 # includes digits — this grammar has no number type, so `12` is just an atom.
 fn sexp_rules() -> TokenRule<SexpKind>[] {
-    let space = " \t\r\n";
-    let sym = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/<>=!?_.";
+    let space: char[] = " \t\r\n";
+    let sym: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/<>=!?_.";
     [
-        TokenRule { matcher: CharRun(space), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: CharRun(space.to_set()), emit: Bare(Punct), trivia: true },
         TokenRule { matcher: ToEol(";"), emit: Bare(Punct), trivia: true },
-        TokenRule { matcher: CharRun(sym), emit: Of(Atom) },
-        TokenRule { matcher: OneChar("()"), emit: Bare(Punct) },
+        TokenRule { matcher: CharRun(sym.to_set()), emit: Of(Atom) },
+        TokenRule { matcher: OneChar(#{'(', ')'}), emit: Bare(Punct) },
     ]
 }
 
@@ -275,12 +275,12 @@ fn sexp_space(l: str, r: str) -> bool { false }
 allocations: 6508
 deallocations: 6508
 reallocations: 911
-bytes allocated: 633302
-instructions executed: 1494878
-binary size: 407976
-  code: 268584
+bytes allocated: 634326
+instructions executed: 1651154
+binary size: 397880
+  code: 263412
   data: 4940
-  metadata: 134452
+  metadata: 129528
 functions:
   __arr_drop___m11__StepResult$SexpKind:
     calls: 0
@@ -290,7 +290,7 @@ functions:
     bytes: 160
   __arr_drop___m11__TokenRule$SexpKind:
     calls: 32
-    bytes: 604
+    bytes: 488
   __arr_drop___m15__Sexp:
     calls: 33
     bytes: 116
@@ -329,7 +329,7 @@ functions:
     bytes: 160
   __arr_retain___m11__TokenRule$SexpKind:
     calls: 0
-    bytes: 604
+    bytes: 488
   __arr_retain___m15__Sexp:
     calls: 38
     bytes: 116
@@ -377,7 +377,7 @@ functions:
     bytes: 324
   __builtin_count_while$char$lam$__m11__lex_step$SexpKind$lambda1:
     calls: 150
-    bytes: 312
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 0
     bytes: 280
@@ -482,7 +482,7 @@ functions:
     bytes: 800
   __m11__delimited_len:
     calls: 0
-    bytes: 1904
+    bytes: 1936
   __m11__finalize_template$SexpKind:
     calls: 0
     bytes: 4004
@@ -497,13 +497,13 @@ functions:
     bytes: 1196
   __m11__lex_step$SexpKind:
     calls: 240
-    bytes: 22604
+    bytes: 18008
   __m11__nested_len:
     calls: 0
     bytes: 1148
   __m11__step_result$SexpKind:
     calls: 622
-    bytes: 8488
+    bytes: 7580
   __m11__template_scan$SexpKind:
     calls: 0
     bytes: 2824
@@ -518,7 +518,7 @@ functions:
     bytes: 268
   __m11__to_eol_unless_len:
     calls: 0
-    bytes: 368
+    bytes: 360
   __m13__can_reach$SexpKind$__m15__Sexp$map1:
     calls: 0
     bytes: 384
@@ -890,7 +890,7 @@ functions:
     bytes: 336
   lex_sexp:
     calls: 32
-    bytes: 3440
+    bytes: 3984
   lower_item:
     calls: 34
     bytes: 508

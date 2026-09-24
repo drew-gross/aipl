@@ -12,6 +12,7 @@ import {
     push,
     split,
     starts_with,
+    to_set,
     value_or,
     value_or_err,
     wrapping_sub as -,
@@ -182,9 +183,15 @@ pub fn doc_line_value(line: str) -> str { line.trim_prefix('#').trim_prefix(' ')
     });
 })
 
-pub fn ident_start() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_" }
+pub fn ident_start() -> #{char} {
+    let chars: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
+    chars.to_set()
+}
 
-pub fn ident_cont() -> str { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789" }
+pub fn ident_cont() -> #{char} {
+    let chars: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
+    chars.to_set()
+}
 
 # One keyword/constant rule: match the exact `spelling` at an identifier
 # boundary (so `fn`/`true` don't split `fnord`/`trueish`) and emit the fixed
@@ -464,7 +471,7 @@ let S_DOC = "comment.line.documentation.aipl";
 pub fn aipl_rules() -> TokenRule<AiplTok>[] {
     let three_quotes = `"""`;
     [
-        TokenRule { matcher: CharRun(" \t\n\r"), emit: Bare(Space), skip: true },
+        TokenRule { matcher: CharRun(#{' ', '\t', '\n', '\r'}), emit: Bare(Space), skip: true },
         TokenRule {
             matcher: ToEol("//"),
             emit: Bare(LineComment),
@@ -504,7 +511,11 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // `#` also leads a set/dict literal (`#{..}`), an ordered set's
         // `#>{..}` / `#<{..}`, and the `#[allow]` marker above, so the matcher
         // declines those leads and they fall through to the rules that want them.
-        TokenRule { matcher: ToEolUnless("#", "{[<>"), emit: Of(doc_text), scope: S_DOC },
+        TokenRule {
+            matcher: ToEolUnless("#", #{'{', '[', '<', '>'}),
+            emit: Of(doc_text),
+            scope: S_DOC,
+        },
         // Keywords and constants, each its own `kw` rule (identifier-boundary
         // matched, so `iffy`/`noneish` stay `Name`s). Order among them is
         // immaterial — the spellings are disjoint — but all must precede the
@@ -560,7 +571,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             scope: S_STRING,
         },
         TokenRule {
-            matcher: Delimited(`"`, `ntr\\"`),
+            matcher: Delimited(`"`, #{'n', 't', 'r', '\\', '"'}),
             emit: Of(|text: str| StrLit(text.unescape(), Quoted)),
             unterminated: "unterminated string literal",
             scope: S_STRING,
@@ -574,7 +585,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // (not `Char`) to avoid the library test `Kind`'s arm (shared constructor
         // namespace). The escape set matches the string rule plus `\'`.
         TokenRule {
-            matcher: Delimited("'", `ntr\\'"`),
+            matcher: Delimited("'", #{'n', 't', 'r', '\\', '\'', '"'}),
             emit: Try(char_lit_emit),
             unterminated: "unterminated char literal",
             scope: S_CHAR,
@@ -924,12 +935,12 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
 allocations: 288
 deallocations: 288
 reallocations: 67
-bytes allocated: 421509
-instructions executed: 1657750
-binary size: 634184
-  code: 430888
+bytes allocated: 439365
+instructions executed: 3871840
+binary size: 635448
+  code: 436756
   data: 10612
-  metadata: 192684
+  metadata: 188080
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -939,7 +950,7 @@ functions:
     bytes: 388
   __arr_drop___m1__TokenRule$AiplTok:
     calls: 31
-    bytes: 832
+    bytes: 716
   __arr_retain___m1__StepResult$AiplTok:
     calls: 2
     bytes: 140
@@ -948,13 +959,13 @@ functions:
     bytes: 388
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
-    bytes: 832
+    bytes: 716
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 24
     bytes: 304
   __builtin_count_while$char$lam$__m1__lex_step$AiplTok$lambda1:
     calls: 55
-    bytes: 312
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 4
     bytes: 268
@@ -1017,7 +1028,7 @@ functions:
     bytes: 800
   __m1__delimited_len:
     calls: 74
-    bytes: 1904
+    bytes: 1936
   __m1__finalize_template$AiplTok:
     calls: 6
     bytes: 7228
@@ -1032,13 +1043,13 @@ functions:
     bytes: 1196
   __m1__lex_step$AiplTok:
     calls: 116
-    bytes: 27352
+    bytes: 22860
   __m1__nested_len:
     calls: 78
     bytes: 1148
   __m1__step_result$AiplTok:
     calls: 2858
-    bytes: 14264
+    bytes: 13344
   __m1__template_scan$AiplTok:
     calls: 6
     bytes: 2824
@@ -1053,7 +1064,7 @@ functions:
     bytes: 268
   __m1__to_eol_unless_len:
     calls: 75
-    bytes: 368
+    bytes: 360
   __m2__unescape:
     calls: 34
     bytes: 1628
@@ -1128,7 +1139,7 @@ functions:
     bytes: (external)
   aipl_rules:
     calls: 31
-    bytes: 91844
+    bytes: 103336
   aipl_rules$lambda0:
     calls: 0
     bytes: 144

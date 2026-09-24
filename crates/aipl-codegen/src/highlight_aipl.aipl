@@ -172,15 +172,15 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 5622
-deallocations: 5622
+allocations: 5624
+deallocations: 5624
 reallocations: 331
-bytes allocated: 467200
-instructions executed: 1386338
-binary size: 237984
-  code: 175752
+bytes allocated: 467682
+instructions executed: 1454986
+binary size: 247952
+  code: 186944
   data: 3336
-  metadata: 58896
+  metadata: 57672
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -193,7 +193,7 @@ functions:
     bytes: 116
   __arr_drop___m4__TokenRule$__m6__AiplTok:
     calls: 1
-    bytes: 832
+    bytes: 716
   __arr_retain___m1__Entry:
     calls: 2
     bytes: 148
@@ -205,7 +205,7 @@ functions:
     bytes: 116
   __arr_retain___m4__TokenRule$__m6__AiplTok:
     calls: 0
-    bytes: 832
+    bytes: 716
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 908
     bytes: 304
@@ -233,6 +233,9 @@ functions:
   __ctor$__m6__AiplTok$Name:
     calls: 0
     bytes: 104
+  __eq_set$char:
+    calls: 2
+    bytes: 84
   __m10__trim_prefix:
     calls: 0
     bytes: 252
@@ -247,7 +250,7 @@ functions:
     bytes: 1076
   __m1__char_class_body:
     calls: 13
-    bytes: 1476
+    bytes: 1428
   __m1__class_char:
     calls: 276
     bytes: 996
@@ -268,7 +271,7 @@ functions:
     bytes: 2224
   __m1__matcher_pat:
     calls: 78
-    bytes: 6684
+    bytes: 6868
   __m1__obj_fld:
     calls: 5
     bytes: 2456
@@ -331,7 +334,7 @@ functions:
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 126284
+    bytes: 137488
   __to_str_u64:
     calls: 7
     bytes: 204
@@ -388,6 +391,9 @@ functions:
     bytes: (external)
   aipl_u64_len:
     calls: 14
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 8
     bytes: (external)
   aipl_write_u64:
     calls: 7

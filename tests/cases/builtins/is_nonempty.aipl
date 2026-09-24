@@ -36,6 +36,11 @@ fn sets(s: #{i64}) -> bool { s.is_nonempty() }.test({
     assert(!sets(#{}));
 })
 
+fn char_sets(s: #{char}) -> bool { s.is_nonempty() }.test({
+    assert(char_sets(#{'a', 'b'}));
+    assert(!char_sets(#{}));
+})
+
 fn dicts(d: #{str: i64}) -> bool { d.is_nonempty() }.test({
     assert(dicts(#{"a": 1}));
 
@@ -48,11 +53,11 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 256
-instructions executed: 498
-binary size: 6168
-  code: 2904
-  data: 611
-  metadata: 2653
+instructions executed: 616
+binary size: 7008
+  code: 3432
+  data: 707
+  metadata: 2869
 functions:
   __dict_drop_str$i64:
     calls: 1
@@ -63,6 +68,9 @@ functions:
   __test$arrays:
     calls: 1
     bytes: 396
+  __test$char_sets:
+    calls: 1
+    bytes: 460
   __test$dicts:
     calls: 1
     bytes: 384
@@ -91,7 +99,7 @@ functions:
     calls: 2
     bytes: (external)
   aipl_assert:
-    calls: 15
+    calls: 17
     bytes: (external)
   aipl_dict_insert:
     calls: 1
@@ -103,14 +111,14 @@ functions:
     calls: 2
     bytes: (external)
   aipl_test_begin:
-    calls: 5
+    calls: 6
     bytes: (external)
   aipl_test_end:
-    calls: 5
+    calls: 6
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   main:
     calls: 1
-    bytes: 360
+    bytes: 428

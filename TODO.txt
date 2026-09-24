@@ -76,6 +76,13 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  delimited should default to empty set for escapes
+  template_inner should use sets better
+  Matcher should use doc comments, also Delimited should use named args probably
+  unordered set needs some way to convert to array
+  class_meta should be a const set
+  three_quotes can be inlined
+  rewrite fn ob(), fn re_meta(), etc. to be less insane with escapes
   match_arm parser in patterns looks like it can be simpler, the => arm_body part is non-DRY
   fn nest and fn one have a lot of overlap
   link should return a Grammar without Named, rule_first and rule_labels should use it
@@ -131,6 +138,8 @@ integer signedness problems:
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
 dev loop:
+  dbg() function
+  report type errors from different functions
   combined failure tests that are all testing failures of the same feature
   a_directory_argument_checks_the_tree_under_it is failing early and preventing more useful tests from failing
 
@@ -163,6 +172,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
+  lex(`"a\\`, strs) should be unterminated delimited token, because strs doesn't have any escapes
   aipl_arr_ensure_heap for a reversed view appears to dec the inner array twice
   binding_is_exclusive treats a later slice of a mut array as an alias for the whole body, so a push loop before the slice copies per iteration
   1 + rs.fold(0, |n, r| n + r.size()) should work, currently doens't due to wrong type getting pinned
@@ -181,6 +191,9 @@ bugs:
       `xs.filter(keep).map(f)`; restructured around it rather than fixing.
 
 errors:
+  assert should print the mixed values when there is an
+  "assert failed at" should show the actual file name, not input:xxx
+  .one_char_len(wrong_type_value) is showing mangled names in it's type errors, and also isn't giving the full file path
   type errors should point to source locations
   better error when you forget a ; after an if.
 
@@ -249,6 +262,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  "str_literal".to_set() should work, also should be const folded and fix the current users
   Variant without Case should work
   i64 without 0 should work
   none.value_or_err doesn't type check. Maybe it should? Unclear.
@@ -425,7 +439,7 @@ design:
   apis should express intent
 
 optimizations:
-  turn #{char} into a 256 (or 128?) bit bitfield, and use set contains for is-alpha checking
+  ident_start and ident_cont should be constants computed at compile time
   for move-in detection:
       need a "last use before overwrite" flag
       also last-use detection for struct fields
@@ -632,6 +646,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  should be able to regenerate syntax highlighter
   display the number of test excluded from handoff
   merge tests of similar things into the same file for less process overhead
   use bazel

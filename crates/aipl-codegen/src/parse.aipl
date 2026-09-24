@@ -59,6 +59,7 @@ import {
     not_equal as !=,
     push,
     sort,
+    to_set,
     try_map,
     union,
     union_all,
@@ -1224,14 +1225,17 @@ pub fn parse<K: variant, A: any>(
     start: str,
 ) -> A!ParseError { lower(src, parse_cst(src, lexed, g, start)?, g) }.test({
     fn trivia_rules() -> TokenRule<Tok>[] {
-        let alpha = "abcdefghijklmnopqrstuvwxyz";
-        let digit = "0123456789";
+        let alpha: char[] = "abcdefghijklmnopqrstuvwxyz";
+        let digit: char[] = "0123456789";
         [
-            TokenRule { matcher: CharRun(" \t\n"), emit: Bare(Punct), trivia: true },
+            TokenRule { matcher: CharRun(#{' ', '\t', '\n'}), emit: Bare(Punct), trivia: true },
             TokenRule { matcher: ToEol("//"), emit: Bare(Punct), trivia: true },
-            TokenRule { matcher: CharRun(alpha), emit: Of(Word) },
-            TokenRule { matcher: CharRun(digit), emit: Of(Num) },
-            TokenRule { matcher: OneChar("()[],;+*"), emit: Bare(Punct) },
+            TokenRule { matcher: CharRun(alpha.to_set()), emit: Of(Word) },
+            TokenRule { matcher: CharRun(digit.to_set()), emit: Of(Num) },
+            TokenRule {
+                matcher: OneChar(#{'(', ')', '[', ']', ',', ';', '+', '*'}),
+                emit: Bare(Punct),
+            },
         ]
     }
 
@@ -1722,13 +1726,16 @@ variant Tok = Word(str) | Num(str) | Punct
 # `trivia_rules` is the same set with whitespace and comments *recorded*, which
 # is what the losslessness assertion needs.
 fn tok_rules() -> TokenRule<Tok>[] {
-    let alpha = "abcdefghijklmnopqrstuvwxyz";
-    let digit = "0123456789";
+    let alpha: char[] = "abcdefghijklmnopqrstuvwxyz";
+    let digit: char[] = "0123456789";
     [
-        TokenRule { matcher: CharRun(" \t\n"), emit: Bare(Punct), skip: true },
-        TokenRule { matcher: CharRun(alpha), emit: Of(Word) },
-        TokenRule { matcher: CharRun(digit), emit: Of(Num) },
-        TokenRule { matcher: OneChar("()[],;+*"), emit: Bare(Punct) },
+        TokenRule { matcher: CharRun(#{' ', '\t', '\n'}), emit: Bare(Punct), skip: true },
+        TokenRule { matcher: CharRun(alpha.to_set()), emit: Of(Word) },
+        TokenRule { matcher: CharRun(digit.to_set()), emit: Of(Num) },
+        TokenRule {
+            matcher: OneChar(#{'(', ')', '[', ']', ',', ';', '+', '*'}),
+            emit: Bare(Punct),
+        },
     ]
 }
 
@@ -1764,12 +1771,12 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
 allocations: 5999
 deallocations: 5999
 reallocations: 1430
-bytes allocated: 700524
-instructions executed: 1539726
-binary size: 764312
-  code: 462348
+bytes allocated: 703844
+instructions executed: 1815356
+binary size: 755272
+  code: 458320
   data: 12892
-  metadata: 289072
+  metadata: 284060
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1800,7 +1807,7 @@ functions:
     bytes: 188
   __arr_drop___m4__TokenRule$Tok:
     calls: 103
-    bytes: 632
+    bytes: 516
   __arr_retain_Node:
     calls: 16
     bytes: 116
@@ -1830,7 +1837,7 @@ functions:
     bytes: 188
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
-    bytes: 632
+    bytes: 516
   __builtin_all$__m3__Rule$Tok$lam$rule_nullable$Tok$lambda0:
     calls: 0
     bytes: 36
@@ -1848,7 +1855,7 @@ functions:
     bytes: 380
   __builtin_count_while$char$lam$__m4__lex_step$Tok$lambda1:
     calls: 230
-    bytes: 312
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 0
     bytes: 280
@@ -2043,7 +2050,7 @@ functions:
     bytes: 800
   __m4__delimited_len:
     calls: 0
-    bytes: 1904
+    bytes: 1936
   __m4__finalize_template$Tok:
     calls: 0
     bytes: 4396
@@ -2058,13 +2065,13 @@ functions:
     bytes: 1196
   __m4__lex_step$Tok:
     calls: 371
-    bytes: 23208
+    bytes: 18608
   __m4__nested_len:
     calls: 0
     bytes: 1148
   __m4__step_result$Tok:
     calls: 998
-    bytes: 9192
+    bytes: 8276
   __m4__template_scan$Tok:
     calls: 0
     bytes: 2824
@@ -2079,7 +2086,7 @@ functions:
     bytes: 268
   __m4__to_eol_unless_len:
     calls: 0
-    bytes: 368
+    bytes: 360
   __m6__line_at:
     calls: 5
     bytes: 652
@@ -2115,7 +2122,7 @@ functions:
     bytes: 932
   __test$parse$trivia_rules:
     calls: 3
-    bytes: 3368
+    bytes: 4224
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -2319,7 +2326,7 @@ functions:
     bytes: 876
   tok_rules:
     calls: 100
-    bytes: 2736
+    bytes: 3580
   tok_text$Tok$Node:
     calls: 211
     bytes: 904

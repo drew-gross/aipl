@@ -29,6 +29,7 @@ import {
     map,
     map_err,
     map_ok,
+    to_set,
     value_or_err,
     wrapping_sub as -,
 } from builtins;
@@ -105,17 +106,20 @@ variant Json =
 # (`Maybe(Lit("-"))` in `number`), one place, rather than split between a
 # sign the lexer swallowed and one it didn't.
 fn json_rules() -> TokenRule<JsonTok>[] {
-    let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+    let alnum: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
     [
-        TokenRule { matcher: CharRun(" \t\r\n"), emit: Bare(Punct), trivia: true },
-        TokenRule { matcher: Delimited(`"`, `"\\/bfnrtu`), emit: Of(Str) },
+        TokenRule { matcher: CharRun(#{' ', '\t', '\r', '\n'}), emit: Bare(Punct), trivia: true },
+        TokenRule {
+            matcher: Delimited(`"`, #{'"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u'}),
+            emit: Of(Str),
+        },
         TokenRule { matcher: Exact("-"), emit: Bare(Punct) },
         TokenRule { matcher: Float, emit: Bare(Num) },
         TokenRule { matcher: Int, emit: Bare(Num) },
-        TokenRule { matcher: Keyword("true", alnum), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("false", alnum), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("null", alnum), emit: Bare(Kw) },
-        TokenRule { matcher: OneChar("{}[]:,"), emit: Bare(Punct) },
+        TokenRule { matcher: Keyword("true", alnum.to_set()), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("false", alnum.to_set()), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("null", alnum.to_set()), emit: Bare(Kw) },
+        TokenRule { matcher: OneChar(#{'{', '}', '[', ']', ':', ','}), emit: Bare(Punct) },
     ]
 }
 
@@ -505,12 +509,12 @@ fn json_space(l: str, r: str) -> bool { l == ":" }
 allocations: 21446
 deallocations: 21446
 reallocations: 3218
-bytes allocated: 2794115
-instructions executed: 5463227
-binary size: 461224
-  code: 301932
+bytes allocated: 2798291
+instructions executed: 6004577
+binary size: 452080
+  code: 297716
   data: 8596
-  metadata: 150696
+  metadata: 145768
 functions:
   __arr_drop_Json:
     calls: 125
@@ -523,7 +527,7 @@ functions:
     bytes: 160
   __arr_drop___m11__TokenRule$JsonTok:
     calls: 58
-    bytes: 604
+    bytes: 488
   __arr_drop___m1__Cst:
     calls: 1300
     bytes: 116
@@ -562,7 +566,7 @@ functions:
     bytes: 160
   __arr_retain___m11__TokenRule$JsonTok:
     calls: 0
-    bytes: 604
+    bytes: 488
   __arr_retain___m1__Cst:
     calls: 1181
     bytes: 116
@@ -607,7 +611,7 @@ functions:
     bytes: 324
   __builtin_count_while$char$lam$__m11__lex_step$JsonTok$lambda1:
     calls: 90
-    bytes: 312
+    bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
     calls: 644
     bytes: 280
@@ -721,7 +725,7 @@ functions:
     bytes: 800
   __m11__delimited_len:
     calls: 395
-    bytes: 1904
+    bytes: 1936
   __m11__finalize_template$JsonTok:
     calls: 0
     bytes: 4004
@@ -736,13 +740,13 @@ functions:
     bytes: 1196
   __m11__lex_step$JsonTok:
     calls: 485
-    bytes: 22604
+    bytes: 18008
   __m11__nested_len:
     calls: 0
     bytes: 1148
   __m11__step_result$JsonTok:
     calls: 2824
-    bytes: 8488
+    bytes: 7580
   __m11__template_scan$JsonTok:
     calls: 0
     bytes: 2824
@@ -757,7 +761,7 @@ functions:
     bytes: 268
   __m11__to_eol_unless_len:
     calls: 0
-    bytes: 368
+    bytes: 360
   __m12__unescape:
     calls: 35
     bytes: 1628
@@ -1171,7 +1175,7 @@ functions:
     bytes: 164
   lex_json:
     calls: 58
-    bytes: 6700
+    bytes: 8200
   lower_member:
     calls: 24
     bytes: 1736
