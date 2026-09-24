@@ -129,7 +129,7 @@ struct Tm {
 # The chars a regex reads specially outside a character class, and so that a
 # literal spelling must escape. `-` is not among them: it is only special
 # *inside* a class (see `class_char`).
-fn re_meta() -> str { """\.^$|?*+()[]{}""" }
+let RE_META = """\.^$|?*+()[]{}""";
 
 # The chars that must be escaped *inside* `[...]`, where the rules are different
 # and much shorter.
@@ -146,7 +146,7 @@ fn cb() -> str { "}" }
 # specially is backslash-escaped. Used for a rule's fixed spelling — an
 # operator, a keyword, a delimiter.
 pub fn re_escape(s: str) -> str {
-    s.map(|ch| if (re_meta().contains(ch)) { `\\{ch}` } else { `{ch}` }).join()
+    s.map(|ch| if (RE_META.contains(ch)) { `\\{ch}` } else { `{ch}` }).join()
 }.test({
     assert(re_escape("fn") == "fn");
     assert(re_escape("+++") == """\+\+\+""");

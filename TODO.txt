@@ -82,7 +82,7 @@ misc cleanup:
   unordered set needs some way to convert to array
   class_meta should be a const set
   dedent_segments should be able to do better than a join/split. Maybe a process raw string segments?
-  rewrite fn ob(), fn re_meta(), etc. to be less insane with escapes
+  rewrite fn ob(), etc. to be less insane with escapes
   match_arm parser in patterns looks like it can be simpler, the => arm_body part is non-DRY
   fn nest and fn one have a lot of overlap
   link should return a Grammar without Named, rule_first and rule_labels should use it
@@ -735,6 +735,7 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  docs for top-level lets
   hide privates by default so you have to expand a thing to show them
   file headers in docs
   don't need to say callable as a method for self: it's inferrable from the signature
