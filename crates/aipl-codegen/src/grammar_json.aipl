@@ -110,7 +110,7 @@ fn json_rules() -> TokenRule<JsonTok>[] {
     [
         TokenRule { matcher: CharRun(#{' ', '\t', '\r', '\n'}), emit: Bare(Punct), trivia: true },
         TokenRule {
-            matcher: Delimited(`"`, #{'"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u'}),
+            matcher: Delimited(`"`, escaped=#{'"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u'}),
             emit: Of(Str),
         },
         TokenRule { matcher: Exact("-"), emit: Bare(Punct) },

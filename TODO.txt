@@ -76,7 +76,6 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  delimited should default to empty set for escapes
   template_inner should use sets better
   Matcher should use doc comments, also Delimited should use named args probably
   unordered set needs some way to convert to array
@@ -440,6 +439,7 @@ design:
 optimizations:
   template literals should constant fold in their parts if constant
   string interning? replaing let tq = `"""`; f(tq, tq) with f(`"""`, `"""`); was slower, which I wouldn't expect
+  to_set() should constant fold
   ident_start and ident_cont should be constants computed at compile time
   for move-in detection:
       need a "last use before overwrite" flag

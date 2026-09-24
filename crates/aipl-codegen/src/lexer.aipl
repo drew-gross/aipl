@@ -217,7 +217,7 @@ variant Matcher =
     // — the token's value is the delimiter-stripped text left *un-decoded*, so
     // the rule's `emit` decides what escapes mean, with its own decoder (the
     // library provides none — escape semantics are the language's).
-    | Delimited(str, #{char})
+    | Delimited(str, escaped: #{char} = #{})
     // The `open` spelling opens the token, which runs to just past the next
     // *full* occurrence of the `close` spelling. Unlike `Delimited`, open and
     // close are multi-char and may differ, and the scan matches the whole
@@ -1147,7 +1147,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // *un-decoded* — with escapes off ("") that's the whole content verbatim, and
     // here none of the inputs carry a backslash so `Of(Str)` needs no decoding.
     // An unterminated token is a hard error at its open delimiter.
-    let strs = [ws, TokenRule { matcher: Delimited(`"'`, #{}), emit: Of(Str) }, ident];
+    let strs = [ws, TokenRule { matcher: Delimited(`"'`), emit: Of(Str) }, ident];
     assert(lex(`"hi" x`, strs)? == toks([
         tok(`"hi" x`, Str("hi"), 0..4),
         tok(`"hi" x`, Ident("x"), 5..6),
@@ -1159,7 +1159,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // hard error), but *decoding* is the emit's job: `esc_str` calls `unescape`.
     let esc = [
         ws,
-        TokenRule { matcher: Delimited(`"`, #{'n', 't', '\\', '"'}), emit: Of(esc_str) },
+        TokenRule { matcher: Delimited(`"`, escaped=#{'n', 't', '\\', '"'}), emit: Of(esc_str) },
         ident,
     ];
     assert(lex(`"a\\"b"`, esc)? == toks([tok(`"a\\"b"`, Str(`a"b`), 0..6)]));
@@ -1183,7 +1183,10 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // message the library pairs with the token's span. A well-formed one passes.
     let nes = [
         ws,
-        TokenRule { matcher: Delimited(`"`, #{'n', 't', '\\', '"'}), emit: Try(nonempty_str) },
+        TokenRule {
+            matcher: Delimited(`"`, escaped=#{'n', 't', '\\', '"'}),
+            emit: Try(nonempty_str),
+        },
         ident,
     ];
     assert(lex(`"hi"`, nes)? == toks([tok(`"hi"`, Str("hi"), 0..4)]));
@@ -1443,7 +1446,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let json = [
         ws,
         TokenRule {
-            matcher: Delimited(`"`, #{'"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u'}),
+            matcher: Delimited(`"`, escaped=#{'"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u'}),
             emit: Of(Str),
         },
         TokenRule { matcher: Float, emit: Bare(FloatTok) },
@@ -1487,7 +1490,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: Keyword("set", alnum.to_set()), emit: Bare(Kw) },
         ident,
         TokenRule { matcher: Int, emit: Try(int_tok) },
-        TokenRule { matcher: Delimited(`"`, #{'n', 't', 'r', '\\', '"'}), emit: Of(Str) },
+        TokenRule { matcher: Delimited(`"`, escaped=#{'n', 't', 'r', '\\', '"'}), emit: Of(Str) },
         TokenRule { matcher: Exact("=="), emit: Bare(Op) },
         TokenRule { matcher: Exact("->"), emit: Bare(Op) },
         TokenRule { matcher: Exact("&&"), emit: Bare(Op) },

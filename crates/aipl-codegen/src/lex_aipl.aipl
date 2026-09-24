@@ -570,7 +570,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             scope: S_STRING,
         },
         TokenRule {
-            matcher: Delimited(`"`, #{'n', 't', 'r', '\\', '"'}),
+            matcher: Delimited(`"`, escaped=#{'n', 't', 'r', '\\', '"'}),
             emit: Of(|text: str| StrLit(text.unescape(), Quoted)),
             unterminated: "unterminated string literal",
             scope: S_STRING,
@@ -584,7 +584,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // (not `Char`) to avoid the library test `Kind`'s arm (shared constructor
         // namespace). The escape set matches the string rule plus `\'`.
         TokenRule {
-            matcher: Delimited("'", #{'n', 't', 'r', '\\', '\'', '"'}),
+            matcher: Delimited("'", escaped=#{'n', 't', 'r', '\\', '\'', '"'}),
             emit: Try(char_lit_emit),
             unterminated: "unterminated char literal",
             scope: S_CHAR,

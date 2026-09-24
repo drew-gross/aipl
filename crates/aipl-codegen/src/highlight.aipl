@@ -277,7 +277,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
 
     // A delimited scan closes on its own delimiter and carries its escapes.
     let esc: Pat = Match("""\\[nt]""", "esc");
-    assert(matcher_pat(Delimited(`"`, #{'n', 't'}), "s", "esc") == Region(
+    assert(matcher_pat(Delimited(`"`, escaped=#{'n', 't'}), "s", "esc") == Region(
         `"`,
         `"`,
         [esc],
@@ -330,7 +330,7 @@ pub fn matcher_regex(m: Matcher) -> str? {
     assert(matcher_regex(Exact("->")) == some("->"));
     assert(matcher_regex(CharRun(#{'a', 'b', '1'}, first=#{'a', 'b'})) == some("[ab][1ab]*"));
     // The four delimiter-scanning matchers have no single-expression form.
-    assert(matcher_regex(Delimited(`"`, #{'n', 't'})) == none);
+    assert(matcher_regex(Delimited(`"`, escaped=#{'n', 't'})) == none);
     assert(matcher_regex(Between("<", ">")) == none);
     assert(matcher_regex(Nested("/*", "*/")) == none);
     assert(matcher_regex(Template("`", "", |segs: str[]| segs)) == none);
@@ -735,9 +735,9 @@ deallocations: 549
 reallocations: 38
 bytes allocated: 43422
 instructions executed: 117850
-binary size: 129192
+binary size: 129208
   code: 85172
-  data: 5576
+  data: 5592
   metadata: 38444
 functions:
   __arr_drop_Entry:
