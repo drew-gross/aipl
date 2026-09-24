@@ -133,10 +133,7 @@ let RE_META = """\.^$|?*+()[]{}""";
 
 # The chars that must be escaped *inside* `[...]`, where the rules are different
 # and much shorter.
-fn class_meta() -> str {
-    let backslash = """\""";
-    `{backslash}[]^-`
-}
+let CLASS_META = """\[]^-""";
 
 # `s` as a regex matching exactly `s`: every character the engine reads
 # specially is backslash-escaped. Used for a rule's fixed spelling — an
@@ -187,7 +184,7 @@ fn class_char(ch: char) -> str {
     if (ch == '\r') {
         return """\r""";
     };
-    if (class_meta().contains(ch)) {
+    if (CLASS_META.contains(ch)) {
         return `\\{ch}`;
     };
     `{ch}`
@@ -733,15 +730,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 641
-deallocations: 641
+allocations: 549
+deallocations: 549
 reallocations: 38
-bytes allocated: 49264
-instructions executed: 118770
-binary size: 129448
-  code: 85332
+bytes allocated: 43422
+instructions executed: 117850
+binary size: 129192
+  code: 85172
   data: 5576
-  metadata: 38540
+  metadata: 38444
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -907,7 +904,7 @@ functions:
     bytes: 1428
   class_char:
     calls: 49
-    bytes: 996
+    bytes: 836
   entry_name:
     calls: 5
     bytes: 444

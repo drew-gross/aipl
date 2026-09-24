@@ -172,15 +172,15 @@ fn section_tail() -> Pat {
     )
 }
 --- performance ---
-allocations: 4494
-deallocations: 4494
+allocations: 3942
+deallocations: 3942
 reallocations: 331
-bytes allocated: 380492
-instructions executed: 1437713
-binary size: 244904
-  code: 184856
+bytes allocated: 345440
+instructions executed: 1432193
+binary size: 244648
+  code: 184696
   data: 3336
-  metadata: 56712
+  metadata: 56616
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -253,7 +253,7 @@ functions:
     bytes: 1428
   __m1__class_char:
     calls: 276
-    bytes: 996
+    bytes: 836
   __m1__decl_pat:
     calls: 2
     bytes: 564
