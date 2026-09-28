@@ -935,9 +935,9 @@ allocations: 288
 deallocations: 288
 reallocations: 67
 bytes allocated: 439365
-instructions executed: 3872057
-binary size: 635496
-  code: 436808
+instructions executed: 3864772
+binary size: 634768
+  code: 436080
   data: 10612
   metadata: 188076
 functions:
@@ -1138,7 +1138,7 @@ functions:
     bytes: (external)
   aipl_rules:
     calls: 31
-    bytes: 103388
+    bytes: 102660
   aipl_rules$lambda0:
     calls: 0
     bytes: 144

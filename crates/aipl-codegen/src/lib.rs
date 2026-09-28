@@ -20983,6 +20983,43 @@ fn compile_expr_inner<M: Module>(
                 let set_ty = ConcreteType::Set(Box::new(ConcreteType::NoneInner), *order);
                 return Ok((value, set_ty));
             }
+            // Every element a literal `char`: the four words are known *now*, so
+            // the set is four immediate stores. The runtime path below builds the
+            // same bitfield with a zeroed slot and a shift-and-OR per element —
+            // fine for a handful, but a spelled-out character class has sixty-odd
+            // members and paid sixty-odd iterations every time it was built.
+            //
+            // Nothing is skipped by returning early: a `char` is a valid set
+            // element, every element agrees in type, and de-duplication is
+            // implicit (setting a bit twice is setting it once).
+            let literal_chars: Option<Vec<u8>> = elems
+                .iter()
+                .map(|e| match &e.kind {
+                    ExprKind::Char(c) => Some(*c),
+                    _ => None,
+                })
+                .collect();
+            if let Some(chars) = literal_chars {
+                let mut words = [0u64; CHARSET_WORDS];
+                for c in chars {
+                    words[(c >> 6) as usize] |= 1u64 << (c & 63);
+                }
+                let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    charset::CHARSET_SIZE as u32,
+                    3,
+                ));
+                for (w, word) in words.iter().enumerate() {
+                    // `as i64` keeps the bit pattern; `iconst` takes the word.
+                    let wv = builder.ins().iconst(types::I64, *word as i64);
+                    builder
+                        .ins()
+                        .stack_store(types::I64, wv, slot, (w * 8) as i32);
+                }
+                let base = builder.ins().stack_addr(types::I64, slot, 0);
+                let elem = ConcreteType::Primitive(Primitive::Char);
+                return Ok((base, ConcreteType::Set(Box::new(elem), *order)));
+            }
             // A set reuses the array heap block. Pre-size to the literal length
             // (an upper bound), then insert each element deduplicated via
             // `aipl_set_insert`. For `str` elements the block carries the array

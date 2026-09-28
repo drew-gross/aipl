@@ -728,9 +728,9 @@ allocations: 549
 deallocations: 549
 reallocations: 38
 bytes allocated: 43422
-instructions executed: 116635
-binary size: 128920
-  code: 84924
+instructions executed: 115977
+binary size: 126944
+  code: 82948
   data: 5592
   metadata: 38404
 functions:
@@ -796,7 +796,7 @@ functions:
     bytes: 1948
   __test$char_class_body:
     calls: 1
-    bytes: 2740
+    bytes: 1892
   __test$decl_pat:
     calls: 1
     bytes: 992
@@ -805,7 +805,7 @@ functions:
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 12948
+    bytes: 12436
   __test$matcher_pat$lambda0:
     calls: 0
     bytes: 64
@@ -814,7 +814,7 @@ functions:
     bytes: 64
   __test$matcher_regex:
     calls: 1
-    bytes: 7552
+    bytes: 7300
   __test$matcher_regex$lambda0:
     calls: 0
     bytes: 64
@@ -823,7 +823,7 @@ functions:
     bytes: 1104
   __test$rule_pats:
     calls: 1
-    bytes: 8380
+    bytes: 8016
   __test$tm_json:
     calls: 1
     bytes: 4876

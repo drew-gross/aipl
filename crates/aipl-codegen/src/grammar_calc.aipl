@@ -471,9 +471,9 @@ allocations: 10716
 deallocations: 10716
 reallocations: 1853
 bytes allocated: 1168679
-instructions executed: 2589064
-binary size: 415144
-  code: 273984
+instructions executed: 2580964
+binary size: 414680
+  code: 273520
   data: 6100
   metadata: 135060
 functions:
@@ -1130,7 +1130,7 @@ functions:
     bytes: 332
   lex_calc:
     calls: 54
-    bytes: 2980
+    bytes: 2516
   lower_atom:
     calls: 121
     bytes: 1252

@@ -1772,9 +1772,9 @@ allocations: 5999
 deallocations: 5999
 reallocations: 1430
 bytes allocated: 703844
-instructions executed: 1815356
-binary size: 755272
-  code: 458320
+instructions executed: 1801245
+binary size: 754432
+  code: 457480
   data: 12892
   metadata: 284060
 functions:
@@ -2122,7 +2122,7 @@ functions:
     bytes: 932
   __test$parse$trivia_rules:
     calls: 3
-    bytes: 4224
+    bytes: 3804
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -2326,7 +2326,7 @@ functions:
     bytes: 876
   tok_rules:
     calls: 100
-    bytes: 3580
+    bytes: 3160
   tok_text$Tok$Node:
     calls: 211
     bytes: 904

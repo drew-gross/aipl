@@ -276,9 +276,9 @@ allocations: 6508
 deallocations: 6508
 reallocations: 911
 bytes allocated: 634326
-instructions executed: 1651154
-binary size: 397880
-  code: 263412
+instructions executed: 1650418
+binary size: 397816
+  code: 263348
   data: 4940
   metadata: 129528
 functions:
@@ -890,7 +890,7 @@ functions:
     bytes: 336
   lex_sexp:
     calls: 32
-    bytes: 3984
+    bytes: 3920
   lower_item:
     calls: 34
     bytes: 508

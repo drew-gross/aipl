@@ -3371,9 +3371,9 @@ allocations: 101983
 deallocations: 101983
 reallocations: 16733
 bytes allocated: 20692365
-instructions executed: 67972766
-binary size: 17801976
-  code: 11435904
+instructions executed: 67927646
+binary size: 17801248
+  code: 11435176
   data: 38420
   metadata: 6327652
 functions:
@@ -3970,7 +3970,7 @@ functions:
     bytes: 6072
   __m22__aipl_rules:
     calls: 192
-    bytes: 103388
+    bytes: 102660
   __m22__aipl_rules$lambda0:
     calls: 0
     bytes: 144

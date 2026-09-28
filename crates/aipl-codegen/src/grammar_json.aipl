@@ -510,9 +510,9 @@ allocations: 21446
 deallocations: 21446
 reallocations: 3218
 bytes allocated: 2798291
-instructions executed: 6004577
-binary size: 452080
-  code: 297716
+instructions executed: 5990773
+binary size: 451352
+  code: 296988
   data: 8596
   metadata: 145768
 functions:
@@ -1175,7 +1175,7 @@ functions:
     bytes: 164
   lex_json:
     calls: 58
-    bytes: 8200
+    bytes: 7472
   lower_member:
     calls: 24
     bytes: 1736

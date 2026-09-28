@@ -1510,11 +1510,11 @@ allocations: 415
 deallocations: 415
 reallocations: 90
 bytes allocated: 67144
-instructions executed: 422597
-binary size: 2495104
-  code: 1696336
+instructions executed: 422182
+binary size: 2494264
+  code: 1695492
   data: 11628
-  metadata: 787140
+  metadata: 787144
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1593,10 +1593,10 @@ functions:
     bytes: 1628
   __test$keep_skipped:
     calls: 1
-    bytes: 22980
+    bytes: 22868
   __test$lex:
     calls: 1
-    bytes: 1583152
+    bytes: 1582420
   __test$lex$checked_seg:
     calls: 2
     bytes: 1780

@@ -53,9 +53,9 @@ allocations: 5
 deallocations: 5
 reallocations: 0
 bytes allocated: 256
-instructions executed: 616
-binary size: 7008
-  code: 3432
+instructions executed: 593
+binary size: 6936
+  code: 3360
   data: 707
   metadata: 2869
 functions:
@@ -70,7 +70,7 @@ functions:
     bytes: 396
   __test$char_sets:
     calls: 1
-    bytes: 460
+    bytes: 388
   __test$dicts:
     calls: 1
     bytes: 384
