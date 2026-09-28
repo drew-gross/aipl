@@ -7311,6 +7311,7 @@ const AIPL_BUILTIN_SOURCES: &[(Callee, &str)] = &[
     (Callee::FindIf, "builtin_find_if.aipl"),
     (Callee::MapFindIf, "builtin_map_find_if.aipl"),
     (Callee::MapJoin, "builtin_map_join.aipl"),
+    (Callee::SplitMap, "builtin_split_map.aipl"),
     (Callee::FindMap, "builtin_find_map.aipl"),
     (Callee::ReverseFindMap, "builtin_reverse_find_map.aipl"),
     (Callee::FindIndex, "builtin_find_index.aipl"),
@@ -7378,6 +7379,45 @@ fn load_aipl_builtin_fn(src: &str) -> (Function, Vec<StructDecl>) {
     (func, templates)
 }
 
+/// [`fuse_operations`] over one loaded builtin body.
+///
+/// A builtin's body is ordinary AIPL and deserves the same rewrites the user's
+/// program gets — `for (let x : self.reverse())` should no more build a
+/// reversed array here than it does there. It needs its own call because these
+/// sources are loaded *during* monomorphization, long after the pass swept the
+/// program, and nothing runs over them afterwards. It runs on the specialized
+/// template only — see the call site for why the declaration stays as written.
+///
+/// The effect set is the declared builtin signatures. That is the whole set a
+/// builtin body can reach: the loader has rewritten every imported reference to
+/// its canonical `__builtin_*` name, a source declares exactly one top-level
+/// `fn`, and the aborting builtins the loop family also refuses are added by
+/// the guard itself ([`sink::undeferrable_fns`]).
+fn fuse_builtin_body(f: Function) -> Function {
+    let program = Program {
+        items: vec![Item::Fn(f)],
+        sources: Vec::new(),
+    };
+    let fused = fuse_operations(&program, &effectful_builtins());
+    match fused.items.into_iter().next() {
+        Some(Item::Fn(f)) => f,
+        _ => unreachable!("fusion rewrites bodies, not items"),
+    }
+}
+
+/// The builtins whose declared signature carries an effect — [`effectful_fns`]
+/// for the builtin declarations, which are not `Item`s to run that over.
+fn effectful_builtins() -> &'static HashSet<String> {
+    static EFFECTFUL: OnceLock<HashSet<String>> = OnceLock::new();
+    EFFECTFUL.get_or_init(|| {
+        builtin_sigs()
+            .iter()
+            .filter(|(_, sig)| !sig.effects.is_empty())
+            .map(|(name, _)| name.clone())
+            .collect()
+    })
+}
+
 /// `f` with its refinements erased — [`aipl_syntax::erase_refinements`] for a
 /// single function, which is the unit a builtin source is loaded as.
 fn erased_fn(f: &Function) -> Function {
@@ -7442,8 +7482,12 @@ fn aipl_builtin(canonical: &str) -> Option<&'static AiplBuiltin> {
         // `erase_refinements`): a `T[] without []` parameter is a `T[]` to it.
         // The declaration handed to the checker keeps the refinement — that is
         // where `nonempty_first` refusing a plain array comes from.
-        let generic =
-            normalize(&erased_fn(&f)).expect("AIPL-implemented builtin signatures normalize");
+        // Fused only into the template mono specializes, never into the
+        // declaration below: the declaration is what the checker resolves calls
+        // against, and fusion writes calls (`__split_iter`) that exist for
+        // codegen's loop lowering and are not names the checker knows.
+        let generic = normalize(&fuse_builtin_body(erased_fn(&f)))
+            .expect("AIPL-implemented builtin signatures normalize");
         let mut decl = f;
         decl.name = canonical.to_string();
         decl.test_body = None;
@@ -7792,6 +7836,11 @@ fn builtin_return(callee: &Callee, arg_tys: &[Type]) -> Option<Type> {
                     .unwrap_or(Type::Array(Box::new(Type::NoneInner))),
             )
         }
+        // `for (let part : s.split(sep))`'s iterable after fusion: the source
+        // and the separator, walked by a split cursor. It stands where the
+        // array of parts stood, so it types as that array — which is what gives
+        // the loop variable its `str`.
+        Callee::SplitIter => return Some(Type::Array(Box::new(Type::Primitive(Primitive::Str)))),
         // Internal: a binding at its last use (see `move_last_use`) — the
         // binding's own value, typed as itself.
         Callee::Move => return Some(arg_tys.first().cloned().unwrap_or(Type::Unit)),

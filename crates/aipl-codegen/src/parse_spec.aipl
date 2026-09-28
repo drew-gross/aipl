@@ -172,15 +172,15 @@ fn companion_path(name: str, prefix: str) -> str!str {
     ok(path)
 }
 --- performance ---
-allocations: 106
-deallocations: 106
+allocations: 93
+deallocations: 93
 reallocations: 0
-bytes allocated: 4489
-instructions executed: 41816
-binary size: 90216
-  code: 60856
+bytes allocated: 2873
+instructions executed: 40075
+binary size: 90112
+  code: 60692
   data: 1798
-  metadata: 27562
+  metadata: 27622
 functions:
   __arr_drop_Entry:
     calls: 2
@@ -216,10 +216,10 @@ functions:
     calls: 301
     bytes: (external)
   aipl_array_dec:
-    calls: 360
+    calls: 347
     bytes: (external)
   aipl_array_new:
-    calls: 15
+    calls: 2
     bytes: (external)
   aipl_array_push:
     calls: 2
@@ -250,4 +250,4 @@ functions:
     bytes: 108
   parse_spec:
     calls: 13
-    bytes: 6620
+    bytes: 6456

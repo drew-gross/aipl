@@ -12,7 +12,10 @@
 //!   `xs.filter(p).map(f)` walks the elements twice and builds an array between
 //!   the two passes, so the pair collapses into `filter_map`, which selects and
 //!   maps in one — and, when the source is uniquely owned and the element sizing
-//!   allows, into the source's own buffer.
+//!   allows, into the source's own buffer. `s.split(sep).map(f)` is the same
+//!   shape over a string: `split` would build a block holding every part — a
+//!   retained view each — for `map` to walk once and drop, so the pair collapses
+//!   into `split_map`, which maps each part as the cut is made.
 //! - [`slice_fusions`] — a call on a sliced receiver. `xs[i..].starts_with(p)`
 //!   builds the whole tail of `xs` — for an array, a fresh block with every
 //!   element copied — only to look at its first few elements, so it collapses
@@ -21,8 +24,9 @@
 //!   builds the whole mapped array only to walk it once, so it collapses into a
 //!   loop over `xs` that applies `f` at the top of each iteration and never
 //!   materializes the intermediate; a `for` over `xs.tuple_windows()` likewise
-//!   becomes a loop over `xs` carrying the previous element, and one over
-//!   `xs.reverse()` a loop that codegen walks backwards.
+//!   becomes a loop over `xs` carrying the previous element, one over
+//!   `xs.reverse()` a loop that codegen walks backwards, and one over
+//!   `s.split(sep)` a walk of a cursor that hands back one part at a time.
 //!
 //! # Adding a fusion
 //!
@@ -65,7 +69,7 @@ mod slice_fusions;
 
 use std::collections::HashSet;
 
-use aipl_syntax::ast::{Expr, ExprKind, Item, Program};
+use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, Program, Type};
 
 use crate::sink::undeferrable_fns;
 
@@ -85,9 +89,9 @@ pub fn fuse_operations(program: &Program, effectful: &HashSet<String>) -> Progra
     let mut out = program.clone();
     for item in &mut out.items {
         if let Item::Fn(f) = item {
-            fuse_expr(&mut f.body, &guards);
+            fuse_expr(&mut f.body, None, &guards);
             if let Some(t) = f.test_body.as_mut() {
-                fuse_expr(t, &guards);
+                fuse_expr(t, None, &guards);
             }
         }
     }
@@ -105,11 +109,33 @@ struct Guards<'a> {
 
 /// Bottom-up: children first, so a fusion can be built from an already-fused
 /// sub-expression rather than racing it.
-fn fuse_expr(e: &mut Expr, guards: &Guards) {
-    for c in crate::children_mut(e) {
-        fuse_expr(c, guards);
+///
+/// `outer` is the callee of the call `e` is the *receiver* of, when it is one.
+/// It is the one piece of context bottom-up traversal loses and a family needs:
+/// a rewrite here can destroy the shape a better rewrite at the parent wanted,
+/// and only the parent's callee distinguishes the two (see
+/// [`chain_fusions::build`]). A receiver may sit under the `let`s an inlined
+/// call leaves in front of its body ([`through_bindings`]), so it travels
+/// through them.
+fn fuse_expr(e: &mut Expr, outer: Option<Callee>, guards: &Guards) {
+    match &mut e.kind {
+        ExprKind::Call(name, args, _) => {
+            let name = name.clone();
+            for (i, arg) in args.iter_mut().enumerate() {
+                fuse_expr(arg, (i == 0).then(|| name.clone()), guards);
+            }
+        }
+        ExprKind::Let(_, _, value, body) => {
+            fuse_expr(value, None, guards);
+            fuse_expr(body, outer.clone(), guards);
+        }
+        _ => {
+            for c in crate::children_mut(e) {
+                fuse_expr(c, None, guards);
+            }
+        }
     }
-    if let Some(fused) = try_fuse(e, guards) {
+    if let Some(fused) = try_fuse(e, outer.as_ref(), guards) {
         *e = fused;
     }
 }
@@ -119,7 +145,7 @@ fn fuse_expr(e: &mut Expr, guards: &Guards) {
 ///
 /// Shape first, effects second: this runs on every node of every body, and the
 /// effect check walks a whole subtree — worth paying only once a shape matched.
-fn try_fuse(e: &Expr, guards: &Guards) -> Option<Expr> {
+fn try_fuse(e: &Expr, outer: Option<&Callee>, guards: &Guards) -> Option<Expr> {
     let fused = match &e.kind {
         // A resolved operator call is the comparison fusions' shape (`xs.count(..)
         // < k`); any other call is the slice/chain shapes'. Operators arrive here
@@ -127,7 +153,7 @@ fn try_fuse(e: &Expr, guards: &Guards) -> Option<Expr> {
         ExprKind::Call(name, args, _) => {
             match (aipl_syntax::binop_for_builtin(name), args.as_slice()) {
                 (Some(op), [l, r]) => comparison_fusions::build(l, op, r, e),
-                _ => slice_fusions::build(e).or_else(|| chain_fusions::build(e)),
+                _ => slice_fusions::build(e).or_else(|| chain_fusions::build(e, outer)),
             }
         }
         // A loop guards itself: only its mapping function has to be pure, not
@@ -139,6 +165,48 @@ fn try_fuse(e: &Expr, guards: &Guards) -> Option<Expr> {
     // An effect *anywhere* in `e` rules the rewrite out, wherever the call sits:
     // fusing reorders the evaluation within it.
     (!has_effect(e, guards.effectful)).then_some(fused)
+}
+
+/// One `let` a fusable expression sits under — see [`through_bindings`].
+pub(super) struct Binding<'a> {
+    pub(super) name: &'a str,
+    pub(super) ty: &'a Option<Type>,
+    pub(super) value: &'a Expr,
+}
+
+/// The `let`s leading `e`, outermost first, and the expression under them.
+///
+/// Inlining a function binds each of its parameters ahead of its body, with the
+/// parameter's declared type, and the binding inliner deliberately leaves an
+/// annotated binding alone — so `s.lines()` reaches the pass as
+/// `let self: str = s; split(self, "\n")`, and a shape that looks for a call
+/// would miss it at exactly the sites inlining creates. Each family looks under
+/// the bindings and puts its rewrite back beneath them.
+pub(super) fn through_bindings(e: &Expr) -> (Vec<Binding<'_>>, &Expr) {
+    let mut bindings = Vec::new();
+    let mut e = e;
+    while let ExprKind::Let(name, ty, value, body) = &e.kind {
+        bindings.push(Binding { name, ty, value });
+        e = body;
+    }
+    (bindings, e)
+}
+
+/// `body` wrapped back up in the `let`s [`through_bindings`] peeled off, each
+/// rebuilt against `whole` — the source the user wrote, and what any later
+/// diagnostic should point at.
+pub(super) fn under_bindings(bindings: Vec<Binding<'_>>, whole: &Expr, body: Expr) -> Expr {
+    bindings.into_iter().rev().fold(body, |body, b| {
+        Expr::rebuilt(
+            ExprKind::Let(
+                b.name.to_string(),
+                b.ty.clone(),
+                Box::new(b.value.clone()),
+                Box::new(body),
+            ),
+            whole,
+        )
+    })
 }
 
 /// Whether evaluating `e` can do anything observable — call a function that

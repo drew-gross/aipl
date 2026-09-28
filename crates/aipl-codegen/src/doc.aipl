@@ -332,11 +332,11 @@ allocations: 314
 deallocations: 314
 reallocations: 1
 bytes allocated: 21677
-instructions executed: 34410
-binary size: 38336
-  code: 23852
+instructions executed: 33161
+binary size: 38176
+  code: 23616
   data: 881
-  metadata: 13603
+  metadata: 13679
 functions:
   __arr_drop_Doc:
     calls: 10
@@ -375,7 +375,7 @@ functions:
     calls: 1
     bytes: 5900
   aipl_arr_inc:
-    calls: 87
+    calls: 76
     bytes: (external)
   aipl_arr_reserve:
     calls: 11
@@ -387,13 +387,13 @@ functions:
     calls: 196
     bytes: (external)
   aipl_array_new:
-    calls: 52
+    calls: 41
     bytes: (external)
   aipl_array_push:
     calls: 40
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1
+    calls: 24
     bytes: (external)
   aipl_array_with_cap:
     calls: 1
@@ -454,7 +454,4 @@ functions:
     bytes: 108
   print:
     calls: 11
-    bytes: 4212
-  print$map2$own0:
-    calls: 11
-    bytes: 472
+    bytes: 4448

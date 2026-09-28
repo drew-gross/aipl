@@ -617,15 +617,15 @@ pub fn show(self: Cst, src: str, names: str[]) -> str {
     assert(grp.show(gs, names) == "[( (term 1 ~  + ~  2) )]");
 })
 --- performance ---
-allocations: 302
-deallocations: 302
+allocations: 291
+deallocations: 291
 reallocations: 19
-bytes allocated: 19629
-instructions executed: 46173
-binary size: 67504
-  code: 40508
+bytes allocated: 19101
+instructions executed: 46194
+binary size: 67120
+  code: 40348
   data: 3573
-  metadata: 23423
+  metadata: 23199
 functions:
   __arr_drop_Cst:
     calls: 40
@@ -653,10 +653,10 @@ functions:
     bytes: 1040
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_leaf:
     calls: 8
-    bytes: 440
+    bytes: 360
   __builtin_reverse_find_map$Cst$__builtin_Span$lam$last_token:
     calls: 3
-    bytes: 440
+    bytes: 360
   __eq_Cst:
     calls: 23
     bytes: 360
@@ -687,23 +687,17 @@ functions:
   __test$through:
     calls: 1
     bytes: 388
-  aipl_arr_elem_ptr:
-    calls: 13
-    bytes: (external)
   aipl_arr_extend:
     calls: 125
     bytes: (external)
   aipl_arr_inc:
-    calls: 1240
+    calls: 1229
     bytes: (external)
   aipl_arr_reserve:
     calls: 158
     bytes: (external)
-  aipl_arr_reverse:
-    calls: 11
-    bytes: (external)
   aipl_array_dec:
-    calls: 1662
+    calls: 1640
     bytes: (external)
   aipl_array_new:
     calls: 92

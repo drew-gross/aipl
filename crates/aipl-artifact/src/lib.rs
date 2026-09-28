@@ -390,7 +390,12 @@ pub fn builtin_import_sig<M: Module>(module: &mut M, sym: &str) -> Signature {
         "aipl_str_split"
         | "aipl_str_split_len"
         | "aipl_read_file_to_string"
-        | "aipl_write_string_to_file" => sig(2, true),
+        | "aipl_write_string_to_file"
+        // The part out pointer and the split cursor; the flag comes back in a
+        // register.
+        | "aipl_str_split_iter_next" => sig(2, true),
+        // The cursor, the source, and the separator.
+        "aipl_str_split_iter_init" => sig(3, false),
         "aipl_list_files" => sig(1, true),
         "aipl_char_to_str" => sig(2, false),
         "aipl_execute_program" => sig(3, false),

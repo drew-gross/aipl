@@ -4491,6 +4491,14 @@ fn new_jit_module() -> Result<JITModule, Error> {
     jit_builder.symbol("aipl_execute_program", aipl_execute_program as *const u8);
     jit_builder.symbol("aipl_str_split", aipl_str_split as *const u8);
     jit_builder.symbol("aipl_str_split_len", str24::aipl_str_split_len as *const u8);
+    jit_builder.symbol(
+        "aipl_str_split_iter_init",
+        str24::aipl_str_split_iter_init as *const u8,
+    );
+    jit_builder.symbol(
+        "aipl_str_split_iter_next",
+        str24::aipl_str_split_iter_next as *const u8,
+    );
     jit_builder.symbol("aipl_str_join", aipl_str_join as *const u8);
     jit_builder.symbol("aipl_arr_drop_str", str24::aipl_arr_drop_str as *const u8);
     jit_builder.symbol(
@@ -7832,6 +7840,9 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_arr_retain_opt"
         | "aipl_arr_retain_opt_str" => (2, Ret::None),
         "aipl_execute_program" => (3, Ret::None),
+        // The cursor, the source, and the separator: a split walk's whole state
+        // (`str24::SplitIter`), written into the caller's stack slot.
+        "aipl_str_split_iter_init" => (3, Ret::None),
         // ---- a scalar back ----
         "aipl_test_summary" | "aipl_now_nanos" | "aipl_monotonic_now" => (0, Ret::Word),
         "aipl_shim_get" | "aipl_str_len" | "aipl_str_hash" | "aipl_str_iter_next"
@@ -7852,6 +7863,9 @@ fn import_abi(sym: &str) -> (usize, Ret) {
         | "aipl_write_string_to_file"
         | "aipl_str_split"
         | "aipl_str_split_len"
+        // The part out pointer and the cursor; the `1`/`0` the loop header
+        // branches on is what comes back, so this is not a `Ret::Str`.
+        | "aipl_str_split_iter_next"
         | "aipl_read_file_to_string"
         | "aipl_rec_alloc"
         | "aipl_write_i64"
@@ -20221,12 +20235,25 @@ fn compile_expr_inner<M: Module>(
             // of `xs` is ever made. A `str` has no backward cursor (its rope
             // streams one way), so there the reversed string is built and
             // walked forwards, as `xs.reverse()` itself would.
-            let (iterable, reverse) = match &iterable.kind {
+            //
+            // `for (let part : s.split(sep))` arrives as `__split_iter(s, sep)`
+            // from the same pass: the parts are handed over one at a time by a
+            // cursor over `s`, so the array of every part — a block, plus a
+            // retain and a drop each — is never built. They are the same windows
+            // into `s` the array held.
+            let (iterable, reverse, split_sep) = match &iterable.kind {
                 // The iterable of a `for` that walks its array backwards: what
                 // the fusion pass wraps `xs.reverse()` in when it is only ever
                 // iterated. Only this arm ever sees it.
-                ExprKind::Call(Callee::ReverseIter, args, _) if args.len() == 1 => (&args[0], true),
-                _ => (&**iterable, false),
+                ExprKind::Call(Callee::ReverseIter, args, _) if args.len() == 1 => {
+                    (&args[0], true, None)
+                }
+                // The iterable of a `for` over a split: the source, and the
+                // separator the cursor cuts on. Only this arm ever sees it.
+                ExprKind::Call(Callee::SplitIter, args, _) if args.len() == 2 => {
+                    (&args[0], false, Some(&args[1]))
+                }
+                _ => (&**iterable, false, None),
             };
             let (it_ptr, it_ty) = compile_expr(module, builder, cx, scopes, iterable)?;
             let it_ptr = if reverse && is_str_shaped(&it_ty) {
@@ -20244,6 +20271,50 @@ fn compile_expr_inner<M: Module>(
                 it_ptr
             };
             let reverse = reverse && !is_str_shaped(&it_ty);
+
+            // The split cursor, and the buffer its parts land in. The separator
+            // is compiled here, after the source — the order `split` evaluated
+            // them in — and both are borrowed for the loop's whole extent, as a
+            // `for` borrows any iterable. One part buffer serves every
+            // iteration: the body retains what it keeps, exactly as it does for
+            // an element read out of an array.
+            let split_cursor = match split_sep {
+                Some(sep) => {
+                    expect_type(
+                        &it_ty,
+                        &ConcreteType::Primitive(Primitive::Str),
+                        "split receiver",
+                        iterable.span.clone(),
+                    )?;
+                    let (sep_v, sep_t) = compile_expr(module, builder, cx, scopes, sep)?;
+                    expect_type(
+                        &sep_t,
+                        &ConcreteType::Primitive(Primitive::Str),
+                        "split separator",
+                        sep.span.clone(),
+                    )?;
+                    let cur = builder.create_sized_stack_slot(StackSlotData::new(
+                        StackSlotKind::ExplicitSlot,
+                        str24::SPLIT_ITER_SIZE as u32,
+                        3,
+                    ));
+                    let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);
+                    builtins.call_void(
+                        module,
+                        builder,
+                        "aipl_str_split_iter_init",
+                        &[cur_addr, it_ptr, sep_v],
+                    );
+                    let part = builder.create_sized_stack_slot(StackSlotData::new(
+                        StackSlotKind::ExplicitSlot,
+                        str24::STR_SIZE as u32,
+                        3,
+                    ));
+                    let part_addr = builder.ins().stack_addr(types::I64, part, 0);
+                    Some((cur_addr, part_addr))
+                }
+                None => None,
+            };
             // A char set is walked by scanning its bits, and the direction is
             // the order it carries rather than anything the fusion pass did:
             // `#>{char}` promises the largest first, `#<{char}` the smallest,
@@ -20259,38 +20330,43 @@ fn compile_expr_inner<M: Module>(
             // representation — including a rope, leaf-by-leaf without
             // materializing — so the header just pulls the next byte (`-1` at the
             // end). For an array this is unused.
-            let str_cursor =
-                if it_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(&it_ty) {
-                    let cur = builder.create_sized_stack_slot(StackSlotData::new(
-                        StackSlotKind::ExplicitSlot,
-                        iter_state_size(),
-                        3,
-                    ));
-                    let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);
-                    builtins.call_void(module, builder, "aipl_str_iter_init", &[cur_addr, it_ptr]);
-                    cur_addr
-                } else {
-                    it_ptr // unused for the array branch
-                };
+            let str_cursor = if split_cursor.is_none()
+                && (it_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(&it_ty))
+            {
+                let cur = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    iter_state_size(),
+                    3,
+                ));
+                let cur_addr = builder.ins().stack_addr(types::I64, cur, 0);
+                builtins.call_void(module, builder, "aipl_str_iter_init", &[cur_addr, it_ptr]);
+                cur_addr
+            } else {
+                it_ptr // unused for the array branch
+            };
 
             // Index slot: the next index to visit walking forwards, or one past
-            // it walking backwards — initialized to 0, or to the length.
+            // it walking backwards — initialized to 0, or to the length. A split
+            // cursor carries its own position, so on that path nothing here is
+            // written, stepped, or read.
             let slot = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
                 8,
                 3,
             ));
-            let start = if is_char_set(&it_ty) {
-                // The cursor is a char index, not an element index: the scan
-                // starts past the last char going down, at the first going up.
-                let from = if charset_descending { 255 } else { 0 };
-                builder.ins().iconst(types::I64, from)
-            } else if reverse {
-                load_arr_len(builder, it_ptr)
-            } else {
-                builder.ins().iconst(types::I64, 0)
-            };
-            builder.ins().stack_store(types::I64, start, slot, 0);
+            if split_cursor.is_none() {
+                let start = if is_char_set(&it_ty) {
+                    // The cursor is a char index, not an element index: the scan
+                    // starts past the last char going down, at the first going up.
+                    let from = if charset_descending { 255 } else { 0 };
+                    builder.ins().iconst(types::I64, from)
+                } else if reverse {
+                    load_arr_len(builder, it_ptr)
+                } else {
+                    builder.ins().iconst(types::I64, 0)
+                };
+                builder.ins().stack_store(types::I64, start, slot, 0);
+            }
 
             let header = builder.create_block();
             let body_block = builder.create_block();
@@ -20301,86 +20377,114 @@ fn compile_expr_inner<M: Module>(
             // fetch the element. `var_value`/`var_ty` are what the body's
             // loop variable binds to.
             builder.switch_to_block(header);
-            let i = builder.ins().stack_load(types::I64, types::I64, slot, 0);
-            let (var_value, var_ty) = match &it_ty {
-                t if *t == ConcreteType::Primitive(Primitive::Str) || is_char_array(t) => {
-                    // Pull the next byte from the cursor; `-1` signals the end (so
-                    // a rope is walked leaf-by-leaf, never flattened, and we never
-                    // index out of bounds).
-                    let byte_i64 = emit_str_iter_next(module, builder, builtins, str_cursor);
-                    let more =
-                        builder
-                            .ins()
-                            .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, byte_i64, 0);
-                    builder.ins().brif(more, body_block, &[], exit, &[]);
-                    (byte_i64, ConcreteType::Primitive(Primitive::Char))
-                }
-                // A char set is the bitfield, so the walk is a bit scan: each
-                // step asks for the next member at or past the cursor and gets
-                // `-1` when there is none. That one signed test is the whole
-                // loop condition — there is no length to compare against.
-                _ if is_char_set(&it_ty) => {
-                    let sym = if charset_descending {
-                        "aipl_charset_prev"
-                    } else {
-                        "aipl_charset_next"
-                    };
-                    let found = builtins.call(module, builder, sym, &[it_ptr, i]);
-                    let more = builder
-                        .ins()
-                        .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, found, 0);
-                    builder.ins().brif(more, body_block, &[], exit, &[]);
-                    builder.switch_to_block(body_block);
-                    (found, ConcreteType::Primitive(Primitive::Char))
-                }
-                // A set shares the array heap block, so the array walk *is* the
-                // set walk — same length word, same element reads. The order is
-                // whatever the representation happens to give and is deliberately
-                // not promised; see the checker for the same note.
-                ConcreteType::Array(inner) | ConcreteType::Set(inner, _) => {
-                    let elem_ty = (**inner).clone();
-                    let more = if reverse {
-                        builder.ins().icmp_imm_s(IntCC::SignedGreaterThan, i, 0)
-                    } else {
-                        let len = load_arr_len(builder, it_ptr);
-                        builder.ins().icmp(IntCC::SignedLessThan, i, len)
-                    };
-                    builder.ins().brif(more, body_block, &[], exit, &[]);
-                    // Fetch element i in the body block (it's only valid there).
-                    // Switch now; the element read (a bit-unpack for `bool`, a
-                    // load or composite address otherwise) happens here.
-                    builder.switch_to_block(body_block);
-                    // Walking backwards the slot is one past the element.
-                    let at = if reverse {
-                        builder.ins().iadd_imm_s(i, -1)
-                    } else {
-                        i
-                    };
-                    let elem = load_array_elem(
-                        module,
-                        builder,
-                        cx.builtins,
-                        it_ptr,
-                        at,
-                        &elem_ty,
-                        cx.structs,
-                    );
-                    (elem, elem_ty)
-                }
-                _ => {
-                    return Err(Error::at(
-                        format!(
-                            "for-loop iterable must be a str, array, set, or range, got {}",
-                            type_name(&it_ty)
-                        ),
-                        iterable.span.clone(),
-                    ));
+            // The split cursor's position lives in the cursor, so there is no
+            // index to load on that path — and none to step at the foot of the
+            // body either.
+            let i = if split_cursor.is_none() {
+                Some(builder.ins().stack_load(types::I64, types::I64, slot, 0))
+            } else {
+                None
+            };
+            let (var_value, var_ty) = if let Some((cur_addr, part_addr)) = split_cursor {
+                // Ask the cursor for the next part; `0` means every one has been
+                // handed out. The part lands in `part_addr` — borrowed from the
+                // source, like an array element read out of the block that owns
+                // it, so the body's binding retains it below just the same.
+                let more = builtins.call(
+                    module,
+                    builder,
+                    "aipl_str_split_iter_next",
+                    &[part_addr, cur_addr],
+                );
+                builder.ins().brif(more, body_block, &[], exit, &[]);
+                builder.switch_to_block(body_block);
+                (part_addr, ConcreteType::Primitive(Primitive::Str))
+            } else {
+                let i = i.expect("a loop with no split cursor loads its index");
+                match &it_ty {
+                    t if *t == ConcreteType::Primitive(Primitive::Str) || is_char_array(t) => {
+                        // Pull the next byte from the cursor; `-1` signals the end (so
+                        // a rope is walked leaf-by-leaf, never flattened, and we never
+                        // index out of bounds).
+                        let byte_i64 = emit_str_iter_next(module, builder, builtins, str_cursor);
+                        let more =
+                            builder
+                                .ins()
+                                .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, byte_i64, 0);
+                        builder.ins().brif(more, body_block, &[], exit, &[]);
+                        (byte_i64, ConcreteType::Primitive(Primitive::Char))
+                    }
+                    // A char set is the bitfield, so the walk is a bit scan: each
+                    // step asks for the next member at or past the cursor and gets
+                    // `-1` when there is none. That one signed test is the whole
+                    // loop condition — there is no length to compare against.
+                    _ if is_char_set(&it_ty) => {
+                        let sym = if charset_descending {
+                            "aipl_charset_prev"
+                        } else {
+                            "aipl_charset_next"
+                        };
+                        let found = builtins.call(module, builder, sym, &[it_ptr, i]);
+                        let more =
+                            builder
+                                .ins()
+                                .icmp_imm_s(IntCC::SignedGreaterThanOrEqual, found, 0);
+                        builder.ins().brif(more, body_block, &[], exit, &[]);
+                        builder.switch_to_block(body_block);
+                        (found, ConcreteType::Primitive(Primitive::Char))
+                    }
+                    // A set shares the array heap block, so the array walk *is* the
+                    // set walk — same length word, same element reads. The order is
+                    // whatever the representation happens to give and is deliberately
+                    // not promised; see the checker for the same note.
+                    ConcreteType::Array(inner) | ConcreteType::Set(inner, _) => {
+                        let elem_ty = (**inner).clone();
+                        let more = if reverse {
+                            builder.ins().icmp_imm_s(IntCC::SignedGreaterThan, i, 0)
+                        } else {
+                            let len = load_arr_len(builder, it_ptr);
+                            builder.ins().icmp(IntCC::SignedLessThan, i, len)
+                        };
+                        builder.ins().brif(more, body_block, &[], exit, &[]);
+                        // Fetch element i in the body block (it's only valid there).
+                        // Switch now; the element read (a bit-unpack for `bool`, a
+                        // load or composite address otherwise) happens here.
+                        builder.switch_to_block(body_block);
+                        // Walking backwards the slot is one past the element.
+                        let at = if reverse {
+                            builder.ins().iadd_imm_s(i, -1)
+                        } else {
+                            i
+                        };
+                        let elem = load_array_elem(
+                            module,
+                            builder,
+                            cx.builtins,
+                            it_ptr,
+                            at,
+                            &elem_ty,
+                            cx.structs,
+                        );
+                        (elem, elem_ty)
+                    }
+                    _ => {
+                        return Err(Error::at(
+                            format!(
+                                "for-loop iterable must be a str, array, set, or range, got {}",
+                                type_name(&it_ty)
+                            ),
+                            iterable.span.clone(),
+                        ));
+                    }
                 }
             };
 
             // Body: bind var, run body in fresh refcount scope, advance i.
-            // (For the array case we already switched to body_block above.)
-            if it_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(&it_ty) {
+            // (For the array and split cases we already switched to body_block
+            // above.)
+            if split_cursor.is_none()
+                && (it_ty == ConcreteType::Primitive(Primitive::Str) || is_char_array(&it_ty))
+            {
                 builder.switch_to_block(body_block);
             }
             builder.seal_block(body_block);
@@ -20419,21 +20523,25 @@ fn compile_expr_inner<M: Module>(
                 scopes.pop().expect("for-body scope"),
             );
             // A char set's cursor advances from the member just visited, not
-            // from the index that found it — the scan skips the gaps.
-            let cursor = if is_char_set(&it_ty) { var_value } else { i };
-            let step = if is_char_set(&it_ty) {
-                if charset_descending {
+            // from the index that found it — the scan skips the gaps. A split
+            // loop has no index at all: `aipl_str_split_iter_next` moved the
+            // cursor on when it cut the part.
+            if let Some(i) = i {
+                let cursor = if is_char_set(&it_ty) { var_value } else { i };
+                let step = if is_char_set(&it_ty) {
+                    if charset_descending {
+                        -1
+                    } else {
+                        1
+                    }
+                } else if reverse {
                     -1
                 } else {
                     1
-                }
-            } else if reverse {
-                -1
-            } else {
-                1
-            };
-            let next = builder.ins().iadd_imm_s(cursor, step);
-            builder.ins().stack_store(types::I64, next, slot, 0);
+                };
+                let next = builder.ins().iadd_imm_s(cursor, step);
+                builder.ins().stack_store(types::I64, next, slot, 0);
+            }
             builder.ins().jump(header, &[]);
             builder.seal_block(header);
 

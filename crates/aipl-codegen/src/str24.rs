@@ -1104,6 +1104,110 @@ pub(crate) extern "C" fn aipl_str_split_len(s: *const Str, sep: *const Str) -> i
     count
 }
 
+// ---------- Split iteration (`for (let part : s.split(sep))`) ----------
+//
+// The array `split` builds is one allocation plus a retain per part, and a
+// `for` over it reads each part once and drops the lot. So the fusion pass
+// rewrites that loop into a walk of the cursor below, which hands back one part
+// at a time and allocates nothing: the parts are the same windows into the same
+// source, cut at the same places, because the scan here is `for_each_split`'s
+// scan resumed from where the last part ended rather than run to completion.
+//
+// Split out of `for_each_split` rather than sharing it because the two are
+// inverted: that one drives the caller's closure, this one is driven, and a
+// cursor is what a codegen loop header can ask for the next value.
+
+/// The `for (let part : s.split(sep))` cursor. Codegen allocates
+/// `SPLIT_ITER_SIZE` bytes for it beside the loop.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(crate) struct SplitIter {
+    root: Str,
+    sep: Str,
+    /// Where the next part starts: one past the separator that ended the last.
+    pos: u64,
+    /// Set once the final part has been handed out. It is a flag rather than a
+    /// `pos == len` test because the end of the string is itself a part — `n`
+    /// separators give `n + 1` — so "nothing left to scan" and "no part left"
+    /// are different questions.
+    done: u64,
+}
+
+impl SplitIter {
+    pub(crate) fn new(root: Str, sep: Str) -> SplitIter {
+        SplitIter {
+            root,
+            sep,
+            pos: 0,
+            done: 0,
+        }
+    }
+
+    /// The next part, or `None` once every one has been handed out. Idempotent
+    /// past the end. The part is a *borrowed* window into the source, like an
+    /// array element: the caller retains it if it keeps it.
+    pub(crate) fn next(&mut self) -> Option<Str> {
+        if self.done != 0 {
+            return None;
+        }
+        // Copies, so the scratch borrows below are of locals rather than of
+        // `self`, which the position write mutates.
+        let (root, sep) = (self.root, self.sep);
+        let mut sb = [0u8; INLINE_CAP];
+        let mut pb = [0u8; INLINE_CAP];
+        let hay = root.bytes(&mut sb);
+        let hay_len = hay.len();
+        let nlen = sep.len();
+        // An empty separator never matches, so the whole string is the one part.
+        if nlen == 0 {
+            self.done = 1;
+            return Some(root.slice(0, hay_len));
+        }
+        let needle = sep.bytes(&mut pb);
+        let start = self.pos as usize;
+        let mut i = start;
+        while i + nlen <= hay_len {
+            if &hay[i..i + nlen] == needle {
+                self.pos = (i + nlen) as u64;
+                return Some(root.slice(start, i));
+            }
+            i += 1;
+        }
+        // No separator left: the rest of the string is the last part.
+        self.done = 1;
+        Some(root.slice(start, hay_len))
+    }
+}
+
+/// Bytes of cursor state codegen must reserve for a fused split loop.
+pub(crate) const SPLIT_ITER_SIZE: usize = core::mem::size_of::<SplitIter>();
+
+/// Start a split walk over `s` on `sep`. Borrows both — the loop holds its own
+/// refs to them for its whole extent, as a `for` over any iterable does.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_split_iter_init(
+    cur: *mut SplitIter,
+    s: *const Str,
+    sep: *const Str,
+) {
+    unsafe { *cur = SplitIter::new(read(s), read(sep)) };
+}
+
+/// The next part into `out`, `1` when there was one and `0` at the end (where
+/// `out` is left alone). The flag is separate from the value because every
+/// 24-byte pattern is a legal `str`, so there is no spare one to mean "done" —
+/// the char cursor's `-1` has no analogue here.
+#[no_mangle]
+pub(crate) extern "C" fn aipl_str_split_iter_next(out: *mut Str, cur: *mut SplitIter) -> i64 {
+    match unsafe { &mut *cur }.next() {
+        Some(part) => {
+            unsafe { *out = part };
+            1
+        }
+        None => 0,
+    }
+}
+
 /// Which separator goes in the gap *before* part `i` of `len`, given the three
 /// `join` takes. `sep` is the ordinary one; `final_sep` goes in the last gap and
 /// `only_sep` in the sole gap of a two-part join, which is the same gap seen two
@@ -1900,6 +2004,55 @@ mod tests {
             ["a", "b", "c"]
         );
         s.release();
+    }
+
+    /// The fused `for (let part : s.split(sep))` walk has to hand back exactly
+    /// the parts the array would have held — same cuts, same order, same
+    /// windows — or a loop would mean something different from the `split` it
+    /// was written as. So the cursor is checked against `for_each_split`, which
+    /// is what `aipl_str_split` fills the array from, over every representation
+    /// and both separator edge cases.
+    #[test]
+    fn the_split_cursor_yields_what_the_array_would_hold() {
+        let source = "alpha,beta,,gamma,";
+        for (what, s) in variants(source) {
+            for sep in [",", "a", "", "no-such-separator", "alpha,beta,,gamma,"] {
+                let sep = from_bytes(sep.as_bytes());
+                let mut expected = Vec::new();
+                for_each_split(s, sep, &mut |p| expected.push(text(p)));
+                let mut cur = SplitIter::new(s, sep);
+                let mut got = Vec::new();
+                while let Some(part) = cur.next() {
+                    got.push(text(part));
+                }
+                assert_eq!(got, expected, "{what} split on {:?}", text(sep));
+                // Idempotent past the end, so a loop that asks once more stops.
+                assert!(cur.next().is_none(), "{what}");
+                sep.release();
+            }
+            s.release();
+        }
+    }
+
+    /// The entry points codegen calls: the cursor is a plain block of
+    /// `SPLIT_ITER_SIZE` bytes it stack-allocates, and the `1`/`0` flag is what
+    /// the loop header branches on.
+    #[test]
+    fn split_iteration_entry_points_walk_the_parts() {
+        let s = from_bytes(b"one two three");
+        let sep = from_bytes(b" ");
+        let mut cur = SplitIter::new(Str::empty(), Str::empty());
+        aipl_str_split_iter_init(&mut cur, &s, &sep);
+        let mut part = Str::empty();
+        let mut got = Vec::new();
+        while aipl_str_split_iter_next(&mut part, &mut cur) != 0 {
+            got.push(text(part));
+        }
+        assert_eq!(got, ["one", "two", "three"]);
+        assert_eq!(aipl_str_split_iter_next(&mut part, &mut cur), 0);
+        assert_eq!(SPLIT_ITER_SIZE, 2 * STR_SIZE + 16);
+        s.release();
+        sep.release();
     }
 
     // ---------- iteration and I/O ----------

@@ -1761,15 +1761,15 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 5999
-deallocations: 5999
+allocations: 5995
+deallocations: 5995
 reallocations: 1430
-bytes allocated: 703844
-instructions executed: 1801245
-binary size: 752912
-  code: 456776
+bytes allocated: 703652
+instructions executed: 1801249
+binary size: 752704
+  code: 456696
   data: 12892
-  metadata: 283244
+  metadata: 283116
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1893,7 +1893,7 @@ functions:
     bytes: 1072
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 4
-    bytes: 440
+    bytes: 360
   __builtin_try_map$__m1__Cst$Node$__m3__ParseError$lam$lower_node$Tok$Node$lambda0:
     calls: 24
     bytes: 536
@@ -2129,22 +2129,19 @@ functions:
     calls: 179
     bytes: (external)
   aipl_arr_elem_ptr:
-    calls: 6
+    calls: 2
     bytes: (external)
   aipl_arr_extend:
     calls: 1984
     bytes: (external)
   aipl_arr_inc:
-    calls: 32598
+    calls: 32594
     bytes: (external)
   aipl_arr_reserve:
     calls: 2199
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 425
-    bytes: (external)
-  aipl_arr_reverse:
-    calls: 4
     bytes: (external)
   aipl_arr_slice:
     calls: 10
@@ -2153,7 +2150,7 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 42188
+    calls: 42180
     bytes: (external)
   aipl_array_new:
     calls: 762

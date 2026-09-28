@@ -2,22 +2,22 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
-; entry parse_test_section_header 463 str -> str?
-; entry strip_test_sections 504 str -> str
-; entry split_test_sections 503 str -> __tuple$str$str
-; entry assert_loc 60 str __builtin_Span -> str
-; entry caret_block 67 str __builtin_Span str -> str
-; entry fill_or_add_sections_file 148 str __m13__Fill[] -> unit!Error
-; entry normalize_output 435 str -> str
-; entry int_fits 370 i64 str -> bool
-; entry is_operator_name 371 str -> bool
-; entry lex_aipl 403 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
-; entry lex_aipl_stripped 405 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
-; entry find_files 149 str str -> str[]!Error
-; entry companion_files 69 str -> __m25__Companion[]!str
-; entry parse_spec 460 str -> __m26__Spec!str
-; entry aipl_parse_file 331 str -> __m27__ParsedFile!__m39__ParseError
-; entry format_source 173 str u64 -> str!__m46__FmtError
+; entry parse_test_section_header 464 str -> str?
+; entry strip_test_sections 505 str -> str
+; entry split_test_sections 504 str -> __tuple$str$str
+; entry assert_loc 61 str __builtin_Span -> str
+; entry caret_block 68 str __builtin_Span str -> str
+; entry fill_or_add_sections_file 149 str __m13__Fill[] -> unit!Error
+; entry normalize_output 436 str -> str
+; entry int_fits 371 i64 str -> bool
+; entry is_operator_name 372 str -> bool
+; entry lex_aipl 404 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry lex_aipl_stripped 406 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry find_files 150 str str -> str[]!Error
+; entry companion_files 70 str -> __m25__Companion[]!str
+; entry parse_spec 461 str -> __m26__Spec!str
+; entry aipl_parse_file 332 str -> __m27__ParsedFile!__m39__ParseError
+; entry format_source 174 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m13__Fill 48 section@0:str body@24:str
@@ -69,58 +69,59 @@
 ; import 5 aipl_arr_reserve
 ; import 6 aipl_arr_retain_ptr
 ; import 7 aipl_arr_retain_str
-; import 8 aipl_arr_reverse
-; import 9 aipl_arr_slice
-; import 10 aipl_arr_sort
-; import 11 aipl_array_dec
-; import 12 aipl_array_new
-; import 13 aipl_array_push
-; import 14 aipl_array_push_mut
-; import 15 aipl_array_with_cap
-; import 16 aipl_char_at
-; import 17 aipl_char_to_str
-; import 18 aipl_concat
-; import 19 aipl_dec
-; import 20 aipl_i64_len
-; import 21 aipl_inc
-; import 22 aipl_list_files
-; import 23 aipl_read_file_to_string
-; import 24 aipl_rec_alloc
-; import 25 aipl_rec_dec_strong
-; import 26 aipl_rec_dec_weak
-; import 27 aipl_rec_inc_strong
-; import 28 aipl_rec_inc_weak
-; import 29 aipl_set_contains
-; import 30 aipl_set_insert
-; import 31 aipl_set_union
-; import 32 aipl_set_union_mut
-; import 33 aipl_str_alloc
-; import 34 aipl_str_append
-; import 35 aipl_str_cmp
-; import 36 aipl_str_contains
-; import 37 aipl_str_data
-; import 38 aipl_str_ends_with
-; import 39 aipl_str_ends_with_char
-; import 40 aipl_str_eq
-; import 41 aipl_str_grew
-; import 42 aipl_str_iter_init
-; import 43 aipl_str_iter_next
-; import 44 aipl_str_join
-; import 45 aipl_str_repeat
-; import 46 aipl_str_reserve
-; import 47 aipl_str_slice
-; import 48 aipl_str_split
-; import 49 aipl_str_split_len
-; import 50 aipl_str_starts_with
-; import 51 aipl_str_starts_with_at
-; import 52 aipl_str_starts_with_char
-; import 53 aipl_str_write_ptr
-; import 54 aipl_trim
-; import 55 aipl_u64_len
-; import 56 aipl_write_bytes
-; import 57 aipl_write_i64
-; import 58 aipl_write_string_to_file
-; import 59 aipl_write_u64
+; import 8 aipl_arr_slice
+; import 9 aipl_arr_sort
+; import 10 aipl_array_dec
+; import 11 aipl_array_new
+; import 12 aipl_array_push
+; import 13 aipl_array_push_mut
+; import 14 aipl_array_with_cap
+; import 15 aipl_char_at
+; import 16 aipl_char_to_str
+; import 17 aipl_concat
+; import 18 aipl_dec
+; import 19 aipl_i64_len
+; import 20 aipl_inc
+; import 21 aipl_list_files
+; import 22 aipl_read_file_to_string
+; import 23 aipl_rec_alloc
+; import 24 aipl_rec_dec_strong
+; import 25 aipl_rec_dec_weak
+; import 26 aipl_rec_inc_strong
+; import 27 aipl_rec_inc_weak
+; import 28 aipl_set_contains
+; import 29 aipl_set_insert
+; import 30 aipl_set_union
+; import 31 aipl_set_union_mut
+; import 32 aipl_str_alloc
+; import 33 aipl_str_append
+; import 34 aipl_str_cmp
+; import 35 aipl_str_contains
+; import 36 aipl_str_data
+; import 37 aipl_str_ends_with
+; import 38 aipl_str_ends_with_char
+; import 39 aipl_str_eq
+; import 40 aipl_str_grew
+; import 41 aipl_str_iter_init
+; import 42 aipl_str_iter_next
+; import 43 aipl_str_join
+; import 44 aipl_str_repeat
+; import 45 aipl_str_reserve
+; import 46 aipl_str_slice
+; import 47 aipl_str_split
+; import 48 aipl_str_split_iter_init
+; import 49 aipl_str_split_iter_next
+; import 50 aipl_str_split_len
+; import 51 aipl_str_starts_with
+; import 52 aipl_str_starts_with_at
+; import 53 aipl_str_starts_with_char
+; import 54 aipl_str_write_ptr
+; import 55 aipl_trim
+; import 56 aipl_u64_len
+; import 57 aipl_write_bytes
+; import 58 aipl_write_i64
+; import 59 aipl_write_string_to_file
+; import 60 aipl_write_u64
 ; data 0 __str_fc52157c3435c584 1f00000000000000ffffffffffffff7f61206c697374206f662062726163652d6c69746572616c20656e7472696573
 ; data 1 __str_32866f403df63a74 1800000000000000ffffffffffffff7f61206669656c6420696e697469616c697a6572206c697374
 ; data 2 __arr_33f6cb1c9b24ca9d ffffffffffffff7f000000000000000000000000000000000000000000000000
@@ -319,4 +320,4 @@
 ; data 195 __tostr_lit_101 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m10__assert_loc
-; source-fingerprint 15803165721151054475
+; source-fingerprint 16916883486606090799

@@ -4774,15 +4774,15 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2058567
-deallocations: 2058567
+allocations: 2049428
+deallocations: 2049428
 reallocations: 296716
-bytes allocated: 389575122
-instructions executed: 574318145
-binary size: 5967776
-  code: 3922160
+bytes allocated: 389136450
+instructions executed: 574324786
+binary size: 5967232
+  code: 3921764
   data: 57196
-  metadata: 1988420
+  metadata: 1988272
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 26
@@ -5083,10 +5083,10 @@ functions:
     bytes: 13024
   __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam$__m8__last_leaf:
     calls: 7416
-    bytes: 440
+    bytes: 360
   __builtin_reverse_find_map$__m8__Cst$__builtin_Span$lam$__m8__last_token:
     calls: 1723
-    bytes: 440
+    bytes: 360
   __builtin_try_map$__m1__Ast$__m2__BraceEntry$__m7__ParseError$lam$lower_brace_body$lambda0:
     calls: 7
     bytes: 9184
@@ -5239,10 +5239,7 @@ functions:
     bytes: 688
   __m13__print:
     calls: 30
-    bytes: 4212
-  __m13__print$map2$own0:
-    calls: 30
-    bytes: 472
+    bytes: 4448
   __m14__reindent_block:
     calls: 0
     bytes: 4460
@@ -5802,22 +5799,19 @@ functions:
     calls: 2361
     bytes: (external)
   aipl_arr_elem_ptr:
-    calls: 9257
+    calls: 118
     bytes: (external)
   aipl_arr_extend:
     calls: 1171178
     bytes: (external)
   aipl_arr_inc:
-    calls: 6270796
+    calls: 6261627
     bytes: (external)
   aipl_arr_reserve:
     calls: 1182858
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 16834
-    bytes: (external)
-  aipl_arr_reverse:
-    calls: 9139
     bytes: (external)
   aipl_arr_slice:
     calls: 381
@@ -5826,16 +5820,16 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 9340419
+    calls: 9322141
     bytes: (external)
   aipl_array_new:
-    calls: 189315
+    calls: 189285
     bytes: (external)
   aipl_array_push:
     calls: 168073
     bytes: (external)
   aipl_array_push_mut:
-    calls: 731578
+    calls: 731618
     bytes: (external)
   aipl_array_with_cap:
     calls: 40195

@@ -8,8 +8,9 @@
 //! inlined body; the chain is found beneath them and the fused call put back
 //! there (see [`build`]).
 
-use aipl_syntax::ast::{Callee, Expr, ExprKind, Type};
+use aipl_syntax::ast::{Callee, Expr, ExprKind};
 
+use super::{through_bindings, under_bindings};
 use crate::sink::mentions_free;
 
 /// One fusable chain shape: a call to `outer` whose receiver is a call to
@@ -49,6 +50,16 @@ const CHAIN_FUSIONS: &[ChainFusion] = &[
         outer: Callee::Join,
         into: Callee::MapJoin,
     },
+    // `s.split(sep).map(f)`: `split` builds a block holding every part — a
+    // retained view each — for `map` to walk once and drop; `split_map` maps
+    // each part as the cut is made, over a cursor that materializes nothing.
+    // The site that matters is `src.lines().map(f)`, which is this once `lines`
+    // has inlined.
+    ChainFusion {
+        inner: Callee::Split,
+        outer: Callee::Map,
+        into: Callee::SplitMap,
+    },
     // `s.split(sep).len()`: `split` builds an array of every part — a retained
     // view each — only for it to be counted and dropped; `split_len` is the
     // count pass alone. The site that matters is `src.lines().len()`, the line
@@ -68,28 +79,41 @@ const CHAIN_FUSIONS: &[ChainFusion] = &[
 /// Bottom-up traversal means the receiver has already been fused if it could
 /// be, so a row composes with the others rather than racing them.
 ///
-/// The inner call may sit under `let`s: inlining a function binds each of its
-/// parameters ahead of its body, with the parameter's declared type, and the
-/// binding inliner deliberately leaves an annotated binding alone — so
-/// `s.lines().len()` reaches here as `(let self: str = s; split(self, "\n")).len()`,
-/// and the chain would otherwise be hidden at exactly the sites inlining
-/// creates. The outer call moves in under the bindings, which changes nothing
-/// about when anything runs: the bound values were evaluated before the outer's
-/// remaining arguments already, as the receiver always is. What it could change
-/// is what a name in those arguments refers to, so an argument mentioning a
-/// bound name keeps the shape as written.
-pub(super) fn build(whole: &Expr) -> Option<Expr> {
+/// The inner call may sit under `let`s ([`through_bindings`]) — so
+/// `s.lines().len()` reaches here as
+/// `(let self: str = s; split(self, "\n")).len()`. The outer call moves in
+/// under the bindings, which changes nothing about when anything runs: the
+/// bound values were evaluated before the outer's remaining arguments already,
+/// as the receiver always is. What it could change is what a name in those
+/// arguments refers to, so an argument mentioning a bound name keeps the shape
+/// as written.
+///
+/// # Standing aside for the parent
+///
+/// Rows stack: `Map` is the `outer` of one row and the `inner` of two others,
+/// so a call can be either half of a pair. Traversal is bottom-up, so without a
+/// word from the parent the inner rewrite would win simply by arriving first —
+/// and it is the worse of the two. `s.split(sep).map(f).join(j)` would become
+/// `split_map(..).join(..)`, an array of mapped pieces measured and copied into
+/// a second buffer, where `map_join(split(..), f, j)` appends each piece into
+/// one buffer as it is produced.
+///
+/// So when `outer` — the callee of the call this one is the receiver of — pairs
+/// with this call under some row, this call stands aside and the parent fuses
+/// instead. Nothing is lost: the parent's row is the one that sees both halves.
+pub(super) fn build(whole: &Expr, outer: Option<&Callee>) -> Option<Expr> {
     let ExprKind::Call(name, args, method_style) = &whole.kind else {
         return None;
     };
+    if outer.is_some_and(|o| row(name, o).is_some()) {
+        return None;
+    }
     let (recv, rest) = args.split_first()?;
     let (bindings, inner) = through_bindings(recv);
     let ExprKind::Call(inner_name, inner_args, _) = &inner.kind else {
         return None;
     };
-    let f = CHAIN_FUSIONS
-        .iter()
-        .find(|f| f.outer == *name && f.inner == *inner_name)?;
+    let f = row(inner_name, name)?;
     if bindings
         .iter()
         .any(|b| rest.iter().any(|a| mentions_free(a, b.name)))
@@ -103,39 +127,20 @@ pub(super) fn build(whole: &Expr) -> Option<Expr> {
     // are rebuilt the same way, since the value they now produce is the fused
     // call's.
     let call = Expr::rebuilt(ExprKind::Call(f.into.clone(), fused, *method_style), whole);
-    Some(bindings.into_iter().rev().fold(call, |body, b| {
-        Expr::rebuilt(
-            ExprKind::Let(
-                b.name.to_string(),
-                b.ty.clone(),
-                Box::new(b.value.clone()),
-                Box::new(body),
-            ),
-            whole,
-        )
-    }))
+    Some(under_bindings(bindings, whole, call))
 }
 
-/// One `let` a receiver sits under — see [`build`].
-struct Binding<'a> {
-    name: &'a str,
-    ty: &'a Option<Type>,
-    value: &'a Expr,
-}
-
-/// The `let`s leading `e`, outermost first, and the expression under them.
-fn through_bindings(e: &Expr) -> (Vec<Binding<'_>>, &Expr) {
-    let mut bindings = Vec::new();
-    let mut e = e;
-    while let ExprKind::Let(name, ty, value, body) = &e.kind {
-        bindings.push(Binding { name, ty, value });
-        e = body;
-    }
-    (bindings, e)
+/// The row pairing an `inner` call with an `outer` one, if there is one.
+fn row(inner: &Callee, outer: &Callee) -> Option<&'static ChainFusion> {
+    CHAIN_FUSIONS
+        .iter()
+        .find(|f| f.inner == *inner && f.outer == *outer)
 }
 
 #[cfg(test)]
 mod tests {
+    use aipl_syntax::ast::Type;
+
     use super::*;
 
     fn e(kind: ExprKind) -> Expr {
@@ -167,7 +172,7 @@ mod tests {
             Callee::Len,
             vec![inlined_split("self", id("src"), id("nl"))],
         );
-        let out = build(&whole).expect("`split(..).len()` fuses through the binding");
+        let out = build(&whole, None).expect("`split(..).len()` fuses through the binding");
         let ExprKind::Let(name, ty, value, body) = &out.kind else {
             panic!("the binding should survive, with the fused call under it: {out:?}");
         };
@@ -195,6 +200,6 @@ mod tests {
             Box::new(call(Callee::Map, vec![id("xs"), id("g")])),
         ));
         let whole = call(Callee::Join, vec![receiver, id("f"), id("f"), id("f")]);
-        assert!(build(&whole).is_none());
+        assert!(build(&whole, None).is_none());
     }
 }

@@ -3371,11 +3371,11 @@ allocations: 101983
 deallocations: 101983
 reallocations: 16733
 bytes allocated: 20692365
-instructions executed: 53912083
-binary size: 17788984
-  code: 11425220
+instructions executed: 53892286
+binary size: 17788432
+  code: 11424824
   data: 38268
-  metadata: 6325496
+  metadata: 6325340
 functions:
   __arr_drop_ImportEntry:
     calls: 17
@@ -3685,10 +3685,10 @@ functions:
     bytes: 1040
   __builtin_reverse_find_map$__m15__Cst$__builtin_Span$lam$__m15__last_leaf:
     calls: 0
-    bytes: 440
+    bytes: 360
   __builtin_reverse_find_map$__m15__Cst$__builtin_Span$lam$__m15__last_token:
     calls: 0
-    bytes: 440
+    bytes: 360
   __builtin_try_map$__m14__Rule$__m22__AiplTok$__m14__Rule$__m22__AiplTok$__m14__ParseError$lam$__m14__desugar_rule$__m22__AiplTok:
     calls: 3675
     bytes: 508
@@ -3937,10 +3937,7 @@ functions:
     bytes: 688
   __m1__print:
     calls: 183
-    bytes: 4212
-  __m1__print$map2$own0:
-    calls: 183
-    bytes: 472
+    bytes: 4448
   __m21__breaks_after:
     calls: 1
     bytes: 468
@@ -4638,7 +4635,7 @@ functions:
     calls: 67049
     bytes: (external)
   aipl_arr_inc:
-    calls: 504889
+    calls: 504706
     bytes: (external)
   aipl_arr_reserve:
     calls: 66612
@@ -4656,13 +4653,13 @@ functions:
     calls: 783076
     bytes: (external)
   aipl_array_new:
-    calls: 11069
+    calls: 10886
     bytes: (external)
   aipl_array_push:
     calls: 9890
     bytes: (external)
   aipl_array_push_mut:
-    calls: 32673
+    calls: 33036
     bytes: (external)
   aipl_array_with_cap:
     calls: 479

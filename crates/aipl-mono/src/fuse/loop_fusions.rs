@@ -15,6 +15,17 @@
 //! call on it. `filter_map` is here because the chain fusion runs first and has
 //! already turned a `.filter(p).map(f)` receiver into it.
 //!
+//! A loop over `s.split(sep)` is relabelled rather than restructured: the
+//! parts are already windows into `s`, so what the array cost was the block
+//! holding them and a retain and drop per part. The fused loop asks a cursor
+//! for one part per iteration instead ([`Callee::SplitIter`]), and codegen
+//! walks it — the same cuts, in the same order, with nothing between the
+//! source and the body. This is what `for (let l : src.lines())` becomes, since
+//! `lines` is `split("\n")` and reaches the pass inlined. Its one guard is
+//! below: the array held a retained view of the source and the cursor does not,
+//! so a body that writes what the source is read from keeps the loop as
+//! written.
+//!
 //! A loop over `xs.tuple_windows()` is the same idea with state instead of a
 //! function: each pair is the previous element with the current one, so the
 //! loop carries the previous element along and builds the pair on the stack
@@ -69,7 +80,8 @@ use std::collections::{HashMap, HashSet};
 
 use aipl_syntax::ast::{Callee, Expr, ExprKind, MatchArm, Pattern};
 
-use crate::sink::can_defer;
+use super::{through_bindings, under_bindings};
+use crate::sink::{can_defer, mentions_free};
 use crate::subst::{assigned_names, read_names};
 
 /// One fusable loop shape: a `for` over a call to `over` becomes a `for` over
@@ -112,6 +124,23 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
     let ExprKind::For(var, iterable, body) = &whole.kind else {
         return None;
     };
+    // The derived array may sit under the `let`s an inlined call leaves in
+    // front of its body ([`through_bindings`]) — `for (let l : src.lines())` is
+    // a `for` over `let self: str = src; split(self, "\n")`, which is the shape
+    // the whole family would otherwise miss at exactly the sites inlining
+    // creates. The loop is rebuilt under those bindings, which changes nothing
+    // about when they run: a `for` evaluates its iterable, and so everything the
+    // iterable is built from, before the first iteration either way. What it
+    // changes is the *body*'s scope — it now sits inside them — so a body
+    // mentioning a bound name keeps the loop as written.
+    let (bindings, iterable) = through_bindings(iterable);
+    if bindings
+        .iter()
+        .any(|b| b.name != var && mentions_free(body, b.name))
+    {
+        return None;
+    }
+    let rebuild = |fused: Expr| under_bindings(bindings, whole, fused);
     let ExprKind::Call(name, args, _) = &iterable.kind else {
         return None;
     };
@@ -119,7 +148,42 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
         let [recv] = args.as_slice() else {
             return None;
         };
-        return Some(build_windows(whole, var, recv, body));
+        return Some(rebuild(build_windows(whole, var, recv, body)));
+    }
+    if *name == Callee::Split {
+        // `for (let part : s.split(sep))`: the parts are handed to the body one
+        // at a time by a cursor instead of an array of every one being built
+        // first — a codegen matter, so the iterable is only relabelled here
+        // (see `Callee::SplitIter`). Nothing the body can observe moves: `s` and
+        // `sep` are still evaluated once, in that order, before the first
+        // iteration, and the parts reach the body in the same order. They are
+        // the same windows into `s`, too — the array's elements were views, not
+        // copies.
+        let [recv, sep] = args.as_slice() else {
+            return None;
+        };
+        // One thing does change: the array of parts held a *retained* view of
+        // the source, where the cursor holds it without a reference of its own,
+        // exactly as the char cursor holds the string a `for (let c : s)` walks.
+        // So a body that writes a binding the source or the separator is read
+        // from could free the bytes the walk is still cutting. Refuse that, the
+        // way the mapping families refuse a body that writes what `f` reads.
+        let mut written = HashSet::new();
+        assigned_names(body, &mut written);
+        let mut read = HashSet::new();
+        read_names(recv, &mut read);
+        read_names(sep, &mut read);
+        if read.iter().any(|n| written.contains(n)) {
+            return None;
+        }
+        let wrapped = Expr::rebuilt(
+            ExprKind::Call(Callee::SplitIter, vec![recv.clone(), sep.clone()], false),
+            iterable,
+        );
+        return Some(rebuild(Expr::rebuilt(
+            ExprKind::For(var.clone(), Box::new(wrapped), body.clone()),
+            whole,
+        )));
     }
     if *name == Callee::Reverse {
         // `for (let v : xs.reverse())`: the walk runs backwards instead of a
@@ -134,10 +198,10 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
             ExprKind::Call(Callee::ReverseIter, vec![recv.clone()], false),
             iterable,
         );
-        return Some(Expr::rebuilt(
+        return Some(rebuild(Expr::rebuilt(
             ExprKind::For(var.clone(), Box::new(wrapped), body.clone()),
             whole,
-        ));
+        )));
     }
     let f = LOOP_FUSIONS.iter().find(|f| f.over == *name)?;
     let (recv, fns) = args.split_first()?;
@@ -191,10 +255,10 @@ pub(super) fn build(whole: &Expr, blocked: &HashSet<String>) -> Option<Expr> {
             iterable.span.clone(),
         );
     }
-    Some(Expr::rebuilt(
+    Some(rebuild(Expr::rebuilt(
         ExprKind::For(elem, Box::new(recv.clone()), Box::new(inner)),
         whole,
-    ))
+    )))
 }
 
 /// `for (let var : recv.tuple_windows()) { body }` as the previous-element loop

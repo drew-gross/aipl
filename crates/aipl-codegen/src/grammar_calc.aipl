@@ -465,15 +465,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 10716
-deallocations: 10716
+allocations: 10714
+deallocations: 10714
 reallocations: 1853
-bytes allocated: 1168679
-instructions executed: 2580964
-binary size: 413152
-  code: 272808
+bytes allocated: 1168583
+instructions executed: 2580435
+binary size: 412784
+  code: 272496
   data: 6100
-  metadata: 134244
+  metadata: 134188
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -636,7 +636,7 @@ functions:
     bytes: 1072
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 2
-    bytes: 440
+    bytes: 360
   __builtin_try_map$__m1__Cst$Calc$__m3__ParseError$lam$__m13__lower_node$CalcTok$Calc$lambda0:
     calls: 447
     bytes: 536
@@ -930,7 +930,7 @@ functions:
     bytes: 3144
   __m4__render_cst$CalcTok$Calc$s1$lam$calc_space:
     calls: 9
-    bytes: 4368
+    bytes: 4608
   __m4__wrapped$lam$calc_space:
     calls: 0
     bytes: 6072
@@ -955,9 +955,6 @@ functions:
   __m5__has_hard$tail:
     calls: 0
     bytes: 688
-  __m5__print$map2$own0:
-    calls: 9
-    bytes: 472
   __m6__reindent_block:
     calls: 0
     bytes: 6592
@@ -1024,14 +1021,11 @@ functions:
   aipl_arr_drop_arr:
     calls: 53
     bytes: (external)
-  aipl_arr_elem_ptr:
-    calls: 2
-    bytes: (external)
   aipl_arr_extend:
     calls: 3309
     bytes: (external)
   aipl_arr_inc:
-    calls: 54121
+    calls: 54110
     bytes: (external)
   aipl_arr_reserve:
     calls: 4145
@@ -1039,23 +1033,20 @@ functions:
   aipl_arr_retain_ptr:
     calls: 290
     bytes: (external)
-  aipl_arr_reverse:
-    calls: 2
-    bytes: (external)
   aipl_arr_sort:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 70629
+    calls: 70625
     bytes: (external)
   aipl_array_new:
-    calls: 2050
+    calls: 2041
     bytes: (external)
   aipl_array_push:
     calls: 2309
     bytes: (external)
   aipl_array_push_mut:
-    calls: 2959
+    calls: 2968
     bytes: (external)
   aipl_array_with_cap:
     calls: 183

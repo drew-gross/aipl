@@ -1,0 +1,166 @@
+import {
+    concat as +++,
+    equal as ==,
+    extend,
+    len,
+    print,
+    split,
+    to_str,
+    wrapping_increment as ++,
+} from builtins;
+
+// Operation fusion: a `for` over `s.split(sep)` walks a cursor instead of an
+// array of parts.
+//
+// `split` on its own allocates a block and fills it with one retained view per
+// part; a loop that only walks it needs neither. The fusion pass relabels the
+// iterable and codegen drives a split cursor — the same cuts, in the same
+// order, with the part handed straight to the body.
+//
+// `for (let l : src.lines())` is the shape this exists for: `lines` is
+// `split("\n")` and reaches the pass inlined, with its parameter bound ahead of
+// the body (`let self: str = src; split(self, "\n")`), so the fusion looks
+// under that binding — which is what `numbered` below proves.
+//
+// Measured on this case with the fusion switched off: the walked splits are one
+// array allocation each (86 become 78, 5,428 bytes become 4,692) and 3,085
+// instructions become 2,411. The `functions:` list is the evidence — two
+// `aipl_array_new`, the ones `materialized` and `rewriting` build because they
+// have to, where the unfused case has ten.
+
+fn lines(self: str) -> str[] { self.split("\n") }
+
+// Fused through the inlined `lines`.
+fn numbered(src: str) -> str {
+    mut out = "";
+    mut n = 0;
+    for (let line : src.lines()) {
+        set n++;
+        set out.extend(`{n}:{line} `);
+    }
+    out
+}
+
+// Fused, spelled directly, with a multi-byte separator.
+fn widths(s: str, sep: str) -> str {
+    mut out = "";
+    for (let part : s.split(sep)) {
+        set out.extend(`{part.len()} `);
+    }
+    out
+}
+
+// The loop leaves early: the cursor owns nothing, so an abandoned walk needs no
+// unwinding.
+fn first_blank(s: str) -> i64 {
+    mut at = 0;
+    for (let line : s.lines()) {
+        if (line == "") {
+            return at;
+        };
+        set at++;
+    }
+    -1
+}
+
+// Not fused: the array is bound and read twice, so it has to exist.
+fn materialized(s: str) -> str { `{s.lines()[1]} of {s.lines().len()}` }
+
+// Not fused either, and this one is a correctness guard rather than a missed
+// chance: the array of parts held a retained view of the source, where the
+// cursor holds it without a reference of its own — so a body that writes what
+// the source is read from keeps the loop as written.
+fn rewriting(src: str) -> str {
+    mut s = src;
+    mut out = "";
+    for (let p : s.split(",")) {
+        set out.extend(`[{p}]`);
+        set s = "";
+    }
+    out
+}
+
+fn main() !prints {
+    print(numbered("alpha\nbeta\n\ngamma"));
+    print(widths("aa--b--cccc", "--"));
+    // An empty separator never matches: the whole string is the one part.
+    print(widths("abcd", ""));
+    print(to_str(first_blank("x\ny\n\nz")));
+    print(to_str(first_blank("none here")));
+
+    // A rope source, so the cursor's walk crosses a representation it cannot
+    // index directly.
+    print(numbered("one\ntw" +++ "o\nthree"));
+    // Long enough that every part is a heap window rather than an inline value.
+    print(widths("first long piece\nsecond long piece", "\n"));
+    print(materialized("alpha\nbeta\ngamma"));
+    print(rewriting("alpha,beta,gamma"));
+
+    // An indexed loop desugars to a counter around the same `for`, so it fuses
+    // like any other.
+    for (let i, part : "x--y".split("--")) {
+        print(`{i}:{part}`);
+    }
+}
+--- stdout ---
+1:alpha 2:beta 3: 4:gamma 
+2 1 4 
+4 
+2
+-1
+1:one 2:two 3:three 
+16 17 
+some("beta") of 3
+[alpha][beta][gamma]
+0:x
+1:y
+--- performance ---
+allocations: 78
+deallocations: 78
+reallocations: 0
+bytes allocated: 4692
+instructions executed: 2411
+binary size: 10072
+  code: 6220
+  data: 123
+  metadata: 3729
+functions:
+  __to_str_i64:
+    calls: 9
+    bytes: 204
+  __to_str_str$opt:
+    calls: 1
+    bytes: 472
+  __to_str_u64:
+    calls: 9
+    bytes: 204
+  aipl_array_dec:
+    calls: 2
+    bytes: (external)
+  aipl_array_new:
+    calls: 2
+    bytes: (external)
+  aipl_i64_len:
+    calls: 18
+    bytes: (external)
+  aipl_u64_len:
+    calls: 18
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 3
+    bytes: (external)
+  aipl_write_i64:
+    calls: 9
+    bytes: (external)
+  aipl_write_u64:
+    calls: 9
+    bytes: (external)
+  first_blank:
+    calls: 2
+    bytes: 272
+  main:
+    calls: 1
+    bytes: 4368
+  widths:
+    calls: 3
+    bytes: 700

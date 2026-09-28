@@ -1,0 +1,113 @@
+import { equal as ==, join, len, map, print, split, split_map, to_str } from builtins;
+
+// Operation fusion: `s.split(sep).map(f)` collapses into `split_map`, which
+// maps each part as the cut is made — instead of `split` building a block of
+// every part, a retained view each, for `map` to walk once and drop.
+//
+// `src.lines().map(f)` is the shape this exists for: `lines` is `split("\n")`
+// and reaches the pass inlined, with its parameter bound ahead of the body, so
+// the fusion looks under that binding — which is what `tagged_lines` proves.
+//
+// `split_map` is itself written as a `for` over a `split` (see
+// `builtin_split_map.aipl`), so the loop fusion applies inside it too: the part
+// goes from the source string through `f` into the result with nothing built in
+// between, and the one array is the answer.
+//
+// Measured on this case with the split+map row switched off: 37 allocations
+// become 35 and 2,693 bytes become 2,533 — `map`'s in-place reuse already
+// spends the split's own block on the result, so what goes is the retain per
+// part and the second block where the mapped type is not `str`-sized. The pass
+// shows up more in the work than the allocation: 2,359 instructions become
+// 1,929, and the binary 10,640 bytes become 8,760.
+
+fn lines(self: str) -> str[] { self.split("\n") }
+
+fn tagged(self: str) -> str { `<{self}>` }
+
+// Fused through the inlined `lines`; the array is read twice, so it is the one
+// thing that does get built.
+fn tagged_lines(src: str) -> str {
+    let ls = src.lines().map(tagged);
+    `{ls.join(sep="|")} of {ls.len()}`
+}
+
+// Fused, spelled directly, mapping to a type other than `str`.
+fn widths(s: str, sep: str) -> u64[] { s.split(sep).map(len) }
+
+// *Not* this row: `.map(f).join(sep)` is `map_join`'s pair, and that one is the
+// better fusion — one buffer appended to as each piece is produced, rather than
+// an array of pieces measured and copied into a second. The inner pair stands
+// aside for it (see `chain_fusions`).
+fn joined(src: str) -> str { src.lines().map(tagged).join(sep="/") }
+
+fn main() !prints {
+    print(tagged_lines("alpha\nbeta\n\ngamma"));
+    print(to_str(widths("aa--b--cccc", "--")));
+    // An empty separator never matches: the whole string is the one part.
+    print(to_str(widths("abcd", "")));
+    print(joined("one\ntwo"));
+    // The fused builtin is importable too, and answers the same as the chain.
+    print(`{"x;y".split_map(";", tagged) == "x;y".split(";").map(tagged)}`);
+}
+--- stdout ---
+<alpha>|<beta>|<>|<gamma> of 4
+[2, 1, 4]
+[4]
+<one>/<two>
+true
+--- performance ---
+allocations: 35
+deallocations: 35
+reallocations: 1
+bytes allocated: 2533
+instructions executed: 1929
+binary size: 8760
+  code: 5096
+  data: 151
+  metadata: 3513
+functions:
+  __builtin_split_map$str$s0$s1$lam$tagged:
+    calls: 3
+    bytes: 456
+  __builtin_split_map$u64$s0$s1$lam$__builtin_len:
+    calls: 2
+    bytes: 324
+  __eq_str$arr:
+    calls: 1
+    bytes: 364
+  __to_str_bool:
+    calls: 1
+    bytes: 232
+  __to_str_u64:
+    calls: 1
+    bytes: 204
+  __to_str_u64$arr:
+    calls: 2
+    bytes: 708
+  aipl_arr_inc:
+    calls: 5
+    bytes: (external)
+  aipl_arr_reserve:
+    calls: 5
+    bytes: (external)
+  aipl_array_dec:
+    calls: 17
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 12
+    bytes: (external)
+  aipl_u64_len:
+    calls: 10
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 7
+    bytes: (external)
+  aipl_write_u64:
+    calls: 5
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2808

@@ -117,6 +117,7 @@ pub enum Callee {
     FindIf,
     MapFindIf,
     MapJoin,
+    SplitMap,
     FindMap,
     ReverseFindMap,
     FindIndex,
@@ -218,6 +219,10 @@ pub enum Callee {
     /// `for (let v : xs.reverse())` after fusion: `xs` itself, walked backwards
     /// by codegen (mono).
     ReverseIter,
+    /// `for (let part : s.split(sep))` after fusion: the source and the
+    /// separator, walked by a codegen-stacked split cursor that hands back one
+    /// part per iteration, so the array of parts is never built (mono).
+    SplitIter,
 
     // ---- names from source ----
     /// A name that is not the compiler's to know: a user function (mangled
@@ -299,6 +304,7 @@ impl Callee {
         Callee::FindIf,
         Callee::MapFindIf,
         Callee::MapJoin,
+        Callee::SplitMap,
         Callee::FindMap,
         Callee::ReverseFindMap,
         Callee::FindIndex,
@@ -375,6 +381,7 @@ impl Callee {
         Callee::FilterTruncate,
         Callee::CharToStr,
         Callee::ReverseIter,
+        Callee::SplitIter,
     ];
 
     /// The canonical name: the reserved `__builtin_*` spelling of a builtin
@@ -452,6 +459,7 @@ impl Callee {
             Callee::FindIf => "__builtin_find_if",
             Callee::MapFindIf => "__builtin_map_find_if",
             Callee::MapJoin => "__builtin_map_join",
+            Callee::SplitMap => "__builtin_split_map",
             Callee::FindMap => "__builtin_find_map",
             Callee::ReverseFindMap => "__builtin_reverse_find_map",
             Callee::FindIndex => "__builtin_find_index",
@@ -521,6 +529,7 @@ impl Callee {
             Callee::FilterTruncate => "__filter_truncate",
             Callee::CharToStr => "__char_to_str",
             Callee::ReverseIter => "__reverse_iter",
+            Callee::SplitIter => "__split_iter",
 
             Callee::User(s) => s,
         }

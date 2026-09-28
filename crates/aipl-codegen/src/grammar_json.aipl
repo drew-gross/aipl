@@ -507,11 +507,11 @@ allocations: 21446
 deallocations: 21446
 reallocations: 3218
 bytes allocated: 2798291
-instructions executed: 5990773
-binary size: 449840
-  code: 296292
+instructions executed: 5988461
+binary size: 449472
+  code: 295980
   data: 8596
-  metadata: 144952
+  metadata: 144896
 functions:
   __arr_drop_Json:
     calls: 125
@@ -668,7 +668,7 @@ functions:
     bytes: 1072
   __builtin_reverse_find_map$__m1__Cst$__builtin_Span$lam$__m1__last_leaf:
     calls: 0
-    bytes: 440
+    bytes: 360
   __builtin_try_map$__m1__Cst$Json$__m3__ParseError$lam$__m13__lower_node$JsonTok$Json$lambda0:
     calls: 166
     bytes: 536
@@ -977,7 +977,7 @@ functions:
     bytes: 3144
   __m4__render_cst$JsonTok$Json$s1$lam$json_space:
     calls: 18
-    bytes: 4368
+    bytes: 4608
   __m4__wrapped$lam$json_space:
     calls: 26
     bytes: 6072
@@ -1002,9 +1002,6 @@ functions:
   __m5__has_hard$tail:
     calls: 599
     bytes: 688
-  __m5__print$map2$own0:
-    calls: 18
-    bytes: 472
   __m6__reindent_block:
     calls: 0
     bytes: 6592
@@ -1063,7 +1060,7 @@ functions:
     calls: 8743
     bytes: (external)
   aipl_arr_inc:
-    calls: 88495
+    calls: 88477
     bytes: (external)
   aipl_arr_reserve:
     calls: 10952
@@ -1081,13 +1078,13 @@ functions:
     calls: 121413
     bytes: (external)
   aipl_array_new:
-    calls: 3428
+    calls: 3410
     bytes: (external)
   aipl_array_push:
     calls: 2562
     bytes: (external)
   aipl_array_push_mut:
-    calls: 5741
+    calls: 5784
     bytes: (external)
   aipl_array_with_cap:
     calls: 244
