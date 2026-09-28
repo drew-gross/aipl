@@ -1,0 +1,383 @@
+import {
+    equal as ==,
+    extend,
+    filter,
+    find_if,
+    is_empty,
+    len,
+    less_than as <,
+    logical_and as &&,
+    logical_or as ||,
+    map,
+    not_equal as !=,
+    value_or,
+    wrapping_add as +,
+} from builtins;
+import { parse_test_section_header } from "./parse_test_section_header.aipl";
+import { trim_end_while } from "./trim_end_while.aipl";
+
+# One section to write back: the `--- name ---` it belongs under, and the body
+# to put there.
+struct Fill { section: str, body: str }
+
+# The state threaded through the line walk: the rewritten file so far, whether
+# the current line is inside an old body being dropped, and the fills that
+# haven't met their header yet (whatever is left gets appended at the end).
+struct Walk { out: str, skipping: bool, pending: Fill[] }
+
+# Fold one source line into the walk. A header line named by a pending fill is
+# re-emitted with that fill's body under it, and everything up to the next
+# header is dropped; any other line passes through unless it sits inside a body
+# already being dropped.
+fn step(w: Walk, line: str) -> Walk {
+    // A validated section name is never empty, so `""` doubles as "not a
+    // header" and can never match a pending fill.
+    let header = parse_test_section_header(line).value_or("");
+    if (w.skipping && header == "") {
+        return w;
+    };
+    let kept = `{w.out}{line}\n`;
+    w.pending
+        .find_if(|f| f.section == header)
+        .map(|f| Walk {
+            out: `{kept}{f.body}\n`,
+            skipping: true,
+            pending: w.pending.filter(|p| p.section != header),
+        })
+        .value_or(Walk { out: kept, skipping: false, pending: w.pending })
+}
+
+# Append a fresh `--- section ---` block for every fill the file carried no
+# header for, after dropping the trailing newlines the walk copied over.
+fn append_missing(out: str, pending: Fill[]) -> str {
+    if (pending.is_empty()) {
+        return out;
+    };
+    mut acc = out.trim_end_while(|c| c == '\n' || c == '\r');
+    for (let f : pending) {
+        set acc.extend(`\n--- {f.section} ---\n{f.body}`);
+    }
+    `{acc}\n`
+}
+
+# Rewrites `contents` so that every section named in `fills` holds that fill's
+# `body`: an existing `--- section ---` block has its old body (up to the next
+# header line or EOF) replaced, and a section the file doesn't carry is appended
+# as a fresh block. Everything else is preserved verbatim.
+#
+# The whole batch costs one walk, which is the point: a case whose `stdout`,
+# `exit code` and `performance` all went stale is read, rewritten and written
+# back once rather than three times.
+pub fn fill_or_add_sections(contents: str, fills: Fill[]) -> str {
+    // Walk `contents` line by line (matching Rust's `str::lines()`: no line
+    // terminators kept, no trailing empty line for a final `\n`, but the final
+    // unterminated line — if any — still counts). Every kept line is re-emitted
+    // with a `\n` terminator.
+    mut w = Walk { out: "", skipping: false, pending: fills };
+    mut line_start: u64 = 0;
+    for (let i, c : contents) {
+        if (c == '\n') {
+            set w = step(w, contents[line_start..i]);
+            set line_start = i + 1;
+        };
+    }
+    if (line_start < contents.len()) {
+        set w = step(w, contents[line_start..]);
+    };
+    append_missing(w.out, w.pending)
+}.test({
+    // Fixtures below embed real `--- name ---` marker lines inside `"""` raw
+    // strings. That's safe: this file is itself parsed through
+    // `strip_test_sections`, which only cuts at a marker line that starts at
+    // column 0 of the *source* — every line inside these raw strings sits
+    // under the surrounding indentation, so it never lands at column 0. (The
+    // dedented *value* can still start a line at its own column 0; only the
+    // physical source position matters for the file-level cut.)
+
+    // Section present: single-line body, more content follows.
+    assert(fill_or_add_sections(
+        """
+            a
+            --- foo ---
+            old
+            --- bar ---
+            b
+
+        """,
+        [Fill { section: "foo", body: "new" }],
+    ) == """
+        a
+        --- foo ---
+        new
+        --- bar ---
+        b
+
+    """);
+    // Section present: multi-line old body, all of it dropped.
+    assert(fill_or_add_sections(
+        """
+            --- foo ---
+            old1
+            old2
+
+        """,
+        [Fill { section: "foo", body: "new" }],
+    ) == """
+        --- foo ---
+        new
+
+    """);
+
+    // Section present: the header is the final, unterminated line (no
+    // trailing `\n` at all).
+    assert(fill_or_add_sections("--- foo ---", [Fill { section: "foo", body: "new" }]) == """
+        --- foo ---
+        new
+
+    """);
+    // Section present: old body is the final, unterminated content.
+    assert(fill_or_add_sections(
+        """
+            --- foo ---
+            old
+        """,
+        [Fill { section: "foo", body: "new" }],
+    ) == """
+        --- foo ---
+        new
+
+    """);
+
+    // Section present: adjacent headers — an empty old body (the next line is
+    // itself a header) has nothing to drop, and the following section passes
+    // through untouched.
+    assert(fill_or_add_sections(
+        """
+            --- foo ---
+            --- bar ---
+            X
+
+        """,
+        [Fill { section: "foo", body: "new" }],
+    ) == """
+        --- foo ---
+        new
+        --- bar ---
+        X
+
+    """);
+
+    // Section missing: appended after stripping trailing newlines.
+    assert(fill_or_add_sections(
+        """
+            code
+
+        """,
+        [Fill { section: "stdout", body: "hi" }],
+    ) == """
+        code
+        --- stdout ---
+        hi
+
+    """);
+    // Missing, with several trailing newlines to strip first.
+    assert(fill_or_add_sections(
+        """
+            code
+
+
+
+        """,
+        [Fill { section: "stdout", body: "hi" }],
+    ) == """
+        code
+        --- stdout ---
+        hi
+
+    """);
+    // Missing, no trailing newline at all.
+    assert(fill_or_add_sections("code", [Fill { section: "stdout", body: "hi" }]) == """
+        code
+        --- stdout ---
+        hi
+
+    """);
+    // Empty input, section missing.
+    assert(fill_or_add_sections("", [Fill { section: "stdout", body: "hi" }]) == """
+
+        --- stdout ---
+        hi
+
+    """);
+
+    // An indented `--- foo ---` line isn't a real header (must start at column
+    // 0), so the section is treated as missing and appended fresh.
+    assert(fill_or_add_sections(
+        """
+            code
+              --- foo ---
+            old
+
+        """,
+        [Fill { section: "foo", body: "new" }],
+    ) == """
+        code
+          --- foo ---
+        old
+        --- foo ---
+        new
+
+    """);
+
+    // No fills at all: `contents` comes back byte for byte, trailing newlines
+    // and all.
+    assert(fill_or_add_sections(
+        """
+            code
+            --- foo ---
+            old
+
+        """,
+        [],
+    ) == """
+        code
+        --- foo ---
+        old
+
+    """);
+
+    // The whole point: several sections in one walk. Each lands under its own
+    // header, in the file's order rather than the batch's, and the sections
+    // not named are untouched.
+    assert(fill_or_add_sections(
+        """
+            code
+            --- stdout ---
+            old out
+            --- exit code ---
+            0
+            --- performance ---
+            old perf
+
+        """,
+        [
+            Fill { section: "performance", body: "new perf" },
+            Fill { section: "stdout", body: "new out" },
+        ],
+    ) == """
+        code
+        --- stdout ---
+        new out
+        --- exit code ---
+        0
+        --- performance ---
+        new perf
+
+    """);
+
+    // A batch mixing a present section with a missing one: the present one is
+    // replaced in place, the missing one appended after it.
+    assert(fill_or_add_sections(
+        """
+            code
+            --- stdout ---
+            old
+
+        """,
+        [
+            Fill { section: "stdout", body: "new" },
+            Fill { section: "performance", body: "allocations: 0" },
+        ],
+    ) == """
+        code
+        --- stdout ---
+        new
+        --- performance ---
+        allocations: 0
+
+    """);
+
+    // Several missing sections are appended in the batch's order.
+    assert(fill_or_add_sections(
+        "code",
+        [Fill { section: "stdout", body: "hi" }, Fill { section: "exit code", body: "3" }],
+    ) == """
+        code
+        --- stdout ---
+        hi
+        --- exit code ---
+        3
+
+    """);
+})
+--- performance ---
+allocations: 133
+deallocations: 133
+reallocations: 2
+bytes allocated: 10371
+instructions executed: 37375
+binary size: 26544
+  code: 13964
+  data: 4366
+  metadata: 8214
+functions:
+  __arr_drop_Fill:
+    calls: 15
+    bytes: 140
+  __arr_retain_Fill:
+    calls: 2
+    bytes: 140
+  __builtin_find_if$Fill$lam$step$lambda0:
+    calls: 29
+    bytes: 620
+  __m1__parse_test_section_header:
+    calls: 36
+    bytes: 744
+  __test$fill_or_add_sections:
+    calls: 1
+    bytes: 6620
+  aipl_arr_inc:
+    calls: 204
+    bytes: (external)
+  aipl_array_dec:
+    calls: 225
+    bytes: (external)
+  aipl_array_new:
+    calls: 13
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 2
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 8
+    bytes: (external)
+  aipl_assert:
+    calls: 14
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 16
+    bytes: (external)
+  append_missing:
+    calls: 14
+    bytes: 1548
+  fill_or_add_sections:
+    calls: 14
+    bytes: 1176
+  main:
+    calls: 1
+    bytes: 128
+  step:
+    calls: 36
+    bytes: 2424
+  step$filter2:
+    calls: 0
+    bytes: 424

@@ -226,47 +226,73 @@ fn parse_spec(contents: &str) -> Spec {
 /// The result of running a single case.
 ///
 /// `Filled` mirrors `Fail`: it carries a message and represents a non-`Pass`
-/// section outcome, but instead of a validation failure it means fill mode (the
-/// `fill_expected` helper) rewrote the section from the actual output. A case is
-/// `Filled` when at least one of its sections was refreshed — neither a failure
-/// nor a clean pass. A section-check that matches is `Pass`; the case folds its
-/// sections together (`Fail` short-circuits, else `Filled` beats `Pass`).
+/// outcome, but instead of a validation failure it means fill mode (the
+/// `fill_expected` helper) rewrote the case's stale sections from the actual
+/// output. Only [`Fills::flush`] builds one — a section check itself only
+/// `Pass`es or `Fail`s, because fill mode *records* the new body and the whole
+/// batch is written back once, when the case is done.
 enum Outcome {
     Pass,
     Filled(String),
     Fail(String),
 }
 
-impl Outcome {
-    /// Fold a later section's `next` outcome into the running case outcome,
-    /// preserving `Fail` > `Filled` > `Pass`: the first `Fail` sticks, two
-    /// `Filled`s combine their notes (so every refreshed section is reported),
-    /// and a matched `Pass` leaves the accumulator unchanged. In practice call
-    /// sites short-circuit on `Fail` before folding (via [`fold_section`]), so
-    /// this mostly resolves the `Filled`/`Pass` upgrade.
-    fn fold(self, next: Outcome) -> Outcome {
-        use Outcome::*;
-        match (self, next) {
-            (fail @ Fail(_), _) => fail,
-            (_, fail @ Fail(_)) => fail,
-            (Filled(a), Filled(b)) => Filled(format!("{a}\n{b}")),
-            (Filled(note), Pass) | (Pass, Filled(note)) => Filled(note),
-            (Pass, Pass) => Pass,
-        }
-    }
-}
-
-/// Fold a section-check `Outcome` into the case accumulator `$acc`, short-
-/// circuiting the whole case on a validation `Fail` (like `?`). A `Filled`
-/// upgrades `$acc` so the case reports as refreshed; a matched `Pass` leaves it
-/// unchanged.
-macro_rules! fold_section {
-    ($acc:ident, $outcome:expr) => {
-        match $outcome {
-            fail @ Outcome::Fail(_) => return fail,
-            other => $acc = $acc.fold(other),
+/// Propagate a section check's `Outcome` like `?`: a validation `Fail` returns
+/// from the enclosing case, so a later section can never mask an earlier
+/// failure. Anything else falls through to the next section.
+macro_rules! check_section {
+    ($outcome:expr) => {
+        if let fail @ Outcome::Fail(_) = $outcome {
+            return fail;
         }
     };
+}
+
+/// The section rewrites a fill run has decided on for one case, held until every
+/// section has been checked and then written back in a single pass.
+///
+/// `enabled` is what makes a run a *fill* run: with it off a differing section
+/// is a failure, with it on it is recorded here instead. Batching is the point
+/// — [`flush`](Fills::flush) costs one read, one walk of the file and one write
+/// for the whole case, where rewriting per section paid for all three once per
+/// stale section (and a case whose `stdout`, `exit code` and `performance` all
+/// moved is the common shape after a codegen change).
+struct Fills {
+    enabled: bool,
+    /// `(section name, new body)`, in the order the sections were checked. The
+    /// file's own order is what the rewrite follows, so this one only decides
+    /// where *appended* (absent) sections land.
+    pending: Vec<(String, String)>,
+}
+
+impl Fills {
+    /// A collector for a run in fill mode (`enabled`) or a normal validating one.
+    fn new(enabled: bool) -> Self {
+        Fills {
+            enabled,
+            pending: Vec::new(),
+        }
+    }
+
+    /// Write every recorded section back to `path` in one pass, reporting what
+    /// was refreshed (one line per section, so a case's diff is legible in the
+    /// fill summary). `Pass` when nothing was recorded — including every normal
+    /// run, where nothing ever is.
+    fn flush(self, path: &Path) -> Outcome {
+        if self.pending.is_empty() {
+            return Outcome::Pass;
+        }
+        let note = self
+            .pending
+            .iter()
+            .map(|(section, _)| format!("[{}]: refreshed `{section}`", path.display()))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let p = path.to_str().expect("utf-8 case path");
+        aipl::codegen::fill_or_add_sections_file(p, &self.pending)
+            .unwrap_or_else(|e| panic!("fill_or_add_sections_file({p:?}): {e}"));
+        Outcome::Filled(note)
+    }
 }
 
 // One `#[test]` per case: libtest runs them in parallel on its own thread pool,
@@ -583,38 +609,36 @@ fn collect_all_cases(cases_root: &Path, examples_root: &Path, crates_root: &Path
     out
 }
 
-/// Validate one expected section, or refresh it in fill mode.
+/// Validate one expected section, or record it for refresh in fill mode.
 ///
-/// - Normal run (`fill = false`): `Outcome::Pass` if `actual == expected`,
-///   otherwise `Outcome::Fail`. There is no `?`/placeholder escape hatch, so a
-///   stale (or `?`) section fails like any other mismatch.
-/// - Fill mode (`fill = true`): a matching section is still `Pass`; a differing
-///   one is rewritten from `actual` and reported as `Outcome::Filled`. The
-///   caller folds this in and keeps checking the *remaining* sections — one fill
-///   pass refreshes them all (no need to run it repeatedly).
+/// - Normal run (`fills.enabled == false`): `Outcome::Pass` if `actual ==
+///   expected`, otherwise `Outcome::Fail`. There is no `?`/placeholder escape
+///   hatch, so a stale (or `?`) section fails like any other mismatch.
+/// - Fill mode: a matching section is still `Pass`; a differing one is queued on
+///   `fills` — also `Pass`, so the caller keeps checking the *remaining*
+///   sections. [`Fills::flush`] writes the whole batch back at the end of the
+///   case, which is why one fill pass refreshes every section of every case.
 fn check_or_fill(
-    orig_path: &Path,
+    fills: &mut Fills,
     ctx: &str,
     section: &str,
     actual: &str,
     expected: &str,
-    fill: bool,
 ) -> Outcome {
     if actual == expected {
         return Outcome::Pass;
     }
-    if fill {
-        let path = orig_path.to_str().expect("utf-8 case path");
-        aipl::codegen::fill_or_add_section_file(path, section, actual)
-            .unwrap_or_else(|e| panic!("fill_or_add_section_file({path:?}): {e}"));
-        Outcome::Filled(format!("[{}]: refreshed `{section}`", orig_path.display()))
-    } else {
-        Outcome::Fail(format!(
-            "{ctx}: `{section}` mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n\
-             If this change is intended, run `{}`.",
-            scoped_fill_cmd(ctx)
-        ))
+    if fills.enabled {
+        fills
+            .pending
+            .push((section.to_string(), actual.to_string()));
+        return Outcome::Pass;
     }
+    Outcome::Fail(format!(
+        "{ctx}: `{section}` mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n\
+         If this change is intended, run `{}`.",
+        scoped_fill_cmd(ctx)
+    ))
 }
 
 /// Entry point for the ignored [`fill_expected`] helper: one serial pass over
@@ -747,17 +771,19 @@ fn collect_cases(dir: &Path, out: &mut Vec<PathBuf>) {
     out.extend(found.into_iter().map(PathBuf::from));
 }
 
+/// Run one case: parse its sections, stage its sources, and check (or, in fill
+/// mode, refresh) every expectation.
+///
+/// The case file is read and parsed **once**, here. Fill mode collects the
+/// sections that moved in a [`Fills`] and flushes them back in one rewrite when
+/// the case is done, so a case with three stale sections costs one read/walk/
+/// write, not three — and the flush is the only thing that touches the file.
 fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill: bool) -> Outcome {
     let contents = fs::read_to_string(path).expect("read test case");
     let spec = parse_spec(&contents);
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap();
     let ctx = format!("[{}]", rel.display());
-
-    // Authoring helper: if the case has an errors section, re-compile and
-    // write the rendered error back into the file in fill mode.
-    if fill && spec.errors.is_some() {
-        return try_fill_expected(path, &contents, &spec);
-    }
+    let mut fills = Fills::new(fill);
 
     // Two modes for staging:
     //   - tests/cases/: stage source + companion `file:` sections into
@@ -785,7 +811,7 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         (path.to_path_buf(), dir)
     };
 
-    if spec.errors.is_some() {
+    let outcome = if spec.errors.is_some() {
         if spec.stdout.is_some() || spec.stderr.is_some() || spec.exit_code.is_some() {
             return Outcome::Fail(format!(
                 "{ctx}: `errors` section is mutually exclusive with stdout/stderr/exit code"
@@ -806,7 +832,7 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
                 "{ctx}: `expect file:` section requires a running program, so it cannot coexist with `errors`"
             ));
         }
-        run_error_case(&ctx, path, &src_path, &spec)
+        run_error_case(&ctx, path, &src_path, &spec, &mut fills)
     } else {
         // A `--- performance ---` section is mandatory for every running test
         // case — `tests/cases/` and the compiler-dogfooded `crates/` helpers
@@ -814,9 +840,9 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
         // with a `?` body and run the fill helper to capture the measured
         // allocation counts.
         // `fill` mode falls through both gates: a missing required section is
-        // *created* by the fill below (`fill_or_add_section_file` appends one
-        // that isn't there), so a brand-new case is finished in a single pass
-        // rather than erroring here and needing a second run.
+        // *created* by the flush below (`fill_or_add_sections_file` appends a
+        // section that isn't there), so a brand-new case is finished in a single
+        // pass rather than erroring here and needing a second run.
         let exempt = rel.starts_with("examples");
         if !exempt && !fill && spec.performance.is_none() {
             return Outcome::Fail(format!(
@@ -826,32 +852,53 @@ fn run_case(path: &Path, rel: &Path, out_root: &Path, stage_to_temp: bool, fill:
                 scoped_fill_cmd(&ctx)
             ));
         }
-        run_success_case(&ctx, path, &src_path, stem, &spec, &case_dir, fill, !exempt)
+        run_success_case(
+            &ctx, path, &src_path, stem, &spec, &case_dir, &mut fills, !exempt,
+        )
+    };
+    // Write back whatever fill mode collected, whether or not a later section
+    // failed: the sections checked before the failure were measured on this run
+    // and refusing to record them would only mean measuring them again on the
+    // next. A failure still decides the case's outcome.
+    let filled = fills.flush(path);
+    if matches!(outcome, Outcome::Fail(_)) {
+        outcome
+    } else {
+        filled
     }
 }
 
-fn run_error_case(ctx: &str, orig_path: &Path, src_path: &Path, spec: &Spec) -> Outcome {
+/// Check (or refresh) the `--- errors ---` section of a case that is expected
+/// not to compile. Fill mode records the rendered diagnostic through the same
+/// [`check_or_fill`] every other section goes through, so there is no second
+/// splicing path for this one section to drift from.
+fn run_error_case(
+    ctx: &str,
+    orig_path: &Path,
+    src_path: &Path,
+    spec: &Spec,
+    fills: &mut Fills,
+) -> Outcome {
     let result = loader::load_program(src_path, debug_opts())
         .and_then(|prog| Compilation::new(&prog, debug_opts()).map(|_| ()));
     let errs = match result {
         Err(e) => e,
         Ok(()) => {
+            // Nothing a refill can fix — the case claims an error the compiler
+            // no longer reports, so the expectation itself is what's wrong.
             return Outcome::Fail(format!(
                 "{ctx}: expected an error, but compilation succeeded"
-            ))
+            ));
         }
     };
     let actual = Error::render_all(&errs, &spec.source, &render_path(orig_path));
-    let expected = spec.errors.as_deref().unwrap_or("");
-    // Fill mode refreshed this above (see `run_case`); here we only validate.
-    if actual != expected {
-        return Outcome::Fail(format!(
-            "{ctx}: error mismatch\n--- expected ---\n{expected}\n--- actual ---\n{actual}\n\
-             If this change is intended, run `{}`.",
-            scoped_fill_cmd(ctx)
-        ));
-    }
-    Outcome::Pass
+    check_or_fill(
+        fills,
+        ctx,
+        "errors",
+        &actual,
+        spec.errors.as_deref().unwrap_or(""),
+    )
 }
 
 // ---------- Perf-monitor refresh (non-deterministic metrics) ----------
@@ -1267,7 +1314,9 @@ fn run_success_case(
     stem: &str,
     spec: &Spec,
     case_dir: &Path,
-    fill: bool,
+    // Where a fill run collects the sections that moved; `fills.enabled` is what
+    // distinguishes fill mode from a normal validating run.
+    fills: &mut Fills,
     // Whether `--- performance ---` is mandatory for this case (false only for
     // the exempt `examples/`). In fill mode this is what authorizes *creating*
     // an absent one, so a fill never adds that section to an example.
@@ -1318,11 +1367,6 @@ fn run_success_case(
             ))
         }
     };
-    // The case's running result. Starts `Pass`; each section folds in via
-    // `fold_section` — a validation `Fail` short-circuits, a fill-mode refresh
-    // upgrades it to `Filled` (so the case reports as refreshed, not a clean
-    // pass). Normal runs only ever leave it `Pass` or short-circuit to `Fail`.
-    let mut outcome = Outcome::Pass;
     // What the object's symbols are called in AIPL, for the per-function `code`
     // breakdown in `--- performance ---`. Read before `emit` consumes `obj_comp`.
     let symbol_names = obj_comp.code_symbol_names();
@@ -1370,25 +1414,15 @@ fn run_success_case(
         let exp_stderr = spec.stderr.as_deref().unwrap_or("");
         let exp_exit = spec.exit_code.unwrap_or(0) & 0xff;
 
-        fold_section!(
-            outcome,
-            check_or_fill(orig_path, ctx, "stdout", &stdout, exp_stdout, fill)
-        );
-        fold_section!(
-            outcome,
-            check_or_fill(orig_path, ctx, "stderr", &stderr, exp_stderr, fill)
-        );
-        fold_section!(
-            outcome,
-            check_or_fill(
-                orig_path,
-                ctx,
-                "exit code",
-                &exit.to_string(),
-                &exp_exit.to_string(),
-                fill,
-            )
-        );
+        check_section!(check_or_fill(fills, ctx, "stdout", &stdout, exp_stdout));
+        check_section!(check_or_fill(fills, ctx, "stderr", &stderr, exp_stderr));
+        check_section!(check_or_fill(
+            fills,
+            ctx,
+            "exit code",
+            &exit.to_string(),
+            &exp_exit.to_string(),
+        ));
 
         // Validate any files the program was expected to *write* (e.g. via
         // `write_string_to_file`). Checked after stdout/exit so a file mismatch
@@ -1403,17 +1437,13 @@ fn run_success_case(
                     ))
                 }
             };
-            fold_section!(
-                outcome,
-                check_or_fill(
-                    orig_path,
-                    ctx,
-                    &format!("expect file: {rel}"),
-                    &actual,
-                    expected,
-                    fill,
-                )
-            );
+            check_section!(check_or_fill(
+                fills,
+                ctx,
+                &format!("expect file: {rel}"),
+                &actual,
+                expected,
+            ));
         }
     } // end `if has_main` (behavior run)
 
@@ -1443,10 +1473,7 @@ fn run_success_case(
             // A `--- check ---` section pins the expected report exactly (this is
             // how a *failing* test is documented).
             Some(expected) => {
-                fold_section!(
-                    outcome,
-                    check_or_fill(orig_path, ctx, "check", &report, expected, fill)
-                );
+                check_section!(check_or_fill(fills, ctx, "check", &report, expected));
             }
             // No pinned report: the in-language tests must simply pass.
             None => {
@@ -1466,33 +1493,30 @@ fn run_success_case(
 
     // Allocation accounting, if requested. Correctness (above) is checked
     // first so a perf mismatch never masks a behavioral regression.
-    if spec.performance.is_some() || (fill && require_metrics) {
+    if spec.performance.is_some() || (fills.enabled && require_metrics) {
         let perf = spec.performance.as_deref().unwrap_or("");
         // `obj_bytes` is the non-instrumented (production) object; its length is
         // the `binary size` metric — split into code/data/metadata for the
         // report, with `code`'s per-function parts going to the `functions:`
         // block instead.
         let (sizes, fn_sizes) = BinSizes::of(&obj_bytes, &symbol_names);
-        fold_section!(
-            outcome,
-            run_performance_check(
-                ctx,
-                orig_path,
-                &measured,
-                stem,
-                spec,
-                case_dir,
-                perf,
-                sizes,
-                fn_sizes,
-                &symbol_names,
-                fill,
-            )
-        );
+        check_section!(run_performance_check(
+            ctx,
+            orig_path,
+            &measured,
+            stem,
+            spec,
+            case_dir,
+            perf,
+            sizes,
+            fn_sizes,
+            &symbol_names,
+            fills,
+        ));
     }
-    // `Pass` if every section matched, `Filled` if fill mode refreshed any of
-    // them (a normal run would have short-circuited to `Fail` before here).
-    outcome
+    // Every section matched, or fill mode queued the ones that didn't; a normal
+    // run would have short-circuited to `Fail` before here. The caller flushes.
+    Outcome::Pass
 }
 
 /// Build the *instrumented* object (executed-instruction counter enabled), link
@@ -1511,7 +1535,7 @@ fn run_performance_check(
     prod_sizes: BinSizes,
     fn_sizes: Vec<(String, u64)>,
     symbol_names: &HashMap<String, String>,
-    fill: bool,
+    fills: &mut Fills,
 ) -> Outcome {
     let obj_bytes = match ObjectCompilation::new(program, stem, debug_opts(), true)
         .and_then(|c| c.emit().map_err(Vec::from))
@@ -1560,12 +1584,11 @@ fn run_performance_check(
         None => String::new(),
     };
     check_or_fill(
-        orig_path,
+        fills,
         ctx,
         "performance",
         &actual.render(),
         &expected_render,
-        fill,
     )
 }
 
@@ -1964,62 +1987,4 @@ fn parse_perf_stats(s: &str) -> Option<PerfStats> {
 /// fallback — see `aipl::codegen::normalize_output`.
 fn normalize_output(s: &str) -> String {
     aipl::codegen::normalize_output(s)
-}
-
-fn try_fill_expected(path: &Path, contents: &str, spec: &Spec) -> Outcome {
-    // Re-run the load/compile path against the in-memory source so we
-    // can render an error to splice in. If compilation succeeds the
-    // author has a bigger problem than a stale expected error — the normal
-    // run will fail (`expected an error, but compilation succeeded`).
-    //
-    // Stage to a per-PID subdir using the case's stem as the filename,
-    // so any errors that mention the source file's name (e.g. the
-    // loader's "duplicate top-level item" error) reproduce exactly what
-    // the real test will see. Also stage any `file:` companions.
-    let stem = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .expect("utf-8 case stem");
-    let dir = std::env::temp_dir().join(format!("aipl-fill-{}-{stem}", std::process::id()));
-    let _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(&dir).expect("mkdir fill staging");
-    let tmp = dir.join(format!("{stem}.aipl"));
-    fs::write(&tmp, &spec.source).expect("write tmp source");
-    aipl::stage_companions(&dir, &spec.extra_files).expect("stage companions");
-    let result = loader::load_program(&tmp, debug_opts())
-        .and_then(|prog| Compilation::new(&prog, debug_opts()).map(|_| ()));
-    let _ = fs::remove_dir_all(&dir);
-    let errs = match result {
-        Err(e) => e,
-        Ok(()) => {
-            // The program compiled, so there's no error to splice in — nothing
-            // to refresh. The normal run will report this as a failure
-            // (`expected an error, but compilation succeeded`).
-            eprintln!(
-                "[{}]: fill_expected: program compiled — nothing to splice in.",
-                path.display()
-            );
-            return Outcome::Pass;
-        }
-    };
-    let rendered = Error::render_all(&errs, &spec.source, &render_path(path));
-    // Replace everything after the `--- errors ---` header with the rendered error.
-    let header_marker = "--- errors ---";
-    let header_idx = contents
-        .find(header_marker)
-        .expect("`--- errors ---` header in source");
-    let after_header = header_idx + header_marker.len();
-    let new_contents = format!(
-        "{}\n{}\n",
-        &contents[..after_header].trim_end(),
-        rendered.trim_end()
-    );
-    // Only report (and rewrite) when the rendered error actually differs, so a
-    // fill run over an already-current corpus refreshes nothing — matching
-    // `check_or_fill`'s "differs ⇒ refresh" contract for the other sections.
-    if new_contents == contents {
-        return Outcome::Pass;
-    }
-    fs::write(path, new_contents).expect("rewrite case file");
-    Outcome::Filled(format!("[{}]: refreshed `errors`", path.display()))
 }

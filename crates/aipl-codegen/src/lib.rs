@@ -2937,8 +2937,8 @@ pub const DOGFOOD_SOURCE_FILES: &[&str] = &[
     "./assert_loc.aipl",
     "./line_at.aipl",
     "./caret_block.aipl",
-    "./fill_or_add_section.aipl",
-    "./fill_or_add_section_file.aipl",
+    "./fill_or_add_sections.aipl",
+    "./fill_or_add_sections_file.aipl",
     "./normalize_output.aipl",
     "./int_fits.aipl",
     "./operator_named_forms.aipl",
@@ -3026,8 +3026,8 @@ pub fn source_refs(sources: &[(String, String)]) -> Vec<(&str, &str)> {
 /// index of what is dogfooded. A dogfooded function whose caller has since been
 /// ported to AIPL is reached in-engine by that AIPL caller and belongs only in
 /// [`DOGFOOD_SOURCE_FILES`] — `process_raw_string` (called by `lex_aipl`'s
-/// emit), `line_at` (by `caret_block`), and `fill_or_add_section` (by
-/// `fill_or_add_section_file`) are all in that position. Listing one here anyway
+/// emit), `line_at` (by `caret_block`), and `fill_or_add_sections` (by
+/// `fill_or_add_sections_file`) are all in that position. Listing one here anyway
 /// costs entry metadata in the artifact and advertises a Rust-facing API that
 /// nothing calls.
 pub const DOGFOOD_ENTRIES: &[&str] = &[
@@ -3036,7 +3036,7 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "split_test_sections",
     "assert_loc",
     "caret_block",
-    "fill_or_add_section_file",
+    "fill_or_add_sections_file",
     "normalize_output",
     "int_fits",
     "is_operator_name",
@@ -3499,31 +3499,41 @@ fn caret_block(source: &str, span: Span, filename: &str) -> String {
     })
 }
 
-/// Reads the file at `path`, splices `body` into (or appends) its
-/// `--- section ---` block via the dogfooded AIPL `fill_or_add_section`, and
-/// writes the result back to `path` — computed by the dogfooded AIPL
-/// `fill_or_add_section_file` via the FFI (itself doing the file I/O; nothing
-/// here touches `std::fs`). Not a parser hook — only the cases test harness
-/// calls this. Returns `Ok(())` on success or the builtin `Error`'s message on
-/// a read/write failure — the AIPL function returns `!Error` directly, marshaled
+/// Reads the file at `path`, rewrites each `(section, body)` in `fills` into
+/// (or appends it to) the file's `--- section ---` blocks, and writes the result
+/// back — computed by the dogfooded AIPL `fill_or_add_sections_file` via the FFI
+/// (itself doing the file I/O; nothing here touches `std::fs`). Not a parser
+/// hook — only the cases test harness calls this.
+///
+/// The batch is the point: a case whose `stdout`, `exit code` and `performance`
+/// all went stale is read, walked and written back **once**, not once per
+/// section. Returns `Ok(())` on success or the builtin `Error`'s message on a
+/// read/write failure — the AIPL function returns `!Error` directly, marshaled
 /// through `FfiValue::Res`. No native fallback; panics if it can't be built or
 /// called.
-pub fn fill_or_add_section_file(path: &str, section: &str, body: &str) -> Result<(), String> {
+pub fn fill_or_add_sections_file(path: &str, fills: &[(String, String)]) -> Result<(), String> {
+    let fills = FfiValue::Array(
+        fills
+            .iter()
+            .map(|(section, body)| {
+                FfiValue::Struct(vec![
+                    ("section".to_string(), FfiValue::Str(section.clone())),
+                    ("body".to_string(), FfiValue::Str(body.clone())),
+                ])
+            })
+            .collect(),
+    );
     DOGFOOD_ENGINE.with(|comp| {
         match comp.call_values(
-            "fill_or_add_section_file",
-            &[
-                FfiValue::Str(path.to_string()),
-                FfiValue::Str(section.to_string()),
-                FfiValue::Str(body.to_string()),
-            ],
+            "fill_or_add_sections_file",
+            &[FfiValue::Str(path.to_string()), fills],
         ) {
             Ok(FfiValue::Res(Ok(_))) => Ok(()),
             Ok(FfiValue::Res(Err(e))) => match *e {
                 FfiValue::Str(s) => Err(s),
-                other => panic!("dogfooded fill_or_add_section_file() err payload: {other:?}"),
+                other => panic!("dogfooded fill_or_add_sections_file() err payload: {other:?}"),
             },
-            other => panic!("dogfooded fill_or_add_section_file() call: {other:?}"),
+            other => panic!("dogfooded fill_or_add_sections_file() call: {other:?}"),
         }
     })
 }

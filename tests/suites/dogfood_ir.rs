@@ -359,7 +359,7 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
     // Real file I/O, so stage it under the OS temp dir (never the repo tree)
     // and clean up after.
     let dir = std::env::temp_dir().join(format!(
-        "aipl-dogfood-fill-or-add-section-file-{}",
+        "aipl-dogfood-fill-or-add-sections-file-{}",
         std::process::id()
     ));
     std::fs::create_dir_all(&dir).expect("mkdir sanity-check staging");
@@ -367,30 +367,31 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
     std::fs::write(&path, "code\n--- stdout ---\nold\n").expect("write staged file");
     let path_str = path.to_str().expect("utf-8 temp path").to_string();
 
+    // A batch of two: one section the file already has (replaced in place) and
+    // one it doesn't (appended) — in a single read/walk/write.
+    let fill = |section: &str, body: &str| {
+        FfiValue::Struct(vec![
+            ("section".to_string(), FfiValue::Str(section.to_string())),
+            ("body".to_string(), FfiValue::Str(body.to_string())),
+        ])
+    };
+    let fills = FfiValue::Array(vec![fill("stdout", "new"), fill("exit code", "3")]);
     let file_result = comp
         .call_values(
-            "fill_or_add_section_file",
-            &[
-                FfiValue::Str(path_str.clone()),
-                FfiValue::Str("stdout".to_string()),
-                FfiValue::Str("new".to_string()),
-            ],
+            "fill_or_add_sections_file",
+            &[FfiValue::Str(path_str.clone()), fills.clone()],
         )
         .unwrap();
     assert_eq!(file_result, FfiValue::Res(Ok(Box::new(FfiValue::Int(0)))));
     let written = std::fs::read_to_string(&path).expect("read back staged file");
-    assert_eq!(written, "code\n--- stdout ---\nnew\n");
+    assert_eq!(written, "code\n--- stdout ---\nnew\n--- exit code ---\n3\n");
 
     // A missing file surfaces the builtin `Error`'s message.
     let missing = dir.join("no_such_file.txt");
     let file_err = comp
         .call_values(
-            "fill_or_add_section_file",
-            &[
-                FfiValue::Str(missing.to_str().unwrap().to_string()),
-                FfiValue::Str("stdout".to_string()),
-                FfiValue::Str("new".to_string()),
-            ],
+            "fill_or_add_sections_file",
+            &[FfiValue::Str(missing.to_str().unwrap().to_string()), fills],
         )
         .unwrap();
     assert_eq!(

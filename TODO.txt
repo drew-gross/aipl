@@ -76,7 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  template_inner should use sets better
+  Fill[] should probably be a dict
   Matcher should use doc comments, also Delimited should use named args probably
   unordered set needs some way to convert to array
   class_meta should be a const set
@@ -104,7 +104,6 @@ misc cleanup:
   fmt_node can only fail due to bad internal index; see if we can fix that, maybe with a LinkedGrammar type?
   breaks_after can be take_while->starts_with I think?
   lower_atom should be able to better than an if chain
-  fill_section seems like it should be able to be simpler. And maybe should be fill_sections with str* or str+?
   Remove need for Member JSON arm. Should be dict probably?
   unescape + unescape_braces can probably be DRYed up
   union_all can be context ordered, like to_set
