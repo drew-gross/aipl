@@ -1172,11 +1172,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         """incomplete escape sequence: \ at end of input""",
         2..3,
     )));
-    // TODO: this should be an unterminated delimited token error.
-    assert(lex(`"a\\`, strs) == err(lex_err(
-        """incomplete escape sequence: \ at end of input""",
-        2..3,
-    )));
+    assert(lex(`"a\\`, strs) == err(lex_err("unterminated delimited token", 0..3)));
 
     // Try: a fallible string emit. `nonempty_str` decodes, then enforces a
     // content rule the *caller* owns — an empty string literal is an error whose
@@ -1514,11 +1510,11 @@ allocations: 415
 deallocations: 415
 reallocations: 90
 bytes allocated: 67144
-instructions executed: 422525
-binary size: 2495232
-  code: 1696404
-  data: 11668
-  metadata: 787160
+instructions executed: 422597
+binary size: 2495104
+  code: 1696336
+  data: 11628
+  metadata: 787140
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1600,7 +1596,7 @@ functions:
     bytes: 22980
   __test$lex:
     calls: 1
-    bytes: 1583220
+    bytes: 1583152
   __test$lex$checked_seg:
     calls: 2
     bytes: 1780

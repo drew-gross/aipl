@@ -10716,6 +10716,31 @@ fn charset_slot(builder: &mut FunctionBuilder) -> Value {
     builder.ins().stack_addr(types::I64, slot, 0)
 }
 
+/// A value on its way into a location of type `dst`, with the empty-`#{}`
+/// placeholder substituted for a real bitfield.
+///
+/// An empty set literal nothing has given an element type to is the shared empty
+/// *array block* — eight bytes of header. Stored where a `#{char}` is expected,
+/// the 32-byte copy reads 24 bytes *past* that block, and what it finds is
+/// whatever the data section holds next. So the symptom moves when an unrelated
+/// string literal changes length, which is how this was found: two programs
+/// differing only in their `print` labels, one right and one reporting four
+/// members in an empty set.
+///
+/// The empty set is what zeroed memory reads as, so the substitute allocates
+/// nothing and the block it replaces is static and untracked.
+fn coerce_into_charset(
+    builder: &mut FunctionBuilder,
+    v: Value,
+    src: &ConcreteType,
+    dst: &ConcreteType,
+) -> Value {
+    if is_char_set(dst) && matches!(src, ConcreteType::Set(inner, _) if is_none_inner(inner)) {
+        return charset_slot(builder);
+    }
+    v
+}
+
 /// A char-set operand, with the empty-`#{}` placeholder substituted.
 ///
 /// An empty set literal is the shared empty *array* block until something gives
@@ -14669,6 +14694,7 @@ fn compile_variant<M: Module>(
         // A bare literal takes the payload field's int type.
         let actual = flex_int_ty(arg, &actual, fty);
         expect_type(&actual, fty, "constructor argument", arg.span.clone())?;
+        let v = coerce_into_charset(builder, v, &actual, fty);
         vals.push((*offset, fty.clone(), v, owned_temp_since(scopes, before, v)));
     }
 
@@ -19252,7 +19278,9 @@ fn compile_expr_inner<M: Module>(
                     let actual = flex_int_ty(&init.value, &actual, &fty);
                     expect_type(&actual, &fty, &ctx, init.value.span.clone())?;
                 }
-                vals.push((offset, fty, v, owned_temp_since(scopes, before, v)));
+                let owned_temp = owned_temp_since(scopes, before, v);
+                let v = coerce_into_charset(builder, v, &actual, &fty);
+                vals.push((offset, fty, v, owned_temp));
             }
 
             // Phase 2: no field expression runs from here on, so nothing below
@@ -20848,6 +20876,17 @@ fn compile_expr_inner<M: Module>(
                     }
                 }
                 let owned_temp = owned_temp_since(scopes, before, v);
+                // An empty `#{}` among `#{char}` elements is the placeholder
+                // block, which is narrower than the bitfield the element slot
+                // expects; substitute before the store sizes itself by the
+                // element type.
+                let (v, t) = match &elem_ty {
+                    Some(expected) if is_char_set(expected) => (
+                        coerce_into_charset(builder, v, &t, expected),
+                        expected.clone(),
+                    ),
+                    _ => (v, t),
+                };
                 vals.push((v, t, owned_temp));
             }
             let elem = elem_ty.unwrap_or(ConcreteType::NoneInner);

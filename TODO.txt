@@ -76,6 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  I think coerce_into_charset would be unnecessary if the type checking pass went before codegen and assigned types to all empty set literals
   template_inner should use sets better
   Matcher should use doc comments, also Delimited should use named args probably
   unordered set needs some way to convert to array
@@ -170,6 +171,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
+  that's a live miscompile (an empty #{char} reading as len=1),
   lex(`"a\\`, strs) should be unterminated delimited token, because strs doesn't have any escapes
   aipl_arr_ensure_heap for a reversed view appears to dec the inner array twice
   binding_is_exclusive treats a later slice of a mut array as an alias for the whole body, so a push loop before the slice copies per iteration
@@ -439,6 +441,7 @@ design:
 optimizations:
   template literals should constant fold in their parts if constant
   string interning? replaing let tq = `"""`; f(tq, tq) with f(`"""`, `"""`); was slower, which I wouldn't expect
+  set literals should constant fold
   to_set() should constant fold
   ident_start and ident_cont should be constants computed at compile time
   for move-in detection:
@@ -456,7 +459,6 @@ optimizations:
   code sinking should sink into potentially-unused match arms
   generalize try_push for opts, strings, structs?
   output array length prediction that propagates and allows for really good pre-reserving
-  constant folding optimization pass
   dead store elimination optimization pass
   Replacing self[end].value_or(' ') == '.' with self[end] == some('.') should not cause a perf decrease
   inline if it would create a fusion opportunity
