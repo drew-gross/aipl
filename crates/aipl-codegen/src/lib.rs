@@ -16634,17 +16634,52 @@ fn compile_call_expr<M: Module>(
                 ));
             }
             let (arr_ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
-            let ConcreteType::Array(elem) = &t else {
-                return Err(Error::at(
-                    format!("\"to_set\" requires an array, got {}", type_name(&t)),
-                    args[0].span.clone(),
-                ));
+            // A `str` receiver gives a `#{char}` — a string is a sequence of
+            // chars, and the bitfield is filled by streaming it, so nothing
+            // reads its bytes as array elements.
+            let elem = match &t {
+                ConcreteType::Array(e) => (**e).clone(),
+                _ if is_str_repr(&t) => ConcreteType::Primitive(Primitive::Char),
+                other => {
+                    return Err(Error::at(
+                        format!(
+                            "\"to_set\" requires an array or a str, got {}",
+                            type_name(other)
+                        ),
+                        args[0].span.clone(),
+                    ));
+                }
             };
-            let elem = (**elem).clone();
             let order = match &locked {
                 Some(ConcreteType::Set(_, o)) if *o != aipl_syntax::ast::SetOrder::Context => *o,
                 _ => aipl_syntax::ast::SetOrder::Unordered,
             };
+            // A literal source: the members are known *now*, so the bitfield is
+            // four immediate stores rather than a scan over the characters.
+            // This is what makes a character class free — as a top-level
+            // constant it is spliced into each use already built, where asking
+            // for one per rule walked its sixty-odd characters every time.
+            if elem == ConcreteType::Primitive(Primitive::Char) {
+                if let ExprKind::Str(lit) = &args[0].kind {
+                    let mut words = [0u64; CHARSET_WORDS];
+                    for c in lit.as_bytes() {
+                        words[(c >> 6) as usize] |= 1u64 << (c & 63);
+                    }
+                    let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                        StackSlotKind::ExplicitSlot,
+                        charset::CHARSET_SIZE as u32,
+                        3,
+                    ));
+                    for (w, word) in words.iter().enumerate() {
+                        let wv = builder.ins().iconst(types::I64, *word as i64);
+                        builder
+                            .ins()
+                            .stack_store(types::I64, wv, slot, (w * 8) as i32);
+                    }
+                    let base = builder.ins().stack_addr(types::I64, slot, 0);
+                    return Ok((base, ConcreteType::Set(Box::new(elem), order)));
+                }
+            }
             // A `char[]` source is *str-shaped*: its value is the 24-byte
             // string, not an array block, so the index walk below would read
             // the string's own words as a length. It is also the only source

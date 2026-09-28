@@ -141,6 +141,8 @@ case_tests! {
     cases_conditionals_err_if_without_parens = "cases/conditionals/err_if_without_parens",
     cases_conditionals_if_no_else = "cases/conditionals/if_no_else",
     cases_conditionals_if_picks_branch = "cases/conditionals/if_picks_branch",
+    cases_constants_char_set = "cases/constants/char_set",
+    cases_constants_err_computed_to_set = "cases/constants/err_computed_to_set",
     cases_constants_err_computed_value = "cases/constants/err_computed_value",
     cases_constants_err_lowercase_name = "cases/constants/err_lowercase_name",
     cases_constants_err_mut = "cases/constants/err_mut",

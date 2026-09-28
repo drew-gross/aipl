@@ -606,10 +606,18 @@ impl Loader {
                         }
                     }
                 }
-                if let Item::Const(c) = item {
-                    check_const(c)?;
+                let const_written = match item {
+                    Item::Const(c) => {
+                        check_const_name(c)?;
+                        Some(c.name.clone())
+                    }
+                    _ => None,
+                };
+                let rewritten = rewrite_item(item, view, &ctor_cases, is_root)?;
+                if let (Some(written), Item::Const(c)) = (&const_written, &rewritten) {
+                    check_const_value(written, c)?;
                 }
-                merged.push(rewrite_item(item, view, &ctor_cases, is_root)?);
+                merged.push(rewritten);
             }
         }
         // Every reference is a final global name by now, so a constant's uses
@@ -650,7 +658,7 @@ impl Loader {
 /// literal is the only value that can be spliced without an evaluation order to
 /// argue about. A negative number is a literal too — the parser builds it as a
 /// `Neg` around one, which is the one non-leaf shape allowed through.
-fn check_const(c: &aipl_syntax::ast::ConstDecl) -> Result<(), Error> {
+fn check_const_name(c: &aipl_syntax::ast::ConstDecl) -> Result<(), Error> {
     if !is_screaming_snake_case(&c.name) {
         return Err(Error::at(
             format!(
@@ -661,13 +669,22 @@ fn check_const(c: &aipl_syntax::ast::ConstDecl) -> Result<(), Error> {
             c.span.clone(),
         ));
     }
+    Ok(())
+}
+
+/// The value half of [`check_const_name`].
+///
+/// Run on the *rewritten* declaration, so a callee in the value carries its
+/// canonical name — which is what tells the `to_set` builtin apart from a user
+/// function of the same spelling. `written` is the name the author gave the
+/// constant, since the rewritten one is mangled.
+fn check_const_value(written: &str, c: &aipl_syntax::ast::ConstDecl) -> Result<(), Error> {
     if !is_const_literal(&c.value) {
         return Err(Error::at(
             format!(
-                "a top-level constant stands for a literal, and {:?} is given something to \
-                 evaluate — a constant is substituted into each use, so there is no point at \
-                 which a computation would run",
-                c.name
+                "a top-level constant stands for a literal, and {written:?} is given something \
+                 to evaluate — a constant is substituted into each use, so there is no point at \
+                 which a computation would run"
             ),
             c.value.span.clone(),
         ));
@@ -694,6 +711,17 @@ fn to_screaming_snake_case(name: &str) -> String {
 }
 
 /// Whether `e` is a literal a constant may stand for.
+/// Whether `callee` is the `to_set` builtin. The name has been rewritten to its
+/// canonical by now, which a user function cannot hold — so this is the check
+/// that a `to_set` in a constant is *the* one and not a same-named local.
+fn is_to_set(callee: &Callee) -> bool {
+    match callee {
+        Callee::ToSet => true,
+        Callee::User(n) => Callee::from_canonical(n) == Some(Callee::ToSet),
+        _ => false,
+    }
+}
+
 fn is_const_literal(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Num(_)
@@ -703,6 +731,18 @@ fn is_const_literal(e: &Expr) -> bool {
         | ExprKind::Unit => true,
         // `-1` is a literal with a sign on it.
         ExprKind::Neg(inner) => matches!(inner.kind, ExprKind::Num(_)),
+        // `"…".to_set()` — a character class. Written as a call, but it names a
+        // value rather than computing one: the receiver is a literal, there is
+        // no second operand to order against it, and codegen folds it to the
+        // four words of the `#{char}` bitfield, so each substituted use is four
+        // immediate stores. That is what a literal has to mean here — something
+        // that can be spliced with no evaluation order to argue about.
+        //
+        // Only a *literal* receiver qualifies. `xs.to_set()` over a binding is
+        // a computation like any other and stays refused.
+        ExprKind::Call(callee, args, _) if is_to_set(callee) => {
+            matches!(args.as_slice(), [arg] if matches!(arg.kind, ExprKind::Str(_)))
+        }
         _ => false,
     }
 }
@@ -1116,12 +1156,16 @@ fn rewrite_item(
                 })
                 .collect(),
         }),
-        // A constant's value is a literal, which names nothing to resolve; only
-        // its own name is rewritten to the global it becomes, and its
-        // annotation may name an imported type.
+        // A constant's own name becomes the global it stands for, and its
+        // annotation may name an imported type. Its *value* is rewritten too:
+        // `"…".to_set()` is admitted as a constant, so a value can name a
+        // builtin, and the name has to resolve here — substitution happens
+        // after this pass, so anything left unresolved would reach the use site
+        // as an unknown function.
         Item::Const(c) => Item::Const(aipl_syntax::ast::ConstDecl {
             name: view.get(&c.name).cloned().unwrap_or_else(|| c.name.clone()),
             ty: c.ty.as_ref().map(|t| rewrite_type(t, view, &[])),
+            value: rewrite_expr(&c.value, view, sc, &std::collections::HashSet::new()),
             ..c.clone()
         }),
         Item::Import(_) => unreachable!("imports stripped during load"),

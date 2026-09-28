@@ -1,0 +1,67 @@
+import { has, len, logical_not as !, print, to_set, to_str } from builtins;
+
+// A character class as a top-level constant. `"…".to_set()` is admitted as a
+// constant even though it is written as a call: it has no operands to evaluate
+// in any order, and codegen folds a literal receiver to the four words of the
+// `#{char}` bitfield — so the substituted use is four immediate stores, not a
+// walk over the characters.
+//
+// This is what a lexer wants. A class asked for per rule rebuilt itself once
+// per keyword; as a constant it is spliced into each use already built.
+pub let IDENT_START: #{char} = "abcdefghijklmnopqrstuvwxyz_".to_set();
+
+let PUNCT: #{char} = "(){}[],;".to_set();
+
+fn is_ident_start(c: char) -> bool { IDENT_START.has(c) }
+
+fn main() !prints {
+    print(IDENT_START.len().to_str());
+    print(is_ident_start('q').to_str());
+    print((!is_ident_start('Q')).to_str());
+    print(is_ident_start('_').to_str());
+    // Substituted at more than one use, and in another constant's company.
+    print(PUNCT.len().to_str());
+    print(PUNCT.has('{').to_str());
+    print((!PUNCT.has('q')).to_str());
+    // Duplicates in the source string collapse, as they must.
+    print("aab".to_set().len().to_str());
+}
+--- stdout ---
+27
+true
+true
+true
+8
+true
+true
+2
+
+--- performance ---
+allocations: 8
+deallocations: 8
+reallocations: 0
+bytes allocated: 152
+instructions executed: 525
+binary size: 3456
+  code: 1900
+  data: 95
+  metadata: 1461
+functions:
+  __to_str_bool:
+    calls: 5
+    bytes: 232
+  __to_str_u64:
+    calls: 3
+    bytes: 204
+  aipl_u64_len:
+    calls: 6
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 5
+    bytes: (external)
+  aipl_write_u64:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 1464

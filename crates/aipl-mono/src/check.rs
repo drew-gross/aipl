@@ -3893,13 +3893,17 @@ impl Cx<'_> {
         // `needs_lock`), and a plain `#{T}` where nothing does.
         if *callee == Callee::ToSet && args.len() == 1 {
             let t = self.check_expr(&args[0], env, effects)?;
-            // Arrays only: a `str` is a char sequence to `T[]` signatures, but
-            // its bytes are not laid out as array elements, so it is refused
-            // here rather than read as one downstream.
+            // A `str` receiver gives a `#{char}`: a string *is* a sequence of
+            // chars, and that is the set a character class wants. It was
+            // refused while a set was an array block — a `str`'s bytes are not
+            // laid out as array elements, so reading one as an array walked
+            // nonsense — but a `#{char}` is the bitfield, which codegen fills
+            // by streaming the string (and folds outright when it is a
+            // literal). Nothing reads it as an array on the way.
             if is_str_repr(&t) {
-                return Err(Error::at(
-                    "\"to_set\" takes an array, not a str",
-                    args[0].span.clone(),
+                return Ok(Type::Set(
+                    Box::new(Type::Primitive(Primitive::Char)),
+                    aipl_syntax::ast::SetOrder::Context,
                 ));
             }
             if let Type::Array(inner) = unrefined(&t) {
