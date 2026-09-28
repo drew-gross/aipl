@@ -248,11 +248,11 @@ allocations: 20914
 deallocations: 20914
 reallocations: 3004
 bytes allocated: 4513481
-instructions executed: 9253831
-binary size: 6557088
-  code: 4343532
+instructions executed: 8933017
+binary size: 6558344
+  code: 4344548
   data: 11914
-  metadata: 2201642
+  metadata: 2201882
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -817,7 +817,7 @@ functions:
     bytes: 6072
   __m23__aipl_rules:
     calls: 39
-    bytes: 93236
+    bytes: 94252
   __m23__aipl_rules$lambda0:
     calls: 0
     bytes: 144

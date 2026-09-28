@@ -464,34 +464,6 @@
 
 
 
-        <section class="item" id="item-ident_start">
-          <h3>
-            <a class="anchor" href="#item-ident_start">ident_start</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn ident_start() -&#62; #{char}</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-ident_cont">
-          <h3>
-            <a class="anchor" href="#item-ident_cont">ident_cont</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn ident_cont() -&#62; #{char}</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
         <section class="item" id="item-str_lit_value">
           <h3>
             <a class="anchor" href="#item-str_lit_value">str_lit_value</a>
@@ -616,7 +588,7 @@
             <a class="anchor" href="#item-kw">kw</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn kw(spelling: str, kind: AiplTok, scope: str, boundary: #{char}) -&#62; TokenRule&#60;AiplTok&#62;</code></pre>
+          <pre class="signature"><code>fn kw(spelling: str, kind: AiplTok, scope: str) -&#62; TokenRule&#60;AiplTok&#62;</code></pre>
 
           <div class="doc"><p>One keyword/constant rule: match the exact <code>spelling</code> at an identifier boundary (so <code>fn</code>/<code>true</code> don't split <code>fnord</code>/<code>trueish</code>) and emit the fixed <code>kind</code>. Every keyword and constant is a single <code>kw</code> call in <code>aipl_rules</code>, so the spelling and its <code>AiplTok</code> arm are named together — no spelling→arm <code>match</code> to keep in sync with a separate spelling list.</p></div>
 

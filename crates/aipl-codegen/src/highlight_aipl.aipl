@@ -44,7 +44,7 @@ import {
     tm_json,
     word_pat,
 } from "./highlight.aipl";
-import { S_PUNCT, aipl_rules, ident_cont, ident_start } from "./lex_aipl.aipl";
+import { IDENT_CONT, IDENT_START, S_PUNCT, aipl_rules } from "./lex_aipl.aipl";
 import { CharRun } from "./lexer.aipl";
 
 # AIPL's TextMate grammar as `.tmLanguage.json` text — what
@@ -139,7 +139,7 @@ fn escape_scope() -> str { "constant.character.escape.aipl" }
 # built from (`lex_aipl.aipl`), so `fn NAME` accepts exactly the names AIPL
 # accepts. `matcher_regex` answers `none` only for the delimiter-scanning
 # matchers, which a `CharRun` is not.
-fn ident_regex() -> str { matcher_regex(CharRun(ident_cont(), first=ident_start())).value_or("") }
+fn ident_regex() -> str { matcher_regex(CharRun(IDENT_CONT, first=IDENT_START)).value_or("") }
 
 # The builtin type names. Lexically these are plain identifiers — the AIPL lexer
 # emits `Name` for them and `classify_lexed` (`crates/aipl-parser/src/lib.rs`)
@@ -176,11 +176,11 @@ allocations: 3942
 deallocations: 3942
 reallocations: 331
 bytes allocated: 345440
-instructions executed: 1359914
-binary size: 233344
-  code: 174440
+instructions executed: 1346070
+binary size: 234960
+  code: 175880
   data: 3336
-  metadata: 55568
+  metadata: 55744
 functions:
   __arr_drop___m1__Entry:
     calls: 2
@@ -331,7 +331,7 @@ functions:
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 127176
+    bytes: 128616
   __to_str_u64:
     calls: 7
     bytes: 204

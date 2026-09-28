@@ -183,23 +183,23 @@ pub fn doc_line_value(line: str) -> str { line.trim_prefix('#').trim_prefix(' ')
     });
 })
 
-pub fn ident_start() -> #{char} {
-    let chars: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
-    chars.to_set()
-}
+# The identifier character classes. Constants rather than functions: a literal
+# `to_set()` folds to the four words of the `#{char}` bitfield, and a constant is
+# spliced into each use already built — so asking for one costs four immediate
+# stores wherever it appears, and the class is built once per program rather than
+# once per `lex` (let alone once per keyword rule, which is what it cost when
+# `kw` asked for its own).
+pub let IDENT_START: #{char} = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".to_set();
 
-pub fn ident_cont() -> #{char} {
-    let chars: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
-    chars.to_set()
-}
+pub let IDENT_CONT: #{char} = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789".to_set();
 
 # One keyword/constant rule: match the exact `spelling` at an identifier
 # boundary (so `fn`/`true` don't split `fnord`/`trueish`) and emit the fixed
 # `kind`. Every keyword and constant is a single `kw` call in `aipl_rules`, so
 # the spelling and its `AiplTok` arm are named together — no spelling→arm
 # `match` to keep in sync with a separate spelling list.
-fn kw(spelling: str, kind: AiplTok, scope: str, boundary: #{char}) -> TokenRule<AiplTok> {
-    matcher: Keyword(spelling, boundary),
+fn kw(spelling: str, kind: AiplTok, scope: str) -> TokenRule<AiplTok> {
+    matcher: Keyword(spelling, IDENT_CONT),
     emit: Bare(kind),
     scope,
 }
@@ -469,10 +469,6 @@ pub let S_PUNCT = "punctuation.aipl";
 let S_DOC = "comment.line.documentation.aipl";
 
 pub fn aipl_rules() -> TokenRule<AiplTok>[] {
-    // Built once and handed to every keyword rule. Asking `ident_cont()` per
-    // rule walked its sixty-odd characters twenty-two times before the lexer
-    // reached a single character of source.
-    let cont = ident_cont();
     [
         TokenRule { matcher: CharRun(#{' ', '\t', '\n', '\r'}), emit: Bare(Space), skip: true },
         TokenRule {
@@ -524,30 +520,30 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // immaterial — the spellings are disjoint — but all must precede the
         // identifier rule. Constants (`true`/`false`/`none`) get their own kinds,
         // a distinct category from keywords, mirroring the Rust lexer.
-        kw("fn", Fn, S_KEYWORD, cont),
-        kw("let", Let, S_KEYWORD, cont),
-        kw("mut", Mut, S_KEYWORD, cont),
-        kw("set", Set, S_KEYWORD, cont),
-        kw("pub", Pub, S_KEYWORD, cont),
-        kw("import", Import, S_IMPORT, cont),
-        kw("from", From, S_IMPORT, cont),
-        kw("as", As, S_IMPORT, cont),
-        kw("for", For, S_KEYWORD, cont),
-        kw("while", While, S_KEYWORD, cont),
-        kw("match", Match, S_KEYWORD, cont),
-        kw("return", Return, S_KEYWORD, cont),
-        kw("shim", Shim, S_KEYWORD, cont),
-        kw("struct", Struct, S_KEYWORD, cont),
-        kw("variant", Variant, S_KEYWORD, cont),
-        kw("if", If, S_KEYWORD, cont),
-        kw("else", Else, S_KEYWORD, cont),
-        kw("builtins", Builtins, S_KEYWORD, cont),
-        kw("without", Without, S_KEYWORD, cont),
-        kw("true", True, S_CONSTANT, cont),
-        kw("false", False, S_CONSTANT, cont),
-        kw("none", None, S_CONSTANT, cont),
+        kw("fn", Fn, S_KEYWORD),
+        kw("let", Let, S_KEYWORD),
+        kw("mut", Mut, S_KEYWORD),
+        kw("set", Set, S_KEYWORD),
+        kw("pub", Pub, S_KEYWORD),
+        kw("import", Import, S_IMPORT),
+        kw("from", From, S_IMPORT),
+        kw("as", As, S_IMPORT),
+        kw("for", For, S_KEYWORD),
+        kw("while", While, S_KEYWORD),
+        kw("match", Match, S_KEYWORD),
+        kw("return", Return, S_KEYWORD),
+        kw("shim", Shim, S_KEYWORD),
+        kw("struct", Struct, S_KEYWORD),
+        kw("variant", Variant, S_KEYWORD),
+        kw("if", If, S_KEYWORD),
+        kw("else", Else, S_KEYWORD),
+        kw("builtins", Builtins, S_KEYWORD),
+        kw("without", Without, S_KEYWORD),
+        kw("true", True, S_CONSTANT),
+        kw("false", False, S_CONSTANT),
+        kw("none", None, S_CONSTANT),
         TokenRule {
-            matcher: CharRun(ident_cont(), first=ident_start()),
+            matcher: CharRun(IDENT_CONT, first=IDENT_START),
             emit: Of(Name),
             scope: S_NAME,
         },
@@ -939,11 +935,11 @@ allocations: 288
 deallocations: 288
 reallocations: 67
 bytes allocated: 439365
-instructions executed: 1866202
-binary size: 624336
-  code: 426656
+instructions executed: 1611196
+binary size: 625592
+  code: 427672
   data: 10612
-  metadata: 187068
+  metadata: 187308
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -1142,7 +1138,7 @@ functions:
     bytes: (external)
   aipl_rules:
     calls: 31
-    bytes: 93236
+    bytes: 94252
   aipl_rules$lambda0:
     calls: 0
     bytes: 144
