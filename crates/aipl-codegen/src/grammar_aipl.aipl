@@ -4832,11 +4832,11 @@ allocations: 2106881
 deallocations: 2106881
 reallocations: 300668
 bytes allocated: 394168577
-instructions executed: 584578401
-binary size: 5976264
-  code: 3927100
+instructions executed: 584519591
+binary size: 5974432
+  code: 3926232
   data: 57652
-  metadata: 1991512
+  metadata: 1990548
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 26
@@ -4861,7 +4861,7 @@ functions:
     bytes: 388
   __arr_drop___m22__TokenRule$__m21__AiplTok:
     calls: 714
-    bytes: 716
+    bytes: 700
   __arr_drop___m2__BraceEntry:
     calls: 5
     bytes: 184
@@ -4954,7 +4954,7 @@ functions:
     bytes: 388
   __arr_retain___m22__TokenRule$__m21__AiplTok:
     calls: 25704
-    bytes: 716
+    bytes: 700
   __arr_retain___m2__BraceEntry:
     calls: 9
     bytes: 184
@@ -5410,16 +5410,16 @@ functions:
     bytes: 1196
   __m22__lex_step$__m21__AiplTok:
     calls: 5347
-    bytes: 22860
+    bytes: 22244
   __m22__nested_len:
     calls: 3567
     bytes: 1148
   __m22__step_result$__m21__AiplTok:
     calls: 166621
-    bytes: 13344
+    bytes: 13212
   __m22__template_scan$__m21__AiplTok:
     calls: 5
-    bytes: 2824
+    bytes: 2844
   __m22__template_step$__m21__AiplTok:
     calls: 4125
     bytes: 444
@@ -6121,7 +6121,7 @@ functions:
     bytes: 652
   lex_lossless:
     calls: 357
-    bytes: 99884
+    bytes: 99776
   lower_aipl_block:
     calls: 36
     bytes: 3624

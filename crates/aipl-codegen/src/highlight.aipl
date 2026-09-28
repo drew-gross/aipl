@@ -55,6 +55,7 @@ import {
     split,
     to_set,
     to_str,
+    union,
     value_or,
     wrapping_add as +,
     wrapping_add_assign as +=,
@@ -296,14 +297,14 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
     // whole language back into itself; a raw one (no escapes) carries only the
     // interpolation.
     let interp: Pat = Region("""\{""", """\}""", [Include("brace-group"), Include("main")]);
-    assert(matcher_pat(Template("`", "nt", |segs: str[]| segs), "s", "esc") == Region(
+    assert(matcher_pat(Template("`", "nt".to_set(), |segs: str[]| segs), "s", "esc") == Region(
         "`",
         "`",
         [Match("""\\[nt{}]""", "esc"), interp],
         scope="s",
     ));
     // A raw template's escapes are the braces alone.
-    assert(matcher_pat(Template("```", "", |segs: str[]| segs), "s", "esc") == Region(
+    assert(matcher_pat(Template("```", #{}, |segs: str[]| segs), "s", "esc") == Region(
         "```",
         "```",
         [Match("""\\[{}]""", "esc"), interp],
@@ -327,7 +328,7 @@ pub fn matcher_regex(m: Matcher) -> str? {
     assert(matcher_regex(Delimited(`"`, escaped=#{'n', 't'})) == none);
     assert(matcher_regex(Between("<", ">")) == none);
     assert(matcher_regex(Nested("/*", "*/")) == none);
-    assert(matcher_regex(Template("`", "", |segs: str[]| segs)) == none);
+    assert(matcher_regex(Template("`", #{}, |segs: str[]| segs)) == none);
 })
 
 # A backslash followed by one of `escapes` — what a delimited scan treats as an
@@ -342,10 +343,10 @@ fn escape_pat(escapes: #{char}, scope: str) -> Pat { Match(`\\\\{char_class(esca
 # it. The brace group comes first inside so a `{ .. }` *inside* the expression —
 # a set literal, a struct — closes itself rather than the interpolation; see
 # `brace_group_entry`.
-fn template_inner(escapes: char[], esc_scope: str) -> Pat[] {
+fn template_inner(escapes: #{char}, esc_scope: str) -> Pat[] {
     let interp: Pat = Region("""\{""", """\}""", [Include("brace-group"), Include("main")]);
-    let braces: char[] = "{}";
-    [escape_pat([..escapes, ..braces].to_set(), esc_scope), interp]
+    let braces: #{char} = "{}".to_set();
+    [escape_pat(escapes.union(braces), esc_scope), interp]
 }
 
 # The repository entry an interpolation nests braces through: a `{ .. }` whose
@@ -724,15 +725,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 549
-deallocations: 549
+allocations: 546
+deallocations: 546
 reallocations: 38
-bytes allocated: 43422
-instructions executed: 115977
-binary size: 126944
-  code: 82948
-  data: 5592
-  metadata: 38404
+bytes allocated: 43366
+instructions executed: 115390
+binary size: 124864
+  code: 81776
+  data: 5600
+  metadata: 37488
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -745,7 +746,7 @@ functions:
     bytes: 116
   __arr_drop___m3__TokenRule$Kind:
     calls: 2
-    bytes: 428
+    bytes: 412
   __arr_retain_Entry:
     calls: 1
     bytes: 148
@@ -757,7 +758,7 @@ functions:
     bytes: 116
   __arr_retain___m3__TokenRule$Kind:
     calls: 0
-    bytes: 428
+    bytes: 412
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 38
     bytes: 304
@@ -805,7 +806,7 @@ functions:
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 12436
+    bytes: 12236
   __test$matcher_pat$lambda0:
     calls: 0
     bytes: 64
@@ -814,7 +815,7 @@ functions:
     bytes: 64
   __test$matcher_regex:
     calls: 1
-    bytes: 7300
+    bytes: 7192
   __test$matcher_regex$lambda0:
     calls: 0
     bytes: 64
@@ -884,9 +885,6 @@ functions:
   aipl_test_summary:
     calls: 1
     bytes: (external)
-  aipl_write_bytes:
-    calls: 6
-    bytes: (external)
   arr_fld:
     calls: 2
     bytes: 1900
@@ -913,7 +911,7 @@ functions:
     bytes: 760
   matcher_pat:
     calls: 26
-    bytes: 6868
+    bytes: 6276
   obj_fld:
     calls: 1
     bytes: 1900
@@ -928,4 +926,4 @@ functions:
     bytes: 1956
   rule_pats$Kind:
     calls: 2
-    bytes: 9972
+    bytes: 9732

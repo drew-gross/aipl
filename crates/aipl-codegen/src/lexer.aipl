@@ -211,7 +211,7 @@ variant Matcher =
     // occurrence of the *same* char. `escapes` is the set of chars that may
     // follow a backslash inside the token: `\` plus an allowed char is content
     // (in particular an escaped delimiter does not close), `\` plus anything
-    // else is a lex error, and "" turns escape handling off entirely (a
+    // else is a lex error, and `#{}` turns escape handling off entirely (a
     // backslash is ordinary content). A token still open at the end of the
     // source is a lex error. String literals. `escapes` governs *scanning* only
     // — the token's value is the delimiter-stripped text left *un-decoded*, so
@@ -238,7 +238,7 @@ variant Matcher =
     // spelling opens and closes the literal; it may be multi-char and scans
     // like `Between` (a lone backtick under a triple-backtick delim is
     // content). Text segments follow `escapes` as in `Delimited` (an escaped
-    // delim doesn't close, `""` turns escapes off — the verbatim raw-template
+    // delim doesn't close, `#{}` turns escapes off — the verbatim raw-template
     // shape) — except that `\{` and `\}` are every template's own: the braces
     // are the template's syntax, so escaping one is the template's business
     // rather than the escape set's. `\{` is content that doesn't interpolate
@@ -258,7 +258,7 @@ variant Matcher =
     // K_middle for each segment between interpolations, and K_tail (through the
     // closing delim). The `skip` flag is ignored — a template always produces
     // tokens.
-    | Template(str, str, (str[]) -> str[])
+    | Template(str, #{char}, (str[]) -> str[])
     // The `marker` spelling, then everything up to (not including) the next
     // newline. Line comments — usually `skip: true`.
     | ToEol(str)
@@ -749,7 +749,7 @@ fn template_step<K>(
     src: str,
     at: u64,
     delim: str,
-    escapes: str,
+    escapes: #{char},
     finalize: (str[]) -> str[],
     emit: Emit<K>,
     rules: TokenRule<K>[],
@@ -786,7 +786,7 @@ fn template_scan<K>(
     src: str,
     at: u64,
     delim: str,
-    escapes: str,
+    escapes: #{char},
     finalize: (str[]) -> str[],
     emit: Emit<K>,
     rules: TokenRule<K>[],
@@ -838,7 +838,7 @@ fn template_scan<K>(
                     message: incomplete_escape(),
                     span: i..i + 1,
                 })?;
-                if (!escapes.contains(e)) {
+                if (!escapes.has(e)) {
                     return err(LexError {
                         message: `unknown escape sequence \\{e}`,
                         span: i..i + 2,
@@ -1144,7 +1144,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex("if", kws)? == toks([tok("if", Kw, 0..2)]));
 
     // Delimited: an `Of` emit carries the delimiter-stripped contents, left
-    // *un-decoded* — with escapes off ("") that's the whole content verbatim, and
+    // *un-decoded* — with escapes off (`#{}`) that's the whole content verbatim, and
     // here none of the inputs carry a backslash so `Of(Str)` needs no decoding.
     // An unterminated token is a hard error at its open delimiter.
     let strs = [ws, TokenRule { matcher: Delimited(`"'`), emit: Of(Str) }, ident];
@@ -1264,7 +1264,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let tpls_signed = [
         ws,
         TokenRule {
-            matcher: Template("`", """\`{ntr""", |segs: str[]| segs),
+            matcher: Template("`", """\`{ntr""".to_set(), |segs: str[]| segs),
             emit: OfSeg(tpl_kind),
         },
         TokenRule { matcher: Int, emit: Try(int_tok) },
@@ -1288,7 +1288,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // Template: `text {expr} text`. `OfSeg` maps each segment's decoded text and
     // position (`Plain`/`Head`/`Middle`/`Tail`) to a `Kind` arm.
     let tpl = TokenRule {
-        matcher: Template("`", """\`{ntr""", |segs: str[]| segs),
+        matcher: Template("`", """\`{ntr""".to_set(), |segs: str[]| segs),
         emit: OfSeg(tpl_kind),
     };
     let tpls = [ws, tpl, ident, digits];
@@ -1345,7 +1345,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // verbatim — every backslash but one before a brace, which is content that
     // doesn't interpolate here too (`rawtpl_kind` decodes it).
     let raw3 = TokenRule {
-        matcher: Template("```", "", |segs: str[]| segs),
+        matcher: Template("```", #{}, |segs: str[]| segs),
         emit: OfSeg(rawtpl_kind),
     };
     let tpl2 = [ws, raw3, tpl, ident, digits];
@@ -1364,7 +1364,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // TrySeg: a fallible segment emit (`checked_seg`) validates each segment; a
     // rejected one aborts the lex with the template's span.
     let tseg = TokenRule {
-        matcher: Template("`", """\`{ntr""", |segs: str[]| segs),
+        matcher: Template("`", """\`{ntr""".to_set(), |segs: str[]| segs),
         emit: TrySeg(checked_seg),
     };
     let tsegs = [ws, tseg, ident, digits];
@@ -1510,11 +1510,11 @@ allocations: 415
 deallocations: 415
 reallocations: 90
 bytes allocated: 67144
-instructions executed: 422182
-binary size: 2494264
-  code: 1695492
+instructions executed: 421814
+binary size: 2480736
+  code: 1688416
   data: 11628
-  metadata: 787144
+  metadata: 780692
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1524,7 +1524,7 @@ functions:
     bytes: 472
   __arr_drop_TokenRule$Kind:
     calls: 35
-    bytes: 796
+    bytes: 780
   __arr_retain_StepResult$Kind:
     calls: 9
     bytes: 140
@@ -1533,7 +1533,7 @@ functions:
     bytes: 472
   __arr_retain_TokenRule$Kind:
     calls: 6
-    bytes: 796
+    bytes: 780
   __builtin_count_while$char$lam$lex_step$Kind$lambda1:
     calls: 85
     bytes: 308
@@ -1593,10 +1593,10 @@ functions:
     bytes: 1628
   __test$keep_skipped:
     calls: 1
-    bytes: 22868
+    bytes: 22520
   __test$lex:
     calls: 1
-    bytes: 1582420
+    bytes: 1576536
   __test$lex$checked_seg:
     calls: 2
     bytes: 1780
@@ -1701,13 +1701,13 @@ functions:
     bytes: 1896
   keep_skipped$Kind:
     calls: 3
-    bytes: 5172
+    bytes: 5044
   lex$Kind:
     calls: 78
     bytes: 1196
   lex_step$Kind:
     calls: 178
-    bytes: 24572
+    bytes: 24008
   main:
     calls: 1
     bytes: 240
@@ -1716,10 +1716,10 @@ functions:
     bytes: 1148
   step_result$Kind:
     calls: 477
-    bytes: 15384
+    bytes: 15244
   template_scan$Kind:
     calls: 20
-    bytes: 2824
+    bytes: 2844
   template_step$Kind:
     calls: 32
     bytes: 444

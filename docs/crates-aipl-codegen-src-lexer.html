@@ -231,7 +231,7 @@
 
             </li>
 
-            <li id="item-Template"><code>Template(str, str, (str[]) -&#62; str[])</code>
+            <li id="item-Template"><code>Template(str, #{char}, (str[]) -&#62; str[])</code>
 
 
             </li>
@@ -682,7 +682,7 @@
             <a class="anchor" href="#item-apply_emit">apply_emit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31934: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
+          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31942: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
 
           <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its content string — the matcher-computed <code>value</code> (a delimited string, stripped) when there is one, else the raw matched <code>text</code>. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
 
@@ -766,7 +766,7 @@
             <a class="anchor" href="#item-template_step">template_step</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn template_step&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+          <pre class="signature"><code>fn template_step&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: #{char}, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
 
           <div class="doc"><p>The <code>Template</code> arm of <code>lex_step</code>'s dispatch: a decline when <code>src[at..]</code> doesn't open with <code>delim</code> (mirroring every other matcher's 0), else the literal's whole token run.</p></div>
 
@@ -780,7 +780,7 @@
             <a class="anchor" href="#item-template_scan">template_scan</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn template_scan&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+          <pre class="signature"><code>fn template_scan&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: #{char}, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
 
           <div class="doc"><p><code>Template</code>: scans a whole template literal at <code>at</code> (the caller verified the opening <code>delim</code>); the result's tokens are the literal's whole run and its <code>end</code> sits just past the closing <code>delim</code>. A text segment runs until the closing <code>delim</code> (matched in full, like <code>Between</code>) or a <code>{</code>, which ends the segment and opens an interpolation (see <code>interp_scan</code>).</p><p>**A segment's span runs brace to brace, and its value does not.** The span takes the delimiter or <code>}</code> that opens the segment and the delimiter or <code>{</code> that closes it; the value is what lies strictly between. Keeping the two starts apart is what makes the token stream *tile* the source — every byte of a template under exactly one token — which a concrete syntax tree needs and a token stream alone does not care about. They were once the same variable, and the <code>}</code> closing an interpolation was then the one byte of a template that belonged to no token at all. The text segments are collected first (with their spans and the interpolation token runs between them), then handed to <code>finalize_template</code> — which post-processes them as a group and emits each. A nested template inside an interpolation is fully lexed (and its own segments finalized) by the recursive <code>interp_scan</code>, so each <code>template_scan</code> only ever handles its own direct segments. <code>escapes</code> still governs *scanning* as in <code>delimited_len</code>, including the hard error on an unknown escape and the dangling backslash falling through to run the literal out unterminated.</p></div>
 

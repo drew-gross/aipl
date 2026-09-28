@@ -511,10 +511,10 @@ deallocations: 21446
 reallocations: 3218
 bytes allocated: 2798291
 instructions executed: 5990773
-binary size: 451352
-  code: 296988
+binary size: 449840
+  code: 296292
   data: 8596
-  metadata: 145768
+  metadata: 144952
 functions:
   __arr_drop_Json:
     calls: 125
@@ -527,7 +527,7 @@ functions:
     bytes: 160
   __arr_drop___m11__TokenRule$JsonTok:
     calls: 58
-    bytes: 488
+    bytes: 472
   __arr_drop___m1__Cst:
     calls: 1300
     bytes: 116
@@ -566,7 +566,7 @@ functions:
     bytes: 160
   __arr_retain___m11__TokenRule$JsonTok:
     calls: 0
-    bytes: 488
+    bytes: 472
   __arr_retain___m1__Cst:
     calls: 1181
     bytes: 116
@@ -740,16 +740,16 @@ functions:
     bytes: 1196
   __m11__lex_step$JsonTok:
     calls: 485
-    bytes: 18008
+    bytes: 17460
   __m11__nested_len:
     calls: 0
     bytes: 1148
   __m11__step_result$JsonTok:
     calls: 2824
-    bytes: 7580
+    bytes: 7444
   __m11__template_scan$JsonTok:
     calls: 0
-    bytes: 2824
+    bytes: 2844
   __m11__template_step$JsonTok:
     calls: 0
     bytes: 444

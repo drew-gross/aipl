@@ -600,13 +600,13 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // one escape a raw template decodes. Each interpolation re-lexes with
         // this whole rule set, so templates nest.
         TokenRule {
-            matcher: Template("```", "", dedent_segments),
+            matcher: Template("```", #{}, dedent_segments),
             emit: OfSeg(raw_tpl_kind),
             unterminated: "unterminated triple-backtick template literal",
             scope: S_STRING,
         },
         TokenRule {
-            matcher: Template("`", """\`ntr""", |segs: str[]| segs),
+            matcher: Template("`", """\`ntr""".to_set(), |segs: str[]| segs),
             emit: OfSeg(tpl_kind),
             scope: S_STRING,
         },
@@ -935,11 +935,11 @@ allocations: 288
 deallocations: 288
 reallocations: 67
 bytes allocated: 439365
-instructions executed: 1611196
-binary size: 625592
-  code: 427672
+instructions executed: 1611020
+binary size: 623992
+  code: 426916
   data: 10612
-  metadata: 187308
+  metadata: 186464
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -949,7 +949,7 @@ functions:
     bytes: 388
   __arr_drop___m1__TokenRule$AiplTok:
     calls: 31
-    bytes: 716
+    bytes: 700
   __arr_retain___m1__StepResult$AiplTok:
     calls: 2
     bytes: 140
@@ -958,7 +958,7 @@ functions:
     bytes: 388
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
-    bytes: 716
+    bytes: 700
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 24
     bytes: 304
@@ -1042,16 +1042,16 @@ functions:
     bytes: 1196
   __m1__lex_step$AiplTok:
     calls: 116
-    bytes: 22860
+    bytes: 22244
   __m1__nested_len:
     calls: 78
     bytes: 1148
   __m1__step_result$AiplTok:
     calls: 2858
-    bytes: 13344
+    bytes: 13212
   __m1__template_scan$AiplTok:
     calls: 6
-    bytes: 2824
+    bytes: 2844
   __m1__template_step$AiplTok:
     calls: 60
     bytes: 444
@@ -1138,7 +1138,7 @@ functions:
     bytes: (external)
   aipl_rules:
     calls: 31
-    bytes: 94252
+    bytes: 94256
   aipl_rules$lambda0:
     calls: 0
     bytes: 144
