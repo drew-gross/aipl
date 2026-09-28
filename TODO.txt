@@ -441,7 +441,6 @@ design:
 optimizations:
   template literals should constant fold in their parts if constant
   string interning? replaing let tq = `"""`; f(tq, tq) with f(`"""`, `"""`); was slower, which I wouldn't expect
-  set literals should constant fold
   to_set() should constant fold
   ident_start and ident_cont should be constants computed at compile time
   for move-in detection:
