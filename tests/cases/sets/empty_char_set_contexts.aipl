@@ -1,4 +1,4 @@
-import { equal as ==, len, print, union, value_or } from builtins;
+import { equal as ==, len, print, to_set, union, value_or } from builtins;
 
 // An empty `#{}` is the shared empty *array* block until something gives it an
 // element type; a `#{char}` is the 256-bit inline bitfield instead. So a `#{}`
@@ -28,7 +28,7 @@ fn takes_holder(h: Holder) -> u64 {
 }
 
 fn main() !prints {
-    let populated: #{char} = #{'x', 'y', 'z'};
+    let populated: #{char} = "xyz".to_set();
     let annotated: #{char} = #{};
     print(`annotated: {len(annotated)}`);
     print(`declared return: {len(declared_return())}`);

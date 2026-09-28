@@ -11,6 +11,7 @@
 //! `parse_with_allows`), so lints fire before type checking.
 
 mod arm_block_value;
+mod char_set_literal;
 mod compound_assign;
 mod destructure_binding;
 mod destructure_param;
@@ -49,6 +50,7 @@ use crate::{each_expr, each_subexpr, Error, Span};
 use std::collections::{HashMap, HashSet};
 
 use self::arm_block_value::arm_block_value;
+use self::char_set_literal::char_set_literal;
 use self::compound_assign::{compound_assign, matching_compound};
 use self::destructure_binding::destructure_binding;
 use self::destructure_param::destructure_param;
@@ -105,6 +107,13 @@ pub fn check(program: &Program, src: &str, allows: &[Span]) -> Result<(), Vec<Er
     }
     // A string or char literal as an interpolation, which is just its text.
     each_expr(program, &mut |e| interp_literal(e, src, &mut hits));
+    // A char set spelled out element by element, which a string says better.
+    // Fires whether or not the file imported `to_set` — the name is only for
+    // the advice, which says to import it when it is missing.
+    let to_set = imported_as(program, "to_set");
+    each_expr(program, &mut |e| {
+        char_set_literal(e, src, to_set.as_deref(), &mut hits)
+    });
     // `map(f).find_if(is_some)` is `find_map(f)` — see `find_map_names` for the
     // three names the shape is made of.
     let find_map = find_map_names(program);

@@ -1,0 +1,46 @@
+import { equal as ==, len, print, to_set } from builtins;
+
+// `#[allow]` on the line squelches the char-set lint, like any other — the
+// spelled-out literal compiles and runs as written. The marker goes at the end
+// of the literal's line, which is where this lint points, and the lint only
+// fires on a literal `aipl fmt` keeps on one line, so that line always exists.
+//
+// Both spellings run here, side by side, because the lint's whole claim is that
+// they are the same set: the members, the count, and the escapes a `str`
+// literal has to carry for the punctuation ones.
+fn main() !prints {
+    let kept: #{char} = #{'a', 'b', 'a', 'c'}; #[allow]
+    let rewritten: #{char} = "abac".to_set();
+    print(`{kept == rewritten} {len(kept) == 3}`);
+
+    // The escapes travel too: a quote and a backslash are escaped inside the
+    // string, a `'` is not, and `\n`/`\t` keep the spelling they already had.
+    let punct: #{char} = #{'"', '\\', '\'', '\n', '\t'}; #[allow]
+    print(`{punct == "\"\\'\n\t".to_set()}`);
+}
+--- stdout ---
+true true
+true
+--- performance ---
+allocations: 5
+deallocations: 5
+reallocations: 0
+bytes allocated: 236
+instructions executed: 274
+binary size: 2448
+  code: 1180
+  data: 47
+  metadata: 1221
+functions:
+  __eq_set$char:
+    calls: 2
+    bytes: 84
+  __to_str_bool:
+    calls: 3
+    bytes: 232
+  aipl_write_bytes:
+    calls: 3
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 864

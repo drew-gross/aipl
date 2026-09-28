@@ -55,7 +55,10 @@ fn bool_score(s: #{bool}) -> i64 {
 fn main() !prints {
     print(elems(#{"b", "a", "c", "a"}).sort().to_str());
     print(total(#{1, 2, 3, 2}).to_str());
-    print(char_strs(#{'x', 'y', 'x'}).sort().to_str());
+
+    // Spelled out beside the other three element types, so the four read as one
+    // list (`#[allow]`, against `char_set_literal`).
+    print(char_strs(#{'x', 'y', 'x'}).sort().to_str()); #[allow]
     print(bool_score(#{true, false, true}).to_str());
 
     // An empty set yields no iterations.

@@ -1,0 +1,102 @@
+import { has, len, print } from builtins;
+
+// The shapes the char-set lint deliberately leaves alone.
+fn main() !prints {
+    // Two elements: the spellings are the same width, and the literal keeps each
+    // element visibly a char.
+    let two: #{char} = #{'a', 'b'};
+
+    // An ordered set is not interchangeable. `to_set` leaves its order to the
+    // use site, so nothing here would pin one and the set would stop sorting.
+    let down: #>{char} = #>{'a', 'c', 'b'};
+    let up: #<{char} = #<{'c', 'a', 'b'};
+
+    // Not a set of chars at all.
+    let ints: #{u64} = #{1, 2, 3};
+    let strs: #{str} = #{"a", "b", "c"};
+
+    // An element that is not a literal: there is no string to advise.
+    let c = 'c';
+    let computed: #{char} = #{'a', 'b', c};
+
+    // A char with no spelling inside a `str` literal. The element below the
+    // comment is a *raw* control byte (0x01) written straight into the char
+    // literal, which is the only way to reach one — AIPL has no numeric escape.
+    // Advice that did not lex would be worse than none, so the lint bows out.
+    let control: #{char} = #{'', 'a', 'b'};
+
+    // Wide enough that `aipl fmt` breaks it one element per line. `#[allow]` is
+    // line-scoped and the marker cannot then sit on the line the span starts on,
+    // so the lint stays quiet rather than becoming unsquelchable.
+    let wide: #{char} = #{
+        'a',
+        'b',
+        'c',
+        'd',
+        'e',
+        'f',
+        'g',
+        'h',
+        'i',
+        'j',
+        'k',
+        'l',
+        'm',
+        'n',
+        'o',
+        'p',
+        'q',
+        'r',
+        's',
+        't',
+    };
+    print(`{len(two)} {down.has('c')} {up.has('c')} {len(ints)} {len(strs)}`);
+    print(`{len(computed)} {len(control)} {len(wide)}`);
+}
+--- stdout ---
+2 true true 3 3
+3 3 20
+--- performance ---
+allocations: 22
+deallocations: 22
+reallocations: 0
+bytes allocated: 1359
+instructions executed: 564
+binary size: 5168
+  code: 2952
+  data: 47
+  metadata: 2169
+functions:
+  __to_str_bool:
+    calls: 2
+    bytes: 232
+  __to_str_u64:
+    calls: 6
+    bytes: 204
+  aipl_array_dec:
+    calls: 2
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 6
+    bytes: (external)
+  aipl_array_with_cap:
+    calls: 2
+    bytes: (external)
+  aipl_set_contains:
+    calls: 6
+    bytes: (external)
+  aipl_set_insert:
+    calls: 6
+    bytes: (external)
+  aipl_u64_len:
+    calls: 12
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 2
+    bytes: (external)
+  aipl_write_u64:
+    calls: 6
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 2516

@@ -470,7 +470,7 @@ let S_DOC = "comment.line.documentation.aipl";
 
 pub fn aipl_rules() -> TokenRule<AiplTok>[] {
     [
-        TokenRule { matcher: CharRun(#{' ', '\t', '\n', '\r'}), emit: Bare(Space), skip: true },
+        TokenRule { matcher: CharRun(" \t\n\r".to_set()), emit: Bare(Space), skip: true },
         TokenRule {
             matcher: ToEol("//"),
             emit: Bare(LineComment),
@@ -510,11 +510,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // `#` also leads a set/dict literal (`#{..}`), an ordered set's
         // `#>{..}` / `#<{..}`, and the `#[allow]` marker above, so the matcher
         // declines those leads and they fall through to the rules that want them.
-        TokenRule {
-            matcher: ToEolUnless("#", #{'{', '[', '<', '>'}),
-            emit: Of(doc_text),
-            scope: S_DOC,
-        },
+        TokenRule { matcher: ToEolUnless("#", "{[<>".to_set()), emit: Of(doc_text), scope: S_DOC },
         // Keywords and constants, each its own `kw` rule (identifier-boundary
         // matched, so `iffy`/`noneish` stay `Name`s). Order among them is
         // immaterial — the spellings are disjoint — but all must precede the
@@ -570,7 +566,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             scope: S_STRING,
         },
         TokenRule {
-            matcher: Delimited(`"`, escaped=#{'n', 't', 'r', '\\', '"'}),
+            matcher: Delimited(`"`, escaped=`ntr\\"`.to_set()),
             emit: Of(|text: str| StrLit(text.unescape(), Quoted)),
             unterminated: "unterminated string literal",
             scope: S_STRING,
@@ -584,7 +580,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // (not `Char`) to avoid the library test `Kind`'s arm (shared constructor
         // namespace). The escape set matches the string rule plus `\'`.
         TokenRule {
-            matcher: Delimited("'", escaped=#{'n', 't', 'r', '\\', '\'', '"'}),
+            matcher: Delimited("'", escaped=`ntr\\'"`.to_set()),
             emit: Try(char_lit_emit),
             unterminated: "unterminated char literal",
             scope: S_CHAR,
@@ -935,11 +931,11 @@ allocations: 288
 deallocations: 288
 reallocations: 67
 bytes allocated: 439365
-instructions executed: 1611020
-binary size: 623992
-  code: 426916
-  data: 10612
-  metadata: 186464
+instructions executed: 1604851
+binary size: 622664
+  code: 426204
+  data: 10460
+  metadata: 186000
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -1138,7 +1134,7 @@ functions:
     bytes: (external)
   aipl_rules:
     calls: 31
-    bytes: 94256
+    bytes: 93544
   aipl_rules$lambda0:
     calls: 0
     bytes: 144

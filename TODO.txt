@@ -358,7 +358,6 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
-  char set literals with 3+ elements should use "str".to_set()
   tok_span should be value_or, with a lint (but also should make sure inlining and code sinking doens't result in the argument being actually evaluated)
   template_segments should maybe accept str[] without []
   delimited_len can probably use without [] somehow or other
@@ -502,7 +501,7 @@ optimizations:
 
   operation fusion:
     .join().first() should fuse. also map_join().first().
-    for line in v.lines() should fuse
+    for line in v.lines() and v.lines().map() should fuse
     can we make a fully general v.foo().len() fusion? Maybe by monomorphizing?
     to_str().len() should fuse to a a new, super simple/fast function that just computes and returns an int
     .reverse().find_map() should fuse
@@ -564,16 +563,13 @@ optimizations:
 
     C. Generated code
 
-    C1. 88% of calls in generated code are refcount traffic. In the largest dogfooded function (u0:58, 7327 lines of CLIF), 432 of 489 calls are aipl_inc/aipl_dec — each a real extern call. Two complementary fixes: (a) inline the fast path the way load_array_elem (:8297) already does for arrays — an inline/null-tagged str makes inc/dec a no-op, so a 2-instruction tag test in-line skips almost all of them; (b) extend the existing retain-elision pass (borrowed args never need a pair).
-      C1a: tried it an there were a lot of bugs.
-
     C2 redux - inline str len fast path, only call into runtime when it turns out to be a rope
 
     C3. Mangled symbol names dominate small binaries. tests/cases.rs:1675 notes it outright: metadata (symbol/string tables, relocations) exceeds code for small programs. Shortening or hashing mangled names would move binary size — an asserted metric — across the whole corpus at once.
 
     D. Runtime data structures
 
-    D1. Sets and dicts are linear scans. aipl_set_contains (:2614) and dict_find (:2751) walk every element, so building an n-element set or dict is O(n²). There's already an FNV-1a hash (:2600) and a comment at :9584 anticipating "the eventual hash-dict/set use case" — this is the largest asymptotic win available to user programs.
+    D1. Sets and dicts are linear scans. aipl_set_contains and dict_find walk every element, so building an n-element set or dict is O(n²). There's already an FNV-1a hash and a comment anticipating "the eventual hash-dict/set use case" — this is the largest asymptotic win available to user programs.
 
     F. Worth a look, lower confidence
 
@@ -823,7 +819,6 @@ walker.aipl:
 sort:
   make sort_by a builtin so it can be faster
   make stable_sort and unstable_sort (qsort)
-  get rid of the mut out = self[0..0] workaround
   the sibling limitation sort_by documents in a comment — "a function-typed parameter cannot be captured into a nested lambda" — is a different restriction and still stands. It's what forces sort_by's hand-rolled insertion scan instead of a count_while, and it's the next thing in this area that would pay for itself.
   Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting in walker.aipl
 

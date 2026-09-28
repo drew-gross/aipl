@@ -1,0 +1,34 @@
+import { has, print } from builtins;
+
+// Every char set literal the lint flags, and what it advises for each. This
+// file has no `to_set`, so each hit names the import to add alongside the
+// rewrite.
+fn main() !prints {
+    // Three is the threshold: below it the two spellings are a tie.
+    let abc: #{char} = #{'a', 'b', 'c'};
+    // The wider the set, the more the quotes and commas outweigh the content.
+    let digits: #{char} = #{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+
+    // A char needing an escape keeps it, in the form a `str` literal takes: a
+    // quote and a backslash are escaped, a `'` needs nothing inside quotes.
+    let escapes: #{char} = #{'"', '\\', '\'', '\n', '\t'};
+    print(`{abc.has('b')} {digits.has('7')} {escapes.has('\n')}`);
+}
+--- errors ---
+error: a char set of 3 elements spelled out — write `"abc".to_set()`, importing `to_set` from builtins (or append #[allow] to this line to keep it)
+ --> ./tests/cases/lints/err_char_set_literal.aipl:8:24
+  |
+8 |     let abc: #{char} = #{'a', 'b', 'c'};
+  |                        ^^^^^^^^^^^^^^^^
+
+error: a char set of 10 elements spelled out — write `"0123456789".to_set()`, importing `to_set` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_char_set_literal.aipl:10:27
+   |
+10 |     let digits: #{char} = #{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: a char set of 5 elements spelled out — write `"\"\\'\n\t".to_set()`, importing `to_set` from builtins (or append #[allow] to this line to keep it)
+  --> ./tests/cases/lints/err_char_set_literal.aipl:14:28
+   |
+14 |     let escapes: #{char} = #{'"', '\\', '\'', '\n', '\t'};
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

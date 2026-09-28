@@ -163,14 +163,14 @@ pub fn char_class(chars: #{char}) -> str { `[{char_class_body(chars)}]` }
 # class is data, the character set comes from a lexer rule that spells it out
 # too, and a range is only a shorter way to say the same thing.
 fn char_class_body(chars: #{char}) -> str { chars.map(class_char).join() }.test({
-    assert(char_class(#{'a', 'b', 'c'}) == "[abc]");
-    assert(char_class(#{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}) == "[0123456789]");
+    assert(char_class("abc".to_set()) == "[abc]");
+    assert(char_class("0123456789".to_set()) == "[0123456789]");
     // The four class metacharacters are escaped; nothing else is.
-    assert(char_class(#{'a', '-', 'z'}) == """[\-az]""");
+    assert(char_class("a-z".to_set()) == """[\-az]""");
     assert(char_class(#{'[', ']'}) == """[\[\]]""");
     assert(char_class(#{'^'}) == """[\^]""");
     // Whitespace is spelled with the escapes a JSON string can carry verbatim.
-    assert(char_class(#{' ', '\t', '\n', '\r'}) == """[\t\n\r ]""");
+    assert(char_class(" \t\n\r".to_set()) == """[\t\n\r ]""");
 })
 
 # One character inside a class: the control characters as their regex escapes
@@ -253,7 +253,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
 }.test({
     let none_scope = "";
     assert(matcher_pat(Exact("=="), "op", none_scope) == Match("==", "op"));
-    assert(matcher_pat(Keyword("fn", #{'a', 'b', 'c'}), "kw", none_scope) == Match(
+    assert(matcher_pat(Keyword("fn", "abc".to_set()), "kw", none_scope) == Match(
         """\bfn\b""",
         "kw",
     ));
@@ -265,7 +265,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
     // A run with one class is `+`; a run with a narrower opener is the opener
     // then the rest starred — the identifier shape.
     assert(matcher_pat(CharRun(#{'a', 'b'}), "r", none_scope) == Match("[ab]+", "r"));
-    assert(matcher_pat(CharRun(#{'a', 'b', '1'}, first=#{'a', 'b'}), "r", none_scope) == Match(
+    assert(matcher_pat(CharRun("ab1".to_set(), first=#{'a', 'b'}), "r", none_scope) == Match(
         "[ab][1ab]*",
         "r",
     ));
@@ -323,7 +323,7 @@ pub fn matcher_regex(m: Matcher) -> str? {
     }
 }.test({
     assert(matcher_regex(Exact("->")) == some("->"));
-    assert(matcher_regex(CharRun(#{'a', 'b', '1'}, first=#{'a', 'b'})) == some("[ab][1ab]*"));
+    assert(matcher_regex(CharRun("ab1".to_set(), first=#{'a', 'b'})) == some("[ab][1ab]*"));
     // The four delimiter-scanning matchers have no single-expression form.
     assert(matcher_regex(Delimited(`"`, escaped=#{'n', 't'})) == none);
     assert(matcher_regex(Between("<", ">")) == none);
@@ -419,9 +419,9 @@ pub fn rule_pats<K>(rules: TokenRule<K>[], esc_scope: str) -> Expansion {
     // rule between them breaks the run.
     let rules: TokenRule<Kind>[] = [
         TokenRule { matcher: CharRun(#{' ', '\t'}), emit: Bare(Punct), skip: true },
-        TokenRule { matcher: Keyword("fn", #{'a', 'b', 'c'}), emit: Bare(Punct), scope: "kw" },
-        TokenRule { matcher: Keyword("let", #{'a', 'b', 'c'}), emit: Bare(Punct), scope: "kw" },
-        TokenRule { matcher: Keyword("true", #{'a', 'b', 'c'}), emit: Bare(Punct), scope: "const" },
+        TokenRule { matcher: Keyword("fn", "abc".to_set()), emit: Bare(Punct), scope: "kw" },
+        TokenRule { matcher: Keyword("let", "abc".to_set()), emit: Bare(Punct), scope: "kw" },
+        TokenRule { matcher: Keyword("true", "abc".to_set()), emit: Bare(Punct), scope: "const" },
         TokenRule { matcher: Exact("=="), emit: Bare(Punct), scope: "op" },
         TokenRule { matcher: Exact("="), emit: Bare(Punct), scope: "op" },
     ];
@@ -729,10 +729,10 @@ allocations: 546
 deallocations: 546
 reallocations: 38
 bytes allocated: 43366
-instructions executed: 115390
-binary size: 124864
-  code: 81776
-  data: 5600
+instructions executed: 115362
+binary size: 124800
+  code: 81760
+  data: 5552
   metadata: 37488
 functions:
   __arr_drop_Entry:
@@ -806,7 +806,7 @@ functions:
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 12236
+    bytes: 12220
   __test$matcher_pat$lambda0:
     calls: 0
     bytes: 64

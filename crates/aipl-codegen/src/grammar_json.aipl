@@ -108,18 +108,15 @@ variant Json =
 fn json_rules() -> TokenRule<JsonTok>[] {
     let alnum: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
     [
-        TokenRule { matcher: CharRun(#{' ', '\t', '\r', '\n'}), emit: Bare(Punct), trivia: true },
-        TokenRule {
-            matcher: Delimited(`"`, escaped=#{'"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u'}),
-            emit: Of(Str),
-        },
+        TokenRule { matcher: CharRun(" \t\r\n".to_set()), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: Delimited(`"`, escaped=`"\\/bfnrtu`.to_set()), emit: Of(Str) },
         TokenRule { matcher: Exact("-"), emit: Bare(Punct) },
         TokenRule { matcher: Float, emit: Bare(Num) },
         TokenRule { matcher: Int, emit: Bare(Num) },
         TokenRule { matcher: Keyword("true", alnum.to_set()), emit: Bare(Kw) },
         TokenRule { matcher: Keyword("false", alnum.to_set()), emit: Bare(Kw) },
         TokenRule { matcher: Keyword("null", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: OneChar(#{'{', '}', '[', ']', ':', ','}), emit: Bare(Punct) },
+        TokenRule { matcher: OneChar("{}[]:,".to_set()), emit: Bare(Punct) },
     ]
 }
 

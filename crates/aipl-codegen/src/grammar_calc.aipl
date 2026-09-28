@@ -40,6 +40,7 @@ import {
     map_ok,
     saturating_divide as /,
     saturating_remainder as %,
+    to_set,
     to_str,
     value_or_err,
     wrapping_add as +,
@@ -93,11 +94,8 @@ variant Calc = Lit(i64) | Neg(Calc) | Bin(str, Calc, Calc)
 # invisible to it — `1 -2` would lex as two numbers and parse as nothing.
 fn calc_rules() -> TokenRule<CalcTok>[] {
     [
-        TokenRule { matcher: CharRun(#{' ', '\t', '\r', '\n'}), emit: Bare(Punct), trivia: true },
-        TokenRule {
-            matcher: OneChar(#{'+', '-', '*', '/', '%', '^', '(', ')'}),
-            emit: Bare(Punct),
-        },
+        TokenRule { matcher: CharRun(" \t\r\n".to_set()), emit: Bare(Punct), trivia: true },
+        TokenRule { matcher: OneChar("+-*/%^()".to_set()), emit: Bare(Punct) },
         TokenRule { matcher: Int, emit: Bare(Num) },
     ]
 }

@@ -1079,7 +1079,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // `Of` applies a constructor to the token's content (stripped for a delimited
     // matcher, raw text otherwise); `Bare` is a fixed kind; a skip rule's emit is
     // never applied.
-    let ws = TokenRule { matcher: CharRun(#{' ', '\t', '\n', '\r'}), emit: Bare(Ws), skip: true };
+    let ws = TokenRule { matcher: CharRun(" \t\n\r".to_set()), emit: Bare(Ws), skip: true };
     let ident = TokenRule {
         matcher: CharRun(alnum.to_set(), first=alpha.to_set()),
         emit: Of(Ident),
@@ -1159,7 +1159,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // hard error), but *decoding* is the emit's job: `esc_str` calls `unescape`.
     let esc = [
         ws,
-        TokenRule { matcher: Delimited(`"`, escaped=#{'n', 't', '\\', '"'}), emit: Of(esc_str) },
+        TokenRule { matcher: Delimited(`"`, escaped=`nt\\"`.to_set()), emit: Of(esc_str) },
         ident,
     ];
     assert(lex(`"a\\"b"`, esc)? == toks([tok(`"a\\"b"`, Str(`a"b`), 0..6)]));
@@ -1179,10 +1179,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // message the library pairs with the token's span. A well-formed one passes.
     let nes = [
         ws,
-        TokenRule {
-            matcher: Delimited(`"`, escaped=#{'n', 't', '\\', '"'}),
-            emit: Try(nonempty_str),
-        },
+        TokenRule { matcher: Delimited(`"`, escaped=`nt\\"`.to_set()), emit: Try(nonempty_str) },
         ident,
     ];
     assert(lex(`"hi"`, nes)? == toks([tok(`"hi"`, Str("hi"), 0..4)]));
@@ -1381,7 +1378,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         emit: Of(Str),
     };
     let punct_r: TokenRule<Kind> = TokenRule {
-        matcher: OneChar(#{'#', '{', '}'}),
+        matcher: OneChar("#{}".to_set()),
         emit: Bare(Punct),
     };
     let docs = [ws, doc_r, punct_r, ident, digits];
@@ -1441,10 +1438,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // JSON: strings, numbers, keywords, punctuation.
     let json = [
         ws,
-        TokenRule {
-            matcher: Delimited(`"`, escaped=#{'"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u'}),
-            emit: Of(Str),
-        },
+        TokenRule { matcher: Delimited(`"`, escaped=`"\\/bfnrtu`.to_set()), emit: Of(Str) },
         TokenRule { matcher: Float, emit: Bare(FloatTok) },
         TokenRule { matcher: Int, emit: Try(int_tok) },
         TokenRule { matcher: Keyword("true", alnum.to_set()), emit: Bare(Kw) },
@@ -1486,7 +1480,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: Keyword("set", alnum.to_set()), emit: Bare(Kw) },
         ident,
         TokenRule { matcher: Int, emit: Try(int_tok) },
-        TokenRule { matcher: Delimited(`"`, escaped=#{'n', 't', 'r', '\\', '"'}), emit: Of(Str) },
+        TokenRule { matcher: Delimited(`"`, escaped=`ntr\\"`.to_set()), emit: Of(Str) },
         TokenRule { matcher: Exact("=="), emit: Bare(Op) },
         TokenRule { matcher: Exact("->"), emit: Bare(Op) },
         TokenRule { matcher: Exact("&&"), emit: Bare(Op) },
@@ -1510,11 +1504,11 @@ allocations: 415
 deallocations: 415
 reallocations: 90
 bytes allocated: 67144
-instructions executed: 421814
-binary size: 2480736
-  code: 1688416
+instructions executed: 421793
+binary size: 2479784
+  code: 1687460
   data: 11628
-  metadata: 780692
+  metadata: 780696
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1596,7 +1590,7 @@ functions:
     bytes: 22520
   __test$lex:
     calls: 1
-    bytes: 1576536
+    bytes: 1575580
   __test$lex$checked_seg:
     calls: 2
     bytes: 1780

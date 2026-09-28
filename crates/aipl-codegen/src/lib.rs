@@ -16593,6 +16593,48 @@ fn compile_call_expr<M: Module>(
                     span.clone(),
                 ));
             }
+            let order = match &locked {
+                Some(ConcreteType::Set(_, o)) if *o != aipl_syntax::ast::SetOrder::Context => *o,
+                _ => aipl_syntax::ast::SetOrder::Unordered,
+            };
+            // A *string literal* source: the members are known now, so the
+            // bitfield is four immediate stores rather than a scan over the
+            // characters. This is what makes a character class free — as a
+            // top-level constant it is spliced into each use already built,
+            // where asking for one per rule walked its sixty-odd characters
+            // every time.
+            //
+            // Settled *before* the receiver is compiled, because compiling it
+            // is the work being folded away: a string literal is 24 bytes of
+            // immediate stores (or a data symbol) that nothing would ever read,
+            // and emitting them first left every folded character class paying
+            // for a string it then abandoned. It also makes the fold exact, so
+            // `"abc".to_set()` and `#{'a', 'b', 'c'}` are the same four stores
+            // — which is what `char_set_literal` promises when it sends a
+            // spelled-out char set here.
+            //
+            // A string literal is str-shaped by construction, so its element
+            // type is `char` without asking.
+            if let ExprKind::Str(lit) = &args[0].kind {
+                let elem = ConcreteType::Primitive(Primitive::Char);
+                let mut words = [0u64; CHARSET_WORDS];
+                for c in lit.as_bytes() {
+                    words[(c >> 6) as usize] |= 1u64 << (c & 63);
+                }
+                let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    charset::CHARSET_SIZE as u32,
+                    3,
+                ));
+                for (w, word) in words.iter().enumerate() {
+                    let wv = builder.ins().iconst(types::I64, *word as i64);
+                    builder
+                        .ins()
+                        .stack_store(types::I64, wv, slot, (w * 8) as i32);
+                }
+                let base = builder.ins().stack_addr(types::I64, slot, 0);
+                return Ok((base, ConcreteType::Set(Box::new(elem), order)));
+            }
             let (arr_ptr, t) = compile_expr(module, builder, cx, scopes, &args[0])?;
             // A `str` receiver gives a `#{char}` — a string is a sequence of
             // chars, and the bitfield is filled by streaming it, so nothing
@@ -16610,36 +16652,6 @@ fn compile_call_expr<M: Module>(
                     ));
                 }
             };
-            let order = match &locked {
-                Some(ConcreteType::Set(_, o)) if *o != aipl_syntax::ast::SetOrder::Context => *o,
-                _ => aipl_syntax::ast::SetOrder::Unordered,
-            };
-            // A literal source: the members are known *now*, so the bitfield is
-            // four immediate stores rather than a scan over the characters.
-            // This is what makes a character class free — as a top-level
-            // constant it is spliced into each use already built, where asking
-            // for one per rule walked its sixty-odd characters every time.
-            if elem == ConcreteType::Primitive(Primitive::Char) {
-                if let ExprKind::Str(lit) = &args[0].kind {
-                    let mut words = [0u64; CHARSET_WORDS];
-                    for c in lit.as_bytes() {
-                        words[(c >> 6) as usize] |= 1u64 << (c & 63);
-                    }
-                    let slot = builder.create_sized_stack_slot(StackSlotData::new(
-                        StackSlotKind::ExplicitSlot,
-                        charset::CHARSET_SIZE as u32,
-                        3,
-                    ));
-                    for (w, word) in words.iter().enumerate() {
-                        let wv = builder.ins().iconst(types::I64, *word as i64);
-                        builder
-                            .ins()
-                            .stack_store(types::I64, wv, slot, (w * 8) as i32);
-                    }
-                    let base = builder.ins().stack_addr(types::I64, slot, 0);
-                    return Ok((base, ConcreteType::Set(Box::new(elem), order)));
-                }
-            }
             // A `char[]` source is *str-shaped*: its value is the 24-byte
             // string, not an array block, so the index walk below would read
             // the string's own words as a length. It is also the only source

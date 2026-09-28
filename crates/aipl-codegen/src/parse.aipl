@@ -1228,14 +1228,11 @@ pub fn parse<K: variant, A: any>(
         let alpha: char[] = "abcdefghijklmnopqrstuvwxyz";
         let digit: char[] = "0123456789";
         [
-            TokenRule { matcher: CharRun(#{' ', '\t', '\n'}), emit: Bare(Punct), trivia: true },
+            TokenRule { matcher: CharRun(" \t\n".to_set()), emit: Bare(Punct), trivia: true },
             TokenRule { matcher: ToEol("//"), emit: Bare(Punct), trivia: true },
             TokenRule { matcher: CharRun(alpha.to_set()), emit: Of(Word) },
             TokenRule { matcher: CharRun(digit.to_set()), emit: Of(Num) },
-            TokenRule {
-                matcher: OneChar(#{'(', ')', '[', ']', ',', ';', '+', '*'}),
-                emit: Bare(Punct),
-            },
+            TokenRule { matcher: OneChar("()[],;+*".to_set()), emit: Bare(Punct) },
         ]
     }
 
@@ -1729,13 +1726,10 @@ fn tok_rules() -> TokenRule<Tok>[] {
     let alpha: char[] = "abcdefghijklmnopqrstuvwxyz";
     let digit: char[] = "0123456789";
     [
-        TokenRule { matcher: CharRun(#{' ', '\t', '\n'}), emit: Bare(Punct), skip: true },
+        TokenRule { matcher: CharRun(" \t\n".to_set()), emit: Bare(Punct), skip: true },
         TokenRule { matcher: CharRun(alpha.to_set()), emit: Of(Word) },
         TokenRule { matcher: CharRun(digit.to_set()), emit: Of(Num) },
-        TokenRule {
-            matcher: OneChar(#{'(', ')', '[', ']', ',', ';', '+', '*'}),
-            emit: Bare(Punct),
-        },
+        TokenRule { matcher: OneChar("()[],;+*".to_set()), emit: Bare(Punct) },
     ]
 }
 
