@@ -429,7 +429,7 @@ fn delimited_len(self: str, at: u64, delims: str, escapes: #{char}, msg: str) ->
             // escaped char must be allowed, and is content: skipping it is
             // what keeps an escaped delimiter from closing the token.
             let e = self[i + 1].value_or_err(LexError {
-                message: incomplete_escape(),
+                message: INCOMPLETE_ESCAPE,
                 span: at + i..at + i + 1,
             })?;
             if (!escapes.has(e)) {
@@ -446,7 +446,7 @@ fn delimited_len(self: str, at: u64, delims: str, escapes: #{char}, msg: str) ->
 
 # The message for a backslash the end of the source cut off. Shared by the
 # `Delimited` scan and the template scan, which decode the same escapes.
-fn incomplete_escape() -> str { """incomplete escape sequence: \ at end of input""" }
+let INCOMPLETE_ESCAPE = """incomplete escape sequence: \ at end of input""";
 
 # The message for an unterminated scan: a rule's own `unterminated` override, or
 # the generic default when it left the field empty.
@@ -835,7 +835,7 @@ fn template_scan<K>(
         } else {
             if (c == '\\' && escapes.is_nonempty()) {
                 let e = src[i + 1].value_or_err(LexError {
-                    message: incomplete_escape(),
+                    message: INCOMPLETE_ESCAPE,
                     span: i..i + 1,
                 })?;
                 if (!escapes.has(e)) {
