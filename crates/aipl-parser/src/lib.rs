@@ -9,11 +9,8 @@
 //! types as they cross the FFI, and the other dogfooded helpers a parse leans
 //! on (section stripping, companion files, assertion locations).
 //!
-//! It used to hold a second parser — a gazelle LR(1) grammar with 86 build
-//! actions — which the AIPL one replaced once it built the same `Program` on
-//! every corpus file (`PARSER_LIBRARY.md`, stage 5). Nothing here parses by
-//! hand any more, and there is **no native fallback**: a parse without the
-//! hook installed is a panic, not a slower path.
+//! Nothing here parses by hand, and there is **no native fallback**: a parse
+//! without the hook installed is a panic, not a slower path.
 
 use std::collections::HashMap;
 use std::path::Path;

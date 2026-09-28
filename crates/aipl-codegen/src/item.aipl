@@ -87,8 +87,8 @@ variant Item =
 struct Program { items: Item[] }
 
 # A parsed function body, before the return type is in scope to name the struct
-# the shorthand constructs. Gazelle's `ParsedBody`, and parser-local for the
-# same reason: by the time a `Function` is built the sugar is gone.
+# the shorthand constructs. Parser-local: by the time a `Function` is built the
+# sugar is gone.
 variant ParsedBody = Block(Expr) | Construct(FieldInit[], Span)
 
 # A parameter as written, before the destructuring form is taken apart.

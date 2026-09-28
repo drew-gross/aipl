@@ -26,7 +26,7 @@
           </h3>
           <pre class="signature"><code>variant Stmt</code></pre>
 
-          <div class="doc"><p>One keyword statement, after its own production has read it and before the rest of the block is in scope. <code>wrap_stmt</code> is what folds it together with that rest, and several of these fold into *several* nodes — which is why a statement cannot simply lower to an <code>Expr</code> the way an expression does.</p><p>It mirrors gazelle's <code>StmtSpec</code>, which is a parser-local type there for the same reason it is one here: the AST has no statement node, so this shape exists only between the production and the fold.</p></div>
+          <div class="doc"><p>One keyword statement, after its own production has read it and before the rest of the block is in scope. <code>wrap_stmt</code> is what folds it together with that rest, and several of these fold into *several* nodes — which is why a statement cannot simply lower to an <code>Expr</code> the way an expression does.</p><p>Parser-local: the AST has no statement node, so this shape exists only between the production and the fold.</p></div>
 
 
           <ul class="cases">
@@ -89,7 +89,7 @@
           </h3>
           <pre class="signature"><code>variant ParsedBody</code></pre>
 
-          <div class="doc"><p>A parsed function body, before the return type is in scope to name the struct the shorthand constructs. Gazelle's <code>ParsedBody</code>, and parser-local for the same reason: by the time a <code>Function</code> is built the sugar is gone.</p></div>
+          <div class="doc"><p>A parsed function body, before the return type is in scope to name the struct the shorthand constructs. Parser-local: by the time a <code>Function</code> is built the sugar is gone.</p></div>
 
 
           <ul class="cases">

@@ -1,16 +1,12 @@
 //! The AIPL grammar written in AIPL (`crates/aipl-codegen/src/grammar_aipl.aipl`)
 //! over the whole corpus.
 //!
-//! This file used to be a differential against the gazelle LR(1) parser —
-//! acceptance, expression shape, whole-`Program` equality over 490 files,
-//! span containment, error messages, side-channels — which is what let the
-//! AIPL parser replace it (`PARSER_LIBRARY.md`, stage 5). With gazelle gone
-//! there is no second parser to differ from: every test in the suite now runs
-//! through the AIPL parser, so *what it parses to* is asserted everywhere
-//! programs are compiled, and the grammar's own `.test` blocks assert the
-//! lowering shape by shape.
+//! There is only one parser, so *what it parses to* is asserted everywhere
+//! programs are compiled at all, and the grammar's own `.test` blocks assert
+//! the lowering shape by shape.
 //!
-//! What is left here is the one property nothing else checks: **losslessness**.
+//! What is left for this file is the one property nothing else checks:
+//! **losslessness**.
 //! The concrete tree exists so a formatter can put back what an AST throws away,
 //! and that only holds if concatenating a tree's leaf spans returns the source
 //! byte for byte — asked of every file in the repository, not just the samples

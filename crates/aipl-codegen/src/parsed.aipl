@@ -14,9 +14,8 @@ import { Generic, Named, Ty, Unit, show_ty } from "./ty.aipl";
 # rest, and several of these fold into *several* nodes — which is why a
 # statement cannot simply lower to an `Expr` the way an expression does.
 #
-# It mirrors gazelle's `StmtSpec`, which is a parser-local type there for the
-# same reason it is one here: the AST has no statement node, so this shape
-# exists only between the production and the fold.
+# Parser-local: the AST has no statement node, so this shape exists only between
+# the production and the fold.
 variant Stmt =
     | Let(name: str, name_span: Span, ty: Ty?, value: Expr)
     | Mut(name: str, name_span: Span, ty: Ty?, value: Expr)
@@ -29,8 +28,8 @@ variant Stmt =
     | Return(value: Expr, span: Span)
 
 # A parsed function body, before the return type is in scope to name the struct
-# the shorthand constructs. Gazelle's `ParsedBody`, and parser-local for the
-# same reason: by the time a `Function` is built the sugar is gone.
+# the shorthand constructs. Parser-local: by the time a `Function` is built the
+# sugar is gone.
 variant ParsedBody = Block(Expr) | Construct(FieldInit[], Span)
 
 # A parameter as written, before the destructuring form is taken apart.

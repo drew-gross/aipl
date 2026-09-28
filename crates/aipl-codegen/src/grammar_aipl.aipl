@@ -1,47 +1,45 @@
 // AIPL's own syntax, as a `Grammar` value — the third and largest consumer of
-// the parser library, and the one the whole thing was built for. It describes
-// the same language as the gazelle LR(1) grammar in `crates/aipl-parser/src/lib.rs`,
-// against the same token stream (`lex_aipl.aipl`), and is differential-tested
-// against it over the entire corpus.
+// the parser library, and the one the whole thing was built for. It is the only
+// description of the language there is: every compile runs this grammar over
+// `lex_aipl.aipl`'s token stream, the compiler's own sources included.
 //
-// **LR to PEG: what had to change.** Gazelle is LR(1) with left recursion and a
-// runtime precedence table; this driver is a PEG with ordered choice. Three
-// mechanical translations cover almost all of it:
+// **It is a PEG, and that shapes it.** The driver has ordered choice and no
+// left recursion, so three patterns carry most of the grammar:
 //
-//   - *Left-recursive list rules* (`param_list = param | param_list COMMA param`)
-//     become one `Many` with a separator. What varies between them is whether
-//     the list may be empty and whether a trailing separator is allowed, and
-//     those are `min` and `trailing_sep` — so the four wrapper productions an LR
-//     grammar spells out by hand are two arguments here.
-//   - *Left-recursive postfix rules* (`postfix`, `base_ty`) become an atom
-//     followed by `Many(suffix)`.
-//   - *`expr binop expr` with a precedence table* becomes `Climb`, whose levels
-//     are `op_precedence`'s, `..` included (level 4, between `==` and `<`).
+//   - *List rules* (`param_list = param | param_list COMMA param` in a
+//     left-recursive grammar) are one `Many` with a separator. What varies
+//     between them is whether the list may be empty and whether a trailing
+//     separator is allowed, and those are `min` and `trailing_sep` — two
+//     arguments in place of the wrapper productions each list would otherwise
+//     spell out by hand.
+//   - *Postfix chains* (`postfix`, `base_ty`) are an atom followed by
+//     `Many(suffix)`, rather than a rule recursing on its own left edge.
+//   - *`expr binop expr`* is `Climb`, whose levels are `op_precedence`'s, `..`
+//     included (level 4, between `==` and `<`).
 //
-// What is *not* mechanical is **alternative order**. LR picks a production with
-// a token of lookahead; a PEG commits to the first alternative that matches, so
-// every choice here is written longest-first — `IDENT "(" args ")"` before
-// `IDENT "{" fields "}"` before a bare `IDENT`, `let (a, b) = ..` before
-// `let x = ..`. Where gazelle's comments say "one token of lookahead picks the
-// production", that token is what the ordering below encodes.
+// What ordered choice does not do for free is pick the right alternative: it
+// commits to the first that matches, so every choice here is written
+// longest-first — `IDENT "(" args ")"` before `IDENT "{" fields "}"` before a
+// bare `IDENT`, `let (a, b) = ..` before `let x = ..`. Reading a choice from the
+// top is reading it in the order the parser tries it.
 //
-// Two shapes are deliberately copied verbatim rather than simplified:
+// Two shapes are right-recursive on purpose:
 //
-//   - `block_body`/`block_tail` keep gazelle's right recursion. Written as
-//     `Many(stmt)` followed by an optional trailing expression, a PEG parses the
-//     trailing expression *twice* — once inside the statement alternative that
-//     then fails on its missing `;` — and that doubling compounds through nested
-//     blocks. Deciding after the expression, as gazelle does, parses it once.
+//   - `block_body`/`block_tail`. Written as `Many(stmt)` followed by an
+//     optional trailing expression, a PEG parses the trailing expression
+//     *twice* — once inside the statement alternative that then fails on its
+//     missing `;` — and that doubling compounds through nested blocks. Deciding
+//     after the expression parses it once.
 //   - `loop_body` likewise. A loop body admits no trailing expression at all,
 //     which is why it is a separate rule and not `block` with a flag.
 //
-// Every production lowers to the AST declared in `ast.aipl` (stage 5d in
-// `PARSER_LIBRARY.md`), so this file now answers three questions rather than
-// two: *what parses*, *the shape of the tree*, and *what it means*. The first
-// two are what the `.test` blocks and the corpus differential check; the third
-// is what `lower_aipl_ty`, `lower_aipl_pattern`, `lower_aipl_expr`,
-// `lower_aipl_block` and `lower_aipl_program` assert, each entering the grammar
-// at the production its slice is about.
+// Every production lowers to the AST declared in `ast.aipl`, so this file
+// answers three questions rather than two: *what parses*, *the shape of the
+// tree*, and *what it means*. The first two are what the `.test` blocks and the
+// whole-corpus losslessness check verify; the third is what `lower_aipl_ty`,
+// `lower_aipl_pattern`, `lower_aipl_expr`, `lower_aipl_block` and
+// `lower_aipl_program` assert, each entering the grammar at the production its
+// slice is about.
 //
 // What is left of stage 5 is the bridge on the other side: a `Program` built
 // here still cannot cross the FFI, so `aipl_lower_program` hands back a
@@ -95,6 +93,7 @@ import {
     wrapping_add_assign as +=,
     wrapping_decrement as --,
     wrapping_sub as -,
+    zip_with,
 } from builtins;
 import {
     Arms as AArms,
@@ -462,8 +461,8 @@ fn items() -> Production<AiplTok, Ast>[] {
         Lit(";"),
     ]);
 
-    // `<T, U: ord>`. At least one parameter — `<>` is a syntax error, as it is
-    // under gazelle, which is why this list has `min=1`.
+    // `<T, U: ord>`. At least one parameter — `<>` is a syntax error, which is
+    // why this list has `min=1`.
     let type_params: Rule<AiplTok> = Maybe(Many(
         Named("type_param"),
         min=1,
@@ -477,16 +476,16 @@ fn items() -> Production<AiplTok, Ast>[] {
     ]);
 
     // The five parameter shapes, longest first. `mut self: T` takes no default
-    // and no variadic marker, exactly as gazelle spells it. The variadic marker
-    // is `*` (zero or more) or `+` (one or more).
+    // and no variadic marker. The variadic marker is `*` (zero or more) or `+`
+    // (one or more).
     let variadic: Rule<AiplTok> = OneOf([Lit("*"), Lit("+")]);
     let param: Rule<AiplTok> = OneOf([
         Then([Lit("mut"), Term(Name), Lit(":"), Named("ty")]),
         Then([Term(Name), Lit(":"), Named("ty"), variadic, Lit("="), Named("expr")]),
         // `k?: T = none` — a parameter that may be *omitted*, as against `k: T?`
         // whose type is optional. Ordered choice makes this an ordinary
-        // alternative; gazelle needs `?:` glued into one terminal to see it,
-        // since an LR parser cannot look past the `?` to the `:`.
+        // alternative: the parser backtracks over the `?` when the `:` does not
+        // follow, so `?:` needs no terminal of its own.
         Then([Term(Name), Lit("?"), Lit(":"), Named("ty"), Lit("="), Named("expr")]),
         Then([Term(Name), Lit(":"), Named("ty"), Lit("="), Named("expr")]),
         Then([Term(Name), Lit(":"), Named("ty"), variadic]),
@@ -517,9 +516,9 @@ fn items() -> Production<AiplTok, Ast>[] {
         Then([Term(Name), Lit(","), Many(Named("field_init"), sep=Lit(","))]),
     ]);
 
-    // `.test({ .. })`, the only attribute. The string-argument form parses
-    // here and in gazelle so that the retired `.doc("..")` can be refused by
-    // name, with the migration to `# ..` lines in the message.
+    // `.test({ .. })`, the only attribute. The string-argument form parses so
+    // that the retired `.doc("..")` can be refused by name, with the migration
+    // to `# ..` lines in the message.
     let fn_attr: Rule<AiplTok> = Then([
         Lit("."),
         Term(Name),
@@ -654,9 +653,9 @@ fn types() -> Production<AiplTok, Ast>[] {
     // case, not a change to `ty`.
     let exclusion: Rule<AiplTok> = Then([Lit("["), Lit("]")]);
 
-    // The `(`-led forms are ordered longest-first, which is exactly the shift
-    // decision gazelle's comments describe: `(A, B) -> R` over `(A, B)[]` over
-    // `(A, B)!E` over `(A, B)`.
+    // The `(`-led forms are ordered longest-first, since every one of them
+    // opens the same way: `(A, B) -> R` over `(A, B)[]` over `(A, B)!E` over
+    // `(A, B)`.
     let ty_head: Rule<AiplTok> = OneOf([
         Then([Named("ty_parens"), Lit("->"), Named("ty")]),
         Then([Named("ty_parens"), Lit("["), Lit("]")]),
@@ -715,7 +714,7 @@ fn types() -> Production<AiplTok, Ast>[] {
 // ---------- statements ----------
 
 fn statements() -> Production<AiplTok, Ast>[] {
-    // Gazelle's right recursion, kept: after one expression the parser decides
+    // Right-recursive on purpose: after one expression the parser decides
     // whether a `;` made it a statement or its absence made it the block's
     // value, so the expression is parsed exactly once.
     let block: Rule<AiplTok> = one(Named("block_body"), nested_in=braces());
@@ -1030,7 +1029,8 @@ fn expressions() -> Production<AiplTok, Ast>[] {
     ]);
 
     // The operators that may be passed as values. Narrower than the importable
-    // set: `-` and `!` are unary too, and gazelle gives them their own terminals.
+    // set: `-` and `!` are unary too, and a value has no operand to tell which
+    // spelling was meant.
     let op_value: Rule<AiplTok> = OneOf([
         Lit("+++"),
         Lit("=="),
@@ -1152,8 +1152,7 @@ fn patterns() -> Production<AiplTok, Ast>[] {
 // lower to expressions too, and every item that carries a default holds one.
 //
 // Three things here are *desugarings* rather than translations — the AST has no
-// node for them, because the language stops having them at this point. They are
-// gazelle's, moved verbatim:
+// node for them, because the language stops having them at this point:
 //
 //   - **An operator is a call on its spelling.** `a + b` is `+(a, b)`, `!x` is
 //     `!(x)`, and an operator passed as a value is a two-parameter lambda whose
@@ -1163,7 +1162,7 @@ fn patterns() -> Production<AiplTok, Ast>[] {
 //     here rather than in the loader.
 //   - **A template is a concat chain.** Each interpolation goes through
 //     `__template_interp` and the pieces through `__aipl_concat`, folded from
-//     the tail backwards so the tree matches the one gazelle's right-recursive
+//     the tail backwards so the tree matches the one the right-recursive
 //     `template_rest` produces.
 //
 // A `suffix` and a `#{ .. }` entry get `Ast` cases of their own (`ASuffix`,
@@ -1363,8 +1362,8 @@ fn lower_suffix(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 
 # `.name` names a field and `.0` a tuple slot, which the AST spells as the field
 # `_0` — so the two syntaxes become one here and nothing downstream knows tuples
-# have a second way to name their fields. A negative index is refused, as it is
-# by gazelle: the `Int` matcher claims the sign, so `p.-1` does lex.
+# have a second way to name their fields. A negative index is refused here rather
+# than in the lexer: the `Int` matcher claims the sign, so `p.-1` does lex.
 fn field_name(name: str, span: Span) -> str!ParseError {
     if (name.starts_with('-')) {
         return err(ParseError { message: "tuple index must be a non-negative integer", span });
@@ -1492,8 +1491,8 @@ fn shim_expr(src: str, node: Parts, kids: Ast[], sp: Span) -> Expr!ParseError {
 }
 
 # `if (..) { .. }` and `if (let p = e) { .. }`, with or without an `else`. Both
-# are written in two places — an atom, and the tail of an `else` — and gazelle
-# builds them identically wherever they appear, so this does too.
+# are written in two places — an atom, and the tail of an `else` — and build
+# identically wherever they appear, so one lowering serves both.
 fn lower_if(src: str, node: Parts, kids: Ast[]) -> Expr!ParseError {
     let sp = node.span();
     let tsp = node.tok_span();
@@ -1540,24 +1539,26 @@ fn lower_template(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     ok(AExpr(at(template_chain(segs, exprs, sp).kind, node.tok_span())))
 }
 
-# The concat chain, folded from the tail backwards: each interpolation is
-# `__template_interp` of its expression, and each segment is joined on with
-# `__aipl_concat`. Built right to left because that is the shape gazelle's
-# right-recursive `template_rest` produces, and the two trees have to agree.
+# The concat chain a template lowers to. A template alternates segments and
+# interpolations and always begins and ends with a segment, so there is exactly
+# one more segment than interpolation: `zip_with` pairs each interpolation with
+# the segment in front of it (stopping at the shorter side, which is `exprs`),
+# and the one segment left over is the tail the fold starts from.
+#
+# Right-associated — `(s0 +++ i0) +++ ((s1 +++ i1) +++ (.. +++ sN))` — because
+# that is the tree the parser's right-recursive `template_rest` produces, and
+# the concat chain has to agree with it.
 fn template_chain(segs: str[], exprs: Expr[], sp: Span) -> Expr {
-    mut acc = at(Str(seg_at(segs, exprs.len())), sp);
-    mut i = exprs.len();
-    while (i > 0) {
-        set i--;
-        let text = at(Str(seg_at(segs, i)), sp);
-        set acc = concat_call(concat_call(text, interp_call(expr_at(exprs, i, sp))), acc);
-    }
-    acc
+    let tail = at(Str(segs[exprs.len()].value_or("")), sp);
+    let pieces = zip_with(segs, exprs, |s: str, e: Expr| interpolation_piece(s, e, sp));
+    pieces.right_fold(tail, concat_call)
 }
 
-fn seg_at(self: str[], i: u64) -> str { self[i].value_or("") }
-
-fn expr_at(self: Expr[], i: u64, sp: Span) -> Expr { self[i].value_or(at(Unit, sp)) }
+# One link of the chain: the segment in front of an interpolation, joined to
+# the interpolation itself.
+fn interpolation_piece(segment: str, e: Expr, sp: Span) -> Expr {
+    concat_call(at(Str(segment), sp), interp_call(e))
+}
 
 # `__template_interp` is `to_str` under another name — a `str` passes through
 # unchanged, a `char` widens to its one-character `str`, anything else renders
@@ -1810,9 +1811,8 @@ fn block_tail(e: Expr, brace: Span) -> (Expr, Span) {
 fn lower_block_body(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
 
-    // Empty: the block's value is unit. Its span is empty too — gazelle repairs
-    // that from the block's own `{`, which is a side-channel this does not have
-    // yet (5f).
+    // Empty: the block's value is unit. Its span is empty too; `block_tail`
+    // repairs that from the block's own `{`.
     if (kids.is_empty()) {
         return ok(AExpr(at(Unit, 0..0)));
     };
@@ -1863,7 +1863,7 @@ fn lower_block_tail(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 //   - `set n++;` and `set n += e;` are ordinary operator calls on the binding,
 //     each gated on importing the operator that was actually written.
 //
-// All four are gazelle's desugarings, moved rather than reinvented.
+// All four are desugarings: the AST has no node for any of them.
 
 # The identifier tokens of a binder-led statement: everything this production
 # matched directly, less the fixed spellings around them. A `let` statement's
@@ -2030,7 +2030,7 @@ fn lower_for_stmt(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     };
 
     // `for (let i, x : xs)` — two names, the first of which is the index. Its
-    // span is what the whole statement is spanned from, as gazelle spans it.
+    // span is what the whole statement is spanned from.
     if (names.len() == 2) {
         let name_span = spans[3].value_or(node.tok_span());
         let span = join_spans(name_span, body.span);
@@ -2398,9 +2398,8 @@ fn as_pat(v: Ast, span: Span) -> Pat!ParseError {
     err(wrong_kind("a pattern", v, span))
 }
 
-# `V.A` is one name with a dot in it, exactly as gazelle spells it — the
-# qualification is not a separate field on the AST, so a qualified case and a
-# bare one are the same shape from here on. Anything but a `.` in second
+# `V.A` is one name with a dot in it — the qualification is not a separate field
+# on the AST, so a qualified case and a bare one are the same shape from here on. Anything but a `.` in second
 # position means this pattern was not qualified.
 fn qualified_name(toks: str[], head: str) -> str {
     if (toks[1] != some(".")) {
@@ -2428,7 +2427,7 @@ fn lower_ctor_payload(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # identifier or `none`, after which the payload child (present or not) and the
 # `.` (present or not) settle the rest. `_` lexes as an ordinary identifier, so
 # the wildcard arrives here as a nullary name and is recognised by spelling —
-# and only when nullary, since `_(x)` is a constructor named `_` to gazelle too.
+# and only when nullary, since `_(x)` is a constructor named `_`.
 fn lower_pattern(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let toks = node.own_texts(src);
@@ -3491,7 +3490,7 @@ pub fn lower_aipl_pattern(src: str) -> Pat!ParseError {
     assert(pat_dump("some(v)") == "some(v)");
     assert(pat_dump("Pair(a, b)") == "Pair(a, b)");
     assert(pat_dump("Circle(..)") == "Circle(..)");
-    // `_` is a constructor name once it takes a payload, as it is under gazelle.
+    // `_` is a constructor name once it takes a payload.
     assert(pat_dump("_(x)") == "_(x)");
 
     // `V.A` — the qualification is part of the name, not a field of its own.
@@ -4107,26 +4106,18 @@ pub fn lex_lossless(text: str) -> LexResult<AiplTok>!ParseError {
         .map_err(|e| ParseError { message: e.message, span: e.span })
 }
 
-# What this grammar makes of `src`, in one string: empty when it parses *and*
-# its concrete tree reconstructs the source byte for byte, and otherwise a
-# line beginning `error:` (it did not parse, with the message) or `lossless:`
-# (it did, but the tree lost bytes).
-# Every interior node's *token* span, flattened to `[start, end, start, end, ..]`.
-#
-# The FFI entry the tree differential calls. Its question is whether the two
-# grammars agree about *shape*, not just about acceptance — whether they group
-# `a + b * c` the same way — and spans are how to ask it without writing a
-# renderer for each side and diffing the output, which is most of the work of
-# lowering, done twice. Both sides already carry a span on every node.
+# Every interior node's *token* span, flattened to `[start, end, start, end, ..]`
+# — the tree's *shape* as data, which is what tells `a + b * c`'s grouping apart
+# from any other without writing a renderer and reading its output.
 #
 # Token spans, not `span`: trivia attaches in front of the token that follows
-# it, so a node's plain span reaches back over the whitespace before it while
-# gazelle's spans are token-tight. Comparing the two without this is off by the
-# leading whitespace at every node (see `token_span`).
+# it, so a node's plain span reaches back over the whitespace before it, and two
+# nodes with the same extent would differ by their leading whitespace (see
+# `token_span`).
 #
 # Flat pairs rather than a nested shape because this crosses the FFI, where an
 # array of numbers is the cheapest thing to marshal. A node holding no token
-# contributes nothing — there is no span to compare.
+# contributes nothing — it has no span to report.
 pub fn aipl_node_spans(src: str) -> u64[]!ParseError {
     let text = aipl_source(src);
     ok(node_spans(aipl_parse_cst(src)?))
@@ -4177,9 +4168,8 @@ pub fn aipl_program(src: str) -> Program!ParseError { lower_aipl_program(src) }.
 #
 # The markers are the parser's one *side-channel* — they are trivia, so no
 # production ever sees one, and the loader's lint pass still needs them to drop
-# a hit squelched on the same line. Gazelle carries them out through a
-# thread-local sink armed by `parse_with_allows`; here they ride the return
-# value, which is the same information without the arming.
+# a hit squelched on the same line. They ride out on the return value rather
+# than through a sink the caller has to arm first.
 struct ParsedFile { program: Program, allows: Span[] }
 
 # The whole of `aipl_parser::parse_with_allows`, on this side: strip the
@@ -4280,10 +4270,14 @@ fn node_spans(t: Cst) -> u64[] {
     [..own, ..t.parts().children.map(node_spans).join()]
 }
 
+# What this grammar makes of `src`, in one string: empty when it parses *and*
+# its concrete tree reconstructs the source byte for byte, and otherwise a line
+# beginning `error:` (it did not parse, with the message) or `lossless:` (it did,
+# but the tree lost bytes).
 #
-# The FFI entry the corpus differential test calls — one crossing and one
-# parse per file, checking both properties at once. Rejection is half the
-# comparison: a grammar that accepts everything agrees with nothing.
+# The FFI entry the corpus test calls — one crossing and one parse per file,
+# checking both properties at once. Rejection is half of it: a grammar that
+# accepts everything says nothing about what the language is.
 pub fn aipl_parse_report(src: str) -> str {
     let text = aipl_source(src);
     match (aipl_parse_cst(src)) {
@@ -4675,9 +4669,9 @@ fn kid(kids: Ast[], i: u64, span: Span) -> Ast!ParseError {
 
 # A parenthesized list used as a tuple — or, with one element, as a grouping:
 # `(T[] without [])?` is how a refined type takes a suffix, since `without`
-# binds looser than any. Gazelle validates the arity in its build action rather
-# than in the grammar, for the reason this one does: `(A)` and `()` are
-# parenthesized lists that parse, and only what follows them says whether they
+# binds looser than any. The arity is validated in the lowering rather than in
+# the grammar: `(A)` and `()` are parenthesized lists that parse, and only what
+# follows them says whether they
 # were meant as a tuple or as a function type's parameters. `example` completes
 # the advice with the suffix that was actually written.
 fn tuple_ty(ts: Ty[], example: str, span: Span) -> Ty!ParseError {
@@ -4785,9 +4779,8 @@ fn lower_base_ty(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
 # child count says which of each pair matched.
 #
 # `Case<V>` borrows the generic-application syntax but is a type of its own: one
-# case of a variant, carrying no payload. Spelled out here for the reason
-# gazelle spells it out — so nothing downstream has to know that one base name
-# is special.
+# case of a variant, carrying no payload. Spelled out here so nothing downstream
+# has to know that one base name is special.
 fn lower_ty_core(src: str, node: Parts, kids: Ast[]) -> Ast!ParseError {
     let sp = node.span();
     let head_tok = node.tokens
@@ -4828,15 +4821,15 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2106881
-deallocations: 2106881
+allocations: 2106882
+deallocations: 2106882
 reallocations: 300668
-bytes allocated: 394168577
-instructions executed: 584448548
-binary size: 5973104
-  code: 3925520
+bytes allocated: 394168617
+instructions executed: 584448684
+binary size: 5973152
+  code: 3925532
   data: 57500
-  metadata: 1990084
+  metadata: 1990120
 functions:
   __arr_drop___m11__ParsedParam:
     calls: 26
@@ -4869,7 +4862,7 @@ functions:
     calls: 2673
     bytes: 140
   __arr_drop___m3__Expr:
-    calls: 95
+    calls: 96
     bytes: 116
   __arr_drop___m3__FieldInit:
     calls: 17
@@ -4962,7 +4955,7 @@ functions:
     calls: 17532
     bytes: 140
   __arr_retain___m3__Expr:
-    calls: 70
+    calls: 71
     bytes: 116
   __arr_retain___m3__FieldInit:
     calls: 16
@@ -5889,16 +5882,16 @@ functions:
     calls: 37
     bytes: (external)
   aipl_array_dec:
-    calls: 9705318
+    calls: 9705320
     bytes: (external)
   aipl_array_new:
     calls: 194918
     bytes: (external)
   aipl_array_push:
-    calls: 177942
+    calls: 177943
     bytes: (external)
   aipl_array_push_mut:
-    calls: 736133
+    calls: 736134
     bytes: (external)
   aipl_array_with_cap:
     calls: 40204
@@ -5928,13 +5921,13 @@ functions:
     calls: 1366413
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 7311120
+    calls: 7311123
     bytes: (external)
   aipl_rec_dec_weak:
     calls: 415809
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 5944394
+    calls: 5944397
     bytes: (external)
   aipl_rec_inc_weak:
     calls: 415809
@@ -6271,7 +6264,7 @@ functions:
     bytes: 187992
   lower_template:
     calls: 1
-    bytes: 9304
+    bytes: 9316
   lower_test_block:
     calls: 7
     bytes: 14080

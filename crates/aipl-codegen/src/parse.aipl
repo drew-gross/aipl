@@ -1035,9 +1035,8 @@ fn error_at<K: variant, A: any>(p: Parser<K, A>, src: str, far: Far) -> ParseErr
     // a PEG reaches its alternatives in is an artefact of how the grammar was
     // written, not something a reader can use, and it moves whenever a
     // production is reordered. Sorting makes the message a function of *what*
-    // was expected and nothing else — the same reason gazelle collects its own
-    // expected set into a `BTreeSet` (`friendly_syntax_error`), which is the
-    // behaviour this has to match when it takes over.
+    // was expected and nothing else, so the same missing token reads the same
+    // way however the grammar around it is arranged.
     //
     // It also means nothing upstream has to preserve order: `far_miss` dedupes
     // by hand and `label_sets` is set-valued, and both are free to arrive at

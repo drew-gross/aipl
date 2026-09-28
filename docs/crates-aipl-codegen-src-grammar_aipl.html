@@ -180,7 +180,7 @@
           </h3>
           <pre class="signature"><code>pub fn aipl_node_spans(src: str) -&#62; u64[]!ParseError</code></pre>
 
-          <div class="doc"><p>What this grammar makes of <code>src</code>, in one string: empty when it parses *and* its concrete tree reconstructs the source byte for byte, and otherwise a line beginning <code>error:</code> (it did not parse, with the message) or <code>lossless:</code> (it did, but the tree lost bytes). Every interior node's *token* span, flattened to <code>[start, end, start, end, ..]</code>.</p><p>The FFI entry the tree differential calls. Its question is whether the two grammars agree about *shape*, not just about acceptance — whether they group <code>a + b * c</code> the same way — and spans are how to ask it without writing a renderer for each side and diffing the output, which is most of the work of lowering, done twice. Both sides already carry a span on every node.</p><p>Token spans, not <code>span</code>: trivia attaches in front of the token that follows it, so a node's plain span reaches back over the whitespace before it while gazelle's spans are token-tight. Comparing the two without this is off by the leading whitespace at every node (see <code>token_span</code>).</p><p>Flat pairs rather than a nested shape because this crosses the FFI, where an array of numbers is the cheapest thing to marshal. A node holding no token contributes nothing — there is no span to compare.</p></div>
+          <div class="doc"><p>Every interior node's *token* span, flattened to <code>[start, end, start, end, ..]</code> — the tree's *shape* as data, which is what tells <code>a + b * c</code>'s grouping apart from any other without writing a renderer and reading its output.</p><p>Token spans, not <code>span</code>: trivia attaches in front of the token that follows it, so a node's plain span reaches back over the whitespace before it, and two nodes with the same extent would differ by their leading whitespace (see <code>token_span</code>).</p><p>Flat pairs rather than a nested shape because this crosses the FFI, where an array of numbers is the cheapest thing to marshal. A node holding no token contributes nothing — it has no span to report.</p></div>
 
 
         </section>
@@ -208,7 +208,7 @@
           </h3>
           <pre class="signature"><code>struct ParsedFile</code></pre>
 
-          <div class="doc"><p>What a source file parses to: its program, and the spans of every <code>#[allow]</code> lint-squelch marker in it.</p><p>The markers are the parser's one *side-channel* — they are trivia, so no production ever sees one, and the loader's lint pass still needs them to drop a hit squelched on the same line. Gazelle carries them out through a thread-local sink armed by <code>parse_with_allows</code>; here they ride the return value, which is the same information without the arming.</p></div>
+          <div class="doc"><p>What a source file parses to: its program, and the spans of every <code>#[allow]</code> lint-squelch marker in it.</p><p>The markers are the parser's one *side-channel* — they are trivia, so no production ever sees one, and the loader's lint pass still needs them to drop a hit squelched on the same line. They ride out on the return value rather than through a sink the caller has to arm first.</p></div>
 
 
         </section>
@@ -250,7 +250,7 @@
           </h3>
           <pre class="signature"><code>pub fn aipl_parse_report(src: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>The FFI entry the corpus differential test calls — one crossing and one parse per file, checking both properties at once. Rejection is half the comparison: a grammar that accepts everything agrees with nothing.</p></div>
+          <div class="doc"><p>What this grammar makes of <code>src</code>, in one string: empty when it parses *and* its concrete tree reconstructs the source byte for byte, and otherwise a line beginning <code>error:</code> (it did not parse, with the message) or <code>lossless:</code> (it did, but the tree lost bytes).</p><p>The FFI entry the corpus test calls — one crossing and one parse per file, checking both properties at once. Rejection is half of it: a grammar that accepts everything says nothing about what the language is.</p></div>
 
 
         </section>
@@ -607,7 +607,7 @@
           </h3>
           <pre class="signature"><code>fn field_name(name: str, span: Span) -&#62; str!ParseError</code></pre>
 
-          <div class="doc"><p><code>.name</code> names a field and <code>.0</code> a tuple slot, which the AST spells as the field <code>_0</code> — so the two syntaxes become one here and nothing downstream knows tuples have a second way to name their fields. A negative index is refused, as it is by gazelle: the <code>Int</code> matcher claims the sign, so <code>p.-1</code> does lex.</p></div>
+          <div class="doc"><p><code>.name</code> names a field and <code>.0</code> a tuple slot, which the AST spells as the field <code>_0</code> — so the two syntaxes become one here and nothing downstream knows tuples have a second way to name their fields. A negative index is refused here rather than in the lexer: the <code>Int</code> matcher claims the sign, so <code>p.-1</code> does lex.</p></div>
 
 
         </section>
@@ -663,7 +663,7 @@
           </h3>
           <pre class="signature"><code>fn lower_if(src: str, node: Parts, kids: Ast[]) -&#62; Expr!ParseError</code></pre>
 
-          <div class="doc"><p><code>if (..) { .. }</code> and <code>if (let p = e) { .. }</code>, with or without an <code>else</code>. Both are written in two places — an atom, and the tail of an <code>else</code> — and gazelle builds them identically wherever they appear, so this does too.</p></div>
+          <div class="doc"><p><code>if (..) { .. }</code> and <code>if (let p = e) { .. }</code>, with or without an <code>else</code>. Both are written in two places — an atom, and the tail of an <code>else</code> — and build identically wherever they appear, so one lowering serves both.</p></div>
 
 
         </section>
@@ -719,35 +719,21 @@
           </h3>
           <pre class="signature"><code>fn template_chain(segs: str[], exprs: Expr[], sp: Span) -&#62; Expr</code></pre>
 
-          <div class="doc"><p>The concat chain, folded from the tail backwards: each interpolation is <code>__template_interp</code> of its expression, and each segment is joined on with <code>__aipl_concat</code>. Built right to left because that is the shape gazelle's right-recursive <code>template_rest</code> produces, and the two trees have to agree.</p></div>
+          <div class="doc"><p>The concat chain a template lowers to. A template alternates segments and interpolations and always begins and ends with a segment, so there is exactly one more segment than interpolation: <code>zip_with</code> pairs each interpolation with the segment in front of it (stopping at the shorter side, which is <code>exprs</code>), and the one segment left over is the tail the fold starts from.</p><p>Right-associated — <code>(s0 +++ i0) +++ ((s1 +++ i1) +++ (.. +++ sN))</code> — because that is the tree the parser's right-recursive <code>template_rest</code> produces, and the concat chain has to agree with it.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-seg_at">
+        <section class="item" id="item-interpolation_piece">
           <h3>
-            <a class="anchor" href="#item-seg_at">seg_at</a>
+            <a class="anchor" href="#item-interpolation_piece">interpolation_piece</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn seg_at(self: str[], i: u64) -&#62; str</code></pre>
+          <pre class="signature"><code>fn interpolation_piece(segment: str, e: Expr, sp: Span) -&#62; Expr</code></pre>
 
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-expr_at">
-          <h3>
-            <a class="anchor" href="#item-expr_at">expr_at</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn expr_at(self: Expr[], i: u64, sp: Span) -&#62; Expr</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
+          <div class="doc"><p>One link of the chain: the segment in front of an interpolation, joined to the interpolation itself.</p></div>
 
 
         </section>
@@ -1420,7 +1406,7 @@
           </h3>
           <pre class="signature"><code>fn qualified_name(toks: str[], head: str) -&#62; str</code></pre>
 
-          <div class="doc"><p><code>V.A</code> is one name with a dot in it, exactly as gazelle spells it — the qualification is not a separate field on the AST, so a qualified case and a bare one are the same shape from here on. Anything but a <code>.</code> in second position means this pattern was not qualified.</p></div>
+          <div class="doc"><p><code>V.A</code> is one name with a dot in it — the qualification is not a separate field on the AST, so a qualified case and a bare one are the same shape from here on. Anything but a <code>.</code> in second position means this pattern was not qualified.</p></div>
 
 
         </section>
@@ -1448,7 +1434,7 @@
           </h3>
           <pre class="signature"><code>fn lower_pattern(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>pattern</code> — the seven alternatives, told apart by the first token they matched.</p><p>A literal is what its delimiter says it is; everything else opens with an identifier or <code>none</code>, after which the payload child (present or not) and the <code>.</code> (present or not) settle the rest. <code>_</code> lexes as an ordinary identifier, so the wildcard arrives here as a nullary name and is recognised by spelling — and only when nullary, since <code>_(x)</code> is a constructor named <code>_</code> to gazelle too.</p></div>
+          <div class="doc"><p><code>pattern</code> — the seven alternatives, told apart by the first token they matched.</p><p>A literal is what its delimiter says it is; everything else opens with an identifier or <code>none</code>, after which the payload child (present or not) and the <code>.</code> (present or not) settle the rest. <code>_</code> lexes as an ordinary identifier, so the wildcard arrives here as a nullary name and is recognised by spelling — and only when nullary, since <code>_(x)</code> is a constructor named <code>_</code>.</p></div>
 
 
         </section>
@@ -1964,7 +1950,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$122276: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$122038: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2428,7 +2414,7 @@
           </h3>
           <pre class="signature"><code>fn tuple_ty(ts: Ty[], example: str, span: Span) -&#62; Ty!ParseError</code></pre>
 
-          <div class="doc"><p>A parenthesized list used as a tuple — or, with one element, as a grouping: <code>(T[] without [])?</code> is how a refined type takes a suffix, since <code>without</code> binds looser than any. Gazelle validates the arity in its build action rather than in the grammar, for the reason this one does: <code>(A)</code> and <code>()</code> are parenthesized lists that parse, and only what follows them says whether they were meant as a tuple or as a function type's parameters. <code>example</code> completes the advice with the suffix that was actually written.</p></div>
+          <div class="doc"><p>A parenthesized list used as a tuple — or, with one element, as a grouping: <code>(T[] without [])?</code> is how a refined type takes a suffix, since <code>without</code> binds looser than any. The arity is validated in the lowering rather than in the grammar: <code>(A)</code> and <code>()</code> are parenthesized lists that parse, and only what follows them says whether they were meant as a tuple or as a function type's parameters. <code>example</code> completes the advice with the suffix that was actually written.</p></div>
 
 
         </section>
@@ -2526,7 +2512,7 @@
           </h3>
           <pre class="signature"><code>fn lower_ty_core(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>ty_core</code> — <code>#{K: V}</code>, <code>#{T}</code>, <code>Name&lt;A, B&gt;</code> and a bare <code>Name</code>. The <code>#</code> is what separates the two brace forms from the two name forms, and after that the child count says which of each pair matched.</p><p><code>Case&lt;V&gt;</code> borrows the generic-application syntax but is a type of its own: one case of a variant, carrying no payload. Spelled out here for the reason gazelle spells it out — so nothing downstream has to know that one base name is special.</p></div>
+          <div class="doc"><p><code>ty_core</code> — <code>#{K: V}</code>, <code>#{T}</code>, <code>Name&lt;A, B&gt;</code> and a bare <code>Name</code>. The <code>#</code> is what separates the two brace forms from the two name forms, and after that the child count says which of each pair matched.</p><p><code>Case&lt;V&gt;</code> borrows the generic-application syntax but is a type of its own: one case of a variant, carrying no payload. Spelled out here so nothing downstream has to know that one base name is special.</p></div>
 
 
         </section>

@@ -8,11 +8,10 @@ import { Desc, Primitive, SetOrder, Ty, Unordered, show_order, show_ty } from ".
 
 # block) where its *value* is.
 #
-# The span is this node's *token* span, which is a superset of gazelle's:
-# gazelle's are kept for diagnostics rather than as a record of extent, so a
-# bracketed form's stops before its closing bracket and a unary leaves its own
-# operator out. `aipl_spans_contain_gazelles` is where that is stated and
-# checked; 5e in `PARSER_LIBRARY.md` is where it is argued.
+# The span is this node's *token* span: every token the node was built from,
+# closing bracket and unary operator included. A span kept for diagnostics alone
+# can be narrower than that — it only has to point somewhere useful — but a
+# formatter needs the extent, so this one records it.
 #
 # `value_span` is a block's tail position: `fn f() -> str { let a = 1; a }`
 # returns the `a`, but the body's span starts at the `let`, so a return-type
@@ -48,8 +47,8 @@ struct MatchArm { pattern: Pat, body: Expr, span: Span }
 # Several surface forms are gone by the time they get here, because the AST is
 # where the language stops having them: an operator is an `Call` on its
 # spelling, a range is an `Construct` of the builtin `Span`, a template is a
-# chain of concat calls, and a block is a right-nested `Seq`. That is the same
-# set of desugarings gazelle's build actions do, in the same places.
+# chain of concat calls, and a block is a right-nested `Seq`. Each is done in
+# the lowering, so nothing downstream has to know the surface form existed.
 #
 # `Call`'s `method_style` is the one bit that says which spelling was written:
 # `recv.f(a)` is stored as the free call `f(recv, a)` with the flag set, so the
