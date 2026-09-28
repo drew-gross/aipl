@@ -489,6 +489,7 @@ pub mod ast {
             | Type::NoneInner
             | Type::EmptyArrayArg
             | Type::NoneLiteralArg
+            | Type::Unknown
             | Type::ConcatStr => false,
             Type::Any => true,
             Type::Array(inner)
@@ -985,6 +986,24 @@ pub mod ast {
         /// Monomorphization-only: like `EmptyArrayArg`, but for a bare `none`
         /// literal — substituted back to `Optional(NoneInner)`.
         NoneLiteralArg,
+        /// Checker-only: a type it cannot pin down — chiefly the result of a
+        /// generic call whose type variables this pass does not instantiate, and
+        /// what `subst_vars` yields for a variable nothing bound. It is a
+        /// *wildcard*: it coerces with anything in either direction, so the
+        /// checker stays permissive rather than reporting a mismatch it cannot
+        /// justify, and it renders as `_`.
+        ///
+        /// Deliberately not a [`Type::Named`] sentinel, which is what it was
+        /// (`__unknown__`) — for the reason given there and at
+        /// [`Type::TypeVar`]: a pseudo-type spelled as a name is one string
+        /// comparison away from a user type that happens to share the spelling,
+        /// and every pass that must not treat it as a struct has to remember to
+        /// ask. As a variant, `match` asks for it.
+        ///
+        /// Abstract, like [`Type::TypeVar`]: monomorphization resolves or
+        /// rejects it, so [`Type::to_concrete`] refuses it and codegen never
+        /// sees one.
+        Unknown,
         /// A `str` produced by `+`-concatenating two strings — distinguished
         /// from a plain `str` so codegen can specialize a lazy-concat
         /// representation for it (see [`crate::is_concat_str`]). Only meaningful as
@@ -1075,7 +1094,11 @@ pub mod ast {
         /// nonsense instance.
         pub fn to_concrete(&self) -> Option<ConcreteType> {
             Some(match self {
-                Type::TypeVar(_) | Type::Any | Type::Tuple(_) | Type::Generic(..) => return None,
+                Type::TypeVar(_)
+                | Type::Any
+                | Type::Unknown
+                | Type::Tuple(_)
+                | Type::Generic(..) => return None,
                 Type::Unit => ConcreteType::Unit,
                 Type::Primitive(p) => ConcreteType::Primitive(*p),
                 Type::Named(n) => ConcreteType::Named(n.clone()),
@@ -3050,6 +3073,9 @@ pub fn raw_type_name(t: &Type) -> String {
         // an `any` normalized to has no name to show, so it renders as `any`.
         Type::TypeVar(v) if v.is_empty() => "any".into(),
         Type::TypeVar(v) => v.clone(),
+        // A type the checker could not pin down has no spelling of its own; `_`
+        // is what a reader of a diagnostic should see in its place.
+        Type::Unknown => "_".into(),
         Type::Optional(inner) => format!("{}?", suffix_operand(inner, raw_type_name)),
         Type::Array(inner) => format!("{}[]", suffix_operand(inner, raw_type_name)),
         Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), raw_type_name(inner)),
@@ -3101,6 +3127,9 @@ pub fn type_name(t: &Type) -> String {
         // an `any` normalized to has no name to show, so it renders as `any`.
         Type::TypeVar(v) if v.is_empty() => "any".into(),
         Type::TypeVar(v) => v.clone(),
+        // A type the checker could not pin down has no spelling of its own; `_`
+        // is what a reader of a diagnostic should see in its place.
+        Type::Unknown => "_".into(),
         Type::Optional(inner) => format!("{}?", suffix_operand(inner, type_name)),
         Type::Array(inner) => format!("{}[]", suffix_operand(inner, type_name)),
         Type::Set(inner, o) => format!("#{}{{{}}}", o.spelling(), type_name(inner)),
@@ -3379,6 +3408,7 @@ fn promote_ty(ty: &mut ast::Type, vars: &[String]) {
         | T::NoneInner
         | T::EmptyArrayArg
         | T::NoneLiteralArg
+        | T::Unknown
         | T::ConcatStr => {}
         T::Optional(i) | T::Array(i) | T::Set(i, _) | T::Without(i, _) => promote_ty(i, vars),
         T::Dict(a, b) | T::Result(a, b) => {
@@ -3448,6 +3478,7 @@ pub fn erase_refinement_ty(t: &Type) -> Type {
         | T::NoneInner
         | T::EmptyArrayArg
         | T::NoneLiteralArg
+        | T::Unknown
         | T::ConcatStr => t.clone(),
         T::Case(v) => T::Case(Box::new(erase_refinement_ty(v))),
         T::Optional(i) => T::Optional(Box::new(erase_refinement_ty(i))),
@@ -3856,7 +3887,10 @@ pub fn mentions_typevar(t: &ast::Type) -> bool {
         | T::Named(_)
         | T::NoneInner
         | T::EmptyArrayArg
+        // Not a type parameter: a wildcard is what the checker reaches for when
+        // it *cannot* pin a type down, not a parameter waiting to be substituted.
         | T::NoneLiteralArg
+        | T::Unknown
         | T::ConcatStr => false,
     }
 }

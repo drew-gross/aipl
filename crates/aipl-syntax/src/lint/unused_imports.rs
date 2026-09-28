@@ -154,8 +154,9 @@ fn collect_ty_names(ty: &Type, out: &mut HashSet<String>) {
         // `Case<V>` mentions `V`, so importing a variant to name one of its
         // cases counts as using the import.
         Type::Case(v) => collect_ty_names(v, out),
-        // A type parameter is bound by the signature, not imported.
-        Type::TypeVar(_) => {}
+        // A type parameter is bound by the signature, not imported, and a
+        // wildcard names nothing at all.
+        Type::TypeVar(_) | Type::Unknown => {}
         Type::Generic(base, args) => {
             out.insert(base.clone());
             for a in args {

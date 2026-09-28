@@ -76,7 +76,6 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  Type::Named: __unknown__ should just be a separate arm, for less string matching
   template_inner should use sets better
   Matcher should use doc comments, also Delimited should use named args probably
   unordered set needs some way to convert to array

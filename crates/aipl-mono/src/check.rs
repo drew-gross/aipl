@@ -77,6 +77,14 @@ pub(crate) fn mangle_type(ty: &Type) -> String {
         | Type::ConcatStr => {
             panic!("Synthetic-type members cannot be a compiler pseudo-type")
         }
+        // Reachable, unlike the pseudo-types above: a generic tuple instantiated
+        // with a variable nothing pinned mangles its synthetic struct name
+        // through here (`tests/cases/tuples/generic_tuple.aipl` — measured with
+        // a `panic!` in this arm). So it keeps the spelling the old
+        // `Named("__unknown__")` sentinel mangled to, for the same reason
+        // `TypeVar` below keeps its own: an instance name generated before and
+        // after this split has to be the same name.
+        Type::Unknown => "__unknown__".into(),
         Type::Primitive(p) => p.name().into(),
         Type::Named(n) => n.replace(['$', '!'], "_"),
         // Spelled exactly as the old `Named("__typevar__$T")` sentinel mangled,
@@ -423,11 +431,11 @@ impl<'a> Cx<'a> {
     /// [`Cx::lock`] by node id, for a resolution reached without the `Expr` in
     /// hand — a generic constructor, whose whole call is what gets an instance.
     fn lock_node(&self, key: usize, ty: &Type) {
-        // `__unknown__` is the third shape that is not an answer, alongside a
+        // `Type::Unknown` is the third shape that is not an answer, alongside a
         // placeholder and a type variable: `subst_vars` produces it for a
         // variable nothing pinned, so a generic call whose argument is the only
-        // thing that could pin `T` would otherwise record `T[]` as `__unknown__[]`
-        // — worse than recording nothing, since codegen believes what it reads.
+        // thing that could pin `T` would otherwise record `T[]` as `_[]` — worse
+        // than recording nothing, since codegen believes what it reads.
         if mentions_placeholder(ty) || mentions_typevar(ty) || mentions_unknown(ty) {
             return;
         }
@@ -1577,7 +1585,7 @@ impl Cx<'_> {
         }
 
         // Generic bodies are checked abstractly: each type variable (a declared
-        // `<T>` or an anonymous `any`) is replaced by the permissive `__unknown__`
+        // `<T>` or an anonymous `any`) is replaced by the permissive `Type::Unknown`
         // wildcard, so the body's *structural* type rules are still enforced (you
         // can't return a `T[]` where `i64` is declared) while operations whose
         // validity depends on the concrete instantiation stay permissive. For a
@@ -1660,9 +1668,11 @@ impl Cx<'_> {
             // declared signature a user wrote — but `check_ty` also runs on
             // synthesized types (e.g. a struct field's inferred default), so
             // handle them permissively rather than asserting they can't occur.
-            Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg | Type::ConcatStr => {
-                Ok(())
-            }
+            Type::NoneInner
+            | Type::EmptyArrayArg
+            | Type::NoneLiteralArg
+            | Type::Unknown
+            | Type::ConcatStr => Ok(()),
             Type::Named(n) => {
                 let ok = n == "Error"
                     || self.has_struct(n)
@@ -1923,7 +1933,11 @@ impl Cx<'_> {
             // bare-`none`/empty-container marker are abstract scalars — always a
             // valid element.
             Type::TypeVar(_) => Ok(()),
-            Type::Any | Type::NoneInner | Type::EmptyArrayArg | Type::NoneLiteralArg => Ok(()),
+            Type::Any
+            | Type::NoneInner
+            | Type::EmptyArrayArg
+            | Type::NoneLiteralArg
+            | Type::Unknown => Ok(()),
             // A concat-str has the `str` runtime representation.
             Type::ConcatStr => Ok(()),
             // A refined element is its base laid out in the slot — `check_ty`
@@ -4283,7 +4297,7 @@ impl Cx<'_> {
         // only: an `any[]` parameter's element type varies per call and isn't
         // pinned here (codegen settles the concrete fit), so coercing against it
         // would be unsound. The result type is the substituted return type, with
-        // any still-unresolved variable left permissive (`__unknown__`).
+        // any still-unresolved variable left permissive (`Type::Unknown`).
         let vars: HashSet<&str> = sig.type_vars.iter().map(|tp| tp.name.as_str()).collect();
         let params = sig.param_types();
         let return_ty = sig.return_type();
@@ -4813,7 +4827,7 @@ impl Cx<'_> {
         rspan: Span,
     ) -> Result<Type, Error> {
         if is_unknown(lt) || is_unknown(rt) {
-            return Ok(unknown_ty());
+            return Ok(Type::Unknown);
         }
         if aipl_syntax::is_int_ty(lt) && lt == rt {
             return Ok(lt.clone());
@@ -4879,7 +4893,7 @@ impl Cx<'_> {
             // plain str. An unresolved generic result stays permissive.
             BinOp::Concat => {
                 if is_unknown(lt) || is_unknown(rt) {
-                    Ok(unknown_ty())
+                    Ok(Type::Unknown)
                 } else if (is_str_repr(lt) || is_char_array(lt))
                     && (is_str_repr(rt) || is_char_array(rt))
                 {
@@ -5018,13 +5032,6 @@ fn display(name: &str) -> &str {
 /// `__builtin_`, or the loader's per-file module prefix `__m<index>__` (added to
 /// every non-root file's top-level names). Neither can appear in a user-written
 /// identifier, so this only ever strips compiler-internal decoration.
-/// A type the checker can't pin down (e.g. a generic call's type-variable
-/// result that we don't instantiate here). It coerces with anything, so the
-/// checker stays permissive rather than reporting a false mismatch.
-fn unknown_ty() -> Type {
-    Type::Named("__unknown__".to_string())
-}
-
 /// Whether `aty` has the *shape* `pty` demands — its outermost type
 /// constructor, and nothing below it.
 ///
@@ -5050,7 +5057,7 @@ fn shape_fits(pty: &Type, aty: &Type) -> bool {
     }
     // Argument types that are not yet knowable: the abstract variable of an
     // enclosing generic body (which may well be an array once instantiated), the
-    // permissive `__unknown__`, an untyped `none`/`[]`, and an unresolved
+    // permissive `Type::Unknown`, an untyped `none`/`[]`, and an unresolved
     // generic application. Judging any of these here would reject programs that
     // are fine.
     if matches!(
@@ -5111,10 +5118,10 @@ fn shape_name(pty: &Type) -> &'static str {
 }
 
 fn is_unknown(t: &Type) -> bool {
-    matches!(t, Type::Named(n) if n == "__unknown__")
+    matches!(t, Type::Unknown)
 }
 
-/// An abstract type variable in a generic body. Unlike `__unknown__` it is *not*
+/// An abstract type variable in a generic body. Unlike `Type::Unknown` it is *not*
 /// a wildcard: it coerces only with itself, so the structural rules still bite
 /// (a `T` doesn't fit an `i64`, you can't `+`/`<`/`*` two `T`s — `T: any` makes
 /// no such promise) while `==`, container ops, binding, and `return T` work.
@@ -5197,9 +5204,15 @@ fn is_context_typed(t: &Type) -> bool {
         Type::Result(a, b) => is_context_typed(a) || is_context_typed(b),
         Type::Fn(ps, r) => ps.iter().any(is_context_typed) || is_context_typed(r),
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(is_context_typed),
-        Type::Unit | Type::Primitive(_) | Type::Named(_) | Type::TypeVar(_) | Type::ConcatStr => {
-            false
-        }
+        // Not *context*-typed: context is exactly what a wildcard has failed to
+        // supply, so there is nothing for a use site to decide. It answered
+        // `false` as a `Named` sentinel too.
+        Type::Unit
+        | Type::Primitive(_)
+        | Type::Named(_)
+        | Type::TypeVar(_)
+        | Type::Unknown
+        | Type::ConcatStr => false,
     }
 }
 
@@ -5241,7 +5254,7 @@ fn check_ordered_elem(
 
 fn mentions_unknown(t: &Type) -> bool {
     match t {
-        Type::Named(n) => n == "__unknown__",
+        Type::Unknown => true,
         Type::Case(v) => mentions_unknown(v),
         Type::Optional(i) | Type::Array(i) | Type::Set(i, _) | Type::Without(i, _) => {
             mentions_unknown(i)
@@ -5252,6 +5265,7 @@ fn mentions_unknown(t: &Type) -> bool {
         Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(mentions_unknown),
         Type::Unit
         | Type::Primitive(_)
+        | Type::Named(_)
         | Type::TypeVar(_)
         | Type::Any
         | Type::NoneInner
@@ -5279,13 +5293,14 @@ fn mentions_typevar(t: &Type) -> bool {
         | Type::NoneInner
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
+        | Type::Unknown
         | Type::ConcatStr => false,
     }
 }
 
 /// Valid element of an array literal: a scalar, `str`, a nested array, an
 /// optional (`T?[]`), or an (abstract) type variable — never a struct.
-/// `none`/`__unknown__` are accepted (they coerce). Used in body position.
+/// `none`/`Type::Unknown` are accepted (they coerce). Used in body position.
 fn is_valid_elem(t: &Type) -> bool {
     is_array_elem(t)
         || is_none_inner(t)
@@ -5314,6 +5329,7 @@ fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
         | Type::NoneInner
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
+        | Type::Unknown
         | Type::ConcatStr => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_typevars(inner, type_params))),
         Type::Without(base, x) => Type::Without(Box::new(subst_typevars(base, type_params)), *x),
@@ -5350,10 +5366,10 @@ fn subst_typevars(t: &Type, type_params: &[String]) -> Type {
 }
 
 /// Like `type_name`, but renders the checker's internal sentinels as human
-/// phrases instead of leaking them: the abstract `__typevar__` as "a type
-/// parameter", and the unresolved-generic `__unknown__` wildcard as `_`.
-/// Recurses so a sentinel nested in a function/array/optional type is rendered
-/// too (e.g. an inferred `(i64) -> _` from a partly-resolved generic).
+/// phrases instead of leaking them — chiefly a type variable as "a type
+/// parameter". Recurses so a sentinel nested in a function/array/optional type
+/// is rendered too (e.g. an inferred `(i64) -> _` from a partly-resolved
+/// generic, where `type_name` renders the unresolved part as `_`).
 fn tyname(t: &Type) -> String {
     match t {
         // The sentinel carries its variable's name (see `typevar_ty`); name it in
@@ -5366,7 +5382,6 @@ fn tyname(t: &Type) -> String {
         Type::Optional(inner) if is_typevar(inner) => "an optional type parameter".to_string(),
         Type::Array(inner) if is_typevar(inner) => "an array of a type parameter".to_string(),
         Type::Set(inner, _) if is_typevar(inner) => "a set of a type parameter".to_string(),
-        Type::Named(n) if n == "__unknown__" => "_".to_string(),
         // A builtin type (`Span`), a per-file name (`__m1__LexError`), or a
         // generic instance (`Token$AiplTok`) carries internal mangling — render
         // it back to source-like form for diagnostics.
@@ -5447,7 +5462,7 @@ fn nonempty_variadic_accepts(arg: &Type, seq: &Type) -> bool {
 }
 
 /// `actual` fits `expected`, applying the same `none`/empty-array coercions as
-/// codegen's `expect_type`. `__unknown__` (an unresolved generic result) fits
+/// codegen's `expect_type`. `Type::Unknown` (an unresolved generic result) fits
 /// anything.
 /// Whether `e` is a literal usable as an array-pattern element: a scalar/string
 /// literal, or a nested array literal of such. Restricting patterns to literals
@@ -5538,7 +5553,7 @@ pub(crate) fn coerce(actual: &Type, expected: &Type) -> Result<(), ()> {
         return Ok(());
     }
     // The same alias against a `T[]` whose element is still open — a type
-    // variable, or the `__unknown__` a generic call's expected type carries
+    // variable, or the `Type::Unknown` a generic call's expected type carries
     // for one not yet pinned: a `str` is the `char[]` that pins `T = char`
     // (`collect_var_bindings`), so it fits before the binding is made too.
     // `map_join`'s `f: (T) -> U[]` meets a `str`-valued `f` this way.
@@ -5824,14 +5839,14 @@ pub(crate) fn collect_var_bindings(
 }
 
 /// Substitute the type variables in `vars` within `t`: a bound variable becomes
-/// its inferred type, an *un*bound one becomes the permissive `__unknown__`
+/// its inferred type, an *un*bound one becomes the permissive `Type::Unknown`
 /// wildcard (so an only-partly-inferred signature still type-checks). Names not
 /// in `vars` (concrete types, anonymous `any`) are left as-is.
 fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Type {
     match t {
         Type::Case(v) => Type::Case(Box::new(subst_vars(v, map, vars))),
         Type::TypeVar(v) if vars.contains(v.as_str()) => {
-            map.get(v).cloned().unwrap_or_else(unknown_ty)
+            map.get(v).cloned().unwrap_or(Type::Unknown)
         }
         Type::Primitive(_)
         | Type::Named(_)
@@ -5841,6 +5856,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>, vars: &HashSet<&str>) -> Ty
         | Type::NoneInner
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
+        | Type::Unknown
         | Type::ConcatStr => t.clone(),
         Type::Array(inner) => Type::Array(Box::new(subst_vars(inner, map, vars))),
         Type::Without(base, x) => Type::Without(Box::new(subst_vars(base, map, vars)), *x),

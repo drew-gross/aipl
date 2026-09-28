@@ -669,6 +669,7 @@ fn ty_has_var(t: &Type) -> bool {
         | Type::NoneInner
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
+        | Type::Unknown
         | Type::ConcatStr => false,
     }
 }
@@ -724,6 +725,7 @@ fn lt_ty(
             Type::Named(name)
         }
         Type::TypeVar(v) => Type::TypeVar(v.clone()),
+        Type::Unknown => Type::Unknown,
         Type::Array(inner) => Type::Array(Box::new(lt_ty(inner, fields_map, order))),
         Type::Without(base, x) => Type::Without(Box::new(lt_ty(base, fields_map, order)), *x),
         Type::Set(inner, o) => Type::Set(Box::new(lt_ty(inner, fields_map, order)), *o),
@@ -1065,7 +1067,7 @@ fn subst_type_params(t: &Type, map: &HashMap<String, Type>) -> Type {
         // Only a *variable* substitutes. Keying this on `Named` meant a struct
         // that happened to share a template parameter's name was rewritten too.
         Type::TypeVar(n) => map.get(n).cloned().unwrap_or_else(|| t.clone()),
-        Type::Named(_) => t.clone(),
+        Type::Named(_) | Type::Unknown => t.clone(),
         Type::Optional(i) => Type::Optional(Box::new(subst_type_params(i, map))),
         Type::Array(i) => Type::Array(Box::new(subst_type_params(i, map))),
         Type::Without(b, x) => Type::Without(Box::new(subst_type_params(b, map)), *x),
@@ -8015,6 +8017,7 @@ fn normalize_param_ty(
         | Type::NoneInner
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
+        | Type::Unknown
         | Type::ConcatStr => Ok(t.clone()),
         Type::Optional(inner) => Ok(Type::Optional(Box::new(normalize_inner(
             inner, type_vars, counter,
@@ -8083,6 +8086,7 @@ fn normalize_inner(t: &Type, type_vars: &mut Vec<String>, counter: &mut usize) -
         | Type::NoneInner
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
+        | Type::Unknown
         | Type::ConcatStr => t.clone(),
         // The surface grammar can't nest deeper, but recurse defensively.
         Type::Optional(inner) => {
@@ -8247,6 +8251,7 @@ fn subst_vars(t: &Type, map: &HashMap<String, Type>) -> Type {
         | Type::NoneInner
         | Type::EmptyArrayArg
         | Type::NoneLiteralArg
+        | Type::Unknown
         | Type::ConcatStr => t.clone(),
         // A variable is what a substitution map is keyed by; an ordinary name
         // stands for itself however the map is populated.
@@ -8317,7 +8322,7 @@ fn ty_mentions(t: &Type, name: &str) -> bool {
         // Only a variable can *be* the name asked about; a struct called `T` is
         // not the type parameter `T`.
         Type::TypeVar(n) => n == name,
-        Type::Named(_) => false,
+        Type::Named(_) | Type::Unknown => false,
         Type::Optional(inner)
         | Type::Array(inner)
         | Type::Set(inner, _)
@@ -8344,7 +8349,7 @@ fn ty_contains_var(t: &Type, vars: &HashSet<&str>) -> bool {
         | Type::NoneLiteralArg
         | Type::ConcatStr => false,
         Type::TypeVar(v) => vars.contains(v.as_str()),
-        Type::Named(_) => false,
+        Type::Named(_) | Type::Unknown => false,
         Type::Optional(inner)
         | Type::Array(inner)
         | Type::Set(inner, _)
@@ -8940,6 +8945,10 @@ fn mentions_abstract_type(ty: &Type) -> bool {
         }
         Type::Fn(ps, r) => ps.iter().any(mentions_abstract_type) || mentions_abstract_type(r),
         Type::Tuple(ts) | Type::Generic(_, ts) => ts.iter().any(mentions_abstract_type),
+        // A type the checker could not pin down is abstract in exactly the sense
+        // this asks about: only monomorphization settles it, so a body carrying
+        // one is not safe to inline early.
+        Type::Unknown => true,
         // A type *variable* is abstract in the ordinary sense, but a generic
         // signature is already excluded by the candidate filter before this runs
         // (see the doc comment), so counting one here would change nothing but

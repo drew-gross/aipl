@@ -1182,6 +1182,7 @@ fn rewrite_type(t: &Type, view: &HashMap<String, String>, type_vars: &[TypeParam
         Type::NoneInner => Type::NoneInner,
         Type::EmptyArrayArg => Type::EmptyArrayArg,
         Type::NoneLiteralArg => Type::NoneLiteralArg,
+        Type::Unknown => Type::Unknown,
         Type::ConcatStr => Type::ConcatStr,
         // `Case<V>` names `V`, which resolves through the view like any other
         // type name — importing the variant is what puts its cases in scope.
