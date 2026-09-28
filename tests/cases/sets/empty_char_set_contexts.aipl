@@ -1,0 +1,128 @@
+import { equal as ==, len, print, union, value_or } from builtins;
+
+// An empty `#{}` is the shared empty *array* block until something gives it an
+// element type; a `#{char}` is the 256-bit inline bitfield instead. So a `#{}`
+// landing in a `#{char}` location has to become one *before* the store sizes
+// itself by the destination type — otherwise the 32-byte copy reads 24 bytes
+// past the 8-byte block, and the symptom moves when an unrelated literal
+// changes length.
+//
+// Deciding that is the checker's job: it resolves the literal against the
+// position (`flex_fit`) and records the answer on the node (`Cx::lock`), which
+// codegen reads back. Every position that can *be* the context has to record
+// it — a position that only type-checks the literal and discards the resolved
+// type leaves codegen guessing. This covers each one.
+
+struct Holder { cs: #{char} }
+
+variant Carrier = Payload(#{char}) | Nothing
+
+fn declared_return() -> #{char} { #{} }
+
+fn shorthand_field() -> Holder { cs: #{} }
+
+fn takes_set(s: #{char}) -> u64 { len(s) }
+
+fn takes_holder(h: Holder) -> u64 {
+    len(h.cs) #[allow]
+}
+
+fn main() !prints {
+    let populated: #{char} = #{'x', 'y', 'z'};
+    let annotated: #{char} = #{};
+    print(`annotated: {len(annotated)}`);
+    print(`declared return: {len(declared_return())}`);
+    print(`call argument: {takes_set(#{})}`);
+
+    // An assignment's place type. Unlocked this copied 32 bytes out of the
+    // 8-byte empty array block, so the "cleared" set kept a garbage member —
+    // and `== #{}` then agreed with it, because both sides were that block.
+    mut reassigned: #{char} = #{'a', 'b'};
+    set reassigned = #{};
+    print(`reassigned: {len(reassigned)}`);
+    print(`reassigned renders: {reassigned}`);
+
+    // A struct field — including through the fn-body shorthand, where the
+    // field is the only thing naming the position.
+    print(`struct field: {takes_holder(Holder { cs: #{} })}`);
+    print(`shorthand field: {len(shorthand_field().cs)}`);
+
+    // A variant payload.
+    let carried = match (Payload(#{})) {
+        Payload(c) => len(c),
+        Nothing => 999,
+    };
+    print(`variant payload: {carried}`);
+
+    // An array element, whose type comes from an earlier element.
+    let arr: #{char}[] = [#{'a'}, #{}];
+    print(`array element: {len(arr[1].value_or(#{'z'}))}`);
+
+    // A binary operand, where the other side is the only context — `flex_fit`
+    // flexes only a *non-empty* literal, so an empty one gets nothing from it.
+    print(`empty on the left: {#{} == populated}`);
+    print(`empty on the right: {reassigned == #{}}`);
+    print(`populated on the right: {populated == #{}}`);
+
+    // A generic builtin's argument, where the type variable is pinned by the
+    // *other* argument — so the receiver has no context until the whole
+    // substitution is known.
+    print(`empty receiver: {len(#{}.union(populated))}`);
+    print(`empty argument: {len(populated.union(#{}))}`);
+}
+--- stdout ---
+annotated: 0
+declared return: 0
+call argument: 0
+reassigned: 0
+reassigned renders: {}
+struct field: 0
+shorthand field: 0
+variant payload: 0
+array element: 0
+empty on the left: false
+empty on the right: true
+populated on the right: false
+empty receiver: 3
+empty argument: 3
+--- performance ---
+allocations: 29
+deallocations: 29
+reallocations: 0
+bytes allocated: 1578
+instructions executed: 1360
+binary size: 9680
+  code: 6328
+  data: 191
+  metadata: 3161
+functions:
+  __eq_set$char:
+    calls: 3
+    bytes: 84
+  __to_str_bool:
+    calls: 3
+    bytes: 232
+  __to_str_set$char:
+    calls: 1
+    bytes: 572
+  __to_str_u64:
+    calls: 10
+    bytes: 204
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_u64_len:
+    calls: 20
+    bytes: (external)
+  aipl_write_bytes:
+    calls: 5
+    bytes: (external)
+  aipl_write_u64:
+    calls: 10
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 5236

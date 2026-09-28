@@ -76,7 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  I think coerce_into_charset would be unnecessary if the type checking pass went before codegen and assigned types to all empty set literals
+  Type::Named: __unknown__ should just be a separate arm, for less string matching
   template_inner should use sets better
   Matcher should use doc comments, also Delimited should use named args probably
   unordered set needs some way to convert to array
@@ -359,8 +359,8 @@ format:
   exclude if expressions from being on same line as function it's result is passed to
 
 lint:
+  char set literals with 3+ elements should use "str".to_set()
   tok_span should be value_or, with a lint (but also should make sure inlining and code sinking doens't result in the argument being actually evaluated)
-  merge_runs should use out.push()
   template_segments should maybe accept str[] without []
   delimited_len can probably use without [] somehow or other
   lint that in an assert, when a value is compared directly against some(...)/ok(...), use ? instead (also support ? for optionals in tests)

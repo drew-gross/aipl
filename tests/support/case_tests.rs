@@ -578,6 +578,7 @@ case_tests! {
     cases_sets_as_sequence = "cases/sets/as_sequence",
     cases_sets_basic = "cases/sets/basic",
     cases_sets_elem_types = "cases/sets/elem_types",
+    cases_sets_empty_char_set_contexts = "cases/sets/empty_char_set_contexts",
     cases_sets_err_ordered_elem = "cases/sets/err_ordered_elem",
     cases_sets_err_ordered_mismatch = "cases/sets/err_ordered_mismatch",
     cases_sets_err_ordered_pairs = "cases/sets/err_ordered_pairs",

@@ -396,6 +396,19 @@ impl<'a> Cx<'a> {
     /// context-dependent shapes worth locking and `ty` is concrete enough to be
     /// worth recording. Idempotent; a conflicting second answer poisons the
     /// entry rather than picking one.
+    ///
+    /// **Every position that can be the context has to call this**, because for
+    /// some types the recorded type decides the *representation* and not just
+    /// the name: an empty `#{}` is the shared empty array block, but `#{char}`
+    /// is a 256-bit inline bitfield, and a store sized by the destination reads
+    /// 24 bytes past an 8-byte block.
+    ///
+    /// The tell is a position that computes the resolved type (`flex_int`) and
+    /// then spends it only on `expect`. Five did — a struct field initializer, a
+    /// constructor payload, an array literal element, an assignment's place, and
+    /// a generic call's argument once its type variables are pinned — and each
+    /// was a live miscompile for `#{char}` that codegen patched up per
+    /// destination kind, or (for `==`) did not patch up at all.
     fn lock(&self, e: &Expr, ty: &Type) {
         // A constructor reference is context-dependent in the same way a bare
         // `none` is: `Str` is the case where a `Case<V>` is wanted and the
@@ -410,7 +423,12 @@ impl<'a> Cx<'a> {
     /// [`Cx::lock`] by node id, for a resolution reached without the `Expr` in
     /// hand — a generic constructor, whose whole call is what gets an instance.
     fn lock_node(&self, key: usize, ty: &Type) {
-        if mentions_placeholder(ty) || mentions_typevar(ty) {
+        // `__unknown__` is the third shape that is not an answer, alongside a
+        // placeholder and a type variable: `subst_vars` produces it for a
+        // variable nothing pinned, so a generic call whose argument is the only
+        // thing that could pin `T` would otherwise record `T[]` as `__unknown__[]`
+        // — worse than recording nothing, since codegen believes what it reads.
+        if mentions_placeholder(ty) || mentions_typevar(ty) || mentions_unknown(ty) {
             return;
         }
         // Read out before the map is borrowed mutably: `same_answer` reaches
@@ -3170,6 +3188,9 @@ impl Cx<'_> {
                             )
                         })?;
                 }
+                // The place's type is this value's context, exactly as an
+                // annotated `let`'s is (see the `Let` arm's own lock).
+                self.lock(val, &expected);
                 let vt = self.check_expr(val, env, effects)?;
                 // A bare literal takes the binding's (or field's) int type.
                 let vt = self.flex_int(val, &vt, &expected)?;
@@ -3228,6 +3249,12 @@ impl Cx<'_> {
             ExprKind::ArrayLit(elems) => {
                 let mut elem_ty = Type::NoneInner;
                 for (i, e) in elems.iter().enumerate() {
+                    // The element type the first element established is every
+                    // later element's context — the only place a bare `none` or
+                    // an empty `#{}` at index 1+ learns what it is. Recording it
+                    // is what [`Cx::lock`] is for; on the first element there is
+                    // nothing to record yet and the placeholder is discarded.
+                    self.lock(e, &elem_ty);
                     let t = self.check_expr(e, env, effects)?;
                     if i == 0 {
                         elem_ty = t;
@@ -3438,6 +3465,9 @@ impl Cx<'_> {
                                 fi.value.span.clone(),
                             )
                         })?;
+                    // The field's declared type is this initializer's context,
+                    // exactly as a parameter type is an argument's (`check_arg`).
+                    self.lock(&fi.value, expected);
                     let vt = self.check_in_position(&fi.value, expected, env, effects)?;
                     let ctx = format!("struct {:?} field {:?}", display(name), fi.name);
                     // `start..end` desugars to a `__builtin_Span` construction, so
@@ -3823,6 +3853,10 @@ impl Cx<'_> {
                     ));
                 }
                 for (arg, pty) in args.iter().zip(&payload) {
+                    // The payload's declared type is this argument's context. A
+                    // constructor call is not routed through `check_arg`, so the
+                    // lock it does has to be repeated here.
+                    self.lock(arg, pty);
                     let at = self.check_in_position(arg, pty, env, effects)?;
                     let at = self.flex_int(arg, &at, pty)?;
                     expect(
@@ -3978,6 +4012,18 @@ impl Cx<'_> {
                 let lt2 = self.flex_int(&args[0], &lt, &rt)?;
                 self.lock(&args[0], &lt2);
                 self.lock(&args[1], &rt2);
+                // `flex_fit` only flexes a *non-empty* literal, so an empty one
+                // (`#{}`, `[]`) still carries its placeholder here and the other
+                // operand is its only context. For `#{char}` that is not just a
+                // vaguer type: unlocked, `#{} == cs` compared the empty array
+                // block against a bitfield, and two of them compared *equal* to
+                // each other — a right answer by accident, from garbage.
+                if mentions_placeholder(&lt2) {
+                    self.lock(&args[0], &rt2);
+                }
+                if mentions_placeholder(&rt2) {
+                    self.lock(&args[1], &lt2);
+                }
                 return self.check_binop(
                     op,
                     &lt2,
@@ -4306,6 +4352,26 @@ impl Cx<'_> {
                 let seq = subst_vars(&p.ty, &map, &vars);
                 self.check_variadic_arg(&atys[i], p.arity, &seq, name, i, arg.span.clone())?;
             }
+        }
+        // Every type variable a non-function argument could pin is bound by now,
+        // so the substituted parameter type is finally that argument's context —
+        // the only thing able to tell a bare `none` or an empty `#{}` what it is.
+        // Pass 1 cannot do this: `#{}.union(cs)` learns `T = char` from the
+        // *second* argument, so the receiver's context does not exist until the
+        // whole map does. A parameter still open substitutes to something
+        // [`Cx::lock_node`] discards, so an unpinned variable records nothing.
+        for (i, (arg, pty)) in args.iter().zip(&params).enumerate() {
+            // A variadic parameter is exempt for the reason pass 1 gives: its
+            // stored type is the *sequence* the body sees (`T[]`, or `str` for
+            // chars), while the call site may equally pass one bare `T` or a
+            // `T?`. Locking `none` against `T[]` there would record a type the
+            // argument does not have, and codegen would compile the sequence.
+            if matches!(pty, Type::Fn(_, _))
+                || sig.params.get(i).is_some_and(|p| p.arity.is_variadic())
+            {
+                continue;
+            }
+            self.lock(arg, &subst_vars(pty, &map, &vars));
         }
         // Pass 2: function-typed arguments — check against the substituted type.
         for (i, (arg, pty)) in args.iter().zip(&params).enumerate() {
@@ -5171,6 +5237,28 @@ fn check_ordered_elem(
          be an integer, char, or str, got {}",
         tyname(inner)
     )))
+}
+
+fn mentions_unknown(t: &Type) -> bool {
+    match t {
+        Type::Named(n) => n == "__unknown__",
+        Type::Case(v) => mentions_unknown(v),
+        Type::Optional(i) | Type::Array(i) | Type::Set(i, _) | Type::Without(i, _) => {
+            mentions_unknown(i)
+        }
+        Type::Dict(k, v) => mentions_unknown(k) || mentions_unknown(v),
+        Type::Result(a, b) => mentions_unknown(a) || mentions_unknown(b),
+        Type::Fn(ps, r) => ps.iter().any(mentions_unknown) || mentions_unknown(r),
+        Type::Tuple(es) | Type::Generic(_, es) => es.iter().any(mentions_unknown),
+        Type::Unit
+        | Type::Primitive(_)
+        | Type::TypeVar(_)
+        | Type::Any
+        | Type::NoneInner
+        | Type::EmptyArrayArg
+        | Type::NoneLiteralArg
+        | Type::ConcatStr => false,
+    }
 }
 
 fn mentions_typevar(t: &Type) -> bool {
