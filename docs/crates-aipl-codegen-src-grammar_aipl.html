@@ -173,20 +173,6 @@
 
 
 
-        <section class="item" id="item-aipl_node_spans">
-          <h3>
-            <a class="anchor" href="#item-aipl_node_spans">aipl_node_spans</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn aipl_node_spans(src: str) -&#62; u64[]!ParseError</code></pre>
-
-          <div class="doc"><p>Every interior node's *token* span, flattened to <code>[start, end, start, end, ..]</code> — the tree's *shape* as data, which is what tells <code>a + b * c</code>'s grouping apart from any other without writing a renderer and reading its output.</p><p>Token spans, not <code>span</code>: trivia attaches in front of the token that follows it, so a node's plain span reaches back over the whitespace before it, and two nodes with the same extent would differ by their leading whitespace (see <code>token_span</code>).</p><p>Flat pairs rather than a nested shape because this crosses the FFI, where an array of numbers is the cheapest thing to marshal. A node holding no token contributes nothing — it has no span to report.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-aipl_program">
           <h3>
             <a class="anchor" href="#item-aipl_program">aipl_program</a>
@@ -1950,7 +1936,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$122038: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$122021: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

@@ -2,21 +2,21 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
-; entry parse_test_section_header 464 str -> str?
-; entry strip_test_sections 505 str -> str
-; entry split_test_sections 504 str -> __tuple$str$str
+; entry parse_test_section_header 463 str -> str?
+; entry strip_test_sections 504 str -> str
+; entry split_test_sections 503 str -> __tuple$str$str
 ; entry assert_loc 60 str __builtin_Span -> str
 ; entry caret_block 67 str __builtin_Span str -> str
 ; entry fill_or_add_sections_file 148 str __m13__Fill[] -> unit!Error
-; entry normalize_output 436 str -> str
-; entry int_fits 371 i64 str -> bool
-; entry is_operator_name 372 str -> bool
-; entry lex_aipl 404 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
-; entry lex_aipl_stripped 406 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry normalize_output 435 str -> str
+; entry int_fits 370 i64 str -> bool
+; entry is_operator_name 371 str -> bool
+; entry lex_aipl 403 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry lex_aipl_stripped 405 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
 ; entry find_files 149 str str -> str[]!Error
 ; entry companion_files 69 str -> __m25__Companion[]!str
-; entry parse_spec 461 str -> __m26__Spec!str
-; entry aipl_parse_file 332 str -> __m27__ParsedFile!__m39__ParseError
+; entry parse_spec 460 str -> __m26__Spec!str
+; entry aipl_parse_file 331 str -> __m27__ParsedFile!__m39__ParseError
 ; entry format_source 173 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
@@ -319,4 +319,4 @@
 ; data 195 __tostr_lit_101 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m10__assert_loc
-; source-fingerprint 13985881477665637285
+; source-fingerprint 15803165721151054475
