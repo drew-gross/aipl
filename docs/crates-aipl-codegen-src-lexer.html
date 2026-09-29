@@ -141,25 +141,35 @@
 
             <li id="item-Bare"><code>Bare(K)</code>
 
+              <div class="doc"><p>A finished kind for a valueless token: punctuation, an operator.</p></div>
+
 
             </li>
 
             <li id="item-Of"><code>Of((str) -&#62; K)</code>
+
+              <div class="doc"><p>Applies a constructor to the token's content string.</p></div>
 
 
             </li>
 
             <li id="item-OfSeg"><code>OfSeg((str, Seg) -&#62; K)</code>
 
+              <div class="doc"><p>For a <code>Template</code> rule: applied to each segment's text and its position, so one rule can produce a different kind per position.</p></div>
+
 
             </li>
 
             <li id="item-Try"><code>Try((str) -&#62; K!str)</code>
 
+              <div class="doc"><p><code>Of</code>'s fallible sibling: the function returns <code>K!str</code> — a kind, or an error *message*. Interpreting a match can fail (a numeric literal that overflows i64, a single-quoted string that isn't exactly one char), and on <code>err(msg)</code> the library pairs the message with the token's whole span to build a <code>LexError</code> (see <code>apply_emit</code>). The token span is the right location for a whole-token verdict like overflow; a matcher-level, byte-precise error (an unterminated string, an unknown escape) still comes from scanning, not the emit.</p></div>
+
 
             </li>
 
             <li id="item-TrySeg"><code>TrySeg((str, Seg) -&#62; K!str)</code>
+
+              <div class="doc"><p><code>OfSeg</code>'s fallible sibling, on the same terms.</p></div>
 
 
             </li>
@@ -198,60 +208,84 @@
 
             <li id="item-CharRun"><code>CharRun(cont: #{char}, first: #{char} = cont)</code>
 
+              <div class="doc"><p>A maximal run of chars in <code>cont</code>. <code>first</code> restricts what may *open* the run and defaults to <code>cont</code>, so the usual shape — one class for the whole token — is a single argument (<code>CharRun(digits)</code>, and whitespace runs), and only a narrower opener is worth naming (<code>CharRun(alnum, first = alpha)</code>: an identifier may not start with a digit).</p></div>
+
 
             </li>
 
             <li id="item-OneChar"><code>OneChar(#{char})</code>
+
+              <div class="doc"><p>Exactly one char, any of <code>chars</code>. Single-character punctuation, where one rule stands for a whole class of one-char tokens (<code>OneChar(&quot;()[],;&quot;)</code>) instead of an <code>Exact</code> rule apiece. It is the direct concept a <code>CharRun</code> cannot state: a run needs something to continue with, so &quot;exactly one&quot; would have to be spelled as a run that can never extend.</p></div>
 
 
             </li>
 
             <li id="item-Exact"><code>Exact(str)</code>
 
+              <div class="doc"><p>The given spelling, verbatim. Punctuation and operators — one spelling per rule; when spellings share a prefix, order the rules longest first (<code>==</code> before <code>=</code>), since rule order is the priority mechanism (a single rule matching a set, with its own longest-wins, would duplicate that ordering as a second mechanism).</p></div>
+
 
             </li>
 
             <li id="item-Keyword"><code>Keyword(str, #{char})</code>
+
+              <div class="doc"><p>Like <code>Exact</code>, but the spelling only matches when the char after it is absent or outside <code>boundary</code> (the identifier continue class) — so a keyword rule placed before the identifier rule claims <code>if</code> without biting the front off <code>iffy</code>. One spelling per rule, as with <code>Exact</code>; a shared prefix (<code>in</code>/<code>int</code>) is resolved by the boundary check, not rule order, so order among keyword rules doesn't matter.</p></div>
 
 
             </li>
 
             <li id="item-Delimited"><code>Delimited(#{char}, escaped: #{char} = #{})</code>
 
+              <div class="doc"><p>A char in <code>delims</code> opens the token, which runs to just past the next occurrence of the *same* char. <code>escapes</code> is the set of chars that may follow a backslash inside the token: <code>\</code> plus an allowed char is content (in particular an escaped delimiter does not close), <code>\</code> plus anything else is a lex error, and <code>#{}</code> turns escape handling off entirely (a backslash is ordinary content). A token still open at the end of the source is a lex error. String literals. <code>escapes</code> governs *scanning* only — the token's value is the delimiter-stripped text left *un-decoded*, so the rule's <code>emit</code> decides what escapes mean, with its own decoder (the library provides none — escape semantics are the language's).</p></div>
+
 
             </li>
 
             <li id="item-Between"><code>Between(str, str)</code>
+
+              <div class="doc"><p>The <code>open</code> spelling opens the token, which runs to just past the next *full* occurrence of the <code>close</code> spelling. Unlike <code>Delimited</code>, open and close are multi-char and may differ, and the scan matches the whole <code>close</code> — so a partial close inside (a lone <code>&quot;</code> or <code>&quot;&quot;</code> under a <code>&quot;&quot;&quot;</code> close) is ordinary content. Contents are verbatim (no escape processing), which is what raw strings <code>&quot;&quot;&quot;...&quot;&quot;&quot;</code> and non-nesting block comments <code>/* ... */</code> want. Both spellings must be non-empty. A token still open at the end of the source is a lex error.</p></div>
 
 
             </li>
 
             <li id="item-Nested"><code>Nested(str, str)</code>
 
+              <div class="doc"><p>Like <code>Between</code>, but depth-tracked — each further <code>open</code> inside raises the nesting depth and the matching <code>close</code> lowers it, so the token ends only at the <code>close</code> that balances the outermost <code>open</code>. Rust-style nesting block comments <code>/* ... /* ... */ ... */</code>. <code>open</code> and <code>close</code> must be distinct (a delimiter can't both open and close a level) and non-empty. A token still open (depth &gt; 0) at the end of the source is a lex error.</p></div>
+
 
             </li>
 
             <li id="item-Template"><code>Template(str, #{char}, (str[]) -&#62; str[])</code>
+
+              <div class="doc"><p>A template literal — text with <code>{expr}</code> interpolations. The <code>delim</code> spelling opens and closes the literal; it may be multi-char and scans like <code>Between</code> (a lone backtick under a triple-backtick delim is content). Text segments follow <code>escapes</code> as in <code>Delimited</code> (an escaped delim doesn't close, <code>#{}</code> turns escapes off — the verbatim raw-template shape) — except that <code>\{</code> and <code>\}</code> are every template's own: the braces are the template's syntax, so escaping one is the template's business rather than the escape set's. <code>\{</code> is content that doesn't interpolate and <code>\}</code> is content, whatever <code>escapes</code> says, and a raw template with every other backslash verbatim still has a way to write a brace. (The emit decodes them; see <code>unescape_braces</code>.) A <code>{</code> in text opens an interpolation, lexed by the full rule set until the balancing <code>}</code> — so skip rules and nested template rules apply inside — with brace depth tracked and the closing <code>}</code> consumed without a token. <code>finalize</code> is a <code>(str[]) -&gt; str[]</code> the caller supplies to post-process a literal's text segments *as a group* before they're emitted (it must return one text per input segment) — for a transform that needs the whole literal, like de-denting a raw template's shared indent; pass an identity for none. The emitted kinds are context-dependent, derived from the rule's kind K: a literal with no interpolations is one K token; otherwise K_head (the open delim through the first <code>{</code>), each interpolation's tokens under their own rules' kinds, K_middle for each segment between interpolations, and K_tail (through the closing delim). The <code>skip</code> flag is ignored — a template always produces tokens.</p></div>
 
 
             </li>
 
             <li id="item-ToEol"><code>ToEol(str)</code>
 
+              <div class="doc"><p>The <code>marker</code> spelling, then everything up to (not including) the next newline. Line comments — usually <code>skip: true</code>.</p></div>
+
 
             </li>
 
             <li id="item-ToEolUnless"><code>ToEolUnless(marker: str, blocked: #{char})</code>
+
+              <div class="doc"><p><code>marker</code>, then everything up to (not including) the next newline — but only when the character right after <code>marker</code> is *not* in <code>blocked</code>. Line comments whose marker is also the start of something else: AIPL's <code>#</code> leads a doc comment, and also a set/dict literal (<code>#{..}</code>), an ordered set (<code>#&gt;{..}</code> / <code>#&lt;{..}</code>) and the <code>#[allow]</code> lint marker, so <code>ToEolUnless(&quot;#&quot;, &quot;{[&lt;&gt;&quot;)</code> claims the comment and leaves the others to the rules that want them.</p><p>The marker alone at end of line still matches — an empty doc line has no following character to block it, and writing one as <code>marker</code> plus a space is not open to a language that forbids trailing whitespace.</p></div>
 
 
             </li>
 
             <li id="item-Float"><code>Float</code>
 
+              <div class="doc"><p>A digit run that extends past a fraction (<code>.</code> plus at least one digit) and/or an exponent (<code>e</code>/<code>E</code>, an optional sign, at least one digit), JSON style. A bare digit run does *not* match — put a <code>Float</code> rule ahead of the int rule and each number lexes as the right one.</p></div>
+
 
             </li>
 
             <li id="item-Int"><code>Int</code>
+
+              <div class="doc"><p>A decimal digit run with an *optional* leading <code>-</code> — a distinct matcher because a number is not an identifier, but (like <code>Float</code>) it carries no computed value: its text is left *unparsed*, so the rule pairs it with an <code>Of</code>/<code>Try</code> emit that parses the digits (and any sign) itself (via the <code>int_parse</code> builtin, or its own scanner). Parsing — base, digit separators, and what overflow means — is the caller's, not the library's. The <code>-</code> is consumed only when a digit *immediately* follows it, so <code>- 5</code>/<code>-x</code> (a space or a letter after the <code>-</code>) don't match and are left for a <code>-</code> operator rule. Rule order alone then decides the reading: <code>Int</code> before a <code>-</code> operator makes <code>-5</code> a signed literal (and <code>a - 5</code> still subtraction, since the <code>- 5</code> there has a space); the operator before <code>Int</code> makes every <code>-</code> the operator and <code>Int</code> unsigned. Scanning the sign *into* the token is also what lets the emit reach the full signed range — an i64's <code>-9223372036854775808</code> overflows as a positive literal, so it's only expressible with the <code>-</code> and digits together.</p></div>
 
 
             </li>
@@ -668,7 +702,7 @@
             <a class="anchor" href="#item-apply_emit">apply_emit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31920: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
+          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31805: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
 
           <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its content string — the matcher-computed <code>value</code> (a delimited string, stripped) when there is one, else the raw matched <code>text</code>. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
 

@@ -81,7 +81,6 @@ misc cleanup:
   remove PARSER_LIBRARY.md references since that project is complete
   get rid of convention of using 0..0 span as a substitute for none
   Fill[] should probably be a dict
-  Matcher should use doc comments
   unordered set needs some way to convert to array
   class_meta should be a const set
   dedent_segments should be able to do better than a join/split. Maybe a process raw string segments?
