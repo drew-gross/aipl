@@ -676,6 +676,22 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
         trivia: [atok(src, LineComment, 12..19)],
     });
 
+    // The trivia side-channel carries every comment and `#[allow]` marker, in
+    // source order, and keeps them out of the token stream; whitespace appears
+    // in neither. Ported from the Rust `dogfood_lex_hook_returns_trivia` — the
+    // production hook's agreement with *this* source is what
+    // `dogfood_lex_hook_matches_fresh_compile_on_corpus` checks, so the claim
+    // belongs beside the rules that make it true.
+    let mixed = "x // c\n#[allow] /* b */ y";
+    assert(lex_aipl(mixed)? == LexResult {
+        tokens: [atok(mixed, Name("x"), 0..1), atok(mixed, Name("y"), 24..25)],
+        trivia: [
+            atok(mixed, LineComment, 2..6),
+            atok(mixed, AllowMarker, 7..15),
+            atok(mixed, BlockComment, 16..23),
+        ],
+    });
+
     // Keywords beyond the starter set. `builtins` is a keyword everywhere (as in
     // the Rust lexer), not just in a `from builtins;` import; `iffy` still lexes
     // as a `Name`, since the `Keyword` matcher stops at an identifier boundary.
@@ -938,30 +954,30 @@ pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
     });
 })
 --- performance ---
-allocations: 369
-deallocations: 369
-reallocations: 75
-bytes allocated: 504888
-instructions executed: 1994710
-binary size: 429144
-  code: 303616
-  data: 10268
-  metadata: 115260
+allocations: 382
+deallocations: 382
+reallocations: 78
+bytes allocated: 522584
+instructions executed: 2045613
+binary size: 453280
+  code: 319408
+  data: 10628
+  metadata: 123244
 functions:
   __arr_drop___m1__ModeFrame:
     calls: 14
     bytes: 120
   __arr_drop___m1__Token$AiplTok:
-    calls: 169
+    calls: 178
     bytes: 248
   __arr_drop___m1__TokenRule$AiplTok:
-    calls: 29
+    calls: 30
     bytes: 536
   __arr_retain___m1__ModeFrame:
     calls: 13
     bytes: 120
   __arr_retain___m1__Token$AiplTok:
-    calls: 90
+    calls: 95
     bytes: 248
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
@@ -973,7 +989,7 @@ functions:
     calls: 14
     bytes: 324
   __builtin_count_while$char$lam$__m1__lex_step$AiplTok$lambda1:
-    calls: 56
+    calls: 62
     bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 5
@@ -985,7 +1001,7 @@ functions:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$__m1__to_eol_len$lambda0$tail:
-    calls: 7
+    calls: 8
     bytes: 356
   __builtin_count_while$char$s0$lam$__m4__dedent$lambda1:
     calls: 0
@@ -1000,31 +1016,31 @@ functions:
     calls: 6
     bytes: 140
   __ctor$AiplTok$Name:
-    calls: 18
+    calls: 20
     bytes: 104
   __eq_AiplTok:
-    calls: 77
+    calls: 82
     bytes: 416
   __eq_StrStyle:
     calls: 8
     bytes: 64
   __eq___builtin_Span:
-    calls: 82
+    calls: 87
     bytes: 104
   __eq___m1__LexError:
     calls: 5
     bytes: 128
   __eq___m1__LexResult$AiplTok:
-    calls: 22
+    calls: 23
     bytes: 120
   __eq___m1__SpanStr:
-    calls: 77
+    calls: 82
     bytes: 128
   __eq___m1__Token$AiplTok:
-    calls: 77
+    calls: 82
     bytes: 120
   __eq___m1__Token$AiplTok$arr:
-    calls: 45
+    calls: 47
     bytes: 284
   __eq_str$arr:
     calls: 7
@@ -1042,25 +1058,25 @@ functions:
     calls: 0
     bytes: 824
   __m1__lex$AiplTok:
-    calls: 29
+    calls: 30
     bytes: 3552
   __m1__lex_step$AiplTok:
-    calls: 133
+    calls: 142
     bytes: 20308
   __m1__nested_len:
-    calls: 81
+    calls: 85
     bytes: 1148
   __m1__step_result$AiplTok:
-    calls: 3225
+    calls: 3294
     bytes: 8324
   __m1__to_eol_len:
     calls: 0
     bytes: 52
   __m1__to_eol_len$tail:
-    calls: 161
+    calls: 168
     bytes: 268
   __m1__to_eol_unless_len:
-    calls: 78
+    calls: 80
     bytes: 360
   __m1__up_to_any_len:
     calls: 6
@@ -1091,7 +1107,7 @@ functions:
     bytes: 1964
   __test$lex_aipl:
     calls: 1
-    bytes: 135260
+    bytes: 151052
   __test$lex_aipl_stripped:
     calls: 1
     bytes: 4928
@@ -1114,34 +1130,34 @@ functions:
     calls: 6
     bytes: (external)
   aipl_arr_extend:
-    calls: 256
+    calls: 274
     bytes: (external)
   aipl_arr_inc:
-    calls: 21850
+    calls: 22338
     bytes: (external)
   aipl_arr_reserve:
-    calls: 271
+    calls: 289
     bytes: (external)
   aipl_arr_slice:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 30005
+    calls: 30647
     bytes: (external)
   aipl_array_new:
-    calls: 231
+    calls: 241
     bytes: (external)
   aipl_array_push_mut:
     calls: 35
     bytes: (external)
   aipl_array_with_cap:
-    calls: 39
+    calls: 40
     bytes: (external)
   aipl_assert:
-    calls: 53
+    calls: 54
     bytes: (external)
   aipl_rules:
-    calls: 29
+    calls: 30
     bytes: 88776
   aipl_rules$lambda0:
     calls: 0

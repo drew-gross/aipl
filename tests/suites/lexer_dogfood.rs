@@ -5,8 +5,12 @@
 //! guards the lexer against itself: [`dogfood_lex_hook_matches_fresh_compile_on_corpus`]
 //! checks that the production path (the checked-in `dogfood.clif` through the
 //! installed hook) agrees with a fresh compile of the working-tree lexer source
-//! over the whole corpus, and [`dogfood_lex_hook_returns_trivia`] checks the
-//! trivia side-channel.
+//! over the whole corpus.
+//!
+//! What the *lexer* produces for a given source is asserted in AIPL, in
+//! `lex_aipl.aipl`'s own `.test` block — including the trivia side-channel. This
+//! file only has to show that the production path agrees with that source; the
+//! behaviour itself belongs next to the rules.
 //!
 //! The corpus comparison is at *category + span* granularity (keyword / ident /
 //! number / str / char / constant / operator / punct); `categorize` maps each
@@ -257,35 +261,4 @@ fn dogfood_lex_hook_matches_fresh_compile_on_corpus() {
             );
         }
     });
-}
-
-/// The hook's trivia side-channel carries comments and `#[allow]` markers (in
-/// source order) and keeps them out of the token stream; whitespace appears in
-/// neither.
-#[test]
-fn dogfood_lex_hook_returns_trivia() {
-    use aipl::LexedTokenKind as K;
-    aipl::install_parser_hooks();
-    let out = aipl::lex_aipl("x // c\n#[allow] /* b */ y").expect("lexes clean");
-    assert_eq!(
-        out.tokens
-            .iter()
-            .map(|t| (t.kind.clone(), t.span.clone()))
-            .collect::<Vec<_>>(),
-        vec![
-            (K::Name("x".to_string()), 0..1),
-            (K::Name("y".to_string()), 24..25),
-        ],
-    );
-    assert_eq!(
-        out.trivia
-            .iter()
-            .map(|t| (t.kind.clone(), t.span.clone()))
-            .collect::<Vec<_>>(),
-        vec![
-            (K::LineComment, 2..6),
-            (K::AllowMarker, 7..15),
-            (K::BlockComment, 16..23),
-        ],
-    );
 }
