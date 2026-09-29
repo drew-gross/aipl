@@ -590,7 +590,7 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
     };
     let lex_src = "let x = 42; // note";
     let lexed = comp
-        .call_values("lex_aipl", &[FfiValue::Str(lex_src.to_string())])
+        .call_values("lex_aipl_stripped", &[FfiValue::Str(lex_src.to_string())])
         .unwrap();
     assert_eq!(
         lexed,
@@ -613,7 +613,7 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
     );
     // A byte no rule matches is a hard `LexError` with its span.
     let lex_err = comp
-        .call_values("lex_aipl", &[FfiValue::Str("@".to_string())])
+        .call_values("lex_aipl_stripped", &[FfiValue::Str("@".to_string())])
         .unwrap();
     assert_eq!(
         lex_err,

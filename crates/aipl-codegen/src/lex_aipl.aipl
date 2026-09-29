@@ -959,10 +959,10 @@ deallocations: 382
 reallocations: 78
 bytes allocated: 522584
 instructions executed: 2045613
-binary size: 453280
-  code: 319408
+binary size: 453080
+  code: 319264
   data: 10628
-  metadata: 123244
+  metadata: 123188
 functions:
   __arr_drop___m1__ModeFrame:
     calls: 14
@@ -1192,9 +1192,6 @@ functions:
   int_lit:
     calls: 5
     bytes: 624
-  lex_aipl:
-    calls: 0
-    bytes: 144
   lex_aipl_tokens:
     calls: 2
     bytes: 348

@@ -3041,7 +3041,6 @@ pub const DOGFOOD_ENTRIES: &[&str] = &[
     "normalize_output",
     "int_fits",
     "is_operator_name",
-    "lex_aipl",
     "lex_aipl_stripped",
     "find_files",
     "companion_files",
@@ -3624,8 +3623,8 @@ fn is_operator_name(s: &str) -> bool {
 /// the parser's [`aipl_parser::LexedOutput`] arm-for-arm, and a `LexError`
 /// into [`aipl_parser::LexedError`]. One FFI crossing per source, not one per
 /// token. No native fallback; panics if the engine can't be built or called,
-/// or if a marshaled shape doesn't match `lex_aipl.aipl`'s types. Shared by
-/// the raw ([`lex_aipl`]) and section-stripping ([`lex_aipl_stripped`]) hooks.
+/// or if a marshaled shape doesn't match `lex_aipl.aipl`'s types. Used by the
+/// one lexer hook, [`lex_aipl_stripped`].
 fn marshal_lex(
     entry: &str,
     src: &str,
@@ -3862,13 +3861,6 @@ fn marshal_lex(
     )
 }
 
-/// The parser's raw lexer hook (see [`install_parser_hooks`]): lex `src`
-/// as-is through the dogfooded AIPL `lex_aipl`. Used by the formatter, which
-/// accounts for every byte and must not strip test sections.
-fn lex_aipl(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser::LexedError> {
-    marshal_lex("lex_aipl", src)
-}
-
 /// The parser's section-stripping lexer hook (see [`install_parser_hooks`]):
 /// strip trailing `--- section ---` cases-harness blocks, then lex — through
 /// the dogfooded AIPL `lex_aipl_stripped`, which composes both dogfooded steps
@@ -3884,8 +3876,9 @@ fn lex_aipl_stripped(src: &str) -> Result<aipl_parser::LexedOutput, aipl_parser:
 /// assertion-location formatter at [`assert_loc`], the error-renderer's
 /// caret-block formatter at [`caret_block`], the checker's flexible-literal
 /// range check at [`int_fits`], the loader's operator-import gate at
-/// [`is_operator_name`], and the lexer at [`lex_aipl`] (which de-dents `"""` raw
-/// strings itself, in its emit, so there is no separate raw-string hook).
+/// [`is_operator_name`], and the lexer at [`lex_aipl_stripped`] (which de-dents
+/// `"""` raw strings itself, in its emit, so there is no separate raw-string
+/// hook).
 /// (The formatter needs no hook: it is dogfooded end to end through
 /// [`format_source`], and its printer imports `reindent_block.aipl` directly.)
 /// Idempotent (first install wins). The compiler's entry points (the CLI and the
@@ -3899,7 +3892,6 @@ pub fn install_parser_hooks() {
     aipl_parser::set_companion_files_hook(companion_files);
     aipl_parser::set_parse_hook(parse_file);
     aipl_parser::set_assert_loc_hook(assert_loc);
-    aipl_parser::set_lex_hook(lex_aipl);
     aipl_parser::set_lex_stripped_hook(lex_aipl_stripped);
     aipl_syntax::set_caret_block_hook(caret_block);
     aipl_syntax::set_int_fits_hook(int_fits);

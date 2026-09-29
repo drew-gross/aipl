@@ -11,7 +11,6 @@
 ; entry normalize_output 442 str -> str
 ; entry int_fits 381 i64 str -> bool
 ; entry is_operator_name 382 str -> bool
-; entry lex_aipl 413 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
 ; entry lex_aipl_stripped 415 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
 ; entry find_files 150 str str -> str[]!Error
 ; entry companion_files 70 str -> __m25__Companion[]!str
@@ -312,4 +311,4 @@
 ; data 187 __tostr_lit_94 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m10__assert_loc
-; source-fingerprint 9496476068527620900
+; source-fingerprint 12108059770148222570

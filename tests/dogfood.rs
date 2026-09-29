@@ -5,7 +5,5 @@
 mod dogfood_ir;
 #[path = "suites/ffi.rs"]
 mod ffi;
-#[path = "suites/lexer_dogfood.rs"]
-mod lexer_dogfood;
 #[path = "suites/parser_dogfood.rs"]
 mod parser_dogfood;

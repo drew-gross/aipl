@@ -76,6 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  Remove need for NameSpans by storing a SpanStr on Item arms (replacing name)
   Tpl and Tok should not be abbreviated
   re_escape_set should use a map of some sort probably
   delimited should use a char set

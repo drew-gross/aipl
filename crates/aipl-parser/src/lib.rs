@@ -153,36 +153,15 @@ pub struct LexedError {
     pub span: Span,
 }
 
-/// The dogfooded lexer, installed by the compiler (via [`set_lex_hook`]).
-static LEX_HOOK: std::sync::OnceLock<fn(&str) -> Result<LexedOutput, LexedError>> =
-    std::sync::OnceLock::new();
-
 /// The dogfooded strip-then-lex lexer, installed via [`set_lex_stripped_hook`].
 static LEX_STRIPPED_HOOK: std::sync::OnceLock<fn(&str) -> Result<LexedOutput, LexedError>> =
     std::sync::OnceLock::new();
-
-/// Install the raw lexer hook. The compiler points this at the dogfooded AIPL
-/// `lex_aipl`, run through the embedding FFI. First install wins (the hook is
-/// process-global).
-pub fn set_lex_hook(f: fn(&str) -> Result<LexedOutput, LexedError>) {
-    let _ = LEX_HOOK.set(f);
-}
 
 /// Install the strip-then-lex hook. The compiler points this at the dogfooded
 /// AIPL `lex_aipl_stripped` (which strips trailing `--- section ---` blocks
 /// then lexes, both dogfooded steps in one FFI crossing). First install wins.
 pub fn set_lex_stripped_hook(f: fn(&str) -> Result<LexedOutput, LexedError>) {
     let _ = LEX_STRIPPED_HOOK.set(f);
-}
-
-/// Lex `src` as-is through the installed dogfooded AIPL lexer. There is no
-/// native fallback: this panics if the hook isn't installed (call
-/// `install_parser_hooks` first).
-pub fn lex_aipl(src: &str) -> Result<LexedOutput, LexedError> {
-    let hook = LEX_HOOK
-        .get()
-        .expect("lex hook not installed before lexing (call install_parser_hooks)");
-    hook(src)
 }
 
 /// Strip trailing `--- section ---` test blocks from `src`, then lex — through
