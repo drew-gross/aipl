@@ -19,11 +19,14 @@ import {
     concat as +++,
     equal as ==,
     filter,
+    is_nonempty,
+    join,
     len,
-    logical_and as &&,
+    logical_not as !,
     map,
     map_err,
     not_equal as !=,
+    push,
     sort,
     to_str,
     value_or,
@@ -33,10 +36,14 @@ import { aipl_parse_file } from "./grammar_aipl.aipl";
 import {
     AiplTok,
     Backtick,
+    Comma,
+    Import,
+    Pipe,
     Quoted,
     RawTemplateHead,
     RawTemplateMid,
     RawTemplateTail,
+    Semi,
     StrLit,
     TemplateHead,
     TemplateMid,
@@ -123,38 +130,39 @@ fn fmt_layout(cleaned: str, width: u64) -> str!FmtError {
     assert(fmt_layout("fn  main( )  {  }", 100) == ok("fn main() {}\n"));
 })
 
-# Refuse unless `output` holds exactly `input`'s tokens and comments. Imports
-# may be reordered, so both are compared as sorted multisets rather than in
-# position. A token is compared by its *value* — `to_str` of its kind, which
-# carries a literal's decoded value and a name's spelling — so the formatter's
-# value-preserving whitespace edits inside a `"""` block are not flagged, while
-# any change to a literal's value is.
+# Refuse unless `output` holds exactly `input`'s tokens and comments — exactly
+# as `TokenFingerprint` defines it, which is where the three things a reformat
+# is allowed to change are spelled out.
 #
-# Trailing commas are normalized by design (dropped when a list renders flat,
-# added when it breaks), so commas don't take part. A variant's *leading* `|`
-# is the same normalization at the other end (dropped flat, added when the
-# cases break), so `|` sits out too — which also excludes the `|` between
-# match-pattern alternatives, the price of comparing multisets rather than
-# positions.
+# The three parts are reported separately so the message names what moved: a
+# reordered statement is an import-hoisting bug, a reordered token is a layout
+# bug, and they want different reading.
 fn verify_same_tokens(input: str, output: str) -> !FmtError {
     let before = lex_aipl(input).map_err(|e| FmtError { message: e.message, span: e.span })?;
     let after = lex_aipl(output).map_err(|e| FmtError {
         message: `formatter produced unlexable output: {e.message}`,
         span: e.span,
     })?;
-    let was = token_values(before);
-    let now = token_values(after);
-    if (was != now) {
-        // Name the first token that differs — the sorted multisets line up
-        // until the first token one side has and the other lacks — so the bug
-        // report says which literal moved rather than only that one did.
-        let differ = first_difference(was, now);
+    let was = token_fingerprint(before);
+    let now = token_fingerprint(after);
+    if (was.rest != now.rest) {
+        // Name the first token that differs — the two lists agree up to it —
+        // so the bug report says which literal moved rather than only that one
+        // did.
+        let differ = first_difference(was.rest, now.rest);
         return err(FmtError {
             message: `formatter would not preserve the token stream (formatter bug): {differ}; no output written`,
             span: 0..0,
         });
     };
-    if (comment_texts(before) != comment_texts(after)) {
+    if (was.imports != now.imports) {
+        let differ = first_difference(was.imports, now.imports);
+        return err(FmtError {
+            message: `formatter would not preserve the imports (formatter bug): {differ}; no output written`,
+            span: 0..0,
+        });
+    };
+    if (was.comments != now.comments) {
         return err(FmtError {
             message: "formatter would not preserve comments (formatter bug); no output written",
             span: 0..0,
@@ -184,6 +192,23 @@ fn verify_same_tokens(input: str, output: str) -> !FmtError {
     assert(verify_same_tokens(`let s = "a";`, `let s = "b";`) != ok());
     assert(verify_same_tokens("fn f() {}", "fn f() { 1 }") != ok());
     assert(verify_same_tokens("// c\nfn f() {}", "fn f() {}") != ok());
+
+    // Outside the imports the check is positional, so a token the layout moved
+    // is refused even though nothing was lost — a reordering the multiset
+    // comparison this replaced could not see.
+    assert(verify_same_tokens("f(a, b)", "f(b, a)") != ok());
+    assert(verify_same_tokens("let x = 1;\nlet y = 2;", "let y = 2;\nlet x = 1;") != ok());
+    // Reordering *inside* the imports stays invisible, one statement or several.
+    assert(
+        verify_same_tokens(
+            "import { b, a } from builtins;",
+            "import { a, b } from builtins;",
+        ) == ok(),
+    );
+    // Losing an imported name is not.
+    assert(
+        verify_same_tokens("import { a, b } from builtins;", "import { a } from builtins;") != ok(),
+    );
 })
 
 # A token's value for the preservation check: `to_str` of its kind, except that
@@ -215,7 +240,7 @@ fn token_value(kind: AiplTok) -> str {
     assert(token_value(TemplateHead("a")) != token_value(TemplateTail("a")));
 })
 
-# Where two sorted token lists first disagree, as `<before> became <after>`
+# Where two token lists first disagree, as `<before> became <after>`
 # (`nothing` for a side that ran out) — the detail a preservation failure
 # reports.
 fn first_difference(was: str[], now: str[]) -> str {
@@ -231,28 +256,106 @@ fn first_difference(was: str[], now: str[]) -> str {
     assert(first_difference(["a", "b"], ["a"]) == "b became nothing");
 })
 
-# Every token's value, as a sorted multiset — minus the commas and `|`s that
-# are layout rather than content (see `verify_same_tokens`).
-fn token_values(lexed: LexResult<AiplTok>) -> str[] {
-    lexed.tokens
-        .filter(|t| t.text.text != "," && t.text.text != "|")
-        .map(|t| token_value(t.kind))
-        .sort()
+# A lexed source reduced to what a reformat must preserve: every non-import
+# token **in order**, the import statements as a sorted multiset, and the
+# comments as one too. Two sources with equal fingerprints hold the same code.
+#
+# A token counts as its *value* (`token_value`), so the formatter's
+# value-preserving whitespace edits inside a `"""` block are not flagged while
+# any change to a literal's value is.
+#
+# Three things a reformat is allowed to change, and each is why a part is shaped
+# the way it is:
+#
+# - **Imports are hoisted and sorted**, both the statements and the names inside
+#   one. So each statement collapses to its own tokens sorted and joined
+#   (`import_signature`) and the statements are then sorted among themselves —
+#   reordering is invisible, losing or changing a name is not.
+# - **A trailing comma is normalized** (dropped when a list renders flat, added
+#   when it breaks), and a variant's **leading `|`** is the same normalization at
+#   the other end. Both are layout, so `is_layout` drops them before anything
+#   else — which also excludes the `|` between match-pattern alternatives.
+# - **Comments move with the construct they are glued to**, which can reorder
+#   them against the tokens, so they are their own sorted multiset rather than
+#   part of `rest`.
+#
+# Everything else is positional: `rest` catches a token the layout moved, not
+# just one it lost.
+struct TokenFingerprint { imports: str[], rest: str[], comments: str[] }
+
+fn token_fingerprint(lexed: LexResult<AiplTok>) -> TokenFingerprint {
+    mut imports: str[] = [];
+    mut rest: str[] = [];
+    mut statement: str[] = [];
+    mut in_import = false;
+    for (let t : lexed.tokens.filter(|t| !t.kind.is_layout())) {
+        let value = token_value(t.kind);
+        if (in_import) {
+            set statement.push(value);
+            if (let Semi = t.kind) {
+                set imports.push(import_signature(statement));
+                set statement = [];
+                set in_import = false;
+            };
+        } else {
+            if (let Import = t.kind) {
+                set in_import = true;
+                set statement = [value];
+            } else {
+                set rest.push(value);
+            };
+        };
+    }
+    if (statement.is_nonempty()) {
+        // An `import` with no `;`. A parsed program has none, and both sides of
+        // the check are parsed — but dropping it would hide a lost name, which
+        // is the one thing this function exists to catch.
+        set imports.push(import_signature(statement));
+    };
+    TokenFingerprint {
+        imports: imports.sort(),
+        rest,
+        comments: lexed.trivia.map(|t| t.text.text).sort(),
+    }
 }
 
-# Every comment's text — the trivia channel is comments and `#[allow]` markers
-# only — as a sorted multiset.
-fn comment_texts(lexed: LexResult<AiplTok>) -> str[] { lexed.trivia.map(|t| t.text.text).sort() }
+# One import statement's tokens as a single comparable unit: sorted, so the
+# names reordering inside the list doesn't show, then joined so the statement
+# compares as a whole rather than mixing into its neighbours.
+fn import_signature(statement: str[]) -> str { statement.sort().join(sep=" ") }.test({
+    assert(import_signature(["import", "b", "a", ";"]) == "; a b import");
+    assert(import_signature(["import", "a", "b", ";"]) == import_signature([
+        "import",
+        "b",
+        "a",
+        ";",
+    ]));
+})
+
+# Whether a token is pure layout — a comma or a `|` the formatter adds and drops
+# as a list renders flat or broken (see `TokenFingerprint`) — and so takes no
+# part in the preservation check.
+fn is_layout(self: AiplTok) -> bool {
+    match (self) {
+        Comma | Pipe => true,
+        _ => false,
+    }
+}.test({
+    assert(Comma.is_layout());
+    assert(Pipe.is_layout());
+    assert(!Semi.is_layout());
+    assert(!StrLit(",", Quoted).is_layout());
+})
 --- performance ---
-allocations: 20884
-deallocations: 20884
-reallocations: 3004
-bytes allocated: 4512041
-instructions executed: 8922357
-binary size: 6554680
-  code: 4342584
-  data: 11762
-  metadata: 2200334
+allocations: 21173
+deallocations: 21173
+reallocations: 3094
+bytes allocated: 4638149
+instructions executed: 10088621
+binary size: 6576328
+  code: 4355204
+  data: 12914
+  metadata: 2208210
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -312,10 +415,10 @@ functions:
     calls: 0
     bytes: 140
   __arr_drop___m24__Token$__m23__AiplTok:
-    calls: 292
+    calls: 374
     bytes: 388
   __arr_drop___m24__TokenRule$__m23__AiplTok:
-    calls: 43
+    calls: 51
     bytes: 700
   __arr_drop___m36__ImportEntry:
     calls: 0
@@ -411,7 +514,7 @@ functions:
     calls: 0
     bytes: 140
   __arr_retain___m24__Token$__m23__AiplTok:
-    calls: 222
+    calls: 288
     bytes: 388
   __arr_retain___m24__TokenRule$__m23__AiplTok:
     calls: 288
@@ -492,13 +595,13 @@ functions:
     calls: 0
     bytes: 348
   __builtin_count_while$char$lam$__m24__lex_step$__m23__AiplTok$lambda1:
-    calls: 169
+    calls: 225
     bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
-    calls: 4
+    calls: 8
     bytes: 268
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
-    calls: 128
+    calls: 161
     bytes: 280
   __builtin_count_while$char$s0$lam$__m19__dedent$lambda1:
     calls: 0
@@ -534,10 +637,10 @@ functions:
     calls: 0
     bytes: 364
   __builtin_int_parse:
-    calls: 4
+    calls: 8
     bytes: 1096
   __builtin_int_parse$lambda1:
-    calls: 4
+    calls: 8
     bytes: 140
   __builtin_intersperse$__m17__Doc:
     calls: 14
@@ -651,7 +754,7 @@ functions:
     calls: 53
     bytes: 24
   __ctor$__m23__AiplTok$Name:
-    calls: 42
+    calls: 59
     bytes: 104
   __ctor$__m5__Ast$Name:
     calls: 0
@@ -660,7 +763,7 @@ functions:
     calls: 5
     bytes: 64
   __eq_str$arr:
-    calls: 25
+    calls: 43
     bytes: 364
   __m10__show_ty:
     calls: 0
@@ -813,7 +916,7 @@ functions:
     calls: 0
     bytes: 6072
   __m23__aipl_rules:
-    calls: 39
+    calls: 47
     bytes: 93544
   __m23__aipl_rules$lambda0:
     calls: 0
@@ -846,7 +949,7 @@ functions:
     calls: 0
     bytes: 196
   __m23__int_lit:
-    calls: 4
+    calls: 8
     bytes: 896
   __m23__raw_tpl_kind:
     calls: 0
@@ -861,10 +964,10 @@ functions:
     calls: 2
     bytes: 2608
   __m24__between_len:
-    calls: 124
+    calls: 153
     bytes: 800
   __m24__delimited_len:
-    calls: 238
+    calls: 296
     bytes: 1936
   __m24__finalize_template$__m23__AiplTok:
     calls: 2
@@ -876,31 +979,31 @@ functions:
     calls: 0
     bytes: 1896
   __m24__lex$__m23__AiplTok:
-    calls: 39
+    calls: 47
     bytes: 1196
   __m24__lex_step$__m23__AiplTok:
-    calls: 336
+    calls: 441
     bytes: 22244
   __m24__nested_len:
-    calls: 208
+    calls: 274
     bytes: 1148
   __m24__step_result$__m23__AiplTok:
-    calls: 9425
+    calls: 12062
     bytes: 13212
   __m24__template_scan$__m23__AiplTok:
     calls: 2
     bytes: 2844
   __m24__template_step$__m23__AiplTok:
-    calls: 232
+    calls: 290
     bytes: 444
   __m24__to_eol_len:
     calls: 0
     bytes: 52
   __m24__to_eol_len$tail:
-    calls: 417
+    calls: 549
     bytes: 268
   __m24__to_eol_unless_len:
-    calls: 208
+    calls: 274
     bytes: 360
   __m25__unescape:
     calls: 8
@@ -1871,14 +1974,20 @@ functions:
   __test$format_source:
     calls: 1
     bytes: 1328
+  __test$import_signature:
+    calls: 1
+    bytes: 1976
+  __test$is_layout:
+    calls: 1
+    bytes: 260
   __test$token_value:
     calls: 1
     bytes: 4104
   __test$verify_same_tokens:
     calls: 1
-    bytes: 2280
+    bytes: 3068
   __to_str___m23__AiplTok:
-    calls: 150
+    calls: 211
     bytes: 8728
   __to_str_u64:
     calls: 0
@@ -1887,40 +1996,40 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_extend:
-    calls: 12347
+    calls: 12557
     bytes: (external)
   aipl_arr_inc:
-    calls: 79395
+    calls: 90857
     bytes: (external)
   aipl_arr_reserve:
-    calls: 12294
+    calls: 12504
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 16
     bytes: (external)
   aipl_arr_sort:
-    calls: 51
+    calls: 84
     bytes: (external)
   aipl_array_dec:
-    calls: 124779
+    calls: 141952
     bytes: (external)
   aipl_array_new:
-    calls: 2206
+    calls: 2291
     bytes: (external)
   aipl_array_push:
-    calls: 1516
+    calls: 1601
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6298
+    calls: 6308
     bytes: (external)
   aipl_array_with_cap:
-    calls: 101
+    calls: 87
     bytes: (external)
   aipl_assert:
-    calls: 33
+    calls: 43
     bytes: (external)
   aipl_i64_len:
-    calls: 8
+    calls: 16
     bytes: (external)
   aipl_rec_alloc:
     calls: 14480
@@ -1938,25 +2047,22 @@ functions:
     calls: 4459
     bytes: (external)
   aipl_test_begin:
-    calls: 6
+    calls: 8
     bytes: (external)
   aipl_test_end:
-    calls: 6
+    calls: 8
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   aipl_write_bytes:
-    calls: 272
+    calls: 392
     bytes: (external)
   aipl_write_i64:
-    calls: 4
+    calls: 8
     bytes: (external)
-  comment_texts$own0:
-    calls: 22
-    bytes: 1048
   first_difference:
-    calls: 6
+    calls: 9
     bytes: 1988
   fmt_layout:
     calls: 7
@@ -1969,13 +2075,13 @@ functions:
     bytes: 1656
   main:
     calls: 1
-    bytes: 492
+    bytes: 640
+  token_fingerprint$own0:
+    calls: 36
+    bytes: 10936
   token_value:
-    calls: 167
+    calls: 228
     bytes: 6260
-  token_values:
-    calls: 28
-    bytes: 1744
   verify_same_tokens:
-    calls: 14
-    bytes: 3028
+    calls: 18
+    bytes: 4332

@@ -65,10 +65,10 @@ import { AiplTok, lex_aipl } from "./lex_aipl.aipl";
 import { LexResult } from "./lexer.aipl";
 import { requote, retemplate } from "./requote.aipl";
 
-# What the walker dispatches on. Mirrors the Rust `FmtTokenKind`: the parser's
-# `TokenKind` for an ordinary token, plus the three interpolated-template pieces,
-# which token *text* alone cannot distinguish — an empty segment's `TplMid` is
-# the single character `{`, identical to a brace.
+# What the walker dispatches on: the coarse class the highlighter's `TokenKind`
+# gives an ordinary token, plus the three interpolated-template pieces, which
+# token *text* alone cannot distinguish — an empty segment's `TplMid` is the
+# single character `{`, identical to a brace.
 variant FmtKind =
     | Keyword
     | Constant

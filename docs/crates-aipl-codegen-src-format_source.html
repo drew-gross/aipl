@@ -46,6 +46,20 @@
         </section>
 
 
+
+        <section class="item" id="item-TokenFingerprint">
+          <h3>
+            <a class="anchor" href="#item-TokenFingerprint">TokenFingerprint</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct TokenFingerprint</code></pre>
+
+          <div class="doc"><p>A lexed source reduced to what a reformat must preserve: every non-import token **in order**, the import statements as a sorted multiset, and the comments as one too. Two sources with equal fingerprints hold the same code.</p><p>A token counts as its *value* (<code>token_value</code>), so the formatter's value-preserving whitespace edits inside a <code>&quot;&quot;&quot;</code> block are not flagged while any change to a literal's value is.</p><p>Three things a reformat is allowed to change, and each is why a part is shaped the way it is:</p><p>- **Imports are hoisted and sorted**, both the statements and the names inside one. So each statement collapses to its own tokens sorted and joined (<code>import_signature</code>) and the statements are then sorted among themselves — reordering is invisible, losing or changing a name is not. - **A trailing comma is normalized** (dropped when a list renders flat, added when it breaks), and a variant's **leading <code>|</code>** is the same normalization at the other end. Both are layout, so <code>is_layout</code> drops them before anything else — which also excludes the <code>|</code> between match-pattern alternatives. - **Comments move with the construct they are glued to**, which can reorder them against the tokens, so they are their own sorted multiset rather than part of <code>rest</code>.</p><p>Everything else is positional: <code>rest</code> catches a token the layout moved, not just one it lost.</p></div>
+
+
+        </section>
+
+
       </section>
 
 
@@ -89,7 +103,7 @@
           </h3>
           <pre class="signature"><code>fn verify_same_tokens(input: str, output: str) -&#62; ()!FmtError</code></pre>
 
-          <div class="doc"><p>Refuse unless <code>output</code> holds exactly <code>input</code>'s tokens and comments. Imports may be reordered, so both are compared as sorted multisets rather than in position. A token is compared by its *value* — <code>to_str</code> of its kind, which carries a literal's decoded value and a name's spelling — so the formatter's value-preserving whitespace edits inside a <code>&quot;&quot;&quot;</code> block are not flagged, while any change to a literal's value is.</p><p>Trailing commas are normalized by design (dropped when a list renders flat, added when it breaks), so commas don't take part. A variant's *leading* <code>|</code> is the same normalization at the other end (dropped flat, added when the cases break), so <code>|</code> sits out too — which also excludes the <code>|</code> between match-pattern alternatives, the price of comparing multisets rather than positions.</p></div>
+          <div class="doc"><p>Refuse unless <code>output</code> holds exactly <code>input</code>'s tokens and comments — exactly as <code>TokenFingerprint</code> defines it, which is where the three things a reformat is allowed to change are spelled out.</p><p>The three parts are reported separately so the message names what moved: a reordered statement is an import-hoisting bug, a reordered token is a layout bug, and they want different reading.</p></div>
 
 
         </section>
@@ -117,35 +131,49 @@
           </h3>
           <pre class="signature"><code>fn first_difference(was: str[], now: str[]) -&#62; str</code></pre>
 
-          <div class="doc"><p>Where two sorted token lists first disagree, as <code>&lt;before&gt; became &lt;after&gt;</code> (<code>nothing</code> for a side that ran out) — the detail a preservation failure reports.</p></div>
+          <div class="doc"><p>Where two token lists first disagree, as <code>&lt;before&gt; became &lt;after&gt;</code> (<code>nothing</code> for a side that ran out) — the detail a preservation failure reports.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-token_values">
+        <section class="item" id="item-token_fingerprint">
           <h3>
-            <a class="anchor" href="#item-token_values">token_values</a>
+            <a class="anchor" href="#item-token_fingerprint">token_fingerprint</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn token_values(lexed: LexResult&#60;AiplTok&#62;) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn token_fingerprint(lexed: LexResult&#60;AiplTok&#62;) -&#62; TokenFingerprint</code></pre>
 
-          <div class="doc"><p>Every token's value, as a sorted multiset — minus the commas and <code>|</code>s that are layout rather than content (see <code>verify_same_tokens</code>).</p></div>
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
 
 
 
-        <section class="item" id="item-comment_texts">
+        <section class="item" id="item-import_signature">
           <h3>
-            <a class="anchor" href="#item-comment_texts">comment_texts</a>
+            <a class="anchor" href="#item-import_signature">import_signature</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn comment_texts(lexed: LexResult&#60;AiplTok&#62;) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn import_signature(statement: str[]) -&#62; str</code></pre>
 
-          <div class="doc"><p>Every comment's text — the trivia channel is comments and <code>#[allow]</code> markers only — as a sorted multiset.</p></div>
+          <div class="doc"><p>One import statement's tokens as a single comparable unit: sorted, so the names reordering inside the list doesn't show, then joined so the statement compares as a whole rather than mixing into its neighbours.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-is_layout">
+          <h3>
+            <a class="anchor" href="#item-is_layout">is_layout</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn is_layout(self: AiplTok) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a token is pure layout — a comma or a <code>|</code> the formatter adds and drops as a list renders flat or broken (see <code>TokenFingerprint</code>) — and so takes no part in the preservation check.</p></div>
 
 
         </section>

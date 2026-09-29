@@ -7,14 +7,15 @@
 //!   `cargo test --test compiler -- --ignored fmt::fill_expected_fmt` (scope with
 //!   `AIPL_FMT_CASE=<substring>`), then review the diff.
 //! - **Corpus invariants**: every parseable `.aipl` in the repo (test cases,
-//!   dogfooded compiler sources, examples) must format without error, format
-//!   *idempotently*, and preserve its tokens and comments exactly — imports
-//!   excepted, which may reorder by design and are compared as multisets.
+//!   dogfooded compiler sources, examples) must format without error and format
+//!   *idempotently*. Token and comment preservation is not checked here — it is
+//!   `format_source`'s own precondition, which refuses rather than emits, so
+//!   "formatted without error" already covers it (`verify_same_tokens` /
+//!   `TokenFingerprint` in `format_source.aipl`).
 
 use std::path::{Path, PathBuf};
 
 use aipl::fmt::{format_source, FmtOptions};
-use aipl::{lex_signatures_and_comments, FmtTokenKind};
 
 fn setup() {
     aipl::install_parser_hooks();
@@ -28,59 +29,6 @@ fn aipl_files(dir: &str, out: &mut Vec<PathBuf>) {
     let found = aipl::codegen::find_files(dir, ".aipl")
         .unwrap_or_else(|e| panic!("find_files({dir:?}): {e}"));
     out.extend(found.into_iter().map(PathBuf::from));
-}
-
-/// A value fingerprint of `src` split into import statements and everything
-/// else: `(sorted import-statement signatures, the remaining token signatures
-/// in order, sorted comment texts)`. Tokens are compared by *semantic value*
-/// (see `lex_signatures_and_comments`), so the formatter's value-preserving
-/// whitespace edits to a raw block don't show. Imports may legitimately reorder
-/// (they are hoisted and sorted), so each import statement's tokens are
-/// compared as one sorted unit; every other token must survive in exact order.
-fn token_fingerprint(src: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
-    let (toks, comments) = lex_signatures_and_comments(src).expect("lexes");
-    let mut imports: Vec<String> = Vec::new();
-    let mut rest: Vec<String> = Vec::new();
-    let mut i = 0;
-    while i < toks.len() {
-        let (kind, sig) = &toks[i];
-        if sig == "," || sig == "|" {
-            // Trailing commas are normalized by design (dropped when flat,
-            // added when broken); commas don't participate in the check. A
-            // variant's *leading* `|` is normalized the same way (added when
-            // the cases break), so `|` sits out too.
-            i += 1;
-            continue;
-        }
-        if *kind == FmtTokenKind::Plain(aipl::TokenKind::Keyword) && sig == "import" {
-            // Collect through the terminating `;`, sorting the names inside so
-            // reordering within the list doesn't matter either.
-            let mut stmt: Vec<String> = Vec::new();
-            while i < toks.len() {
-                let t = &toks[i].1;
-                let done = t == ";";
-                if t != "," {
-                    stmt.push(t.clone());
-                }
-                i += 1;
-                if done {
-                    break;
-                }
-            }
-            stmt.sort();
-            imports.push(stmt.join(" "));
-        } else {
-            rest.push(format!("{kind:?} {sig}"));
-            i += 1;
-        }
-    }
-    imports.sort();
-    let mut ctexts: Vec<String> = comments
-        .iter()
-        .map(|sp| src[sp.clone()].to_string())
-        .collect();
-    ctexts.sort();
-    (imports, rest, ctexts)
 }
 
 /// The `.aipl` files whose checked-in text is required to already be in
@@ -218,13 +166,11 @@ fn corpus_formats_idempotently_and_losslessly() {
             }
             Err(e) => failures.push(format!("[{ctx}] reformat of own output failed: {e}")),
         }
-        // Token/comment preservation, stronger than format_source's internal
-        // multiset check: outside imports, order matters too.
-        let before = token_fingerprint(prefix);
-        let after = token_fingerprint(aipl::strip_test_sections(&once));
-        if before != after {
-            failures.push(format!("[{ctx}] token fingerprint changed"));
-        }
+        // Token/comment preservation is `format_source`'s own precondition —
+        // it refuses rather than emits (see `verify_same_tokens` /
+        // `TokenFingerprint` in `format_source.aipl`), so reaching this point
+        // already means the tokens survived, both times.
+        //
         // Trailing sections ride along byte-for-byte.
         if !sections.is_empty() && !once.ends_with(sections) {
             failures.push(format!("[{ctx}] trailing sections were not preserved"));
