@@ -566,7 +566,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
             scope: S_STRING,
         },
         TokenRule {
-            matcher: Delimited(`"`, escaped=`ntr\\"`.to_set()),
+            matcher: Delimited(`"`.to_set(), escaped=`ntr\\"`.to_set()),
             emit: Of(|text: str| StrLit(text.unescape(), Quoted)),
             unterminated: "unterminated string literal",
             scope: S_STRING,
@@ -580,7 +580,7 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
         // (not `Char`) to avoid the library test `Kind`'s arm (shared constructor
         // namespace). The escape set matches the string rule plus `\'`.
         TokenRule {
-            matcher: Delimited("'", escaped=`ntr\\'"`.to_set()),
+            matcher: Delimited("'".to_set(), escaped=`ntr\\'"`.to_set()),
             emit: Try(char_lit_emit),
             unterminated: "unterminated char literal",
             scope: S_CHAR,
@@ -931,11 +931,11 @@ allocations: 288
 deallocations: 288
 reallocations: 67
 bytes allocated: 439365
-instructions executed: 1604851
-binary size: 622664
-  code: 426204
+instructions executed: 1601617
+binary size: 620448
+  code: 424896
   data: 10460
-  metadata: 186000
+  metadata: 185092
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -945,7 +945,7 @@ functions:
     bytes: 388
   __arr_drop___m1__TokenRule$AiplTok:
     calls: 31
-    bytes: 700
+    bytes: 672
   __arr_retain___m1__StepResult$AiplTok:
     calls: 2
     bytes: 140
@@ -954,7 +954,7 @@ functions:
     bytes: 388
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
-    bytes: 700
+    bytes: 672
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 24
     bytes: 304
@@ -1023,7 +1023,7 @@ functions:
     bytes: 800
   __m1__delimited_len:
     calls: 74
-    bytes: 1936
+    bytes: 1952
   __m1__finalize_template$AiplTok:
     calls: 6
     bytes: 7228
@@ -1038,13 +1038,13 @@ functions:
     bytes: 1196
   __m1__lex_step$AiplTok:
     calls: 116
-    bytes: 22244
+    bytes: 21172
   __m1__nested_len:
     calls: 78
     bytes: 1148
   __m1__step_result$AiplTok:
     calls: 2858
-    bytes: 13212
+    bytes: 13024
   __m1__template_scan$AiplTok:
     calls: 6
     bytes: 2844
@@ -1134,7 +1134,7 @@ functions:
     bytes: (external)
   aipl_rules:
     calls: 31
-    bytes: 93544
+    bytes: 93536
   aipl_rules$lambda0:
     calls: 0
     bytes: 144

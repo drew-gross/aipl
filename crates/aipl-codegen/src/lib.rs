@@ -4771,11 +4771,16 @@ pub fn generate_dogfood_artifact(
     entries: &[&str],
 ) -> Result<String, Vec<Error>> {
     let dbg = DebugOptions::new(false);
-    // Propagate a load/parse failure (don't `unwrap`) so the caller can pin the
-    // offending source file and report how to test just it.
+    // Propagate every frontend failure (don't `unwrap`) so the caller can pin the
+    // offending source file and report how to test just it. This is the whole
+    // reason the signature carries `Vec<Error>` rather than panicking: a
+    // `.unwrap()` here reports a merged-program failure as a `Debug` dump of the
+    // errors, and since each one carries the *source text* of the file it was
+    // raised against (`Error::origin`), that dump is tens of kilobytes with the
+    // one useful fact — which file — buried in it.
     let program = aipl_loader::load_program_sources(sources, dbg)?;
     let mut module = new_jit_module().unwrap();
-    let (funcs, structs, ir) = compile_program(&mut module, &program, None, dbg, false).unwrap();
+    let (funcs, structs, ir) = compile_program(&mut module, &program, None, dbg, false)?;
 
     // Collect static data objects (e.g. string literals longer than the 7-byte
     // inline SSO threshold). Finalize the JIT module only when any exist so we

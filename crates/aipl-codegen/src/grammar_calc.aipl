@@ -469,11 +469,11 @@ allocations: 10714
 deallocations: 10714
 reallocations: 1853
 bytes allocated: 1168583
-instructions executed: 2580435
-binary size: 412784
-  code: 272496
+instructions executed: 2567337
+binary size: 410624
+  code: 271168
   data: 6100
-  metadata: 134188
+  metadata: 133356
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -486,7 +486,7 @@ functions:
     bytes: 128
   __arr_drop___m11__TokenRule$CalcTok:
     calls: 54
-    bytes: 412
+    bytes: 384
   __arr_drop___m1__Cst:
     calls: 1438
     bytes: 116
@@ -525,7 +525,7 @@ functions:
     bytes: 128
   __arr_retain___m11__TokenRule$CalcTok:
     calls: 0
-    bytes: 412
+    bytes: 384
   __arr_retain___m1__Cst:
     calls: 1402
     bytes: 116
@@ -675,7 +675,7 @@ functions:
     bytes: 800
   __m11__delimited_len:
     calls: 0
-    bytes: 1936
+    bytes: 1952
   __m11__finalize_template$CalcTok:
     calls: 0
     bytes: 3516
@@ -690,13 +690,13 @@ functions:
     bytes: 1196
   __m11__lex_step$CalcTok:
     calls: 444
-    bytes: 16452
+    bytes: 15368
   __m11__nested_len:
     calls: 0
     bytes: 1148
   __m11__step_result$CalcTok:
     calls: 870
-    bytes: 6400
+    bytes: 6196
   __m11__template_scan$CalcTok:
     calls: 0
     bytes: 2844

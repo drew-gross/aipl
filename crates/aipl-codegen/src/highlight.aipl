@@ -37,13 +37,13 @@
 // word-character set, which is the only case any rule set here has.
 import {
     concat as +++,
-    contains,
     count_while,
     drop_last,
     equal as ==,
     extend,
     filter,
     first,
+    has,
     is_empty,
     is_nonempty,
     join,
@@ -131,17 +131,17 @@ struct Tm {
 # The chars a regex reads specially outside a character class, and so that a
 # literal spelling must escape. `-` is not among them: it is only special
 # *inside* a class (see `class_char`).
-let RE_META = """\.^$|?*+()[]{}""";
+let RE_META = """\.^$|?*+()[]{}""".to_set();
 
 # The chars that must be escaped *inside* `[...]`, where the rules are different
 # and much shorter.
-let CLASS_META = """\[]^-""";
+let CLASS_META = """\[]^-""".to_set();
 
 # `s` as a regex matching exactly `s`: every character the engine reads
 # specially is backslash-escaped. Used for a rule's fixed spelling — an
 # operator, a keyword, a delimiter.
 pub fn re_escape(s: str) -> str {
-    s.map(|ch| if (RE_META.contains(ch)) { `\\{ch}` } else { `{ch}` }).join()
+    s.map(|ch| if (RE_META.has(ch)) { `\\{ch}` } else { `{ch}` }).join()
 }.test({
     assert(re_escape("fn") == "fn");
     assert(re_escape("+++") == """\+\+\+""");
@@ -152,6 +152,18 @@ pub fn re_escape(s: str) -> str {
     assert(re_escape("->") == "->");
     assert(re_escape("") == "");
 })
+
+pub fn re_escape_set(s: #{char}) -> char[] {
+    mut out: char[] = [];
+    for (let ch : s) {
+        if (RE_META.has(ch)) {
+            set out.extend(`\\{ch}`);
+        } else {
+            set out.push(ch);
+        };
+    }
+    out
+}
 
 pub fn char_class(chars: #{char}) -> str { `[{char_class_body(chars)}]` }
 
@@ -181,7 +193,7 @@ fn class_char(ch: char) -> str {
         '\n' => """\n""",
         '\t' => """\t""",
         '\r' => """\r""",
-        _ => if (CLASS_META.contains(ch)) { `\\{ch}` } else { ch.to_str() },
+        _ => if (CLASS_META.has(ch)) { `\\{ch}` } else { ch.to_str() },
     }
 }
 
@@ -226,8 +238,8 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
         // pattern is not decoration: it is what stops `end` from matching a
         // delimiter the source escaped (`'\''`).
         Delimited(open, escapes) => Region(
-            re_escape(open),
-            re_escape(open),
+            re_escape_set(open),
+            re_escape_set(open),
             [escape_pat(escapes, esc_scope)],
             scope=scope,
         ),
@@ -272,7 +284,7 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
 
     // A delimited scan closes on its own delimiter and carries its escapes.
     let esc: Pat = Match("""\\[nt]""", "esc");
-    assert(matcher_pat(Delimited(`"`, escaped=#{'n', 't'}), "s", "esc") == Region(
+    assert(matcher_pat(Delimited(`"`.to_set(), escaped=#{'n', 't'}), "s", "esc") == Region(
         `"`,
         `"`,
         [esc],
@@ -325,7 +337,7 @@ pub fn matcher_regex(m: Matcher) -> str? {
     assert(matcher_regex(Exact("->")) == some("->"));
     assert(matcher_regex(CharRun("ab1".to_set(), first=#{'a', 'b'})) == some("[ab][1ab]*"));
     // The four delimiter-scanning matchers have no single-expression form.
-    assert(matcher_regex(Delimited(`"`, escaped=#{'n', 't'})) == none);
+    assert(matcher_regex(Delimited(`"`.to_set(), escaped=#{'n', 't'})) == none);
     assert(matcher_regex(Between("<", ">")) == none);
     assert(matcher_regex(Nested("/*", "*/")) == none);
     assert(matcher_regex(Template("`", #{}, |segs: str[]| segs)) == none);
@@ -728,12 +740,12 @@ variant Kind = Punct
 allocations: 546
 deallocations: 546
 reallocations: 38
-bytes allocated: 43366
-instructions executed: 115362
-binary size: 124800
-  code: 81760
-  data: 5552
-  metadata: 37488
+bytes allocated: 43486
+instructions executed: 116161
+binary size: 124104
+  code: 81464
+  data: 5568
+  metadata: 37072
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -746,7 +758,7 @@ functions:
     bytes: 116
   __arr_drop___m3__TokenRule$Kind:
     calls: 2
-    bytes: 412
+    bytes: 384
   __arr_retain_Entry:
     calls: 1
     bytes: 148
@@ -758,7 +770,7 @@ functions:
     bytes: 116
   __arr_retain___m3__TokenRule$Kind:
     calls: 0
-    bytes: 412
+    bytes: 384
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 38
     bytes: 304
@@ -806,7 +818,7 @@ functions:
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 12220
+    bytes: 11812
   __test$matcher_pat$lambda0:
     calls: 0
     bytes: 64
@@ -815,7 +827,7 @@ functions:
     bytes: 64
   __test$matcher_regex:
     calls: 1
-    bytes: 7192
+    bytes: 7012
   __test$matcher_regex$lambda0:
     calls: 0
     bytes: 64
@@ -850,7 +862,7 @@ functions:
     calls: 12
     bytes: (external)
   aipl_array_dec:
-    calls: 487
+    calls: 471
     bytes: (external)
   aipl_array_new:
     calls: 56
@@ -893,7 +905,7 @@ functions:
     bytes: 788
   char_class_body:
     calls: 17
-    bytes: 2016
+    bytes: 1996
   entry_name:
     calls: 5
     bytes: 444
@@ -911,7 +923,7 @@ functions:
     bytes: 760
   matcher_pat:
     calls: 26
-    bytes: 6276
+    bytes: 6280
   obj_fld:
     calls: 1
     bytes: 1900
@@ -922,8 +934,11 @@ functions:
     calls: 2
     bytes: 3112
   re_escape:
-    calls: 42
-    bytes: 1956
+    calls: 38
+    bytes: 1928
+  re_escape_set:
+    calls: 4
+    bytes: 736
   rule_pats$Kind:
     calls: 2
-    bytes: 9732
+    bytes: 9388

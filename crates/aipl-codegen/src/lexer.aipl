@@ -15,7 +15,6 @@
 // with a `LexError` — a message plus the span of the offending source.
 import {
     Span,
-    contains,
     count_while,
     drop_first,
     equal as ==,
@@ -217,7 +216,7 @@ variant Matcher =
     // — the token's value is the delimiter-stripped text left *un-decoded*, so
     // the rule's `emit` decides what escapes mean, with its own decoder (the
     // library provides none — escape semantics are the language's).
-    | Delimited(str, escaped: #{char} = #{})
+    | Delimited(#{char}, escaped: #{char} = #{})
     // The `open` spelling opens the token, which runs to just past the next
     // *full* occurrence of the `close` spelling. Unlike `Delimited`, open and
     // close are multi-char and may differ, and the scan matches the whole
@@ -408,8 +407,8 @@ fn keyword_len(self: str, spelling: str, boundary: #{char}) -> u64 {
 # the end of the source cut the escape off. A token still open at the end of
 # the source is a hard error (`at` is the token's absolute start, so error spans
 # land in the real source).
-fn delimited_len(self: str, at: u64, delims: str, escapes: #{char}, msg: str) -> u64!LexError {
-    if (!self.first().is_some_and(|c| delims.contains(c))) {
+fn delimited_len(self: str, at: u64, delims: #{char}, escapes: #{char}, msg: str) -> u64!LexError {
+    if (!self.first().is_some_and(|c| delims.has(c))) {
         return ok(0);
     };
     let d = self.first().value_or(' '); // in bounds: the guard above saw a char
@@ -1147,7 +1146,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // *un-decoded* — with escapes off (`#{}`) that's the whole content verbatim, and
     // here none of the inputs carry a backslash so `Of(Str)` needs no decoding.
     // An unterminated token is a hard error at its open delimiter.
-    let strs = [ws, TokenRule { matcher: Delimited(`"'`), emit: Of(Str) }, ident];
+    let strs = [ws, TokenRule { matcher: Delimited(`"'`.to_set()), emit: Of(Str) }, ident];
     assert(lex(`"hi" x`, strs)? == toks([
         tok(`"hi" x`, Str("hi"), 0..4),
         tok(`"hi" x`, Ident("x"), 5..6),
@@ -1159,7 +1158,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // hard error), but *decoding* is the emit's job: `esc_str` calls `unescape`.
     let esc = [
         ws,
-        TokenRule { matcher: Delimited(`"`, escaped=`nt\\"`.to_set()), emit: Of(esc_str) },
+        TokenRule { matcher: Delimited(`"`.to_set(), escaped=`nt\\"`.to_set()), emit: Of(esc_str) },
         ident,
     ];
     assert(lex(`"a\\"b"`, esc)? == toks([tok(`"a\\"b"`, Str(`a"b`), 0..6)]));
@@ -1179,7 +1178,10 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // message the library pairs with the token's span. A well-formed one passes.
     let nes = [
         ws,
-        TokenRule { matcher: Delimited(`"`, escaped=`nt\\"`.to_set()), emit: Try(nonempty_str) },
+        TokenRule {
+            matcher: Delimited(`"`.to_set(), escaped=`nt\\"`.to_set()),
+            emit: Try(nonempty_str),
+        },
         ident,
     ];
     assert(lex(`"hi"`, nes)? == toks([tok(`"hi"`, Str("hi"), 0..4)]));
@@ -1438,7 +1440,10 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // JSON: strings, numbers, keywords, punctuation.
     let json = [
         ws,
-        TokenRule { matcher: Delimited(`"`, escaped=`"\\/bfnrtu`.to_set()), emit: Of(Str) },
+        TokenRule {
+            matcher: Delimited(`"`.to_set(), escaped=`"\\/bfnrtu`.to_set()),
+            emit: Of(Str),
+        },
         TokenRule { matcher: Float, emit: Bare(FloatTok) },
         TokenRule { matcher: Int, emit: Try(int_tok) },
         TokenRule { matcher: Keyword("true", alnum.to_set()), emit: Bare(Kw) },
@@ -1480,7 +1485,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         TokenRule { matcher: Keyword("set", alnum.to_set()), emit: Bare(Kw) },
         ident,
         TokenRule { matcher: Int, emit: Try(int_tok) },
-        TokenRule { matcher: Delimited(`"`, escaped=`ntr\\"`.to_set()), emit: Of(Str) },
+        TokenRule { matcher: Delimited(`"`.to_set(), escaped=`ntr\\"`.to_set()), emit: Of(Str) },
         TokenRule { matcher: Exact("=="), emit: Bare(Op) },
         TokenRule { matcher: Exact("->"), emit: Bare(Op) },
         TokenRule { matcher: Exact("&&"), emit: Bare(Op) },
@@ -1504,11 +1509,11 @@ allocations: 415
 deallocations: 415
 reallocations: 90
 bytes allocated: 67144
-instructions executed: 421793
-binary size: 2479784
-  code: 1687460
-  data: 11628
-  metadata: 780696
+instructions executed: 418015
+binary size: 2463208
+  code: 1677416
+  data: 11620
+  metadata: 774172
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1518,7 +1523,7 @@ functions:
     bytes: 472
   __arr_drop_TokenRule$Kind:
     calls: 35
-    bytes: 780
+    bytes: 756
   __arr_retain_StepResult$Kind:
     calls: 9
     bytes: 140
@@ -1527,7 +1532,7 @@ functions:
     bytes: 472
   __arr_retain_TokenRule$Kind:
     calls: 6
-    bytes: 780
+    bytes: 756
   __builtin_count_while$char$lam$lex_step$Kind$lambda1:
     calls: 85
     bytes: 308
@@ -1587,10 +1592,10 @@ functions:
     bytes: 1628
   __test$keep_skipped:
     calls: 1
-    bytes: 22520
+    bytes: 21900
   __test$lex:
     calls: 1
-    bytes: 1575580
+    bytes: 1567652
   __test$lex$checked_seg:
     calls: 2
     bytes: 1780
@@ -1683,7 +1688,7 @@ functions:
     bytes: 800
   delimited_len:
     calls: 28
-    bytes: 1936
+    bytes: 1952
   finalize_template$Kind:
     calls: 16
     bytes: 8376
@@ -1695,13 +1700,13 @@ functions:
     bytes: 1896
   keep_skipped$Kind:
     calls: 3
-    bytes: 5044
+    bytes: 4848
   lex$Kind:
     calls: 78
     bytes: 1196
   lex_step$Kind:
     calls: 178
-    bytes: 24008
+    bytes: 22936
   main:
     calls: 1
     bytes: 240
@@ -1710,7 +1715,7 @@ functions:
     bytes: 1148
   step_result$Kind:
     calls: 477
-    bytes: 15244
+    bytes: 15048
   template_scan$Kind:
     calls: 20
     bytes: 2844

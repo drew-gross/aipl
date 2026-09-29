@@ -76,6 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  re_escape_set should use a map of some sort probably
   delimited should use a char set
   remove PARSER_LIBRARY.md references since that project is complete
   get rid of convention of using 0..0 span as a substitute for none

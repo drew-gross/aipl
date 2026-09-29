@@ -1765,11 +1765,11 @@ allocations: 5995
 deallocations: 5995
 reallocations: 1430
 bytes allocated: 703652
-instructions executed: 1801249
-binary size: 752704
-  code: 456696
+instructions executed: 1787503
+binary size: 750512
+  code: 455376
   data: 12892
-  metadata: 283116
+  metadata: 282244
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1800,7 +1800,7 @@ functions:
     bytes: 188
   __arr_drop___m4__TokenRule$Tok:
     calls: 103
-    bytes: 500
+    bytes: 472
   __arr_retain_Node:
     calls: 16
     bytes: 116
@@ -1830,7 +1830,7 @@ functions:
     bytes: 188
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
-    bytes: 500
+    bytes: 472
   __builtin_all$__m3__Rule$Tok$lam$rule_nullable$Tok$lambda0:
     calls: 0
     bytes: 36
@@ -2043,7 +2043,7 @@ functions:
     bytes: 800
   __m4__delimited_len:
     calls: 0
-    bytes: 1936
+    bytes: 1952
   __m4__finalize_template$Tok:
     calls: 0
     bytes: 4396
@@ -2058,13 +2058,13 @@ functions:
     bytes: 1196
   __m4__lex_step$Tok:
     calls: 371
-    bytes: 18044
+    bytes: 16972
   __m4__nested_len:
     calls: 0
     bytes: 1148
   __m4__step_result$Tok:
     calls: 998
-    bytes: 8148
+    bytes: 7940
   __m4__template_scan$Tok:
     calls: 0
     bytes: 2844

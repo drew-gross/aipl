@@ -99,6 +99,20 @@
 
 
 
+        <section class="item" id="item-re_escape_set">
+          <h3>
+            <a class="anchor" href="#item-re_escape_set">re_escape_set</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn re_escape_set(s: #{char}) -&#62; char[]</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
         <section class="item" id="item-char_class">
           <h3>
             <a class="anchor" href="#item-char_class">char_class</a>
@@ -230,7 +244,7 @@
             <a class="anchor" href="#item-tm_json">tm_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn tm_json(__spat$23872: Tm) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn tm_json(__spat$24139: Tm) -&#62; str</code></pre>
 
           <div class="doc"><p><code>g</code> as the <code>.tmLanguage.json</code> text an editor extension ships: two-space indented, one trailing newline. Generated files are read in diffs, so the layout is fixed and deterministic rather than minified.</p></div>
 
@@ -288,7 +302,7 @@
             <a class="anchor" href="#item-RE_META">RE_META</a>
             <span class="kind kind-const">let</span>
           </h3>
-          <pre class="signature"><code>let RE_META = &#34;&#34;&#34;\.^$|?*+()[]{}&#34;&#34;&#34;</code></pre>
+          <pre class="signature"><code>let RE_META = &#34;&#34;&#34;\.^$|?*+()[]{}&#34;&#34;&#34;.to_set()</code></pre>
 
           <div class="doc"><p>The chars a regex reads specially outside a character class, and so that a literal spelling must escape. <code>-</code> is not among them: it is only special *inside* a class (see <code>class_char</code>).</p></div>
 
@@ -302,7 +316,7 @@
             <a class="anchor" href="#item-CLASS_META">CLASS_META</a>
             <span class="kind kind-const">let</span>
           </h3>
-          <pre class="signature"><code>let CLASS_META = &#34;&#34;&#34;\[]^-&#34;&#34;&#34;</code></pre>
+          <pre class="signature"><code>let CLASS_META = &#34;&#34;&#34;\[]^-&#34;&#34;&#34;.to_set()</code></pre>
 
           <div class="doc"><p>The chars that must be escaped *inside* <code>[...]</code>, where the rules are different and much shorter.</p></div>
 
@@ -484,7 +498,7 @@
             <a class="anchor" href="#item-entry_json">entry_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn entry_json(__spat$26585: Entry) -&#62; str</code></pre>
+          <pre class="signature"><code>fn entry_json(__spat$26852: Entry) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

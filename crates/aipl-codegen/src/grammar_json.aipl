@@ -109,7 +109,10 @@ fn json_rules() -> TokenRule<JsonTok>[] {
     let alnum: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
     [
         TokenRule { matcher: CharRun(" \t\r\n".to_set()), emit: Bare(Punct), trivia: true },
-        TokenRule { matcher: Delimited(`"`, escaped=`"\\/bfnrtu`.to_set()), emit: Of(Str) },
+        TokenRule {
+            matcher: Delimited(`"`.to_set(), escaped=`"\\/bfnrtu`.to_set()),
+            emit: Of(Str),
+        },
         TokenRule { matcher: Exact("-"), emit: Bare(Punct) },
         TokenRule { matcher: Float, emit: Bare(Num) },
         TokenRule { matcher: Int, emit: Bare(Num) },
@@ -507,11 +510,11 @@ allocations: 21446
 deallocations: 21446
 reallocations: 3218
 bytes allocated: 2798291
-instructions executed: 5988461
-binary size: 449472
-  code: 295980
+instructions executed: 5987929
+binary size: 447304
+  code: 294664
   data: 8596
-  metadata: 144896
+  metadata: 144044
 functions:
   __arr_drop_Json:
     calls: 125
@@ -524,7 +527,7 @@ functions:
     bytes: 160
   __arr_drop___m11__TokenRule$JsonTok:
     calls: 58
-    bytes: 472
+    bytes: 444
   __arr_drop___m1__Cst:
     calls: 1300
     bytes: 116
@@ -563,7 +566,7 @@ functions:
     bytes: 160
   __arr_retain___m11__TokenRule$JsonTok:
     calls: 0
-    bytes: 472
+    bytes: 444
   __arr_retain___m1__Cst:
     calls: 1181
     bytes: 116
@@ -722,7 +725,7 @@ functions:
     bytes: 800
   __m11__delimited_len:
     calls: 395
-    bytes: 1936
+    bytes: 1952
   __m11__finalize_template$JsonTok:
     calls: 0
     bytes: 4004
@@ -737,13 +740,13 @@ functions:
     bytes: 1196
   __m11__lex_step$JsonTok:
     calls: 485
-    bytes: 17460
+    bytes: 16384
   __m11__nested_len:
     calls: 0
     bytes: 1148
   __m11__step_result$JsonTok:
     calls: 2824
-    bytes: 7444
+    bytes: 7244
   __m11__template_scan$JsonTok:
     calls: 0
     bytes: 2844

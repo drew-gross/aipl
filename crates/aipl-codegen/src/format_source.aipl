@@ -351,11 +351,11 @@ allocations: 21173
 deallocations: 21173
 reallocations: 3094
 bytes allocated: 4638149
-instructions executed: 10088621
-binary size: 6576328
-  code: 4355204
+instructions executed: 10076097
+binary size: 6573848
+  code: 4353700
   data: 12914
-  metadata: 2208210
+  metadata: 2207234
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -419,7 +419,7 @@ functions:
     bytes: 388
   __arr_drop___m24__TokenRule$__m23__AiplTok:
     calls: 51
-    bytes: 700
+    bytes: 672
   __arr_drop___m36__ImportEntry:
     calls: 0
     bytes: 148
@@ -518,7 +518,7 @@ functions:
     bytes: 388
   __arr_retain___m24__TokenRule$__m23__AiplTok:
     calls: 288
-    bytes: 700
+    bytes: 672
   __arr_retain___m36__ImportEntry:
     calls: 0
     bytes: 148
@@ -917,7 +917,7 @@ functions:
     bytes: 6072
   __m23__aipl_rules:
     calls: 47
-    bytes: 93544
+    bytes: 93536
   __m23__aipl_rules$lambda0:
     calls: 0
     bytes: 144
@@ -968,7 +968,7 @@ functions:
     bytes: 800
   __m24__delimited_len:
     calls: 296
-    bytes: 1936
+    bytes: 1952
   __m24__finalize_template$__m23__AiplTok:
     calls: 2
     bytes: 7228
@@ -983,13 +983,13 @@ functions:
     bytes: 1196
   __m24__lex_step$__m23__AiplTok:
     calls: 441
-    bytes: 22244
+    bytes: 21172
   __m24__nested_len:
     calls: 274
     bytes: 1148
   __m24__step_result$__m23__AiplTok:
     calls: 12062
-    bytes: 13212
+    bytes: 13024
   __m24__template_scan$__m23__AiplTok:
     calls: 2
     bytes: 2844
@@ -1637,7 +1637,7 @@ functions:
     bytes: 652
   __m4__lex_lossless:
     calls: 4
-    bytes: 5224
+    bytes: 5028
   __m4__lower_arg:
     calls: 0
     bytes: 39700

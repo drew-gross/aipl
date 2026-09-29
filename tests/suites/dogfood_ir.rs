@@ -140,11 +140,84 @@ fn ir_override(a: &Artifact) -> Option<PathBuf> {
     }
 }
 
-/// A dogfood source failed the combined frontend. Pin the offender by parsing
-/// each source on its own, then panic with the rendered error and the exact
-/// command to iterate on just that file. Falls back to the raw error if no
-/// single file reproduces the failure (e.g. a cross-file resolution or codegen
-/// error, not a parse error).
+/// The command that reproduces a dogfood failure against one file, and the one
+/// that checks every dogfooded source at once. Both go through `cargo run`
+/// rather than a bare `aipl`: an installed `aipl` on `PATH` is whatever was last
+/// `cargo install`ed, and the failure being reported is in the *working tree's*
+/// frontend, which only a fresh build speaks for.
+fn check_cmd(path: &str) -> String {
+    format!("cargo run -q -- check {path}")
+}
+
+/// The repo-relative path of a dogfooded source, given either the `./name.aipl`
+/// the source list spells or the bare `name.aipl` an [`aipl::Error`]'s `origin`
+/// carries — `None` for a label that isn't one of this artifact's sources.
+///
+/// A label the artifact doesn't own is not a bug: an error can be raised against
+/// an AIPL-implemented *builtin* (`aipl-mono/src/builtin_*.aipl`), which the
+/// dogfood build pulls in through monomorphization and which lives in a
+/// different crate — so the path can't be built by prefixing this one's `src/`.
+fn dogfood_source_path(sources: &[&str], label: &str) -> Option<String> {
+    let base = label.trim_start_matches("./");
+    sources
+        .iter()
+        .any(|s| s.trim_start_matches("./") == base)
+        .then(|| format!("crates/aipl-codegen/src/{base}"))
+}
+
+/// The blame report's file attribution: the two spellings a label arrives in,
+/// and the label it must *refuse* to build a path for. Getting that last one
+/// wrong is the failure mode worth a test — an AIPL-implemented builtin's label
+/// looks exactly like a dogfood source's, so a blind prefix yields a path that
+/// doesn't exist and a `check` command that can't run.
+#[test]
+fn blame_names_only_this_artifacts_sources() {
+    let sources = &["./lex_aipl.aipl", "./dedent.aipl"];
+    let want = Some("crates/aipl-codegen/src/lex_aipl.aipl".to_string());
+    // Either spelling: the source list's `./name`, or an origin's bare `name`.
+    assert_eq!(dogfood_source_path(sources, "./lex_aipl.aipl"), want);
+    assert_eq!(dogfood_source_path(sources, "lex_aipl.aipl"), want);
+    // A builtin lives in another crate, so this artifact can't place it.
+    assert_eq!(
+        dogfood_source_path(sources, "builtin_count_while.aipl"),
+        None
+    );
+    // And the real list resolves a real member, so the prefix stays correct.
+    assert!(dogfood_source_path(DOGFOOD_SOURCE_FILES, "lex_aipl.aipl")
+        .is_some_and(|p| std::path::Path::new(&p).exists()));
+}
+
+/// One diagnostic rendered against the source its spans actually index.
+///
+/// An error raised against an imported file carries that file in
+/// [`aipl::Error::origin`] (the loader's `tag_origin` and the checker's
+/// `attribute` put it there), and `Error::render` prefers it over whatever
+/// source it is handed — so passing the origin's own text is what makes the
+/// caret land in the right file. An error with *no* origin has no source to
+/// point into from here: it belongs either to the root source or to a builtin
+/// declaration, and rendering it against a guess would put a caret on a
+/// plausible but wrong line, which is the exact failure `origin` exists to
+/// prevent. Those render as the plain message and byte range.
+fn render_blamed(e: &aipl::Error) -> String {
+    match e.origin.as_deref() {
+        Some(o) => e.render(&o.source, &o.label),
+        None => format!("error: {e}"),
+    }
+}
+
+/// A dogfood source failed the combined frontend. Report it as *which file* to
+/// re-check, because the combined build on its own says only that the artifact
+/// could not be generated — and a merged-program failure is the one shape where
+/// that is genuinely hard to see by hand.
+///
+/// Two ways to get there, and they need different handling:
+///
+/// - A **parse** error is pinned by re-parsing each source alone. The loader
+///   raises it while merging, so there is no single file to render it against
+///   until it is reproduced in isolation.
+/// - Anything **past** the parse (a checker or codegen diagnostic) already
+///   carries the file its spans index, so the errors are rendered in place and
+///   every implicated file gets a repro command.
 fn blame_dogfood_failure(errs: Vec<aipl::Error>) -> ! {
     for (name, src) in read_dogfood_sources(DOGFOOD_SOURCE_FILES) {
         let stripped = aipl::strip_test_sections(&src);
@@ -155,11 +228,49 @@ fn blame_dogfood_failure(errs: Vec<aipl::Error>) -> ! {
         let rel = format!("crates/aipl-codegen/src/{}", name.trim_start_matches("./"));
         panic!(
             "dogfood source failed to parse:\n{}\n\n\
-             To test just this file, run:\n    aipl check {rel}",
+             To test just this file, run:\n    {}",
             e.render(stripped, &rel),
+            check_cmd(&rel),
         );
     }
-    panic!("generate dogfood IR:\n{}", aipl::Error::display_all(&errs));
+
+    let rendered: Vec<String> = errs.iter().map(render_blamed).collect();
+    // Distinct files, in the order the errors named them, so the first command
+    // listed is the first thing to go look at.
+    let mut files: Vec<String> = Vec::new();
+    let mut unattributed = 0usize;
+    for e in &errs {
+        match e
+            .origin
+            .as_deref()
+            .and_then(|o| dogfood_source_path(DOGFOOD_SOURCE_FILES, &o.label))
+        {
+            Some(path) if !files.contains(&path) => files.push(path),
+            Some(_) => {}
+            None => unattributed += 1,
+        }
+    }
+    let mut repro: Vec<String> = files
+        .iter()
+        .map(|f| format!("    {}", check_cmd(f)))
+        .collect();
+    if unattributed > 0 || repro.is_empty() {
+        // Not attributable to one of this artifact's files — the root source, or
+        // an AIPL-implemented builtin in another crate. `check crates` is the
+        // same sweep `compiler_aipl_files_are_tested_and_pass_check` runs, so it
+        // reaches both.
+        repro.push(format!(
+            "    {}   # {unattributed} error(s) named no file of this artifact",
+            check_cmd("crates"),
+        ));
+    }
+    panic!(
+        "dogfood sources failed to compile ({} error(s)):\n\n{}\n\n\
+         To reproduce without the rest of the artifact, run:\n{}",
+        errs.len(),
+        rendered.join("\n\n"),
+        repro.join("\n"),
+    );
 }
 
 /// Generate the unified dogfood artifact via the live frontend.
@@ -184,7 +295,15 @@ fn generate_for(a: &Artifact) -> String {
                     .unwrap_or_else(|e| blame_dogfood_failure(e))
             })
             .expect("spawn scoped thread");
-        result = Some(handle.join().expect("generate thread panicked"));
+        result = Some(match handle.join() {
+            Ok(artifact) => artifact,
+            // A failure in there has already printed its rendered diagnostic
+            // (see `blame_dogfood_failure`). `expect` would append a second
+            // panic carrying only `Any { .. }`, so the report would *end* on
+            // the one line with nothing in it. Resuming the unwind re-raises
+            // the original panic and adds nothing.
+            Err(payload) => std::panic::resume_unwind(payload),
+        });
     });
     result.unwrap()
 }
