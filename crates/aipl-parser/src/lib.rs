@@ -38,8 +38,13 @@ pub enum LexedStrStyle {
 /// direct name match. Value-carrying arms hold the decoded value: a `StrLit`'s
 /// escape-decoded (and, for a `Triple`/`TripleBacktick` style, de-dented)
 /// contents plus its delimiter style, an int literal's value, a char literal's
-/// byte. The `RawTemplate*` interpolated-segment arms hold their de-dented
-/// value too (their rule's `finalize` is `dedent_segments`).
+/// byte.
+///
+/// A template is a *run* of tokens — `TplOpen`, its text runs, the `LBrace`
+/// / `RBrace` pairs of its interpolations, and `TplClose` — rather than one
+/// token per segment. A `TplText` carries its escape-decoded value, except that
+/// a raw template's is left as written: de-denting is a whole-literal operation
+/// and the parser's lowering does it once it holds every segment.
 /// `Space`/comments/`AllowMarker` only ever appear in [`LexedOutput::trivia`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexedTokenKind {
@@ -55,12 +60,11 @@ pub enum LexedTokenKind {
     IntLit(i64),
     StrLit(String, LexedStrStyle),
     CharTok(u8),
-    TemplateHead(String),
-    TemplateMid(String),
-    TemplateTail(String),
-    RawTemplateHead(String),
-    RawTemplateMid(String),
-    RawTemplateTail(String),
+    /// A template's opening delimiter, carrying which one it was written with.
+    TplOpen(LexedStrStyle),
+    /// One run of literal text inside a template.
+    TplText(String),
+    TplClose,
     True,
     False,
     None,
@@ -429,13 +433,7 @@ fn classify_lexed(k: &LexedTokenKind) -> TokenKind {
             _ => TokenKind::Identifier,
         },
         K::IntLit(_) => TokenKind::Number,
-        K::StrLit(_, _)
-        | K::TemplateHead(_)
-        | K::TemplateMid(_)
-        | K::TemplateTail(_)
-        | K::RawTemplateHead(_)
-        | K::RawTemplateMid(_)
-        | K::RawTemplateTail(_) => TokenKind::Str,
+        K::StrLit(_, _) | K::TplOpen(_) | K::TplText(_) | K::TplClose => TokenKind::Str,
         K::CharTok(_) => TokenKind::Char,
         K::EqEq
         | K::Ne

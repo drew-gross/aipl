@@ -127,6 +127,62 @@
 
 
 
+        <section class="item" id="item-strip_line_indent">
+          <h3>
+            <a class="anchor" href="#item-strip_line_indent">strip_line_indent</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn strip_line_indent(self: str) -&#62; str</code></pre>
+
+          <div class="doc"><p>Every line of <code>self</code> with its leading spaces and tabs removed — the shape of a raw template's text that survives re-indentation.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-TPL_OPEN">
+          <h3>
+            <a class="anchor" href="#item-TPL_OPEN">TPL_OPEN</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let TPL_OPEN = &#34;tpl-open&#34;</code></pre>
+
+          <div class="doc"><p>The fingerprint spellings of a template's delimiters. Named because <code>collapse_templates</code> matches on them, and a spelling matched in two places is a spelling to write once.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-TPL_CLOSE">
+          <h3>
+            <a class="anchor" href="#item-TPL_CLOSE">TPL_CLOSE</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let TPL_CLOSE = &#34;tpl-close&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-collapse_templates">
+          <h3>
+            <a class="anchor" href="#item-collapse_templates">collapse_templates</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn collapse_templates(values: str[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>An interpolation-free template folded to the one string value it is.</p><p><code>`a`</code> and <code>&quot;a&quot;</code> are the same program — the parser lowers a template with no interpolations to a plain string, and <code>requote</code> moves a literal between the two spellings to save escapes. They are not the same <em>tokens</em>, though: one is a run of three and the other is one, so a token-by-token comparison would call a legal respelling a formatter bug. Folding the run is what lets the check stay token-based everywhere else.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-first_difference">
           <h3>
             <a class="anchor" href="#item-first_difference">first_difference</a>

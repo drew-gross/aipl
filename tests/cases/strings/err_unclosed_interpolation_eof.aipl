@@ -7,8 +7,8 @@ import { print } from builtins;
 fn main() !prints {
     print(```{1
 --- errors ---
-error: unterminated template literal interpolation
- --> ./tests/cases/strings/err_unclosed_interpolation_eof.aipl:8:14
+error: unterminated triple-backtick template literal
+ --> ./tests/cases/strings/err_unclosed_interpolation_eof.aipl:8:11
   |
 8 |     print(```{1
-  |              ^
+  |           ^^^

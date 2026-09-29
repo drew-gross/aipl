@@ -64,44 +64,6 @@
 
 
 
-        <section class="item" id="item-Seg">
-          <h3>
-            <a class="anchor" href="#item-Seg">Seg</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant Seg</code></pre>
-
-          <div class="doc"><p>Where in a template literal a text segment sits, handed to a <code>Template</code> rule's <code>OfSeg</code> emit so one rule can produce a <em>different</em> kind per position: <code>Plain</code> (a literal with no interpolations), <code>Head</code> (open delim through the first <code>{</code>), <code>Middle</code> (between two interpolations), <code>Tail</code> (through the close).</p></div>
-
-
-          <ul class="cases">
-
-            <li id="item-Plain"><code>Plain</code>
-
-
-            </li>
-
-            <li id="item-Head"><code>Head</code>
-
-
-            </li>
-
-            <li id="item-Middle"><code>Middle</code>
-
-
-            </li>
-
-            <li id="item-Tail"><code>Tail</code>
-
-
-            </li>
-
-          </ul>
-
-        </section>
-
-
-
         <section class="item" id="item-Emit">
           <h3>
             <a class="anchor" href="#item-Emit">Emit</a>
@@ -128,23 +90,9 @@
 
             </li>
 
-            <li id="item-OfSeg"><code>OfSeg((str, Seg) -&#62; K)</code>
-
-              <div class="doc"><p>For a <code>Template</code> rule: applied to each segment's text and its position, so one rule can produce a different kind per position.</p></div>
-
-
-            </li>
-
             <li id="item-Try"><code>Try((str) -&#62; K!str)</code>
 
               <div class="doc"><p><code>Of</code>'s fallible sibling: the function returns <code>K!str</code> — a kind, or an error <em>message</em>. Interpreting a match can fail (a numeric literal that overflows i64, a single-quoted string that isn't exactly one char), and on <code>err(msg)</code> the library pairs the message with the token's whole span to build a <code>LexError</code> (see <code>apply_emit</code>). The token span is the right location for a whole-token verdict like overflow; a matcher-level, byte-precise error (an unterminated string, an unknown escape) still comes from scanning, not the emit.</p></div>
-
-
-            </li>
-
-            <li id="item-TrySeg"><code>TrySeg((str, Seg) -&#62; K!str)</code>
-
-              <div class="doc"><p><code>OfSeg</code>'s fallible sibling, on the same terms.</p></div>
 
 
             </li>
@@ -230,10 +178,28 @@
 
             </li>
 
-            <li id="item-Template"><code>Template(str, #{char}, (str[]) -&#62; str[])</code>
+            <li id="item-UpToAny"><code>UpToAny(stops: str[], escapes: #{char}, refuse_unknown_escape: bool = true)</code>
 
-              <div class="doc"><p>A template literal — text with <code>{expr}</code> interpolations. The <code>delim</code> spelling opens and closes the literal; it may be multi-char and scans like <code>Between</code> (a lone backtick under a triple-backtick delim is content). Text segments follow <code>escapes</code> as in <code>Delimited</code> (an escaped delim doesn't close, <code>#{}</code> turns escapes off — the verbatim raw-template shape) — except that <code>\{</code> and <code>\}</code> are every template's own: the braces are the template's syntax, so escaping one is the template's business rather than the escape set's. <code>\{</code> is content that doesn't interpolate and <code>\}</code> is content, whatever <code>escapes</code> says, and a raw template with every other backslash verbatim still has a way to write a brace. (The emit decodes them; see <code>unescape_braces</code>.) A <code>{</code> in text opens an interpolation, lexed by the full rule set until the balancing <code>}</code> — so skip rules and nested template rules apply inside — with brace depth tracked and the closing <code>}</code> consumed without a token. <code>finalize</code> is a <code>(str[]) -&gt; str[]</code> the caller supplies to post-process a literal's text segments <em>as a group</em> before they're emitted (it must return one text per input segment) — for a transform that needs the whole literal, like de-denting a raw template's shared indent; pass an identity for none. The emitted kinds are context-dependent, derived from the rule's kind K: a literal with no interpolations is one K token; otherwise K_head (the open delim through the first <code>{</code>), each interpolation's tokens under their own rules' kinds, K_middle for each segment between interpolations, and K_tail (through the closing delim). The <code>skip</code> flag is ignored — a template always produces tokens.</p></div>
+              <div class="doc"><p>A maximal run of text holding none of the <code>stops</code> spellings, with <code>\X</code> escapes consumed as a unit and checked against <code>escapes</code> exactly as <code>Delimited</code> does (<code>#{}</code> turns escaping off, leaving the run verbatim).</p><p>The complement of the bracketing matchers: where they are told what encloses a token, this one is told what <em>ends</em> it and consumes up to there without consuming the terminator. That is the shape a mode wants — inside a template, text runs until the closing delimiter or the <code>{</code> that opens an interpolation, and each of those is a token of its own belonging to another rule.</p><p>The stops are spellings rather than chars so a multi-char terminator works: a run inside a <code>```</code> template stops at the full <code>```</code> and a lone backtick stays content, the same distinction <code>Between</code> draws.</p><p>Reaching the end of the source is a match, not an error: an unclosed construct is the <em>mode's</em> to report (see <code>Transition</code>), and this matcher has no idea what opened the one it is scanning inside of. Like every matcher it declines rather than matching empty, so a stop spelling at the cursor is length 0 — which is exactly right: the rule that matches the terminator is the one that should win there, so order it first.</p></div>
 
+
+              <ul class="slots">
+
+                <li><code>stops: str[]</code>
+
+                </li>
+
+                <li><code>escapes: #{char}</code>
+
+                </li>
+
+                <li><code>refuse_unknown_escape: bool = true</code>
+
+                  <div class="doc"><p>Whether a <code>\X</code> whose X is not in <code>escapes</code> is a hard error, as in <code>Delimited</code>, or ordinary content. Content is what a <em>verbatim</em> scan wants: a raw template decodes <code>\{</code>/<code>\}</code> so a brace can be written without opening an interpolation, and holds every other backslash as written — so it lists those two and refuses nothing.</p></div>
+
+                </li>
+
+              </ul>
 
             </li>
 
@@ -271,6 +237,53 @@
 
 
 
+        <section class="item" id="item-Transition">
+          <h3>
+            <a class="anchor" href="#item-Transition">Transition</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Transition</code></pre>
+
+          <div class="doc"><p>What matching a rule does to the lexer's mode stack.</p><p>A rule set is otherwise context-free at the token level: the rules are tried in order at every position, so the same bytes always lex the same way. That is what keeps a rule set plain data — and it is not enough for a language where the same bytes mean different things in different places, which is any language with string interpolation: in <code>`a{x}b`</code> the <code>b</code> is template text and the <code>x</code> is an identifier, and only what came before tells them apart.</p><p>A <strong>mode</strong> is a named subset of the rules, named by a <code>u64</code> the caller assigns. The lexer is always in one and only its rules are tried, so a rule can be invisible outside the context it belongs to. <code>Push</code> enters a mode and <code>Pop</code> leaves it.</p><p>The <strong>stack</strong> is what makes contexts nest. A single &quot;current mode&quot; could say where the lexer is but not what it returns to when the context ends; a stack answers both, at any depth. <code>{</code> inside a template pushes, and the <code>}</code> that balances it pops back into the template — and a template inside <em>that</em> interpolation simply pushes again. Nothing here counts depth: the stack is the depth.</p><p><code>Pop</code> at the base mode stays at the base rather than running off the bottom. A stray closer is a syntax error for a parser to report against a token, not a lexical one — the lexer's job is to hand over the tokens.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Stay"><code>Stay</code>
+
+
+            </li>
+
+            <li id="item-Push"><code>Push(i64)</code>
+
+
+            </li>
+
+            <li id="item-Pop"><code>Pop</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-ModeFrame">
+          <h3>
+            <a class="anchor" href="#item-ModeFrame">ModeFrame</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ModeFrame</code></pre>
+
+          <div class="doc"><p>One entry of the mode stack: the mode, where the token that pushed it started, and that rule's <code>unterminated</code> message. The span and the message are carried so that a mode still open at the end of the source is reported against its <em>opener</em> — which is where a reader has to go to fix it — rather than against the whole remaining source.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-TokenRule">
           <h3>
             <a class="anchor" href="#item-TokenRule">TokenRule</a>
@@ -278,7 +291,7 @@
           </h3>
           <pre class="signature"><code>struct TokenRule&#60;K: any&#62;</code></pre>
 
-          <div class="doc"><p>One prioritized entry of a rule set: the shape to match, how to turn a match into a kind (<code>emit</code>), and what becomes of its matches. A plain rule emits a token; <code>skip: true</code> consumes matches silently (whitespace); <code>trivia: true</code> consumes them but records each in the result's trivia side-channel — for matches a later pass wants located but not parsed, like comments (a formatter re-attaches them) or lint markers (<code>#[allow]</code>). Set at most one of the two flags (<code>skip</code> wins when both are set). Generic over the kind type <code>K</code> — every rule of one set builds the same <code>K</code>. <code>unterminated</code> overrides the message used when this rule's token runs off the end of the source (a <code>Delimited</code>/<code>Between</code>/<code>Nested</code>/<code>Template</code> scan that never closes). Empty means &quot;use the matcher's built-in default&quot; (a generic &quot;unterminated delimited token&quot; / &quot;unterminated template literal&quot;) — so a rule can name its token in the diagnostic (<code>&quot;unterminated string literal&quot;</code>) without every rule having to.</p><p><code>scope</code> is the TextMate scope a syntax highlighter should paint this rule's matches — <code>&quot;keyword.control.aipl&quot;</code>, <code>&quot;string.quoted.double.aipl&quot;</code>. <code>lex</code> ignores it entirely: it is carried here so that one rule set describes a language's lexical structure <em>once</em>, for the lexer and the highlighter both (<code>highlight.aipl</code> generates the second from it), rather than the two drifting apart as separate descriptions. Empty means &quot;not highlighted&quot;, which is what a <code>skip</code> rule wants. The same hint on the syntactic half is <code>Production.scope</code> in <code>grammar.aipl</code>.</p></div>
+          <div class="doc"><p>One prioritized entry of a rule set: the shape to match, how to turn a match into a kind (<code>emit</code>), and what becomes of its matches. A plain rule emits a token; <code>skip: true</code> consumes matches silently (whitespace); <code>trivia: true</code> consumes them but records each in the result's trivia side-channel — for matches a later pass wants located but not parsed, like comments (a formatter re-attaches them) or lint markers (<code>#[allow]</code>). Set at most one of the two flags (<code>skip</code> wins when both are set). Generic over the kind type <code>K</code> — every rule of one set builds the same <code>K</code>. <code>unterminated</code> overrides the message used when this rule's token runs off the end of the source (a <code>Delimited</code>/<code>Between</code>/<code>Nested</code> scan that never closes), or that this rule's mode is still open there (see <code>Transition</code>). Empty means &quot;use the built-in default&quot; (a generic &quot;unterminated delimited token&quot;) — so a rule can name its token in the diagnostic (<code>&quot;unterminated string literal&quot;</code>) without every rule having to.</p><p><code>mode</code> and <code>go</code> are the rule's place in, and effect on, the lexer's mode stack — see <code>Transition</code>. A rule set that mentions neither is entirely in the base mode, which is how every rule set that predates modes keeps working.</p><p><code>scope</code> is the TextMate scope a syntax highlighter should paint this rule's matches — <code>&quot;keyword.control.aipl&quot;</code>, <code>&quot;string.quoted.double.aipl&quot;</code>. <code>lex</code> ignores it entirely: it is carried here so that one rule set describes a language's lexical structure <em>once</em>, for the lexer and the highlighter both (<code>highlight.aipl</code> generates the second from it), rather than the two drifting apart as separate descriptions. Empty means &quot;not highlighted&quot;, which is what a <code>skip</code> rule wants. The same hint on the syntactic half is <code>Production.scope</code> in <code>grammar.aipl</code>.</p></div>
 
 
         </section>
@@ -320,7 +333,7 @@
           </h3>
           <pre class="signature"><code>struct StepResult&#60;K: any&#62;</code></pre>
 
-          <div class="doc"><p>One lexing step's outcome: the token(s) the winning rule produced — one usually, none for a <code>skip</code> rule, a whole head/expr/middle/tail run for a <code>Template</code> — any trivia recorded along the way, and the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p></div>
+          <div class="doc"><p>One lexing step's outcome: the token(s) the winning rule produced — one usually, none for a <code>skip</code> rule, a whole head/expr/middle/tail run for a — any trivia recorded along the way, and the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p></div>
 
 
         </section>
@@ -414,41 +427,6 @@
 
             </li>
 
-            <li id="item-TplHead"><code>TplHead(str)</code>
-
-
-            </li>
-
-            <li id="item-TplMid"><code>TplMid(str)</code>
-
-
-            </li>
-
-            <li id="item-TplTail"><code>TplTail(str)</code>
-
-
-            </li>
-
-            <li id="item-RawTpl"><code>RawTpl(str)</code>
-
-
-            </li>
-
-            <li id="item-RawTplHead"><code>RawTplHead(str)</code>
-
-
-            </li>
-
-            <li id="item-RawTplMid"><code>RawTplMid(str)</code>
-
-
-            </li>
-
-            <li id="item-RawTplTail"><code>RawTplTail(str)</code>
-
-
-            </li>
-
           </ul>
 
         </section>
@@ -462,7 +440,7 @@
           </h3>
           <pre class="signature"><code>pub fn lex&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; LexResult&#60;K&#62;!LexError</code></pre>
 
-          <div class="doc"><p>Lexes <code>self</code> into a <code>LexResult</code>: the flat token list, plus the trivia side-channel, as described by the ordered <code>rules</code>. At each position the first rule whose matcher matches claims the token (so order is priority — keywords before identifiers, floats before ints); a <code>skip: true</code> rule consumes its match without producing anything (whitespace), and a <code>trivia: true</code> rule records its matches in the side-channel instead of the token stream (comments, lint markers). A <code>Template</code> rule emits several tokens per literal — head/middle/tail segments around the tokens of each <code>{...}</code> interpolation, which are lexed by this same rule set. Lexing fails with an <code>err</code> — a <code>LexError</code> carrying a message and the offending span — when a byte matches no rule or a matcher sees invalid input outright (an unterminated <code>Delimited</code> token).</p></div>
+          <div class="doc"><p>Lexes <code>self</code> into a <code>LexResult</code>: the flat token list, plus the trivia side-channel, as described by the ordered <code>rules</code>. At each position the first rule whose matcher matches claims the token (so order is priority — keywords before identifiers, floats before ints); a <code>skip: true</code> rule consumes its match without producing anything (whitespace), and a <code>trivia: true</code> rule records its matches in the side-channel instead of the token stream (comments, lint markers). Lexing fails with an <code>err</code> — a <code>LexError</code> carrying a message and the offending span — when a byte matches no rule or a matcher sees invalid input outright (an unterminated <code>Delimited</code> token).</p></div>
 
 
         </section>
@@ -474,6 +452,20 @@
       <section class="group private">
         <h2 id="private">Private</h2>
         <p class="note">Not importable from another file.</p>
+
+
+        <section class="item" id="item-transition">
+          <h3>
+            <a class="anchor" href="#item-transition">transition</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn transition(push: i64, pop: bool) -&#62; Transition</code></pre>
+
+          <div class="doc"><p>A rule's <code>push</code>/<code>pop</code> pair read as the one decision it is. The flags are a pair because a struct field's default must be a literal, so neither a constructor nor an optional variant can sit on <code>TokenRule</code>; classifying them here means the stack is driven by an exhaustive <code>match</code> on three cases rather than by two booleans checked in the right order at each site.</p></div>
+
+
+        </section>
+
 
 
         <section class="item" id="item-char_run_len">
@@ -574,6 +566,20 @@
 
 
 
+        <section class="item" id="item-up_to_any_len">
+          <h3>
+            <a class="anchor" href="#item-up_to_any_len">up_to_any_len</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn up_to_any_len(self: str, at: u64, stops: str[], escapes: #{char}, refuse_unknown_escape: bool) -&#62; u64!LexError</code></pre>
+
+          <div class="doc"><p><code>UpToAny</code>: the length of the run before the first of <code>stops</code>, or the whole of <code>self</code> when none of them appears. <code>\X</code> escapes are consumed as a unit and validated as in <code>delimited_len</code>, so an escaped terminator does not end the run and an unknown or cut-off escape is the same hard error there.</p><p>0 when a stop spelling sits at the cursor — a decline, like every other matcher, which hands the position to the rule that matches the terminator.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-nested_len">
           <h3>
             <a class="anchor" href="#item-nested_len">nested_len</a>
@@ -665,7 +671,7 @@
           </h3>
           <pre class="signature"><code>fn token_content(m: Matcher, text: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>The content string a token of matcher <code>m</code> is built from: its matched <code>text</code> (<code>src[at..at+n]</code>, delimiters included), with the delimiters taken off by the three matchers that bracket their content — see the table on <code>Matcher</code>. Everything else is its own text, and its rule's <code>emit</code> interprets it.</p><p><code>Template</code> answers here for exhaustiveness only: a template's tokens are built inside <code>template_scan</code>, which passes each segment's text to <code>seg_emit</code> itself and never reaches this.</p></div>
+          <div class="doc"><p>The content string a token of matcher <code>m</code> is built from: its matched <code>text</code> (<code>src[at..at+n]</code>, delimiters included), with the delimiters taken off by the three matchers that bracket their content — see the table on <code>Matcher</code>. Everything else is its own text, and its rule's <code>emit</code> interprets it.</p></div>
 
 
         </section>
@@ -679,21 +685,7 @@
           </h3>
           <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, span: Span, content: str) -&#62; K!LexError</code></pre>
 
-          <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its <code>content</code> string — what <code>token_content</code> made of the matched text. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-seg_only">
-          <h3>
-            <a class="anchor" href="#item-seg_only">seg_only</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn seg_only(span: Span) -&#62; LexError</code></pre>
-
-          <div class="doc"><p>A <code>LexError</code> for a segment emit (<code>OfSeg</code>/<code>TrySeg</code>) used on a non-<code>Template</code> rule — those only make sense per template segment (see <code>seg_emit</code>).</p></div>
+          <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its <code>content</code> string — what <code>token_content</code> made of the matched text. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>).</p></div>
 
 
         </section>
@@ -714,98 +706,28 @@
 
 
 
+        <section class="item" id="item-stepped">
+          <h3>
+            <a class="anchor" href="#item-stepped">stepped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn stepped&#60;K: any&#62;(self: ModeFrame[], step: StepResult&#60;K&#62;, at: u64) -&#62; ModeFrame[]</code></pre>
+
+          <div class="doc"><p>The mode stack after a step that consumed <code>at..step.end</code>: unchanged, one frame deeper, or one shallower. A <code>Pop</code> at the base stays at the base — see <code>Transition</code>.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lex_step">
           <h3>
             <a class="anchor" href="#item-lex_step">lex_step</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lex_step&#60;K: any&#62;(src: str, at: u64, rules: TokenRule&#60;K&#62;[]) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
+          <pre class="signature"><code>fn lex_step&#60;K: any&#62;(src: str, at: u64, rules: TokenRule&#60;K&#62;[], mode: i64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
 
-          <div class="doc"><p>One lexing step at absolute position <code>at</code>: tries each rule in order (first match wins) and returns the winning rule's outcome — see <code>StepResult</code>. Every arm but <code>Template</code> computes how far its matcher reaches (0 for no match — no matcher matches empty input, so a nonzero length always means progress) and wraps it via <code>step_result</code>; a <code>Template</code>'s multi-token run doesn't fit a single length, so its arm builds the outcome directly. Mutually recursive with <code>template_scan</code>: an interpolation re-enters this full rule set, so template literals nest.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-seg_emit">
-          <h3>
-            <a class="anchor" href="#item-seg_emit">seg_emit</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn seg_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, text: str, seg: Seg, span: Span) -&#62; K!LexError</code></pre>
-
-          <div class="doc"><p>Apply a <code>Template</code> rule's <code>emit</code> to one segment's raw text and its position. The emit must be an <code>OfSeg</code> (or its fallible sibling <code>TrySeg</code>) — a template produces several kinds per literal, one per segment position, which only a segment emit can distinguish; any other option is a lex error. A <code>TrySeg</code> that returns <code>err(msg)</code> carries the segment's <code>span</code>.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-seg_needs_ofseg">
-          <h3>
-            <a class="anchor" href="#item-seg_needs_ofseg">seg_needs_ofseg</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn seg_needs_ofseg(span: Span) -&#62; LexError</code></pre>
-
-          <p class="undocumented">Undocumented.</p>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-template_step">
-          <h3>
-            <a class="anchor" href="#item-template_step">template_step</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn template_step&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: #{char}, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
-
-          <div class="doc"><p>The <code>Template</code> arm of <code>lex_step</code>'s dispatch: a decline when <code>src[at..]</code> doesn't open with <code>delim</code> (mirroring every other matcher's 0), else the literal's whole token run.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-template_scan">
-          <h3>
-            <a class="anchor" href="#item-template_scan">template_scan</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn template_scan&#60;K: any&#62;(src: str, at: u64, delim: str, escapes: #{char}, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, rules: TokenRule&#60;K&#62;[], unterminated: str) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
-
-          <div class="doc"><p><code>Template</code>: scans a whole template literal at <code>at</code> (the caller verified the opening <code>delim</code>); the result's tokens are the literal's whole run and its <code>end</code> sits just past the closing <code>delim</code>. A text segment runs until the closing <code>delim</code> (matched in full, like <code>Between</code>) or a <code>{</code>, which ends the segment and opens an interpolation (see <code>interp_scan</code>).</p><p><strong>A segment's span runs brace to brace, and its value does not.</strong> The span takes the delimiter or <code>}</code> that opens the segment and the delimiter or <code>{</code> that closes it; the value is what lies strictly between. Keeping the two starts apart is what makes the token stream <em>tile</em> the source — every byte of a template under exactly one token — which a concrete syntax tree needs and a token stream alone does not care about. They were once the same variable, and the <code>}</code> closing an interpolation was then the one byte of a template that belonged to no token at all. The text segments are collected first (with their spans and the interpolation token runs between them), then handed to <code>finalize_template</code> — which post-processes them as a group and emits each. A nested template inside an interpolation is fully lexed (and its own segments finalized) by the recursive <code>interp_scan</code>, so each <code>template_scan</code> only ever handles its own direct segments. <code>escapes</code> still governs <em>scanning</em> as in <code>delimited_len</code>, including the hard error on an unknown escape and the dangling backslash falling through to run the literal out unterminated.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-finalize_template">
-          <h3>
-            <a class="anchor" href="#item-finalize_template">finalize_template</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn finalize_template&#60;K: any&#62;(src: str, finalize: (str[]) -&#62; str[], emit: Emit&#60;K&#62;, seg_texts: str[], seg_spans: Span[], interp_runs: StepResult&#60;K&#62;[], end: u64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
-
-          <div class="doc"><p>Emit a template literal's tokens: apply the caller's <code>finalize</code> to all of its text segments as a group (it returns one finalized text per segment), then emit each finalized segment — its position <code>Plain</code> for a lone segment, else <code>Head</code>/<code>Middle</code>/<code>Tail</code> — via the rule's <code>OfSeg</code>/<code>TrySeg</code> emit, interleaved with the interpolation token runs (<code>interp_runs[k]</code> following segment <code>k</code>). <code>end</code> sits just past the closing delim.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-interp_scan">
-          <h3>
-            <a class="anchor" href="#item-interp_scan">interp_scan</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn interp_scan&#60;K: any&#62;(src: str, at: u64, open: u64, rules: TokenRule&#60;K&#62;[]) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
-
-          <div class="doc"><p>A template interpolation's <code>{ ... }</code> body: lexes expression tokens with the full rule set from <code>at</code> (just past the opening <code>{</code>, which sits at <code>open</code>) until the <code>}</code> balancing it; that closing <code>}</code> is consumed without a token of its own — it's the template's delimiter, not an expression token, and it is the <em>next</em> text segment's span that covers it (see <code>template_scan</code>). Depth moves by what each step consumed: a step consuming exactly <code>{</code> or <code>}</code> (a brace lexed as its own token — set/dict literals, blocks) raises/lowers it, while a brace buried inside a bigger token (a delimited string's content, a nested template) doesn't. The result's <code>end</code> sits just past the closing <code>}</code>.</p></div>
+          <div class="doc"><p>One lexing step at absolute position <code>at</code>: tries each rule of <code>mode</code> in order (first match wins) and returns the winning rule's outcome — see <code>StepResult</code>. Each arm computes how far its matcher reaches (0 for no match — no matcher matches empty input, so a nonzero length always means progress) and wraps it via <code>step_result</code>.</p><p>A rule of another mode is passed over rather than filtered out up front: the check is one comparison inside the loop that already runs, where filtering would build a new array at every position of every lex.</p></div>
 
 
         </section>

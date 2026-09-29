@@ -117,32 +117,17 @@
 
             </li>
 
-            <li id="item-TemplateHead"><code>TemplateHead(str)</code>
+            <li id="item-TplOpen"><code>TplOpen(StrStyle)</code>
 
 
             </li>
 
-            <li id="item-TemplateMid"><code>TemplateMid(str)</code>
+            <li id="item-TplText"><code>TplText(str)</code>
 
 
             </li>
 
-            <li id="item-TemplateTail"><code>TemplateTail(str)</code>
-
-
-            </li>
-
-            <li id="item-RawTemplateHead"><code>RawTemplateHead(str)</code>
-
-
-            </li>
-
-            <li id="item-RawTemplateMid"><code>RawTemplateMid(str)</code>
-
-
-            </li>
-
-            <li id="item-RawTemplateTail"><code>RawTemplateTail(str)</code>
+            <li id="item-TplClose"><code>TplClose</code>
 
 
             </li>
@@ -500,9 +485,79 @@
             <a class="anchor" href="#item-template_segments">template_segments</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn template_segments(texts: str[]) -&#62; str[]</code></pre>
+          <pre class="signature"><code>pub fn template_segments(raw: bool, texts: str[]) -&#62; str[]</code></pre>
 
-          <div class="doc"><p>The decoded text segments of a template literal, given each segment token's source text in order — the head, any middles, then the tail, with their delimiters and interpolation braces still attached.</p><p>The whole literal at once rather than a segment at a time, because a raw template is de-dented across <em>all</em> its segments (<code>dedent_segments</code>, the raw rule's <code>finalize</code>): the common indent is a property of the literal, not of any one piece of it. The interpolation-free case never reaches here — it lexes to a plain <code>StrLit</code>, which is <code>str_lit_value</code>'s job.</p></div>
+          <div class="doc"><p>A template's text segments, as written, decoded into their values.</p><p>The cooked <code>`...`</code> form decodes each segment's escapes on its own. The raw <code>```...```</code> form decodes only the braces — every other backslash is content — and is then de-dented across <em>all</em> its segments at once: the common indent is a property of the whole literal, not of any one piece, so no segment can be read on its own. They are joined by a <code>{</code> (which cannot occur in a raw segment unescaped — it would have opened an interpolation), de-dented as one block by the dogfooded <code>process_raw_string</code>, split back, and only then brace-decoded. The join uses the literal's own delimiter, which is the one string a raw segment provably cannot hold — it would have closed the literal — where a <code>{</code> would split an escaped <code>\{</code> down the middle.</p><p>That whole-literal step is why the lexer leaves raw segments as written and this runs in the parser's lowering, the one place a whole template is in hand. It used to run in both: once here off the token texts, and once in the lexer's <code>finalize</code> hook off the segments — two implementations of one rule.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-M_BASE">
+          <h3>
+            <a class="anchor" href="#item-M_BASE">M_BASE</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>pub let M_BASE: i64 = 0</code></pre>
+
+          <div class="doc"><p>The lexer modes AIPL needs, as the <code>i64</code> tags <code>TokenRule.mode</code>/<code>push</code> take. <code>M_BASE</code> is the mode a lex starts in — ordinary AIPL — and is named rather than written as <code>0</code> because a template's <code>{</code> <em>pushes</em> it, which is how an interpolation gets the whole language back.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-M_TEMPLATE">
+          <h3>
+            <a class="anchor" href="#item-M_TEMPLATE">M_TEMPLATE</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>pub let M_TEMPLATE: i64 = 1</code></pre>
+
+          <div class="doc"><p>Inside a <code>`...`</code> template, between its delimiters and around its interpolations.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-M_RAW_TEMPLATE">
+          <h3>
+            <a class="anchor" href="#item-M_RAW_TEMPLATE">M_RAW_TEMPLATE</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>pub let M_RAW_TEMPLATE: i64 = 2</code></pre>
+
+          <div class="doc"><p>The same for a <code>```...```</code> template, whose text scans verbatim.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-S_STRING">
+          <h3>
+            <a class="anchor" href="#item-S_STRING">S_STRING</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>pub let S_STRING = &#34;string.quoted.double.aipl&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-S_PUNCT">
+          <h3>
+            <a class="anchor" href="#item-S_PUNCT">S_PUNCT</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>pub let S_PUNCT = &#34;punctuation.aipl&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -614,42 +669,28 @@
 
 
 
-        <section class="item" id="item-tpl_kind">
+        <section class="item" id="item-tpl_text">
           <h3>
-            <a class="anchor" href="#item-tpl_kind">tpl_kind</a>
+            <a class="anchor" href="#item-tpl_text">tpl_text</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn tpl_kind(text: str, seg: Seg) -&#62; AiplTok</code></pre>
+          <pre class="signature"><code>fn tpl_text(text: str) -&#62; AiplTok</code></pre>
 
-          <div class="doc"><p>The <code>OfSeg</code> emit for the <code>`...`</code> template rule: the <code>Template</code> matcher hands each text segment's <em>raw</em> text plus its position (<code>Plain</code> for an interpolation-free literal, else <code>Head</code>/<code>Middle</code>/<code>Tail</code>), and this maps each to its own <code>AiplTok</code> arm — decoding the segment's escapes (<code>\`</code>/<code>\n</code>/… as in the <code>escapes</code> set below, plus the template's own <code>\{</code>/<code>\}</code>) with <code>unescape</code>, exactly as the <code>&quot;...&quot;</code> emit does. An interpolation-free template (<code>Plain</code>) folds into <code>StrLit</code> (with <code>Backtick</code> style) — the same token any other string literal produces — while a template <em>with</em> interpolations keeps distinct <code>TemplateHead</code>/<code>Mid</code>/<code>Tail</code> kinds.</p></div>
+          <div class="doc"><p>The text emit for a <code>`...`</code> template's segments: the <code>UpToAny</code> matcher hands the segment's <em>raw</em> text, and this decodes its escapes (<code>\`</code>/<code>\n</code>/… as in the <code>escapes</code> set below, plus the template's own <code>\{</code>/<code>\}</code>) with <code>unescape</code>, exactly as the <code>&quot;...&quot;</code> emit does.</p></div>
 
 
         </section>
 
 
 
-        <section class="item" id="item-dedent_segments">
+        <section class="item" id="item-raw_tpl_text">
           <h3>
-            <a class="anchor" href="#item-dedent_segments">dedent_segments</a>
+            <a class="anchor" href="#item-raw_tpl_text">raw_tpl_text</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn dedent_segments(segs: str[]) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn raw_tpl_text(text: str) -&#62; AiplTok</code></pre>
 
-          <div class="doc"><p>The segment finalizer for the raw-template rule (the <code>Template</code> matcher's <code>finalize</code>): de-dent the whole literal's text segments <em>together</em>, so the common indent is computed across the entire template — just like a <code>&quot;&quot;&quot;</code> raw string. The segments are joined by the literal's own delimiter (which can't occur inside a raw segment, since it would have closed the literal — unlike a brace, which <code>\{</code> can spell), de-dented as one block via the dogfooded <code>process_raw_string</code>, then split back. A no-interpolation raw template is the one-segment case (de-dent that single segment).</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-raw_tpl_kind">
-          <h3>
-            <a class="anchor" href="#item-raw_tpl_kind">raw_tpl_kind</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn raw_tpl_kind(text: str, seg: Seg) -&#62; AiplTok</code></pre>
-
-          <div class="doc"><p>The <code>OfSeg</code> emit for the <code>```...```</code> raw-template rule: like <code>tpl_kind</code>, but the delimiter scans verbatim (empty <code>escapes</code>), so the segment text is decoded only for the template's own <code>\{</code>/<code>\}</code> — a lone <code>`</code>/<code>``</code> or any other backslash inside is content. The segments arrive already de-dented (by <code>dedent_segments</code>, the rule's <code>finalize</code>), so this decodes the braces and wraps them: an interpolation-free raw template (<code>Plain</code>) folds into <code>StrLit</code> with <code>TripleBacktick</code> style, and an interpolated one keeps distinct <code>RawTemplate*</code> kinds.</p></div>
+          <div class="doc"><p>The same for a <code>```...```</code> template's segments, whose delimiter scans verbatim: a lone <code>`</code> or any other backslash inside is content, so only the template's own <code>\{</code>/<code>\}</code> are decoded.</p><p><strong>The text is not de-dented here.</strong> A raw template's indent is common to the whole literal, so de-denting is a operation over every segment at once — and a lexer reading one token at a time never holds them all. The parser's lowering does it, over the segments it has just collected, which is also where the CST path already did it (<code>template_segments</code>): one implementation instead of two.</p></div>
 
 
         </section>
@@ -678,6 +719,118 @@
           <pre class="signature"><code>fn char_lit_emit(text: str) -&#62; AiplTok!str</code></pre>
 
           <div class="doc"><p>Decode and validate a single-quote literal. This is where AIPL <em>defines</em> what a char literal is: the <code>Delimited(&quot;'&quot;, ..)</code> matcher (the same escape-aware scan <code>&quot;...&quot;</code> strings use) just hands over the un-decoded text between the quotes, and this emit unescapes it and requires exactly one char — so an empty (<code>''</code>) or multi-char (<code>'ab'</code>, <code>'multiple'</code>) literal is a hard error. As a <code>Try</code> emit the library pairs the message with the <em>whole</em> literal's span, so the caret underlines the entire bad token. Unknown escapes and unterminated literals are caught earlier, by the matcher's own scan (its <code>escapes</code> set).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-S_KEYWORD">
+          <h3>
+            <a class="anchor" href="#item-S_KEYWORD">S_KEYWORD</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let S_KEYWORD = &#34;keyword.control.aipl&#34;</code></pre>
+
+          <div class="doc"><p>The AIPL rule set. Order is priority (the first matching rule wins): skipped whitespace and recorded comments/markers first; then every keyword and constant (each its own <code>kw</code> rule) before the identifier rule, so <code>fn</code> isn't swallowed as a <code>Name</code>; then numbers, strings, char literals, and templates; and finally the operator/punctuation rules — each spelling its own <code>op</code> rule, listed longest first so first-match-wins still yields maximal munch (<code>==</code> before <code>=</code>), since separate rules don't get <code>Exact</code>'s automatic longest-match. The TextMate scopes AIPL's tokens are painted with, named once here so the rule table below reads as spelling/kind/scope triples and <code>editors/vscode/syntaxes/aipl.tmLanguage.json</code> — generated from this table by <code>highlight_aipl.aipl</code> — cannot disagree with it. These are TextMate's conventional names, which is what lets an editor theme colour AIPL without knowing anything about AIPL.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-S_CONSTANT">
+          <h3>
+            <a class="anchor" href="#item-S_CONSTANT">S_CONSTANT</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let S_CONSTANT = &#34;constant.language.aipl&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-S_IMPORT">
+          <h3>
+            <a class="anchor" href="#item-S_IMPORT">S_IMPORT</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let S_IMPORT = &#34;keyword.control.import.aipl&#34;</code></pre>
+
+          <div class="doc"><p><code>import</code>/<code>from</code>/<code>as</code> are keywords like any other, but scoped as the import-statement family so a theme can colour a module header on its own. They are consecutive in the table below, so they come out of the highlighter generator as one alternation between the two halves of the keyword run.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-S_NAME">
+          <h3>
+            <a class="anchor" href="#item-S_NAME">S_NAME</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let S_NAME = &#34;variable.other.aipl&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-S_NUMBER">
+          <h3>
+            <a class="anchor" href="#item-S_NUMBER">S_NUMBER</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let S_NUMBER = &#34;constant.numeric.integer.aipl&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-S_CHAR">
+          <h3>
+            <a class="anchor" href="#item-S_CHAR">S_CHAR</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let S_CHAR = &#34;string.quoted.single.aipl&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-S_OPERATOR">
+          <h3>
+            <a class="anchor" href="#item-S_OPERATOR">S_OPERATOR</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let S_OPERATOR = &#34;keyword.operator.aipl&#34;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-S_DOC">
+          <h3>
+            <a class="anchor" href="#item-S_DOC">S_DOC</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let S_DOC = &#34;comment.line.documentation.aipl&#34;</code></pre>
+
+          <div class="doc"><p>A doc comment is documentation, not an aside — a highlighter paints it like a doc string rather than like a <code>//</code> comment, which is what every editor theme already distinguishes.</p></div>
 
 
         </section>

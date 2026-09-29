@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">107 files, 1292 items.</p>
+      <p class="summary">107 files, 1297 items.</p>
 
       <ul class="files">
 
@@ -617,7 +617,7 @@
           <p class="file-summary"><code>format_source</code>, the formatter's top-level pipeline.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-format_source.html#private">8 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-format_source.html#private">12 private</a></span>
 
 
           <ul class="items">
@@ -737,7 +737,7 @@
           <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">166 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">167 private</a></span>
 
 
           <ul class="items">
@@ -987,7 +987,7 @@
           <p class="file-summary">Generates a TextMate grammar — the <code>.tmLanguage.json</code> a VS Code, Sublime or Zed extension ships — from the data a language is <em>already</em> described with.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-highlight.html#private">22 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-highlight.html#private">24 private</a></span>
 
 
           <ul class="items">
@@ -1029,6 +1029,11 @@
 
             <li>
               <a href="crates-aipl-codegen-src-highlight.html#item-matcher_regex"><code>matcher_regex</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-highlight.html#item-template_inner"><code>template_inner</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
 
@@ -1087,7 +1092,7 @@
           <p class="file-summary">AIPL's own TextMate grammar, as data — the file <code>editors/vscode/syntaxes/aipl.tmLanguage.json</code> is generated from. This is the highlighter's counterpart of <code>lex_aipl.aipl</code>: <code>highlight.aipl</code> is the generic machinery, and this is just the table.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-highlight_aipl.html#private">5 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-highlight_aipl.html#private">6 private</a></span>
 
 
           <ul class="items">
@@ -1282,7 +1287,7 @@
           <p class="file-summary">A lexer for AIPL itself, built on the <code>lexer.aipl</code> library: it pins the library's generic <code>Token&lt;K&gt;</code>/<code>TokenRule&lt;K&gt;</code>/<code>lex&lt;K&gt;</code> to AIPL's own token-kind variant <code>AiplTok</code> and describes AIPL's tokens as a plain <code>TokenRule</code> list.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lex_aipl.html#private">9 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lex_aipl.html#private">16 private</a></span>
 
 
           <ul class="items">
@@ -1318,6 +1323,31 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-lex_aipl.html#item-M_BASE"><code>M_BASE</code></a>
+              <span class="kind kind-const">let</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lex_aipl.html#item-M_TEMPLATE"><code>M_TEMPLATE</code></a>
+              <span class="kind kind-const">let</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lex_aipl.html#item-M_RAW_TEMPLATE"><code>M_RAW_TEMPLATE</code></a>
+              <span class="kind kind-const">let</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lex_aipl.html#item-S_STRING"><code>S_STRING</code></a>
+              <span class="kind kind-const">let</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lex_aipl.html#item-S_PUNCT"><code>S_PUNCT</code></a>
+              <span class="kind kind-const">let</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-lex_aipl.html#item-aipl_rules"><code>aipl_rules</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
@@ -1347,7 +1377,7 @@
           <p class="file-summary">A small library for building lexers. <code>lex</code> turns source text into a flat <code>Token[]</code>, driven by an ordered <code>TokenRule[]</code> describing the language being lexed. Each rule pairs a caller-chosen <code>kind</code> label with a <code>Matcher</code> — a data-only description of one token shape (a char-class run, a list of fixed spellings, a delimited literal, ...) — so a rule set is plain data and one <code>lex</code> serves many languages; see the JSON and AIPL-flavored rule sets in the tests. At each position the <em>first</em> rule whose matcher matches wins, so order is priority: put keywords before identifiers, floats before ints. Whitespace is an ordinary rule marked <code>skip: true</code> — matched and consumed, but producing nothing. Rules marked <code>trivia: true</code> (comments, lint markers) are consumed the same way but recorded in the result's trivia side-channel, so a formatter or lint pass can find them without them cluttering the token stream. Lexing can fail: a byte no rule matches, or a matcher that matches invalid input outright (an unterminated <code>Delimited</code> token), aborts the lex with a <code>LexError</code> — a message plus the span of the offending source.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lexer.html#private">25 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lexer.html#private">21 private</a></span>
 
 
           <ul class="items">
@@ -1368,11 +1398,6 @@
             </li>
 
             <li>
-              <a href="crates-aipl-codegen-src-lexer.html#item-Seg"><code>Seg</code></a>
-              <span class="kind kind-variant">variant</span>
-            </li>
-
-            <li>
               <a href="crates-aipl-codegen-src-lexer.html#item-Emit"><code>Emit</code></a>
               <span class="kind kind-variant">variant</span>
             </li>
@@ -1385,6 +1410,16 @@
             <li>
               <a href="crates-aipl-codegen-src-lexer.html#item-Matcher"><code>Matcher</code></a>
               <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lexer.html#item-Transition"><code>Transition</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lexer.html#item-ModeFrame"><code>ModeFrame</code></a>
+              <span class="kind kind-struct">struct</span>
             </li>
 
             <li>

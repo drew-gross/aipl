@@ -76,6 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  Tpl and Tok should not be abbreviated
   re_escape_set should use a map of some sort probably
   delimited should use a char set
   remove PARSER_LIBRARY.md references since that project is complete
@@ -137,6 +138,7 @@ integer signedness problems:
   3. Test-block effect poisoning, now with a concrete reproducer. A specialization created inside a .test body inherits its "all effects allowed", and a production caller reuses that instance — so float_len failed with ucount_while$lam0 has effect "!prints". I diagnosed it by bisecting (removing just the test block fixed it) rather than guessing, and it's why ucount_while carries no test of its own; its behavior is covered through its four callers in the lex tests.
 
 dev loop:
+  have the clir IR include the human readable version of data section strings in comments
   check should also validate sections (e.g. performance)
   dbg() function
   report type errors from different functions
@@ -172,8 +174,8 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
-  that's a live miscompile (an empty #{char} reading as len=1),
-  lex(`"a\\`, strs) should be unterminated delimited token, because strs doesn't have any escapes
+  A struct field default must be a literal, so go: Transition = Stay is impossible; an optional-of-variant field is also rejected outright.
+  Struct-field defaults don't widen an integer literal to u64
   aipl_arr_ensure_heap for a reversed view appears to dec the inner array twice
   binding_is_exclusive treats a later slice of a mut array as an alias for the whole body, so a push loop before the slice copies per iteration
   1 + rs.fold(0, |n, r| n + r.size()) should work, currently doens't due to wrong type getting pinned
@@ -667,11 +669,11 @@ figure out / fix why template literals are peforming worse than concat chains
 make try_left_fold and try_right_fold for use when the lambda returns an error
 
 lexer:
+  "No push" is now a negative sentinel <--- don't do this, sentinels are bad. use optionals
   if Keyword boundary defaults to empty set I think we don't need a separate Exact
   maybe instead of keep_skipped that modifies a ruleset we should have lex_lossless that lexes with trivia. Maybe then we don't even need a trivia/skip split?
 - remove the dump/load stuff when the FFI supports the full lex result
 - Should be able to detect infinite loop - if a lext step succeeded and consumed no charachters, error. Then get rid of 0 < len checks.
-- lexer lib seems to know too much about how template literals work. Probably needs a "mode stack" to fully resolve it.
 - give LexError an optional secondary span+message (a "note") so the nested
   unclosed-interpolation error can again point back at the real culprit `{`
   (dropped when the native lexer was deleted; see
@@ -679,12 +681,6 @@ lexer:
   threaded across the FFI (marshal_lex, LexedError) and rendered by Error.
 
 check if flat vec is more performant for cons list in doc.aipl (use runtime perf numbers) NOTE: probably should make a perf test to format entire codebase for this
-
-have the clir IR include the human readable version of data section strings in comments
-
-improve dogfooding:
-- stop using global function ids.
-- go back to one .clif file per .aipl file
 
 Nested matching e.g.
     match (opt_of_array) {
@@ -745,6 +741,9 @@ docs:
   doc comments for struct fields
   make the types and etc. into links
   the docs are showing a mangled name for tm_json, please fix
+
+highlighting:
+  template highlighting shouldn't need to be hand-written.
 
 optional:
   value_or can't unwrap struct optionals — needs match. <--- fix this

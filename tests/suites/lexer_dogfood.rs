@@ -97,14 +97,14 @@ fn categorize(case: &str) -> &'static str {
         | "Without" => "keyword",
         "Name" => "ident",
         "IntLit" => "number",
-        // Every string literal — `"..."`, `"""..."""`, and an interpolation-free
-        // `` `...` ``/```` ```...``` ```` template — is one `StrLit` (its
-        // delimiter kept as a style, dropped for this category dump).
+        // A `"..."` or `"""..."""` literal is one `StrLit` (its delimiter kept as
+        // a style, dropped for this category dump).
         "StrLit" => "str",
         "CharTok" => "char",
-        // A template-literal piece (head/middle/tail) folds into `str`.
-        "TemplateHead" | "TemplateMid" | "TemplateTail" | "RawTemplateHead" | "RawTemplateMid"
-        | "RawTemplateTail" => "str",
+        // A template is a run of tokens: its delimiters and its text runs fold
+        // into `str`, while the braces around each interpolation are the
+        // ordinary `LBrace`/`RBrace` below.
+        "TplOpen" | "TplText" | "TplClose" => "str",
         "True" | "False" | "None" => "constant",
         "EqEq" | "Ne" | "Arrow" | "FatArrow" | "AndAnd" | "OrOr" | "Pipe" | "DotDot"
         | "PlusPlusPlus" | "PlusPlus" | "MinusMinus" | "PlusEq" | "MinusEq" | "StarEq"

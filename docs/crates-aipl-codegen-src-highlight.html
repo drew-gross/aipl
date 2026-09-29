@@ -158,6 +158,20 @@
 
 
 
+        <section class="item" id="item-template_inner">
+          <h3>
+            <a class="anchor" href="#item-template_inner">template_inner</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn template_inner(escapes: #{char}, esc_scope: str, punct_scope: str) -&#62; Pat[]</code></pre>
+
+          <div class="doc"><p>What lies inside a template literal: its escapes and the <code>{ .. }</code> interpolation, which includes the whole language back into itself so an interpolated expression keeps its ordinary scopes. The escapes always include the template's own <code>\{</code>/<code>\}</code>, listed ahead of the interpolation so an escaped brace is painted as one rather than opening it. The brace group comes first inside so a <code>{ .. }</code> <em>inside</em> the expression — a set literal, a struct — closes itself rather than the interpolation; see <code>brace_group_entry</code>.</p><p>The interpolation region is scoped as punctuation for the sake of its two braces — which are ordinary <code>{</code>/<code>}</code> tokens, and have to be painted as such — and every token between them is painted over by <code>main</code>'s own patterns. Same arrangement, and the same reason, as <code>brace_group_entry</code>.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-brace_group_entry">
           <h3>
             <a class="anchor" href="#item-brace_group_entry">brace_group_entry</a>
@@ -247,7 +261,7 @@
             <a class="anchor" href="#item-tm_json">tm_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn tm_json(__spat$24103: Tm) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn tm_json(__spat$25146: Tm) -&#62; str</code></pre>
 
           <div class="doc"><p><code>g</code> as the <code>.tmLanguage.json</code> text an editor extension ships: two-space indented, one trailing newline. Generated files are read in diffs, so the layout is fixed and deterministic rather than minified.</p></div>
 
@@ -370,14 +384,42 @@
 
 
 
-        <section class="item" id="item-template_inner">
+        <section class="item" id="item-stop_leaders">
           <h3>
-            <a class="anchor" href="#item-template_inner">template_inner</a>
+            <a class="anchor" href="#item-stop_leaders">stop_leaders</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn template_inner(escapes: #{char}, esc_scope: str) -&#62; Pat[]</code></pre>
+          <pre class="signature"><code>fn stop_leaders(stops: str[]) -&#62; #{char}</code></pre>
 
-          <div class="doc"><p>What lies inside a template literal: its escapes and the <code>{ .. }</code> interpolation, which includes the whole language back into itself so an interpolated expression keeps its ordinary scopes. The escapes always include the template's own <code>\{</code>/<code>\}</code> (see <code>Template</code> in <code>lexer.aipl</code>), listed ahead of the interpolation so an escaped brace is painted as one rather than opening it. The brace group comes first inside so a <code>{ .. }</code> <em>inside</em> the expression — a set literal, a struct — closes itself rather than the interpolation; see <code>brace_group_entry</code>.</p></div>
+          <div class="doc"><p>The first character of each stop spelling — what a negated class can be built from. Sliced rather than taken as a <code>char</code>, so the leaders arrive as the <code>str</code> a set is made from; a stop is never empty (a rule stopping on nothing would never advance), so every slice has a character in it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-char_class_not">
+          <h3>
+            <a class="anchor" href="#item-char_class_not">char_class_not</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn char_class_not(chars: #{char}) -&#62; str</code></pre>
+
+          <div class="doc"><p>A negated character class: <code>[^ab]</code>, matching one character that is none of them.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-escape_alternative">
+          <h3>
+            <a class="anchor" href="#item-escape_alternative">escape_alternative</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn escape_alternative(escapes: #{char}) -&#62; str</code></pre>
+
+          <div class="doc"><p>The <code>\X|</code> alternative that lets an escaped stop stay inside a run, or nothing when the rule scans verbatim.</p></div>
 
 
         </section>
@@ -501,7 +543,7 @@
             <a class="anchor" href="#item-entry_json">entry_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn entry_json(__spat$26816: Entry) -&#62; str</code></pre>
+          <pre class="signature"><code>fn entry_json(__spat$27859: Entry) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

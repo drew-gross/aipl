@@ -74,9 +74,9 @@ import {
     Matcher,
     Nested,
     OneChar,
-    Template,
     ToEol,
     TokenRule,
+    UpToAny,
 } from "./lexer.aipl";
 
 // ---------- the TextMate model ----------
@@ -256,11 +256,16 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
             [Include(entry_name(scope))],
             scope=scope,
         ),
-        Template(open, escapes, _) => Region(
-            re_escape(open),
-            re_escape(open),
-            template_inner(escapes, esc_scope),
-            scope=scope,
+        // A run up to the first of its stops, as a negated class over the
+        // characters those stops *start* with. Exact when every stop is one
+        // character, which is the case a mode-driven rule set writes; a
+        // multi-character stop ends the painted run at its first character
+        // instead, which paints one token less rather than anything wrong. It
+        // is the closest the dialect allows: the faithful pattern is a negative
+        // lookahead, and `regex` has no lookaround (see the header).
+        UpToAny(stops, escapes, _) => Match(
+            `{escape_alternative(escapes)}{char_class_not(stop_leaders(stops))}+`,
+            scope,
         ),
     }
 }.test({
@@ -306,22 +311,10 @@ pub fn matcher_pat(m: Matcher, scope: str, esc_scope: str) -> Pat {
         scope="comment.block.aipl",
     ));
 
-    // A template carries its escapes *and* an interpolation that includes the
-    // whole language back into itself; a raw one (no escapes) carries only the
-    // interpolation.
-    let interp: Pat = Region("""\{""", """\}""", [Include("brace-group"), Include("main")]);
-    assert(matcher_pat(Template("`", "nt".to_set(), |segs: str[]| segs), "s", "esc") == Region(
-        "`",
-        "`",
-        [Match("""\\[nt{}]""", "esc"), interp],
-        scope="s",
-    ));
-    // A raw template's escapes are the braces alone.
-    assert(matcher_pat(Template("```", #{}, |segs: str[]| segs), "s", "esc") == Region(
-        "```",
-        "```",
-        [Match("""\\[{}]""", "esc"), interp],
-        scope="s",
+    // A run up to a stop is a negated class over the stops' first characters.
+    assert(matcher_pat(UpToAny(["`", "{"], "nt".to_set()), "s", "esc") == Match(
+        """\\[nt]|[^`{]+""",
+        "s",
     ));
 })
 
@@ -341,23 +334,48 @@ pub fn matcher_regex(m: Matcher) -> str? {
     assert(matcher_regex(Delimited(`"`.to_set(), escaped=#{'n', 't'})) == none);
     assert(matcher_regex(Between("<", ">")) == none);
     assert(matcher_regex(Nested("/*", "*/")) == none);
-    assert(matcher_regex(Template("`", #{}, |segs: str[]| segs)) == none);
 })
 
 # A backslash followed by one of `escapes` — what a delimited scan treats as an
 # escape rather than as content.
 fn escape_pat(escapes: #{char}, scope: str) -> Pat { Match(`\\\\{char_class(escapes)}`, scope) }
 
+# The first character of each stop spelling — what a negated class can be built
+# from. Sliced rather than taken as a `char`, so the leaders arrive as the `str`
+# a set is made from; a stop is never empty (a rule stopping on nothing would
+# never advance), so every slice has a character in it.
+fn stop_leaders(stops: str[]) -> #{char} { stops.map(|s| s[..1]).join().to_set() }
+
+# A negated character class: `[^ab]`, matching one character that is none of
+# them.
+fn char_class_not(chars: #{char}) -> str { `[^{char_class_body(chars)}]` }
+
+# The `\X|` alternative that lets an escaped stop stay inside a run, or nothing
+# when the rule scans verbatim.
+fn escape_alternative(escapes: #{char}) -> str {
+    if (escapes.is_empty()) { "" } else { `\\\\{char_class(escapes)}|` }
+}
+
 # What lies inside a template literal: its escapes and the `{ .. }`
 # interpolation, which includes the whole language back into itself so an
 # interpolated expression keeps its ordinary scopes. The escapes always include
-# the template's own `\{`/`\}` (see `Template` in `lexer.aipl`), listed ahead of
+# the template's own `\{`/`\}`, listed ahead of
 # the interpolation so an escaped brace is painted as one rather than opening
 # it. The brace group comes first inside so a `{ .. }` *inside* the expression —
 # a set literal, a struct — closes itself rather than the interpolation; see
 # `brace_group_entry`.
-fn template_inner(escapes: #{char}, esc_scope: str) -> Pat[] {
-    let interp: Pat = Region("""\{""", """\}""", [Include("brace-group"), Include("main")]);
+#
+# The interpolation region is scoped as punctuation for the sake of its two
+# braces — which are ordinary `{`/`}` tokens, and have to be painted as such —
+# and every token between them is painted over by `main`'s own patterns. Same
+# arrangement, and the same reason, as `brace_group_entry`.
+pub fn template_inner(escapes: #{char}, esc_scope: str, punct_scope: str) -> Pat[] {
+    let interp: Pat = Region(
+        """\{""",
+        """\}""",
+        [Include("brace-group"), Include("main")],
+        scope=punct_scope,
+    );
     let braces: #{char} = "{}".to_set();
     [escape_pat(escapes.union(braces), esc_scope), interp]
 }
@@ -543,9 +561,9 @@ fn self_referential(m: Matcher) -> bool {
         | Keyword(..)
         | Delimited(..)
         | Between(..)
-        | Template(..)
         | ToEol(..)
         | ToEolUnless(..)
+        | UpToAny(..)
         | Int
         | Float => false,
     }
@@ -738,15 +756,15 @@ fn json_char(ch: char) -> str {
 
 variant Kind = Punct
 --- performance ---
-allocations: 546
-deallocations: 546
+allocations: 512
+deallocations: 512
 reallocations: 38
-bytes allocated: 43486
-instructions executed: 116161
-binary size: 124104
-  code: 81464
-  data: 5568
-  metadata: 37072
+bytes allocated: 39926
+instructions executed: 110788
+binary size: 119872
+  code: 79260
+  data: 5200
+  metadata: 35412
 functions:
   __arr_drop_Entry:
     calls: 3
@@ -755,11 +773,11 @@ functions:
     calls: 7
     bytes: 172
   __arr_drop_Pat:
-    calls: 30
+    calls: 21
     bytes: 116
   __arr_drop___m3__TokenRule$Kind:
     calls: 2
-    bytes: 384
+    bytes: 388
   __arr_retain_Entry:
     calls: 1
     bytes: 148
@@ -771,7 +789,7 @@ functions:
     bytes: 116
   __arr_retain___m3__TokenRule$Kind:
     calls: 0
-    bytes: 384
+    bytes: 388
   __builtin_all$char$s0$lam$__builtin_is_whitespace:
     calls: 38
     bytes: 304
@@ -788,10 +806,10 @@ functions:
     calls: 2
     bytes: 284
   __eq_Pat:
-    calls: 20
+    calls: 12
     bytes: 480
   __eq_Pat$arr:
-    calls: 13
+    calls: 9
     bytes: 300
   __eq_set$char:
     calls: 3
@@ -803,7 +821,7 @@ functions:
     calls: 12
     bytes: 1660
   __rec_drop_Pat:
-    calls: 76
+    calls: 57
     bytes: 268
   __test$brace_group_entry:
     calls: 1
@@ -819,25 +837,16 @@ functions:
     bytes: 852
   __test$matcher_pat:
     calls: 1
-    bytes: 11812
-  __test$matcher_pat$lambda0:
-    calls: 0
-    bytes: 64
-  __test$matcher_pat$lambda1:
-    calls: 0
-    bytes: 64
+    bytes: 9192
   __test$matcher_regex:
     calls: 1
-    bytes: 7012
-  __test$matcher_regex$lambda0:
-    calls: 0
-    bytes: 64
+    bytes: 5744
   __test$re_escape:
     calls: 1
     bytes: 1104
   __test$rule_pats:
     calls: 1
-    bytes: 8016
+    bytes: 8556
   __test$tm_json:
     calls: 1
     bytes: 4876
@@ -854,7 +863,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 47
+    calls: 45
     bytes: (external)
   aipl_arr_reserve:
     calls: 1
@@ -863,10 +872,10 @@ functions:
     calls: 12
     bytes: (external)
   aipl_array_dec:
-    calls: 471
+    calls: 437
     bytes: (external)
   aipl_array_new:
-    calls: 56
+    calls: 48
     bytes: (external)
   aipl_array_push:
     calls: 9
@@ -878,16 +887,16 @@ functions:
     calls: 6
     bytes: (external)
   aipl_assert:
-    calls: 46
+    calls: 44
     bytes: (external)
   aipl_rec_alloc:
-    calls: 76
+    calls: 57
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 180
+    calls: 154
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 104
+    calls: 97
     bytes: (external)
   aipl_test_begin:
     calls: 10
@@ -905,14 +914,11 @@ functions:
     calls: 0
     bytes: 788
   char_class_body:
-    calls: 17
+    calls: 16
     bytes: 1996
   entry_name:
     calls: 5
     bytes: 444
-  escape_pat:
-    calls: 5
-    bytes: 456
   fld:
     calls: 6
     bytes: 348
@@ -923,8 +929,8 @@ functions:
     calls: 1
     bytes: 760
   matcher_pat:
-    calls: 26
-    bytes: 6280
+    calls: 24
+    bytes: 8024
   obj_fld:
     calls: 1
     bytes: 1900
@@ -935,11 +941,11 @@ functions:
     calls: 2
     bytes: 3112
   re_escape:
-    calls: 38
+    calls: 32
     bytes: 1928
   re_escape_set:
     calls: 4
     bytes: 736
   rule_pats$Kind:
     calls: 2
-    bytes: 9388
+    bytes: 9428

@@ -1762,15 +1762,15 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 5995
-deallocations: 5995
+allocations: 6098
+deallocations: 6098
 reallocations: 1430
-bytes allocated: 703652
-instructions executed: 1777172
-binary size: 748872
-  code: 454180
-  data: 12892
-  metadata: 281800
+bytes allocated: 716908
+instructions executed: 1917858
+binary size: 744552
+  code: 451668
+  data: 12644
+  metadata: 280240
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1793,15 +1793,15 @@ functions:
   __arr_drop___m3__Rule$Tok:
     calls: 278
     bytes: 116
-  __arr_drop___m4__StepResult$Tok:
+  __arr_drop___m4__ModeFrame:
     calls: 0
-    bytes: 140
+    bytes: 120
   __arr_drop___m4__Token$Tok:
     calls: 497
     bytes: 188
   __arr_drop___m4__TokenRule$Tok:
     calls: 103
-    bytes: 472
+    bytes: 476
   __arr_retain_Node:
     calls: 16
     bytes: 116
@@ -1823,15 +1823,15 @@ functions:
   __arr_retain___m3__Rule$Tok:
     calls: 576
     bytes: 116
-  __arr_retain___m4__StepResult$Tok:
+  __arr_retain___m4__ModeFrame:
     calls: 0
-    bytes: 140
+    bytes: 120
   __arr_retain___m4__Token$Tok:
     calls: 295
     bytes: 188
   __arr_retain___m4__TokenRule$Tok:
     calls: 0
-    bytes: 472
+    bytes: 476
   __builtin_all$__m3__Rule$Tok$lam$rule_nullable$Tok$lambda0:
     calls: 0
     bytes: 36
@@ -1847,6 +1847,9 @@ functions:
   __builtin_any$__m3__Rule$Tok$lam$rule_nullable$Tok$lambda1$tail:
     calls: 0
     bytes: 380
+  __builtin_any$str$lam$__m4__up_to_any_len$lambda0:
+    calls: 0
+    bytes: 324
   __builtin_count_while$char$lam$__m4__lex_step$Tok$lambda1:
     calls: 230
     bytes: 308
@@ -2045,33 +2048,21 @@ functions:
   __m4__delimited_len:
     calls: 0
     bytes: 1952
-  __m4__finalize_template$Tok:
-    calls: 0
-    bytes: 4396
   __m4__float_len:
     calls: 0
     bytes: 824
-  __m4__interp_scan$Tok:
-    calls: 0
-    bytes: 1896
   __m4__lex$Tok:
     calls: 103
-    bytes: 1196
+    bytes: 3552
   __m4__lex_step$Tok:
     calls: 371
-    bytes: 16972
+    bytes: 19224
   __m4__nested_len:
     calls: 0
     bytes: 1148
   __m4__step_result$Tok:
     calls: 998
-    bytes: 6744
-  __m4__template_scan$Tok:
-    calls: 0
-    bytes: 2844
-  __m4__template_step$Tok:
-    calls: 0
-    bytes: 444
+    bytes: 6828
   __m4__to_eol_len:
     calls: 0
     bytes: 52
@@ -2081,6 +2072,9 @@ functions:
   __m4__to_eol_unless_len:
     calls: 0
     bytes: 360
+  __m4__up_to_any_len:
+    calls: 0
+    bytes: 1520
   __m6__line_at:
     calls: 5
     bytes: 652
@@ -2116,7 +2110,7 @@ functions:
     bytes: 932
   __test$parse$trivia_rules:
     calls: 3
-    bytes: 3804
+    bytes: 4128
   __test_try_fail___m3__ParseError:
     calls: 0
     bytes: 84
@@ -2136,7 +2130,7 @@ functions:
     calls: 1984
     bytes: (external)
   aipl_arr_inc:
-    calls: 32594
+    calls: 36204
     bytes: (external)
   aipl_arr_reserve:
     calls: 2199
@@ -2151,7 +2145,7 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 42180
+    calls: 46291
     bytes: (external)
   aipl_array_new:
     calls: 762
@@ -2163,7 +2157,7 @@ functions:
     calls: 2337
     bytes: (external)
   aipl_array_with_cap:
-    calls: 666
+    calls: 769
     bytes: (external)
   aipl_assert:
     calls: 99
@@ -2317,7 +2311,7 @@ functions:
     bytes: 876
   tok_rules:
     calls: 100
-    bytes: 3160
+    bytes: 3400
   tok_text$Tok$Node:
     calls: 211
     bytes: 904

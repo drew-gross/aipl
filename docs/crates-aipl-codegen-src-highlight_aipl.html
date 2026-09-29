@@ -44,6 +44,20 @@
         <p class="note">Not importable from another file.</p>
 
 
+        <section class="item" id="item-template_pat">
+          <h3>
+            <a class="anchor" href="#item-template_pat">template_pat</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn template_pat(delim: str, escapes: #{char}) -&#62; Pat</code></pre>
+
+          <div class="doc"><p>One template literal as a region: the delimiter opens and closes it, and inside are its escapes and the <code>{ .. }</code> interpolation that includes the whole language back into itself. <code>template_inner</code> builds the inside — the one piece of this that is not AIPL-specific, so it stays in <code>highlight.aipl</code>.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-escape_scope">
           <h3>
             <a class="anchor" href="#item-escape_scope">escape_scope</a>

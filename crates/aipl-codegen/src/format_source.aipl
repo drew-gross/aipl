@@ -21,16 +21,25 @@ import {
     equal as ==,
     filter,
     is_nonempty,
+    is_space,
     join,
     len,
+    less_than as <,
+    logical_and as &&,
     logical_not as !,
     map,
     map_err,
     not_equal as !=,
     push,
     sort,
+    split,
+    starts_with,
     to_str,
+    trim_while,
     value_or,
+    wrapping_add as +,
+    wrapping_add_assign as +=,
+    wrapping_increment as ++,
 } from builtins;
 import { clean_trailing_whitespace } from "./clean_trailing_whitespace.aipl";
 import { aipl_parse_file } from "./grammar_aipl.aipl";
@@ -41,14 +50,11 @@ import {
     Import,
     Pipe,
     Quoted,
-    RawTemplateHead,
-    RawTemplateMid,
-    RawTemplateTail,
     Semi,
     StrLit,
-    TemplateHead,
-    TemplateMid,
-    TemplateTail,
+    TplOpen,
+    TplText,
+    TripleBacktick,
     TripleQuoted,
     lex_aipl,
 } from "./lex_aipl.aipl";
@@ -221,24 +227,93 @@ fn token_value(kind: AiplTok) -> str {
         return `str {v}`;
     };
 
-    // A template's pieces likewise: the raw and single-backtick forms of one
-    // segment are one token, and `retemplate` moves between them.
-    if (let RawTemplateHead(v) = kind) {
-        return token_value(TemplateHead(v));
+    // A template's opener likewise: which delimiter it was written with is not
+    // part of the token, since `retemplate` moves a literal between the two.
+    // Its text segments need no such arm — both forms lex to one `TplText`.
+    if (let TplOpen(_) = kind) {
+        return TPL_OPEN;
     };
-    if (let RawTemplateMid(v) = kind) {
-        return token_value(TemplateMid(v));
+    if (let TplClose = kind) {
+        return TPL_CLOSE;
     };
-    if (let RawTemplateTail(v) = kind) {
-        return token_value(TemplateTail(v));
+
+    // A text segment reads as the string it is, so a literal respelled across
+    // the string/template line compares equal — see `collapse_templates`.
+    //
+    // Each line's leading indent comes off first. A raw template is de-dented
+    // across the whole literal, which no lexer reading one token at a time can
+    // do — so the segments arrive as written and the *parser* de-dents them
+    // (`template_segments`). Re-indenting the literal is therefore a change the
+    // formatter is allowed to make to these tokens, exactly as it may re-indent
+    // a `"""` block, and this is where that latitude is spelled out.
+    if (let TplText(v) = kind) {
+        return `str {v.strip_line_indent()}`;
     };
     to_str(kind)
 }.test({
     assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", Backtick)));
     assert(token_value(StrLit("a", Quoted)) == token_value(StrLit("a", TripleQuoted)));
     assert(token_value(StrLit("a", Quoted)) != token_value(StrLit("b", Quoted)));
-    assert(token_value(TemplateHead("a")) == token_value(RawTemplateHead("a")));
-    assert(token_value(TemplateHead("a")) != token_value(TemplateTail("a")));
+    assert(token_value(TplOpen(Backtick)) == token_value(TplOpen(TripleBacktick)));
+    assert(token_value(TplText("a")) != token_value(TplText("b")));
+})
+
+# Every line of `self` with its leading spaces and tabs removed — the shape of a
+# raw template's text that survives re-indentation.
+fn strip_line_indent(self: str) -> str {
+    self.split("\n").map(|line: str| line.trim_while(is_space)).join(sep="\n")
+}.test({
+    assert("a".strip_line_indent() == "a");
+    assert("  a".strip_line_indent() == "a");
+    assert("  a\n    b".strip_line_indent() == "a\nb");
+    // Only the *leading* run goes: what a line says is untouched.
+    assert("  a  b  ".strip_line_indent() == "a  b  ");
+})
+
+# The fingerprint spellings of a template's delimiters. Named because
+# `collapse_templates` matches on them, and a spelling matched in two places is
+# a spelling to write once.
+let TPL_OPEN = "tpl-open";
+
+let TPL_CLOSE = "tpl-close";
+
+# An interpolation-free template folded to the one string value it is.
+#
+# `` `a` `` and `"a"` are the same program — the parser lowers a template with
+# no interpolations to a plain string, and `requote` moves a literal between the
+# two spellings to save escapes. They are not the same *tokens*, though: one is
+# a run of three and the other is one, so a token-by-token comparison would call
+# a legal respelling a formatter bug. Folding the run is what lets the check
+# stay token-based everywhere else.
+fn collapse_templates(values: str[]) -> str[] {
+    mut out: str[] = [];
+    mut i: u64 = 0;
+    while (i < values.len()) {
+        let v = values[i].value_or("");
+        let next = values[i + 1].value_or("");
+        let closes = values[i + 2].value_or("") == TPL_CLOSE;
+        if (v == TPL_OPEN && next == TPL_CLOSE) {
+            set out.push("str ");
+            set i += 2;
+        } else if (v == TPL_OPEN && closes && next.starts_with("str ")) {
+            set out.push(next);
+            set i += 3;
+        } else {
+            set out.push(v);
+            set i++;
+        };
+    }
+    out
+}.test({
+    // An interpolation-free template collapses to the one string it is; the
+    // empty one to the empty string.
+    assert(collapse_templates([TPL_OPEN, "str a", TPL_CLOSE]) == ["str a"]);
+    assert(collapse_templates([TPL_OPEN, TPL_CLOSE]) == ["str "]);
+    assert(collapse_templates(["x", TPL_OPEN, "str a", TPL_CLOSE, "y"]) == ["x", "str a", "y"]);
+
+    // One with an interpolation keeps every piece — there is no string it is.
+    let interpolated = [TPL_OPEN, "str a", "{", "Name(x)", "}", TPL_CLOSE];
+    assert(collapse_templates(interpolated) == interpolated);
 })
 
 # Where two token lists first disagree, as `<before> became <after>`
@@ -315,7 +390,7 @@ fn token_fingerprint(lexed: LexResult<AiplTok>) -> TokenFingerprint {
     };
     TokenFingerprint {
         imports: imports.sort(),
-        rest,
+        rest: collapse_templates(rest),
         comments: lexed.trivia.map(|t| t.text.text).sort(),
     }
 }
@@ -348,21 +423,21 @@ fn is_layout(self: AiplTok) -> bool {
     assert(!StrLit(",", Quoted).is_layout());
 })
 --- performance ---
-allocations: 21187
-deallocations: 21187
-reallocations: 3094
-bytes allocated: 4655437
-instructions executed: 10088272
-binary size: 7645840
-  code: 5071648
-  data: 13242
-  metadata: 2560950
+allocations: 21434
+deallocations: 21434
+reallocations: 3186
+bytes allocated: 4817374
+instructions executed: 11031401
+binary size: 7600160
+  code: 5047248
+  data: 13498
+  metadata: 2539414
 functions:
   __arr_drop___m10__Ty:
     calls: 0
     bytes: 116
   __arr_drop___m11__ListStyle:
-    calls: 2432
+    calls: 2408
     bytes: 120
   __arr_drop___m11__Prec:
     calls: 8
@@ -371,7 +446,7 @@ functions:
     calls: 40
     bytes: 3888
   __arr_drop___m11__Rule$__m23__AiplTok:
-    calls: 2584
+    calls: 2552
     bytes: 116
   __arr_drop___m12__Cst:
     calls: 81
@@ -412,15 +487,15 @@ functions:
   __arr_drop___m22__Piece:
     calls: 0
     bytes: 228
-  __arr_drop___m24__StepResult$__m23__AiplTok:
-    calls: 0
-    bytes: 140
+  __arr_drop___m24__ModeFrame:
+    calls: 59
+    bytes: 120
   __arr_drop___m24__Token$__m23__AiplTok:
-    calls: 374
-    bytes: 388
+    calls: 376
+    bytes: 248
   __arr_drop___m24__TokenRule$__m23__AiplTok:
     calls: 51
-    bytes: 672
+    bytes: 536
   __arr_drop___m36__ImportEntry:
     calls: 0
     bytes: 148
@@ -511,15 +586,15 @@ functions:
   __arr_retain___m22__Piece:
     calls: 0
     bytes: 228
-  __arr_retain___m24__StepResult$__m23__AiplTok:
-    calls: 0
-    bytes: 140
+  __arr_retain___m24__ModeFrame:
+    calls: 30
+    bytes: 120
   __arr_retain___m24__Token$__m23__AiplTok:
-    calls: 288
-    bytes: 388
+    calls: 290
+    bytes: 248
   __arr_retain___m24__TokenRule$__m23__AiplTok:
-    calls: 288
-    bytes: 672
+    calls: 312
+    bytes: 536
   __arr_retain___m36__ImportEntry:
     calls: 0
     bytes: 148
@@ -583,6 +658,9 @@ functions:
   __builtin_any$__m17__Doc$lam$__m17__has_hard$tail:
     calls: 0
     bytes: 324
+  __builtin_any$str$lam$__m24__up_to_any_len$lambda0:
+    calls: 13
+    bytes: 324
   __builtin_any$str$lam$__m37__retemplate$lambda0:
     calls: 0
     bytes: 324
@@ -611,7 +689,7 @@ functions:
     calls: 161
     bytes: 280
   __builtin_count_while$char$s0$lam$__builtin_is_space:
-    calls: 0
+    calls: 9
     bytes: 304
   __builtin_count_while$char$s0$lam$__m19__dedent$lambda1:
     calls: 0
@@ -635,7 +713,7 @@ functions:
     calls: 240
     bytes: 404
   __builtin_find_index$str$lam$__m11__link_rule$__m23__AiplTok$lambda0:
-    calls: 772
+    calls: 768
     bytes: 404
   __builtin_find_index$str$lam$__m32__parse_prepared$__m23__AiplTok$__m5__Ast$lambda0:
     calls: 4
@@ -659,7 +737,7 @@ functions:
     calls: 0
     bytes: 44
   __builtin_map_join$__m11__Rule$__m23__AiplTok$__m11__ListStyle$lam$__m11__group_styles$__m23__AiplTok$tail:
-    calls: 1556
+    calls: 1532
     bytes: 1072
   __builtin_map_join$__m12__Cst$__builtin_Span$lam$__m12__token_leaves:
     calls: 0
@@ -680,7 +758,7 @@ functions:
     calls: 8
     bytes: 360
   __builtin_try_map$__m11__Rule$__m23__AiplTok$__m11__Rule$__m23__AiplTok$__m11__ParseError$lam$__m11__desugar_rule$__m23__AiplTok:
-    calls: 700
+    calls: 692
     bytes: 508
   __builtin_try_map$__m12__Cst$__m5__Ast$__m11__ParseError$lam$__m32__lower_node$__m23__AiplTok$__m5__Ast$lambda0:
     calls: 15
@@ -715,7 +793,7 @@ functions:
   __builtin_try_map$__m5__Ast$__m7__Expr$__m11__ParseError$lam$__m4__lower_block_tail$lambda0:
     calls: 0
     bytes: 10732
-  __builtin_try_map$__m5__Ast$__m7__Expr$__m11__ParseError$lam$__m4__lower_template$lambda0:
+  __builtin_try_map$__m5__Ast$__m7__Expr$__m11__ParseError$lam$__m4__lower_template$lambda2:
     calls: 0
     bytes: 10732
   __builtin_try_map$__m5__Ast$__m7__FieldInit$__m11__ParseError$lam$__m4__lower_atom$lambda3:
@@ -770,7 +848,7 @@ functions:
     calls: 10
     bytes: 64
   __eq_str$arr:
-    calls: 43
+    calls: 47
     bytes: 364
   __m10__show_ty:
     calls: 0
@@ -782,13 +860,13 @@ functions:
     calls: 324
     bytes: 580
   __m11__desugar_rule$__m23__AiplTok:
-    calls: 3676
+    calls: 3688
     bytes: 12048
   __m11__group_styles$__m23__AiplTok:
     calls: 0
     bytes: 32
   __m11__group_styles$__m23__AiplTok$tail:
-    calls: 13300
+    calls: 13324
     bytes: 3104
   __m11__link$__m23__AiplTok$__m5__Ast:
     calls: 4
@@ -797,10 +875,10 @@ functions:
     calls: 324
     bytes: 596
   __m11__link_rule$__m23__AiplTok:
-    calls: 3676
+    calls: 3688
     bytes: 6984
   __m11__link_rules$__m23__AiplTok:
-    calls: 700
+    calls: 692
     bytes: 604
   __m11__opt_group_styles$__m23__AiplTok:
     calls: 1988
@@ -924,7 +1002,7 @@ functions:
     bytes: 6072
   __m23__aipl_rules:
     calls: 47
-    bytes: 93536
+    bytes: 88776
   __m23__aipl_rules$lambda0:
     calls: 0
     bytes: 144
@@ -937,72 +1015,51 @@ functions:
   __m23__aipl_rules$lambda3:
     calls: 6
     bytes: 164
-  __m23__aipl_rules$lambda4:
-    calls: 0
-    bytes: 48
-  __m23__aipl_rules$lambda5:
-    calls: 2
-    bytes: 64
   __m23__char_lit_emit:
     calls: 0
-    bytes: 1784
+    bytes: 1224
   __m23__char_lit_value:
     calls: 0
     bytes: 304
-  __m23__dedent_segments:
-    calls: 0
-    bytes: 288
   __m23__doc_text:
     calls: 0
     bytes: 196
   __m23__int_lit:
     calls: 8
-    bytes: 896
-  __m23__raw_tpl_kind:
+    bytes: 624
+  __m23__raw_tpl_text:
     calls: 0
-    bytes: 2608
+    bytes: 148
   __m23__str_lit_value:
     calls: 0
     bytes: 576
   __m23__template_segments:
     calls: 0
-    bytes: 1660
-  __m23__tpl_kind:
+    bytes: 924
+  __m23__tpl_text:
     calls: 2
-    bytes: 2608
+    bytes: 148
   __m24__between_len:
     calls: 153
     bytes: 800
   __m24__delimited_len:
     calls: 296
     bytes: 1952
-  __m24__finalize_template$__m23__AiplTok:
-    calls: 2
-    bytes: 7228
   __m24__float_len:
     calls: 0
     bytes: 824
-  __m24__interp_scan$__m23__AiplTok:
-    calls: 0
-    bytes: 1896
   __m24__lex$__m23__AiplTok:
     calls: 47
-    bytes: 1196
+    bytes: 3552
   __m24__lex_step$__m23__AiplTok:
-    calls: 441
-    bytes: 21172
+    calls: 445
+    bytes: 20308
   __m24__nested_len:
     calls: 274
     bytes: 1148
   __m24__step_result$__m23__AiplTok:
-    calls: 12062
-    bytes: 11808
-  __m24__template_scan$__m23__AiplTok:
-    calls: 2
-    bytes: 2844
-  __m24__template_step$__m23__AiplTok:
-    calls: 290
-    bytes: 444
+    calls: 12360
+    bytes: 8324
   __m24__to_eol_len:
     calls: 0
     bytes: 52
@@ -1012,6 +1069,9 @@ functions:
   __m24__to_eol_unless_len:
     calls: 274
     bytes: 360
+  __m24__up_to_any_len:
+    calls: 2
+    bytes: 1520
   __m25__unescape:
     calls: 8
     bytes: 1628
@@ -1035,15 +1095,15 @@ functions:
     bytes: 744
   __m32__can_reach$__m23__AiplTok$__m5__Ast$map1:
     calls: 0
-    bytes: 840
+    bytes: 560
   __m32__climb$__m23__AiplTok$__m5__Ast:
     calls: 2
     bytes: 2956
   __m32__error_at$__m23__AiplTok$__m5__Ast:
     calls: 1
-    bytes: 4180
+    bytes: 3484
   __m32__far_miss:
-    calls: 179
+    calls: 177
     bytes: 1084
   __m32__far_unclosed:
     calls: 0
@@ -1070,17 +1130,17 @@ functions:
     calls: 17
     bytes: 856
   __m32__match_one_of$__m23__AiplTok$__m5__Ast:
-    calls: 31
+    calls: 29
     bytes: 1492
   __m32__match_prod$__m23__AiplTok$__m5__Ast:
     calls: 74
-    bytes: 64124
+    bytes: 62716
   __m32__match_reps$__m23__AiplTok$__m5__Ast:
     calls: 21
     bytes: 4144
   __m32__match_rule$__m23__AiplTok$__m5__Ast:
-    calls: 476
-    bytes: 14952
+    calls: 472
+    bytes: 13696
   __m32__match_sep$__m23__AiplTok$__m5__Ast:
     calls: 2
     bytes: 952
@@ -1095,19 +1155,19 @@ functions:
     bytes: 352
   __m32__parse_prepared$__m23__AiplTok$__m5__Ast:
     calls: 4
-    bytes: 8080
+    bytes: 7240
   __m32__pruned$__m23__AiplTok$__m5__Ast:
     calls: 0
     bytes: 1236
   __m32__refusal$__m23__AiplTok$__m5__Ast:
     calls: 0
-    bytes: 7304
+    bytes: 4932
   __m32__tok_text$__m23__AiplTok$__m5__Ast:
     calls: 133
-    bytes: 1712
+    bytes: 1152
   __m32__trivia_span$__m23__AiplTok:
     calls: 11
-    bytes: 1568
+    bytes: 1008
   __m33__can_start$__m23__AiplTok:
     calls: 0
     bytes: 256
@@ -1227,7 +1287,7 @@ functions:
     bytes: 10040
   __m36__format_program:
     calls: 7
-    bytes: 11968
+    bytes: 11020
   __m36__hash_opener:
     calls: 0
     bytes: 1708
@@ -1320,7 +1380,7 @@ functions:
     bytes: 9916
   __m36__pattern:
     calls: 0
-    bytes: 13552
+    bytes: 13712
   __m36__pattern_alts:
     calls: 0
     bytes: 2872
@@ -1407,7 +1467,7 @@ functions:
     bytes: 736
   __m36__template_scan:
     calls: 0
-    bytes: 3668
+    bytes: 3832
   __m36__template_verbatim:
     calls: 0
     bytes: 668
@@ -1509,7 +1569,7 @@ functions:
     bytes: 223428
   __m4__aipl_parse_file:
     calls: 4
-    bytes: 10300
+    bytes: 9740
   __m4__angles:
     calls: 12
     bytes: 376
@@ -1623,7 +1683,7 @@ functions:
     bytes: 15348
   __m4__expressions:
     calls: 8
-    bytes: 171024
+    bytes: 170908
   __m4__field_name:
     calls: 0
     bytes: 868
@@ -1653,7 +1713,7 @@ functions:
     bytes: 652
   __m4__lex_lossless:
     calls: 4
-    bytes: 5028
+    bytes: 4080
   __m4__lower_arg:
     calls: 0
     bytes: 46476
@@ -1770,7 +1830,7 @@ functions:
     bytes: 212776
   __m4__lower_pattern:
     calls: 0
-    bytes: 81676
+    bytes: 89304
   __m4__lower_postfix:
     calls: 0
     bytes: 22296
@@ -1791,7 +1851,7 @@ functions:
     bytes: 219924
   __m4__lower_template:
     calls: 0
-    bytes: 10504
+    bytes: 11928
   __m4__lower_test_block:
     calls: 0
     bytes: 16364
@@ -1857,7 +1917,7 @@ functions:
     bytes: 376
   __m4__patterns:
     calls: 8
-    bytes: 39304
+    bytes: 39648
   __m4__pipes:
     calls: 16
     bytes: 376
@@ -1949,7 +2009,7 @@ functions:
     calls: 0
     bytes: 476
   __rec_drop___m11__Rule$__m23__AiplTok:
-    calls: 13432
+    calls: 13480
     bytes: 404
   __rec_drop___m12__Cst:
     calls: 51
@@ -1984,6 +2044,9 @@ functions:
   __rec_drop___tuple$__m7__Expr$__m7__Expr:
     calls: 0
     bytes: 72
+  __test$collapse_templates:
+    calls: 1
+    bytes: 2584
   __test$first_difference:
     calls: 1
     bytes: 1604
@@ -2002,15 +2065,18 @@ functions:
   __test$is_layout:
     calls: 1
     bytes: 260
+  __test$strip_line_indent:
+    calls: 1
+    bytes: 660
   __test$token_value:
     calls: 1
-    bytes: 4104
+    bytes: 2612
   __test$verify_same_tokens:
     calls: 1
     bytes: 3068
   __to_str___m23__AiplTok:
-    calls: 211
-    bytes: 8728
+    calls: 207
+    bytes: 7648
   __to_str_u64:
     calls: 0
     bytes: 204
@@ -2018,71 +2084,77 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_extend:
-    calls: 12557
+    calls: 12561
     bytes: (external)
   aipl_arr_inc:
-    calls: 90931
+    calls: 119733
     bytes: (external)
   aipl_arr_reserve:
-    calls: 12504
+    calls: 12512
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 16
+    bytes: (external)
+  aipl_arr_slice:
+    calls: 29
     bytes: (external)
   aipl_arr_sort:
     calls: 84
     bytes: (external)
   aipl_array_dec:
-    calls: 142046
+    calls: 173354
     bytes: (external)
   aipl_array_new:
-    calls: 2291
+    calls: 2390
     bytes: (external)
   aipl_array_push:
-    calls: 1601
+    calls: 1611
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6308
+    calls: 6527
     bytes: (external)
   aipl_array_with_cap:
-    calls: 87
+    calls: 134
     bytes: (external)
   aipl_assert:
-    calls: 43
+    calls: 51
     bytes: (external)
   aipl_i64_len:
     calls: 16
     bytes: (external)
   aipl_rec_alloc:
-    calls: 14494
+    calls: 14542
     bytes: (external)
   aipl_rec_dec_strong:
-    calls: 70761
+    calls: 70925
     bytes: (external)
   aipl_rec_dec_weak:
-    calls: 4466
+    calls: 4514
     bytes: (external)
   aipl_rec_inc_strong:
-    calls: 56267
+    calls: 56383
     bytes: (external)
   aipl_rec_inc_weak:
-    calls: 4466
+    calls: 4514
     bytes: (external)
   aipl_test_begin:
-    calls: 8
+    calls: 10
     bytes: (external)
   aipl_test_end:
-    calls: 8
+    calls: 10
     bytes: (external)
   aipl_test_summary:
     calls: 1
     bytes: (external)
   aipl_write_bytes:
-    calls: 392
+    calls: 376
     bytes: (external)
   aipl_write_i64:
     calls: 8
     bytes: (external)
+  collapse_templates:
+    calls: 40
+    bytes: 1864
   first_difference:
     calls: 9
     bytes: 1988
@@ -2097,13 +2169,16 @@ functions:
     bytes: 2168
   main:
     calls: 1
-    bytes: 640
+    bytes: 808
+  strip_line_indent:
+    calls: 8
+    bytes: 1556
   token_fingerprint$own0:
     calls: 36
-    bytes: 10936
+    bytes: 8868
   token_value:
-    calls: 228
-    bytes: 6260
+    calls: 231
+    bytes: 5292
   verify_same_tokens:
     calls: 18
     bytes: 4332

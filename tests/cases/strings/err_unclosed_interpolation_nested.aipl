@@ -18,4 +18,4 @@ error: unterminated triple-backtick template literal
   --> ./tests/cases/strings/err_unclosed_interpolation_nested.aipl:14:17
    |
 14 |     print(```{1 ```)
-   |                 ^^^^
+   |                 ^^^

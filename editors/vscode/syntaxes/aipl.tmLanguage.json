@@ -37,6 +37,46 @@
           "name": "support.type.builtin.aipl"
         },
         {
+          "begin": "```",
+          "end": "```",
+          "name": "string.quoted.double.aipl",
+          "patterns": [
+            {
+              "match": "\\\\[{}]",
+              "name": "constant.character.escape.aipl"
+            },
+            {
+              "begin": "\\{",
+              "end": "\\}",
+              "name": "punctuation.aipl",
+              "patterns": [
+                { "include": "#brace-group" },
+                { "include": "#main" }
+              ]
+            }
+          ]
+        },
+        {
+          "begin": "`",
+          "end": "`",
+          "name": "string.quoted.double.aipl",
+          "patterns": [
+            {
+              "match": "\\\\[\\\\`nrt{}]",
+              "name": "constant.character.escape.aipl"
+            },
+            {
+              "begin": "\\{",
+              "end": "\\}",
+              "name": "punctuation.aipl",
+              "patterns": [
+                { "include": "#brace-group" },
+                { "include": "#main" }
+              ]
+            }
+          ]
+        },
+        {
           "match": "//.*$",
           "name": "comment.line.double-slash.aipl"
         },
@@ -97,44 +137,6 @@
             {
               "match": "\\\\[\"'\\\\nrt]",
               "name": "constant.character.escape.aipl"
-            }
-          ]
-        },
-        {
-          "begin": "```",
-          "end": "```",
-          "name": "string.quoted.double.aipl",
-          "patterns": [
-            {
-              "match": "\\\\[{}]",
-              "name": "constant.character.escape.aipl"
-            },
-            {
-              "begin": "\\{",
-              "end": "\\}",
-              "patterns": [
-                { "include": "#brace-group" },
-                { "include": "#main" }
-              ]
-            }
-          ]
-        },
-        {
-          "begin": "`",
-          "end": "`",
-          "name": "string.quoted.double.aipl",
-          "patterns": [
-            {
-              "match": "\\\\[\\\\`nrt{}]",
-              "name": "constant.character.escape.aipl"
-            },
-            {
-              "begin": "\\{",
-              "end": "\\}",
-              "patterns": [
-                { "include": "#brace-group" },
-                { "include": "#main" }
-              ]
             }
           ]
         },

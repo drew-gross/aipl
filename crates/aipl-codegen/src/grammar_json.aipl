@@ -507,28 +507,28 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
 # braces — is a list breaking or not breaking, which the layouts decide.
 fn json_space(l: str, r: str) -> bool { l == ":" }
 --- performance ---
-allocations: 21446
-deallocations: 21446
+allocations: 21503
+deallocations: 21503
 reallocations: 3218
-bytes allocated: 2798291
-instructions executed: 5969796
-binary size: 445656
-  code: 293460
-  data: 8596
-  metadata: 143600
+bytes allocated: 2812643
+instructions executed: 6279947
+binary size: 442000
+  code: 291352
+  data: 8348
+  metadata: 142300
 functions:
   __arr_drop_Json:
     calls: 125
     bytes: 116
-  __arr_drop___m11__StepResult$JsonTok:
+  __arr_drop___m11__ModeFrame:
     calls: 0
-    bytes: 140
+    bytes: 120
   __arr_drop___m11__Token$JsonTok:
     calls: 596
     bytes: 160
   __arr_drop___m11__TokenRule$JsonTok:
     calls: 58
-    bytes: 444
+    bytes: 448
   __arr_drop___m1__Cst:
     calls: 1300
     bytes: 116
@@ -559,15 +559,15 @@ functions:
   __arr_retain_Json:
     calls: 139
     bytes: 116
-  __arr_retain___m11__StepResult$JsonTok:
+  __arr_retain___m11__ModeFrame:
     calls: 0
-    bytes: 140
+    bytes: 120
   __arr_retain___m11__Token$JsonTok:
     calls: 484
     bytes: 160
   __arr_retain___m11__TokenRule$JsonTok:
     calls: 0
-    bytes: 444
+    bytes: 448
   __arr_retain___m1__Cst:
     calls: 1181
     bytes: 116
@@ -609,6 +609,9 @@ functions:
     bytes: 32
   __builtin_any$__m5__Doc$lam$__m5__has_hard$tail:
     calls: 296
+    bytes: 324
+  __builtin_any$str$lam$__m11__up_to_any_len$lambda0:
+    calls: 0
     bytes: 324
   __builtin_count_while$char$lam$__m11__lex_step$JsonTok$lambda1:
     calls: 90
@@ -727,33 +730,21 @@ functions:
   __m11__delimited_len:
     calls: 395
     bytes: 1952
-  __m11__finalize_template$JsonTok:
-    calls: 0
-    bytes: 4004
   __m11__float_len:
     calls: 322
     bytes: 824
-  __m11__interp_scan$JsonTok:
-    calls: 0
-    bytes: 1896
   __m11__lex$JsonTok:
     calls: 58
-    bytes: 1196
+    bytes: 3552
   __m11__lex_step$JsonTok:
     calls: 485
-    bytes: 16384
+    bytes: 18636
   __m11__nested_len:
     calls: 0
     bytes: 1148
   __m11__step_result$JsonTok:
     calls: 2824
-    bytes: 6040
-  __m11__template_scan$JsonTok:
-    calls: 0
-    bytes: 2844
-  __m11__template_step$JsonTok:
-    calls: 0
-    bytes: 444
+    bytes: 6132
   __m11__to_eol_len:
     calls: 0
     bytes: 52
@@ -763,6 +754,9 @@ functions:
   __m11__to_eol_unless_len:
     calls: 0
     bytes: 360
+  __m11__up_to_any_len:
+    calls: 0
+    bytes: 1520
   __m12__unescape:
     calls: 35
     bytes: 1628
@@ -1064,7 +1058,7 @@ functions:
     calls: 8743
     bytes: (external)
   aipl_arr_inc:
-    calls: 88477
+    calls: 96175
     bytes: (external)
   aipl_arr_reserve:
     calls: 10952
@@ -1079,7 +1073,7 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 121413
+    calls: 129710
     bytes: (external)
   aipl_array_new:
     calls: 3410
@@ -1091,7 +1085,7 @@ functions:
     calls: 5784
     bytes: (external)
   aipl_array_with_cap:
-    calls: 244
+    calls: 301
     bytes: (external)
   aipl_assert:
     calls: 64
@@ -1173,7 +1167,7 @@ functions:
     bytes: 164
   lex_json:
     calls: 58
-    bytes: 7472
+    bytes: 8040
   lower_member:
     calls: 24
     bytes: 1736

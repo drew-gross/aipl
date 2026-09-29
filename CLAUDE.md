@@ -687,6 +687,32 @@ the formatter's *FFI surface* changes — a renamed or new entry the checked-in
 artifact doesn't export — since `aipl fmt` then has nothing to call until the
 artifact is regenerated.
 
+**The escape above assumes `fill_staged_ir` can still parse the compiler's own
+sources. When it can't, swap the offending literals out first.** Tightening what
+the *lexer* accepts strands you harder: regenerating the artifact means parsing
+`crates/**/*.aipl` with the checked-in one, so any source written in a form the
+new rule rejects — but the old artifact produced — stops the regeneration that
+would fix it. `fill_staged_ir` fails with a parse error in a compiler source
+rather than in your test.
+
+The way out is to make those sources parse under the *old* artifact for one
+round trip:
+
+1. Rewrite each offending literal into an equivalent the old artifact accepts (a
+   raw ```` ```..\"..``` ```` becomes a cooked `` `..\\"..` ``: same value,
+   escapes the old rule allows). Keep the list — you are putting them back.
+2. `fill_staged_ir` → `validate_staged_ir` → `promote_staged_ir`. The live
+   artifact now has the new rule.
+3. Restore the originals, then regenerate again — the sources changed, so the
+   artifact must too.
+4. Hand off.
+
+**Do not run `aipl fmt` while the swaps are in place.** `requote` respells a
+literal into whichever delimiter needs fewer escapes, so it turns the cooked form
+straight back into the raw one the old lexer refuses — and the formatter then
+reports unlexable output, which reads like a formatter bug rather than the
+bootstrap it is. Formatting waits until step 3.
+
 This is not a licence to hand-drive generally: it announces itself as a hard
 failure in the parser or in `aipl fmt`, and it's the only ordering the gate
 can't express.

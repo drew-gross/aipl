@@ -708,7 +708,21 @@
           </h3>
           <pre class="signature"><code>fn lower_template(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>template</code> — the head, the interpolations, the tail. The segments are decoded together (<code>template_segments</code>), because a raw template is de-dented as one block and a segment cannot be read on its own.</p></div>
+          <div class="doc"><p><code>template</code> — the delimiters, the text runs and the braces, as one concat chain. The segments are decoded here, together: a raw template is de-dented across the whole literal, so no segment can be read on its own — which is why the lexer leaves them as written (see <code>raw_tpl_text</code> in <code>lex_aipl.aipl</code>).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-template_slots">
+          <h3>
+            <a class="anchor" href="#item-template_slots">template_slots</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn template_slots(toks: str[]) -&#62; str[]</code></pre>
+
+          <div class="doc"><p>A template's text slots, as written: one per gap, with an empty string where the source had no text there at all. A template alternates text and interpolation and begins and ends with text, so there is always one more slot than interpolation — which is the shape <code>template_chain</code> folds.</p><p><code>toks</code> is every token this production matched: the two delimiters at the ends, and between them the text runs and the braces (the interpolated expressions are children, not tokens, so a <code>{</code> is always followed by its <code>}</code>).</p><p>An opening brace is told from text by its spelling — an unescaped <code>{</code> always lexes as a brace, and a literal one is written <code>\{</code>, two characters long. A <em>closing</em> brace is not: <code>}</code> needs no escape in template text, so a text run holding exactly <code>}</code> reads the same as the token. It is found by pairing instead — the token after a <code>{</code> is its <code>}</code> — which is what <code>`\{{x}}`</code> needs to keep its trailing <code>}</code> as text.</p></div>
 
 
         </section>
@@ -2009,7 +2023,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$126203: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$128765: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 

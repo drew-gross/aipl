@@ -3669,24 +3669,33 @@ fn marshal_lex(
             Ok([FfiValue::Int(i)]) => i,
             other => panic!("dogfooded lex_aipl(): {case} payload: {other:?}"),
         };
-        // `StrLit`'s `(str, StrStyle)` payload: the decoded value plus a nested
-        // `StrStyle` variant (nullary), marshaled as `Variant(style_name, [])`.
-        let str_lit_payload = |payload: Vec<FfiValue>| match <[FfiValue; 2]>::try_from(payload) {
-            Ok([FfiValue::Str(s), FfiValue::Variant(style, style_payload)]) => {
+        // A nullary `StrStyle`, marshaled as `Variant(style_name, [])`. Carried by
+        // `StrLit` beside its value, and by `TplOpen` alone.
+        let style_payload = |v: FfiValue| match v {
+            FfiValue::Variant(style, style_payload) => {
                 assert!(
                     style_payload.is_empty(),
                     "dogfooded lex_aipl(): StrStyle {style} carries an unexpected payload"
                 );
-                let style = match style.as_str() {
+                match style.as_str() {
                     "Quoted" => LexedStrStyle::Quoted,
                     "TripleQuoted" => LexedStrStyle::TripleQuoted,
                     "Backtick" => LexedStrStyle::Backtick,
                     "TripleBacktick" => LexedStrStyle::TripleBacktick,
                     other => panic!("dogfooded lex_aipl(): unknown StrStyle {other:?}"),
-                };
-                (s, style)
+                }
             }
+            other => panic!("dogfooded lex_aipl(): StrStyle: {other:?}"),
+        };
+        // `StrLit`'s `(str, StrStyle)` payload: the decoded value plus the style.
+        let str_lit_payload = |payload: Vec<FfiValue>| match <[FfiValue; 2]>::try_from(payload) {
+            Ok([FfiValue::Str(s), style]) => (s, style_payload(style)),
             other => panic!("dogfooded lex_aipl(): StrLit payload: {other:?}"),
+        };
+        // `TplOpen`'s single `StrStyle` payload.
+        let tpl_open_payload = |payload: Vec<FfiValue>| match <[FfiValue; 1]>::try_from(payload) {
+            Ok([style]) => style_payload(style),
+            other => panic!("dogfooded lex_aipl(): TplOpen payload: {other:?}"),
         };
         match case.as_str() {
             "Name" => return K::Name(str_payload(payload)),
@@ -3696,12 +3705,8 @@ fn marshal_lex(
                 return K::StrLit(s, style);
             }
             "CharTok" => return K::CharTok(int_payload(payload) as u8),
-            "TemplateHead" => return K::TemplateHead(str_payload(payload)),
-            "TemplateMid" => return K::TemplateMid(str_payload(payload)),
-            "TemplateTail" => return K::TemplateTail(str_payload(payload)),
-            "RawTemplateHead" => return K::RawTemplateHead(str_payload(payload)),
-            "RawTemplateMid" => return K::RawTemplateMid(str_payload(payload)),
-            "RawTemplateTail" => return K::RawTemplateTail(str_payload(payload)),
+            "TplOpen" => return K::TplOpen(tpl_open_payload(payload)),
+            "TplText" => return K::TplText(str_payload(payload)),
             "DocComment" => return K::DocComment(str_payload(payload)),
             _ => {}
         }
@@ -3770,6 +3775,7 @@ fn marshal_lex(
             "Hash" => K::Hash,
             "LParen" => K::LParen,
             "RParen" => K::RParen,
+            "TplClose" => K::TplClose,
             "LBrace" => K::LBrace,
             "RBrace" => K::RBrace,
             "LBracket" => K::LBracket,
