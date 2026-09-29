@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/item.aipl</code></h1>
 
+      <div class="module-doc"><p>The items and declarations of AIPL's syntax tree — functions, structs, variants, imports, and the program that holds them — with the source-like dump the item lowering's tests assert against. One of the files the AST is declared across; see <code>ast.aipl</code>.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -96,7 +99,7 @@
           </h3>
           <pre class="signature"><code>struct Param</code></pre>
 
-          <div class="doc"><p>One declared parameter. <code>ty</code> is the type the *body* sees, which is not always the one written: a variadic <code>x: T*</code> / <code>x: T+</code> stores the sequence type, and a <code>k?: T</code> stores <code>T?</code> with <code>implicit_some</code> recording that the call site passes a bare <code>T</code>.</p></div>
+          <div class="doc"><p>One declared parameter. <code>ty</code> is the type the <em>body</em> sees, which is not always the one written: a variadic <code>x: T*</code> / <code>x: T+</code> stores the sequence type, and a <code>k?: T</code> stores <code>T?</code> with <code>implicit_some</code> recording that the call site passes a bare <code>T</code>.</p></div>
 
 
         </section>
@@ -312,7 +315,7 @@
           </h3>
           <pre class="signature"><code>struct Program</code></pre>
 
-          <div class="doc"><p><code>aipl_syntax::ast::Program</code>, less its <code>sources</code> map: a single parsed file has none, and the loader fills one in when it flattens several files together.</p></div>
+          <div class="doc"><p><code>aipl_syntax::ast::Program</code>, less its <code>sources</code> map: a single parsed file has none, and the loader fills one in when it flattens several files together.</p><p><code>doc</code> is the file's own documentation — the <code># ..</code> block at the top that a blank line detaches from whatever follows, so it documents no declaration. <code>none</code> for a file that opens with anything else, and for every program a pass builds or the loader flattens, neither of which is one file.</p></div>
 
 
         </section>

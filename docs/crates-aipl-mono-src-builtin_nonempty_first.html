@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_nonempty_first.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>nonempty_first</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>); <code>first</code> for an array the type system knows is not empty.</p><p>A refined array is a plain array at runtime, so indexing it still yields an optional, and the <code>none</code> arm has to be written even though the type says it cannot be taken. It recurses: there is no value of <code>T</code> to invent, and a call that can never happen is the honest spelling of &quot;unreachable&quot; until the language has one. (The loader resolves the call to the canonical name when this file is loaded as the builtin — see <code>flatten</code>'s pass 1.)</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

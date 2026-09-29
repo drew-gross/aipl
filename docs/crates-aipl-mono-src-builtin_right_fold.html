@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_right_fold.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>right_fold</code> builtin — <code>left_fold</code>'s mirror (see <code>builtin_left_fold.aipl</code>). Monomorphization registers this function under the canonical name <code>__builtin_right_fold</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.right_fold(init, f)</code> specializes through the ordinary generic / higher-order machinery.</p><p>Walks the indices backwards rather than folding over a reversed copy, so nothing is allocated. <code>self[i]</code> yields an optional and <code>i</code> is always in range, so the <code>none</code> arm is dead — it just hands the accumulator back unchanged.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

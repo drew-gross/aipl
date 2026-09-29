@@ -14,6 +14,12 @@
 
       <h1><code>crates/aipl-codegen/src/grammar_calc.aipl</code></h1>
 
+      <div class="module-doc"><p>A four-operator calculator: the library's third end-to-end target, and the one that exercises <code>Climb</code>. Neither earlier toy has an infix operator at all — S-expressions put the operator first and JSON has none — so precedence climbing was proven only by <code>parse.aipl</code>'s own unit tests, which stop at the concrete tree. This one lowers through that tree and then <em>evaluates</em> the result, which is the assertion that a wrong shape cannot survive.</p><pre><code>expr  -&gt; Climb(unary, [+ -  |  * / %  |  ^ right])
+unary -&gt; &quot;-&quot; unary | atom
+atom  -&gt; Num | &quot;(&quot; expr &quot;)&quot;
+</code></pre><p>Three things it pins down that a tree-shape assertion alone would not:</p><ul><li><strong>Precedence and associativity, as arithmetic.</strong> <code>2 + 3 * 4</code> is 14 and not 20; <code>2 ^ 3 ^ 2</code> is 512 (right-associative) and not 64; <code>10 - 3 - 2</code> is 5 (left-associative) and not 9.</li><li><strong>What <code>Climb</code> hands a lowering function.</strong> Each operand nests under the <em>enclosing</em> production's index, so a binary node arrives as two interior children with the operator between them as a direct leaf — read with <code>own_token_text</code>, which exists for exactly this (see <code>cst.aipl</code>).</li><li><strong>A <code>build</code> that legitimately fails.</strong> An integer literal too big for an <code>i64</code> is a lowering error, not a parse error, and it propagates out of <code>parse</code> unchanged. That is the case the two-pass design was chosen for: run during the parse it would have aborted alternatives that should simply have been retried.</li></ul><p>Unary minus is <em>not</em> a <code>Climb</code> operator — <code>Climb</code> is binary — so it lives in the atom rule, which is what makes it bind tighter than every infix operator: <code>-2 ^ 2</code> is <code>(-2) ^ 2</code>.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -157,7 +163,7 @@
           </h3>
           <pre class="signature"><code>pub fn format_calc(src: str, width: u64) -&#62; str!ParseError</code></pre>
 
-          <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>The counterpart of <code>render_calc</code>, and the interesting half of the pair. <code>render_calc</code> prints the *value*, fully parenthesized, so it can only ever produce the tree's own shape; this prints the *source*, so the parentheses the author wrote survive and the ones they left out are not invented. Both round trip, and they are round trips of different things.</p><p>This grammar's lexer records no comments — it has none — so what a comment does to a layout is <code>grammar_sexp.aipl</code>'s to show.</p></div>
+          <div class="doc"><p><code>src</code> reformatted: parse it to the concrete tree, then lay that out at <code>width</code>.</p><p>The counterpart of <code>render_calc</code>, and the interesting half of the pair. <code>render_calc</code> prints the <em>value</em>, fully parenthesized, so it can only ever produce the tree's own shape; this prints the <em>source</em>, so the parentheses the author wrote survive and the ones they left out are not invented. Both round trip, and they are round trips of different things.</p><p>This grammar's lexer records no comments — it has none — so what a comment does to a layout is <code>grammar_sexp.aipl</code>'s to show.</p></div>
 
 
         </section>
@@ -178,7 +184,7 @@
           </h3>
           <pre class="signature"><code>fn calc_rules() -&#62; TokenRule&#60;CalcTok&#62;[]</code></pre>
 
-          <div class="doc"><p>Whitespace is trivia rather than skipped, so the concrete tree covers every byte and reconstructs the source exactly.</p><p>The punctuation rule sits *ahead* of <code>Int</code>, which makes every <code>-</code> its own token and <code>Int</code> unsigned. That is the ordering this grammar needs: negation is a rule (<code>unary</code>), so a <code>-</code> the lexer had swallowed into the literal would be invisible to it — <code>1 -2</code> would lex as two numbers and parse as nothing.</p></div>
+          <div class="doc"><p>Whitespace is trivia rather than skipped, so the concrete tree covers every byte and reconstructs the source exactly.</p><p>The punctuation rule sits <em>ahead</em> of <code>Int</code>, which makes every <code>-</code> its own token and <code>Int</code> unsigned. That is the ordering this grammar needs: negation is a rule (<code>unary</code>), so a <code>-</code> the lexer had swallowed into the literal would be invisible to it — <code>1 -2</code> would lex as two numbers and parse as nothing.</p></div>
 
 
         </section>

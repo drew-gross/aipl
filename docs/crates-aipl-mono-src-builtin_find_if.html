@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_find_if.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>find_if</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_find_if</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.find_if(pred)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>find_if</code> is only for this file's own tests, which read exactly like user code.</p><p>It is <code>any</code> with the element handed back: both stop at the first element satisfying <code>pred</code>, and where <code>any</code> reports only that one existed, this returns it. The optional is what carries the not-found case, so the empty array needs no special handling.</p><p>The <code>#[allow]</code> squelches <code>return_loop_find_if</code>, which flags exactly this shape — a loop returning the first match — and asks for <code>find_if</code>. Here it <em>is</em> <code>find_if</code>.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

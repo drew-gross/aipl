@@ -14,6 +14,9 @@
 //! - [`Reference`] — every identifier occurrence in the file, so a cursor
 //!   offset can be turned into a name.
 //!
+//! and one thing that is about no symbol at all: [`FileIndex::module_doc`], the
+//! `# ..` block at the top of the file, which documents the file itself.
+//!
 //! # Where the positions come from
 //!
 //! The AST is the source of names, kinds, signatures and docs. It is *not* the
@@ -139,6 +142,14 @@ pub struct Reference {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileIndex {
     pub path: PathBuf,
+    /// The file's own documentation: the `# ..` block at the top of it that a
+    /// blank line detaches from whatever follows, and so documents no
+    /// declaration. `None` when the file opens with anything else.
+    ///
+    /// It is a file-level answer rather than a symbol because it is about no
+    /// symbol — which is also why a docs page shows it above the declarations
+    /// rather than among them.
+    pub module_doc: Option<String>,
     pub symbols: Vec<Symbol>,
     pub imports: Vec<Import>,
     pub references: Vec<Reference>,
@@ -165,6 +176,7 @@ impl FileIndex {
         let tokens = aipl_parser::lex_tokens(stripped)?;
         Ok(FileIndex {
             path,
+            module_doc: program.doc.clone(),
             symbols: symbols(&program, &tokens, stripped),
             imports: imports(&program),
             references: references(&tokens, stripped),
@@ -645,6 +657,40 @@ fn helper(n: i64) !prints -> i64 {
             .nth(n)
             .expect("occurrence")
             .0
+    }
+
+    /// A file's own `# ..` block — the one a blank line detaches from what
+    /// follows — is a file-level answer, not a symbol.
+    #[test]
+    fn keeps_the_files_own_documentation() {
+        hosted();
+        let src = "# What this file is for.\n\n# Adds.\npub fn add() -> i64 { 1 }\n";
+        let idx = FileIndex::parse("src/m.aipl", src).expect("indexes");
+        assert_eq!(idx.module_doc.as_deref(), Some("What this file is for."));
+        // The block below the blank line still documents the declaration, and
+        // the file's own block is no symbol of its own.
+        assert_eq!(
+            idx.define("add").expect("add").doc.as_deref(),
+            Some("Adds.")
+        );
+        assert_eq!(idx.outline().len(), 1);
+    }
+
+    /// A block that runs straight into the first declaration documents it, and
+    /// the file has none of its own — the test that the two are told apart by
+    /// the blank line rather than by position.
+    #[test]
+    fn a_block_above_the_first_declaration_is_not_the_files() {
+        hosted();
+        let src = "# Adds.\npub fn add() -> i64 { 1 }\n";
+        let idx = FileIndex::parse("src/m.aipl", src).expect("indexes");
+        assert_eq!(idx.module_doc, None);
+        assert_eq!(
+            idx.define("add").expect("add").doc.as_deref(),
+            Some("Adds.")
+        );
+        // `SRC` opens with an import and so has none either.
+        assert_eq!(index().module_doc, None);
     }
 
     #[test]

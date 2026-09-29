@@ -82,7 +82,7 @@ fn usage(prog: &str) -> String {
         "usage:
   {prog} run   <file.aipl> [fn] [args...]   compile and JIT-execute a function (default: main)
   {prog} ir    <file.aipl>                  print cranelift IR for a source file
-  {prog} doc   <file.aipl>                  print each declaration's `# ..` documentation
+  {prog} doc   <file.aipl>                  print the file's and each declaration's `# ..` docs
   {prog} docs  [path...] [-o <dir>]         write an HTML documentation site
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
   {prog} fmt   <file.aipl> [--check]        rewrite the file in canonical format
@@ -463,11 +463,11 @@ fn ir_cmd(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-/// `doc <file>` — print the `# ..` documentation above each declaration.
-/// Undocumented declarations are skipped. Parses just this file (it doesn't
-/// resolve imports, compile, or run it), so docs come out under the names
-/// written here — not the loader's cross-file-mangled forms — and are available
-/// even for code that wouldn't otherwise build.
+/// `doc <file>` — print the file's own `# ..` documentation, then the block
+/// above each declaration. Undocumented declarations are skipped. Parses just
+/// this file (it doesn't resolve imports, compile, or run it), so docs come out
+/// under the names written here — not the loader's cross-file-mangled forms —
+/// and are available even for code that wouldn't otherwise build.
 fn doc_cmd(args: &[String]) -> Result<(), String> {
     let (args, _dbg) = take_debug_flag(args);
     let file = args.first().ok_or("missing source file")?;
@@ -476,6 +476,11 @@ fn doc_cmd(args: &[String]) -> Result<(), String> {
     // a `--- performance ---` block) so the source parses on its own.
     let stripped = aipl::strip_test_sections(&src);
     let program = aipl::parse(stripped).map_err(|e| e.render(stripped, file))?;
+    // The file's own documentation leads, under the file's name — it is about
+    // no declaration, so it has no other name to print under.
+    if let Some(doc) = &program.doc {
+        print_doc(file, doc);
+    }
     for item in &program.items {
         // Every kind of declaration a `# ..` block can sit above; an `import`
         // declares nothing, so it is the one item with no documentation slot.

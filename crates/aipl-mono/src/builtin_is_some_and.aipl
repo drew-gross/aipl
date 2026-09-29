@@ -1,11 +1,12 @@
+# The AIPL implementation of the `is_some_and` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_is_some_and`
+# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `x.is_some_and(pred)`
+# specializes through the ordinary generic / higher-order machinery — the
+# in-file name `is_some_and` is only for this file's own tests, which read
+# exactly like user code.
+
 import { equal as ==, less_than_or_equal as <=, logical_not as ! } from builtins;
 
-// The AIPL implementation of the `is_some_and` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_is_some_and`
-// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `x.is_some_and(pred)`
-// specializes through the ordinary generic / higher-order machinery — the
-// in-file name `is_some_and` is only for this file's own tests, which read
-// exactly like user code.
 # True when `self` is `some(x)` and `pred(x)` holds; `false` for `none` (the
 # predicate is not called). Generic over the inner type and callable as a
 # method: `x.is_some_and(pred)`.

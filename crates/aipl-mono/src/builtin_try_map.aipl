@@ -1,16 +1,17 @@
+# The AIPL implementation of the `try_map` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_try_map` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.try_map(f)` resolves
+# through the ordinary generic / higher-order machinery — the in-file name
+# `try_map` is only for this file's own tests, which read exactly like user
+# code.
+#
+# `map` cannot call a fallible `f`: a `U[]` has nowhere to put an error, so
+# every mapping that can fail had to be spelled out as a loop over `push` with
+# `?` — the one array-building shape `map` could not absorb. This is that loop,
+# written once.
+
 import { equal as ==, is_err_and, len, less_than as <, push } from builtins;
 
-// The AIPL implementation of the `try_map` builtin. Monomorphization registers
-// this function under the canonical name `__builtin_try_map` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.try_map(f)` resolves
-// through the ordinary generic / higher-order machinery — the in-file name
-// `try_map` is only for this file's own tests, which read exactly like user
-// code.
-//
-// `map` cannot call a fallible `f`: a `U[]` has nowhere to put an error, so
-// every mapping that can fail had to be spelled out as a loop over `push` with
-// `?` — the one array-building shape `map` could not absorb. This is that loop,
-// written once.
 # `self` with `f` applied to each element, short-circuiting on failure: the
 # result is `ok` of every mapped value, in order, or the *first* `err` that
 # `f` returned — after which no further element is mapped. Generic over the

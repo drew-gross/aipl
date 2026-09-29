@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_count_if.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>count_if</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_count_if</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.count_if(pred)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>count_if</code> is only for this file's own tests, which read exactly like user code.</p><p>It completes the trio: <code>count</code> counts elements equal to a <em>value</em>, <code>count_while</code> counts a <em>leading run</em> matching a predicate, and this counts <em>every</em> element matching a predicate, anywhere. Unsigned, like <code>len</code>: a count is never negative.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/ast.aipl</code></h1>
 
+      <div class="module-doc"><p>The AST <code>grammar_aipl.aipl</code> lowers to — AIPL's own syntax tree, declared in AIPL. It mirrors <code>aipl_syntax::ast</code> (<code>crates/aipl-syntax/src/lib.rs</code>), which is the type the compiler's passes actually run on: the bridge marshals a value of this shape across the FFI and the Rust side rebuilds an <code>ast::Program</code> from it.</p><p>It is declared across several files, one per case family, because constructors share one namespace per file and the families reuse names (<code>Str</code> is a primitive, an expression and a pattern; <code>Unit</code> a type and an expression): <code>prim.aipl</code>, <code>ty.aipl</code>, <code>expr.aipl</code>, <code>pat.aipl</code>, <code>suffix.aipl</code>, <code>brace_entry.aipl</code>, <code>bound.aipl</code>, <code>item.aipl</code> and <code>parsed.aipl</code>. A file that needs two of a name renames one on import — which is why this one imports <code>Ty as TyNode</code>: its own <code>Ty</code> case wraps it.</p><p>Two rules keep the two declarations comparable by eye and, later, by test:</p><ul><li><strong>A case here is its Rust case name, bare.</strong> <code>Type::Named</code> is <code>Named</code>, <code>Type::Optional</code> is <code>Optional</code>, <code>ExprKind::Call</code> is <code>Call</code>. The mapping the FFI bridge (<code>ffi_ast.rs</code>) applies is the identity, so a case it does not know about is a case the two declarations disagree about.</li><li><strong>Only what the parser can produce is declared.</strong> <code>Type</code> carries four sentinels no source text spells — <code>NoneInner</code>, <code>EmptyArrayArg</code>, <code>NoneLiteralArg</code>, <code>ConcatStr</code> — invented by the checker for literals whose type is still open. They are deliberately absent; a lowering that produced one would be a bug.</li></ul><p><code>Ast</code> below is the single type <code>Build&lt;A&gt;</code> pins for the whole grammar, so every production lowers to it whatever it is about, with a case per node kind the lowering produces.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant Ast</code></pre>
 
-          <div class="doc"><p>The one type every <code>build</code> in <code>grammar_aipl.aipl</code> returns, whatever the production is about — <code>Build&lt;A&gt;</code> pins a single <code>A</code> for a whole grammar, so a grammar describing a language rather than one expression type carries the seam here. Each case is a node kind the lowering produces.</p><p>Two cases are not node kinds but the intermediate a production hands its parent. <code>Tys</code> is the *list* a production whose whole content is a comma-separated run of types lowers to, and the case it lands in is what tells <code>ty</code>'s alternatives apart — <code>(A, B)</code> and <code>A</code> reach <code>ty</code> as different <code>Ast</code> cases, so nothing has to count tokens to know which matched. <code>Payload</code> is a constructor pattern's slot list — each slot a pattern — and whether it was written <code>..</code>, which is what <code>Pat</code>'s <code>Ctor</code>/<code>Nested</code> need and no node of its own.</p></div>
+          <div class="doc"><p>The one type every <code>build</code> in <code>grammar_aipl.aipl</code> returns, whatever the production is about — <code>Build&lt;A&gt;</code> pins a single <code>A</code> for a whole grammar, so a grammar describing a language rather than one expression type carries the seam here. Each case is a node kind the lowering produces.</p><p>Two cases are not node kinds but the intermediate a production hands its parent. <code>Tys</code> is the <em>list</em> a production whose whole content is a comma-separated run of types lowers to, and the case it lands in is what tells <code>ty</code>'s alternatives apart — <code>(A, B)</code> and <code>A</code> reach <code>ty</code> as different <code>Ast</code> cases, so nothing has to count tokens to know which matched. <code>Payload</code> is a constructor pattern's slot list — each slot a pattern — and whether it was written <code>..</code>, which is what <code>Pat</code>'s <code>Ctor</code>/<code>Nested</code> need and no node of its own.</p></div>
 
 
           <ul class="cases">
@@ -117,6 +120,13 @@
             </li>
 
             <li id="item-Item"><code>Item(ItemNode)</code>
+
+
+            </li>
+
+            <li id="item-DetachedDoc"><code>DetachedDoc(str, Span, ItemNode)</code>
+
+              <div class="doc"><p>An item under a <code># ..</code> block that a blank line detaches from it, with the block's text and its span. <code>program</code> is the only production that accepts one: a detached block documents the file, which nothing below the top of the file can be, so anywhere else it is refused there.</p></div>
 
 
             </li>

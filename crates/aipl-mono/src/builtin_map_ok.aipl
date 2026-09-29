@@ -1,16 +1,17 @@
+# The AIPL implementation of the `map_ok` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_map_ok` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `r.map_ok(f)` specializes
+# through the ordinary generic / higher-order machinery — the in-file name
+# `map_ok` is only for this file's own tests, which read exactly like user code.
+#
+# The mirror of `map_err`: this one rewrites the *value* side and leaves the
+# error alone. `?` already covers the case where the error type is the enclosing
+# function's, so what is left for this is the result that is handed straight
+# back or stored rather than unwrapped — where a hand-written `match` would
+# otherwise rebuild both sides in order to change one.
+
 import { equal as ==, is_err_and, len, logical_not as !, map_err } from builtins;
 
-// The AIPL implementation of the `map_ok` builtin. Monomorphization registers
-// this function under the canonical name `__builtin_map_ok` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `r.map_ok(f)` specializes
-// through the ordinary generic / higher-order machinery — the in-file name
-// `map_ok` is only for this file's own tests, which read exactly like user code.
-//
-// The mirror of `map_err`: this one rewrites the *value* side and leaves the
-// error alone. `?` already covers the case where the error type is the enclosing
-// function's, so what is left for this is the result that is handed straight
-// back or stored rather than unwrapped — where a hand-written `match` would
-// otherwise rebuild both sides in order to change one.
 # `self` with its value side rewritten by `f`: `ok(v)` becomes `ok(f(v))`, and
 # `err(e)` passes through untouched (`f` is not called). Generic over both
 # value types and the error type, and callable as a method: `r.map_ok(f)`.

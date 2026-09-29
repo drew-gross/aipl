@@ -12,6 +12,12 @@
 //! reading them on the rendered site, and they pushed the declarations — the
 //! reason to be on the page — below the fold.
 //!
+//! **A file's own `# ..` block is the page's introduction.** It documents the
+//! file rather than any declaration in it, so it sits above both sections, and
+//! its first paragraph is the one-line summary the index page shows beside the
+//! file's name — the only prose there, and the only thing on that page that
+//! says what a file is *for* rather than what it contains.
+//!
 //! **Public and private declarations are separate sections**, public first. A
 //! private declaration is not importable, so it is not part of what a file
 //! offers to anyone else; it stays on the page because a reader of *this* file
@@ -32,6 +38,14 @@
 //! so the whole thing works opened straight off the filesystem, moved
 //! somewhere else, or unzipped — with no base href, no relative-path
 //! arithmetic and no server. The page's heading still shows the real path.
+//!
+//! **Doc text is prose, not Markdown** — but it is prose with habits, and the
+//! renderer knows the four this repo actually writes: blank-line paragraphs,
+//! `` `code spans` `` (delimited by a run of backticks, so a span can hold one),
+//! `- ` lists, and `**bold**` / `*emphasis*`. An indented block stays verbatim
+//! in a `<pre>`, since reflowing one would destroy the thing it is showing.
+//! Anything else — headings, links, tables — renders as the characters it is
+//! written with, which is the honest answer for text nobody wrote as Markdown.
 //!
 //! **No JavaScript, and no web fonts.** A docs tree should open from a
 //! `file://` URL, over a slow link, and out of an archive; each of those rules
@@ -94,9 +108,12 @@ pub fn write_site(index: &Index, root: &Path, project: &str, out: &Path) -> Resu
         let slug = &slugs[&file.path];
         let page = FilePage::build(file, root, project, slug);
         symbol_count += file.symbols.len();
+        let summary = summary_html(file.module_doc.as_deref().unwrap_or_default());
         listings.push(FileListing {
             display: display_path(&file.path, root),
             href: format!("{slug}.html"),
+            has_summary: !summary.is_empty(),
+            summary,
             entries: page.entries(),
             private_count: page.private.len(),
         });
@@ -187,6 +204,10 @@ struct IndexPage {
 struct FileListing {
     display: String,
     href: String,
+    /// The file's own documentation, first paragraph only — see
+    /// [`summary_html`]. Pre-rendered HTML, marked `|safe` by the template.
+    summary: String,
+    has_summary: bool,
     /// Public declarations only. The index is a table of contents for what a
     /// project offers; a file's private helpers are one click away on its own
     /// page, and listing them here buried the rest.
@@ -208,6 +229,12 @@ struct FilePage {
     title: String,
     project: String,
     display: String,
+    /// The file's own `# ..` block as HTML — see [`doc_html`]. Empty when the
+    /// file has none, and then nothing is rendered in its place: a page whose
+    /// declarations are documented is not an undocumented page, so the
+    /// "Undocumented." an item gets would be a lie here.
+    doc: String,
+    has_doc: bool,
     /// Importable from another file, and so the part of this file that is
     /// anyone else's business. Shown first.
     public: Vec<SymbolSection>,
@@ -254,6 +281,7 @@ struct SlotRow {
 impl FilePage {
     fn build(file: &FileIndex, root: &Path, project: &str, slug: &str) -> FilePage {
         let display = display_path(&file.path, root);
+        let module_doc = file.module_doc.as_deref().unwrap_or_default();
         let mut symbols: Vec<SymbolSection> = Vec::new();
         for sym in &file.symbols {
             // A case is shown under the variant that declares it rather than as
@@ -305,6 +333,8 @@ impl FilePage {
             title: format!("{display} — {project}"),
             project: project.to_string(),
             display,
+            doc: doc_html(module_doc),
+            has_doc: !module_doc.trim().is_empty(),
             public,
             private,
         }
@@ -398,20 +428,53 @@ fn doc_html(doc: &str) -> String {
                 let joined = lines.join(" ");
                 let _ = write!(out, "<p>{}</p>", inline(&joined));
             }
+            Block::List(items) => {
+                out.push_str("<ul>");
+                for item in items {
+                    let _ = write!(out, "<li>{}</li>", inline(&item.join(" ")));
+                }
+                out.push_str("</ul>");
+            }
         }
     }
     out
 }
 
+/// A documentation block's first paragraph, as inline HTML with no `<p>`
+/// around it — what the index page shows beside a file's name.
+///
+/// The first paragraph rather than the first line: a doc block is prose, wrapped
+/// wherever the author's column ran out, so a line is not a unit of anything.
+/// Empty when the block opens with a code block, which is not a summary of
+/// anything either.
+fn summary_html(doc: &str) -> String {
+    match blocks(doc).into_iter().next() {
+        Some(Block::Para(lines)) => inline(&lines.join(" ")),
+        Some(Block::Code(_)) | Some(Block::List(_)) | None => String::new(),
+    }
+}
+
 enum Block<'a> {
     Para(Vec<&'a str>),
     Code(Vec<&'a str>),
+    /// One `- ` run, as the lines of each item.
+    List(Vec<Vec<&'a str>>),
 }
 
-/// Split doc text into paragraphs and indented code blocks. A blank line ends
-/// either; indentation of four spaces or more starts a code block.
+/// Split doc text into paragraphs, `- ` lists and indented code blocks. A blank
+/// line ends any of them; indentation of four spaces or more starts a code
+/// block, and a line whose first non-space characters are `- ` starts a list
+/// item.
+///
+/// A list is indented — two spaces, in the doc blocks this repo writes — and its
+/// continuation lines are indented further still, past the four that would
+/// otherwise mark code. So while a list is open, indentation continues the item
+/// rather than opening a code block; the list ends where the blank line does.
+/// That is also why the code rule is checked second: a four-space line is code
+/// only when there is no list to belong to.
 fn blocks(doc: &str) -> Vec<Block<'_>> {
     let indented_line = |l: &str| l.starts_with("    ") && !l.trim().is_empty();
+    let item_line = |l: &str| !indented_line(l) && l.trim_start().starts_with("- ");
     let mut out: Vec<Block> = Vec::new();
     let mut open: Option<Block> = None;
     for line in doc.lines() {
@@ -422,15 +485,19 @@ fn blocks(doc: &str) -> Vec<Block<'_>> {
         }
         // A paragraph swallows any following line, indented or not — an
         // indented continuation is a wrapped sentence, not a code block. A code
-        // block ends the moment the indentation does.
+        // block ends the moment the indentation does, and a list the moment a
+        // line is neither a new item nor indented under one.
         let continues = match &open {
-            Some(Block::Para(_)) => true,
+            Some(Block::Para(_)) => !item_line(line),
             Some(Block::Code(_)) => indented_line(line),
+            Some(Block::List(_)) => item_line(line) || indented_line(line),
             None => false,
         };
         if !continues {
             out.extend(open.take());
-            open = Some(if indented_line(line) {
+            open = Some(if item_line(line) {
+                Block::List(Vec::new())
+            } else if indented_line(line) {
                 Block::Code(Vec::new())
             } else {
                 Block::Para(Vec::new())
@@ -439,6 +506,18 @@ fn blocks(doc: &str) -> Vec<Block<'_>> {
         match open.as_mut() {
             Some(Block::Code(lines)) => lines.push(line),
             Some(Block::Para(lines)) => lines.push(line.trim()),
+            Some(Block::List(items)) => {
+                let text = line.trim();
+                match text.strip_prefix("- ") {
+                    // A new item, with the marker off: it is what said "item",
+                    // not part of what the item says.
+                    Some(rest) => items.push(vec![rest.trim_start()]),
+                    None => match items.last_mut() {
+                        Some(item) => item.push(text),
+                        None => items.push(vec![text]),
+                    },
+                }
+            }
             None => {}
         }
     }
@@ -446,26 +525,161 @@ fn blocks(doc: &str) -> Vec<Block<'_>> {
     out
 }
 
-/// Escape `text`, then turn `` `spans` `` into `<code>` elements. Escaping
-/// first is what makes this safe: by the time a backtick is looked for, every
-/// `<`, `&` and `"` in the text is already an entity.
+/// Escape `text`, then turn `` `spans` `` into `<code>` elements and
+/// `**bold**` / `*emphasis*` into `<strong>` / `<em>`. Escaping first is what
+/// makes this safe: by the time a delimiter is looked for, every `<`, `&` and
+/// `"` in the text is already an entity.
+///
+/// Code spans are found first and become opaque, so nothing is looked for
+/// inside one — a `` `xs: i64*` `` is a variadic parameter, not an open
+/// emphasis. They are *atoms* rather than a separate pass, because prose here
+/// routinely emphasizes across one (**`Member` is where the seam shows.**) and
+/// two passes would each see only half of that.
+///
+/// A span is delimited by a *run* of backticks and closes at the next run of
+/// the same length, so a span can hold a backtick by doubling its
+/// delimiters — which this repo's prose does whenever it names one. Counting
+/// single ticks instead would take the inner one for a delimiter and shift
+/// every span after it in the paragraph.
 fn inline(text: &str) -> String {
     let escaped = escape(text);
-    let mut out = String::new();
-    // Splitting on the delimiter puts the spans at the odd indices: `a `b` c`
-    // is ["a ", "b", " c"]. An odd number of backticks leaves the final piece at
-    // an odd index and so wrapped — a stray backtick swallows the rest of the
-    // paragraph into a `<code>`, which looks wrong but is at least well-formed.
-    for (i, piece) in escaped.split('`').enumerate() {
-        if i % 2 == 1 {
-            out.push_str("<code>");
-            out.push_str(piece);
-            out.push_str("</code>");
-        } else {
-            out.push_str(piece);
+    let chars: Vec<char> = escaped.chars().collect();
+    let mut pieces: Vec<Piece> = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '`' {
+            let open = tick_run(&chars, i);
+            if let Some(close) = next_tick_run(&chars, i + open, open) {
+                let body: String = chars[i + open..close].iter().collect();
+                pieces.push(Piece::Code(format!("<code>{}</code>", code_body(&body))));
+                i = close + open;
+                continue;
+            }
         }
+        // A run that never closes is a stray tick: it stays literal rather than
+        // swallowing the rest of the paragraph into a `<code>`.
+        pieces.push(Piece::Ch(chars[i]));
+        i += 1;
+    }
+    emphasize(&pieces)
+}
+
+/// How many backticks in a row start at `at`.
+fn tick_run(chars: &[char], at: usize) -> usize {
+    chars[at..].iter().take_while(|c| **c == '`').count()
+}
+
+/// The next run of *exactly* `n` backticks at or after `from`. A longer run is
+/// not a closer — it is content of a span this one cannot close.
+fn next_tick_run(chars: &[char], from: usize, n: usize) -> Option<usize> {
+    let mut i = from;
+    while i < chars.len() {
+        if chars[i] != '`' {
+            i += 1;
+            continue;
+        }
+        let run = tick_run(chars, i);
+        if run == n {
+            return Some(i);
+        }
+        i += run;
+    }
+    None
+}
+
+/// A code span's text: one space comes off each end when both are there, which
+/// is what lets `` ` `` hold a backtick without the delimiters touching it.
+/// A span of nothing but spaces keeps them — there is nothing else in it.
+fn code_body(body: &str) -> &str {
+    match (body.strip_prefix(' '), body.strip_suffix(' ')) {
+        (Some(_), Some(_)) if !body.trim().is_empty() => &body[1..body.len() - 1],
+        _ => body,
+    }
+}
+
+/// One atom of an inline run: a rendered code span, which nothing looks inside,
+/// or one character of ordinary text.
+enum Piece {
+    Code(String),
+    Ch(char),
+}
+
+impl Piece {
+    fn is_star(&self) -> bool {
+        matches!(self, Piece::Ch('*'))
+    }
+
+    /// A code span is not whitespace — it is what a delimiter beside it is
+    /// wrapping.
+    fn is_space(&self) -> bool {
+        matches!(self, Piece::Ch(c) if c.is_whitespace())
+    }
+}
+
+/// `**bold**` and `*emphasis*`, longest marker first so `**` never reads as two
+/// `*`. Recursive, so a `*word*` inside a `**lead-in**` is both.
+///
+/// A delimiter only opens when a non-space follows it and only closes when a
+/// non-space precedes it, which keeps arithmetic prose (`a * b * c`) and a lone
+/// marker out of it. An unpaired delimiter stays literal rather than running to
+/// the end of the paragraph — what it would swallow is prose someone wrote, not
+/// markup they meant.
+fn emphasize(pieces: &[Piece]) -> String {
+    let mut out = String::new();
+    let mut i = 0;
+    while i < pieces.len() {
+        if pieces[i].is_star() {
+            let open = star_run(pieces, i).min(2);
+            if let Some(close) = closer(pieces, i + open, open) {
+                let (before, after) = if open == 2 {
+                    ("<strong>", "</strong>")
+                } else {
+                    ("<em>", "</em>")
+                };
+                out.push_str(before);
+                out.push_str(&emphasize(&pieces[i + open..close]));
+                out.push_str(after);
+                i = close + open;
+                continue;
+            }
+        }
+        match &pieces[i] {
+            Piece::Code(html) => out.push_str(html),
+            Piece::Ch(c) => out.push(*c),
+        }
+        i += 1;
     }
     out
+}
+
+/// How many `*` in a row start at `at`.
+fn star_run(pieces: &[Piece], at: usize) -> usize {
+    pieces[at..].iter().take_while(|p| p.is_star()).count()
+}
+
+/// Where the span whose content starts at `from` closes: the next run of at
+/// least `open` stars that has something other than a space in front of it.
+/// `None` when the span never opened (a space right after the marker, or
+/// nothing at all) or never closes.
+fn closer(pieces: &[Piece], from: usize, open: usize) -> Option<usize> {
+    match pieces.get(from) {
+        None => return None,
+        Some(p) if p.is_space() => return None,
+        Some(_) => {}
+    }
+    let mut i = from;
+    while i < pieces.len() {
+        if !pieces[i].is_star() {
+            i += 1;
+            continue;
+        }
+        let run = star_run(pieces, i);
+        if run >= open && i > from && !pieces[i - 1].is_space() {
+            return Some(i);
+        }
+        i += run;
+    }
+    None
 }
 
 fn escape(text: &str) -> String {
@@ -486,7 +700,12 @@ fn escape(text: &str) -> String {
 mod tests {
     use super::*;
 
-    const SRC: &str = r#"import { print } from builtins;
+    const SRC: &str = r#"# Shapes, and the areas of them.
+#
+# A second paragraph, which is on the file's page but not in the one-line
+# summary the index shows.
+
+import { print } from builtins;
 
 struct Point { x: i64, y: i64 }
 
@@ -655,6 +874,75 @@ fn private_helper() -> i64 { 1 }
         assert!(!page.contains(">Private<"), "{page}");
     }
 
+    /// The file's own `# ..` block leads the page, above both sections, and is
+    /// rendered like any other documentation.
+    #[test]
+    fn a_page_shows_the_files_own_documentation() {
+        let (_d, out) = site();
+        let page = read(&out, "src-shapes.html");
+        let doc = page
+            .find("<p>Shapes, and the areas of them.</p>")
+            .expect("the module doc");
+        let public = page.find(">Public<").expect("a public section");
+        assert!(doc < public, "the file's docs lead the page:\n{page}");
+        // Every paragraph of it, not just the summary the index takes.
+        assert!(page.contains("A second paragraph, which is on"), "{page}");
+        // It documents no declaration, so it is not one of the items.
+        assert!(page.contains("class=\"module-doc\""), "{page}");
+    }
+
+    /// The index page's one line per file is that file's own documentation,
+    /// first paragraph only.
+    #[test]
+    fn the_index_summarises_a_file_from_its_own_documentation() {
+        let (_d, out) = site();
+        let index = read(&out, "index.html");
+        assert!(
+            index.contains("<p class=\"file-summary\">Shapes, and the areas of them.</p>"),
+            "{index}"
+        );
+        // The rest of the block stays on the file's own page.
+        assert!(!index.contains("A second paragraph"), "{index}");
+    }
+
+    /// A file with no `# ..` block of its own gets no introduction and no
+    /// summary — not an empty one, and not an "Undocumented." the way an item
+    /// does: a file whose declarations are documented is not undocumented.
+    #[test]
+    fn a_file_without_its_own_documentation_shows_none() {
+        aipl_codegen::install_parser_hooks();
+        let dir = tempdir::Dir::new("aipl-docs-nomod");
+        let src = "# Just this one.\npub fn f() -> i64 { 1 }\n";
+        std::fs::write(dir.path().join("p.aipl"), src).expect("write");
+        let mut index = Index::new();
+        index.add(dir.path().join("p.aipl"), src).expect("indexes");
+        let out = dir.path().join("out");
+        write_site(&index, dir.path(), "demo", &out).expect("writes");
+        // The block is adjacent to the declaration, so it documents it.
+        let page = read(&out, "p.html");
+        assert!(page.contains("<p>Just this one.</p>"), "{page}");
+        assert!(!page.contains("module-doc"), "{page}");
+        assert!(!read(&out, "index.html").contains("file-summary"));
+    }
+
+    /// The summary is the first *paragraph*, since a doc block is prose wrapped
+    /// wherever the author's column ran out.
+    #[test]
+    fn a_summary_is_the_first_paragraph() {
+        assert_eq!(
+            summary_html("One sentence\nwrapped over two lines.\n\nA second paragraph."),
+            "One sentence wrapped over two lines."
+        );
+        // Inline code is rendered, and escaped, like anywhere else.
+        assert_eq!(
+            summary_html("see `Rule<K>`"),
+            "see <code>Rule&lt;K&gt;</code>"
+        );
+        // Nothing to summarise: no docs, or a block opening with an example.
+        assert_eq!(summary_html(""), "");
+        assert_eq!(summary_html("    let a = 1;"), "");
+    }
+
     /// Imports are indexed but deliberately not rendered.
     #[test]
     fn imports_are_not_shown() {
@@ -701,6 +989,59 @@ fn private_helper() -> i64 { 1 }
         );
     }
 
+    /// A `- ` run is a list, and its continuation lines belong to their item
+    /// rather than opening a code block — the shape every file header in this
+    /// repo writes.
+    #[test]
+    fn renders_dash_runs_as_lists() {
+        assert_eq!(
+            doc_html(
+                "Three of them:\n\n  - one, which runs\n    over two lines.\n  - two.\n\nAfter."
+            ),
+            "<p>Three of them:</p><ul><li>one, which runs over two lines.</li>\
+             <li>two.</li></ul><p>After.</p>"
+        );
+        // A four-space line with no list open is still a code block.
+        assert_eq!(
+            doc_html("Example:\n\n    let a = 1;"),
+            "<p>Example:</p><pre><code>let a = 1;\n</code></pre>"
+        );
+        // A list is not a summary — the index shows prose or nothing.
+        assert_eq!(summary_html("  - one\n  - two"), "");
+    }
+
+    /// `**bold**` and `*emphasis*`, which is what the prose uses to lead a
+    /// paragraph and to stress a word.
+    #[test]
+    fn renders_emphasis() {
+        assert_eq!(
+            doc_html("**It is a PEG.** The driver has *no* left recursion."),
+            "<p><strong>It is a PEG.</strong> The driver has <em>no</em> left recursion.</p>"
+        );
+        // Not markup: a lone marker, one with a space after it, and one inside
+        // a code span — `i64*` is a variadic parameter, not an open emphasis.
+        assert_eq!(doc_html("2*3 and a * b * c"), "<p>2*3 and a * b * c</p>");
+        assert_eq!(
+            doc_html("takes `xs: i64*` and `ys: i64*`"),
+            "<p>takes <code>xs: i64*</code> and <code>ys: i64*</code></p>"
+        );
+        // An unpaired marker stays literal rather than swallowing the rest.
+        assert_eq!(doc_html("a *stray marker"), "<p>a *stray marker</p>");
+        // Emphasis routinely spans a code span, which is why code spans are
+        // atoms of one pass rather than a pass of their own.
+        assert_eq!(
+            doc_html("**`Member` is the seam.** So is `Build<A>`."),
+            "<p><strong><code>Member</code> is the seam.</strong> So is \
+             <code>Build&lt;A&gt;</code>.</p>"
+        );
+        // And a `*word*` inside a `**lead-in**` is both.
+        assert_eq!(
+            doc_html("**A rule set is written against a token *kind* type.**"),
+            "<p><strong>A rule set is written against a token <em>kind</em> type.\
+             </strong></p>"
+        );
+    }
+
     #[test]
     fn an_unbalanced_backtick_still_produces_well_formed_markup() {
         let html = doc_html("a ` stray tick");
@@ -708,6 +1049,21 @@ fn private_helper() -> i64 { 1 }
             html.matches("<code>").count(),
             html.matches("</code>").count()
         );
+        // It stays where it was written, too, rather than turning the rest of
+        // the paragraph into code.
+        assert_eq!(html, "<p>a ` stray tick</p>");
+    }
+
+    /// Doubled delimiters are how prose names a backtick, and a span reading
+    /// them as two spans would shift every span after it in the paragraph.
+    #[test]
+    fn a_doubled_delimiter_holds_a_backtick() {
+        assert_eq!(
+            doc_html("a lone `` ` `` or a `RawTemplate*` kind"),
+            "<p>a lone <code>`</code> or a <code>RawTemplate*</code> kind</p>"
+        );
+        // Only a run of the same length closes it.
+        assert_eq!(doc_html("`` a ` b ``"), "<p><code>a ` b</code></p>");
     }
 
     #[test]

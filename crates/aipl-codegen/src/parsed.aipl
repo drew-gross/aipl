@@ -1,8 +1,9 @@
-// The shapes that exist only between a production and the fold that consumes
-// it: a keyword statement before the rest of its block is in scope, a function
-// body before its return type is, a parameter before its destructuring is
-// taken apart, and a `.test` attribute. None is a node of the AST proper. One
-// of the files the AST is declared across; see `ast.aipl`.
+# The shapes that exist only between a production and the fold that consumes
+# it: a keyword statement before the rest of its block is in scope, a function
+# body before its return type is, a parameter before its destructuring is
+# taken apart, and a `.test` attribute. None is a node of the AST proper. One
+# of the files the AST is declared across; see `ast.aipl`.
+
 import { Span, equal as ==, is_err_and, value_or_err } from builtins;
 import { Construct as ConstructExpr, Expr, FieldInit, at, num, show_expr } from "./expr.aipl";
 import { ParseError } from "./grammar.aipl";

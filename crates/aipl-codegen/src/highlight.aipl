@@ -1,40 +1,41 @@
-// Generates a TextMate grammar — the `.tmLanguage.json` a VS Code, Sublime or
-// Zed extension ships — from the data a language is *already* described with.
-//
-// The input is a `TokenRule[]`, the same rule set `lexer.aipl` lexes with. Every
-// rule carries a `scope` (see `TokenRule` in `lexer.aipl`), and this file turns
-// each rule's `Matcher` into the TextMate pattern that recognizes the same text.
-// A highlighter is then not a third hand-written description of the language but
-// a projection of the first one, which is the whole point: the copy that drifts
-// is the copy nobody generated.
-//
-// **Order means the same thing in both.** `lex` is first-match-wins at a
-// position; TextMate takes the pattern whose match starts earliest and breaks a
-// tie by the order patterns are listed. So a rule list already ordered for
-// maximal munch — `==` before `=`, the block comment before `/` — comes out
-// ordered correctly, and consecutive rules sharing a scope merge into one
-// ordered alternation for free.
-//
-// **What does not come from the lexer.** Two kinds of pattern have no lexical
-// rule to derive from, and both are supplied by the caller:
-//
-//   - *Contextual declarations* — `fn NAME`, `struct NAME` — where the name gets
-//     a different scope for being in that position. `decl_pat` builds one from a
-//     keyword and the identifier regex, so the names it accepts are still the
-//     lexer's.
-//   - *Post-lexical classes* — a language whose builtin type names lex as plain
-//     identifiers and are told apart later. `word_pat` builds the alternation.
-//
-// Anything else is `Pat`, hand-built: the model below is the escape hatch, and
-// `highlight_aipl.aipl` uses it for exactly one pattern (the test-case section
-// tail, which is not AIPL syntax at all).
-//
-// **Regex dialect.** The output has to satisfy two engines: Oniguruma, which is
-// what a real editor runs, and Rust's `regex`, which is what the oracle in
-// `tests/highlighting.rs` validates the checked-in file with. `regex` has no
-// lookaround, so a keyword boundary is `\b..\b` rather than a negative lookahead
-// on the rule's own continuation class — correct whenever that class is the
-// word-character set, which is the only case any rule set here has.
+# Generates a TextMate grammar — the `.tmLanguage.json` a VS Code, Sublime or
+# Zed extension ships — from the data a language is *already* described with.
+#
+# The input is a `TokenRule[]`, the same rule set `lexer.aipl` lexes with. Every
+# rule carries a `scope` (see `TokenRule` in `lexer.aipl`), and this file turns
+# each rule's `Matcher` into the TextMate pattern that recognizes the same text.
+# A highlighter is then not a third hand-written description of the language but
+# a projection of the first one, which is the whole point: the copy that drifts
+# is the copy nobody generated.
+#
+# **Order means the same thing in both.** `lex` is first-match-wins at a
+# position; TextMate takes the pattern whose match starts earliest and breaks a
+# tie by the order patterns are listed. So a rule list already ordered for
+# maximal munch — `==` before `=`, the block comment before `/` — comes out
+# ordered correctly, and consecutive rules sharing a scope merge into one
+# ordered alternation for free.
+#
+# **What does not come from the lexer.** Two kinds of pattern have no lexical
+# rule to derive from, and both are supplied by the caller:
+#
+#   - *Contextual declarations* — `fn NAME`, `struct NAME` — where the name gets
+#     a different scope for being in that position. `decl_pat` builds one from a
+#     keyword and the identifier regex, so the names it accepts are still the
+#     lexer's.
+#   - *Post-lexical classes* — a language whose builtin type names lex as plain
+#     identifiers and are told apart later. `word_pat` builds the alternation.
+#
+# Anything else is `Pat`, hand-built: the model below is the escape hatch, and
+# `highlight_aipl.aipl` uses it for exactly one pattern (the test-case section
+# tail, which is not AIPL syntax at all).
+#
+# **Regex dialect.** The output has to satisfy two engines: Oniguruma, which is
+# what a real editor runs, and Rust's `regex`, which is what the oracle in
+# `tests/highlighting.rs` validates the checked-in file with. `regex` has no
+# lookaround, so a keyword boundary is `\b..\b` rather than a negative lookahead
+# on the rule's own continuation class — correct whenever that class is the
+# word-character set, which is the only case any rule set here has.
+
 import {
     concat as +++,
     count_while,

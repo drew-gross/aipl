@@ -1,11 +1,12 @@
+# The AIPL implementation of the `any` builtin — the dual of `all` (see
+# `builtin_all.aipl`). Monomorphization registers this function under the
+# canonical name `__builtin_any` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a
+# user's `xs.any(pred)` specializes through the ordinary generic / higher-order
+# machinery — the in-file name `any` is only for this file's own tests, which
+# read exactly like user code.
+
 import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
 
-// The AIPL implementation of the `any` builtin — the dual of `all` (see
-// `builtin_all.aipl`). Monomorphization registers this function under the
-// canonical name `__builtin_any` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a
-// user's `xs.any(pred)` specializes through the ordinary generic / higher-order
-// machinery — the in-file name `any` is only for this file's own tests, which
-// read exactly like user code.
 # True when at least one element satisfies `pred`, short-circuiting at the first
 # element that does; an empty array is false. Generic over the element type and
 # callable as a method: `xs.any(pred)`.

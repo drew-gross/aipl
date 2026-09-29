@@ -1,9 +1,10 @@
-// The content half of the formatter's raw-block re-layout (see `reindent_block`):
-// indents a block of text — the lines *between* a raw-string / template atom's
-// delimiters, with no `"""` / ``` ``` ``` framing — by a chosen column. Split out
-// so `reindent_block` deals only with the delimiters. Assumes the input is already
-// fully dedented (its common indent is 0): it *adds* `target` spaces, it does not
-// rebase an existing indent — `reindent_block` dedents first (via `dedent`).
+# The content half of the formatter's raw-block re-layout (see `reindent_block`):
+# indents a block of text — the lines *between* a raw-string / template atom's
+# delimiters, with no `"""` / ```` ``` ```` framing — by a chosen column. Split
+# out so `reindent_block` deals only with the delimiters. Assumes the input is already
+# fully dedented (its common indent is 0): it *adds* `target` spaces, it does not
+# rebase an existing indent — `reindent_block` dedents first (via `dedent`).
+
 import { concat as +++, equal as ==, is_all_whitespace, join, map, repeat } from builtins;
 import { lines } from "./lines.aipl";
 

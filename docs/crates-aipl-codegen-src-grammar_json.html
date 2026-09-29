@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/grammar_json.aipl</code></h1>
 
+      <div class="module-doc"><p>JSON: the library's second end-to-end target, and the one that adds everything S-expressions deliberately left out — several terminal classes rather than one, a separated <code>Many</code> with a trailing-comma rule, an <code>OneOf</code> across six alternatives, and a heterogeneous AST. Still no precedence; that arrives with the calculator in <code>grammar_calc.aipl</code>.</p><p>Complete but tiny: eight productions and one <code>variant Json</code>, against a rule set cribbed from <code>lexer.aipl</code>'s own JSON-flavored test table.</p><p>Two things worth reading before the grammar:</p><ul><li><strong>Numbers stay text.</strong> <code>Number</code> carries the source spelling rather than a parsed value. JSON's number syntax is wider than any one AIPL type (an arbitrary-precision integer is legal JSON), so <em>what a number means</em> is the consumer's policy, exactly as it is for the lexer's <code>Int</code>/<code>Float</code>, which hand over their digits unparsed for the same reason.</li><li><strong><code>Member</code> is where a uniform lowering type shows its seam.</strong> <code>Build&lt;A&gt;</code> pins one <code>A</code> for every production in a grammar, so the <code>member</code> production — whose natural result is a key/value <em>pair</em>, not a JSON value — has to lower to a <code>Json</code> too. It gets a case of its own, meaningful only as an element of a <code>Object</code>. That is the honest cost of one lowering type per grammar, and it is worth knowing before the grammar describes AIPL itself, where the AST has many more shapes than its expression type.</li></ul></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant JsonTok</code></pre>
 
-          <div class="doc"><p>The token kinds: three terminal classes that carry meaning, and one bare kind for the punctuation the grammar matches by <code>Lit</code>.</p><p><code>Str</code> keeps its delimiter-stripped contents (the lexer's <code>Delimited</code> computes them), but the concrete tree holds *spans*, not values — so lowering reads the quoted source text back out and strips it itself. The payload is what makes a string token tell itself apart from a number, which is all <code>Term</code> needs.</p></div>
+          <div class="doc"><p>The token kinds: three terminal classes that carry meaning, and one bare kind for the punctuation the grammar matches by <code>Lit</code>.</p><p><code>Str</code> keeps its delimiter-stripped contents (the lexer's <code>Delimited</code> computes them), but the concrete tree holds <em>spans</em>, not values — so lowering reads the quoted source text back out and strips it itself. The payload is what makes a string token tell itself apart from a number, which is all <code>Term</code> needs.</p></div>
 
 
           <ul class="cases">
@@ -194,7 +197,7 @@
           </h3>
           <pre class="signature"><code>fn json_rules() -&#62; TokenRule&#60;JsonTok&#62;[]</code></pre>
 
-          <div class="doc"><p>Whitespace is recorded as **trivia** rather than skipped, so the concrete tree covers every byte of the source and reconstructs it exactly. JSON has no comments, so trivia is whitespace and nothing else.</p><p>Rule order carries two decisions. <code>Float</code> sits ahead of <code>Int</code> because a bare digit run doesn't match <code>Float</code> and <code>1.5</code> would otherwise lex as <code>1</code> then a stray <code>.</code>. And <code>Exact(&quot;-&quot;)</code> sits ahead of both, which makes every <code>-</code> its own token and <code>Int</code> unsigned — so the sign is the *grammar's* business (<code>Maybe(Lit(&quot;-&quot;))</code> in <code>number</code>), one place, rather than split between a sign the lexer swallowed and one it didn't.</p></div>
+          <div class="doc"><p>Whitespace is recorded as <strong>trivia</strong> rather than skipped, so the concrete tree covers every byte of the source and reconstructs it exactly. JSON has no comments, so trivia is whitespace and nothing else.</p><p>Rule order carries two decisions. <code>Float</code> sits ahead of <code>Int</code> because a bare digit run doesn't match <code>Float</code> and <code>1.5</code> would otherwise lex as <code>1</code> then a stray <code>.</code>. And <code>Exact(&quot;-&quot;)</code> sits ahead of both, which makes every <code>-</code> its own token and <code>Int</code> unsigned — so the sign is the <em>grammar's</em> business (<code>Maybe(Lit(&quot;-&quot;))</code> in <code>number</code>), one place, rather than split between a sign the lexer swallowed and one it didn't.</p></div>
 
 
         </section>
@@ -208,7 +211,7 @@
           </h3>
           <pre class="signature"><code>fn lower_member(src: str, node: Parts, kids: Json[]) -&#62; Json!ParseError</code></pre>
 
-          <div class="doc"><p>A member's value is its one interior child; its key is the string token in front of the <code>:</code>, which is a *leaf* and so has no lowered value — the first of the node's own tokens is where it is read from.</p></div>
+          <div class="doc"><p>A member's value is its one interior child; its key is the string token in front of the <code>:</code>, which is a <em>leaf</em> and so has no lowered value — the first of the node's own tokens is where it is read from.</p></div>
 
 
         </section>
@@ -250,7 +253,7 @@
           </h3>
           <pre class="signature"><code>fn escape_json(s: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>The inverse of the <code>unescape</code> lowering applies: the two characters JSON *requires* escaping, plus the control characters that have short forms. Enough for the round trip, and for anything this library will parse back.</p></div>
+          <div class="doc"><p>The inverse of the <code>unescape</code> lowering applies: the two characters JSON <em>requires</em> escaping, plus the control characters that have short forms. Enough for the round trip, and for anything this library will parse back.</p></div>
 
 
         </section>

@@ -1,47 +1,48 @@
-// Introspection over a `Grammar` (see `grammar.aipl`): what it *says*, rendered
-// as EBNF, and what it can *start with*, computed as FIRST sets. Neither parses
-// anything — both are pure functions of the grammar value, which is the whole
-// reason the grammar is data and the driver is somewhere else.
-//
-// **The EBNF dump** (`ebnf`) is the grammar as a reader would write it by hand:
-// one `name = rule ;` line per production, sequence by juxtaposition, `|` for
-// ordered choice, and the postfix `?`/`*`/`+` for the repetitions. A separated
-// `Many` and a `Climb` are combinators rather than EBNF operators, so both are
-// *expanded*: a list into its `(item (sep item)* sep?)?` longhand, and a climb
-// into the flat
-// `atom (op atom)*` with the precedence it actually uses stated in a trailing
-// `(* precedence: ... *)` comment — EBNF cannot express binding power or
-// associativity, so the honest thing is to say them rather than to imply them.
-// The dump is a *debug* rendering like `cst.aipl`'s `show`: it never fails, so a
-// grammar can be dumped linked or unlinked (a `Named` renders as its name, a
-// `NamedIdx` as the name it indexes, or `?` when it indexes nothing).
-//
-// **FIRST sets** (`first_sets`) answer, per production, which terminals a match
-// can begin with and whether it can match nothing at all. Two uses:
-//
-//   - A grammar author reads them. A production whose FIRST set is empty matches
-//     nothing; two alternatives of a `OneOf` whose sets overlap are the ones
-//     where the order written decides the parse.
-//   - A driver prunes with them. `OneOf` currently tries every alternative and
-//     backtracks; `can_start` is the test that skips an alternative no token
-//     could begin — which is what keeps a PEG parse near-linear without packrat
-//     memoization, and memoization needs the hash-backed dicts that do not exist
-//     yet. This file computes and proves the sets; wiring them into
-//     `parse.aipl`'s `match_one_of` is a separate change, because pruning an
-//     alternative also has to keep contributing its expectations to `Far` or the
-//     error messages get worse.
-//
-// A terminal here is a token *kind* (what `Term` matches) or an exact
-// *spelling* (what `Literal` matches). The two are genuinely different tests —
-// a kind ignores the text and a spelling ignores the kind — so a FIRST set is
-// two sets, and `can_start` asks both.
-//
-// The computation is a fixed point, because a reference may reach back through
-// the production it started from: every production starts empty and
-// not-nullable, each round recomputes all of them from the previous round, and
-// the loop stops when a round changes nothing. Both halves of a `First` only
-// ever grow, so it terminates — and unlike the parse, it terminates on a
-// left-recursive grammar too.
+# Introspection over a `Grammar` (see `grammar.aipl`): what it *says*, rendered
+# as EBNF, and what it can *start with*, computed as FIRST sets. Neither parses
+# anything — both are pure functions of the grammar value, which is the whole
+# reason the grammar is data and the driver is somewhere else.
+#
+# **The EBNF dump** (`ebnf`) is the grammar as a reader would write it by hand:
+# one `name = rule ;` line per production, sequence by juxtaposition, `|` for
+# ordered choice, and the postfix `?`/`*`/`+` for the repetitions. A separated
+# `Many` and a `Climb` are combinators rather than EBNF operators, so both are
+# *expanded*: a list into its `(item (sep item)* sep?)?` longhand, and a climb
+# into the flat
+# `atom (op atom)*` with the precedence it actually uses stated in a trailing
+# `(* precedence: ... *)` comment — EBNF cannot express binding power or
+# associativity, so the honest thing is to say them rather than to imply them.
+# The dump is a *debug* rendering like `cst.aipl`'s `show`: it never fails, so a
+# grammar can be dumped linked or unlinked (a `Named` renders as its name, a
+# `NamedIdx` as the name it indexes, or `?` when it indexes nothing).
+#
+# **FIRST sets** (`first_sets`) answer, per production, which terminals a match
+# can begin with and whether it can match nothing at all. Two uses:
+#
+#   - A grammar author reads them. A production whose FIRST set is empty matches
+#     nothing; two alternatives of a `OneOf` whose sets overlap are the ones
+#     where the order written decides the parse.
+#   - A driver prunes with them. `OneOf` currently tries every alternative and
+#     backtracks; `can_start` is the test that skips an alternative no token
+#     could begin — which is what keeps a PEG parse near-linear without packrat
+#     memoization, and memoization needs the hash-backed dicts that do not exist
+#     yet. This file computes and proves the sets; wiring them into
+#     `parse.aipl`'s `match_one_of` is a separate change, because pruning an
+#     alternative also has to keep contributing its expectations to `Far` or the
+#     error messages get worse.
+#
+# A terminal here is a token *kind* (what `Term` matches) or an exact
+# *spelling* (what `Literal` matches). The two are genuinely different tests —
+# a kind ignores the text and a spelling ignores the kind — so a FIRST set is
+# two sets, and `can_start` asks both.
+#
+# The computation is a fixed point, because a reference may reach back through
+# the production it started from: every production starts empty and
+# not-nullable, each round recomputes all of them from the previous round, and
+# the loop stops when a round changes nothing. Both halves of a `First` only
+# ever grow, so it terminates — and unlike the parse, it terminates on a
+# left-recursive grammar too.
+
 import {
     any,
     case_name,

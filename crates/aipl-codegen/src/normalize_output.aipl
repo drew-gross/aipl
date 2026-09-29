@@ -1,8 +1,9 @@
-// The cases harness's captured-output normalizer: the test harness calls this
-// through the embedding FFI (see `aipl::codegen::normalize_output`) to compare a
-// child program's stdout/stderr against the expected sections, and `aipl check`
-// exercises it via the `.test` block below. Collapsing CRLF to LF matters on
-// Windows, where libc text-mode stdout rewrites the runtime's `\n` to `\r\n`.
+# The cases harness's captured-output normalizer: the test harness calls this
+# through the embedding FFI (see `aipl::codegen::normalize_output`) to compare a
+# child program's stdout/stderr against the expected sections, and `aipl check`
+# exercises it via the `.test` block below. Collapsing CRLF to LF matters on
+# Windows, where libc text-mode stdout rewrites the runtime's `\n` to `\r\n`.
+
 import { equal as ==, join, logical_or as ||, split } from builtins;
 import { trim_end_while } from "./trim_end_while.aipl";
 

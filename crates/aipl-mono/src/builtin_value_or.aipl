@@ -1,18 +1,19 @@
+# The AIPL implementation of the `value_or` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_value_or` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `o.value_or(d)` resolves
+# through the ordinary generic machinery — the in-file name `value_or` is only
+# for this file's own tests, which read exactly like user code.
+#
+# Written in AIPL rather than emitted natively so it works for *every* payload
+# type. The native version was a tag `select` over a single i64 value, so it
+# refused an optional whose payload is an inline struct or variant and told
+# callers to "use match to unwrap" — which is how the compiler's own
+# `walker.aipl` ended up spelling this out by hand. A generic AIPL body has no
+# such restriction: the `match` it expands to is the one those callers were
+# writing themselves.
+
 import { equal as ==, len } from builtins;
 
-// The AIPL implementation of the `value_or` builtin. Monomorphization registers
-// this function under the canonical name `__builtin_value_or` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `o.value_or(d)` resolves
-// through the ordinary generic machinery — the in-file name `value_or` is only
-// for this file's own tests, which read exactly like user code.
-//
-// Written in AIPL rather than emitted natively so it works for *every* payload
-// type. The native version was a tag `select` over a single i64 value, so it
-// refused an optional whose payload is an inline struct or variant and told
-// callers to "use match to unwrap" — which is how the compiler's own
-// `walker.aipl` ended up spelling this out by hand. A generic AIPL body has no
-// such restriction: the `match` it expands to is the one those callers were
-// writing themselves.
 # The optional's payload when it has one, otherwise `default`. Generic over the
 # payload type — including inline structs and variants — and callable as a
 # method: `o.value_or(d)`.

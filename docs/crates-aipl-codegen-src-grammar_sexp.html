@@ -14,6 +14,11 @@
 
       <h1><code>crates/aipl-codegen/src/grammar_sexp.aipl</code></h1>
 
+      <div class="module-doc"><p>S-expressions: the library's first end-to-end target, and deliberately the floor rather than a warm-up. Two productions —</p><pre><code>list -&gt; &quot;(&quot; item* &quot;)&quot;
+item -&gt; Atom | list
+</code></pre><p>— where <code>item</code> reaches <code>list</code> and <code>list</code> reaches back through <code>item</code>, which is the whole point: a non-recursive toy (a comma-separated integer list, key/value lines) would exercise none of what the driver is actually built on. This one forces a <strong>recursive CST</strong> (a <code>Cst</code> boxed through an array), a <strong>parse as deep as its input</strong>, and a lowering to a <strong>boxed AST</strong> reached through a function <em>value</em> — the <code>(str, Cst, A[]) -&gt; A!ParseError</code> shape with <code>A</code> boxed.</p><p>Recursive descent spends a stack frame per level and none of those calls is in tail position, so parse depth is bounded by the stack rather than by the heap. Measured on the 8 MB an ordinary binary gets: <code>((( ... )))</code> nests fine at 1,000 levels and segfaults somewhere before 2,000, which is why the deep test below sits at 200 — deep enough that a regression in frame size would show, with room to spare.</p><p>It deliberately omits precedence, more than one terminal class, separators, and error-message subtlety: if the driver is wrong, it is wrong here in two productions rather than in ten. <code>grammar_json.aipl</code> adds the rest.</p><p>The file is also the worked example of what a consumer of this library brings: a token-kind type, a <code>TokenRule[]</code> for it, an AST, one <code>lower_*</code> per production, and a <code>Grammar</code> tying them together. Nothing else — the parse itself is <code>parse.aipl</code>'s, unmodified.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -117,7 +122,7 @@
           </h3>
           <pre class="signature"><code>fn sexp_rules() -&#62; TokenRule&#60;SexpKind&#62;[]</code></pre>
 
-          <div class="doc"><p>Whitespace and <code>;</code> comments are recorded as **trivia** rather than skipped, so the concrete tree covers every byte of the source and reconstructs it exactly (asserted below). An atom is a run of the usual Lisp symbol characters, which includes digits — this grammar has no number type, so <code>12</code> is just an atom.</p></div>
+          <div class="doc"><p>Whitespace and <code>;</code> comments are recorded as <strong>trivia</strong> rather than skipped, so the concrete tree covers every byte of the source and reconstructs it exactly (asserted below). An atom is a run of the usual Lisp symbol characters, which includes digits — this grammar has no number type, so <code>12</code> is just an atom.</p></div>
 
 
         </section>
@@ -129,7 +134,7 @@
             <a class="anchor" href="#item-lower_item">lower_item</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lower_item(src: str, __spat$3575: Parts, kids: Sexp[]) -&#62; Sexp</code></pre>
+          <pre class="signature"><code>fn lower_item(src: str, __spat$3548: Parts, kids: Sexp[]) -&#62; Sexp</code></pre>
 
           <div class="doc"><p>An <code>item</code> is one of its two alternatives, told apart by whether it got an interior child: the <code>list</code> branch lowered one, and the <code>Atom</code> branch matched a bare token, whose spelling is the node's own text with trivia dropped.</p></div>
 

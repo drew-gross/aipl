@@ -1,0 +1,47 @@
+# What this file is: a `# ..` block at the top, separated from everything below
+# it by a blank line. A blank line detaches a block from the declaration under
+# it, and a detached block documents no declaration — so at the top of a file it
+# documents the file. `aipl doc` prints it under the file's name and `aipl docs`
+# renders it above the declarations, with this first paragraph as the file's
+# one-line summary on the index page.
+#
+# It is the one position an `import` makes impossible to document, which is what
+# lets it sit where a reader looks first — above the imports.
+
+import { print, wrapping_add as + } from builtins;
+
+# Adds two integers.
+#
+# Directly above the declaration, so it documents `add` rather than the file:
+# the blank line is the whole difference.
+pub fn add(a: i64, b: i64) -> i64 { a + b }
+
+// Documentation is ignored by run/check/build, here as anywhere else.
+fn main() !prints {
+    print(`sum {add(2, 3)}`);
+}
+--- stdout ---
+sum 5
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 105
+instructions executed: 49
+binary size: 1400
+  code: 448
+  data: 1
+  metadata: 951
+functions:
+  __to_str_i64:
+    calls: 1
+    bytes: 204
+  aipl_i64_len:
+    calls: 2
+    bytes: (external)
+  aipl_write_i64:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 244

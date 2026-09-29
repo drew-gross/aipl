@@ -1,3 +1,20 @@
+# The AIPL implementation of the `map_find_if` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_map_find_if`
+# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.map_find_if(f, p)`
+# resolves through the ordinary generic / higher-order machinery — the in-file
+# name is only for this file's own tests, which read exactly like user code.
+#
+# It is what `xs.map(f).find_if(p)` means, in one pass: `map` would apply `f`
+# to every element and build the whole array before `find_if` looked at any
+# of it, where the answer may be the first element. Written by the compiler's
+# operation-fusion pass for that chain (see `chain_fusions` in aipl-mono);
+# also callable directly, and worth writing by hand when the two halves
+# belong together.
+#
+# No lint steers a hand-written loop here: the shape it replaces is
+# `return_loop_find_if`'s with a `let` in front, and that lint already sends
+# the loop to `find_if`, from where the chain fuses.
+
 import {
     equal as ==,
     greater_than as >,
@@ -6,22 +23,6 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-// The AIPL implementation of the `map_find_if` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_map_find_if`
-// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.map_find_if(f, p)`
-// resolves through the ordinary generic / higher-order machinery — the in-file
-// name is only for this file's own tests, which read exactly like user code.
-//
-// It is what `xs.map(f).find_if(p)` means, in one pass: `map` would apply `f`
-// to every element and build the whole array before `find_if` looked at any
-// of it, where the answer may be the first element. Written by the compiler's
-// operation-fusion pass for that chain (see `chain_fusions` in aipl-mono);
-// also callable directly, and worth writing by hand when the two halves
-// belong together.
-//
-// No lint steers a hand-written loop here: the shape it replaces is
-// `return_loop_find_if`'s with a `let` in front, and that lint already sends
-// the loop to `find_if`, from where the chain fuses.
 # The first `f(x)` over the elements of `self` that satisfies `pred`, or
 # `none` when none does — `self.map(f).find_if(pred)` without the array between,
 # and without mapping the elements after the match. Generic over both types and

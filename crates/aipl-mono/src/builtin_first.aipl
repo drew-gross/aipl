@@ -1,12 +1,13 @@
+# The AIPL implementation of the `first` builtin. Monomorphization registers
+# this under the canonical name `__builtin_first` (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`), so a user's `xs.first()` resolves through the ordinary generic
+# machinery.
+#
+# Indexing already yields an optional — `some(elem)` in bounds, `none` out of
+# bounds — so the empty case needs no special handling: `[][0]` is `none`.
+
 import { equal as == } from builtins;
 
-// The AIPL implementation of the `first` builtin. Monomorphization registers
-// this under the canonical name `__builtin_first` (see `AIPL_BUILTIN_SOURCES`
-// in `lib.rs`), so a user's `xs.first()` resolves through the ordinary generic
-// machinery.
-//
-// Indexing already yields an optional — `some(elem)` in bounds, `none` out of
-// bounds — so the empty case needs no special handling: `[][0]` is `none`.
 # The first element, or `none` if the array is empty.
 pub fn first<T: any>(self: T[]) -> T? { self[0] }.test({
     assert([1, 2, 3].first() == some(1));

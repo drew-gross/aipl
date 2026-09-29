@@ -1,18 +1,19 @@
+# The AIPL implementation of the `map_err` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_map_err` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `r.map_err(f)` specializes
+# through the ordinary generic / higher-order machinery — the in-file name
+# `map_err` is only for this file's own tests, which read exactly like user
+# code.
+#
+# `?` propagates only the enclosing function's error type, so a call whose error
+# side differs from its caller's cannot be propagated directly. Without this,
+# every such boundary needs a hand-written `match` that rebuilds one error as
+# the other — one per pair of error types. `map_err` converts the error side and
+# leaves the ok side alone, so the bridge becomes part of the call:
+# `lex(src).map_err(|e| FmtError { message: e.message, span: e.span })?`.
+
 import { equal as ==, is_err_and, logical_not as !, value_or_err } from builtins;
 
-// The AIPL implementation of the `map_err` builtin. Monomorphization registers
-// this function under the canonical name `__builtin_map_err` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `r.map_err(f)` specializes
-// through the ordinary generic / higher-order machinery — the in-file name
-// `map_err` is only for this file's own tests, which read exactly like user
-// code.
-//
-// `?` propagates only the enclosing function's error type, so a call whose error
-// side differs from its caller's cannot be propagated directly. Without this,
-// every such boundary needs a hand-written `match` that rebuilds one error as
-// the other — one per pair of error types. `map_err` converts the error side and
-// leaves the ok side alone, so the bridge becomes part of the call:
-// `lex(src).map_err(|e| FmtError { message: e.message, span: e.span })?`.
 # `self` with its error side rewritten by `f`: `err(e)` becomes `err(f(e))`,
 # and `ok(v)` passes through untouched (`f` is not called). Generic over the
 # ok type and both error types, and callable as a method: `r.map_err(f)`.

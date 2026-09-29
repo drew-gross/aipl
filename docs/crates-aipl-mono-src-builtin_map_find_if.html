@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_map_find_if.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>map_find_if</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_map_find_if</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.map_find_if(f, p)</code> resolves through the ordinary generic / higher-order machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>It is what <code>xs.map(f).find_if(p)</code> means, in one pass: <code>map</code> would apply <code>f</code> to every element and build the whole array before <code>find_if</code> looked at any of it, where the answer may be the first element. Written by the compiler's operation-fusion pass for that chain (see <code>chain_fusions</code> in aipl-mono); also callable directly, and worth writing by hand when the two halves belong together.</p><p>No lint steers a hand-written loop here: the shape it replaces is <code>return_loop_find_if</code>'s with a <code>let</code> in front, and that lint already sends the loop to <code>find_if</code>, from where the chain fuses.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

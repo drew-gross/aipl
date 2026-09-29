@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_opt_left_fold.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>opt_left_fold</code> builtin: <code>left_fold</code> with a fallible combiner. Monomorphization registers this function under the canonical name <code>__builtin_opt_left_fold</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.opt_left_fold(init, f)</code> specializes through the ordinary generic / higher-order machinery.</p><p><code>f</code> is not called again once a step has failed, so the fold's <em>work</em> stops at the first <code>none</code> — but the walk itself continues (AIPL has no <code>break</code>). That keeps the plain <code>for</code>, whose element access streams a <code>str</code> receiver through the char cursor; an index-driven <code>while</code> that really exits early reads <code>self[i]</code> per element, which costs far more than the leftover <code>if (ok)</code> ticks. The accumulator stays a plain <code>A</code> — the <code>ok</code> flag, not an <code>A?</code> threaded through the loop, carries the failure. A <code>mut</code> binding of an <em>optional</em> (a composite) reassigned from inside a loop body is currently miscompiled: the body's scope releases the new value's heap components while the binding still points at them, so a <code>str</code>/array/boxed accumulator would corrupt. A plain <code>A</code> binding goes through the slot-owned-reference model instead, which is correct across scopes.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn opt_left_fold&#60;T: any, A: any&#62;(self: T[], init: A, f: (A, T) -&#62; A?) -&#62; A?</code></pre>
 
-          <div class="doc"><p>Combine the elements left to right with a *fallible* combiner, starting from <code>init</code>: <code>f</code> returns <code>A?</code>, and the first <code>none</code> ends the fold with <code>none</code> — the remaining elements are never visited. All-<code>some</code> folds to <code>some(result)</code>, exactly as <code>left_fold</code> would; an empty array folds to <code>some(init)</code>.</p><p>Since the combiner's body may use <code>?</code>, a fold that can fail reads as one expression: <code>s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?))</code>.</p><p>Import it as plain <code>opt_fold</code> — <code>import { opt_left_fold as opt_fold } from builtins;</code> — in the usual case where a file folds in only one direction; spell it <code>opt_left_fold</code> only in a file that also imports <code>opt_right_fold</code>.</p></div>
+          <div class="doc"><p>Combine the elements left to right with a <em>fallible</em> combiner, starting from <code>init</code>: <code>f</code> returns <code>A?</code>, and the first <code>none</code> ends the fold with <code>none</code> — the remaining elements are never visited. All-<code>some</code> folds to <code>some(result)</code>, exactly as <code>left_fold</code> would; an empty array folds to <code>some(init)</code>.</p><p>Since the combiner's body may use <code>?</code>, a fold that can fail reads as one expression: <code>s.opt_fold(0, |acc, c| some(acc * 10 + c.to_digit()?))</code>.</p><p>Import it as plain <code>opt_fold</code> — <code>import { opt_left_fold as opt_fold } from builtins;</code> — in the usual case where a file folds in only one direction; spell it <code>opt_left_fold</code> only in a file that also imports <code>opt_right_fold</code>.</p></div>
 
 
         </section>

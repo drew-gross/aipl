@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_opt_right_fold.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>opt_right_fold</code> builtin: <code>right_fold</code> with a fallible combiner, and the mirror of <code>opt_left_fold</code> (see <code>builtin_opt_left_fold.aipl</code>). Monomorphization registers this function under the canonical name <code>__builtin_opt_right_fold</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p><p>Walks the indices backwards, stopping at the first <code>none</code> — AIPL has no <code>break</code>, so the short-circuit lives in the <code>while</code> condition. Nothing is allocated (no reversed copy). <code>self[i]</code> yields an optional and <code>i</code> is always in range, so that inner <code>none</code> arm is dead.</p><p>The accumulator stays a plain <code>A</code> — the <code>ok</code> flag, not an <code>A?</code> threaded through the loop, carries the failure. A <code>mut</code> binding of an <em>optional</em> (a composite) reassigned from inside a loop body is currently miscompiled: the body's scope releases the new value's heap components while the binding still points at them, so a <code>str</code>/array/boxed accumulator would corrupt. A plain <code>A</code> binding goes through the slot-owned-reference model instead, which is correct across scopes.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn opt_right_fold&#60;T: any, A: any&#62;(self: T[], init: A, f: (T, A) -&#62; A?) -&#62; A?</code></pre>
 
-          <div class="doc"><p>Combine the elements right to left with a *fallible* combiner, starting from <code>init</code>: <code>f</code> takes the element first and the accumulator second (the mirror of <code>opt_left_fold</code>) and returns <code>A?</code>; the first <code>none</code> ends the fold with <code>none</code>, and the elements to its left are never visited. An empty array folds to <code>some(init)</code>.</p><p>Prefer <code>opt_left_fold</code> (imported as plain <code>opt_fold</code>) unless the right-to-left order matters.</p></div>
+          <div class="doc"><p>Combine the elements right to left with a <em>fallible</em> combiner, starting from <code>init</code>: <code>f</code> takes the element first and the accumulator second (the mirror of <code>opt_left_fold</code>) and returns <code>A?</code>; the first <code>none</code> ends the fold with <code>none</code>, and the elements to its left are never visited. An empty array folds to <code>some(init)</code>.</p><p>Prefer <code>opt_left_fold</code> (imported as plain <code>opt_fold</code>) unless the right-to-left order matters.</p></div>
 
 
         </section>

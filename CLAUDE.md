@@ -293,6 +293,50 @@ Note that every `.aipl` under `crates/` is *also* discovered as a case, so
 adding a dogfooded source adds a case too — it needs the same `#[test]` entry
 and the same `--- performance ---` section any case does. Handoff fills both.
 
+## Documentation attaches by adjacency; a detached block at the top is the file's
+A `# ..` block directly above a declaration documents it. **A blank line under a
+block detaches it**, and a detached block documents no declaration — so at the
+top of a file it documents the *file*:
+
+```
+# What this file is for.          ← module docs: `Program::doc`,
+                                    `FileIndex::module_doc`
+import { print } from builtins;
+
+# Adds two integers.              ← `add`'s docs: no blank line under them
+pub fn add(a: i64, b: i64) -> i64 { a + b }
+```
+
+One newline is the whole difference, which is why both the parser
+(`split_doc_lines` in `grammar_aipl.aipl`) and the formatter (`module_doc` in
+`walker.aipl`) read *whitespace only* when they look for it — a `//` comment
+written in the gap neither detaches a block nor hides a blank line that does.
+
+- **The top of a file is the only place a block may stand apart.** Anywhere else
+  there is nothing for it to document, and it is a compile error rather than a
+  block silently ignored.
+- **It is the one position an `import` makes impossible to document**, which is
+  what lets it sit above the imports, where a reader looks first. A block
+  *adjacent* to an `import` is still an error, and the message names the blank
+  line as the fix.
+- **`aipl fmt` keeps module docs at the very top**, above the hoisted imports,
+  and keeps the blank line under them — the separation is the syntax.
+- `aipl doc` prints the block under the file's name; `aipl docs` renders it above
+  the declarations, and its first paragraph is the file's one-line summary on the
+  index page.
+
+**Every `.aipl` file under `crates/` and `examples/` that had a file-level `//`
+header now carries it as module docs instead** — including the builtin sources,
+whose header sat under the imports because that was the only place it could go.
+A new file describing itself does the same; a `//` comment is for a note about
+the code next to it. Adding one moves line numbers, so refill any
+`--- errors ---`/`--- check ---` sections after.
+
+The docs renderer is not a Markdown one, but it knows the four habits this prose
+has: paragraphs, `` `code spans` `` (a run of backticks, so a span can hold one),
+`- ` lists, and `**bold**`/`*emphasis*`. Headings, links and tables render as the
+characters they are written with.
+
 ## Operators must be imported — always as `name as op`
 Operators are not ambient, and **none of them has a bare form**. Every operator is
 imported by aliasing its named builtin:

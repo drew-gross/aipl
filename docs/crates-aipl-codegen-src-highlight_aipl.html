@@ -14,6 +14,10 @@
 
       <h1><code>crates/aipl-codegen/src/highlight_aipl.aipl</code></h1>
 
+      <div class="module-doc"><p>AIPL's own TextMate grammar, as data — the file <code>editors/vscode/syntaxes/aipl.tmLanguage.json</code> is generated from. This is the highlighter's counterpart of <code>lex_aipl.aipl</code>: <code>highlight.aipl</code> is the generic machinery, and this is just the table.</p><p>Almost all of it comes straight from <code>aipl_rules()</code> — the same rule list the lexer runs on, whose <code>scope</code> fields say what each token is painted. What is left is what a <em>lexer</em> cannot know:</p><ul><li><code>fn NAME</code> / <code>struct NAME</code>, where the name is scoped for its position, not its spelling. The names they accept come from the identifier rule's own character classes, so the two cannot disagree.</li><li>The builtin type names, which lex as ordinary identifiers and are told apart afterwards (<code>classify_lexed</code> in <code>aipl-parser</code>); this list is that one, and the only genuinely duplicated data here.</li><li>The <code>!prints</code> effect marker, which is one token to the lexer (<code>!</code>) and two halves to a reader.</li><li>The <code>--- section ---</code> tail of a test-case file, which is not AIPL at all: everything after the first marker is expected output, and highlighting it as source would be actively wrong.</li></ul><p>Regenerate the JSON with:</p><pre><code>cargo test --test compiler -- --ignored highlighting::fill_tmlanguage
+</code></pre><p><code>highlighting::checked_in_tmlanguage_is_current</code> fails when the checked-in file and this description disagree, and the rest of <code>tests/highlighting.rs</code> validates the <em>result</em> against every token of every case file and example — which is the real check on anything changed here.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -61,7 +65,7 @@
           </h3>
           <pre class="signature"><code>fn ident_regex() -&#62; str</code></pre>
 
-          <div class="doc"><p>The identifier regex, built from the very classes the identifier *rule* is built from (<code>lex_aipl.aipl</code>), so <code>fn NAME</code> accepts exactly the names AIPL accepts. <code>matcher_regex</code> answers <code>none</code> only for the delimiter-scanning matchers, which a <code>CharRun</code> is not.</p></div>
+          <div class="doc"><p>The identifier regex, built from the very classes the identifier <em>rule</em> is built from (<code>lex_aipl.aipl</code>), so <code>fn NAME</code> accepts exactly the names AIPL accepts. <code>matcher_regex</code> answers <code>none</code> only for the delimiter-scanning matchers, which a <code>CharRun</code> is not.</p></div>
 
 
         </section>

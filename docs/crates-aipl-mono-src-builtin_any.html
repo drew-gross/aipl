@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_any.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>any</code> builtin — the dual of <code>all</code> (see <code>builtin_all.aipl</code>). Monomorphization registers this function under the canonical name <code>__builtin_any</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.any(pred)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>any</code> is only for this file's own tests, which read exactly like user code.</p></div>
+
+
       <p class="empty">This file declares nothing.</p>
 
 

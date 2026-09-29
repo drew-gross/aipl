@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_first.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>first</code> builtin. Monomorphization registers this under the canonical name <code>__builtin_first</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.first()</code> resolves through the ordinary generic machinery.</p><p>Indexing already yields an optional — <code>some(elem)</code> in bounds, <code>none</code> out of bounds — so the empty case needs no special handling: <code>[][0]</code> is <code>none</code>.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

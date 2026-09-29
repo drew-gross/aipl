@@ -1,5 +1,6 @@
-// The compiler's own directory walk: `tests/fmt.rs` uses it to discover every
-// `.aipl` file whose formatting is enforced.
+# The compiler's own directory walk: `tests/fmt.rs` uses it to discover every
+# `.aipl` file whose formatting is enforced.
+
 import { ends_with, equal as ==, filter, list_files, sort } from builtins;
 
 # Every file at or below `dir` whose path ends with `ext`, sorted. `err(..)` if

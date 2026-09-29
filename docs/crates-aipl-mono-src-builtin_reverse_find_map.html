@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_reverse_find_map.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>reverse_find_map</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_reverse_find_map</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.reverse_find_map(f)</code> resolves through the ordinary generic / higher-order machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>It walks by index from the end rather than reversing first: <code>find_map</code> over <code>xs.reverse()</code> would allocate the reversed view each time, and a descent that asks this at every level (the parser's <code>last_leaf_of</code>) would pay that per level. The indexed loop is the whole reason the builtin exists rather than being spelled as the two calls.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn reverse_find_map&#60;T: any, U: any&#62;(self: T[], f: (T) -&#62; U?) -&#62; U?</code></pre>
 
-          <div class="doc"><p>The first <code>some</code> that <code>f</code> returns over the elements of <code>self</code> taken from the *end* — <code>some(y)</code> for the last <code>x</code> with <code>f(x) == some(y)</code>, <code>none</code> when every <code>f(x)</code> is <code>none</code> — stopping at that element. <code>find_map</code> from the other end. Generic over both types and callable as a method; a <code>str</code> receiver iterates its chars.</p></div>
+          <div class="doc"><p>The first <code>some</code> that <code>f</code> returns over the elements of <code>self</code> taken from the <em>end</em> — <code>some(y)</code> for the last <code>x</code> with <code>f(x) == some(y)</code>, <code>none</code> when every <code>f(x)</code> is <code>none</code> — stopping at that element. <code>find_map</code> from the other end. Generic over both types and callable as a method; a <code>str</code> receiver iterates its chars.</p></div>
 
 
         </section>

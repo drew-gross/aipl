@@ -1,5 +1,6 @@
-// Used by the raw-string processor to drop the newline (and CR) that end a blank
-// closing line.
+# Used by the raw-string processor to drop the newline (and CR) that end a blank
+# closing line.
+
 import { drop_last, equal as ==, last } from builtins;
 
 # Drops a single trailing `c` if present, else returns `self` unchanged.

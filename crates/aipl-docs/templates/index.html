@@ -9,6 +9,9 @@
 {% for file in files %}
         <li>
           <a class="file" href="{{ file.href }}">{{ file.display }}</a>
+{% if file.has_summary %}
+          <p class="file-summary">{{ file.summary|safe }}</p>
+{% endif %}
 {% if file.private_count > 0 %}
           <span class="private-count"><a href="{{ file.href }}#private">{{ file.private_count }} private</a></span>
 {% endif %}

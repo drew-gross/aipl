@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_count_is_not_equal.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>count_is_not_equal</code> builtin. Registered under <code>__builtin_count_is_not_equal</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p><p>A fused comparison: <code>count(x) != limit</code> without counting past the point the answer is settled. Once the running count exceeds <code>limit</code> it can never come back, so the rest of the collection cannot change the answer.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

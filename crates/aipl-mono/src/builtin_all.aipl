@@ -1,10 +1,11 @@
+# The AIPL implementation of the `all` builtin. Monomorphization registers this
+# function under the canonical name `__builtin_all` (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`), so a user's `xs.all(pred)` specializes through the ordinary
+# generic / higher-order machinery — the in-file name `all` is only for this
+# file's own tests, which read exactly like user code.
+
 import { equal as ==, filter, less_than_or_equal as <=, logical_not as ! } from builtins;
 
-// The AIPL implementation of the `all` builtin. Monomorphization registers this
-// function under the canonical name `__builtin_all` (see `AIPL_BUILTIN_SOURCES`
-// in `lib.rs`), so a user's `xs.all(pred)` specializes through the ordinary
-// generic / higher-order machinery — the in-file name `all` is only for this
-// file's own tests, which read exactly like user code.
 # True when every element satisfies `pred`, short-circuiting at the first element
 # that fails it; an empty array is vacuously true. Generic over the element type
 # and callable as a method: `xs.all(pred)`.

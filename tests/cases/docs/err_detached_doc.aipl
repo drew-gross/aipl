@@ -1,0 +1,17 @@
+# Module documentation, which is what a detached `# ..` block at the top of a
+# file is.
+
+import { print } from builtins;
+
+fn main() !prints { print("hi"); }
+
+# A blank line under this block detaches it from `later` below, and there is no
+# file to document from here — the top of the file is taken.
+
+fn later() -> i64 { 1 }
+--- errors ---
+error: this `# ..` block documents nothing — a blank line detaches it from the declaration below, and only the block at the top of a file, which documents the file, may stand apart
+ --> ./tests/cases/docs/err_detached_doc.aipl:8:1
+  |
+8 | # A blank line under this block detaches it from `later` below, and there is no
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

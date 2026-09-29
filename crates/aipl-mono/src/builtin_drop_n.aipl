@@ -1,10 +1,11 @@
+# The AIPL implementation of the `drop_n` builtin (see `AIPL_BUILTIN_SOURCES`
+# in `lib.rs`).
+#
+# A start past the end already slices to empty, so dropping more than there is
+# needs no guard.
+
 import { equal as ==, first, is_empty, len } from builtins;
 
-// The AIPL implementation of the `drop_n` builtin (see `AIPL_BUILTIN_SOURCES`
-// in `lib.rs`).
-//
-// A start past the end already slices to empty, so dropping more than there is
-// needs no guard.
 # Every element except the first `n`. Dropping `n >= len` gives an empty
 # array — the same clamping an out-of-range slice does.
 pub fn drop_n<T: any>(self: T[], n: u64) -> T[] { self[n..] }.test({

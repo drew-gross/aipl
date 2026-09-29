@@ -1,15 +1,16 @@
+# The AIPL implementation of the `is_err_and` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_is_err_and` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `r.is_err_and(pred)`
+# specializes through the ordinary generic / higher-order machinery — the
+# in-file name `is_err_and` is only for this file's own tests, which read
+# exactly like user code.
+#
+# The result-world mirror of `is_some_and`. It exists mainly for tests that
+# assert on a failure: `==` doesn't span the two sides of a result, so without
+# it every such assertion needs a hand-written `match` helper per error type.
+
 import { equal as ==, logical_not as !, value_or_err } from builtins;
 
-// The AIPL implementation of the `is_err_and` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_is_err_and` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `r.is_err_and(pred)`
-// specializes through the ordinary generic / higher-order machinery — the
-// in-file name `is_err_and` is only for this file's own tests, which read
-// exactly like user code.
-//
-// The result-world mirror of `is_some_and`. It exists mainly for tests that
-// assert on a failure: `==` doesn't span the two sides of a result, so without
-// it every such assertion needs a hand-written `match` helper per error type.
 # True when `self` is `err(e)` and `pred(e)` holds; `false` for `ok` (the
 # predicate is not called). The result-world mirror of `is_some_and`, generic
 # over both the ok and error types and callable as a method:

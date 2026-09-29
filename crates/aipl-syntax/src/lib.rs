@@ -258,6 +258,17 @@ pub mod ast {
         /// file gets rendered into the entry file's source, at a byte offset
         /// that means nothing there.
         pub sources: Vec<FileSource>,
+        /// The file's own documentation: the `# ..` block at the top that a
+        /// blank line detaches from whatever follows, so it documents no
+        /// declaration. `None` for a file that opens with anything else.
+        ///
+        /// A *file's*, so it survives only as long as the program is one file.
+        /// A pass rebuilding a program carries it through, and the loader's
+        /// merge drops it: a flattened program is several files, and the entry
+        /// file's documentation is no more the merged program's than any
+        /// other's. Nothing downstream of the loader reads it — this is for the
+        /// tools that index one file at a time (`aipl doc`, `aipl docs`).
+        pub doc: Option<String>,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]

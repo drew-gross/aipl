@@ -1,15 +1,16 @@
+# The AIPL implementation of the `nonempty_first` builtin (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`); `first` for an array the type system
+# knows is not empty.
+#
+# A refined array is a plain array at runtime, so indexing it still yields an
+# optional, and the `none` arm has to be written even though the type says it
+# cannot be taken. It recurses: there is no value of `T` to invent, and a call
+# that can never happen is the honest spelling of "unreachable" until the
+# language has one. (The loader resolves the call to the canonical name when
+# this file is loaded as the builtin — see `flatten`'s pass 1.)
+
 import { equal as == } from builtins;
 
-// The AIPL implementation of the `nonempty_first` builtin (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`); `first` for an array the type system
-// knows is not empty.
-//
-// A refined array is a plain array at runtime, so indexing it still yields an
-// optional, and the `none` arm has to be written even though the type says it
-// cannot be taken. It recurses: there is no value of `T` to invent, and a call
-// that can never happen is the honest spelling of "unreachable" until the
-// language has one. (The loader resolves the call to the canonical name when
-// this file is loaded as the builtin — see `flatten`'s pass 1.)
 # The first element of a non-empty array — the element itself, not a `T?`,
 # because a `T[] without []` has one. `first` is the same question for an
 # array that may be empty.

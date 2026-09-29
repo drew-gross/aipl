@@ -1,8 +1,9 @@
+# The AIPL implementation of the `drop_last` builtin (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`) — `drop_last_n(1)`, named for the common
+# case.
+
 import { drop_last_n, equal as ==, is_empty, last, len } from builtins;
 
-// The AIPL implementation of the `drop_last` builtin (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`) — `drop_last_n(1)`, named for the common
-// case.
 # Every element except the last. An empty array stays empty.
 pub fn drop_last<T: any>(self: T[]) -> T[] { self.drop_last_n(1) }.test({
     assert([1, 2, 3].drop_last().len() == 2);
@@ -17,9 +18,9 @@ deallocations: 7
 reallocations: 0
 bytes allocated: 344
 instructions executed: 356
-binary size: 4440
+binary size: 4448
   code: 1808
-  data: 460
+  data: 468
   metadata: 2172
 functions:
   __test$drop_last:

@@ -1,7 +1,8 @@
-// The `--- file: <path> ---` companion sources a case declares: the sibling
-// files it needs on disk beside it (modules it imports, fixtures its tests
-// read). `aipl check` stages these into the scratch directory it runs a file's
-// tests in, and the corpus harness stages the same set for a case's build.
+# The `--- file: <path> ---` companion sources a case declares: the sibling
+# files it needs on disk beside it (modules it imports, fixtures its tests
+# read). `aipl check` stages these into the scratch directory it runs a file's
+# tests in, and the corpus harness stages the same set for a case's build.
+
 import {
     contains,
     equal as ==,

@@ -1,16 +1,17 @@
+# The AIPL implementation of the `reverse_find_map` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_reverse_find_map`
+# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.reverse_find_map(f)`
+# resolves through the ordinary generic / higher-order machinery — the in-file
+# name is only for this file's own tests, which read exactly like user code.
+#
+# It walks by index from the end rather than reversing first: `find_map` over
+# `xs.reverse()` would allocate the reversed view each time, and a descent
+# that asks this at every level (the parser's `last_leaf_of`) would pay that
+# per level. The indexed loop is the whole reason the builtin exists rather
+# than being spelled as the two calls.
+
 import { equal as ==, greater_than as >, reverse, to_digit, wrapping_mul as * } from builtins;
 
-// The AIPL implementation of the `reverse_find_map` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_reverse_find_map`
-// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.reverse_find_map(f)`
-// resolves through the ordinary generic / higher-order machinery — the in-file
-// name is only for this file's own tests, which read exactly like user code.
-//
-// It walks by index from the end rather than reversing first: `find_map` over
-// `xs.reverse()` would allocate the reversed view each time, and a descent
-// that asks this at every level (the parser's `last_leaf_of`) would pay that
-// per level. The indexed loop is the whole reason the builtin exists rather
-// than being spelled as the two calls.
 # The first `some` that `f` returns over the elements of `self` taken from the
 # *end* — `some(y)` for the last `x` with `f(x) == some(y)`, `none` when every
 # `f(x)` is `none` — stopping at that element. `find_map` from the other end.

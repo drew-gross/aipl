@@ -100,6 +100,7 @@ fn program(v: &FfiValue) -> R<ast::Program> {
         // A single parsed file has no merged-source map; the loader fills one
         // in when it flattens several files together.
         sources: Vec::new(),
+        doc: maybe(field(v, "doc")?, text)?,
     })
 }
 

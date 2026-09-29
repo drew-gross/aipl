@@ -241,6 +241,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
     Program {
         items,
         sources: program.sources.clone(),
+        doc: program.doc.clone(),
     }
 }
 
@@ -592,6 +593,7 @@ pub fn lower_tuples(program: &Program) -> Program {
     Program {
         items: synth,
         sources: program.sources.clone(),
+        doc: program.doc.clone(),
     }
 }
 
@@ -1495,6 +1497,7 @@ pub fn lower_generics(program: &Program) -> Result<Program, Error> {
     Ok(Program {
         items: out,
         sources: program.sources.clone(),
+        doc: program.doc.clone(),
     })
 }
 
@@ -7397,6 +7400,7 @@ fn fuse_builtin_body(f: Function) -> Function {
     let program = Program {
         items: vec![Item::Fn(f)],
         sources: Vec::new(),
+        doc: None,
     };
     let fused = fuse_operations(&program, &effectful_builtins());
     match fused.items.into_iter().next() {
@@ -7424,6 +7428,7 @@ fn erased_fn(f: &Function) -> Function {
     let mut program = Program {
         items: vec![Item::Fn(f.clone())],
         sources: Vec::new(),
+        doc: None,
     };
     aipl_syntax::erase_refinements(&mut program);
     match program.items.pop() {

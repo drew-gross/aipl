@@ -13,12 +13,15 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">107 files, 1285 items.</p>
+      <p class="summary">107 files, 1295 items.</p>
 
       <ul class="files">
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-assert_loc.html">crates/aipl-codegen/src/assert_loc.aipl</a>
+
+          <p class="file-summary">The <code>assert(cond)</code> location formatter: the compiler calls this through the FFI (see <code>install_parser_hooks</code>) while baking <code>assert(cond)</code> calls inside <code>.test({ .. })</code> bodies into <code>__assert(cond, loc)</code>, capturing each assertion's source location for the <code>check</code> failure report. <code>span</code> is the condition's half-open byte range within <code>src</code>; both bounds clamp to <code>[0, len]</code> (and an out-of-order range collapses to &quot;&quot;) via ordinary string-slicing semantics, so no manual clamping is needed here.</p>
+
 
 
           <ul class="items">
@@ -34,6 +37,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-ast.html">crates/aipl-codegen/src/ast.aipl</a>
+
+          <p class="file-summary">The AST <code>grammar_aipl.aipl</code> lowers to — AIPL's own syntax tree, declared in AIPL. It mirrors <code>aipl_syntax::ast</code> (<code>crates/aipl-syntax/src/lib.rs</code>), which is the type the compiler's passes actually run on: the bridge marshals a value of this shape across the FFI and the Rust side rebuilds an <code>ast::Program</code> from it.</p>
+
 
 
           <ul class="items">
@@ -54,6 +60,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-bound.html">crates/aipl-codegen/src/bound.aipl</a>
+
+          <p class="file-summary"><code>aipl_syntax::ast::Bound</code> as AIPL declares it. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
+
 
 
           <ul class="items">
@@ -80,6 +89,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-brace_entry.html">crates/aipl-codegen/src/brace_entry.aipl</a>
 
+          <p class="file-summary">One entry of a <code>#{ .. }</code> literal and the decision that turns a list of them into a set or a dict. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
+
+
           <span class="private-count"><a href="crates-aipl-codegen-src-brace_entry.html#private">2 private</a></span>
 
 
@@ -103,6 +115,7 @@
           <a class="file" href="crates-aipl-codegen-src-caret_block.html">crates/aipl-codegen/src/caret_block.aipl</a>
 
 
+
           <ul class="items">
 
             <li>
@@ -116,6 +129,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-clean_trailing_whitespace.html">crates/aipl-codegen/src/clean_trailing_whitespace.aipl</a>
+
+          <p class="file-summary">The formatter's pre-pass: trailing spaces and tabs come off every line before layout, so every span the walker copies verbatim refers to the cleaned text. The language rejects trailing whitespace, so removing it can't change the meaning of a program the parser would accept.</p>
+
 
 
           <ul class="items">
@@ -132,6 +148,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-common_space_prefix.html">crates/aipl-codegen/src/common_space_prefix.aipl</a>
 
+          <p class="file-summary">A dogfooded helper, no longer wired in (the raw-string de-denter moved to the dogfooded <code>dedent</code>); kept as a well-tested example. Returns a <em>length</em> rather than a slice deliberately — AIPL has no substring operator.</p>
+
+
 
           <ul class="items">
 
@@ -146,6 +165,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-companion_files.html">crates/aipl-codegen/src/companion_files.aipl</a>
+
+          <p class="file-summary">The <code>--- file: &lt;path&gt; ---</code> companion sources a case declares: the sibling files it needs on disk beside it (modules it imports, fixtures its tests read). <code>aipl check</code> stages these into the scratch directory it runs a file's tests in, and the corpus harness stages the same set for a case's build.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-companion_files.html#private">1 private</a></span>
 
@@ -168,6 +190,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-cst.html">crates/aipl-codegen/src/cst.aipl</a>
+
+          <p class="file-summary">The tree the parser driver (<code>parse.aipl</code>) builds: a <em>concrete</em> syntax tree, lossless by construction. Every byte of the parsed source is covered by exactly one leaf — <code>Leaf</code> for a token the grammar matched, <code>Trivia</code> for a comment or a run of whitespace the lexer set aside — so concatenating a tree's leaf spans in order reproduces the source byte for byte (<code>text</code>). That is what a formatter generator needs and what an AST cannot give it: an AST has already thrown away the text that carries no meaning, and a formatter's whole job is to put it back.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-cst.html#private">10 private</a></span>
 
@@ -282,6 +307,7 @@
           <a class="file" href="crates-aipl-codegen-src-dedent.html">crates/aipl-codegen/src/dedent.aipl</a>
 
 
+
           <ul class="items">
 
             <li>
@@ -295,6 +321,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-doc.html">crates/aipl-codegen/src/doc.aipl</a>
+
+          <p class="file-summary">A Wadler/Prettier-style pretty-printing document algebra, dogfooded in AIPL: the formatter builds a <code>Doc</code> tree describing <em>possible</em> layouts and <code>print</code> picks one — each <code>Group</code> renders on one line (&quot;flat&quot;) when it fits within the width limit, and breaks at its <code>Line</code>/<code>SoftLine</code> points otherwise. This is the port of the Rust <code>aipl-fmt</code> <code>doc.rs</code>; <code>format_source</code> (the formatter proper) builds the tree and calls <code>print</code> here.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-doc.html#private">11 private</a></span>
 
@@ -327,6 +356,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-ebnf.html">crates/aipl-codegen/src/ebnf.aipl</a>
+
+          <p class="file-summary">Introspection over a <code>Grammar</code> (see <code>grammar.aipl</code>): what it <em>says</em>, rendered as EBNF, and what it can <em>start with</em>, computed as FIRST sets. Neither parses anything — both are pure functions of the grammar value, which is the whole reason the grammar is data and the driver is somewhere else.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-ebnf.html#private">18 private</a></span>
 
@@ -379,6 +411,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-expr.html">crates/aipl-codegen/src/expr.aipl</a>
+
+          <p class="file-summary"><code>aipl_syntax::ast::Expr</code> and <code>ExprKind</code> as AIPL declares them, with the structural dump the lowering's tests assert against. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-expr.html#private">10 private</a></span>
 
@@ -452,6 +487,7 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-fill_or_add_sections.html">crates/aipl-codegen/src/fill_or_add_sections.aipl</a>
 
+
           <span class="private-count"><a href="crates-aipl-codegen-src-fill_or_add_sections.html#private">2 private</a></span>
 
 
@@ -480,6 +516,7 @@
           <a class="file" href="crates-aipl-codegen-src-fill_or_add_sections_file.html">crates/aipl-codegen/src/fill_or_add_sections_file.aipl</a>
 
 
+
           <ul class="items">
 
             <li>
@@ -493,6 +530,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-find_files.html">crates/aipl-codegen/src/find_files.aipl</a>
+
+          <p class="file-summary">The compiler's own directory walk: <code>tests/fmt.rs</code> uses it to discover every <code>.aipl</code> file whose formatting is enforced.</p>
+
 
 
           <ul class="items">
@@ -514,6 +554,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-find_trailing_whitespace.html">crates/aipl-codegen/src/find_trailing_whitespace.aipl</a>
 
+          <p class="file-summary">The parser's trailing-whitespace locator: the compiler calls this through the FFI (see <code>install_parser_hooks</code>) from <code>reject_trailing_whitespace</code> on every parse, and <code>aipl check</code> exercises it via the <code>.test</code> block below. It returns a <code>Span?</code> — an optional builtin <code>Span</code> returned over the FFI — locating the first offending run, or <code>none</code> when there is none; <code>aipl_str_iter_next</code> walks <code>src</code> byte-by-byte, so the offsets are byte offsets, matching the parser's error rendering.</p>
+
+
           <span class="private-count"><a href="crates-aipl-codegen-src-find_trailing_whitespace.html#private">1 private</a></span>
 
 
@@ -530,6 +573,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-format.html">crates/aipl-codegen/src/format.aipl</a>
+
+          <p class="file-summary">The formatter driver: one pass from a lossless <code>Cst</code> to a <code>Doc</code>, decided by the <code>Layout</code> each production carries. It is the third interpreter of a <code>Grammar</code> — after <code>parse.aipl</code>'s parser and <code>ebnf.aipl</code>'s dump — and is written the same way: the language is data, this file is the loop over it.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-format.html#private">22 private</a></span>
 
@@ -568,6 +614,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-format_source.html">crates/aipl-codegen/src/format_source.aipl</a>
 
+          <p class="file-summary"><code>format_source</code>, the formatter's top-level pipeline.</p>
+
+
           <span class="private-count"><a href="crates-aipl-codegen-src-format_source.html#private">8 private</a></span>
 
 
@@ -594,6 +643,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-grammar.html">crates/aipl-codegen/src/grammar.aipl</a>
+
+          <p class="file-summary">A grammar, expressed as data. <code>Rule</code> is a PEG combinator tree — sequence, ordered choice, repetition, a rule reference — and a <code>Production</code> pairs one rule with everything the passes downstream need to know about it: the CST node name, the label errors should blame, the scope a highlighter should paint, and the function that lowers a matched node to the caller's AST. One <code>Grammar</code> is then the whole description of a language, interpreted by the driver in <code>parse.aipl</code>, exactly as <code>lexer.aipl</code> interprets a <code>TokenRule[]</code>.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-grammar.html#private">11 private</a></span>
 
@@ -682,7 +734,10 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-grammar_aipl.html">crates/aipl-codegen/src/grammar_aipl.aipl</a>
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">162 private</a></span>
+          <p class="file-summary">AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-grammar_aipl.html#private">166 private</a></span>
 
 
           <ul class="items">
@@ -690,6 +745,11 @@
             <li>
               <a href="crates-aipl-codegen-src-grammar_aipl.html#item-aipl_grammar"><code>aipl_grammar</code></a>
               <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-grammar_aipl.html#item-DocSplit"><code>DocSplit</code></a>
+              <span class="kind kind-struct">struct</span>
             </li>
 
             <li>
@@ -779,6 +839,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-grammar_calc.html">crates/aipl-codegen/src/grammar_calc.aipl</a>
 
+          <p class="file-summary">A four-operator calculator: the library's third end-to-end target, and the one that exercises <code>Climb</code>. Neither earlier toy has an infix operator at all — S-expressions put the operator first and JSON has none — so precedence climbing was proven only by <code>parse.aipl</code>'s own unit tests, which stop at the concrete tree. This one lowers through that tree and then <em>evaluates</em> the result, which is the assertion that a wrong shape cannot survive.</p>
+
+
           <span class="private-count"><a href="crates-aipl-codegen-src-grammar_calc.html#private">8 private</a></span>
 
 
@@ -831,6 +894,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-grammar_json.html">crates/aipl-codegen/src/grammar_json.aipl</a>
 
+          <p class="file-summary">JSON: the library's second end-to-end target, and the one that adds everything S-expressions deliberately left out — several terminal classes rather than one, a separated <code>Many</code> with a trailing-comma rule, an <code>OneOf</code> across six alternatives, and a heterogeneous AST. Still no precedence; that arrives with the calculator in <code>grammar_calc.aipl</code>.</p>
+
+
           <span class="private-count"><a href="crates-aipl-codegen-src-grammar_json.html#private">6 private</a></span>
 
 
@@ -878,6 +944,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-grammar_sexp.html">crates/aipl-codegen/src/grammar_sexp.aipl</a>
 
+          <p class="file-summary">S-expressions: the library's first end-to-end target, and deliberately the floor rather than a warm-up. Two productions —</p>
+
+
           <span class="private-count"><a href="crates-aipl-codegen-src-grammar_sexp.html#private">4 private</a></span>
 
 
@@ -914,6 +983,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-highlight.html">crates/aipl-codegen/src/highlight.aipl</a>
+
+          <p class="file-summary">Generates a TextMate grammar — the <code>.tmLanguage.json</code> a VS Code, Sublime or Zed extension ships — from the data a language is <em>already</em> described with.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-highlight.html#private">22 private</a></span>
 
@@ -1012,6 +1084,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-highlight_aipl.html">crates/aipl-codegen/src/highlight_aipl.aipl</a>
 
+          <p class="file-summary">AIPL's own TextMate grammar, as data — the file <code>editors/vscode/syntaxes/aipl.tmLanguage.json</code> is generated from. This is the highlighter's counterpart of <code>lex_aipl.aipl</code>: <code>highlight.aipl</code> is the generic machinery, and this is just the table.</p>
+
+
           <span class="private-count"><a href="crates-aipl-codegen-src-highlight_aipl.html#private">5 private</a></span>
 
 
@@ -1029,6 +1104,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-indent.html">crates/aipl-codegen/src/indent.aipl</a>
 
+          <p class="file-summary">The content half of the formatter's raw-block re-layout (see <code>reindent_block</code>): indents a block of text — the lines <em>between</em> a raw-string / template atom's delimiters, with no <code>&quot;&quot;&quot;</code> / <code>```</code> framing — by a chosen column. Split out so <code>reindent_block</code> deals only with the delimiters. Assumes the input is already fully dedented (its common indent is 0): it <em>adds</em> <code>target</code> spaces, it does not rebase an existing indent — <code>reindent_block</code> dedents first (via <code>dedent</code>).</p>
+
+
 
           <ul class="items">
 
@@ -1043,6 +1121,7 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-int_fits.html">crates/aipl-codegen/src/int_fits.aipl</a>
+
 
 
           <ul class="items">
@@ -1060,6 +1139,7 @@
           <a class="file" href="crates-aipl-codegen-src-is_operator_name.html">crates/aipl-codegen/src/is_operator_name.aipl</a>
 
 
+
           <ul class="items">
 
             <li>
@@ -1073,6 +1153,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-item.html">crates/aipl-codegen/src/item.aipl</a>
+
+          <p class="file-summary">The items and declarations of AIPL's syntax tree — functions, structs, variants, imports, and the program that holds them — with the source-like dump the item lowering's tests assert against. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-item.html#private">14 private</a></span>
 
@@ -1196,6 +1279,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-lex_aipl.html">crates/aipl-codegen/src/lex_aipl.aipl</a>
 
+          <p class="file-summary">A lexer for AIPL itself, built on the <code>lexer.aipl</code> library: it pins the library's generic <code>Token&lt;K&gt;</code>/<code>TokenRule&lt;K&gt;</code>/<code>lex&lt;K&gt;</code> to AIPL's own token-kind variant <code>AiplTok</code> and describes AIPL's tokens as a plain <code>TokenRule</code> list.</p>
+
+
           <span class="private-count"><a href="crates-aipl-codegen-src-lex_aipl.html#private">9 private</a></span>
 
 
@@ -1257,6 +1343,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-lexer.html">crates/aipl-codegen/src/lexer.aipl</a>
+
+          <p class="file-summary">A small library for building lexers. <code>lex</code> turns source text into a flat <code>Token[]</code>, driven by an ordered <code>TokenRule[]</code> describing the language being lexed. Each rule pairs a caller-chosen <code>kind</code> label with a <code>Matcher</code> — a data-only description of one token shape (a char-class run, a list of fixed spellings, a delimited literal, ...) — so a rule set is plain data and one <code>lex</code> serves many languages; see the JSON and AIPL-flavored rule sets in the tests. At each position the <em>first</em> rule whose matcher matches wins, so order is priority: put keywords before identifiers, floats before ints. Whitespace is an ordinary rule marked <code>skip: true</code> — matched and consumed, but producing nothing. Rules marked <code>trivia: true</code> (comments, lint markers) are consumed the same way but recorded in the result's trivia side-channel, so a formatter or lint pass can find them without them cluttering the token stream. Lexing can fail: a byte no rule matches, or a matcher that matches invalid input outright (an unterminated <code>Delimited</code> token), aborts the lex with a <code>LexError</code> — a message plus the span of the offending source.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-lexer.html#private">25 private</a></span>
 
@@ -1341,6 +1430,7 @@
           <a class="file" href="crates-aipl-codegen-src-line_at.html">crates/aipl-codegen/src/line_at.aipl</a>
 
 
+
           <ul class="items">
 
             <li>
@@ -1361,6 +1451,7 @@
           <a class="file" href="crates-aipl-codegen-src-lines.html">crates/aipl-codegen/src/lines.aipl</a>
 
 
+
           <ul class="items">
 
             <li>
@@ -1374,6 +1465,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-normalize_output.html">crates/aipl-codegen/src/normalize_output.aipl</a>
+
+          <p class="file-summary">The cases harness's captured-output normalizer: the test harness calls this through the embedding FFI (see <code>aipl::codegen::normalize_output</code>) to compare a child program's stdout/stderr against the expected sections, and <code>aipl check</code> exercises it via the <code>.test</code> block below. Collapsing CRLF to LF matters on Windows, where libc text-mode stdout rewrites the runtime's <code>\n</code> to <code>\r\n</code>.</p>
+
 
 
           <ul class="items">
@@ -1391,6 +1485,7 @@
           <a class="file" href="crates-aipl-codegen-src-operator_named_forms.html">crates/aipl-codegen/src/operator_named_forms.aipl</a>
 
 
+
           <ul class="items">
 
             <li>
@@ -1404,6 +1499,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-parse.html">crates/aipl-codegen/src/parse.aipl</a>
+
+          <p class="file-summary">The parser driver: one function that interprets a <code>Grammar</code> (see <code>grammar.aipl</code>) over a token stream (see <code>lexer.aipl</code>) and yields a lossless <code>Cst</code> (see <code>cst.aipl</code>), plus a second pass that lowers that tree to the caller's own AST through each production's <code>build</code>. Together they are the upper half of a front end whose lower half is already data-driven: a language is a <code>TokenRule[]</code> and a <code>Grammar</code>, and nothing else.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-parse.html#private">44 private</a></span>
 
@@ -1472,6 +1570,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-parse_spec.html">crates/aipl-codegen/src/parse_spec.aipl</a>
 
+          <p class="file-summary">A case file's <code>--- section ---</code> layout, parsed. The corpus harness (and <code>aipl check</code>) drive every expectation in <code>tests/cases/**/*.aipl</code> off this: the entry-point source is whatever precedes the first marker, and each marker opens a section whose body runs to the next marker or EOF.</p>
+
+
           <span class="private-count"><a href="crates-aipl-codegen-src-parse_spec.html#private">2 private</a></span>
 
 
@@ -1500,6 +1601,7 @@
           <a class="file" href="crates-aipl-codegen-src-parse_test_section_header.html">crates/aipl-codegen/src/parse_test_section_header.aipl</a>
 
 
+
           <ul class="items">
 
             <li>
@@ -1513,6 +1615,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-parsed.html">crates/aipl-codegen/src/parsed.aipl</a>
+
+          <p class="file-summary">The shapes that exist only between a production and the fold that consumes it: a keyword statement before the rest of its block is in scope, a function body before its return type is, a parameter before its destructuring is taken apart, and a <code>.test</code> attribute. None is a node of the AST proper. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-parsed.html#private">1 private</a></span>
 
@@ -1555,6 +1660,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-pat.html">crates/aipl-codegen/src/pat.aipl</a>
+
+          <p class="file-summary"><code>aipl_syntax::ast::Pattern</code> as AIPL declares it. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-pat.html#private">7 private</a></span>
 
@@ -1603,6 +1711,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-prim.html">crates/aipl-codegen/src/prim.aipl</a>
 
+          <p class="file-summary">The primitive types of AIPL's own syntax tree — <code>aipl_syntax::ast::Primitive</code> case for case. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
+
+
 
           <ul class="items">
 
@@ -1628,6 +1739,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-process_raw_string.html">crates/aipl-codegen/src/process_raw_string.aipl</a>
 
+          <p class="file-summary">The parser's raw-string hook: the compiler calls this through the FFI (see <code>install_parser_hooks</code>) for every <code>&quot;&quot;&quot;...&quot;&quot;&quot;</code> literal, and <code>aipl check</code> exercises it via the <code>.test</code> block below.</p>
+
+
 
           <ul class="items">
 
@@ -1643,6 +1757,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-reindent_block.html">crates/aipl-codegen/src/reindent_block.aipl</a>
 
+          <p class="file-summary">The formatter's raw-block re-layout: <code>aipl-fmt</code>'s <code>print</code> calls this through the FFI (see <code>install_parser_hooks</code>) when emitting a verbatim <code>&quot;&quot;&quot;...&quot;&quot;&quot;</code> raw string or triple-backtick template atom, to align its closing delimiter (and, for a bare-delimiter block, its content) around the column the atom opened at. <code>base</code> is that column (the opening line's indent) — unsigned, matching the <code>usize</code> the Rust caller holds, and matching the unsigned counts <code>indent</code>/<code>repeat</code> take.</p>
+
+
 
           <ul class="items">
 
@@ -1657,6 +1774,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-requote.html">crates/aipl-codegen/src/requote.aipl</a>
+
+          <p class="file-summary">The formatter's string re-delimiter. A <code>&quot;...&quot;</code> literal and an interpolation-free <code>`...`</code> literal denote the same value and differ only in which characters they must escape — <code>&quot;</code> under the first, <code>`</code>/<code>{</code>/<code>}</code> under the second — so <code>aipl fmt</code> spells each literal with whichever delimiter needs fewer escapes. A <code>&quot;&quot;&quot;</code>/<code>```</code> block whose value has no newline is a single-line literal spread over three lines, so it is respelled as one too, with the same choice of delimiter. <code>walker.aipl</code> applies it to every string token.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-requote.html#private">16 private</a></span>
 
@@ -1685,6 +1805,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-sexp.html">crates/aipl-codegen/src/sexp.aipl</a>
 
+          <p class="file-summary">The AST <code>grammar_sexp.aipl</code> lowers to, and its canonical rendering. Its own file because its <code>Atom</code> and the token kind's <code>Atom</code> are two names for one idea at two levels, and a file holds one of each: <code>grammar_sexp.aipl</code> imports this one as <code>AtomNode</code>.</p>
+
+
           <span class="private-count"><a href="crates-aipl-codegen-src-sexp.html#private">1 private</a></span>
 
 
@@ -1708,6 +1831,7 @@
           <a class="file" href="crates-aipl-codegen-src-split_test_sections.html">crates/aipl-codegen/src/split_test_sections.aipl</a>
 
 
+
           <ul class="items">
 
             <li>
@@ -1723,6 +1847,7 @@
           <a class="file" href="crates-aipl-codegen-src-strip_test_sections.html">crates/aipl-codegen/src/strip_test_sections.aipl</a>
 
 
+
           <ul class="items">
 
             <li>
@@ -1736,6 +1861,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-suffix.html">crates/aipl-codegen/src/suffix.aipl</a>
+
+          <p class="file-summary">One postfix step of AIPL's syntax tree and what applying it to a receiver means. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
+
 
           <span class="private-count"><a href="crates-aipl-codegen-src-suffix.html#private">3 private</a></span>
 
@@ -1759,6 +1887,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-trim_end_while.html">crates/aipl-codegen/src/trim_end_while.aipl</a>
 
+          <p class="file-summary">String-only; walks once, tracking the position just past the last <em>non</em>-matching char.</p>
+
+
 
           <ul class="items">
 
@@ -1773,6 +1904,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-trim_prefix.html">crates/aipl-codegen/src/trim_prefix.aipl</a>
+
+          <p class="file-summary">Used by the raw-string processor to drop the newline that ends a blank opening line.</p>
+
 
 
           <ul class="items">
@@ -1789,6 +1923,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-trim_suffix.html">crates/aipl-codegen/src/trim_suffix.aipl</a>
 
+          <p class="file-summary">Used by the raw-string processor to drop the newline (and CR) that end a blank closing line.</p>
+
+
 
           <ul class="items">
 
@@ -1803,6 +1940,9 @@
 
         <li>
           <a class="file" href="crates-aipl-codegen-src-ty.html">crates/aipl-codegen/src/ty.aipl</a>
+
+          <p class="file-summary"><code>aipl_syntax::ast::Type</code> as AIPL declares it. One of the files the AST is declared across; see <code>ast.aipl</code>.</p>
+
 
 
           <ul class="items">
@@ -1849,6 +1989,9 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-unescape.html">crates/aipl-codegen/src/unescape.aipl</a>
 
+          <p class="file-summary">AIPL's string-escape decoder.</p>
+
+
 
           <ul class="items">
 
@@ -1874,7 +2017,10 @@
         <li>
           <a class="file" href="crates-aipl-codegen-src-walker.html">crates/aipl-codegen/src/walker.aipl</a>
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-walker.html#private">153 private</a></span>
+          <p class="file-summary">The formatter's token-stream walker, dogfooded in AIPL: the port of the Rust <code>aipl-fmt</code> <code>Walker</code> (<code>crates/aipl-fmt/src/lib.rs</code>). It walks the token stream <code>lex_aipl</code> produces — not the AST, since the parser desugars as it builds (template literals, <code>set n++</code>, destructuring), so an AST can't be printed back faithfully — and builds a <code>Doc</code> layout tree for <code>print</code> to lay out.</p>
+
+
+          <span class="private-count"><a href="crates-aipl-codegen-src-walker.html#private">157 private</a></span>
 
 
           <ul class="items">
@@ -1986,6 +2132,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_all.html">crates/aipl-mono/src/builtin_all.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>all</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_all</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.all(pred)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>all</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2001,11 +2150,17 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_any.html">crates/aipl-mono/src/builtin_any.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>any</code> builtin — the dual of <code>all</code> (see <code>builtin_all.aipl</code>). Monomorphization registers this function under the canonical name <code>__builtin_any</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.any(pred)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>any</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
 
         </li>
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_count.html">crates/aipl-mono/src/builtin_count.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>count</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_count</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.count(x)</code> resolves through the ordinary generic machinery — the in-file name <code>count</code> is only for this file's own tests, which read exactly like user code.</p>
+
 
 
           <ul class="items">
@@ -2022,6 +2177,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_count_if.html">crates/aipl-mono/src/builtin_count_if.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>count_if</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_count_if</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.count_if(pred)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>count_if</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2036,6 +2194,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_count_is_at_least.html">crates/aipl-mono/src/builtin_count_is_at_least.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>count_is_at_least</code> builtin. Registered under <code>__builtin_count_is_at_least</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p>
+
 
 
           <ul class="items">
@@ -2052,6 +2213,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_count_is_at_most.html">crates/aipl-mono/src/builtin_count_is_at_most.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>count_is_at_most</code> builtin. Registered under <code>__builtin_count_is_at_most</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p>
+
+
 
           <ul class="items">
 
@@ -2066,6 +2230,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_count_is_equal.html">crates/aipl-mono/src/builtin_count_is_equal.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>count_is_equal</code> builtin. Registered under <code>__builtin_count_is_equal</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p>
+
 
 
           <ul class="items">
@@ -2082,6 +2249,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_count_is_greater_than.html">crates/aipl-mono/src/builtin_count_is_greater_than.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>count_is_greater_than</code> builtin. Registered under <code>__builtin_count_is_greater_than</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p>
+
+
 
           <ul class="items">
 
@@ -2096,6 +2266,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_count_is_less_than.html">crates/aipl-mono/src/builtin_count_is_less_than.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>count_is_less_than</code> builtin. Registered under <code>__builtin_count_is_less_than</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p>
+
 
 
           <ul class="items">
@@ -2112,6 +2285,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_count_is_not_equal.html">crates/aipl-mono/src/builtin_count_is_not_equal.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>count_is_not_equal</code> builtin. Registered under <code>__builtin_count_is_not_equal</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p>
+
+
 
           <ul class="items">
 
@@ -2126,6 +2302,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_count_while.html">crates/aipl-mono/src/builtin_count_while.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>count_while</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_count_while</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.count_while(pred)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>count_while</code> is only for this file's own tests, which read exactly like user code. Because a builtin's body may call other builtins (loaded through the real loader), this is also the shared helper the <code>trim_while</code> builtin and the dogfooded compiler helpers (<code>dedent</code>, and <code>lexer.aipl</code>) call.</p>
+
 
 
           <ul class="items">
@@ -2142,6 +2321,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_drop_first.html">crates/aipl-mono/src/builtin_drop_first.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>drop_first</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>) — <code>drop_n(1)</code>, named for the common case.</p>
+
+
 
           <ul class="items">
 
@@ -2156,6 +2338,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_drop_last.html">crates/aipl-mono/src/builtin_drop_last.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>drop_last</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>) — <code>drop_last_n(1)</code>, named for the common case.</p>
+
 
 
           <ul class="items">
@@ -2172,6 +2357,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_drop_last_n.html">crates/aipl-mono/src/builtin_drop_last_n.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>drop_last_n</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>); <code>drop_n</code>'s mirror.</p>
+
+
 
           <ul class="items">
 
@@ -2186,6 +2374,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_drop_n.html">crates/aipl-mono/src/builtin_drop_n.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>drop_n</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p>
+
 
 
           <ul class="items">
@@ -2202,6 +2393,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_ensure_nonempty.html">crates/aipl-mono/src/builtin_ensure_nonempty.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>ensure_nonempty</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>): the runtime road into <code>T[] without []</code>. A literal with an element in it takes the refined type on sight; every other array has to be tested, and this is where the test lives.</p>
+
+
 
           <ul class="items">
 
@@ -2216,6 +2410,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_find_if.html">crates/aipl-mono/src/builtin_find_if.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>find_if</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_find_if</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.find_if(pred)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>find_if</code> is only for this file's own tests, which read exactly like user code.</p>
+
 
 
           <ul class="items">
@@ -2232,6 +2429,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_find_index.html">crates/aipl-mono/src/builtin_find_index.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>find_index</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_find_index</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.find_index(pred)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>find_index</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2246,6 +2446,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_find_map.html">crates/aipl-mono/src/builtin_find_map.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>find_map</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_find_map</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.find_map(f)</code> resolves through the ordinary generic / higher-order machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
 
 
           <ul class="items">
@@ -2262,6 +2465,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_first.html">crates/aipl-mono/src/builtin_first.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>first</code> builtin. Monomorphization registers this under the canonical name <code>__builtin_first</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.first()</code> resolves through the ordinary generic machinery.</p>
+
+
 
           <ul class="items">
 
@@ -2276,6 +2482,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_int_parse.html">crates/aipl-mono/src/builtin_int_parse.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>int_parse</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_int_parse</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>s.int_parse()</code> resolves through the ordinary machinery — the in-file name <code>int_parse</code> is only for this file's own tests, which read exactly like user code. The body's own builtin calls (<code>starts_with</code>, <code>to_digit</code>, ...) resolve through this file's imports, loaded like any user file.</p>
+
 
 
           <ul class="items">
@@ -2292,6 +2501,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_intersperse.html">crates/aipl-mono/src/builtin_intersperse.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>intersperse</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_intersperse</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.intersperse(sep)</code> specializes through the ordinary generic machinery.</p>
+
+
 
           <ul class="items">
 
@@ -2307,6 +2519,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_is_all_whitespace.html">crates/aipl-mono/src/builtin_is_all_whitespace.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>is_all_whitespace</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_is_all_whitespace</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>s.is_all_whitespace()</code> resolves through the ordinary machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2321,6 +2536,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_is_err_and.html">crates/aipl-mono/src/builtin_is_err_and.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>is_err_and</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_is_err_and</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>r.is_err_and(pred)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>is_err_and</code> is only for this file's own tests, which read exactly like user code.</p>
+
 
 
           <ul class="items">
@@ -2342,6 +2560,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_is_some_and.html">crates/aipl-mono/src/builtin_is_some_and.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>is_some_and</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_is_some_and</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>x.is_some_and(pred)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>is_some_and</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2356,6 +2577,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_last.html">crates/aipl-mono/src/builtin_last.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>last</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>); <code>first</code>'s mirror.</p>
+
 
 
           <ul class="items">
@@ -2372,6 +2596,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_left_fold.html">crates/aipl-mono/src/builtin_left_fold.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>left_fold</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_left_fold</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.left_fold(init, f)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>left_fold</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2386,6 +2613,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_map_err.html">crates/aipl-mono/src/builtin_map_err.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>map_err</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_map_err</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>r.map_err(f)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>map_err</code> is only for this file's own tests, which read exactly like user code.</p>
+
 
 
           <ul class="items">
@@ -2412,6 +2642,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_map_find_if.html">crates/aipl-mono/src/builtin_map_find_if.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>map_find_if</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_map_find_if</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.map_find_if(f, p)</code> resolves through the ordinary generic / higher-order machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2427,6 +2660,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_map_join.html">crates/aipl-mono/src/builtin_map_join.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>map_join</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_map_join</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.map_join(f, sep=s)</code> resolves through the ordinary generic / higher-order machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2441,6 +2677,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_map_ok.html">crates/aipl-mono/src/builtin_map_ok.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>map_ok</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_map_ok</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>r.map_ok(f)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>map_ok</code> is only for this file's own tests, which read exactly like user code.</p>
+
 
 
           <ul class="items">
@@ -2467,6 +2706,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_nonempty_first.html">crates/aipl-mono/src/builtin_nonempty_first.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>nonempty_first</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>); <code>first</code> for an array the type system knows is not empty.</p>
+
+
 
           <ul class="items">
 
@@ -2481,6 +2723,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_nonempty_last.html">crates/aipl-mono/src/builtin_nonempty_last.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>nonempty_last</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>); <code>nonempty_first</code>'s mirror, and <code>last</code> for an array the type system knows is not empty. The <code>none</code> arm recurses for the reason <code>nonempty_first</code>'s does.</p>
+
 
 
           <ul class="items">
@@ -2497,6 +2742,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_opt_left_fold.html">crates/aipl-mono/src/builtin_opt_left_fold.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>opt_left_fold</code> builtin: <code>left_fold</code> with a fallible combiner. Monomorphization registers this function under the canonical name <code>__builtin_opt_left_fold</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.opt_left_fold(init, f)</code> specializes through the ordinary generic / higher-order machinery.</p>
+
+
 
           <ul class="items">
 
@@ -2511,6 +2759,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_opt_right_fold.html">crates/aipl-mono/src/builtin_opt_right_fold.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>opt_right_fold</code> builtin: <code>right_fold</code> with a fallible combiner, and the mirror of <code>opt_left_fold</code> (see <code>builtin_opt_left_fold.aipl</code>). Monomorphization registers this function under the canonical name <code>__builtin_opt_right_fold</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p>
+
 
 
           <ul class="items">
@@ -2527,6 +2778,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_reverse_find_map.html">crates/aipl-mono/src/builtin_reverse_find_map.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>reverse_find_map</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_reverse_find_map</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.reverse_find_map(f)</code> resolves through the ordinary generic / higher-order machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2542,6 +2796,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_right_fold.html">crates/aipl-mono/src/builtin_right_fold.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>right_fold</code> builtin — <code>left_fold</code>'s mirror (see <code>builtin_left_fold.aipl</code>). Monomorphization registers this function under the canonical name <code>__builtin_right_fold</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.right_fold(init, f)</code> specializes through the ordinary generic / higher-order machinery.</p>
+
+
 
           <ul class="items">
 
@@ -2556,6 +2813,7 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_sort_by.html">crates/aipl-mono/src/builtin_sort_by.aipl</a>
+
 
 
           <ul class="items">
@@ -2577,6 +2835,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_split_map.html">crates/aipl-mono/src/builtin_split_map.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>split_map</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_split_map</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>s.split_map(sep, f)</code> resolves through the ordinary generic / higher-order machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2591,6 +2852,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_trim_while.html">crates/aipl-mono/src/builtin_trim_while.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>trim_while</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_trim_while</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>s.trim_while(pred)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>trim_while</code> is only for this file's own tests, which read exactly like user code. A builtin body may call other builtins (loaded through the real loader), so this drops the leading run via the <code>count_while</code> builtin — the complement of <code>count_while</code>.</p>
+
 
 
           <ul class="items">
@@ -2607,6 +2871,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_try_map.html">crates/aipl-mono/src/builtin_try_map.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>try_map</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_try_map</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.try_map(f)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>try_map</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2621,6 +2888,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_tuple_windows.html">crates/aipl-mono/src/builtin_tuple_windows.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>tuple_windows</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_tuple_windows</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.tuple_windows()</code> specializes through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p>
+
 
 
           <ul class="items">
@@ -2637,6 +2907,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_union_all.html">crates/aipl-mono/src/builtin_union_all.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>union_all</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_union_all</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.union_all()</code> specializes through the ordinary generic machinery — the in-file name <code>union_all</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
 
           <ul class="items">
 
@@ -2651,6 +2924,9 @@
 
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_value_or.html">crates/aipl-mono/src/builtin_value_or.aipl</a>
+
+          <p class="file-summary">The AIPL implementation of the <code>value_or</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_value_or</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>o.value_or(d)</code> resolves through the ordinary generic machinery — the in-file name <code>value_or</code> is only for this file's own tests, which read exactly like user code.</p>
+
 
 
           <ul class="items">
@@ -2677,6 +2953,9 @@
         <li>
           <a class="file" href="crates-aipl-mono-src-builtin_value_or_err.html">crates/aipl-mono/src/builtin_value_or_err.aipl</a>
 
+          <p class="file-summary">The AIPL implementation of the <code>value_or_err</code> builtin: the bridge from the optional world to the result world, and the <code>value_or</code> sibling that keeps a message about the failure instead of erasing it. Monomorphization registers this function under the canonical name <code>__builtin_value_or_err</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>x.value_or_err(e)</code> specializes through the ordinary generic machinery — the in-file name <code>value_or_err</code> is only for this file's own tests, which read exactly like user code.</p>
+
+
           <span class="private-count"><a href="crates-aipl-mono-src-builtin_value_or_err.html#private">1 private</a></span>
 
 
@@ -2694,6 +2973,7 @@
         <li>
           <a class="file" href="examples-arrays.html">examples/arrays.aipl</a>
 
+
           <span class="private-count"><a href="examples-arrays.html#private">4 private</a></span>
 
 
@@ -2701,6 +2981,7 @@
 
         <li>
           <a class="file" href="examples-hello.html">examples/hello.aipl</a>
+
 
           <span class="private-count"><a href="examples-hello.html#private">3 private</a></span>
 
@@ -2719,6 +3000,9 @@
         <li>
           <a class="file" href="examples-imports.html">examples/imports.aipl</a>
 
+          <p class="file-summary">Demonstrates <code>import { ... } from &quot;...&quot;</code>. The path is relative to this file; only the listed names come into scope.</p>
+
+
           <span class="private-count"><a href="examples-imports.html#private">1 private</a></span>
 
 
@@ -2726,6 +3010,7 @@
 
         <li>
           <a class="file" href="examples-lib-strlen.html">examples/lib/strlen.aipl</a>
+
 
 
           <ul class="items">
@@ -2741,6 +3026,7 @@
 
         <li>
           <a class="file" href="examples-math-geometry.html">examples/math/geometry.aipl</a>
+
 
           <span class="private-count"><a href="examples-math-geometry.html#private">2 private</a></span>
 
@@ -2764,6 +3050,7 @@
         <li>
           <a class="file" href="examples-strings.html">examples/strings.aipl</a>
 
+
           <span class="private-count"><a href="examples-strings.html#private">2 private</a></span>
 
 
@@ -2771,6 +3058,7 @@
 
         <li>
           <a class="file" href="examples-uses_strlen.html">examples/uses_strlen.aipl</a>
+
 
           <span class="private-count"><a href="examples-uses_strlen.html#private">1 private</a></span>
 

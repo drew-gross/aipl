@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/indent.aipl</code></h1>
 
+      <div class="module-doc"><p>The content half of the formatter's raw-block re-layout (see <code>reindent_block</code>): indents a block of text — the lines <em>between</em> a raw-string / template atom's delimiters, with no <code>&quot;&quot;&quot;</code> / <code>```</code> framing — by a chosen column. Split out so <code>reindent_block</code> deals only with the delimiters. Assumes the input is already fully dedented (its common indent is 0): it <em>adds</em> <code>target</code> spaces, it does not rebase an existing indent — <code>reindent_block</code> dedents first (via <code>dedent</code>).</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn indent(self: str, target: u64) -&#62; str</code></pre>
 
-          <div class="doc"><p>Indents every non-blank line of <code>self</code> by <code>target</code> spaces, keeping each line's own relative indentation; blank (empty or all-whitespace) lines are emitted empty. Assumes <code>self</code> is already fully dedented — it *adds* indentation, it does not rebase an existing common indent to <code>target</code>. The inverse of <code>dedent</code>; <code>reindent_block</code> dedents the raw-block content before calling this.</p></div>
+          <div class="doc"><p>Indents every non-blank line of <code>self</code> by <code>target</code> spaces, keeping each line's own relative indentation; blank (empty or all-whitespace) lines are emitted empty. Assumes <code>self</code> is already fully dedented — it <em>adds</em> indentation, it does not rebase an existing common indent to <code>target</code>. The inverse of <code>dedent</code>; <code>reindent_block</code> dedents the raw-block content before calling this.</p></div>
 
 
         </section>

@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/walker.aipl</code></h1>
 
+      <div class="module-doc"><p>The formatter's token-stream walker, dogfooded in AIPL: the port of the Rust <code>aipl-fmt</code> <code>Walker</code> (<code>crates/aipl-fmt/src/lib.rs</code>). It walks the token stream <code>lex_aipl</code> produces — not the AST, since the parser desugars as it builds (template literals, <code>set n++</code>, destructuring), so an AST can't be printed back faithfully — and builds a <code>Doc</code> layout tree for <code>print</code> to lay out.</p><p>The Rust walker is a <code>&amp;mut self</code> cursor over <code>(toks, pos, comments, last_end)</code>. AIPL values have no references, so the cursor travels as a <code>W</code> <em>value</em> that every step returns alongside its result — the <code>W…</code> carrier structs below, the same shape <code>lexer.aipl</code>'s <code>StepResult</code> uses for its <code>end</code>. Reading the cursor (<code>peek</code>, <code>at_end</code>, …) takes <code>W</code> by value and returns just the answer; advancing it (<code>bump</code>, <code>expect</code>, <code>lead</code>, …) returns a carrier holding the moved-on <code>W</code>.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant FmtKind</code></pre>
 
-          <div class="doc"><p>What the walker dispatches on: the coarse class the highlighter's <code>TokenKind</code> gives an ordinary token, plus the three interpolated-template pieces, which token *text* alone cannot distinguish — an empty segment's <code>TplMid</code> is the single character <code>{</code>, identical to a brace.</p></div>
+          <div class="doc"><p>What the walker dispatches on: the coarse class the highlighter's <code>TokenKind</code> gives an ordinary token, plus the three interpolated-template pieces, which token <em>text</em> alone cannot distinguish — an empty segment's <code>TplMid</code> is the single character <code>{</code>, identical to a brace.</p></div>
 
 
           <ul class="cases">
@@ -165,7 +168,7 @@
           </h3>
           <pre class="signature"><code>struct WDocs</code></pre>
 
-          <div class="doc"><p>A step that produces *several* docs (a comma list's items, a run of type suffixes) rather than one.</p></div>
+          <div class="doc"><p>A step that produces <em>several</em> docs (a comma list's items, a run of type suffixes) rather than one.</p></div>
 
 
         </section>
@@ -382,7 +385,7 @@
           </h3>
           <pre class="signature"><code>struct Seg</code></pre>
 
-          <div class="doc"><p>One postfix segment, tagged so a long chain can break before each *call* rather than exploding an inner argument list.</p></div>
+          <div class="doc"><p>One postfix segment, tagged so a long chain can break before each <em>call</em> rather than exploding an inner argument list.</p></div>
 
 
         </section>
@@ -501,7 +504,7 @@
           </h3>
           <pre class="signature"><code>fn more_before(self: W, end: str) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Is there another item to read before the closing <code>end</code> token?</p><p>**Use this for every &quot;scan until a closing token&quot; loop.** The bare form</p><pre><code>while (w.peek_text() != &quot;}&quot;) { .. }        // WRONG
+          <div class="doc"><p>Is there another item to read before the closing <code>end</code> token?</p><p><strong>Use this for every &quot;scan until a closing token&quot; loop.</strong> The bare form</p><pre><code>while (w.peek_text() != &quot;}&quot;) { .. }        // WRONG
 </code></pre><p>spins forever on truncated input: past the last token <code>peek_text()</code> is <code>&quot;&quot;</code>, which never equals <code>&quot;}&quot;</code>, and <code>bump()</code> deliberately does not advance at the end (see its comment) — so the loop makes no progress and never exits. That is not hypothetical; it hung <code>aipl check</code> on a truncated import with no output and no diagnostic, which is indistinguishable from a compiler hang.</p><p>Folding the <code>at_end</code> check in here means a caller cannot forget it. The <code>expect(end)</code> that follows the loop then reports the missing token properly.</p></div>
 
 
@@ -600,7 +603,7 @@
           </h3>
           <pre class="signature"><code>fn lead(self: W) -&#62; WDoc</code></pre>
 
-          <div class="doc"><p>Drain the comments before the next token, each on its own line — so a mid-list line comment forces the enclosing group to break (a comment can never be flattened onto one line). A blank line *after* a comment is preserved: it marks the comment as standalone rather than attached to what follows.</p></div>
+          <div class="doc"><p>Drain the comments before the next token, each on its own line — so a mid-list line comment forces the enclosing group to break (a comment can never be flattened onto one line). A blank line <em>after</em> a comment is preserved: it marks the comment as standalone rather than attached to what follows.</p></div>
 
 
         </section>
@@ -628,7 +631,7 @@
           </h3>
           <pre class="signature"><code>fn trailing_comment(self: W) -&#62; WDoc</code></pre>
 
-          <div class="doc"><p>A trailing comment on the same line as whatever just ended, rendered as <code> // ...</code> glued to the current line plus a <code>BreakParent</code>, so no group flattens anything after it onto the comment's line. It must also come *before* the next unconsumed token: a comment ending a source line whose earlier tokens are still pending (e.g. after the <code>}</code> closing an inline block) belongs to a later flush point, not this one.</p></div>
+          <div class="doc"><p>A trailing comment on the same line as whatever just ended, rendered as <code> // ...</code> glued to the current line plus a <code>BreakParent</code>, so no group flattens anything after it onto the comment's line. It must also come <em>before</em> the next unconsumed token: a comment ending a source line whose earlier tokens are still pending (e.g. after the <code>}</code> closing an inline block) belongs to a later flush point, not this one.</p></div>
 
 
         </section>
@@ -640,7 +643,7 @@
             <a class="anchor" href="#item-take_comment">take_comment</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn take_comment(self: W, __spat$14441: Span) -&#62; W</code></pre>
+          <pre class="signature"><code>fn take_comment(self: W, __spat$14461: Span) -&#62; W</code></pre>
 
           <div class="doc"><p>Consume comment <code>c</code>: step past it and mark it as the last thing emitted. The Rust <code>pop_front</code> + <code>last_end</code> update, as one move.</p></div>
 
@@ -684,7 +687,7 @@
           </h3>
           <pre class="signature"><code>fn fmt_kind(k: AiplTok) -&#62; FmtKind</code></pre>
 
-          <div class="doc"><p>A lexer token kind as the kind the walker dispatches on. The interpolated template pieces (regular *or* raw) keep their head/middle/tail position, which token text alone cannot recover; everything else folds to its syntactic class.</p></div>
+          <div class="doc"><p>A lexer token kind as the kind the walker dispatches on. The interpolated template pieces (regular <em>or</em> raw) keep their head/middle/tail position, which token text alone cannot recover; everything else folds to its syntactic class.</p></div>
 
 
         </section>
@@ -894,7 +897,7 @@
           </h3>
           <pre class="signature"><code>fn import_item(self: W) -&#62; WImport!FmtError</code></pre>
 
-          <div class="doc"><p><code>import { a, b as c } from &quot;path&quot;;</code> — the statement laid out, and the hoist key.</p><p>The layout is not the walker's. The statement's source, <code>import</code> through <code>;</code>, goes to <code>import_decl_doc</code>, which parses it against the <code>import_decl</code> production and lays it out from what that production says: the braces take inner spaces, the list breaks one name per line with a trailing comma, and the names *sort* — <code>sorted=true</code> on the production's <code>Many</code>, the one word that replaced the comparator, the sort and the two carrier structs that used to live here. What stays here is the cursor: which tokens the statement spans, and the <code>from</code> target the file-level hoist orders by.</p><p>Comments inside the statement are laid out with it — they are trivia in the concrete tree, and come out beside the name they were written against — so the walker's own comment queue steps past them, or <code>lead</code> would emit them a second time.</p></div>
+          <div class="doc"><p><code>import { a, b as c } from &quot;path&quot;;</code> — the statement laid out, and the hoist key.</p><p>The layout is not the walker's. The statement's source, <code>import</code> through <code>;</code>, goes to <code>import_decl_doc</code>, which parses it against the <code>import_decl</code> production and lays it out from what that production says: the braces take inner spaces, the list breaks one name per line with a trailing comma, and the names <em>sort</em> — <code>sorted=true</code> on the production's <code>Many</code>, the one word that replaced the comparator, the sort and the two carrier structs that used to live here. What stays here is the cursor: which tokens the statement spans, and the <code>from</code> target the file-level hoist orders by.</p><p>Comments inside the statement are laid out with it — they are trivia in the concrete tree, and come out beside the name they were written against — so the walker's own comment queue steps past them, or <code>lead</code> would emit them a second time.</p></div>
 
 
         </section>
@@ -1146,7 +1149,7 @@
           </h3>
           <pre class="signature"><code>fn variant_cases(self: W, acc0: VCase[]) -&#62; WCases!FmtError</code></pre>
 
-          <div class="doc"><p>Each case carries its own leading comments, its <code># ..</code> doc lines and any same-line trailing comment, so a comment written between two arms stays between them. The <code>|</code> in front of a case is dropped here — the layout decides whether to put one back — and it is read *after* the docs, which is where the grammar has it: the docs sit above the <code>|</code>, not between it and the name.</p></div>
+          <div class="doc"><p>Each case carries its own leading comments, its <code># ..</code> doc lines and any same-line trailing comment, so a comment written between two arms stays between them. The <code>|</code> in front of a case is dropped here — the layout decides whether to put one back — and it is read <em>after</em> the docs, which is where the grammar has it: the docs sit above the <code>|</code>, not between it and the name.</p></div>
 
 
         </section>
@@ -1230,7 +1233,63 @@
           </h3>
           <pre class="signature"><code>fn program(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p>A whole file: header comments, then the hoisted imports, then the items.</p></div>
+          <div class="doc"><p>A whole file: header comments, the file's own <code># ..</code> documentation, then the hoisted imports, then the items.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-module_doc_lines">
+          <h3>
+            <a class="anchor" href="#item-module_doc_lines">module_doc_lines</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn module_doc_lines(self: W) -&#62; u64</code></pre>
+
+          <div class="doc"><p>The <code># ..</code> lines at the cursor that document the <em>file</em>: every line up to and including the last one a blank line separates from what follows. The blank line is what detaches a block from the declaration below it, and a detached block at the top of a file is its documentation — the parser splits on exactly this (<code>split_doc_lines</code> in <code>grammar_aipl.aipl</code>), so the two agree about which lines are whose.</p><p>Zero lines is the ordinary case: a block that runs straight into a declaration documents it, and <code>item</code> emits it.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-blank_line_after_n">
+          <h3>
+            <a class="anchor" href="#item-blank_line_after_n">blank_line_after_n</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn blank_line_after_n(self: W, n: u64) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a blank line follows the token <code>n</code> past the cursor.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-blank_line_follows">
+          <h3>
+            <a class="anchor" href="#item-blank_line_follows">blank_line_follows</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn blank_line_follows(self: W, at: u64) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a blank line follows byte <code>at</code>: two newlines before any other character. <code>gap_has_blank</code>'s stricter cousin, reading whitespace only — the parser detaches a <code># ..</code> block on exactly this, and a <code>//</code> comment written under one neither detaches it nor hides a blank line that does.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-module_doc">
+          <h3>
+            <a class="anchor" href="#item-module_doc">module_doc</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn module_doc(self: W) -&#62; WDoc</code></pre>
+
+          <div class="doc"><p>The file's <code># ..</code> documentation, verbatim, closed by the blank line that separates it from the file below — the separation is what makes it the file's rather than the next declaration's, so the formatter writes it back. A blank line <em>inside</em> the block is kept too: the parser reads one as a paragraph break.</p></div>
 
 
         </section>
@@ -1314,7 +1373,7 @@
           </h3>
           <pre class="signature"><code>fn fn_body(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p>A function body: an ordinary statement block, or the *struct-literal shorthand* <code>{ field: value, .. }</code>, which names no type because the declared return type supplies it. The shorthand is laid out like the struct literal it stands for — flat while it fits — not like a block, which always breaks.</p><p><code>{ x }</code> stays a block returning <code>x</code>, so the shorthand is recognized by the token *after* the first one: neither <code>IDENT :</code> nor <code>IDENT ,</code> can begin a statement, and no other body shape puts <code>:</code> or <code>,</code> in that position (a tuple or array literal leads with <code>(</code>/<code>[</code>, a call's comma sits past its <code>(</code>). That is the grammar's own rule, so testing the following token alone keeps the two parsers in step — testing the field name's *kind* would not, since a field may be named <code>str</code>, which the formatter classifies as a builtin type rather than an identifier.</p></div>
+          <div class="doc"><p>A function body: an ordinary statement block, or the <em>struct-literal shorthand</em> <code>{ field: value, .. }</code>, which names no type because the declared return type supplies it. The shorthand is laid out like the struct literal it stands for — flat while it fits — not like a block, which always breaks.</p><p><code>{ x }</code> stays a block returning <code>x</code>, so the shorthand is recognized by the token <em>after</em> the first one: neither <code>IDENT :</code> nor <code>IDENT ,</code> can begin a statement, and no other body shape puts <code>:</code> or <code>,</code> in that position (a tuple or array literal leads with <code>(</code>/<code>[</code>, a call's comma sits past its <code>(</code>). That is the grammar's own rule, so testing the following token alone keeps the two parsers in step — testing the field name's <em>kind</em> would not, since a field may be named <code>str</code>, which the formatter classifies as a builtin type rather than an identifier.</p></div>
 
 
         </section>
@@ -1328,7 +1387,7 @@
           </h3>
           <pre class="signature"><code>fn construct_body(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p>The shorthand body's field list, entered with the <code>{</code> already consumed. Mirrors <code>struct_atom</code> without the leading type name.</p><p>One wrinkle the ordinary struct literal doesn't have: in <code>{ id, }</code> — a single *shorthand* field — the comma is **syntax, not style**. Drop it and <code>{ id }</code> reads back as a block whose value is <code>id</code>, so formatting would change what the source means. <code>comma_list_docs</code> writes a trailing comma only when the list breaks (<code>IfBroken</code>), which is not enough here, so that comma is written into the item itself and the style's own one switched off. Every other shape already carries a comma or a colon between the braces and formats as usual.</p></div>
+          <div class="doc"><p>The shorthand body's field list, entered with the <code>{</code> already consumed. Mirrors <code>struct_atom</code> without the leading type name.</p><p>One wrinkle the ordinary struct literal doesn't have: in <code>{ id, }</code> — a single <em>shorthand</em> field — the comma is <strong>syntax, not style</strong>. Drop it and <code>{ id }</code> reads back as a block whose value is <code>id</code>, so formatting would change what the source means. <code>comma_list_docs</code> writes a trailing comma only when the list breaks (<code>IfBroken</code>), which is not enough here, so that comma is written into the item itself and the style's own one switched off. Every other shape already carries a comma or a colon between the braces and formats as usual.</p></div>
 
 
         </section>
@@ -1468,7 +1527,7 @@
           </h3>
           <pre class="signature"><code>fn block_layout(self: W) -&#62; WDoc!FmtError</code></pre>
 
-          <div class="doc"><p>A <code>{ .. }</code> block: statements (<code>;</code>-terminated) plus an optional trailing expression. <code>{}</code> when empty, <code>{ expr }</code> when a lone trailing expression fits, one statement per line otherwise. *Not* wrapped in a group, so a caller can place several blocks under one shared group (an <code>if</code>/<code>else</code> breaks both branches together) — <code>block</code> is the grouped form.</p></div>
+          <div class="doc"><p>A <code>{ .. }</code> block: statements (<code>;</code>-terminated) plus an optional trailing expression. <code>{}</code> when empty, <code>{ expr }</code> when a lone trailing expression fits, one statement per line otherwise. <em>Not</em> wrapped in a group, so a caller can place several blocks under one shared group (an <code>if</code>/<code>else</code> breaks both branches together) — <code>block</code> is the grouped form.</p></div>
 
 
         </section>
@@ -1508,7 +1567,7 @@
             <a class="anchor" href="#item-range_has_stmt">range_has_stmt</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$55044: Span) -&#62; bool</code></pre>
+          <pre class="signature"><code>fn range_has_stmt(self: W, __spat$58038: Span) -&#62; bool</code></pre>
 
           <div class="doc"><p>Whether any token in <code>[lo, hi)</code> is a <code>;</code> or a <code>fn</code>. A loop, not recursion: this scans every token of a block, so on a large one the recursive form ran the native stack out (AIPL does not guarantee tail-call elimination).</p></div>
 
@@ -1902,7 +1961,7 @@
           </h3>
           <pre class="signature"><code>fn str_atom(self: WStr) -&#62; WDoc</code></pre>
 
-          <div class="doc"><p>A string token, respelled by <code>requote</code> — whichever of <code>&quot;</code> and <code></code> <code> </code><code> needs fewer escapes, and a block whose value is one line as a single-line literal — the one edit the formatter makes inside a literal, and a value-preserving one. What is still a </code>&quot;&quot;&quot;<code>/</code><code></code><code> </code><code></code> <code></code><code></code> block after that is a <code>RawBlock</code>, so its closing delimiter aligns under the opening one; anything else is ordinary text.</p></div>
+          <div class="doc"><p>A string token, respelled by <code>requote</code> — whichever of <code>&quot;</code> and <code>`</code> needs fewer escapes, and a block whose value is one line as a single-line literal — the one edit the formatter makes inside a literal, and a value-preserving one. What is still a <code>&quot;&quot;&quot;</code>/<code>```</code> block after that is a <code>RawBlock</code>, so its closing delimiter aligns under the opening one; anything else is ordinary text.</p></div>
 
 
         </section>
@@ -2406,7 +2465,7 @@
           </h3>
           <pre class="signature"><code>fn hugs_sole_arg(self: W) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether the call whose <code>(</code> was just consumed takes exactly one argument that *ends in* a nesting construct — a bracketed one (a nested call, an array, a struct literal, a set/dict literal, a lambda's block body) or a multi-line <code>&quot;&quot;&quot;</code>/<code></code><code></code> <code></code><code> </code><code></code><code> block — whether that construct is the whole argument or the tail of a larger expression (</code>x == [..]<code>, </code>ebnf(g) == &quot;&quot;&quot;...&quot;&quot;&quot;<code>). Such a call is *hugged*: the construct's own brackets, or the block's own lines, carry the break, so the nesting costs one indent level instead of one per layer, and the closing bracket lands under the call rather than under an argument line —</code></p><pre><code>assert(companion_files(many)? == [
+          <div class="doc"><p>Whether the call whose <code>(</code> was just consumed takes exactly one argument that <em>ends in</em> a nesting construct — a bracketed one (a nested call, an array, a struct literal, a set/dict literal, a lambda's block body) or a multi-line <code>&quot;&quot;&quot;</code>/<code>```</code> block — whether that construct is the whole argument or the tail of a larger expression (<code>x == [..]</code>, <code>ebnf(g) == &quot;&quot;&quot;...&quot;&quot;&quot;</code>). Such a call is <em>hugged</em>: the construct's own brackets, or the block's own lines, carry the break, so the nesting costs one indent level instead of one per layer, and the closing bracket lands under the call rather than under an argument line —</p><pre><code>assert(companion_files(many)? == [
     Companion { path: &quot;a.aipl&quot;, contents: &quot;1&quot; },
 ]);
 </code></pre><p>Pure lookahead over the token stream, no parse state.</p></div>
@@ -2468,7 +2527,7 @@
           </h3>
           <pre class="signature"><code>fn is_block_tok(self: W, i: u64) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether token <code>i</code> closes a multi-line block literal: a <code>&quot;&quot;&quot;</code>/<code></code><code></code> <code></code><code> </code><code></code><code> string that stays a block once </code>requote<code>d, or the tail of a raw template holding a newline (</code>retemplate<code> keeps those as written; a raw template on one line may lose its </code><code></code> <code></code><code></code> and is not a block).</p></div>
+          <div class="doc"><p>Whether token <code>i</code> closes a multi-line block literal: a <code>&quot;&quot;&quot;</code>/<code>```</code> string that stays a block once <code>requote</code>d, or the tail of a raw template holding a newline (<code>retemplate</code> keeps those as written; a raw template on one line may lose its <code>```</code> and is not a block).</p></div>
 
 
         </section>

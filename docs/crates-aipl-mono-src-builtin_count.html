@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_count.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>count</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_count</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.count(x)</code> resolves through the ordinary generic machinery — the in-file name <code>count</code> is only for this file's own tests, which read exactly like user code.</p><p>The counterpart of <code>count_while</code>, which counts a <em>leading run</em> matching a predicate; this counts <em>every</em> element equal to a value, anywhere. Unsigned, like <code>len</code>: a count is never negative.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

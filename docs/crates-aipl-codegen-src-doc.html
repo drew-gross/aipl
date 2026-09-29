@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/doc.aipl</code></h1>
 
+      <div class="module-doc"><p>A Wadler/Prettier-style pretty-printing document algebra, dogfooded in AIPL: the formatter builds a <code>Doc</code> tree describing <em>possible</em> layouts and <code>print</code> picks one — each <code>Group</code> renders on one line (&quot;flat&quot;) when it fits within the width limit, and breaks at its <code>Line</code>/<code>SoftLine</code> points otherwise. This is the port of the Rust <code>aipl-fmt</code> <code>doc.rs</code>; <code>format_source</code> (the formatter proper) builds the tree and calls <code>print</code> here.</p><p>The printer walks a <code>Work</code> cons-list (the explicit work-stack the Rust version keeps in a <code>Vec</code>) with a <code>while</code> loop, so the native stack stays flat however large the document is. It was originally written as a tail-recursive walk on the assumption that the tail call would be eliminated; it is not, and a document of a few tens of thousands of nodes duly exhausted the stack. Output is accumulated as a <code>str[]</code> and joined once at the end. <code>fits</code> looks ahead over the same cons-list — the list <em>is</em> the &quot;rest of the line&quot; the Rust <code>fits</code> reads off the work stack.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -198,7 +201,7 @@
           </h3>
           <pre class="signature"><code>fn go(width: u64, col0: u64, work0: Work, acc0: str[]) -&#62; str[]</code></pre>
 
-          <div class="doc"><p>The main layout loop: pop a frame, emit for its <code>Doc</code>, push any children, and go round again. <code>col</code> is the current column; <code>sp</code> (inside each frame) is the indentation, in spaces, that a line break under that frame lands at.</p><p>Each arm updates the loop's own <code>mut</code> bindings directly. That needs <code>match</code> arms to be statement blocks; before they were, an arm could only be a single *expression*, so this was three functions threading a <code>Step { col, work, emit, emits, done }</code> carrier back to the loop — one to dispatch on the work-list, one on the <code>Doc</code>, and one for the <code>RawBlock</code> atom.</p></div>
+          <div class="doc"><p>The main layout loop: pop a frame, emit for its <code>Doc</code>, push any children, and go round again. <code>col</code> is the current column; <code>sp</code> (inside each frame) is the indentation, in spaces, that a line break under that frame lands at.</p><p>Each arm updates the loop's own <code>mut</code> bindings directly. That needs <code>match</code> arms to be statement blocks; before they were, an arm could only be a single <em>expression</em>, so this was three functions threading a <code>Step { col, work, emit, emits, done }</code> carrier back to the loop — one to dispatch on the work-list, one on the <code>Doc</code>, and one for the <code>RawBlock</code> atom.</p></div>
 
 
         </section>
@@ -212,7 +215,7 @@
           </h3>
           <pre class="signature"><code>fn group_flat(forced: bool, width: u64, col: u64, sp: u64, inner: Doc, rest: Work) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Decide a group's mode: forced groups always break; otherwise the group is flat exactly when its content — laid out flat, followed by the rest of the line — fits in the remaining width. The remaining width is an *unsigned* subtraction, so a line already past the limit floors at 0 rather than going negative — the same thing the Rust printer gets from <code>usize::saturating_sub</code>.</p></div>
+          <div class="doc"><p>Decide a group's mode: forced groups always break; otherwise the group is flat exactly when its content — laid out flat, followed by the rest of the line — fits in the remaining width. The remaining width is an <em>unsigned</em> subtraction, so a line already past the limit floors at 0 rather than going negative — the same thing the Rust printer gets from <code>usize::saturating_sub</code>.</p></div>
 
 
         </section>
@@ -226,7 +229,7 @@
           </h3>
           <pre class="signature"><code>fn fits(budget: u64, work: Work) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Would the pending work — the flat candidate followed by the outer frames, each in its own mode — stay within <code>budget</code> columns? Walks until the budget is exhausted (no) or the line provably ends at a break point (yes).</p><p>The budget is *unsigned*: it can't go negative, so an overrun is an explicit &quot;doesn't fit&quot; comparison in <code>fits_after</code> rather than a sign check on a wrapped-around remainder.</p></div>
+          <div class="doc"><p>Would the pending work — the flat candidate followed by the outer frames, each in its own mode — stay within <code>budget</code> columns? Walks until the budget is exhausted (no) or the line provably ends at a break point (yes).</p><p>The budget is <em>unsigned</em>: it can't go negative, so an overrun is an explicit &quot;doesn't fit&quot; comparison in <code>fits_after</code> rather than a sign check on a wrapped-around remainder.</p></div>
 
 
         </section>
@@ -240,7 +243,7 @@
           </h3>
           <pre class="signature"><code>fn fits_after(budget: u64, n: u64, rest: Work) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Spend <code>n</code> of the remaining columns and keep walking — or give up when <code>n</code> doesn't fit. The check has to come *before* the subtraction: on an unsigned budget <code>budget - n</code> floors at 0, which would hide the overrun.</p></div>
+          <div class="doc"><p>Spend <code>n</code> of the remaining columns and keep walking — or give up when <code>n</code> doesn't fit. The check has to come <em>before</em> the subtraction: on an unsigned budget <code>budget - n</code> floors at 0, which would hide the overrun.</p></div>
 
 
         </section>

@@ -76,8 +76,10 @@ const ABORTING_BUILTINS: &[Callee] = &[Callee::Assert];
 pub fn sink_bindings(program: &Program, effectful: &HashSet<String>) -> Program {
     let blocked = undeferrable_fns(program, effectful);
     Program {
-        // Rewrites bodies/items only; the file map carries through unchanged.
+        // Rewrites bodies/items only; the file map and the file's own
+        // documentation carry through unchanged.
         sources: program.sources.clone(),
+        doc: program.doc.clone(),
         items: program
             .items
             .iter()

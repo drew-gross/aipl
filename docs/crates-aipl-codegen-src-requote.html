@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/requote.aipl</code></h1>
 
+      <div class="module-doc"><p>The formatter's string re-delimiter. A <code>&quot;...&quot;</code> literal and an interpolation-free <code>`...`</code> literal denote the same value and differ only in which characters they must escape — <code>&quot;</code> under the first, <code>`</code>/<code>{</code>/<code>}</code> under the second — so <code>aipl fmt</code> spells each literal with whichever delimiter needs fewer escapes. A <code>&quot;&quot;&quot;</code>/<code>```</code> block whose value has no newline is a single-line literal spread over three lines, so it is respelled as one too, with the same choice of delimiter. <code>walker.aipl</code> applies it to every string token.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn requote(self: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>A string token's source text, respelled as whichever of the four string spellings — <code>&quot;…&quot;</code>, <code></code> <code>…</code> <code></code>, <code>&quot;&quot;&quot;…&quot;&quot;&quot;</code>, <code></code><code></code> <code></code><code>…</code><code></code> <code></code><code></code> — needs the fewest escapes for its value. Ties go to a single-line form over a block (one line rather than three, or one delimiter rather than three), and then to the family the token already has (quotes or backticks), so a literal with nothing to gain is never rewritten. A value holding a newline is what the block forms are for: a block keeps its lines, and a <code>&quot;…&quot;</code>/<code></code> <code>…</code> <code></code> with <code>\n</code> escapes only ever swaps between those two (<code>reswap</code>).</p></div>
+          <div class="doc"><p>A string token's source text, respelled as whichever of the four string spellings — <code>&quot;…&quot;</code>, <code>`…`</code>, <code>&quot;&quot;&quot;…&quot;&quot;&quot;</code>, <code>```…```</code> — needs the fewest escapes for its value. Ties go to a single-line form over a block (one line rather than three, or one delimiter rather than three), and then to the family the token already has (quotes or backticks), so a literal with nothing to gain is never rewritten. A value holding a newline is what the block forms are for: a block keeps its lines, and a <code>&quot;…&quot;</code>/<code>`…`</code> with <code>\n</code> escapes only ever swaps between those two (<code>reswap</code>).</p></div>
 
 
         </section>
@@ -54,7 +57,7 @@
           </h3>
           <pre class="signature"><code>pub fn retemplate(raw: bool, segs: str[], interps: str[]) -&#62; str</code></pre>
 
-          <div class="doc"><p>An interpolated template respelled between its two forms — <code></code> <code>…{e}…</code> <code></code> and <code></code><code></code> <code></code><code>…{e}…</code><code></code> <code></code><code></code> — by the same rule as a string: fewest escapes, then the single-backtick form, then the form it has. <code>segs</code> are the source texts of the template's literal segments (between the delimiters and the interpolation braces), <code>interps</code> the interpolations' source, which is the same in both forms and is copied through; <code>raw</code> says which form the source used. A template holding a newline stays as written.</p><p>The two forms share the brace escapes <code>\{</code>/<code>\}</code>; a single-backtick segment also escapes <code>\\</code>, <code></code> \<code> </code><code> and the control characters, which a raw segment holds verbatim — so a raw segment can become a single one when it holds no backslash (beyond a brace escape) and no backtick, and a single segment can become a raw one when its only escapes are braces, backslashes and backticks (a control-character escape has no raw spelling), which saves every backslash and backtick escape it has.</code></p></div>
+          <div class="doc"><p>An interpolated template respelled between its two forms — <code>`…{e}…`</code> and <code>```…{e}…```</code> — by the same rule as a string: fewest escapes, then the single-backtick form, then the form it has. <code>segs</code> are the source texts of the template's literal segments (between the delimiters and the interpolation braces), <code>interps</code> the interpolations' source, which is the same in both forms and is copied through; <code>raw</code> says which form the source used. A template holding a newline stays as written.</p><p>The two forms share the brace escapes <code>\{</code>/<code>\}</code>; a single-backtick segment also escapes <code>\\</code>, <code>\`</code> and the control characters, which a raw segment holds verbatim — so a raw segment can become a single one when it holds no backslash (beyond a brace escape) and no backtick, and a single segment can become a raw one when its only escapes are braces, backslashes and backticks (a control-character escape has no raw spelling), which saves every backslash and backtick escape it has.</p></div>
 
 
         </section>
@@ -131,7 +134,7 @@
           </h3>
           <pre class="signature"><code>fn is_block(self: str) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether a token spells a <code>&quot;&quot;&quot;</code>/<code></code><code></code> <code></code><code></code> <code></code><code></code> block.</p></div>
+          <div class="doc"><p>Whether a token spells a <code>&quot;&quot;&quot;</code>/<code>```</code> block.</p></div>
 
 
         </section>
@@ -145,7 +148,7 @@
           </h3>
           <pre class="signature"><code>fn reswap(self: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>The <code>&quot;</code>/<code></code> <code> </code><code> swap for a single-line literal whose value holds a newline — the one case not spelled from the value, because </code>&quot;a\nb&quot;<code> and a block are not the same number of lines and the escape is what keeps it on one. Copies the source and moves only the delimiter-specific escapes (</code>redelimit<code>); a tie keeps the delimiter it has.</code></p></div>
+          <div class="doc"><p>The <code>&quot;</code>/<code>`</code> swap for a single-line literal whose value holds a newline — the one case not spelled from the value, because <code>&quot;a\nb&quot;</code> and a block are not the same number of lines and the escape is what keeps it on one. Copies the source and moves only the delimiter-specific escapes (<code>redelimit</code>); a tie keeps the delimiter it has.</p></div>
 
 
         </section>

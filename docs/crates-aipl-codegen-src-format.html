@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/format.aipl</code></h1>
 
+      <div class="module-doc"><p>The formatter driver: one pass from a lossless <code>Cst</code> to a <code>Doc</code>, decided by the <code>Layout</code> each production carries. It is the third interpreter of a <code>Grammar</code> — after <code>parse.aipl</code>'s parser and <code>ebnf.aipl</code>'s dump — and is written the same way: the language is data, this file is the loop over it.</p><p>It works off the <strong>concrete</strong> tree, not the AST, and has to. An AST has already thrown away the parentheses the author wrote and the comments they wrote beside them, and putting those back is the whole job. <code>cst.aipl</code> guarantees the tree covers every byte of the source, so nothing here can lose a comment; the worst it can do is place one badly.</p><p><strong>What this is not.</strong> <code>walker.aipl</code>, AIPL's own formatter, is 3,500 lines, and most of that is judgement about AIPL in particular — which call hugs its last argument, when a method chain breaks, where a blank line survives. None of that follows from a grammar and none of it is here. What is here is the mechanical majority: the productions whose layout is settled by the tokens they matched, which is where the cost of describing one syntax twice actually falls.</p><p>The line moves, though, and the way it moves is by growing the grammar rather than this file: a rule that used to be judgement becomes a fact the grammar states and this driver reads back. Sorting is the worked example. Which lists sort — a JSON object's members, an import's names — is a decision about the language, and it used to live in each language's walker; now the <code>Many</code> that holds the list says <code>sorted=true</code>, <code>list_items</code> below orders what it finds, and the walker has nothing left to say about it.</p><p>The whole vocabulary is the <code>Layout</code> arms, the <code>ListStyle</code> bits, plus one function per language. That function — <code>space</code>, below — is the piece a grammar genuinely cannot supply: whether two adjacent tokens want a space between them is a convention of the language, not a fact about its structure.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -325,7 +328,7 @@
             <a class="anchor" href="#item-list_items">list_items</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$23918: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
+          <pre class="signature"><code>fn list_items(mid: Piece[], __spat$23888: ListStyle, space: (str, str) -&#62; bool) -&#62; Doc[]</code></pre>
 
           <div class="doc"><p>The items between a pair of brackets, each laid out inline — in the order the style asks for.</p><p>A token spelled like the style's separator ends the item it follows and is dropped; the style writes the separators back, which is what lets a list that breaks gain a trailing one it never had in the source. With an empty separator every token or child starts a new item instead, which is the juxtaposed list. A comment never starts one — it belongs to the item it was written against.</p><p>A <code>sorted</code> style orders the items by their leading token, in ordinary <code>str</code> order. The sort is stable, so two items with one key keep the author's order — a duplicate JSON key, say, stays a duplicate in the order it was written.</p></div>
 

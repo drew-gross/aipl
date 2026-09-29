@@ -1,17 +1,18 @@
+# The AIPL implementation of the `value_or_err` builtin: the bridge from the
+# optional world to the result world, and the `value_or` sibling that keeps a
+# message about the failure instead of erasing it. Monomorphization registers
+# this function under the canonical name `__builtin_value_or_err` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `x.value_or_err(e)`
+# specializes through the ordinary generic machinery — the in-file name
+# `value_or_err` is only for this file's own tests, which read exactly like
+# user code.
+#
+# The error is a plain value, so it's evaluated whether or not it's used (like
+# `value_or`'s default). Its main use is in front of `?`:
+# `let v = maybe(x).value_or_err("no value")?;`
+
 import { equal as ==, to_digit } from builtins;
 
-// The AIPL implementation of the `value_or_err` builtin: the bridge from the
-// optional world to the result world, and the `value_or` sibling that keeps a
-// message about the failure instead of erasing it. Monomorphization registers
-// this function under the canonical name `__builtin_value_or_err` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `x.value_or_err(e)`
-// specializes through the ordinary generic machinery — the in-file name
-// `value_or_err` is only for this file's own tests, which read exactly like
-// user code.
-//
-// The error is a plain value, so it's evaluated whether or not it's used (like
-// `value_or`'s default). Its main use is in front of `?`:
-// `let v = maybe(x).value_or_err("no value")?;`
 # Turns an optional into a result: `some(v)` becomes `ok(v)`, `none` becomes
 # `err(e)`. Generic over both the value and the error type, and callable as a
 # method: `x.value_or_err(e)`. `e` is evaluated either way. Pairs with `?` to

@@ -1,3 +1,35 @@
+# The AIPL implementation of the `map_join` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_map_join` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.map_join(f, sep=s)`
+# resolves through the ordinary generic / higher-order machinery — the in-file
+# name is only for this file's own tests, which read exactly like user code.
+#
+# It is what `xs.map(f).join(sep=s)` means, in one pass and one buffer: `map`
+# would build an array of every `f(x)` and `join` would then measure and copy
+# them into a second allocation. Written by the compiler's operation-fusion
+# pass for that chain (see `chain_fusions` in aipl-mono); also callable
+# directly.
+#
+# The single buffer is the point, and its size is the problem: the pieces'
+# lengths are not known until `f` has run, and running it twice to measure
+# would double the work (and the corpus's callers are recursive renderers,
+# where that compounds per level). So the buffer is *reserved* from a guess
+# and *re-sized* from what the input has taught so far:
+#
+#   - reserved up front for the separators, plus two elements per piece;
+#   - on the first piece that does not fit, and on every later one, re-sized to
+#     the bytes written so far scaled by the share of the input they came from
+#     — pieces through the eighth of eighty elements are an eighth of the
+#     total, so the buffer grows to ten times what those took.
+#
+# Every re-size is exact (`reserve`), so a join whose pieces are all of a
+# size settles on the second allocation at the latest, and the appends between
+# are plain writes. Nothing here is load-bearing for correctness: an append
+# that outgrows the reservation grows the buffer the way any `extend` does.
+#
+# No lint steers a hand-written loop here: `push_loop_pipeline` already sends
+# a building loop to `map`, from where the chain fuses.
+
 import {
     equal as ==,
     extend,
@@ -12,37 +44,6 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-// The AIPL implementation of the `map_join` builtin. Monomorphization registers
-// this function under the canonical name `__builtin_map_join` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.map_join(f, sep=s)`
-// resolves through the ordinary generic / higher-order machinery — the in-file
-// name is only for this file's own tests, which read exactly like user code.
-//
-// It is what `xs.map(f).join(sep=s)` means, in one pass and one buffer: `map`
-// would build an array of every `f(x)` and `join` would then measure and copy
-// them into a second allocation. Written by the compiler's operation-fusion
-// pass for that chain (see `chain_fusions` in aipl-mono); also callable
-// directly.
-//
-// The single buffer is the point, and its size is the problem: the pieces'
-// lengths are not known until `f` has run, and running it twice to measure
-// would double the work (and the corpus's callers are recursive renderers,
-// where that compounds per level). So the buffer is *reserved* from a guess
-// and *re-sized* from what the input has taught so far:
-//
-//   - reserved up front for the separators, plus two elements per piece;
-//   - on the first piece that does not fit, and on every later one, re-sized to
-//     the bytes written so far scaled by the share of the input they came from
-//     — pieces through the eighth of eighty elements are an eighth of the
-//     total, so the buffer grows to ten times what those took.
-//
-// Every re-size is exact (`reserve`), so a join whose pieces are all of a
-// size settles on the second allocation at the latest, and the appends between
-// are plain writes. Nothing here is load-bearing for correctness: an append
-// that outgrows the reservation grows the buffer the way any `extend` does.
-//
-// No lint steers a hand-written loop here: `push_loop_pipeline` already sends
-// a building loop to `map`, from where the chain fuses.
 # `self.map(f).join(sep=sep, final_sep=final_sep, only_sep=only_sep)` — every
 # `f(x)` flattened into one sequence with the separators between — computed in
 # a single pass into a single buffer. The three separators are `join`'s (`sep`

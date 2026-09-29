@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/lex_aipl.aipl</code></h1>
 
+      <div class="module-doc"><p>A lexer for AIPL itself, built on the <code>lexer.aipl</code> library: it pins the library's generic <code>Token&lt;K&gt;</code>/<code>TokenRule&lt;K&gt;</code>/<code>lex&lt;K&gt;</code> to AIPL's own token-kind variant <code>AiplTok</code> and describes AIPL's tokens as a plain <code>TokenRule</code> list.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>variant StrStyle</code></pre>
 
-          <div class="doc"><p>Every string literal — <code>&quot;...&quot;</code>, <code>&quot;&quot;&quot;...&quot;&quot;&quot;</code>, and an interpolation-free <code></code> <code>...</code> <code></code> / <code></code><code></code> <code></code><code>...</code><code></code> <code></code><code></code> template — lexes to one <code>StrLit</code> (below) carrying its *decoded* value and the delimiter it was written with, this <code>StrStyle</code>. A <code>Triple</code>/<code>TripleBacktick</code> literal's value is de-dented in the emit; a <code>Quoted</code>/<code>Backtick</code> one is single-line and only escape-decoded. The style lets the autoformatter recover the original spelling from the value.</p></div>
+          <div class="doc"><p>Every string literal — <code>&quot;...&quot;</code>, <code>&quot;&quot;&quot;...&quot;&quot;&quot;</code>, and an interpolation-free <code>`...`</code> / <code>```...```</code> template — lexes to one <code>StrLit</code> (below) carrying its <em>decoded</em> value and the delimiter it was written with, this <code>StrStyle</code>. A <code>Triple</code>/<code>TripleBacktick</code> literal's value is de-dented in the emit; a <code>Quoted</code>/<code>Backtick</code> one is single-line and only escape-decoded. The style lets the autoformatter recover the original spelling from the value.</p></div>
 
 
           <ul class="cases">
@@ -471,7 +474,7 @@
           </h3>
           <pre class="signature"><code>pub fn str_lit_value(text: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>The value of a string literal written exactly as it sits in the source, delimiters included — <code>&quot;a\nb&quot;</code>, <code>&quot;&quot;&quot;...&quot;&quot;&quot;</code>, <code></code> <code>hi</code> <code></code>, <code></code><code></code> <code></code><code>hi</code><code></code> <code></code><code></code>.</p><p>The rules above never need this: their matchers hand the emit the text *between* the delimiters, already stripped. A parser <code>build</code> does, because all it is given is the source and a span — so this is where stripping and decoding are stated for a consumer that has the whole literal.</p><p>It lives here, beside the rules, rather than in the parser, so the two answers cannot drift; the assertions below feed this function's answer straight into the token the lexer is expected to produce, which is what makes them one claim rather than two.</p></div>
+          <div class="doc"><p>The value of a string literal written exactly as it sits in the source, delimiters included — <code>&quot;a\nb&quot;</code>, <code>&quot;&quot;&quot;...&quot;&quot;&quot;</code>, <code>`hi`</code>, <code>```hi```</code>.</p><p>The rules above never need this: their matchers hand the emit the text <em>between</em> the delimiters, already stripped. A parser <code>build</code> does, because all it is given is the source and a span — so this is where stripping and decoding are stated for a consumer that has the whole literal.</p><p>It lives here, beside the rules, rather than in the parser, so the two answers cannot drift; the assertions below feed this function's answer straight into the token the lexer is expected to produce, which is what makes them one claim rather than two.</p></div>
 
 
         </section>
@@ -499,7 +502,7 @@
           </h3>
           <pre class="signature"><code>pub fn template_segments(texts: str[]) -&#62; str[]</code></pre>
 
-          <div class="doc"><p>The decoded text segments of a template literal, given each segment token's source text in order — the head, any middles, then the tail, with their delimiters and interpolation braces still attached.</p><p>The whole literal at once rather than a segment at a time, because a raw template is de-dented across *all* its segments (<code>dedent_segments</code>, the raw rule's <code>finalize</code>): the common indent is a property of the literal, not of any one piece of it. The interpolation-free case never reaches here — it lexes to a plain <code>StrLit</code>, which is <code>str_lit_value</code>'s job.</p></div>
+          <div class="doc"><p>The decoded text segments of a template literal, given each segment token's source text in order — the head, any middles, then the tail, with their delimiters and interpolation braces still attached.</p><p>The whole literal at once rather than a segment at a time, because a raw template is de-dented across <em>all</em> its segments (<code>dedent_segments</code>, the raw rule's <code>finalize</code>): the common indent is a property of the literal, not of any one piece of it. The interpolation-free case never reaches here — it lexes to a plain <code>StrLit</code>, which is <code>str_lit_value</code>'s job.</p></div>
 
 
         </section>
@@ -541,7 +544,7 @@
           </h3>
           <pre class="signature"><code>pub fn lex_aipl_tokens(src: str) -&#62; Token&#60;AiplTok&#62;[]!LexError</code></pre>
 
-          <div class="doc"><p><code>lex_aipl_tokens</code> is the FFI entry the Rust <code>tests/lexer_dogfood.rs</code> calls to compare this AIPL lexer against the compiler's hand-written Rust lexer over the test corpus. It hands back the *actual* token array — <code>Token&lt;AiplTok&gt;[]</code>, each token carrying its typed <code>kind</code> and <code>span</code> — which crosses the embedding FFI directly (an array of structs whose fields are themselves a variant and a struct). The Rust side coarsens each <code>kind</code> to a category and diffs spans, building a burn-down list of the remaining divergences; nothing here is used to compile. <code>trivia</code> is dropped: the differential dump compares only the emitted token stream (the Rust lexer's dump has no comment/marker lines to compare the side-channel against).</p></div>
+          <div class="doc"><p><code>lex_aipl_tokens</code> is the FFI entry the Rust <code>tests/lexer_dogfood.rs</code> calls to compare this AIPL lexer against the compiler's hand-written Rust lexer over the test corpus. It hands back the <em>actual</em> token array — <code>Token&lt;AiplTok&gt;[]</code>, each token carrying its typed <code>kind</code> and <code>span</code> — which crosses the embedding FFI directly (an array of structs whose fields are themselves a variant and a struct). The Rust side coarsens each <code>kind</code> to a category and diffs spans, building a burn-down list of the remaining divergences; nothing here is used to compile. <code>trivia</code> is dropped: the differential dump compares only the emitted token stream (the Rust lexer's dump has no comment/marker lines to compare the side-channel against).</p></div>
 
 
         </section>
@@ -618,7 +621,7 @@
           </h3>
           <pre class="signature"><code>fn tpl_kind(text: str, seg: Seg) -&#62; AiplTok</code></pre>
 
-          <div class="doc"><p>The <code>OfSeg</code> emit for the <code></code> <code>...</code> <code></code> template rule: the <code>Template</code> matcher hands each text segment's *raw* text plus its position (<code>Plain</code> for an interpolation-free literal, else <code>Head</code>/<code>Middle</code>/<code>Tail</code>), and this maps each to its own <code>AiplTok</code> arm — decoding the segment's escapes (<code></code> \<code> </code><code>/</code>\n<code>/… as in the </code>escapes<code> set below, plus the template's own </code>\{<code>/</code>\}<code>) with </code>unescape<code>, exactly as the </code>&quot;...&quot;<code> emit does. An interpolation-free template (</code>Plain<code>) folds into </code>StrLit<code> (with </code>Backtick<code> style) — the same token any other string literal produces — while a template *with* interpolations keeps distinct </code>TemplateHead<code>/</code>Mid<code>/</code>Tail<code> kinds.</code></p></div>
+          <div class="doc"><p>The <code>OfSeg</code> emit for the <code>`...`</code> template rule: the <code>Template</code> matcher hands each text segment's <em>raw</em> text plus its position (<code>Plain</code> for an interpolation-free literal, else <code>Head</code>/<code>Middle</code>/<code>Tail</code>), and this maps each to its own <code>AiplTok</code> arm — decoding the segment's escapes (<code>\`</code>/<code>\n</code>/… as in the <code>escapes</code> set below, plus the template's own <code>\{</code>/<code>\}</code>) with <code>unescape</code>, exactly as the <code>&quot;...&quot;</code> emit does. An interpolation-free template (<code>Plain</code>) folds into <code>StrLit</code> (with <code>Backtick</code> style) — the same token any other string literal produces — while a template <em>with</em> interpolations keeps distinct <code>TemplateHead</code>/<code>Mid</code>/<code>Tail</code> kinds.</p></div>
 
 
         </section>
@@ -632,7 +635,7 @@
           </h3>
           <pre class="signature"><code>fn dedent_segments(segs: str[]) -&#62; str[]</code></pre>
 
-          <div class="doc"><p>The segment finalizer for the raw-template rule (the <code>Template</code> matcher's <code>finalize</code>): de-dent the whole literal's text segments *together*, so the common indent is computed across the entire template — just like a <code>&quot;&quot;&quot;</code> raw string. The segments are joined by the literal's own delimiter (which can't occur inside a raw segment, since it would have closed the literal — unlike a brace, which <code>\{</code> can spell), de-dented as one block via the dogfooded <code>process_raw_string</code>, then split back. A no-interpolation raw template is the one-segment case (de-dent that single segment).</p></div>
+          <div class="doc"><p>The segment finalizer for the raw-template rule (the <code>Template</code> matcher's <code>finalize</code>): de-dent the whole literal's text segments <em>together</em>, so the common indent is computed across the entire template — just like a <code>&quot;&quot;&quot;</code> raw string. The segments are joined by the literal's own delimiter (which can't occur inside a raw segment, since it would have closed the literal — unlike a brace, which <code>\{</code> can spell), de-dented as one block via the dogfooded <code>process_raw_string</code>, then split back. A no-interpolation raw template is the one-segment case (de-dent that single segment).</p></div>
 
 
         </section>
@@ -646,7 +649,7 @@
           </h3>
           <pre class="signature"><code>fn raw_tpl_kind(text: str, seg: Seg) -&#62; AiplTok</code></pre>
 
-          <div class="doc"><p>The <code>OfSeg</code> emit for the <code></code><code></code> <code></code><code>...</code><code></code> <code></code><code></code> raw-template rule: like <code>tpl_kind</code>, but the delimiter scans verbatim (empty <code>escapes</code>), so the segment text is decoded only for the template's own <code>\{</code>/<code>\}</code> — a lone <code></code> <code> </code><code>/</code> <code></code> <code> or any other backslash inside is content. The segments arrive already de-dented (by </code>dedent_segments<code>, the rule's </code>finalize<code>), so this decodes the braces and wraps them: an interpolation-free raw template (</code>Plain<code>) folds into </code>StrLit<code> with </code>TripleBacktick<code> style, and an interpolated one keeps distinct </code>RawTemplate*<code> kinds.</code></p></div>
+          <div class="doc"><p>The <code>OfSeg</code> emit for the <code>```...```</code> raw-template rule: like <code>tpl_kind</code>, but the delimiter scans verbatim (empty <code>escapes</code>), so the segment text is decoded only for the template's own <code>\{</code>/<code>\}</code> — a lone <code>`</code>/<code>``</code> or any other backslash inside is content. The segments arrive already de-dented (by <code>dedent_segments</code>, the rule's <code>finalize</code>), so this decodes the braces and wraps them: an interpolation-free raw template (<code>Plain</code>) folds into <code>StrLit</code> with <code>TripleBacktick</code> style, and an interpolated one keeps distinct <code>RawTemplate*</code> kinds.</p></div>
 
 
         </section>
@@ -674,7 +677,7 @@
           </h3>
           <pre class="signature"><code>fn char_lit_emit(text: str) -&#62; AiplTok!str</code></pre>
 
-          <div class="doc"><p>Decode and validate a single-quote literal. This is where AIPL *defines* what a char literal is: the <code>Delimited(&quot;'&quot;, ..)</code> matcher (the same escape-aware scan <code>&quot;...&quot;</code> strings use) just hands over the un-decoded text between the quotes, and this emit unescapes it and requires exactly one char — so an empty (<code>''</code>) or multi-char (<code>'ab'</code>, <code>'multiple'</code>) literal is a hard error. As a <code>Try</code> emit the library pairs the message with the *whole* literal's span, so the caret underlines the entire bad token. Unknown escapes and unterminated literals are caught earlier, by the matcher's own scan (its <code>escapes</code> set).</p></div>
+          <div class="doc"><p>Decode and validate a single-quote literal. This is where AIPL <em>defines</em> what a char literal is: the <code>Delimited(&quot;'&quot;, ..)</code> matcher (the same escape-aware scan <code>&quot;...&quot;</code> strings use) just hands over the un-decoded text between the quotes, and this emit unescapes it and requires exactly one char — so an empty (<code>''</code>) or multi-char (<code>'ab'</code>, <code>'multiple'</code>) literal is a hard error. As a <code>Try</code> emit the library pairs the message with the <em>whole</em> literal's span, so the caret underlines the entire bad token. Unknown escapes and unterminated literals are caught earlier, by the matcher's own scan (its <code>escapes</code> set).</p></div>
 
 
         </section>

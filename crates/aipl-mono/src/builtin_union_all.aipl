@@ -1,10 +1,11 @@
+# The AIPL implementation of the `union_all` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_union_all` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.union_all()` specializes
+# through the ordinary generic machinery — the in-file name `union_all` is only
+# for this file's own tests, which read exactly like user code.
+
 import { equal as ==, filter, greater_than as >, len, union } from builtins;
 
-// The AIPL implementation of the `union_all` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_union_all` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.union_all()` specializes
-// through the ordinary generic machinery — the in-file name `union_all` is only
-// for this file's own tests, which read exactly like user code.
 # Every element of every set in `self`, collected into one set — `union` folded
 # across a list. An empty list gives the empty set, and a one-element list gives
 # that set back unchanged. Generic over the element type and callable as a

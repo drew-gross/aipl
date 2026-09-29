@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_is_all_whitespace.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>is_all_whitespace</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_is_all_whitespace</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>s.is_all_whitespace()</code> resolves through the ordinary machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>It was a native runtime function (<code>aipl_str_is_all_whitespace</code>) and is now AIPL, which is the direction the whole compiler is headed. Two things made the port honest rather than approximate:</p><ul><li>a <code>str</code> receiver iterates its chars, so <code>all</code> is the whole implementation;</li><li><code>is_whitespace</code> — not <code>is_space</code> — is the predicate. They differ, and the difference is the reason <code>is_whitespace</code> exists: <code>is_space</code> accepts space, tab, newline and carriage return, while ASCII whitespace also includes vertical tab and form feed. The native version accepted all six, so narrowing to four would have been a silent behaviour change. AIPL has no numeric escape, so those two bytes cannot be written in source at all — which is why the predicate covering them is a compiler intrinsic.</li></ul><p>Empty is all-whitespace, by <code>all</code>'s vacuous truth — the same answer the native version gave, and consistent with <code>&quot;&quot;.trim() == &quot;&quot;</code>.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

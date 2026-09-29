@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/unescape.aipl</code></h1>
 
+      <div class="module-doc"><p>AIPL's string-escape decoder.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn escape_text(self: char) -&#62; str</code></pre>
 
-          <div class="doc"><p>Map a <code>\X</code> escape's X to its meaning: <code>n</code>/<code>t</code>/<code>r</code> to the control chars, and any other escaped char (<code>&quot;</code>, <code>\</code>, <code></code> <code> </code><code>, </code>{<code>) to itself. Validity was already enforced by the matcher's scan (its </code>escapes<code> set), so an unknown </code>\X<code> never reaches here. </code>self<code> is the char following the backslash.</code></p></div>
+          <div class="doc"><p>Map a <code>\X</code> escape's X to its meaning: <code>n</code>/<code>t</code>/<code>r</code> to the control chars, and any other escaped char (<code>&quot;</code>, <code>\</code>, <code>`</code>, <code>{</code>) to itself. Validity was already enforced by the matcher's scan (its <code>escapes</code> set), so an unknown <code>\X</code> never reaches here. <code>self</code> is the char following the backslash.</p></div>
 
 
         </section>
@@ -40,7 +43,7 @@
           </h3>
           <pre class="signature"><code>pub fn unescape(self: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>Decode every <code>\X</code> escape in <code>self</code>, copying everything else verbatim. Each char is read with the one after it, so a backslash flushes the plain run before it and decodes its X in the same step; the next run starts past both. The X is then the *first* half of the following pair, which is what <code>run_start &lt;= i</code> rules out — an escaped backslash is one char, not the start of another escape. Copying runs by slicing (rather than char-by-char) keeps the common no-escape case a single copy. A trailing lone backslash can't occur — the matcher already rejected such a token as unterminated — and would be copied verbatim if it did, since the last char is never the first of a pair.</p></div>
+          <div class="doc"><p>Decode every <code>\X</code> escape in <code>self</code>, copying everything else verbatim. Each char is read with the one after it, so a backslash flushes the plain run before it and decodes its X in the same step; the next run starts past both. The X is then the <em>first</em> half of the following pair, which is what <code>run_start &lt;= i</code> rules out — an escaped backslash is one char, not the start of another escape. Copying runs by slicing (rather than char-by-char) keeps the common no-escape case a single copy. A trailing lone backslash can't occur — the matcher already rejected such a token as unterminated — and would be copied verbatim if it did, since the last char is never the first of a pair.</p></div>
 
 
         </section>
@@ -54,7 +57,7 @@
           </h3>
           <pre class="signature"><code>pub fn unescape_braces(self: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>Decode only <code>\{</code> and <code>\}</code> — the escapes every template literal has of its own, braces being the template's syntax — and copy everything else verbatim, backslashes included: a raw <code></code><code></code> <code></code><code>...</code><code></code> <code></code><code></code> template's segments are otherwise untouched, so <code>\n</code> there stays two chars. Runs of plain text are copied by slicing, as <code>unescape</code> does.</p></div>
+          <div class="doc"><p>Decode only <code>\{</code> and <code>\}</code> — the escapes every template literal has of its own, braces being the template's syntax — and copy everything else verbatim, backslashes included: a raw <code>```...```</code> template's segments are otherwise untouched, so <code>\n</code> there stays two chars. Runs of plain text are copied by slicing, as <code>unescape</code> does.</p></div>
 
 
         </section>

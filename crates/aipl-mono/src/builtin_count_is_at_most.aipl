@@ -1,3 +1,11 @@
+# The AIPL implementation of the `count_is_at_most` builtin. Registered under
+# `__builtin_count_is_at_most` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`).
+#
+# A fused comparison: `count(x) <= limit` without counting past the point the answer is
+# settled. `count` itself always walks the whole collection; this stops at the
+# first element that decides it, which is the entire reason the fusion pass
+# exists.
+
 import {
     count,
     equal as ==,
@@ -6,13 +14,6 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// The AIPL implementation of the `count_is_at_most` builtin. Registered under
-// `__builtin_count_is_at_most` (see `AIPL_BUILTIN_SOURCES` in `lib.rs`).
-//
-// A fused comparison: `count(x) <= limit` without counting past the point the answer is
-// settled. `count` itself always walks the whole collection; this stops at the
-// first element that decides it, which is the entire reason the fusion pass
-// exists.
 # Fused form of `count(x) <= limit` — see `count`. Counts only as far as the answer
 # needs, so a an early match decides it without walking the rest.
 #

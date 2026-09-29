@@ -1,34 +1,35 @@
-// The formatter driver: one pass from a lossless `Cst` to a `Doc`, decided by
-// the `Layout` each production carries. It is the third interpreter of a
-// `Grammar` — after `parse.aipl`'s parser and `ebnf.aipl`'s dump — and is
-// written the same way: the language is data, this file is the loop over it.
-//
-// It works off the **concrete** tree, not the AST, and has to. An AST has
-// already thrown away the parentheses the author wrote and the comments they
-// wrote beside them, and putting those back is the whole job. `cst.aipl`
-// guarantees the tree covers every byte of the source, so nothing here can lose
-// a comment; the worst it can do is place one badly.
-//
-// **What this is not.** `walker.aipl`, AIPL's own formatter, is 3,500 lines,
-// and most of that is judgement about AIPL in particular — which call hugs its
-// last argument, when a method chain breaks, where a blank line survives. None
-// of that follows from a grammar and none of it is here. What is here is the
-// mechanical majority: the productions whose layout is settled by the tokens
-// they matched, which is where the cost of describing one syntax twice actually
-// falls.
-//
-// The line moves, though, and the way it moves is by growing the grammar rather
-// than this file: a rule that used to be judgement becomes a fact the grammar
-// states and this driver reads back. Sorting is the worked example. Which lists
-// sort — a JSON object's members, an import's names — is a decision about the
-// language, and it used to live in each language's walker; now the `Many` that
-// holds the list says `sorted=true`, `list_items` below orders what it finds,
-// and the walker has nothing left to say about it.
-//
-// The whole vocabulary is the `Layout` arms, the `ListStyle` bits, plus one
-// function per language. That function — `space`, below — is the piece a
-// grammar genuinely cannot supply: whether two adjacent tokens want a space
-// between them is a convention of the language, not a fact about its structure.
+# The formatter driver: one pass from a lossless `Cst` to a `Doc`, decided by
+# the `Layout` each production carries. It is the third interpreter of a
+# `Grammar` — after `parse.aipl`'s parser and `ebnf.aipl`'s dump — and is
+# written the same way: the language is data, this file is the loop over it.
+#
+# It works off the **concrete** tree, not the AST, and has to. An AST has
+# already thrown away the parentheses the author wrote and the comments they
+# wrote beside them, and putting those back is the whole job. `cst.aipl`
+# guarantees the tree covers every byte of the source, so nothing here can lose
+# a comment; the worst it can do is place one badly.
+#
+# **What this is not.** `walker.aipl`, AIPL's own formatter, is 3,500 lines,
+# and most of that is judgement about AIPL in particular — which call hugs its
+# last argument, when a method chain breaks, where a blank line survives. None
+# of that follows from a grammar and none of it is here. What is here is the
+# mechanical majority: the productions whose layout is settled by the tokens
+# they matched, which is where the cost of describing one syntax twice actually
+# falls.
+#
+# The line moves, though, and the way it moves is by growing the grammar rather
+# than this file: a rule that used to be judgement becomes a fact the grammar
+# states and this driver reads back. Sorting is the worked example. Which lists
+# sort — a JSON object's members, an import's names — is a decision about the
+# language, and it used to live in each language's walker; now the `Many` that
+# holds the list says `sorted=true`, `list_items` below orders what it finds,
+# and the walker has nothing left to say about it.
+#
+# The whole vocabulary is the `Layout` arms, the `ListStyle` bits, plus one
+# function per language. That function — `space`, below — is the piece a
+# grammar genuinely cannot supply: whether two adjacent tokens want a space
+# between them is a convention of the language, not a fact about its structure.
+
 import {
     Span,
     equal as ==,

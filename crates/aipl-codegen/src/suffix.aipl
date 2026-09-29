@@ -1,5 +1,6 @@
-// One postfix step of AIPL's syntax tree and what applying it to a receiver
-// means. One of the files the AST is declared across; see `ast.aipl`.
+# One postfix step of AIPL's syntax tree and what applying it to a receiver
+# means. One of the files the AST is declared across; see `ast.aipl`.
+
 import { Span, equal as == } from builtins;
 import {
     Call,

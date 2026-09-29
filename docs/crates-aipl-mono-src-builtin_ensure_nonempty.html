@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_ensure_nonempty.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>ensure_nonempty</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>): the runtime road into <code>T[] without []</code>. A literal with an element in it takes the refined type on sight; every other array has to be tested, and this is where the test lives.</p><p><code>assume_nonempty</code> is the internal builtin that grants the refinement without a test, and the <code>is_nonempty</code> guard here is what makes granting it sound. The checker erases both the refinement and the call once it has verified the program, so the whole thing costs one length check and no copy.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

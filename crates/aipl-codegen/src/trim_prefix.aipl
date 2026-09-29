@@ -1,5 +1,6 @@
-// Used by the raw-string processor to drop the newline that ends a blank
-// opening line.
+# Used by the raw-string processor to drop the newline that ends a blank
+# opening line.
+
 import { drop_first, equal as ==, first } from builtins;
 
 # Drops a single leading `c` if present, else returns `self` unchanged.

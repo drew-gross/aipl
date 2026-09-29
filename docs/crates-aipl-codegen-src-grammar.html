@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/grammar.aipl</code></h1>
 
+      <div class="module-doc"><p>A grammar, expressed as data. <code>Rule</code> is a PEG combinator tree — sequence, ordered choice, repetition, a rule reference — and a <code>Production</code> pairs one rule with everything the passes downstream need to know about it: the CST node name, the label errors should blame, the scope a highlighter should paint, and the function that lowers a matched node to the caller's AST. One <code>Grammar</code> is then the whole description of a language, interpreted by the driver in <code>parse.aipl</code>, exactly as <code>lexer.aipl</code> interprets a <code>TokenRule[]</code>.</p><p>This file is data and one pass over it (<code>link</code>); nothing here parses. The split matters because the same grammar value is meant to feed more than the parser — an EBNF dump, a highlighter, a formatter — and each of those wants the description without the driver.</p><p><strong>A rule set is written against a token <em>kind</em> type <code>K</code></strong>, the same <code>K</code> a <code>lexer.aipl</code> rule set produces, so a language's lexer and grammar compose directly: <code>Term(Name)</code> matches any token whose kind is a <code>Name</code>, payload ignored (a <code>Case&lt;K&gt;</code> compare, which is why <code>K</code> carries the <code>variant</code> bound).</p><p>Two authoring notes that are compiler limits rather than design:</p><ul><li>An integer literal does not flex through a <em>positional</em> constructor argument — the <code>0</code> types as <code>i64</code> where the payload is <code>u64</code> — but it does through a keyword one. That is why <code>Many</code>'s minimum is a defaulted <code>min:</code> rather than a bare <code>u64</code>: <code>Many(r)</code> is the common zero-or-more, and <code>Many(r, min=1)</code> writes the literal where it flexes.</li><li>Most <code>Rule</code> constructors mention no <code>K</code> (<code>Literal</code>, <code>Named</code>, <code>Then</code> over an array of them), so nothing in them pins the type parameter. Write each production's rule as an <em>annotated</em> binding — <code>let r: Rule&lt;Kind&gt; = ..</code> — and every constructor inside it resolves from that annotation. The <code>.test</code> blocks here and in <code>parse.aipl</code> are written in that idiom throughout.</li></ul></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>struct ParseError</code></pre>
 
-          <div class="doc"><p>Why a parse failed: a message, and the span of the offending source (absolute into the parsed string — slice it to show the offender, or hand it to <code>caret_block.aipl</code> for the rustc-style underline). Mirrors <code>lexer.aipl</code>'s <code>LexError</code>, and for the same reason: the two halves of a front end should report failure in one shape.</p><p>A *grammar* error — an unresolved rule reference, a rule that can loop forever — has no source to point at and carries the empty <code>0..0</code>.</p></div>
+          <div class="doc"><p>Why a parse failed: a message, and the span of the offending source (absolute into the parsed string — slice it to show the offender, or hand it to <code>caret_block.aipl</code> for the rustc-style underline). Mirrors <code>lexer.aipl</code>'s <code>LexError</code>, and for the same reason: the two halves of a front end should report failure in one shape.</p><p>A <em>grammar</em> error — an unresolved rule reference, a rule that can loop forever — has no source to point at and carries the empty <code>0..0</code>.</p></div>
 
 
         </section>
@@ -40,7 +43,7 @@
           </h3>
           <pre class="signature"><code>pub fn failure_message(self: str!ParseError) -&#62; str</code></pre>
 
-          <div class="doc"><p>What a failed parse said — or, when it unexpectedly *succeeded*, a note carrying what it produced, so a broken assertion says which way it broke.</p><p>For <code>.test</code> blocks, which is where the distinction matters: an assertion on a message that silently parses instead reads as a mismatched string with no clue why. Pairs with <code>map_ok</code>, which is what turns a parse of any AST type into the <code>str!ParseError</code> this takes: <code>parse_x(src).map_ok(render_x).failure_message()</code>.</p></div>
+          <div class="doc"><p>What a failed parse said — or, when it unexpectedly <em>succeeded</em>, a note carrying what it produced, so a broken assertion says which way it broke.</p><p>For <code>.test</code> blocks, which is where the distinction matters: an assertion on a message that silently parses instead reads as a mismatched string with no clue why. Pairs with <code>map_ok</code>, which is what turns a parse of any AST type into the <code>str!ParseError</code> this takes: <code>parse_x(src).map_ok(render_x).failure_message()</code>.</p></div>
 
 
         </section>
@@ -75,7 +78,7 @@
 
             <li id="item-Term"><code>Term(Case&#60;K&#62;)</code>
 
-              <div class="doc"><p>Any one token whose kind is the case <code>k</code> — <code>Term(Name)</code> matches every identifier, whatever text it carries. The one place a rule looks at a token's *kind* rather than its text. <code>k</code> is a <code>Case&lt;K&gt;</code>, which is a case with no payload: naming a kind takes no value of that kind, so there is no dummy to invent and none to accidentally read.</p></div>
+              <div class="doc"><p>Any one token whose kind is the case <code>k</code> — <code>Term(Name)</code> matches every identifier, whatever text it carries. The one place a rule looks at a token's <em>kind</em> rather than its text. <code>k</code> is a <code>Case&lt;K&gt;</code>, which is a case with no payload: naming a kind takes no value of that kind, so there is no dummy to invent and none to accidentally read.</p></div>
 
 
             </li>
@@ -103,7 +106,7 @@
 
             <li id="item-Many"><code>Many(Rule&#60;K&#62;, min: u64 = 0, max?: u64 = none, sep?: Rule&#60;K&#62; = none, trailing_sep: bool = true, leading_sep: bool = false, nested_in?: (Rule&#60;K&#62;, Rule&#60;K&#62;) = none, spaced: bool = false, sorted: bool = false, style?: ListStyle = none, group?: u64 = none)</code>
 
-              <div class="doc"><p>The rule repeated until it stops matching — by default a PEG <code>*</code>; <code>Many(r, min=1)</code> is a <code>+</code>, and <code>Many(r, min=1, max=1)</code> is exactly one. A rule that can match empty input would spin here forever, so the driver refuses one outright rather than hanging.</p><p>Between <code>sep</code>, <code>trailing_sep</code> and <code>leading_sep</code>, one rule covers every list a grammar writes. An LR grammar spells each combination as its own wrapper production around a left-recursive pair — <code>x_list | x_list COMMA | _</code> — and which of the four you picked is the thing that is easy to get subtly wrong; here it is arguments with names.</p><p><code>sep</code> and <code>max</code> are both written with the <code>?</code> on the *name*: a caller gives the rule itself (<code>sep=Lit(&quot;,&quot;)</code>), and leaving it out is what yields <code>none</code>. A caller that already holds an optional — <code>link_rule</code> and <code>desugar_rule</code>, rebuilding a rule they took apart — forwards it with <code>sep?=..</code>.</p></div>
+              <div class="doc"><p>The rule repeated until it stops matching — by default a PEG <code>*</code>; <code>Many(r, min=1)</code> is a <code>+</code>, and <code>Many(r, min=1, max=1)</code> is exactly one. A rule that can match empty input would spin here forever, so the driver refuses one outright rather than hanging.</p><p>Between <code>sep</code>, <code>trailing_sep</code> and <code>leading_sep</code>, one rule covers every list a grammar writes. An LR grammar spells each combination as its own wrapper production around a left-recursive pair — <code>x_list | x_list COMMA | _</code> — and which of the four you picked is the thing that is easy to get subtly wrong; here it is arguments with names.</p><p><code>sep</code> and <code>max</code> are both written with the <code>?</code> on the <em>name</em>: a caller gives the rule itself (<code>sep=Lit(&quot;,&quot;)</code>), and leaving it out is what yields <code>none</code>. A caller that already holds an optional — <code>link_rule</code> and <code>desugar_rule</code>, rebuilding a rule they took apart — forwards it with <code>sep?=..</code>.</p></div>
 
 
               <ul class="slots">
@@ -128,7 +131,7 @@
 
                 <li><code>sep?: Rule&#60;K&#62; = none</code>
 
-                  <div class="doc"><p>Given, this is a *separated* list: the rule, then <code>sep</code> and the rule again for as long as the separator keeps appearing.</p></div>
+                  <div class="doc"><p>Given, this is a <em>separated</em> list: the rule, then <code>sep</code> and the rule again for as long as the separator keeps appearing.</p></div>
 
                 </li>
 
@@ -146,13 +149,13 @@
 
                 <li><code>nested_in?: (Rule&#60;K&#62;, Rule&#60;K&#62;) = none</code>
 
-                  <div class="doc"><p>The bracketed-list shorthand: given <code>(open, close)</code> it is a bracket pair around this <code>Many</code>, which is what makes it a *group* before anything else runs. Nearly every bracket pair in a real grammar holds a list, and writing the brackets as an argument of the list beats wrapping the list in a separate rule — <code>Many(param, sep=comma, nested_in=parens())</code> against a separate production wrapping the list in brackets.</p><p>A pair, so &quot;exactly two brackets&quot; is the type rather than a length <code>desugar</code> has to check and a caller has to get right. It was an array until generic tuples worked — a tuple whose elements mention a type variable has no layout until monomorphization binds it, which is now what <code>lt_ty</code> defers to <code>instantiate_generic</code>.</p></div>
+                  <div class="doc"><p>The bracketed-list shorthand: given <code>(open, close)</code> it is a bracket pair around this <code>Many</code>, which is what makes it a <em>group</em> before anything else runs. Nearly every bracket pair in a real grammar holds a list, and writing the brackets as an argument of the list beats wrapping the list in a separate rule — <code>Many(param, sep=comma, nested_in=parens())</code> against a separate production wrapping the list in brackets.</p><p>A pair, so &quot;exactly two brackets&quot; is the type rather than a length <code>desugar</code> has to check and a caller has to get right. It was an array until generic tuples worked — a tuple whose elements mention a type variable has no layout until monomorphization binds it, which is now what <code>lt_ty</code> defers to <code>instantiate_generic</code>.</p></div>
 
                 </li>
 
                 <li><code>spaced: bool = false</code>
 
-                  <div class="doc"><p>Whether the brackets take inner spaces while the list stays flat — <code>{ a, b }</code> against <code>(a, b)</code>. The rest of the list's *style* is read off the <code>Many</code> rather than restated: <code>sep</code> from this rule's own separator and <code>trailing</code> from <code>trailing_sep</code>, which is the same fact said once instead of twice (strict JSON's <code>[1, 2,]</code> is an error *and* is never printed). Only this one cannot be derived, so it is here.</p></div>
+                  <div class="doc"><p>Whether the brackets take inner spaces while the list stays flat — <code>{ a, b }</code> against <code>(a, b)</code>. The rest of the list's <em>style</em> is read off the <code>Many</code> rather than restated: <code>sep</code> from this rule's own separator and <code>trailing</code> from <code>trailing_sep</code>, which is the same fact said once instead of twice (strict JSON's <code>[1, 2,]</code> is an error <em>and</em> is never printed). Only this one cannot be derived, so it is here.</p></div>
 
                 </li>
 
@@ -194,21 +197,21 @@
 
             <li id="item-NamedIdx"><code>NamedIdx(u64)</code>
 
-              <div class="doc"><p>A reference to production <code>i</code>, and the *only* rule that builds a CST node — one <code>Tree(i, ..)</code> per reference matched.</p></div>
+              <div class="doc"><p>A reference to production <code>i</code>, and the <em>only</em> rule that builds a CST node — one <code>Tree(i, ..)</code> per reference matched.</p></div>
 
 
             </li>
 
             <li id="item-Climb"><code>Climb(Rule&#60;K&#62;, Prec[])</code>
 
-              <div class="doc"><p>Precedence climbing — an <code>atom</code>, then binary operators drawn from <code>precs</code>, nested by binding power. Each application nests under the *enclosing* production's index, so <code>1 + 2 * 3</code> yields a node per operand rather than one flat run.</p></div>
+              <div class="doc"><p>Precedence climbing — an <code>atom</code>, then binary operators drawn from <code>precs</code>, nested by binding power. Each application nests under the <em>enclosing</em> production's index, so <code>1 + 2 * 3</code> yields a node per operand rather than one flat run.</p></div>
 
 
             </li>
 
             <li id="item-Refuse"><code>Refuse(Refusal)</code>
 
-              <div class="doc"><p>A rule that never matches: reached, it fails the whole parse with the message its <code>Refusal</code> gives. Refusal is not a miss — no enclosing choice, option or repetition backtracks out of it — so it is only ever reached on purpose, after a sequence has matched the thing worth refusing: <code>Then([Named(&quot;operator&quot;), Refuse(..)])</code> accepts an operator and then rejects it, and the error underlines what the sequence matched.</p><p>This is how a grammar names a shape the language *used to* have, or that a reader would plausibly write, and says something more useful than the &quot;expected X, found Y&quot; a plain non-match would produce.</p><p>The one rule that can hold a function value, which costs <code>Rule</code> its <code>==</code> — a rule is compared through <code>show_rule</code> instead.</p></div>
+              <div class="doc"><p>A rule that never matches: reached, it fails the whole parse with the message its <code>Refusal</code> gives. Refusal is not a miss — no enclosing choice, option or repetition backtracks out of it — so it is only ever reached on purpose, after a sequence has matched the thing worth refusing: <code>Then([Named(&quot;operator&quot;), Refuse(..)])</code> accepts an operator and then rejects it, and the error underlines what the sequence matched.</p><p>This is how a grammar names a shape the language <em>used to</em> have, or that a reader would plausibly write, and says something more useful than the &quot;expected X, found Y&quot; a plain non-match would produce.</p><p>The one rule that can hold a function value, which costs <code>Rule</code> its <code>==</code> — a rule is compared through <code>show_rule</code> instead.</p></div>
 
 
             </li>
@@ -254,7 +257,7 @@
           </h3>
           <pre class="signature"><code>variant Build&#60;A: any&#62;</code></pre>
 
-          <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>.</p><p>Four shapes, by what the lowering reads — the whole node, its children, its one child, or its text. All but <code>Kid</code> come in a total form and a <code>Try</code> form that can refuse with a <code>ParseError</code> the driver passes straight through (a literal that overflows, a duplicate key); <code>Kid</code> hands its child back unchanged, so it has nothing to refuse. A lowering is declared with exactly what it uses and the failure it can have: a total one returns its <code>A</code> bare, so no <code>ok(..)</code> wraps a value that could not be anything else.</p><p>Declaring the child *count* is what <code>Kid</code> adds over <code>Kids</code>: a production that is exactly one other thing — an alternation between named productions, a pass-through, a grouping — *is* its child, rather than a one-element array a lowering would have to index. The driver refuses a node that matched any other number, so the mismatch between a rule and its lowering is named once, in one place, instead of in every lowering that reaches for a child that might not be there.</p><p>Every arm but <code>Kid</code> carries an <code>A</code> — a function returning one, or the value itself — and so pins the type parameter on its own. <code>Kid</code> carries nothing and takes <code>A</code> from where it is written: the <code>Production</code> field, the <code>Grammar</code> around that, the enclosing function's return type. That search is what lets <code>Build</code> have a payload-free arm at all; until it existed there was no way to write one, which is why there is still no <code>NoLower</code>-style arm on anything else.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so a lowering is a named top-level <code>fn lower_x(..)</code>, a constructor (<code>Kids(Object)</code>), or a lambda that reads only its parameters — whose types it takes from the arm's payload, so <code>Text(|t| Bool(t == &quot;true&quot;))</code> needs no annotation. A production whose value *is* its children under one case wants that constructor and nothing around it — <code>Kids(List)</code>, never a <code>fn keep(kids) { List(kids) }</code> wrapper, which is only the constructor spelled out longhand. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar *parses*, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
+          <div class="doc"><p>How a production's matched node becomes a value of the caller's AST type <code>A</code>.</p><p>Four shapes, by what the lowering reads — the whole node, its children, its one child, or its text. All but <code>Kid</code> come in a total form and a <code>Try</code> form that can refuse with a <code>ParseError</code> the driver passes straight through (a literal that overflows, a duplicate key); <code>Kid</code> hands its child back unchanged, so it has nothing to refuse. A lowering is declared with exactly what it uses and the failure it can have: a total one returns its <code>A</code> bare, so no <code>ok(..)</code> wraps a value that could not be anything else.</p><p>Declaring the child <em>count</em> is what <code>Kid</code> adds over <code>Kids</code>: a production that is exactly one other thing — an alternation between named productions, a pass-through, a grouping — <em>is</em> its child, rather than a one-element array a lowering would have to index. The driver refuses a node that matched any other number, so the mismatch between a rule and its lowering is named once, in one place, instead of in every lowering that reaches for a child that might not be there.</p><p>Every arm but <code>Kid</code> carries an <code>A</code> — a function returning one, or the value itself — and so pins the type parameter on its own. <code>Kid</code> carries nothing and takes <code>A</code> from where it is written: the <code>Production</code> field, the <code>Grammar</code> around that, the enclosing function's return type. That search is what lets <code>Build</code> have a payload-free arm at all; until it existed there was no way to write one, which is why there is still no <code>NoLower</code>-style arm on anything else.</p><p>Function values are non-capturing and non-generic (<code>check.rs</code>), so a lowering is a named top-level <code>fn lower_x(..)</code>, a constructor (<code>Kids(Object)</code>), or a lambda that reads only its parameters — whose types it takes from the arm's payload, so <code>Text(|t| Bool(t == &quot;true&quot;))</code> needs no annotation. A production whose value <em>is</em> its children under one case wants that constructor and nothing around it — <code>Kids(List)</code>, never a <code>fn keep(kids) { List(kids) }</code> wrapper, which is only the constructor spelled out longhand. They also can't be compared with <code>==</code>, which is why the tests below assert on what a grammar <em>parses</em>, never on a grammar value — the same constraint <code>lexer.aipl</code> lives with.</p></div>
 
 
           <ul class="cases">
@@ -289,7 +292,7 @@
 
             <li id="item-Kid"><code>Kid</code>
 
-              <div class="doc"><p>The one child, unchanged, for a production whose rule guarantees exactly one — the pass-through a production that only names alternatives wants. Should some grammar ever need a *function* over that child, it goes in a new arm carrying one, which pins <code>A</code> the way every other arm does.</p></div>
+              <div class="doc"><p>The one child, unchanged, for a production whose rule guarantees exactly one — the pass-through a production that only names alternatives wants. Should some grammar ever need a <em>function</em> over that child, it goes in a new arm carrying one, which pins <code>A</code> the way every other arm does.</p></div>
 
 
             </li>
@@ -342,7 +345,7 @@
           </h3>
           <pre class="signature"><code>variant Layout</code></pre>
 
-          <div class="doc"><p>How a production's matched children are joined into a <code>Doc</code> — the formatting half of a language description, read by <code>format.aipl</code> exactly as <code>Rule</code> is read by <code>parse.aipl</code>.</p><p>The vocabulary is deliberately small, and it is not the whole of a formatter: comment attachment, call hugging and chain breaking are judgement about *this* language and do not fall out of any grammar. What these two do cover is the mechanical majority — the productions whose layout is fully determined by the tokens they matched.</p><p>Wrapping is not here, and that is the point of <code>nested_in</code>. Where a list breaks is a property of the bracket pair holding it, not of the production the pair happens to sit in, so it is written at the brackets and read back off the <code>Group</code> node they build. A production may hold several groups, each with its own style — <code>match (e) { .. }</code> is two — which is exactly what a single field on the production could not say.</p></div>
+          <div class="doc"><p>How a production's matched children are joined into a <code>Doc</code> — the formatting half of a language description, read by <code>format.aipl</code> exactly as <code>Rule</code> is read by <code>parse.aipl</code>.</p><p>The vocabulary is deliberately small, and it is not the whole of a formatter: comment attachment, call hugging and chain breaking are judgement about <em>this</em> language and do not fall out of any grammar. What these two do cover is the mechanical majority — the productions whose layout is fully determined by the tokens they matched.</p><p>Wrapping is not here, and that is the point of <code>nested_in</code>. Where a list breaks is a property of the bracket pair holding it, not of the production the pair happens to sit in, so it is written at the brackets and read back off the <code>Group</code> node they build. A production may hold several groups, each with its own style — <code>match (e) { .. }</code> is two — which is exactly what a single field on the production could not say.</p></div>
 
 
           <ul class="cases">
@@ -370,7 +373,7 @@
           </h3>
           <pre class="signature"><code>struct Production&#60;K: variant, A: any&#62;</code></pre>
 
-          <div class="doc"><p>One named production: its rule, and what each downstream pass needs from it.</p><p><code>name</code> is both the reference target (<code>Named(&quot;expr&quot;)</code>) and the CST node's name. <code>expect_as</code> is the label an error blames when this production fails having matched nothing — the reified form of the LR parser's <code>SYMBOL_DISPLAY_NAMES</code>, which collapses <code>expr</code>/<code>term</code>/<code>unary</code>/<code>atom</code> to one word. Empty means *transparent*: a plumbing production never surfaces in a message, and the finer expectations from inside it are what the reader sees. <code>scope</code> is the highlighter hint; it is carried, not yet consumed. <code>layout</code> is how the formatter joins what this production matched.</p><p><code>layout</code> has no default, unlike the two hints above it, and that is the compiler's decision rather than the design's: a struct field's default must be a literal, and <code>Layout</code> has no literal form. A bare <code>= Inline</code> is refused (&quot;unknown identifier&quot;), <code>Layout?</code> is refused as a field type because <code>Layout</code> is not recursive and so is not boxed, and a <code>= inline()</code> call *is* accepted but is then resolved in every file that constructs a <code>Production</code> — so a grammar that never mentions layout would have to import a function it never names, and the error when it forgets points at an unrelated line. Spelling the layout out is the honest version of that, and a grammar saying how each production prints beside how it parses is the whole point of the field.</p></div>
+          <div class="doc"><p>One named production: its rule, and what each downstream pass needs from it.</p><p><code>name</code> is both the reference target (<code>Named(&quot;expr&quot;)</code>) and the CST node's name. <code>expect_as</code> is the label an error blames when this production fails having matched nothing — the reified form of the LR parser's <code>SYMBOL_DISPLAY_NAMES</code>, which collapses <code>expr</code>/<code>term</code>/<code>unary</code>/<code>atom</code> to one word. Empty means <em>transparent</em>: a plumbing production never surfaces in a message, and the finer expectations from inside it are what the reader sees. <code>scope</code> is the highlighter hint; it is carried, not yet consumed. <code>layout</code> is how the formatter joins what this production matched.</p><p><code>layout</code> has no default, unlike the two hints above it, and that is the compiler's decision rather than the design's: a struct field's default must be a literal, and <code>Layout</code> has no literal form. A bare <code>= Inline</code> is refused (&quot;unknown identifier&quot;), <code>Layout?</code> is refused as a field type because <code>Layout</code> is not recursive and so is not boxed, and a <code>= inline()</code> call <em>is</em> accepted but is then resolved in every file that constructs a <code>Production</code> — so a grammar that never mentions layout would have to import a function it never names, and the error when it forgets points at an unrelated line. Spelling the layout out is the honest version of that, and a grammar saying how each production prints beside how it parses is the whole point of the field.</p></div>
 
 
         </section>
@@ -424,7 +427,7 @@
             <a class="anchor" href="#item-show_style">show_style</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_style(__spat$26811: ListStyle) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_style(__spat$26782: ListStyle) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
 
@@ -440,7 +443,7 @@
           </h3>
           <pre class="signature"><code>pub fn desugar_rule&#60;K: variant&#62;(r: Rule&#60;K&#62;) -&#62; Rule&#60;K&#62;!ParseError</code></pre>
 
-          <div class="doc"><p><code>r</code> with every bracketed repetition's style settled: stated, or read off the rule it belongs to.</p><p>Run before anything else looks at a rule, so the style a group carries is already the one it means by the time the driver, the formatter, the EBNF dump or the FIRST sets see it. The rule shape is unchanged — a bracketed <code>Many</code> is the storage form as well as the written one — so this only ever fills the slot a caller left empty.</p><p>The style is derived here — <code>sep</code> from the list's own separator, <code>trailing</code> from <code>trailing_sep</code>, <code>spaced</code> as given — so a grammar states each of those once. <code>wraps</code> comes from <code>max</code>: a <code>Many</code> in brackets is a list by construction and lists wrap, *unless* it is bounded at one item, which makes it a bracket pair holding one thing (<code>(expr)</code>, a block's braces) rather than a list. There is nothing to break at a width in that case, so it lays out inline.</p></div>
+          <div class="doc"><p><code>r</code> with every bracketed repetition's style settled: stated, or read off the rule it belongs to.</p><p>Run before anything else looks at a rule, so the style a group carries is already the one it means by the time the driver, the formatter, the EBNF dump or the FIRST sets see it. The rule shape is unchanged — a bracketed <code>Many</code> is the storage form as well as the written one — so this only ever fills the slot a caller left empty.</p><p>The style is derived here — <code>sep</code> from the list's own separator, <code>trailing</code> from <code>trailing_sep</code>, <code>spaced</code> as given — so a grammar states each of those once. <code>wraps</code> comes from <code>max</code>: a <code>Many</code> in brackets is a list by construction and lists wrap, <em>unless</em> it is bounded at one item, which makes it a bracket pair holding one thing (<code>(expr)</code>, a block's braces) rather than a list. There is nothing to break at a width in that case, so it lays out inline.</p></div>
 
 
         </section>

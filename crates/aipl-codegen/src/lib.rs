@@ -2872,6 +2872,7 @@ pub fn build_test_program(program: &Program) -> Program {
         // The test driver is synthesized around the same files, so a diagnostic
         // raised while checking a `.test` body still attributes to its file.
         sources: program.sources.clone(),
+        doc: program.doc.clone(),
     }
 }
 
@@ -3937,8 +3938,9 @@ fn compile_program<M: Module>(
             .chain(program.items.iter().cloned())
             .collect(),
         // Splicing declarations in front of the user's items does not change
-        // which file any of them came from.
+        // which file any of them came from, nor what the file documents.
         sources: program.sources.clone(),
+        doc: program.doc.clone(),
     };
 
     // Standalone type-check over the (non-monomorphized) source: validates
@@ -3974,8 +3976,10 @@ fn compile_program<M: Module>(
     // error, on a duplicate name).
     let lowered_builtins = aipl_mono::lower_tuples(&Program {
         items: builtin_decls(&needed),
-        // Synthesized declarations: no source file behind them.
+        // Synthesized declarations: no source file behind them, and so no file
+        // documentation either.
         sources: Vec::new(),
+        doc: None,
     });
     let check_program = Program {
         items: lowered_builtins
@@ -3987,6 +3991,7 @@ fn compile_program<M: Module>(
         // `Program::sources`. The builtin declarations prepended above carry no
         // file index, so they resolve to nothing and stay untagged.
         sources: program.sources.clone(),
+        doc: program.doc.clone(),
     };
     // `check` hands back the program with the types of context-dependent
     // expressions stamped in (`Expr::ty`) — a bare `none`, an empty `[]`, a
@@ -3999,6 +4004,7 @@ fn compile_program<M: Module>(
     let mut program = Program {
         items: checked.items[checked.items.len() - program.items.len()..].to_vec(),
         sources: checked.sources.clone(),
+        doc: checked.doc.clone(),
     };
     // The checker is the last pass that cares about a `without` refinement:
     // it has verified every value entering one, and from here on a

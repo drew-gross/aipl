@@ -1,23 +1,24 @@
+# The AIPL implementation of the `find_index` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_find_index` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_index(pred)` resolves
+# through the ordinary generic / higher-order machinery — the in-file name
+# `find_index` is only for this file's own tests, which read exactly like user
+# code.
+#
+# It is `find_if` answering a different question: both stop at the first element
+# satisfying `pred`, and where that one hands back the element, this hands back
+# where it was. The optional carries the not-found case, so an empty array needs
+# no special handling — and `none` is a genuinely different answer from
+# `some(0)`, which is why the position cannot be reported as a bare `u64`.
+#
+# The `#[allow]` squelches `return_loop_find_index`, which flags exactly this
+# shape — an indexed loop returning the first match's position — and asks for
+# `find_index`. Here it *is* `find_index`. Without the marker the lint fires on
+# a builtin's own source, which panics the compiler for every program that
+# reaches it.
+
 import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
 
-// The AIPL implementation of the `find_index` builtin. Monomorphization registers
-// this function under the canonical name `__builtin_find_index` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_index(pred)` resolves
-// through the ordinary generic / higher-order machinery — the in-file name
-// `find_index` is only for this file's own tests, which read exactly like user
-// code.
-//
-// It is `find_if` answering a different question: both stop at the first element
-// satisfying `pred`, and where that one hands back the element, this hands back
-// where it was. The optional carries the not-found case, so an empty array needs
-// no special handling — and `none` is a genuinely different answer from
-// `some(0)`, which is why the position cannot be reported as a bare `u64`.
-//
-// The `#[allow]` squelches `return_loop_find_index`, which flags exactly this
-// shape — an indexed loop returning the first match's position — and asks for
-// `find_index`. Here it *is* `find_index`. Without the marker the lint fires on
-// a builtin's own source, which panics the compiler for every program that
-// reaches it.
 # The position of the first element of `self` satisfying `pred`, or `none` when
 # none does, stopping at the first match. Generic over the element type and
 # callable as a method: `xs.find_index(pred)`. A `str` receiver iterates its

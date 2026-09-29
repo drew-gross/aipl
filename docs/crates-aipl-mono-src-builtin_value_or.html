@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_value_or.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>value_or</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_value_or</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>o.value_or(d)</code> resolves through the ordinary generic machinery — the in-file name <code>value_or</code> is only for this file's own tests, which read exactly like user code.</p><p>Written in AIPL rather than emitted natively so it works for <em>every</em> payload type. The native version was a tag <code>select</code> over a single i64 value, so it refused an optional whose payload is an inline struct or variant and told callers to &quot;use match to unwrap&quot; — which is how the compiler's own <code>walker.aipl</code> ended up spelling this out by hand. A generic AIPL body has no such restriction: the <code>match</code> it expands to is the one those callers were writing themselves.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

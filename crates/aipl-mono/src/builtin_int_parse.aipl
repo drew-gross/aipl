@@ -1,3 +1,11 @@
+# The AIPL implementation of the `int_parse` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_int_parse`
+# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `s.int_parse()`
+# resolves through the ordinary machinery — the in-file name `int_parse` is
+# only for this file's own tests, which read exactly like user code. The
+# body's own builtin calls (`starts_with`, `to_digit`, ...) resolve through
+# this file's imports, loaded like any user file.
+
 import {
     drop_first,
     equal as ==,
@@ -12,13 +20,6 @@ import {
     wrapping_sub as -,
 } from builtins;
 
-// The AIPL implementation of the `int_parse` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_int_parse`
-// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `s.int_parse()`
-// resolves through the ordinary machinery — the in-file name `int_parse` is
-// only for this file's own tests, which read exactly like user code. The
-// body's own builtin calls (`starts_with`, `to_digit`, ...) resolve through
-// this file's imports, loaded like any user file.
 # Parse `self` as a decimal integer: an optional leading `-`, then one or
 # more ASCII digits, nothing else. `none` when the input is empty, a bare
 # `-`, contains any other character (including `+`, spaces, or `_`), or

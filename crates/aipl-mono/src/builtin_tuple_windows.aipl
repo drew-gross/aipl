@@ -1,24 +1,25 @@
+# The AIPL implementation of the `tuple_windows` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_tuple_windows`
+# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.tuple_windows()`
+# specializes through the ordinary generic machinery — the in-file name is only
+# for this file's own tests, which read exactly like user code.
+#
+# Pairs only, for now: the two-wide window is the one a lookahead loop wants
+# (`unescape` reads each char with the one after it), and a wider one would
+# want a tuple whose arity is a parameter, which nothing else here has.
+#
+# A `for` over this call never builds the array: the compiler's operation-fusion
+# pass rewrites `for (let (a, b) : xs.tuple_windows()) { .. }` into a loop over
+# `xs` that carries the previous element along (see `loop_fusions` in
+# aipl-mono). This body is what runs when the array itself is wanted.
+#
+# No lint steers the longhand here. Its shape — a loop carrying the previous
+# element in a `mut` — is also what a lookahead loop with *other* state looks
+# like, and telling the two apart would mean guessing at what the carried value
+# is for; a mis-advised lint is worse than none.
+
 import { equal as ==, is_empty, push } from builtins;
 
-// The AIPL implementation of the `tuple_windows` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_tuple_windows`
-// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.tuple_windows()`
-// specializes through the ordinary generic machinery — the in-file name is only
-// for this file's own tests, which read exactly like user code.
-//
-// Pairs only, for now: the two-wide window is the one a lookahead loop wants
-// (`unescape` reads each char with the one after it), and a wider one would
-// want a tuple whose arity is a parameter, which nothing else here has.
-//
-// A `for` over this call never builds the array: the compiler's operation-fusion
-// pass rewrites `for (let (a, b) : xs.tuple_windows()) { .. }` into a loop over
-// `xs` that carries the previous element along (see `loop_fusions` in
-// aipl-mono). This body is what runs when the array itself is wanted.
-//
-// No lint steers the longhand here. Its shape — a loop carrying the previous
-// element in a `mut` — is also what a lookahead loop with *other* state looks
-// like, and telling the two apart would mean guessing at what the carried value
-// is for; a mis-advised lint is worse than none.
 # Every adjacent pair of elements, overlapping: `[1, 2, 3].tuple_windows()` is
 # `[(1, 2), (2, 3)]`. Fewer than two elements give no pairs at all. Generic over
 # the element type and callable as a method; a `str` receiver pairs its chars.

@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/pat.aipl</code></h1>
 
+      <div class="module-doc"><p><code>aipl_syntax::ast::Pattern</code> as AIPL declares it. One of the files the AST is declared across; see <code>ast.aipl</code>.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -76,7 +79,7 @@
 
             <li id="item-Array"><code>Array(Expr[])</code>
 
-              <div class="doc"><p>The destructuring <code>[a, b] =&gt; ..</code> arm, every element of which is a plain binder name or a literal. The elements are *expressions* rather than patterns because that is the shape codegen compiles directly, and because an expression carries the span a diagnostic about one element wants.</p></div>
+              <div class="doc"><p>The destructuring <code>[a, b] =&gt; ..</code> arm, every element of which is a plain binder name or a literal. The elements are <em>expressions</em> rather than patterns because that is the shape codegen compiles directly, and because an expression carries the span a diagnostic about one element wants.</p></div>
 
 
             </li>

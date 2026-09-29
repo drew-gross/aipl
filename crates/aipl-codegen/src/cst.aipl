@@ -1,21 +1,22 @@
-// The tree the parser driver (`parse.aipl`) builds: a *concrete* syntax tree,
-// lossless by construction. Every byte of the parsed source is covered by
-// exactly one leaf — `Leaf` for a token the grammar matched, `Trivia` for a
-// comment or a run of whitespace the lexer set aside — so concatenating a
-// tree's leaf spans in order reproduces the source byte for byte
-// (`text`). That is what a formatter generator needs and what an AST
-// cannot give it: an AST has already thrown away the text that carries no
-// meaning, and a formatter's whole job is to put it back.
-//
-// An interior node is `Tree(prod, kids)`, where `prod` is a production's
-// index in the grammar's `prods` array — not its name. The index is what
-// `link` (see `grammar.aipl`) rewrites rule references into, so the driver
-// never compares strings while parsing; `show` takes the name table when a
-// human needs to read one.
-//
-// The type is recursive *through an array*, so a `Cst` is a refcounted heap
-// block and the array holds strong references to its element nodes — see
-// `tests/cases/variants/recursive_through_array.aipl`.
+# The tree the parser driver (`parse.aipl`) builds: a *concrete* syntax tree,
+# lossless by construction. Every byte of the parsed source is covered by
+# exactly one leaf — `Leaf` for a token the grammar matched, `Trivia` for a
+# comment or a run of whitespace the lexer set aside — so concatenating a
+# tree's leaf spans in order reproduces the source byte for byte
+# (`text`). That is what a formatter generator needs and what an AST
+# cannot give it: an AST has already thrown away the text that carries no
+# meaning, and a formatter's whole job is to put it back.
+#
+# An interior node is `Tree(prod, kids)`, where `prod` is a production's
+# index in the grammar's `prods` array — not its name. The index is what
+# `link` (see `grammar.aipl`) rewrites rule references into, so the driver
+# never compares strings while parsing; `show` takes the name table when a
+# human needs to read one.
+#
+# The type is recursive *through an array*, so a `Cst` is a refcounted heap
+# block and the array holds strong references to its element nodes — see
+# `tests/cases/variants/recursive_through_array.aipl`.
+
 import {
     Span,
     equal as ==,

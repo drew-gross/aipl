@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_tuple_windows.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>tuple_windows</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_tuple_windows</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.tuple_windows()</code> specializes through the ordinary generic machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>Pairs only, for now: the two-wide window is the one a lookahead loop wants (<code>unescape</code> reads each char with the one after it), and a wider one would want a tuple whose arity is a parameter, which nothing else here has.</p><p>A <code>for</code> over this call never builds the array: the compiler's operation-fusion pass rewrites <code>for (let (a, b) : xs.tuple_windows()) { .. }</code> into a loop over <code>xs</code> that carries the previous element along (see <code>loop_fusions</code> in aipl-mono). This body is what runs when the array itself is wanted.</p><p>No lint steers the longhand here. Its shape — a loop carrying the previous element in a <code>mut</code> — is also what a lookahead loop with <em>other</em> state looks like, and telling the two apart would mean guessing at what the carried value is for; a mis-advised lint is worse than none.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

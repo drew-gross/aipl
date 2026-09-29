@@ -1,3 +1,13 @@
+# The AIPL implementation of the `right_fold` builtin — `left_fold`'s mirror
+# (see `builtin_left_fold.aipl`). Monomorphization registers this function under
+# the canonical name `__builtin_right_fold` (see `AIPL_BUILTIN_SOURCES` in
+# `lib.rs`), so a user's `xs.right_fold(init, f)` specializes through the
+# ordinary generic / higher-order machinery.
+#
+# Walks the indices backwards rather than folding over a reversed copy, so
+# nothing is allocated. `self[i]` yields an optional and `i` is always in range,
+# so the `none` arm is dead — it just hands the accumulator back unchanged.
+
 import {
     concat as +++,
     equal as ==,
@@ -9,15 +19,6 @@ import {
     wrapping_decrement as --,
 } from builtins;
 
-// The AIPL implementation of the `right_fold` builtin — `left_fold`'s mirror
-// (see `builtin_left_fold.aipl`). Monomorphization registers this function under
-// the canonical name `__builtin_right_fold` (see `AIPL_BUILTIN_SOURCES` in
-// `lib.rs`), so a user's `xs.right_fold(init, f)` specializes through the
-// ordinary generic / higher-order machinery.
-//
-// Walks the indices backwards rather than folding over a reversed copy, so
-// nothing is allocated. `self[i]` yields an optional and `i` is always in range,
-// so the `none` arm is dead — it just hands the accumulator back unchanged.
 # Combine the elements right to left, starting from `init`: for `[a, b, c]`,
 # `f(a, f(b, f(c, init)))` — note the combiner takes the element first, the
 # accumulator second, the mirror of `left_fold`. Generic over both the element

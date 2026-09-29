@@ -50,6 +50,41 @@ fn attaches_to_every_kind_of_declaration() {
     assert_eq!(doc_of("fn f() {}"), None);
 }
 
+/// The block at the top of a file, detached by a blank line, documents the
+/// *file*: it lands on `Program::doc` and on no declaration.
+#[test]
+fn a_detached_block_at_the_top_documents_the_file() {
+    let program = parse("# The file.\n\n# The fn.\nfn f() {}");
+    assert_eq!(program.doc.as_deref(), Some("The file."));
+    assert_eq!(
+        doc_of("# The file.\n\n# The fn.\nfn f() {}").as_deref(),
+        Some("The fn.")
+    );
+    // One newline instead of two, and the same lines document the declaration.
+    let attached = parse("# The fn.\nfn f() {}");
+    assert_eq!(attached.doc, None);
+    // The position `import` makes impossible to document is the natural one.
+    assert_eq!(
+        parse("# The file.\n\nimport { print } from builtins;")
+            .doc
+            .as_deref(),
+        Some("The file.")
+    );
+    // Several runs keep the blank lines between them, as paragraph breaks.
+    assert_eq!(
+        parse("# One.\n\n# Two.\n\nfn f() {}").doc.as_deref(),
+        Some("One.\n\nTwo.")
+    );
+}
+
+/// Only the top of a file can carry a detached block, because only a file is
+/// there to be documented — below it there is nothing the block is about.
+#[test]
+fn a_detached_block_below_the_top_is_refused() {
+    let message = err("fn f() {}\n\n# stray\n\nfn g() {}");
+    assert!(message.contains("documents nothing"), "{message}");
+}
+
 /// Lines join with newlines and nothing else, so a doc block keeps its
 /// paragraphs — a bare `#` is a blank line, not a dropped one.
 #[test]

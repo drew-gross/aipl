@@ -647,6 +647,9 @@ impl Loader {
         kwargs::expand_keyword_args(&Program {
             items: merged,
             sources,
+            // A merged program is several files; no one file's `# ..` header
+            // documents it, so it carries none.
+            doc: None,
         })
     }
 }

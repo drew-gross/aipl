@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/grammar_aipl.aipl</code></h1>
 
+      <div class="module-doc"><p>AIPL's own syntax, as a <code>Grammar</code> value — the third and largest consumer of the parser library, and the one the whole thing was built for. It is the only description of the language there is: every compile runs this grammar over <code>lex_aipl.aipl</code>'s token stream, the compiler's own sources included.</p><p><strong>It is a PEG, and that shapes it.</strong> The driver has ordered choice and no left recursion, so three patterns carry most of the grammar:</p><ul><li><em>List rules</em> (<code>param_list = param | param_list COMMA param</code> in a left-recursive grammar) are one <code>Many</code> with a separator. What varies between them is whether the list may be empty and whether a trailing separator is allowed, and those are <code>min</code> and <code>trailing_sep</code> — two arguments in place of the wrapper productions each list would otherwise spell out by hand.</li><li><em>Postfix chains</em> (<code>postfix</code>, <code>base_ty</code>) are an atom followed by <code>Many(suffix)</code>, rather than a rule recursing on its own left edge.</li><li><em><code>expr binop expr</code></em> is <code>Climb</code>, whose levels are <code>op_precedence</code>'s, <code>..</code> included (level 4, between <code>==</code> and <code>&lt;</code>).</li></ul><p>What ordered choice does not do for free is pick the right alternative: it commits to the first that matches, so every choice here is written longest-first — <code>IDENT &quot;(&quot; args &quot;)&quot;</code> before <code>IDENT &quot;{&quot; fields &quot;}&quot;</code> before a bare <code>IDENT</code>, <code>let (a, b) = ..</code> before <code>let x = ..</code>. Reading a choice from the top is reading it in the order the parser tries it.</p><p>Two shapes are right-recursive on purpose:</p><ul><li><code>block_body</code>/<code>block_tail</code>. Written as <code>Many(stmt)</code> followed by an optional trailing expression, a PEG parses the trailing expression <em>twice</em> — once inside the statement alternative that then fails on its missing <code>;</code> — and that doubling compounds through nested blocks. Deciding after the expression parses it once.</li><li><code>loop_body</code> likewise. A loop body admits no trailing expression at all, which is why it is a separate rule and not <code>block</code> with a flag.</li></ul><p>Every production lowers to the AST declared in <code>ast.aipl</code>, so this file answers three questions rather than two: <em>what parses</em>, <em>the shape of the tree</em>, and <em>what it means</em>. The first two are what the <code>.test</code> blocks and the whole-corpus losslessness check verify; the third is what <code>lower_aipl_ty</code>, <code>lower_aipl_pattern</code>, <code>lower_aipl_expr</code>, <code>lower_aipl_block</code> and <code>lower_aipl_program</code> assert, each entering the grammar at the production its slice is about.</p><p>What is left of stage 5 is the bridge on the other side: a <code>Program</code> built here still cannot cross the FFI, so <code>aipl_lower_program</code> hands back a rendering for the Rust-side test to read.</p><p>The rules are written in the library's own vocabulary — <code>Then</code>, <code>OneOf</code>, <code>Many</code>, <code>Maybe</code>, <code>Term</code>, <code>Named</code>, and <code>Literal</code> under the conventional <code>Lit</code> alias — so a reader who knows <code>grammar.aipl</code> knows this file. Each rule is an <em>annotated</em> binding (<code>let x: Rule&lt;AiplTok&gt; = ..</code>) for the reason <code>grammar.aipl</code> documents: <code>Literal</code> and <code>Named</code> mention no <code>K</code>, so a rule made only of them has nothing to pin the type parameter, and the annotation is what every constructor inside resolves from.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -27,6 +30,20 @@
           <pre class="signature"><code>pub fn aipl_grammar() -&#62; Grammar&#60;AiplTok, Ast&#62;</code></pre>
 
           <div class="doc"><p>AIPL's grammar: the productions the driver in <code>parse.aipl</code> parses AIPL with, starting at <code>program</code>.</p><p>Split across five builder functions purely for reading — the array they concatenate to is one flat production list, and position in it is identity (a linked <code>NamedIdx</code> and a <code>Tree</code> both name a production by its index).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-DocSplit">
+          <h3>
+            <a class="anchor" href="#item-DocSplit">DocSplit</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct DocSplit</code></pre>
+
+          <div class="doc"><p>A run of <code># ..</code> lines split at the last blank line in it: the part written directly above the declaration, and everything detached from it.</p></div>
 
 
         </section>
@@ -54,7 +71,7 @@
           </h3>
           <pre class="signature"><code>pub fn aipl_parse_cst(src: str) -&#62; Cst!ParseError</code></pre>
 
-          <div class="doc"><p>The lossless concrete syntax tree for AIPL source <code>src</code>, parsed by the library against <code>aipl_grammar()</code>.</p><p>Every byte of <code>aipl_source(src)</code> is under exactly one leaf. That needs the lexer's rule set read *losslessly* (<code>keep_skipped</code>): the compiler's own lexing skips whitespace outright, having no use for it, and a concrete tree has to be able to put it back. Nothing else needs putting back — every other byte, the braces around a template interpolation included, already sits inside some token's span.</p></div>
+          <div class="doc"><p>The lossless concrete syntax tree for AIPL source <code>src</code>, parsed by the library against <code>aipl_grammar()</code>.</p><p>Every byte of <code>aipl_source(src)</code> is under exactly one leaf. That needs the lexer's rule set read <em>losslessly</em> (<code>keep_skipped</code>): the compiler's own lexing skips whitespace outright, having no use for it, and a concrete tree has to be able to put it back. Nothing else needs putting back — every other byte, the braces around a template interpolation included, already sits inside some token's span.</p></div>
 
 
         </section>
@@ -68,7 +85,7 @@
           </h3>
           <pre class="signature"><code>pub fn format_aipl_ty(src: str, width: u64) -&#62; str!ParseError</code></pre>
 
-          <div class="doc"><p>One AIPL **type**, laid out by the generated formatter.</p><p>This is the stage-4 claim, stated where it can be checked. <code>walker.aipl</code> lays out a type with six hand-written functions — <code>ty</code>, <code>paren_ty</code>, <code>ty_list</code>, <code>base_ty</code>, <code>set_or_dict_ty</code>, <code>dict_value_ty</code>, <code>named_ty</code>, <code>type_suffixes</code>, <code>array_suffixes</code> — about ninety lines of cursor-walking that mirror, by hand, productions this file already describes. Here the same layouts are four annotations on those productions plus <code>aipl_space</code> below, and the assertions under this function are <code>walker.aipl</code>'s own type assertions copied verbatim: same inputs, same expected strings, including the broken-list case. Both sides lex with <code>lex_aipl</code>, so the inputs mean the same thing to both.</p><p>What that does *not* say: the rest of AIPL is not this tractable. Statements want a hard-broken block layout that <code>format.aipl</code> does not have an arm for yet, and expressions want call hugging and chain breaking, which are not layout at all. The types are the honest measure of the mechanical part — and the mechanical part is most of the grammar-shaped half of the walker.</p></div>
+          <div class="doc"><p>One AIPL <strong>type</strong>, laid out by the generated formatter.</p><p>This is the stage-4 claim, stated where it can be checked. <code>walker.aipl</code> lays out a type with six hand-written functions — <code>ty</code>, <code>paren_ty</code>, <code>ty_list</code>, <code>base_ty</code>, <code>set_or_dict_ty</code>, <code>dict_value_ty</code>, <code>named_ty</code>, <code>type_suffixes</code>, <code>array_suffixes</code> — about ninety lines of cursor-walking that mirror, by hand, productions this file already describes. Here the same layouts are four annotations on those productions plus <code>aipl_space</code> below, and the assertions under this function are <code>walker.aipl</code>'s own type assertions copied verbatim: same inputs, same expected strings, including the broken-list case. Both sides lex with <code>lex_aipl</code>, so the inputs mean the same thing to both.</p><p>What that does <em>not</em> say: the rest of AIPL is not this tractable. Statements want a hard-broken block layout that <code>format.aipl</code> does not have an arm for yet, and expressions want call hugging and chain breaking, which are not layout at all. The types are the honest measure of the mechanical part — and the mechanical part is most of the grammar-shaped half of the walker.</p></div>
 
 
         </section>
@@ -82,7 +99,7 @@
           </h3>
           <pre class="signature"><code>pub fn import_decl_doc(src: str) -&#62; Doc!ParseError</code></pre>
 
-          <div class="doc"><p>One AIPL **import statement**, laid out by the generated formatter — the <code>Doc</code> rather than the text, because the caller is <code>walker.aipl</code>, which splices it into the file's layout and prints the whole thing once.</p><p>This is the first piece of AIPL's own formatter to move from the walker to the grammar, and it moved for the sake of one rule: the names sort. That used to be a comparator and a sort in the walker; it is now <code>sorted=true</code> on the <code>import_decl</code> production's <code>Many</code>, and the walker calls this instead of knowing. Everything else about an import's layout — the spaced braces, the trailing comma once it breaks, the <code>from</code> and the <code>;</code> — was already a fact the grammar stated, read back here through <code>format_cst</code> as it is for a type.</p><p><code>src</code> is the statement alone, <code>import</code> through <code>;</code>. Comments inside it are trivia the concrete tree keeps, so they come out inside the statement, beside the name they were written against; the walker skips past them so they are not emitted a second time.</p></div>
+          <div class="doc"><p>One AIPL <strong>import statement</strong>, laid out by the generated formatter — the <code>Doc</code> rather than the text, because the caller is <code>walker.aipl</code>, which splices it into the file's layout and prints the whole thing once.</p><p>This is the first piece of AIPL's own formatter to move from the walker to the grammar, and it moved for the sake of one rule: the names sort. That used to be a comparator and a sort in the walker; it is now <code>sorted=true</code> on the <code>import_decl</code> production's <code>Many</code>, and the walker calls this instead of knowing. Everything else about an import's layout — the spaced braces, the trailing comma once it breaks, the <code>from</code> and the <code>;</code> — was already a fact the grammar stated, read back here through <code>format_cst</code> as it is for a type.</p><p><code>src</code> is the statement alone, <code>import</code> through <code>;</code>. Comments inside it are trivia the concrete tree keeps, so they come out inside the statement, beside the name they were written against; the walker skips past them so they are not emitted a second time.</p></div>
 
 
         </section>
@@ -96,7 +113,7 @@
           </h3>
           <pre class="signature"><code>pub fn lower_aipl_ty(src: str) -&#62; Ty!ParseError</code></pre>
 
-          <div class="doc"><p>One AIPL **type**, lowered to the AST — the stage-5d claim for the slice that is finished, stated where it can be checked.</p><p><code>parse</code> is <code>parse_cst</code> followed by <code>lower</code>, so this is the whole pipeline: the concrete tree is built and discarded, and what comes back is a <code>Ty</code> that means the same thing <code>aipl_parser</code>'s build actions mean by it. The assertions below are written against <code>show_ty</code>'s structural dump rather than against a re-rendering of the source, because the question a lowering has to answer is which way <code>i64?[]</code> nested, and a re-rendering gives that back either way.</p></div>
+          <div class="doc"><p>One AIPL <strong>type</strong>, lowered to the AST — the stage-5d claim for the slice that is finished, stated where it can be checked.</p><p><code>parse</code> is <code>parse_cst</code> followed by <code>lower</code>, so this is the whole pipeline: the concrete tree is built and discarded, and what comes back is a <code>Ty</code> that means the same thing <code>aipl_parser</code>'s build actions mean by it. The assertions below are written against <code>show_ty</code>'s structural dump rather than against a re-rendering of the source, because the question a lowering has to answer is which way <code>i64?[]</code> nested, and a re-rendering gives that back either way.</p></div>
 
 
         </section>
@@ -110,7 +127,7 @@
           </h3>
           <pre class="signature"><code>pub fn lower_aipl_pattern(src: str) -&#62; Pat!ParseError</code></pre>
 
-          <div class="doc"><p>One AIPL **pattern**, lowered to the AST.</p><p>Patterns are the second slice that closes over itself: nothing under <code>pattern</code> reaches an expression, which is why the destructuring <code>[a, b]</code> arm — the one pattern shape that holds expressions — belongs to <code>match_arm</code> rather than here.</p></div>
+          <div class="doc"><p>One AIPL <strong>pattern</strong>, lowered to the AST.</p><p>Patterns are the second slice that closes over itself: nothing under <code>pattern</code> reaches an expression, which is why the destructuring <code>[a, b]</code> arm — the one pattern shape that holds expressions — belongs to <code>match_arm</code> rather than here.</p></div>
 
 
         </section>
@@ -124,7 +141,7 @@
           </h3>
           <pre class="signature"><code>pub fn lower_aipl_expr(src: str) -&#62; Expr!ParseError</code></pre>
 
-          <div class="doc"><p>One AIPL **expression**, lowered to the AST.</p><p>This is most of the language: statements lower to expressions too, and the <code>atom</code> production reaches blocks, match arms and patterns, so what parses here is nearly everything but a declaration. The one thing it cannot do yet is a block holding a keyword statement — that slice is next, and a block that holds one refuses rather than dropping it.</p></div>
+          <div class="doc"><p>One AIPL <strong>expression</strong>, lowered to the AST.</p><p>This is most of the language: statements lower to expressions too, and the <code>atom</code> production reaches blocks, match arms and patterns, so what parses here is nearly everything but a declaration. The one thing it cannot do yet is a block holding a keyword statement — that slice is next, and a block that holds one refuses rather than dropping it.</p></div>
 
 
         </section>
@@ -138,7 +155,7 @@
           </h3>
           <pre class="signature"><code>pub fn lower_aipl_block(src: str) -&#62; Expr!ParseError</code></pre>
 
-          <div class="doc"><p>One AIPL **block**, lowered to the AST — the statement slice's entry point.</p><p>A block is not a node: it is the right-nested chain its statements fold to, so what comes back is an ordinary expression and the assertions read as the desugarings they are.</p></div>
+          <div class="doc"><p>One AIPL <strong>block</strong>, lowered to the AST — the statement slice's entry point.</p><p>A block is not a node: it is the right-nested chain its statements fold to, so what comes back is an ordinary expression and the assertions read as the desugarings they are.</p></div>
 
 
         </section>
@@ -152,7 +169,7 @@
           </h3>
           <pre class="signature"><code>pub fn lower_aipl_program(src: str) -&#62; Program!ParseError</code></pre>
 
-          <div class="doc"><p>A whole AIPL **program**, lowered to the AST — the end of the road for stage 5d's AIPL half. <code>parse</code> is <code>parse_cst</code> followed by <code>lower</code>, so this builds the concrete tree, lowers it and throws the tree away.</p></div>
+          <div class="doc"><p>A whole AIPL <strong>program</strong>, lowered to the AST — the end of the road for stage 5d's AIPL half. <code>parse</code> is <code>parse_cst</code> followed by <code>lower</code>, so this builds the concrete tree, lowers it and throws the tree away.</p></div>
 
 
         </section>
@@ -194,7 +211,7 @@
           </h3>
           <pre class="signature"><code>struct ParsedFile</code></pre>
 
-          <div class="doc"><p>What a source file parses to: its program, and the spans of every <code>#[allow]</code> lint-squelch marker in it.</p><p>The markers are the parser's one *side-channel* — they are trivia, so no production ever sees one, and the loader's lint pass still needs them to drop a hit squelched on the same line. They ride out on the return value rather than through a sink the caller has to arm first.</p></div>
+          <div class="doc"><p>What a source file parses to: its program, and the spans of every <code>#[allow]</code> lint-squelch marker in it.</p><p>The markers are the parser's one <em>side-channel</em> — they are trivia, so no production ever sees one, and the loader's lint pass still needs them to drop a hit squelched on the same line. They ride out on the return value rather than through a sink the caller has to arm first.</p></div>
 
 
         </section>
@@ -208,7 +225,7 @@
           </h3>
           <pre class="signature"><code>pub fn aipl_parse_file(src: str) -&#62; ParsedFile!ParseError</code></pre>
 
-          <div class="doc"><p>The whole of <code>aipl_parser::parse_with_allows</code>, on this side: strip the expected-output sections, refuse trailing whitespace, lex losslessly, keep the <code>#[allow]</code> spans, parse and lower.</p><p>What it deliberately does *not* do is <code>post_parse</code> — <code>bake_asserts</code> and <code>promote_type_vars</code> follow a parse but are no part of one, and they stay on the Rust side where they already live.</p></div>
+          <div class="doc"><p>The whole of <code>aipl_parser::parse_with_allows</code>, on this side: strip the expected-output sections, refuse trailing whitespace, lex losslessly, keep the <code>#[allow]</code> spans, parse and lower.</p><p>What it deliberately does <em>not</em> do is <code>post_parse</code> — <code>bake_asserts</code> and <code>promote_type_vars</code> follow a parse but are no part of one, and they stay on the Rust side where they already live.</p></div>
 
 
         </section>
@@ -236,7 +253,7 @@
           </h3>
           <pre class="signature"><code>pub fn aipl_parse_report(src: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>What this grammar makes of <code>src</code>, in one string: empty when it parses *and* its concrete tree reconstructs the source byte for byte, and otherwise a line beginning <code>error:</code> (it did not parse, with the message) or <code>lossless:</code> (it did, but the tree lost bytes).</p><p>The FFI entry the corpus test calls — one crossing and one parse per file, checking both properties at once. Rejection is half of it: a grammar that accepts everything says nothing about what the language is.</p></div>
+          <div class="doc"><p>What this grammar makes of <code>src</code>, in one string: empty when it parses <em>and</em> its concrete tree reconstructs the source byte for byte, and otherwise a line beginning <code>error:</code> (it did not parse, with the message) or <code>lossless:</code> (it did, but the tree lost bytes).</p><p>The FFI entry the corpus test calls — one crossing and one parse per file, checking both properties at once. Rejection is half of it: a grammar that accepts everything says nothing about what the language is.</p></div>
 
 
         </section>
@@ -355,7 +372,7 @@
           </h3>
           <pre class="signature"><code>fn join_spans(a: Span, b: Span) -&#62; Span</code></pre>
 
-          <div class="doc"><p>Two spans as the one that covers both — <code>aipl_syntax::join_spans</code>, mirrored.</p><p>The rule that matters is the empty one: an *empty* span is the &quot;no location&quot; placeholder a construct with no text of its own carries (an empty block body, a synthesized node), and it must not take part in a join. Written naively as <code>a.start..b.end</code> it drags every enclosing construct's end back to offset 0, which is a span that ends before it starts — and a caret rendered from one is nonsense. Contributing nothing is the honest answer.</p></div>
+          <div class="doc"><p>Two spans as the one that covers both — <code>aipl_syntax::join_spans</code>, mirrored.</p><p>The rule that matters is the empty one: an <em>empty</em> span is the &quot;no location&quot; placeholder a construct with no text of its own carries (an empty block body, a synthesized node), and it must not take part in a join. Written naively as <code>a.start..b.end</code> it drags every enclosing construct's end back to offset 0, which is a span that ends before it starts — and a caret rendered from one is nonsense. Contributing nothing is the honest answer.</p></div>
 
 
         </section>
@@ -369,7 +386,7 @@
           </h3>
           <pre class="signature"><code>fn child_span(self: Cst) -&#62; Span</code></pre>
 
-          <div class="doc"><p>The span a lowered node takes: this node's *tokens*, with the trivia in front of the first one left out. <code>span</code> reaches back over that trivia, which is what losslessness needs and the opposite of what a diagnostic wants. The tight token span of an interior child, which a lowering holds as a bare <code>Cst</code> rather than as the <code>Parts</code> its own node arrives as. The counterpart of <code>tok_span</code>, which answers the same question about the node itself.</p></div>
+          <div class="doc"><p>The span a lowered node takes: this node's <em>tokens</em>, with the trivia in front of the first one left out. <code>span</code> reaches back over that trivia, which is what losslessness needs and the opposite of what a diagnostic wants. The tight token span of an interior child, which a lowering holds as a bare <code>Cst</code> rather than as the <code>Parts</code> its own node arrives as. The counterpart of <code>tok_span</code>, which answers the same question about the node itself.</p></div>
 
 
         </section>
@@ -621,7 +638,7 @@
           </h3>
           <pre class="signature"><code>fn match_expr(kids: Ast[], tsp: Span, sp: Span) -&#62; Expr!ParseError</code></pre>
 
-          <div class="doc"><p><code>match (e) { .. }</code> — every arm child is already a *list* of arms, since an alternation expands to one arm per pattern, so they concatenate. The scrutinee is every leading expression child: one is matched as it is, several are the tuple <code>match (a, b)</code> spells without its own parentheses.</p></div>
+          <div class="doc"><p><code>match (e) { .. }</code> — every arm child is already a <em>list</em> of arms, since an alternation expands to one arm per pattern, so they concatenate. The scrutinee is every leading expression child: one is matched as it is, several are the tuple <code>match (a, b)</code> spells without its own parentheses.</p></div>
 
 
         </section>
@@ -887,7 +904,7 @@
           </h3>
           <pre class="signature"><code>fn lower_field_init(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>field_init</code> — <code>name: value</code>, the shorthand <code>name</code>, or a <code>..base</code> spread. A spread names no field, so it rides as an init with an empty name whose *value* is the spread. The three alternatives are three, two and one position, so the shape is what identifies each.</p></div>
+          <div class="doc"><p><code>field_init</code> — <code>name: value</code>, the shorthand <code>name</code>, or a <code>..base</code> spread. A spread names no field, so it rides as an init with an empty name whose <em>value</em> is the spread. The three alternatives are three, two and one position, so the shape is what identifies each.</p></div>
 
 
         </section>
@@ -957,7 +974,7 @@
           </h3>
           <pre class="signature"><code>fn repair_block_value(e: Expr, brace: Span) -&#62; (Expr, Span)</code></pre>
 
-          <div class="doc"><p>A block's chain with its *value* located, and that location — the two halves of <code>with_block_span</code> in <code>aipl-parser</code>, which does both in one walk for the same reason.</p><p>**Repairing it.** A block with no trailing expression — <code>{}</code>, or one ending in <code>f();</code> — has a unit value the parser cannot locate: the empty production it comes from matches no text. Left at the empty span, every diagnostic about that value reports at line 1 of the file. The block's <code>{</code> is the honest location, and this is the first place it is in scope.</p><p>**Recording it.** <code>fn f() -&gt; str { let a = 1; a }</code> returns the <code>a</code>, but the body's span starts at the <code>let</code>, so a return-type error would underline the binding. The tail is in hand here, so it is stored once rather than re-walked at every diagnostic.</p><p>The value can sit arbitrarily deep in the chain a block is, so this walks the four kinds that pass a value along and rebuilds the spine. Depth is one frame per statement in *this* block — nested blocks repair their own, so the total work is one pass over the program rather than one per nesting level.</p></div>
+          <div class="doc"><p>A block's chain with its <em>value</em> located, and that location — the two halves of <code>with_block_span</code> in <code>aipl-parser</code>, which does both in one walk for the same reason.</p><p><strong>Repairing it.</strong> A block with no trailing expression — <code>{}</code>, or one ending in <code>f();</code> — has a unit value the parser cannot locate: the empty production it comes from matches no text. Left at the empty span, every diagnostic about that value reports at line 1 of the file. The block's <code>{</code> is the honest location, and this is the first place it is in scope.</p><p><strong>Recording it.</strong> <code>fn f() -&gt; str { let a = 1; a }</code> returns the <code>a</code>, but the body's span starts at the <code>let</code>, so a return-type error would underline the binding. The tail is in hand here, so it is stored once rather than re-walked at every diagnostic.</p><p>The value can sit arbitrarily deep in the chain a block is, so this walks the four kinds that pass a value along and rebuilds the spine. Depth is one frame per statement in <em>this</em> block — nested blocks repair their own, so the total work is one pass over the program rather than one per nesting level.</p></div>
 
 
         </section>
@@ -1238,7 +1255,7 @@
           </h3>
           <pre class="signature"><code>fn for_chain(name: str, name_span: Span, index: str?, iterable: Expr, body: Expr, for_span: Span, acc: Expr) -&#62; Expr</code></pre>
 
-          <div class="doc"><p>The <code>for</code> loop and the rest of the block. An indexed loop is a plain one over a counter declared just *outside* it — introduced here rather than in the production because it has to scope over the rest of the block, and being re-declared per entry is what resets it when the loop is nested inside another. <code>i</code> is re-bound immutably each iteration, so the body cannot move the counter out from under the loop.</p><p>The increment calls the canonical builtin rather than emitting a <code>+</code>: operator usage is gated per file against its imports, and a loop should not oblige the file to import an operator it never wrote.</p></div>
+          <div class="doc"><p>The <code>for</code> loop and the rest of the block. An indexed loop is a plain one over a counter declared just <em>outside</em> it — introduced here rather than in the production because it has to scope over the rest of the block, and being re-declared per entry is what resets it when the loop is nested inside another. <code>i</code> is re-bound immutably each iteration, so the body cannot move the counter out from under the loop.</p><p>The increment calls the canonical builtin rather than emitting a <code>+</code>: operator usage is gated per file against its imports, and a loop should not oblige the file to import an operator it never wrote.</p></div>
 
 
         </section>
@@ -1294,7 +1311,7 @@
           </h3>
           <pre class="signature"><code>fn lower_match_arm(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>match_arm</code> — one written arm becomes one *or more* arms: an alternation <code>A | B =&gt; body</code> expands here into one arm per pattern, so no later stage ever sees an or-pattern. The body is shared, which is what makes the same-bindings check below necessary.</p></div>
+          <div class="doc"><p><code>match_arm</code> — one written arm becomes one <em>or more</em> arms: an alternation <code>A | B =&gt; body</code> expands here into one arm per pattern, so no later stage ever sees an or-pattern. The body is shared, which is what makes the same-bindings check below necessary.</p></div>
 
 
         </section>
@@ -1322,7 +1339,7 @@
           </h3>
           <pre class="signature"><code>fn is_plain_elem(self: Pat) -&#62; bool</code></pre>
 
-          <div class="doc"><p>Whether an element needs no sub-pattern machinery: a binder name, <code>_</code>, or a literal. A bare name that is *not* a binder — <code>none</code>, or a capitalised case — is a constructor, so it is not plain and forces the nested form, where it means the case rather than a name to bind.</p></div>
+          <div class="doc"><p>Whether an element needs no sub-pattern machinery: a binder name, <code>_</code>, or a literal. A bare name that is <em>not</em> a binder — <code>none</code>, or a capitalised case — is a constructor, so it is not plain and forces the nested form, where it means the case rather than a name to bind.</p></div>
 
 
         </section>
@@ -1350,7 +1367,7 @@
           </h3>
           <pre class="signature"><code>fn arm_span(pat: Pat, subs: Cst[], i: u64, tsp: Span, alone: bool) -&#62; Span</code></pre>
 
-          <div class="doc"><p>An arm's span is its *pattern's*, so a diagnostic points at what selected the arm rather than at everything it does. The one exception is a char pattern, whose span is a single quoted byte — too narrow to read — so it takes the whole arm.</p></div>
+          <div class="doc"><p>An arm's span is its <em>pattern's</em>, so a diagnostic points at what selected the arm rather than at everything it does. The one exception is a char pattern, whose span is a single quoted byte — too narrow to read — so it takes the whole arm.</p></div>
 
 
         </section>
@@ -1560,7 +1577,7 @@
           </h3>
           <pre class="signature"><code>fn lower_program(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>program</code> — every item in the file. A single parsed file has no merged-source map; the loader fills one in when it flattens several files together.</p></div>
+          <div class="doc"><p><code>program</code> — every item in the file, and the file's own documentation.</p><p>The module doc block arrives here rather than being matched here: <code>item</code> is what holds the <code># ..</code> lines, and it hands up any block a blank line detached from its declaration (see <code>lower_item</code>). This is where that block can be judged, because documenting the <em>file</em> is only open to the block at the top of it; a detached block anywhere below documents nothing and is refused.</p><p>A single parsed file has no merged-source map; the loader fills one in when it flattens several files together.</p></div>
 
 
         </section>
@@ -1574,7 +1591,63 @@
           </h3>
           <pre class="signature"><code>fn lower_item(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>item</code> — a declaration and the <code># ..</code> lines in front of it. The lines are this production's own tokens, which is what makes documentation attach here rather than in each declaration.</p></div>
+          <div class="doc"><p><code>item</code> — a declaration and the <code># ..</code> lines in front of it. The lines are this production's own tokens, which is what makes documentation attach here rather than in each declaration.</p><p>Attachment is adjacency: a blank line under a block detaches it, and a detached block documents the file rather than the declaration below it. So the lines are split at the last blank line — the run written directly above the declaration documents it, and anything in front of that goes up to <code>program</code>, the only production that can see whether it sits at the top of the file.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lower_decl">
+          <h3>
+            <a class="anchor" href="#item-lower_decl">lower_decl</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lower_decl(src: str, decl: Ast, lines: Span[], sp: Span) -&#62; Item!ParseError</code></pre>
+
+          <div class="doc"><p>The declaration under an <code>item</code>, carrying the <code># ..</code> lines written directly above it. Every kind but an <code>import</code> has somewhere to put them; an <code>import</code> declares nothing, so a block adjacent to one documents nothing — and the fix is the blank line that would make it the file's own documentation, which is what the message says.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-split_doc_lines">
+          <h3>
+            <a class="anchor" href="#item-split_doc_lines">split_doc_lines</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn split_doc_lines(src: str, lines: Span[], decl_at: u64) -&#62; DocSplit</code></pre>
+
+          <div class="doc"><p>Split the <code># ..</code> lines an <code>item</code> matched against the declaration starting at <code>decl_at</code>. Read from the back, since it is the <em>last</em> blank line that decides: one between the block and the declaration leaves nothing attached, which is how a file's leading block comes to document the file rather than its first declaration.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-blank_line_follows">
+          <h3>
+            <a class="anchor" href="#item-blank_line_follows">blank_line_follows</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn blank_line_follows(src: str, at: u64) -&#62; bool</code></pre>
+
+          <div class="doc"><p>Whether a blank line follows byte <code>at</code>: two newlines before any other character. This is the whole of what detaches a <code># ..</code> block from what follows it — and it reads <em>whitespace only</em>, so a <code>//</code> comment written in the gap neither makes a blank line nor hides one.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-module_doc_block">
+          <h3>
+            <a class="anchor" href="#item-module_doc_block">module_doc_block</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn module_doc_block(src: str, lines: Span[]) -&#62; str</code></pre>
+
+          <div class="doc"><p>The detached lines as one doc block. Like <code>doc_block</code>, but the blank lines that separated its runs are kept as empty lines: two runs above a file's first item read as two paragraphs, exactly as a bare <code>#</code> line inside one run does.</p></div>
 
 
         </section>
@@ -1644,7 +1717,7 @@
           </h3>
           <pre class="signature"><code>fn lower_import_name(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>import_name</code> — a name, or an aliased name. The span covers the *exported* name, which is where an &quot;is not exported&quot; error points. A bare operator never gets here: the grammar refuses it before lowering.</p></div>
+          <div class="doc"><p><code>import_name</code> — a name, or an aliased name. The span covers the <em>exported</em> name, which is where an &quot;is not exported&quot; error points. A bare operator never gets here: the grammar refuses it before lowering.</p></div>
 
 
         </section>
@@ -1714,7 +1787,7 @@
           </h3>
           <pre class="signature"><code>fn named_param(src: str, kids: Ast[], name: Slot, sp: Span, mutable: bool = false, implicit_some: bool = false, has_default: bool = false, marker: str = &#34;&#34;) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p>A named parameter, from the pieces its shape supplied: the name token, whether a <code>mut</code> or a <code>?</code> preceded it, the variadic marker if one was written, and whether a default followed. The type is always the first interior child and a default the second, in every one of the six shapes.</p><p>The stored type is what the *body* sees: a variadic stores the sequence its elements arrive in, and a <code>k?: T</code> stores the <code>T?</code> a caller's bare <code>T</code> is wrapped into.</p></div>
+          <div class="doc"><p>A named parameter, from the pieces its shape supplied: the name token, whether a <code>mut</code> or a <code>?</code> preceded it, the variadic marker if one was written, and whether a default followed. The type is always the first interior child and a default the second, in every one of the six shapes.</p><p>The stored type is what the <em>body</em> sees: a variadic stores the sequence its elements arrive in, and a <code>k?: T</code> stores the <code>T?</code> a caller's bare <code>T</code> is wrapped into.</p></div>
 
 
         </section>
@@ -1728,7 +1801,7 @@
           </h3>
           <pre class="signature"><code>fn variadic_seq_ty(elem: Ty) -&#62; Ty</code></pre>
 
-          <div class="doc"><p><code>x: T*</code> stores the sequence type: <code>str</code> when the element is <code>char</code> (an AIPL string *is* the char sequence), otherwise <code>T[]</code>. The element type stays recoverable from it.</p></div>
+          <div class="doc"><p><code>x: T*</code> stores the sequence type: <code>str</code> when the element is <code>char</code> (an AIPL string <em>is</em> the char sequence), otherwise <code>T[]</code>. The element type stays recoverable from it.</p></div>
 
 
         </section>
@@ -1784,7 +1857,7 @@
           </h3>
           <pre class="signature"><code>fn lower_fn_attr(src: str, node: Parts, kids: Ast[]) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p><code>fn_attr</code> — <code>.test({ .. })</code>, the only one. The argument shape is fixed by the production; what is checked here is that the name matches it. Every string-argument attribute is refused, which is the whole reason that alternative parses: so each can be refused *by name*.</p></div>
+          <div class="doc"><p><code>fn_attr</code> — <code>.test({ .. })</code>, the only one. The argument shape is fixed by the production; what is checked here is that the name matches it. Every string-argument attribute is refused, which is the whole reason that alternative parses: so each can be refused <em>by name</em>.</p></div>
 
 
         </section>
@@ -1896,7 +1969,7 @@
           </h3>
           <pre class="signature"><code>fn slot_kid(self: Slot, kids: Ast[], span: Span) -&#62; Ast!ParseError</code></pre>
 
-          <div class="doc"><p>The lowered child a slot names, or a refusal — <code>kid</code>'s counterpart for a positional match, where a slot that should name a <code>Named</code> reference holds a token instead. A slot carries the child's *index*, so this is <code>kid</code> with the index read off the position rather than written out by hand.</p></div>
+          <div class="doc"><p>The lowered child a slot names, or a refusal — <code>kid</code>'s counterpart for a positional match, where a slot that should name a <code>Named</code> reference holds a token instead. A slot carries the child's <em>index</em>, so this is <code>kid</code> with the index read off the position rather than written out by hand.</p></div>
 
 
         </section>
@@ -1936,7 +2009,7 @@
             <a class="anchor" href="#item-doc_lines_between">doc_lines_between</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$122021: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
+          <pre class="signature"><code>fn doc_lines_between(src: str, __spat$126203: Parts, lo: u64, hi: u64) -&#62; str[]</code></pre>
 
           <div class="doc"><p>The <code># ..</code> lines among <code>node</code>'s own tokens that start in <code>lo..hi</code> — the run written above the case starting at <code>hi</code>, since between two cases there is nothing but those lines and the <code>|</code>.</p></div>
 
@@ -2120,7 +2193,7 @@
           </h3>
           <pre class="signature"><code>fn p(name: str, rule: Rule&#60;AiplTok&#62;, build: Build&#60;Ast&#62;) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
 
-          <div class="doc"><p>One production, laid out <code>Inline</code>. <code>build</code> takes the wrapped <code>Build</code>, not the function — a function value may be *called* through a parameter but not stored into a field or a constructor from one, so <code>Mk</code> has to be written at the call site where the name is still a name. See the constraint list in <code>PARSER_LIBRARY.md</code>.</p><p><code>Inline</code> is the default in the same sense <code>expect_as: &quot;&quot;</code> is: it is what a production says when it has nothing particular to say. A production whose layout matters names it through <code>pt</code> below.</p></div>
+          <div class="doc"><p>One production, laid out <code>Inline</code>. <code>build</code> takes the wrapped <code>Build</code>, not the function — a function value may be <em>called</em> through a parameter but not stored into a field or a constructor from one, so <code>Mk</code> has to be written at the call site where the name is still a name. See the constraint list in <code>PARSER_LIBRARY.md</code>.</p><p><code>Inline</code> is the default in the same sense <code>expect_as: &quot;&quot;</code> is: it is what a production says when it has nothing particular to say. A production whose layout matters names it through <code>pt</code> below.</p></div>
 
 
         </section>

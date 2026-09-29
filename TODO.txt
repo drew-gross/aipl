@@ -667,6 +667,8 @@ figure out / fix why template literals are peforming worse than concat chains
 make try_left_fold and try_right_fold for use when the lambda returns an error
 
 lexer:
+  if Keyword boundary defaults to empty set I think we don't need a separate Exact
+  maybe instead of keep_skipped that modifies a ruleset we should have lex_lossless that lexes with trivia. Maybe then we don't even need a trivia/skip split?
 - remove the dump/load stuff when the FFI supports the full lex result
 - Should be able to detect infinite loop - if a lext step succeeded and consumed no charachters, error. Then get rid of 0 < len checks.
 - lexer lib seems to know too much about how template literals work. Probably needs a "mode stack" to fully resolve it.
@@ -732,7 +734,6 @@ the arg contract being different for builtins caused problems for retain elision
 docs:
   docs for top-level lets
   hide privates by default so you have to expand a thing to show them
-  file headers in docs
   don't need to say callable as a method for self: it's inferrable from the signature
   add a search of some sort
   make an expression renderer (q: is this just the formatter? a: the formatter works on token streams not asts because the ast desugars) and use it for defaults

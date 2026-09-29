@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/format_source.aipl</code></h1>
 
+      <div class="module-doc"><p><code>format_source</code>, the formatter's top-level pipeline.</p><p>The sequence is: split off the trailing <code>--- section ---</code> blocks, strip trailing whitespace from what's left, parse it with the real parser, lay it out, normalize to exactly one trailing newline, verify the output holds the same tokens as the input, then re-attach the sections verbatim.</p><p>Parsing comes before layout on purpose: the parser's errors are the good ones, and anything it accepts the walker must handle, so a malformed program fails with the parser's message rather than whatever the walker makes of it. The token check comes <em>after</em> and is the safety net: the output must carry exactly the input's tokens and comments, or it is refused rather than emitted — a formatter bug must never corrupt code.</p><p>This used to be two AIPL entries with the parse and the token check between them in Rust, from before the parser was itself dogfooded. Now the whole pipeline runs in-engine and Rust's <code>format_source</code> is one FFI call.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -54,7 +57,7 @@
           </h3>
           <pre class="signature"><code>struct TokenFingerprint</code></pre>
 
-          <div class="doc"><p>A lexed source reduced to what a reformat must preserve: every non-import token **in order**, the import statements as a sorted multiset, and the comments as one too. Two sources with equal fingerprints hold the same code.</p><p>A token counts as its *value* (<code>token_value</code>), so the formatter's value-preserving whitespace edits inside a <code>&quot;&quot;&quot;</code> block are not flagged while any change to a literal's value is.</p><p>Three things a reformat is allowed to change, and each is why a part is shaped the way it is:</p><p>- **Imports are hoisted and sorted**, both the statements and the names inside one. So each statement collapses to its own tokens sorted and joined (<code>import_signature</code>) and the statements are then sorted among themselves — reordering is invisible, losing or changing a name is not. - **A trailing comma is normalized** (dropped when a list renders flat, added when it breaks), and a variant's **leading <code>|</code>** is the same normalization at the other end. Both are layout, so <code>is_layout</code> drops them before anything else — which also excludes the <code>|</code> between match-pattern alternatives. - **Comments move with the construct they are glued to**, which can reorder them against the tokens, so they are their own sorted multiset rather than part of <code>rest</code>.</p><p>Everything else is positional: <code>rest</code> catches a token the layout moved, not just one it lost.</p></div>
+          <div class="doc"><p>A lexed source reduced to what a reformat must preserve: every non-import token <strong>in order</strong>, the import statements as a sorted multiset, and the comments as one too. Two sources with equal fingerprints hold the same code.</p><p>A token counts as its <em>value</em> (<code>token_value</code>), so the formatter's value-preserving whitespace edits inside a <code>&quot;&quot;&quot;</code> block are not flagged while any change to a literal's value is.</p><p>Three things a reformat is allowed to change, and each is why a part is shaped the way it is:</p><ul><li><strong>Imports are hoisted and sorted</strong>, both the statements and the names inside</li></ul><p>one. So each statement collapses to its own tokens sorted and joined (<code>import_signature</code>) and the statements are then sorted among themselves — reordering is invisible, losing or changing a name is not.</p><ul><li><strong>A trailing comma is normalized</strong> (dropped when a list renders flat, added</li></ul><p>when it breaks), and a variant's <strong>leading <code>|</code></strong> is the same normalization at the other end. Both are layout, so <code>is_layout</code> drops them before anything else — which also excludes the <code>|</code> between match-pattern alternatives.</p><ul><li><strong>Comments move with the construct they are glued to</strong>, which can reorder</li></ul><p>them against the tokens, so they are their own sorted multiset rather than part of <code>rest</code>.</p><p>Everything else is positional: <code>rest</code> catches a token the layout moved, not just one it lost.</p></div>
 
 
         </section>
@@ -117,7 +120,7 @@
           </h3>
           <pre class="signature"><code>fn token_value(kind: AiplTok) -&#62; str</code></pre>
 
-          <div class="doc"><p>A token's value for the preservation check: <code>to_str</code> of its kind, except that a string's delimiter is not part of it — <code>&quot;a&quot;</code>, <code></code> <code>a</code> <code></code> and a <code>&quot;&quot;&quot;</code> block holding <code>a</code> are the same token, and respelling one as another (the walker's <code>requote</code>) is the one edit the formatter makes inside a literal.</p></div>
+          <div class="doc"><p>A token's value for the preservation check: <code>to_str</code> of its kind, except that a string's delimiter is not part of it — <code>&quot;a&quot;</code>, <code>`a`</code> and a <code>&quot;&quot;&quot;</code> block holding <code>a</code> are the same token, and respelling one as another (the walker's <code>requote</code>) is the one edit the formatter makes inside a literal.</p></div>
 
 
         </section>

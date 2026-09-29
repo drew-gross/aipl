@@ -1,31 +1,32 @@
-// S-expressions: the library's first end-to-end target, and deliberately the
-// floor rather than a warm-up. Two productions —
-//
-//     list -> "(" item* ")"
-//     item -> Atom | list
-//
-// — where `item` reaches `list` and `list` reaches back through `item`, which is
-// the whole point: a non-recursive toy (a comma-separated integer list, key/value
-// lines) would exercise none of what the driver is actually built on. This one
-// forces a **recursive CST** (a `Cst` boxed through an array), a **parse as deep
-// as its input**, and a lowering to a **boxed AST** reached through a function
-// *value* — the `(str, Cst, A[]) -> A!ParseError` shape with `A` boxed.
-//
-// Recursive descent spends a stack frame per level and none of those calls is in
-// tail position, so parse depth is bounded by the stack rather than by the heap.
-// Measured on the 8 MB an ordinary binary gets: `((( ... )))` nests fine at 1,000
-// levels and segfaults somewhere before 2,000, which is why the deep test below
-// sits at 200 — deep enough that a regression in frame size would show, with room
-// to spare.
-//
-// It deliberately omits precedence, more than one terminal class, separators, and
-// error-message subtlety: if the driver is wrong, it is wrong here in two
-// productions rather than in ten. `grammar_json.aipl` adds the rest.
-//
-// The file is also the worked example of what a consumer of this library brings:
-// a token-kind type, a `TokenRule[]` for it, an AST, one `lower_*` per
-// production, and a `Grammar` tying them together. Nothing else — the parse
-// itself is `parse.aipl`'s, unmodified.
+# S-expressions: the library's first end-to-end target, and deliberately the
+# floor rather than a warm-up. Two productions —
+#
+#     list -> "(" item* ")"
+#     item -> Atom | list
+#
+# — where `item` reaches `list` and `list` reaches back through `item`, which is
+# the whole point: a non-recursive toy (a comma-separated integer list, key/value
+# lines) would exercise none of what the driver is actually built on. This one
+# forces a **recursive CST** (a `Cst` boxed through an array), a **parse as deep
+# as its input**, and a lowering to a **boxed AST** reached through a function
+# *value* — the `(str, Cst, A[]) -> A!ParseError` shape with `A` boxed.
+#
+# Recursive descent spends a stack frame per level and none of those calls is in
+# tail position, so parse depth is bounded by the stack rather than by the heap.
+# Measured on the 8 MB an ordinary binary gets: `((( ... )))` nests fine at 1,000
+# levels and segfaults somewhere before 2,000, which is why the deep test below
+# sits at 200 — deep enough that a regression in frame size would show, with room
+# to spare.
+#
+# It deliberately omits precedence, more than one terminal class, separators, and
+# error-message subtlety: if the driver is wrong, it is wrong here in two
+# productions rather than in ten. `grammar_json.aipl` adds the rest.
+#
+# The file is also the worked example of what a consumer of this library brings:
+# a token-kind type, a `TokenRule[]` for it, an AST, one `lower_*` per
+# production, and a `Grammar` tying them together. Nothing else — the parse
+# itself is `parse.aipl`'s, unmodified.
+
 import { equal as ==, first, map_err, map_ok, to_set } from builtins;
 import { Cst, Parts, show, text, token_text } from "./cst.aipl";
 import { ebnf, show_first_sets } from "./ebnf.aipl";

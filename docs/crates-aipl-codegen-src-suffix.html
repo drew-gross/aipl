@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/suffix.aipl</code></h1>
 
+      <div class="module-doc"><p>One postfix step of AIPL's syntax tree and what applying it to a receiver means. One of the files the AST is declared across; see <code>ast.aipl</code>.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -95,7 +98,7 @@
           </h3>
           <pre class="signature"><code>fn index_or_slice(recv: Expr, index: Expr, span: Span) -&#62; Expr</code></pre>
 
-          <div class="doc"><p><code>recv[a..b]</code> — a range literal written *as* an index is the closed slice form, folded straight into a <code>Slice</code> rather than constructing a <code>Span</code> only to unpack it at runtime. A range that arrives as a *value* (<code>recv[s]</code>, a call result) stays an index and takes the <code>Span</code>-index sugar path instead.</p></div>
+          <div class="doc"><p><code>recv[a..b]</code> — a range literal written <em>as</em> an index is the closed slice form, folded straight into a <code>Slice</code> rather than constructing a <code>Span</code> only to unpack it at runtime. A range that arrives as a <em>value</em> (<code>recv[s]</code>, a call result) stays an index and takes the <code>Span</code>-index sugar path instead.</p></div>
 
 
         </section>

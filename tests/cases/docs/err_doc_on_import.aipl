@@ -3,7 +3,7 @@ import { print } from builtins;
 
 fn main() !prints { print("hi"); }
 --- errors ---
-error: an import cannot be documented — `# ..` lines attach to a declaration, and this one is above an `import`
+error: an import cannot be documented — `# ..` lines attach to the declaration below them and an `import` declares nothing; a blank line under the block makes it the file's documentation instead
  --> ./tests/cases/docs/err_doc_on_import.aipl:1:1
   |
 1 | # An import brings a name in; it declares nothing to document.

@@ -74,6 +74,11 @@ ul.files > li { border-top: 1px solid var(--rule); padding: 0.9rem 0; }
 a.file { font-weight: 600; text-decoration: none; }
 a.file:hover { text-decoration: underline; }
 
+/* A file's own documentation, first paragraph only: it sits between the file
+   name and the list of what is in it, so it reads as a caption rather than
+   competing with either. */
+.file-summary { color: var(--muted); margin: 0.2rem 0 0.6rem; max-width: 46rem; }
+
 ul.items {
   display: flex;
   flex-wrap: wrap;
@@ -124,15 +129,30 @@ pre.signature {
   padding: 0.6rem 0.8rem;
 }
 
-.doc p { margin: 0 0 0.75rem; }
-.doc pre {
+/* The file's own documentation, above the declarations. Set off by a rule
+   rather than by size: it is the page's introduction, not a heading, and it can
+   run to several paragraphs. */
+.module-doc {
+  border-bottom: 1px solid var(--rule);
+  margin: 0 0 1.5rem;
+  max-width: 46rem;
+  padding: 0 0 0.5rem;
+}
+
+.module-doc p, .doc p { margin: 0 0 0.75rem; }
+
+/* A `- ` list in documentation prose. Browser-default markers and indent — it
+   is a list in a piece of writing, not one of the page's own structures. */
+.module-doc ul, .doc ul { margin: 0 0 0.75rem; padding-left: 1.5rem; }
+.module-doc li, .doc li { margin: 0 0 0.25rem; }
+.module-doc pre, .doc pre {
   background: var(--code-bg);
   border-radius: 6px;
   overflow-x: auto;
   padding: 0.6rem 0.8rem;
 }
 
-.doc code, li code, p code, h1 code {
+.module-doc code, .doc code, li code, p code, h1 code {
   background: var(--code-bg);
   border-radius: 4px;
   font-size: 0.9em;

@@ -1,27 +1,28 @@
+# The AIPL implementation of the `split_map` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_split_map` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `s.split_map(sep, f)`
+# resolves through the ordinary generic / higher-order machinery — the in-file
+# name is only for this file's own tests, which read exactly like user code.
+#
+# It is what `s.split(sep).map(f)` means, without the array of parts between:
+# `split` would build a block holding every part — a retained view each — for
+# `map` to walk once and drop. Written by the compiler's operation-fusion pass
+# for that chain (see `chain_fusions` in aipl-mono); also callable directly,
+# and the shape `src.lines().map(f)` becomes once `lines` has inlined.
+#
+# The loop below is the other half of the same story: a `for` over a `split` is
+# itself fused (see `loop_fusions`), into a walk of a cursor that hands back
+# one part at a time. So nothing here materializes either — the part goes
+# straight from the source string through `f` into `out`.
+#
+# No lint of its own: `push_loop_pipeline` already sends a hand-written
+# building loop to `map`, and a `map` over a `split` arrives here through the
+# chain. The seed below escapes that lint honestly rather than with an
+# `#[allow]` — the `reserve` between the seed and the loop is work the lint's
+# rewrite has nowhere to put, which is exactly when it declines.
+
 import { equal as ==, len, logical_not as !, push, reserve, split, split_len } from builtins;
 
-// The AIPL implementation of the `split_map` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_split_map` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `s.split_map(sep, f)`
-// resolves through the ordinary generic / higher-order machinery — the in-file
-// name is only for this file's own tests, which read exactly like user code.
-//
-// It is what `s.split(sep).map(f)` means, without the array of parts between:
-// `split` would build a block holding every part — a retained view each — for
-// `map` to walk once and drop. Written by the compiler's operation-fusion pass
-// for that chain (see `chain_fusions` in aipl-mono); also callable directly,
-// and the shape `src.lines().map(f)` becomes once `lines` has inlined.
-//
-// The loop below is the other half of the same story: a `for` over a `split` is
-// itself fused (see `loop_fusions`), into a walk of a cursor that hands back
-// one part at a time. So nothing here materializes either — the part goes
-// straight from the source string through `f` into `out`.
-//
-// No lint of its own: `push_loop_pipeline` already sends a hand-written
-// building loop to `map`, and a `map` over a `split` arrives here through the
-// chain. The seed below escapes that lint honestly rather than with an
-// `#[allow]` — the `reserve` between the seed and the loop is work the lint's
-// rewrite has nowhere to put, which is exactly when it declines.
 # `self.split(sep).map(f)` — every `sep`-separated part of `self` mapped through
 # `f` — computed without the array of parts in between. The parts are `split`'s:
 # `n` separators give `n + 1`, including empty ones at either end, and an empty

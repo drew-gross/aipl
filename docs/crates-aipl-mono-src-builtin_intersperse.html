@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_intersperse.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>intersperse</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_intersperse</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.intersperse(sep)</code> specializes through the ordinary generic machinery.</p><p>The array counterpart of <code>join</code>: <code>join</code> is this followed by concatenation, which only <code>str</code> can do — every element type can be interleaved, so that is where the generic version stops. <code>Doc[]</code> is the motivating case, where the result is handed to a <code>Concat</code>.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn intersperse&#60;T: any&#62;(self: T[], sep: T) -&#62; T[]</code></pre>
 
-          <div class="doc"><p>Insert <code>sep</code> between consecutive elements, returning a new array: <code>[a, b, c].intersperse(s)</code> is <code>[a, s, b, s, c]</code>. An empty or single-element array comes back unchanged — a separator only ever appears *between* two elements, never leading or trailing.</p><p>Generic over the element type and callable as a method. For <code>str[]</code> prefer <code>join</code>, which does this and concatenates the result in one step.</p></div>
+          <div class="doc"><p>Insert <code>sep</code> between consecutive elements, returning a new array: <code>[a, b, c].intersperse(s)</code> is <code>[a, s, b, s, c]</code>. An empty or single-element array comes back unchanged — a separator only ever appears <em>between</em> two elements, never leading or trailing.</p><p>Generic over the element type and callable as a method. For <code>str[]</code> prefer <code>join</code>, which does this and concatenates the result in one step.</p></div>
 
 
         </section>

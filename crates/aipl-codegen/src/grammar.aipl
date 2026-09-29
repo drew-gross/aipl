@@ -1,33 +1,34 @@
-// A grammar, expressed as data. `Rule` is a PEG combinator tree — sequence,
-// ordered choice, repetition, a rule reference — and a `Production` pairs one
-// rule with everything the passes downstream need to know about it: the CST node
-// name, the label errors should blame, the scope a highlighter should paint, and
-// the function that lowers a matched node to the caller's AST. One `Grammar` is
-// then the whole description of a language, interpreted by the driver in
-// `parse.aipl`, exactly as `lexer.aipl` interprets a `TokenRule[]`.
-//
-// This file is data and one pass over it (`link`); nothing here parses. The
-// split matters because the same grammar value is meant to feed more than the
-// parser — an EBNF dump, a highlighter, a formatter — and each of those wants
-// the description without the driver.
-//
-// **A rule set is written against a token *kind* type `K`**, the same `K` a
-// `lexer.aipl` rule set produces, so a language's lexer and grammar compose
-// directly: `Term(Name)` matches any token whose kind is a `Name`, payload
-// ignored (a `Case<K>` compare, which is why `K` carries the `variant` bound).
-//
-// Two authoring notes that are compiler limits rather than design:
-//
-//   - An integer literal does not flex through a *positional* constructor
-//     argument — the `0` types as `i64` where the payload is `u64` — but it does
-//     through a keyword one. That is why `Many`'s minimum is a defaulted `min:`
-//     rather than a bare `u64`: `Many(r)` is the common zero-or-more, and
-//     `Many(r, min=1)` writes the literal where it flexes.
-//   - Most `Rule` constructors mention no `K` (`Literal`, `Named`, `Then` over
-//     an array of them), so nothing in them pins the type parameter. Write each
-//     production's rule as an *annotated* binding — `let r: Rule<Kind> = ..` —
-//     and every constructor inside it resolves from that annotation. The `.test`
-//     blocks here and in `parse.aipl` are written in that idiom throughout.
+# A grammar, expressed as data. `Rule` is a PEG combinator tree — sequence,
+# ordered choice, repetition, a rule reference — and a `Production` pairs one
+# rule with everything the passes downstream need to know about it: the CST node
+# name, the label errors should blame, the scope a highlighter should paint, and
+# the function that lowers a matched node to the caller's AST. One `Grammar` is
+# then the whole description of a language, interpreted by the driver in
+# `parse.aipl`, exactly as `lexer.aipl` interprets a `TokenRule[]`.
+#
+# This file is data and one pass over it (`link`); nothing here parses. The
+# split matters because the same grammar value is meant to feed more than the
+# parser — an EBNF dump, a highlighter, a formatter — and each of those wants
+# the description without the driver.
+#
+# **A rule set is written against a token *kind* type `K`**, the same `K` a
+# `lexer.aipl` rule set produces, so a language's lexer and grammar compose
+# directly: `Term(Name)` matches any token whose kind is a `Name`, payload
+# ignored (a `Case<K>` compare, which is why `K` carries the `variant` bound).
+#
+# Two authoring notes that are compiler limits rather than design:
+#
+#   - An integer literal does not flex through a *positional* constructor
+#     argument — the `0` types as `i64` where the payload is `u64` — but it does
+#     through a keyword one. That is why `Many`'s minimum is a defaulted `min:`
+#     rather than a bare `u64`: `Many(r)` is the common zero-or-more, and
+#     `Many(r, min=1)` writes the literal where it flexes.
+#   - Most `Rule` constructors mention no `K` (`Literal`, `Named`, `Then` over
+#     an array of them), so nothing in them pins the type parameter. Write each
+#     production's rule as an *annotated* binding — `let r: Rule<Kind> = ..` —
+#     and every constructor inside it resolves from that annotation. The `.test`
+#     blocks here and in `parse.aipl` are written in that idiom throughout.
+
 import {
     Span,
     case_name,

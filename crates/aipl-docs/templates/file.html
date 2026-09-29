@@ -37,6 +37,9 @@
 {% endmacro %}
 {% block content %}
       <h1><code>{{ display }}</code></h1>
+{% if has_doc %}
+      <div class="module-doc">{{ doc|safe }}</div>
+{% endif %}
 {% if public.is_empty() && private.is_empty() %}
       <p class="empty">This file declares nothing.</p>
 {% endif %}

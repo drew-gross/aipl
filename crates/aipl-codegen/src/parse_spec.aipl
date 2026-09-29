@@ -1,7 +1,8 @@
-// A case file's `--- section ---` layout, parsed. The corpus harness (and
-// `aipl check`) drive every expectation in `tests/cases/**/*.aipl` off this:
-// the entry-point source is whatever precedes the first marker, and each marker
-// opens a section whose body runs to the next marker or EOF.
+# A case file's `--- section ---` layout, parsed. The corpus harness (and
+# `aipl check`) drive every expectation in `tests/cases/**/*.aipl` off this:
+# the entry-point source is whatever precedes the first marker, and each marker
+# opens a section whose body runs to the next marker or EOF.
+
 import {
     contains,
     drop_n,

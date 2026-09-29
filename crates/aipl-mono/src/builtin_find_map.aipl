@@ -1,15 +1,16 @@
+# The AIPL implementation of the `find_map` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_find_map` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_map(f)` resolves
+# through the ordinary generic / higher-order machinery — the in-file name is
+# only for this file's own tests, which read exactly like user code.
+#
+# It is the one-pass shape of `xs.map(f).find_if(is_some)` with the double
+# optional that chain produces already peeled: the first element `f` has an
+# answer for, and that answer. The `map_find_if_some` lint sends the chain
+# here.
+
 import { equal as ==, greater_than as >, to_digit, wrapping_mul as * } from builtins;
 
-// The AIPL implementation of the `find_map` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_find_map` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_map(f)` resolves
-// through the ordinary generic / higher-order machinery — the in-file name is
-// only for this file's own tests, which read exactly like user code.
-//
-// It is the one-pass shape of `xs.map(f).find_if(is_some)` with the double
-// optional that chain produces already peeled: the first element `f` has an
-// answer for, and that answer. The `map_find_if_some` lint sends the chain
-// here.
 # The first `some` that `f` returns over the elements of `self`, unwrapped
 # one level — `some(y)` for the first `x` with `f(x) == some(y)`, `none` when
 # every `f(x)` is `none` — stopping at that element. Generic over both types and

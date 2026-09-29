@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/reindent_block.aipl</code></h1>
 
+      <div class="module-doc"><p>The formatter's raw-block re-layout: <code>aipl-fmt</code>'s <code>print</code> calls this through the FFI (see <code>install_parser_hooks</code>) when emitting a verbatim <code>&quot;&quot;&quot;...&quot;&quot;&quot;</code> raw string or triple-backtick template atom, to align its closing delimiter (and, for a bare-delimiter block, its content) around the column the atom opened at. <code>base</code> is that column (the opening line's indent) — unsigned, matching the <code>usize</code> the Rust caller holds, and matching the unsigned counts <code>indent</code>/<code>repeat</code> take.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

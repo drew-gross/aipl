@@ -1,5 +1,6 @@
-// The primitive types of AIPL's own syntax tree — `aipl_syntax::ast::Primitive`
-// case for case. One of the files the AST is declared across; see `ast.aipl`.
+# The primitive types of AIPL's own syntax tree — `aipl_syntax::ast::Primitive`
+# case for case. One of the files the AST is declared across; see `ast.aipl`.
+
 import { equal as == } from builtins;
 
 # The primitive types, `aipl_syntax::ast::Primitive` case for case.

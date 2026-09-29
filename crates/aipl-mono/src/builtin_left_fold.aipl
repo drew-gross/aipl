@@ -1,11 +1,12 @@
+# The AIPL implementation of the `left_fold` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_left_fold` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.left_fold(init, f)`
+# specializes through the ordinary generic / higher-order machinery — the
+# in-file name `left_fold` is only for this file's own tests, which read exactly
+# like user code.
+
 import { concat as +++, equal as ==, filter, logical_not as !, wrapping_add as + } from builtins;
 
-// The AIPL implementation of the `left_fold` builtin. Monomorphization registers
-// this function under the canonical name `__builtin_left_fold` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.left_fold(init, f)`
-// specializes through the ordinary generic / higher-order machinery — the
-// in-file name `left_fold` is only for this file's own tests, which read exactly
-// like user code.
 # Combine the elements left to right, starting from `init`: for `[a, b, c]`,
 # `f(f(f(init, a), b), c)`. Generic over both the element and accumulator types
 # and callable as a method: `xs.left_fold(0, |acc, x| acc + x)`.

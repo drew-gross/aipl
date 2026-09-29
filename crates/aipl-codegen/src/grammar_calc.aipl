@@ -1,32 +1,33 @@
-// A four-operator calculator: the library's third end-to-end target, and the one
-// that exercises `Climb`. Neither earlier toy has an infix operator at all —
-// S-expressions put the operator first and JSON has none — so precedence
-// climbing was proven only by `parse.aipl`'s own unit tests, which stop at the
-// concrete tree. This one lowers through that tree and then *evaluates* the
-// result, which is the assertion that a wrong shape cannot survive.
-//
-//     expr  -> Climb(unary, [+ -  |  * / %  |  ^ right])
-//     unary -> "-" unary | atom
-//     atom  -> Num | "(" expr ")"
-//
-// Three things it pins down that a tree-shape assertion alone would not:
-//
-//   - **Precedence and associativity, as arithmetic.** `2 + 3 * 4` is 14 and not
-//     20; `2 ^ 3 ^ 2` is 512 (right-associative) and not 64; `10 - 3 - 2` is 5
-//     (left-associative) and not 9.
-//   - **What `Climb` hands a lowering function.** Each operand nests under the
-//     *enclosing* production's index, so a binary node arrives as two interior
-//     children with the operator between them as a direct leaf — read with
-//     `own_token_text`, which exists for exactly this (see `cst.aipl`).
-//   - **A `build` that legitimately fails.** An integer literal too big for an
-//     `i64` is a lowering error, not a parse error, and it propagates out of
-//     `parse` unchanged. That is the case the two-pass design was chosen for: run
-//     during the parse it would have aborted alternatives that should simply have
-//     been retried.
-//
-// Unary minus is *not* a `Climb` operator — `Climb` is binary — so it lives in
-// the atom rule, which is what makes it bind tighter than every infix operator:
-// `-2 ^ 2` is `(-2) ^ 2`.
+# A four-operator calculator: the library's third end-to-end target, and the one
+# that exercises `Climb`. Neither earlier toy has an infix operator at all —
+# S-expressions put the operator first and JSON has none — so precedence
+# climbing was proven only by `parse.aipl`'s own unit tests, which stop at the
+# concrete tree. This one lowers through that tree and then *evaluates* the
+# result, which is the assertion that a wrong shape cannot survive.
+#
+#     expr  -> Climb(unary, [+ -  |  * / %  |  ^ right])
+#     unary -> "-" unary | atom
+#     atom  -> Num | "(" expr ")"
+#
+# Three things it pins down that a tree-shape assertion alone would not:
+#
+#   - **Precedence and associativity, as arithmetic.** `2 + 3 * 4` is 14 and not
+#     20; `2 ^ 3 ^ 2` is 512 (right-associative) and not 64; `10 - 3 - 2` is 5
+#     (left-associative) and not 9.
+#   - **What `Climb` hands a lowering function.** Each operand nests under the
+#     *enclosing* production's index, so a binary node arrives as two interior
+#     children with the operator between them as a direct leaf — read with
+#     `own_token_text`, which exists for exactly this (see `cst.aipl`).
+#   - **A `build` that legitimately fails.** An integer literal too big for an
+#     `i64` is a lowering error, not a parse error, and it propagates out of
+#     `parse` unchanged. That is the case the two-pass design was chosen for: run
+#     during the parse it would have aborted alternatives that should simply have
+#     been retried.
+#
+# Unary minus is *not* a `Climb` operator — `Climb` is binary — so it lives in
+# the atom rule, which is what makes it bind tighter than every infix operator:
+# `-2 ^ 2` is `(-2) ^ 2`.
+
 import {
     equal as ==,
     first,

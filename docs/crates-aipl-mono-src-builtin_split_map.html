@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_split_map.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>split_map</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_split_map</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>s.split_map(sep, f)</code> resolves through the ordinary generic / higher-order machinery — the in-file name is only for this file's own tests, which read exactly like user code.</p><p>It is what <code>s.split(sep).map(f)</code> means, without the array of parts between: <code>split</code> would build a block holding every part — a retained view each — for <code>map</code> to walk once and drop. Written by the compiler's operation-fusion pass for that chain (see <code>chain_fusions</code> in aipl-mono); also callable directly, and the shape <code>src.lines().map(f)</code> becomes once <code>lines</code> has inlined.</p><p>The loop below is the other half of the same story: a <code>for</code> over a <code>split</code> is itself fused (see <code>loop_fusions</code>), into a walk of a cursor that hands back one part at a time. So nothing here materializes either — the part goes straight from the source string through <code>f</code> into <code>out</code>.</p><p>No lint of its own: <code>push_loop_pipeline</code> already sends a hand-written building loop to <code>map</code>, and a <code>map</code> over a <code>split</code> arrives here through the chain. The seed below escapes that lint honestly rather than with an <code>#[allow]</code> — the <code>reserve</code> between the seed and the loop is work the lint's rewrite has nowhere to put, which is exactly when it declines.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

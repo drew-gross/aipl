@@ -1,14 +1,15 @@
+# The AIPL implementation of the `intersperse` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_intersperse` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.intersperse(sep)`
+# specializes through the ordinary generic machinery.
+#
+# The array counterpart of `join`: `join` is this followed by concatenation,
+# which only `str` can do — every element type can be interleaved, so that is
+# where the generic version stops. `Doc[]` is the motivating case, where the
+# result is handed to a `Concat`.
+
 import { equal as ==, len, less_than as <, push } from builtins;
 
-// The AIPL implementation of the `intersperse` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_intersperse` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.intersperse(sep)`
-// specializes through the ordinary generic machinery.
-//
-// The array counterpart of `join`: `join` is this followed by concatenation,
-// which only `str` can do — every element type can be interleaved, so that is
-// where the generic version stops. `Doc[]` is the motivating case, where the
-// result is handed to a `Concat`.
 # Insert `sep` between consecutive elements, returning a new array:
 # `[a, b, c].intersperse(s)` is `[a, s, b, s, c]`. An empty or single-element
 # array comes back unchanged — a separator only ever appears *between* two

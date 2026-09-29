@@ -1,11 +1,12 @@
-// The formatter's string re-delimiter. A `"..."` literal and an
-// interpolation-free `` `...` `` literal denote the same value and differ only in
-// which characters they must escape — `"` under the first, `` ` ``/`{`/`}` under
-// the second — so `aipl fmt` spells each literal with whichever delimiter needs
-// fewer escapes. A `"""`/```` ``` ```` block whose value has no newline is a
-// single-line literal spread over three lines, so it is respelled as one too,
-// with the same choice of delimiter. `walker.aipl` applies it to every string
-// token.
+# The formatter's string re-delimiter. A `"..."` literal and an
+# interpolation-free `` `...` `` literal denote the same value and differ only in
+# which characters they must escape — `"` under the first, `` ` ``/`{`/`}` under
+# the second — so `aipl fmt` spells each literal with whichever delimiter needs
+# fewer escapes. A `"""`/```` ``` ```` block whose value has no newline is a
+# single-line literal spread over three lines, so it is respelled as one too,
+# with the same choice of delimiter. `walker.aipl` applies it to every string
+# token.
+
 import {
     all,
     any,
@@ -252,7 +253,7 @@ pub fn requote(self: str) -> str {
     assert(requote(`'"'`) == `'"'`);
 })
 
-# Whether a token spells a `"""`/```` ```` ```` block.
+# Whether a token spells a `"""`/```` ``` ```` block.
 fn is_block(self: str) -> bool { self.starts_with(`"""`) || self.starts_with("```") }.test({
     assert(`"""a"""`.is_block());
     assert("```a```".is_block());
@@ -541,9 +542,9 @@ deallocations: 626
 reallocations: 8
 bytes allocated: 40594
 instructions executed: 167049
-binary size: 80336
+binary size: 80344
   code: 47564
-  data: 7993
+  data: 8001
   metadata: 24779
 functions:
   __builtin_all$char$s0$lam$__builtin_is_whitespace:

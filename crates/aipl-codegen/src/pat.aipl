@@ -1,5 +1,6 @@
-// `aipl_syntax::ast::Pattern` as AIPL declares it. One of the files the AST is
-// declared across; see `ast.aipl`.
+# `aipl_syntax::ast::Pattern` as AIPL declares it. One of the files the AST is
+# declared across; see `ast.aipl`.
+
 import {
     all,
     contains,

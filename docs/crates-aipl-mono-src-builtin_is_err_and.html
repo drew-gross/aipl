@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_is_err_and.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>is_err_and</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_is_err_and</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>r.is_err_and(pred)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>is_err_and</code> is only for this file's own tests, which read exactly like user code.</p><p>The result-world mirror of <code>is_some_and</code>. It exists mainly for tests that assert on a failure: <code>==</code> doesn't span the two sides of a result, so without it every such assertion needs a hand-written <code>match</code> helper per error type.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

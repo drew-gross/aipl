@@ -1,32 +1,33 @@
-// AIPL's own TextMate grammar, as data — the file
-// `editors/vscode/syntaxes/aipl.tmLanguage.json` is generated from. This is the
-// highlighter's counterpart of `lex_aipl.aipl`: `highlight.aipl` is the generic
-// machinery, and this is just the table.
-//
-// Almost all of it comes straight from `aipl_rules()` — the same rule list the
-// lexer runs on, whose `scope` fields say what each token is painted. What is
-// left is what a *lexer* cannot know:
-//
-//   - `fn NAME` / `struct NAME`, where the name is scoped for its position, not
-//     its spelling. The names they accept come from the identifier rule's own
-//     character classes, so the two cannot disagree.
-//   - The builtin type names, which lex as ordinary identifiers and are told
-//     apart afterwards (`classify_lexed` in `aipl-parser`); this list is that
-//     one, and the only genuinely duplicated data here.
-//   - The `!prints` effect marker, which is one token to the lexer (`!`) and two
-//     halves to a reader.
-//   - The `--- section ---` tail of a test-case file, which is not AIPL at all:
-//     everything after the first marker is expected output, and highlighting it
-//     as source would be actively wrong.
-//
-// Regenerate the JSON with:
-//
-//     cargo test --test compiler -- --ignored highlighting::fill_tmlanguage
-//
-// `highlighting::checked_in_tmlanguage_is_current` fails when the checked-in
-// file and this description disagree, and the rest of `tests/highlighting.rs`
-// validates the *result* against every token of every case file and example —
-// which is the real check on anything changed here.
+# AIPL's own TextMate grammar, as data — the file
+# `editors/vscode/syntaxes/aipl.tmLanguage.json` is generated from. This is the
+# highlighter's counterpart of `lex_aipl.aipl`: `highlight.aipl` is the generic
+# machinery, and this is just the table.
+#
+# Almost all of it comes straight from `aipl_rules()` — the same rule list the
+# lexer runs on, whose `scope` fields say what each token is painted. What is
+# left is what a *lexer* cannot know:
+#
+#   - `fn NAME` / `struct NAME`, where the name is scoped for its position, not
+#     its spelling. The names they accept come from the identifier rule's own
+#     character classes, so the two cannot disagree.
+#   - The builtin type names, which lex as ordinary identifiers and are told
+#     apart afterwards (`classify_lexed` in `aipl-parser`); this list is that
+#     one, and the only genuinely duplicated data here.
+#   - The `!prints` effect marker, which is one token to the lexer (`!`) and two
+#     halves to a reader.
+#   - The `--- section ---` tail of a test-case file, which is not AIPL at all:
+#     everything after the first marker is expected output, and highlighting it
+#     as source would be actively wrong.
+#
+# Regenerate the JSON with:
+#
+#     cargo test --test compiler -- --ignored highlighting::fill_tmlanguage
+#
+# `highlighting::checked_in_tmlanguage_is_current` fails when the checked-in
+# file and this description disagree, and the rest of `tests/highlighting.rs`
+# validates the *result* against every token of every case file and example —
+# which is the real check on anything changed here.
+
 import { contains, value_or } from builtins;
 import {
     Caps,

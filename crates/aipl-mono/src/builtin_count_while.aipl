@@ -1,3 +1,12 @@
+# The AIPL implementation of the `count_while` builtin. Monomorphization
+# registers this function under the canonical name `__builtin_count_while`
+# (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.count_while(pred)`
+# resolves through the ordinary generic / higher-order machinery — the in-file
+# name `count_while` is only for this file's own tests, which read exactly like
+# user code. Because a builtin's body may call other builtins (loaded through
+# the real loader), this is also the shared helper the `trim_while` builtin and
+# the dogfooded compiler helpers (`dedent`, and `lexer.aipl`) call.
+
 import {
     equal as ==,
     less_than_or_equal as <=,
@@ -5,14 +14,6 @@ import {
     wrapping_increment as ++,
 } from builtins;
 
-// The AIPL implementation of the `count_while` builtin. Monomorphization
-// registers this function under the canonical name `__builtin_count_while`
-// (see `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.count_while(pred)`
-// resolves through the ordinary generic / higher-order machinery — the in-file
-// name `count_while` is only for this file's own tests, which read exactly like
-// user code. Because a builtin's body may call other builtins (loaded through
-// the real loader), this is also the shared helper the `trim_while` builtin and
-// the dogfooded compiler helpers (`dedent`, and `lexer.aipl`) call.
 # Counts elements from the front while `pred` holds, stopping at the first element
 # that fails it (or at the end). Generic over the element type and callable as a
 # method: `xs.count_while(pred)`.

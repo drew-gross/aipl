@@ -1,7 +1,8 @@
-// The items and declarations of AIPL's syntax tree — functions, structs,
-// variants, imports, and the program that holds them — with the source-like
-// dump the item lowering's tests assert against. One of the files the AST is
-// declared across; see `ast.aipl`.
+# The items and declarations of AIPL's syntax tree — functions, structs,
+# variants, imports, and the program that holds them — with the source-like
+# dump the item lowering's tests assert against. One of the files the AST is
+# declared across; see `ast.aipl`.
+
 import { Span, equal as ==, is_empty, join, map, value_or } from builtins;
 import { Bound, show_bound } from "./bound.aipl";
 import { Expr, FieldInit, show_expr } from "./expr.aipl";
@@ -84,7 +85,12 @@ variant Item =
 
 # `aipl_syntax::ast::Program`, less its `sources` map: a single parsed file has
 # none, and the loader fills one in when it flattens several files together.
-struct Program { items: Item[] }
+#
+# `doc` is the file's own documentation — the `# ..` block at the top that a
+# blank line detaches from whatever follows, so it documents no declaration.
+# `none` for a file that opens with anything else, and for every program a pass
+# builds or the loader flattens, neither of which is one file.
+struct Program { items: Item[], doc: str? }
 
 # A parsed function body, before the return type is in scope to name the struct
 # the shorthand constructs. Parser-local: by the time a `Function` is built the

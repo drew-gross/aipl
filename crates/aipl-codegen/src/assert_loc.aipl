@@ -1,10 +1,11 @@
-// The `assert(cond)` location formatter: the compiler calls this through the
-// FFI (see `install_parser_hooks`) while baking `assert(cond)` calls inside
-// `.test({ .. })` bodies into `__assert(cond, loc)`, capturing each assertion's
-// source location for the `check` failure report. `span` is the condition's
-// half-open byte range within `src`; both bounds clamp to `[0, len]` (and an
-// out-of-order range collapses to "") via ordinary string-slicing semantics, so
-// no manual clamping is needed here.
+# The `assert(cond)` location formatter: the compiler calls this through the
+# FFI (see `install_parser_hooks`) while baking `assert(cond)` calls inside
+# `.test({ .. })` bodies into `__assert(cond, loc)`, capturing each assertion's
+# source location for the `check` failure report. `span` is the condition's
+# half-open byte range within `src`; both bounds clamp to `[0, len]` (and an
+# out-of-order range collapses to "") via ordinary string-slicing semantics, so
+# no manual clamping is needed here.
+
 import { Span, equal as ==, len, trim } from builtins;
 import { lines } from "./lines.aipl";
 

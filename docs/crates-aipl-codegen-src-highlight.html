@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/highlight.aipl</code></h1>
 
+      <div class="module-doc"><p>Generates a TextMate grammar — the <code>.tmLanguage.json</code> a VS Code, Sublime or Zed extension ships — from the data a language is <em>already</em> described with.</p><p>The input is a <code>TokenRule[]</code>, the same rule set <code>lexer.aipl</code> lexes with. Every rule carries a <code>scope</code> (see <code>TokenRule</code> in <code>lexer.aipl</code>), and this file turns each rule's <code>Matcher</code> into the TextMate pattern that recognizes the same text. A highlighter is then not a third hand-written description of the language but a projection of the first one, which is the whole point: the copy that drifts is the copy nobody generated.</p><p><strong>Order means the same thing in both.</strong> <code>lex</code> is first-match-wins at a position; TextMate takes the pattern whose match starts earliest and breaks a tie by the order patterns are listed. So a rule list already ordered for maximal munch — <code>==</code> before <code>=</code>, the block comment before <code>/</code> — comes out ordered correctly, and consecutive rules sharing a scope merge into one ordered alternation for free.</p><p><strong>What does not come from the lexer.</strong> Two kinds of pattern have no lexical rule to derive from, and both are supplied by the caller:</p><ul><li><em>Contextual declarations</em> — <code>fn NAME</code>, <code>struct NAME</code> — where the name gets a different scope for being in that position. <code>decl_pat</code> builds one from a keyword and the identifier regex, so the names it accepts are still the lexer's.</li><li><em>Post-lexical classes</em> — a language whose builtin type names lex as plain identifiers and are told apart later. <code>word_pat</code> builds the alternation.</li></ul><p>Anything else is <code>Pat</code>, hand-built: the model below is the escape hatch, and <code>highlight_aipl.aipl</code> uses it for exactly one pattern (the test-case section tail, which is not AIPL syntax at all).</p><p><strong>Regex dialect.</strong> The output has to satisfy two engines: Oniguruma, which is what a real editor runs, and Rust's <code>regex</code>, which is what the oracle in <code>tests/highlighting.rs</code> validates the checked-in file with. <code>regex</code> has no lookaround, so a keyword boundary is <code>\b..\b</code> rather than a negative lookahead on the rule's own continuation class — correct whenever that class is the word-character set, which is the only case any rule set here has.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -218,7 +221,7 @@
           </h3>
           <pre class="signature"><code>pub fn decl_pat(keyword: str, name_re: str, kw_scope: str, name_scope: str) -&#62; Pat</code></pre>
 
-          <div class="doc"><p>A declaration: <code>keyword</code> then a name matching <code>name_re</code>, with the two halves painted <code>kw_scope</code> and <code>name_scope</code>. This is the one genuinely *syntactic* thing a highlighter does — a name means something different for standing after <code>fn</code> — and the only one a regex- and line-based target can express.</p><p>Pass <code>name_re</code> from the identifier rule's own matcher (<code>matcher_regex</code>) so the names a declaration accepts stay the names the lexer accepts. It must contain no capture groups of its own, which a character-class run never does.</p></div>
+          <div class="doc"><p>A declaration: <code>keyword</code> then a name matching <code>name_re</code>, with the two halves painted <code>kw_scope</code> and <code>name_scope</code>. This is the one genuinely <em>syntactic</em> thing a highlighter does — a name means something different for standing after <code>fn</code> — and the only one a regex- and line-based target can express.</p><p>Pass <code>name_re</code> from the identifier rule's own matcher (<code>matcher_regex</code>) so the names a declaration accepts stay the names the lexer accepts. It must contain no capture groups of its own, which a character-class run never does.</p></div>
 
 
         </section>
@@ -244,7 +247,7 @@
             <a class="anchor" href="#item-tm_json">tm_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn tm_json(__spat$24139: Tm) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn tm_json(__spat$24103: Tm) -&#62; str</code></pre>
 
           <div class="doc"><p><code>g</code> as the <code>.tmLanguage.json</code> text an editor extension ships: two-space indented, one trailing newline. Generated files are read in diffs, so the layout is fixed and deterministic rather than minified.</p></div>
 
@@ -304,7 +307,7 @@
           </h3>
           <pre class="signature"><code>let RE_META = &#34;&#34;&#34;\.^$|?*+()[]{}&#34;&#34;&#34;.to_set()</code></pre>
 
-          <div class="doc"><p>The chars a regex reads specially outside a character class, and so that a literal spelling must escape. <code>-</code> is not among them: it is only special *inside* a class (see <code>class_char</code>).</p></div>
+          <div class="doc"><p>The chars a regex reads specially outside a character class, and so that a literal spelling must escape. <code>-</code> is not among them: it is only special <em>inside</em> a class (see <code>class_char</code>).</p></div>
 
 
         </section>
@@ -318,7 +321,7 @@
           </h3>
           <pre class="signature"><code>let CLASS_META = &#34;&#34;&#34;\[]^-&#34;&#34;&#34;.to_set()</code></pre>
 
-          <div class="doc"><p>The chars that must be escaped *inside* <code>[...]</code>, where the rules are different and much shorter.</p></div>
+          <div class="doc"><p>The chars that must be escaped <em>inside</em> <code>[...]</code>, where the rules are different and much shorter.</p></div>
 
 
         </section>
@@ -374,7 +377,7 @@
           </h3>
           <pre class="signature"><code>fn template_inner(escapes: #{char}, esc_scope: str) -&#62; Pat[]</code></pre>
 
-          <div class="doc"><p>What lies inside a template literal: its escapes and the <code>{ .. }</code> interpolation, which includes the whole language back into itself so an interpolated expression keeps its ordinary scopes. The escapes always include the template's own <code>\{</code>/<code>\}</code> (see <code>Template</code> in <code>lexer.aipl</code>), listed ahead of the interpolation so an escaped brace is painted as one rather than opening it. The brace group comes first inside so a <code>{ .. }</code> *inside* the expression — a set literal, a struct — closes itself rather than the interpolation; see <code>brace_group_entry</code>.</p></div>
+          <div class="doc"><p>What lies inside a template literal: its escapes and the <code>{ .. }</code> interpolation, which includes the whole language back into itself so an interpolated expression keeps its ordinary scopes. The escapes always include the template's own <code>\{</code>/<code>\}</code> (see <code>Template</code> in <code>lexer.aipl</code>), listed ahead of the interpolation so an escaped brace is painted as one rather than opening it. The brace group comes first inside so a <code>{ .. }</code> <em>inside</em> the expression — a set literal, a struct — closes itself rather than the interpolation; see <code>brace_group_entry</code>.</p></div>
 
 
         </section>
@@ -498,7 +501,7 @@
             <a class="anchor" href="#item-entry_json">entry_json</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn entry_json(__spat$26852: Entry) -&#62; str</code></pre>
+          <pre class="signature"><code>fn entry_json(__spat$26816: Entry) -&#62; str</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_left_fold.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>left_fold</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_left_fold</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.left_fold(init, f)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>left_fold</code> is only for this file's own tests, which read exactly like user code.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

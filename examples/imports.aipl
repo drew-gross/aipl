@@ -1,5 +1,5 @@
-// Demonstrates `import { ... } from "..."`. The path is relative to
-// this file; only the listed names come into scope.
+# Demonstrates `import { ... } from "..."`. The path is relative to
+# this file; only the listed names come into scope.
 
 import { Rect, double_area } from "./math/geometry.aipl";
 

@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_drop_last_n.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>drop_last_n</code> builtin (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>); <code>drop_n</code>'s mirror.</p><p>The guard is deliberate rather than emergent. Without it, <code>len() - n</code> for <code>n &gt; len</code> wraps to a value that reads as a <em>negative</em> slice bound, which does happen to produce an empty array — but that is an accident of how a wrapped <code>u64</code> is interpreted, not a stated rule. Spelling the empty case out keeps the contract independent of that.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

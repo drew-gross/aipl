@@ -1,14 +1,15 @@
+# The AIPL implementation of the `count` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_count` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.count(x)` resolves
+# through the ordinary generic machinery — the in-file name `count` is only for
+# this file's own tests, which read exactly like user code.
+#
+# The counterpart of `count_while`, which counts a *leading run* matching a
+# predicate; this counts *every* element equal to a value, anywhere. Unsigned,
+# like `len`: a count is never negative.
+
 import { equal as ==, wrapping_increment as ++ } from builtins;
 
-// The AIPL implementation of the `count` builtin. Monomorphization registers
-// this function under the canonical name `__builtin_count` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.count(x)` resolves
-// through the ordinary generic machinery — the in-file name `count` is only for
-// this file's own tests, which read exactly like user code.
-//
-// The counterpart of `count_while`, which counts a *leading run* matching a
-// predicate; this counts *every* element equal to a value, anywhere. Unsigned,
-// like `len`: a count is never negative.
 # Counts how many elements of `self` equal `x`, comparing with `==` (so strings
 # and chars compare by value). Generic over the element type and callable as a
 # method: `xs.count(x)`. A `str` receiver counts bytes, since `str` and `char[]`

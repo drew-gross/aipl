@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/normalize_output.aipl</code></h1>
 
+      <div class="module-doc"><p>The cases harness's captured-output normalizer: the test harness calls this through the embedding FFI (see <code>aipl::codegen::normalize_output</code>) to compare a child program's stdout/stderr against the expected sections, and <code>aipl check</code> exercises it via the <code>.test</code> block below. Collapsing CRLF to LF matters on Windows, where libc text-mode stdout rewrites the runtime's <code>\n</code> to <code>\r\n</code>.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

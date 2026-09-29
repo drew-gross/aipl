@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_count_is_at_least.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>count_is_at_least</code> builtin. Registered under <code>__builtin_count_is_at_least</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>).</p><p>A fused comparison: <code>count(x) &gt;= limit</code> without counting past the point the answer is settled. <code>count</code> itself always walks the whole collection; this stops at the first element that decides it, which is the entire reason the fusion pass exists.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

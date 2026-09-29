@@ -1,18 +1,19 @@
-// A Wadler/Prettier-style pretty-printing document algebra, dogfooded in AIPL:
-// the formatter builds a `Doc` tree describing *possible* layouts and `print`
-// picks one — each `Group` renders on one line ("flat") when it fits within the
-// width limit, and breaks at its `Line`/`SoftLine` points otherwise. This is the
-// port of the Rust `aipl-fmt` `doc.rs`; `format_source` (the formatter proper)
-// builds the tree and calls `print` here.
-//
-// The printer walks a `Work` cons-list (the explicit work-stack the Rust version
-// keeps in a `Vec`) with a `while` loop, so the native stack stays flat however
-// large the document is. It was originally written as a tail-recursive walk on
-// the assumption that the tail call would be eliminated; it is not, and a
-// document of a few tens of thousands of nodes duly exhausted the stack. Output
-// is accumulated as a `str[]` and joined once at the end. `fits` looks ahead over
-// the same cons-list — the list *is* the "rest of the line" the Rust `fits` reads
-// off the work stack.
+# A Wadler/Prettier-style pretty-printing document algebra, dogfooded in AIPL:
+# the formatter builds a `Doc` tree describing *possible* layouts and `print`
+# picks one — each `Group` renders on one line ("flat") when it fits within the
+# width limit, and breaks at its `Line`/`SoftLine` points otherwise. This is the
+# port of the Rust `aipl-fmt` `doc.rs`; `format_source` (the formatter proper)
+# builds the tree and calls `print` here.
+#
+# The printer walks a `Work` cons-list (the explicit work-stack the Rust version
+# keeps in a `Vec`) with a `while` loop, so the native stack stays flat however
+# large the document is. It was originally written as a tail-recursive walk on
+# the assumption that the tail call would be eliminated; it is not, and a
+# document of a few tens of thousands of nodes duly exhausted the stack. Output
+# is accumulated as a `str[]` and joined once at the end. `fits` looks ahead over
+# the same cons-list — the list *is* the "rest of the line" the Rust `fits` reads
+# off the work stack.
+
 import {
     any,
     concat as +++,

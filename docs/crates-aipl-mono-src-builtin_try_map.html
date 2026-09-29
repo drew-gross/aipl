@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-mono/src/builtin_try_map.aipl</code></h1>
 
+      <div class="module-doc"><p>The AIPL implementation of the <code>try_map</code> builtin. Monomorphization registers this function under the canonical name <code>__builtin_try_map</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.try_map(f)</code> resolves through the ordinary generic / higher-order machinery — the in-file name <code>try_map</code> is only for this file's own tests, which read exactly like user code.</p><p><code>map</code> cannot call a fallible <code>f</code>: a <code>U[]</code> has nowhere to put an error, so every mapping that can fail had to be spelled out as a loop over <code>push</code> with <code>?</code> — the one array-building shape <code>map</code> could not absorb. This is that loop, written once.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>
@@ -26,7 +29,7 @@
           </h3>
           <pre class="signature"><code>pub fn try_map&#60;T: any, U: any, E: any&#62;(self: T[], f: (T) -&#62; U!E) -&#62; U[]!E</code></pre>
 
-          <div class="doc"><p><code>self</code> with <code>f</code> applied to each element, short-circuiting on failure: the result is <code>ok</code> of every mapped value, in order, or the *first* <code>err</code> that <code>f</code> returned — after which no further element is mapped. Generic over the element type, the mapped type and the error type, and callable as a method: <code>xs.try_map(f)</code>.</p><p>The fallible counterpart of <code>map</code>, and what a <code>for</code> loop over <code>set out.push(f(x)?)</code> is written as.</p></div>
+          <div class="doc"><p><code>self</code> with <code>f</code> applied to each element, short-circuiting on failure: the result is <code>ok</code> of every mapped value, in order, or the <em>first</em> <code>err</code> that <code>f</code> returned — after which no further element is mapped. Generic over the element type, the mapped type and the error type, and callable as a method: <code>xs.try_map(f)</code>.</p><p>The fallible counterpart of <code>map</code>, and what a <code>for</code> loop over <code>set out.push(f(x)?)</code> is written as.</p></div>
 
 
         </section>

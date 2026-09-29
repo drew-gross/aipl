@@ -1,6 +1,7 @@
-// `aipl_syntax::ast::Expr` and `ExprKind` as AIPL declares them, with the
-// structural dump the lowering's tests assert against. One of the files the
-// AST is declared across; see `ast.aipl`.
+# `aipl_syntax::ast::Expr` and `ExprKind` as AIPL declares them, with the
+# structural dump the lowering's tests assert against. One of the files the
+# AST is declared across; see `ast.aipl`.
+
 import { Span, equal as ==, first, is_empty, join, logical_not as !, map, value_or } from builtins;
 import { Ctor, Pat, show_pat } from "./pat.aipl";
 import { I64 } from "./prim.aipl";

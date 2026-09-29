@@ -1,3 +1,22 @@
+# The AIPL implementation of the `opt_left_fold` builtin: `left_fold` with a
+# fallible combiner. Monomorphization registers this function under the
+# canonical name `__builtin_opt_left_fold` (see `AIPL_BUILTIN_SOURCES` in
+# `lib.rs`), so a user's `xs.opt_left_fold(init, f)` specializes through the
+# ordinary generic / higher-order machinery.
+#
+# `f` is not called again once a step has failed, so the fold's *work* stops at
+# the first `none` — but the walk itself continues (AIPL has no `break`). That
+# keeps the plain `for`, whose element access streams a `str` receiver through
+# the char cursor; an index-driven `while` that really exits early reads
+# `self[i]` per element, which costs far more than the leftover `if (ok)` ticks.
+# The accumulator stays a plain `A` — the `ok` flag, not an `A?` threaded
+# through the loop, carries the failure. A `mut` binding of an *optional* (a
+# composite) reassigned from inside a loop body is currently miscompiled: the
+# body's scope releases the new value's heap components while the binding still
+# points at them, so a `str`/array/boxed accumulator would corrupt. A plain `A`
+# binding goes through the slot-owned-reference model instead, which is correct
+# across scopes.
+
 import {
     concat as +++,
     equal as ==,
@@ -10,24 +29,6 @@ import {
     wrapping_mul as *,
 } from builtins;
 
-// The AIPL implementation of the `opt_left_fold` builtin: `left_fold` with a
-// fallible combiner. Monomorphization registers this function under the
-// canonical name `__builtin_opt_left_fold` (see `AIPL_BUILTIN_SOURCES` in
-// `lib.rs`), so a user's `xs.opt_left_fold(init, f)` specializes through the
-// ordinary generic / higher-order machinery.
-//
-// `f` is not called again once a step has failed, so the fold's *work* stops at
-// the first `none` — but the walk itself continues (AIPL has no `break`). That
-// keeps the plain `for`, whose element access streams a `str` receiver through
-// the char cursor; an index-driven `while` that really exits early reads
-// `self[i]` per element, which costs far more than the leftover `if (ok)` ticks.
-// The accumulator stays a plain `A` — the `ok` flag, not an `A?` threaded
-// through the loop, carries the failure. A `mut` binding of an *optional* (a
-// composite) reassigned from inside a loop body is currently miscompiled: the
-// body's scope releases the new value's heap components while the binding still
-// points at them, so a `str`/array/boxed accumulator would corrupt. A plain `A`
-// binding goes through the slot-owned-reference model instead, which is correct
-// across scopes.
 # Combine the elements left to right with a *fallible* combiner, starting from
 # `init`: `f` returns `A?`, and the first `none` ends the fold with `none` —
 # the remaining elements are never visited. All-`some` folds to `some(result)`,

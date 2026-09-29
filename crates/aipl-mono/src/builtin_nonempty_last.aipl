@@ -1,9 +1,10 @@
+# The AIPL implementation of the `nonempty_last` builtin (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`); `nonempty_first`'s mirror, and `last`
+# for an array the type system knows is not empty. The `none` arm recurses
+# for the reason `nonempty_first`'s does.
+
 import { equal as ==, len, wrapping_sub as - } from builtins;
 
-// The AIPL implementation of the `nonempty_last` builtin (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`); `nonempty_first`'s mirror, and `last`
-// for an array the type system knows is not empty. The `none` arm recurses
-// for the reason `nonempty_first`'s does.
 # The last element of a non-empty array — the element itself, not a `T?`,
 # because a `T[] without []` has one. `last` is the same question for an array
 # that may be empty.

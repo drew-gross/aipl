@@ -163,8 +163,10 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
         .collect::<Result<_, _>>()?;
     Ok(Program {
         items,
-        // Expansion rewrites bodies only; the file map is unchanged.
+        // Expansion rewrites bodies only; the file map and the file's own
+        // documentation are unchanged.
         sources: program.sources.clone(),
+        doc: program.doc.clone(),
     })
 }
 

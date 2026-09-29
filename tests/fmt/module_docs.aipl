@@ -1,0 +1,27 @@
+# What this file is.
+#
+# A blank line under a `# ..` block detaches it from what follows, and at the
+# top of a file a detached block documents the file. So it has to stay above
+# the hoisted imports, and keep the blank line that says it is the file's.
+
+import { x }   from "./m.aipl" ;
+import { print } from builtins;
+
+# This one runs straight into the declaration, so it documents `f` and rides
+# down below the imports with it.
+fn f( ) { print("hi") ; }
+--- formatted ---
+# What this file is.
+#
+# A blank line under a `# ..` block detaches it from what follows, and at the
+# top of a file a detached block documents the file. So it has to stay above
+# the hoisted imports, and keep the blank line that says it is the file's.
+
+import { print } from builtins;
+import { x } from "./m.aipl";
+
+# This one runs straight into the declaration, so it documents `f` and rides
+# down below the imports with it.
+fn f() {
+    print("hi");
+}

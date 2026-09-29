@@ -1,6 +1,7 @@
-// One entry of a `#{ .. }` literal and the decision that turns a list of them
-// into a set or a dict. One of the files the AST is declared across; see
-// `ast.aipl`.
+# One entry of a `#{ .. }` literal and the decision that turns a list of them
+# into a set or a dict. One of the files the AST is declared across; see
+# `ast.aipl`.
+
 import {
     Span,
     equal as ==,

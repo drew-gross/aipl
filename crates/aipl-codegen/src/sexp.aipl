@@ -1,7 +1,8 @@
-// The AST `grammar_sexp.aipl` lowers to, and its canonical rendering. Its own
-// file because its `Atom` and the token kind's `Atom` are two names for one
-// idea at two levels, and a file holds one of each: `grammar_sexp.aipl`
-// imports this one as `AtomNode`.
+# The AST `grammar_sexp.aipl` lowers to, and its canonical rendering. Its own
+# file because its `Atom` and the token kind's `Atom` are two names for one
+# idea at two levels, and a file holds one of each: `grammar_sexp.aipl`
+# imports this one as `AtomNode`.
+
 import { equal as ==, join, map, maximum, repeat, value_or, wrapping_add as + } from builtins;
 import { parse_sexp } from "./grammar_sexp.aipl";
 

@@ -1,34 +1,35 @@
-// The parser driver: one function that interprets a `Grammar` (see
-// `grammar.aipl`) over a token stream (see `lexer.aipl`) and yields a lossless
-// `Cst` (see `cst.aipl`), plus a second pass that lowers that tree to the
-// caller's own AST through each production's `build`. Together they are the
-// upper half of a front end whose lower half is already data-driven: a language
-// is a `TokenRule[]` and a `Grammar`, and nothing else.
-//
-// **PEG, not LR.** `OneOf` commits to its first matching alternative, so a
-// grammar is unambiguous by construction and a failed alternative simply
-// backtracks. Two consequences the driver has to handle, and does:
-//
-//   - *Left recursion does not work.* `expr -> expr "+" term` would call itself
-//     at the same position forever. Binary operators are spelled with `Climb`
-//     instead, which is why that rule exists.
-//   - *Errors need furthest-failure tracking.* Backtracking throws away the
-//     position where a parse got the furthest, which is nearly always where the
-//     mistake is. Every rule threads a `Far` — the deepest position anything was
-//     expected at, and the set of things expected there — through both success
-//     and failure, so the reported error is the deepest one, not the last.
-//
-// **Two passes, not one.** `parse_cst` builds the tree; `lower` walks it calling
-// `build`. Lowering during the parse would run a production's `build` inside
-// speculative alternatives that then backtrack — wasted allocation at best, and
-// at worst a `build` that legitimately fails aborting a parse that should simply
-// have tried the next alternative. `parse` is the two in sequence.
-//
-// Costs worth knowing before this drives something large: trivia is attached by
-// scanning the trivia list for each consumed token, so a parse is O(tokens ×
-// trivia); and with no memoization a heavily-backtracking grammar can be
-// exponential. Both are answered later in the plan — FIRST sets remove most
-// backtracking — and neither matters at the sizes here.
+# The parser driver: one function that interprets a `Grammar` (see
+# `grammar.aipl`) over a token stream (see `lexer.aipl`) and yields a lossless
+# `Cst` (see `cst.aipl`), plus a second pass that lowers that tree to the
+# caller's own AST through each production's `build`. Together they are the
+# upper half of a front end whose lower half is already data-driven: a language
+# is a `TokenRule[]` and a `Grammar`, and nothing else.
+#
+# **PEG, not LR.** `OneOf` commits to its first matching alternative, so a
+# grammar is unambiguous by construction and a failed alternative simply
+# backtracks. Two consequences the driver has to handle, and does:
+#
+#   - *Left recursion does not work.* `expr -> expr "+" term` would call itself
+#     at the same position forever. Binary operators are spelled with `Climb`
+#     instead, which is why that rule exists.
+#   - *Errors need furthest-failure tracking.* Backtracking throws away the
+#     position where a parse got the furthest, which is nearly always where the
+#     mistake is. Every rule threads a `Far` — the deepest position anything was
+#     expected at, and the set of things expected there — through both success
+#     and failure, so the reported error is the deepest one, not the last.
+#
+# **Two passes, not one.** `parse_cst` builds the tree; `lower` walks it calling
+# `build`. Lowering during the parse would run a production's `build` inside
+# speculative alternatives that then backtrack — wasted allocation at best, and
+# at worst a `build` that legitimately fails aborting a parse that should simply
+# have tried the next alternative. `parse` is the two in sequence.
+#
+# Costs worth knowing before this drives something large: trivia is attached by
+# scanning the trivia list for each consumed token, so a parse is O(tokens ×
+# trivia); and with no memoization a heavily-backtracking grammar can be
+# exponential. Both are answered later in the plan — FIRST sets remove most
+# backtracking — and neither matters at the sizes here.
+
 import {
     Span,
     all,

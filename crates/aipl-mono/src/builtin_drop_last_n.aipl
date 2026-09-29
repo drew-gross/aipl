@@ -1,13 +1,14 @@
+# The AIPL implementation of the `drop_last_n` builtin (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`); `drop_n`'s mirror.
+#
+# The guard is deliberate rather than emergent. Without it, `len() - n` for
+# `n > len` wraps to a value that reads as a *negative* slice bound, which does
+# happen to produce an empty array — but that is an accident of how a wrapped
+# `u64` is interpreted, not a stated rule. Spelling the empty case out keeps the
+# contract independent of that.
+
 import { equal as ==, first, is_empty, last, len, less_than as <, wrapping_sub as - } from builtins;
 
-// The AIPL implementation of the `drop_last_n` builtin (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`); `drop_n`'s mirror.
-//
-// The guard is deliberate rather than emergent. Without it, `len() - n` for
-// `n > len` wraps to a value that reads as a *negative* slice bound, which does
-// happen to produce an empty array — but that is an accident of how a wrapped
-// `u64` is interpreted, not a stated rule. Spelling the empty case out keeps the
-// contract independent of that.
 # Every element except the last `n`. Dropping `n >= len` gives an empty array,
 # mirroring `drop_n`.
 pub fn drop_last_n<T: any>(self: T[], n: u64) -> T[] {

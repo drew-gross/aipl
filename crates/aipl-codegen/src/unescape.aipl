@@ -1,4 +1,5 @@
-// AIPL's string-escape decoder.
+# AIPL's string-escape decoder.
+
 import {
     concat as +++,
     equal as ==,

@@ -1,20 +1,21 @@
+# The AIPL implementation of the `find_if` builtin. Monomorphization registers
+# this function under the canonical name `__builtin_find_if` (see
+# `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_if(pred)` resolves
+# through the ordinary generic / higher-order machinery — the in-file name
+# `find_if` is only for this file's own tests, which read exactly like user
+# code.
+#
+# It is `any` with the element handed back: both stop at the first element
+# satisfying `pred`, and where `any` reports only that one existed, this
+# returns it. The optional is what carries the not-found case, so the empty
+# array needs no special handling.
+#
+# The `#[allow]` squelches `return_loop_find_if`, which flags exactly this
+# shape — a loop returning the first match — and asks for `find_if`. Here it
+# *is* `find_if`.
+
 import { equal as ==, filter, greater_than as >, logical_not as ! } from builtins;
 
-// The AIPL implementation of the `find_if` builtin. Monomorphization registers
-// this function under the canonical name `__builtin_find_if` (see
-// `AIPL_BUILTIN_SOURCES` in `lib.rs`), so a user's `xs.find_if(pred)` resolves
-// through the ordinary generic / higher-order machinery — the in-file name
-// `find_if` is only for this file's own tests, which read exactly like user
-// code.
-//
-// It is `any` with the element handed back: both stop at the first element
-// satisfying `pred`, and where `any` reports only that one existed, this
-// returns it. The optional is what carries the not-found case, so the empty
-// array needs no special handling.
-//
-// The `#[allow]` squelches `return_loop_find_if`, which flags exactly this
-// shape — a loop returning the first match — and asks for `find_if`. Here it
-// *is* `find_if`.
 # The first element of `self` satisfying `pred`, or `none` when none does,
 # stopping at the first match. Generic over the element type and callable as a
 # method: `xs.find_if(pred)`. A `str` receiver iterates its chars, since `str`

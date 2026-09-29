@@ -14,6 +14,9 @@
 
       <h1><code>crates/aipl-codegen/src/find_trailing_whitespace.aipl</code></h1>
 
+      <div class="module-doc"><p>The parser's trailing-whitespace locator: the compiler calls this through the FFI (see <code>install_parser_hooks</code>) from <code>reject_trailing_whitespace</code> on every parse, and <code>aipl check</code> exercises it via the <code>.test</code> block below. It returns a <code>Span?</code> — an optional builtin <code>Span</code> returned over the FFI — locating the first offending run, or <code>none</code> when there is none; <code>aipl_str_iter_next</code> walks <code>src</code> byte-by-byte, so the offsets are byte offsets, matching the parser's error rendering.</p></div>
+
+
 
       <section class="group">
         <h2 id="public">Public</h2>

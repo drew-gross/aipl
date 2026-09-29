@@ -1,26 +1,27 @@
-// JSON: the library's second end-to-end target, and the one that adds everything
-// S-expressions deliberately left out — several terminal classes rather than one,
-// a separated `Many` with a trailing-comma rule, an `OneOf` across six
-// alternatives, and a heterogeneous AST. Still no precedence; that arrives with
-// the calculator in `grammar_calc.aipl`.
-//
-// Complete but tiny: eight productions and one `variant Json`, against a rule set
-// cribbed from `lexer.aipl`'s own JSON-flavored test table.
-//
-// Two things worth reading before the grammar:
-//
-//   - **Numbers stay text.** `Number` carries the source spelling rather than a
-//     parsed value. JSON's number syntax is wider than any one AIPL type (an
-//     arbitrary-precision integer is legal JSON), so *what a number means* is the
-//     consumer's policy, exactly as it is for the lexer's `Int`/`Float`, which
-//     hand over their digits unparsed for the same reason.
-//   - **`Member` is where a uniform lowering type shows its seam.** `Build<A>`
-//     pins one `A` for every production in a grammar, so the `member` production
-//     — whose natural result is a key/value *pair*, not a JSON value — has to
-//     lower to a `Json` too. It gets a case of its own, meaningful only as an
-//     element of a `Object`. That is the honest cost of one lowering type per
-//     grammar, and it is worth knowing before the grammar describes AIPL itself,
-//     where the AST has many more shapes than its expression type.
+# JSON: the library's second end-to-end target, and the one that adds everything
+# S-expressions deliberately left out — several terminal classes rather than one,
+# a separated `Many` with a trailing-comma rule, an `OneOf` across six
+# alternatives, and a heterogeneous AST. Still no precedence; that arrives with
+# the calculator in `grammar_calc.aipl`.
+#
+# Complete but tiny: eight productions and one `variant Json`, against a rule set
+# cribbed from `lexer.aipl`'s own JSON-flavored test table.
+#
+# Two things worth reading before the grammar:
+#
+#   - **Numbers stay text.** `Number` carries the source spelling rather than a
+#     parsed value. JSON's number syntax is wider than any one AIPL type (an
+#     arbitrary-precision integer is legal JSON), so *what a number means* is the
+#     consumer's policy, exactly as it is for the lexer's `Int`/`Float`, which
+#     hand over their digits unparsed for the same reason.
+#   - **`Member` is where a uniform lowering type shows its seam.** `Build<A>`
+#     pins one `A` for every production in a grammar, so the `member` production
+#     — whose natural result is a key/value *pair*, not a JSON value — has to
+#     lower to a `Json` too. It gets a case of its own, meaningful only as an
+#     element of a `Object`. That is the honest cost of one lowering type per
+#     grammar, and it is worth knowing before the grammar describes AIPL itself,
+#     where the AST has many more shapes than its expression type.
+
 import {
     equal as ==,
     first,
