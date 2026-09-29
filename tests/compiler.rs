@@ -26,6 +26,8 @@ mod highlighting;
 mod mono;
 #[path = "suites/parser.rs"]
 mod parser;
+#[path = "suites/projects.rs"]
+mod projects;
 #[path = "suites/shims.rs"]
 mod shims;
 

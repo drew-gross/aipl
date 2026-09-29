@@ -90,7 +90,13 @@ fn token_fingerprint(src: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
 /// misformatted to exercise the formatter.
 fn enforced_files() -> Vec<PathBuf> {
     let mut files = Vec::new();
-    for dir in ["tests/cases", "crates", "examples", "tests/ffi_fixtures"] {
+    for dir in [
+        "tests/cases",
+        "crates",
+        "examples",
+        "projects",
+        "tests/ffi_fixtures",
+    ] {
         aipl_files(dir, &mut files);
     }
     files

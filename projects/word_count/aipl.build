@@ -1,0 +1,9 @@
+# The `aipl` beside this file is the compiler that builds this project
+# (DESIGN_PRINCIPLES.md §4). This records which compiler it is: a
+# fingerprint of every file the binary was built from.
+#
+# It exists because the projects in *this* repository are held to the
+# current compiler — a project of your own would not have one. Checked by
+# `projects::checked_in_compilers_are_current`; rewritten, with the
+# binary, by `cargo handoff`.
+source-fingerprint 15376183680968157633

@@ -1,0 +1,4 @@
+# `./aipl build word_count.aipl` links the executable here, next to the source.
+# It is a build output: rebuild it rather than commit it. The compiler beside it
+# is the one file in this directory that *is* checked in on purpose.
+/word_count

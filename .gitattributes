@@ -11,3 +11,10 @@
 # To read one anyway: `git diff --text -- '*.clif'`.
 *.clif -diff
 docs/** -diff
+
+# Each project under `projects/` carries the compiler that builds it
+# (DESIGN_PRINCIPLES.md §4), so an `aipl` in there is a 20–30 MB executable that
+# git would otherwise sniff and report on. `-diff` makes it a one-line "Binary
+# files ... differ", which is all there is to say about it: what records *which*
+# compiler it is is the `aipl.build` beside it, and that is ordinary text.
+projects/*/aipl -diff

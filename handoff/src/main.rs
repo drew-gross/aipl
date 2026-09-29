@@ -31,7 +31,8 @@
 //! 2. Discovery run. Three outcomes:
 //!    - green → done.
 //!    - only fillable staleness (a section mismatch, a drifted per-case
-//!      `#[test]` list, a stale docs site, or IR staleness) → remediate
+//!      `#[test]` list, a stale docs site, a stale per-project compiler, or IR
+//!      staleness) → remediate
 //!      (steps 3-5), then
 //!      re-confirm. Refreshing a section is always recoverable
 //!      (`git reset --hard HEAD`), so even behavioral sections (stdout / exit
@@ -56,6 +57,14 @@
 //!    the remediation steps rewrite that is compiled in rather than read at run
 //!    time. Its own labelled step purely so the timing report attributes that
 //!    compile to the thing that caused it instead of to the final run.
+//! 5c. `fill_project_compilers` re-copies the compiler each project under
+//!    `projects/` carries (DESIGN_PRINCIPLES.md §4). Last of the remediation
+//!    steps, because it has to copy the *final* compiler and the promote above
+//!    rewrites `dogfood.o`, which is linked into it. The check is against a
+//!    fingerprint of the compiler's whole source tree, so any compiler change at
+//!    all makes every project stale — the most routinely fillable staleness
+//!    there is, and one that would stop nearly every run if it were treated as a
+//!    failure.
 //! 6. Final run confirms green against the live (promoted) artifacts —
 //!    *scoped*, when the remediation was confined to section refills, to those
 //!    refilled cases plus every test that is not a per-case test. A case this
@@ -228,7 +237,9 @@ fn final_run_scope(repo: &Path, plan: &discovery::Plan) -> Option<Vec<String>> {
 /// imports included. So refilling `ty.aipl`'s `--- performance ---` cannot
 /// change what `grammar_aipl.aipl` compiles to, even though it imports it.
 /// `fill_docs` is likewise harmless: nothing under `docs/` is a case input, and
-/// the test that reads it is not a per-case test, so it runs regardless.
+/// the test that reads it is not a per-case test, so it runs regardless. So is
+/// `fill_project_compilers`: a project's `aipl` is read by nothing but the two
+/// tests that own it, neither of them a per-case test.
 fn final_run_scope_from(
     names: &HashMap<String, String>,
     plan: &discovery::Plan,
@@ -774,6 +785,40 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
         r.fail("rebuild after regeneration", &detail);
     }
 
+    // --- 5c. Re-copy each project's checked-in compiler --------------------
+
+    // Every project under `projects/` carries the compiler that builds it
+    // (DESIGN_PRINCIPLES.md §4), checked against a fingerprint of the compiler's
+    // source tree — so any change to the compiler, Rust half or dogfooded AIPL,
+    // makes every project stale at once. That makes it the most routinely-stale
+    // checked-in artifact here, and re-copying is unconditionally safe: nothing
+    // in the build or the suite reads a project's `aipl` except the two tests
+    // that own it.
+    //
+    // *Last* of the remediation steps, because the copy has to be of the final
+    // compiler and step 5 can rewrite `dogfood.o`, which is linked into it — a
+    // copy taken before the promote would be stale again immediately after. Going
+    // through the cargo helper rather than copying the file directly is what makes
+    // that safe without a rebuild step of its own: the helper's target depends on
+    // the `aipl` bin, so cargo rebuilds it against the promoted artifact before
+    // the copy happens.
+    //
+    // Also runs when step 1b or step 5 promoted IR without this gate having
+    // tripped: the discovery run then passed against an artifact that the promote
+    // has since replaced, so the projects are stale even though no test said so.
+    if plan.need_compilers || regenerated_ir || plan.need_ir {
+        r.step(
+            "fill_project_compilers (per-project compiler)",
+            helper("projects::fill_project_compilers"),
+        );
+        let out = helper_output(&mut r, "fill_project_compilers");
+        if !out.contains("review the diff") {
+            r.save_out();
+            let detail = tail(&out, 40);
+            r.fail("fill_project_compilers", &detail);
+        }
+    }
+
     // --- 6. Final confirmation against the live artifacts ------------------
 
     // Scoped to what the remediation above could possibly have changed, when it
@@ -818,6 +863,9 @@ and update MESSAGE_FORMAT_VERSION in handoff/src/runner.rs.",
     }
     if plan.need_docs {
         eprintln!("  regenerated the checked-in docs site");
+    }
+    if plan.need_compilers || regenerated_ir || plan.need_ir {
+        eprintln!("  re-copied each project's checked-in compiler");
     }
     if let Some(keep) = &scope {
         eprintln!(

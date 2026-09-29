@@ -256,3 +256,72 @@ PatStr` has made `PatStr` a name a reader must look up, exactly as they would
 have had to look up `EStr`. The difference is that this lookup is in the import
 list at the top of the file they are already reading, and only in the files
 that needed it.
+
+---
+
+## 4. A project carries its own compiler
+
+**A project directory contains the compiler that builds it.** Not a version
+number, not a constraint, not a lockfile naming one — the executable itself,
+checked in beside the source it compiles. `projects/word_count/` holds
+`word_count.aipl` and `aipl`, and building the project is running the `aipl`
+that is sitting there.
+
+The failure this avoids is the one every version-constrained toolchain has.
+Python states the requirement (`requires-python = ">=3.11"`) and leaves
+satisfying it to the developer, so a person working on two projects at once
+needs a mechanism *outside* both of them — pyenv, conda, virtualenvs, a
+container — whose job is to make the right interpreter be the one on `PATH` at
+the right moment. That mechanism is where the time goes: it is per-machine, it
+is stateful, it is invisible in the repository, and when it is wrong the error
+surfaces as a type error or an import failure rather than as "wrong compiler".
+
+Shipping the compiler collapses all of it. There is no version to resolve
+because there is no choice to make; there is no environment to activate because
+the path to the compiler is a path inside the project; and a checkout is
+complete — clone it and the thing that builds it is already there, at exactly
+the revision that was known to build it.
+
+### Downstream decisions
+
+| Decision | Shape |
+|---|---|
+| where the compiler lives | `<project>/aipl`, beside the source — not in a `bin/`, `tools/` or `.aipl/` subdirectory, because the whole point is that it is not somewhere a person has to be told about |
+| how a project is built | with that copy: `./aipl check`, `./aipl build word_count.aipl` |
+| what pins the compiler | the executable itself — there is no version to resolve, and nothing that could claim one thing while the binary is another |
+| upgrading a project | replacing that file; a project on an old compiler stays working, because nothing outside it changed |
+| this repository's projects | held to the *current* compiler, by `projects::checked_in_compilers_are_current` — see below |
+
+### In this repository, they are all current
+
+A real project upgrades its compiler when it chooses to. The projects under
+`projects/` here do not get that latitude: they are also the language's
+worked examples, so a project pinned to a superseded compiler would be
+demonstrating superseded AIPL. `checked_in_compilers_are_current` asserts that
+each project's `aipl` was built from the compiler sources as they stand now, and
+`cargo handoff` re-copies it when a compiler change makes it stale. What each
+project records for that is a fingerprint of those sources, in an `aipl.build`
+file beside the compiler — *not* the binary's own bytes, which cargo varies by
+build mode and would make the check answer a question about cargo rather than
+about the project. That file is part of the policy too: a project of your own
+would not carry one.
+
+That is a policy for this repository, not a property of the design. It is the
+one place where the projects here are *unlike* the user projects they are
+otherwise meant to be indistinguishable from.
+
+### What it costs, and why that is the right trade
+
+An `aipl` is 20–30 MB, and git keeps every revision of it forever, so a repository
+that updates the compiler often pays real bytes for this. Two things make it the
+right call anyway. The cost is storage, which is cheap and getting cheaper, where
+the cost it replaces is a person's attention at the moment they are trying to do
+something else. And it is bounded and visible — a number you can look up — where
+environment drift is neither.
+
+The honest limitation is that an executable is built for one platform. A project
+checked in from a macOS arm64 machine carries a macOS arm64 compiler, and a
+checkout on Linux has a file it cannot run. The answer is the same one the
+principle already gives: the project holds what it needs, so a project that
+wants two platforms holds two compilers. Nothing about that is resolved by
+naming a version instead.

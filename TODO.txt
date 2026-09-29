@@ -9,7 +9,7 @@ variant:
   Allow variants to be passed to HOFs, you can e.g. v.map(VariantConstructor).
 
 projects:
-  make some projects in AIPL, probably organized where it's a folder in this repo that would otherwise work standalone (i.e. aipl bin is copied in)
+  get rid of aipl.build, maybe by checking in the compiler in the main project also?
   Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
 
 vscode extension:

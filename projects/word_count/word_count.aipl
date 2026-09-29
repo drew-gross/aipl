@@ -1,0 +1,81 @@
+import {
+    equal as ==,
+    is_whitespace,
+    logical_not as !,
+    print,
+    read_file_to_string,
+    wrapping_increment as ++,
+} from builtins;
+
+# The number of words in `self`, a word being any run of non-whitespace
+# characters.
+#
+# Runs are counted by their first character, which is what makes the rule
+# "non-whitespace surrounded by whitespace" hold at both ends and for any amount
+# of whitespace between: leading and trailing whitespace separate nothing, a run
+# of spaces, tabs and newlines between two words separates them exactly once, and
+# an empty or all-whitespace input has no words at all.
+pub fn word_count(self: str) -> u64 {
+    mut words: u64 = 0;
+    mut inside = false;
+    for (let c : self) {
+        if (c.is_whitespace()) {
+            set inside = false;
+        } else {
+            if (!inside) {
+                set words++;
+            };
+            set inside = true;
+        };
+    }
+    words
+}.test({
+    assert(word_count("one two three") == 3);
+    assert(word_count("solo") == 1);
+
+    // Nothing to count.
+    assert(word_count("") == 0);
+    assert(word_count("   ") == 0);
+    assert(word_count("\n\t \n") == 0);
+
+    // Whitespace at the ends separates nothing.
+    assert(word_count("  padded  ") == 1);
+    assert(word_count("\n\nleading") == 1);
+    assert(word_count("trailing\n") == 1);
+
+    // Any run of whitespace, of any kind, is one separator.
+    assert(word_count("a     b") == 2);
+    assert(word_count("a\tb\nc\r\nd") == 4);
+    assert(
+        word_count("""
+            first line
+            second line
+        """) == 4,
+    );
+
+    // Punctuation is not whitespace, so it rides along with its word.
+    assert(word_count("Hello, world!") == 2);
+    assert(word_count("a,b c") == 2);
+})
+
+# Count the words in the file named by the single command-line argument, print
+# the count, and exit 0. Exits 1 — after saying why — when no path was given or
+# the file could not be read.
+fn main(args: str[]) !prints !read_files -> i64 {
+    match (args[0]) {
+        none => {
+            print("usage: word_count <file>");
+            1
+        },
+        some(path) => match (read_file_to_string(path)) {
+            ok(contents) => {
+                print(`{word_count(contents)}`);
+                0
+            },
+            err(e) => {
+                print(`word_count: {path}: {e}`);
+                1
+            },
+        },
+    }
+}
