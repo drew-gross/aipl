@@ -54,20 +54,6 @@ import {
 // than keeping a second copy in sync.
 import { unescape, unescape_braces } from "./unescape.aipl";
 
-# What a token carries beyond its span: the processed *value* of the matched
-# text, computed at lex time by the matcher that claimed it (see each
-# matcher's doc). `StrVal` holds delimiter-stripped, *un-decoded* text (strings,
-# raw strings, template segments) — the library strips the delimiters but leaves
-# escapes verbatim for the rule's `emit` to decode with its own decoder (escape
-# meaning is a language's policy, not the library's). Everything a rule can
-# recover by slicing its span — identifiers, punctuation, keywords, comments,
-# and the `Int`/`Float` numeric runs (whose *parsing* is the rule's `emit`'s
-# job, via the `int_parse` builtin or its own) — carries `NoValue`. (A char
-# literal is not a library concern: a consumer that wants one lexes it as a
-# single-quoted `Delimited` string and validates the one-char shape in its
-# `emit` — see `lex_aipl.aipl`.)
-variant TokenValue = NoValue | StrVal(str)
-
 # Matched text together with where it was matched: the two halves every
 # consumer of a token needs, carried in one value so they cannot be separated.
 #
@@ -167,19 +153,22 @@ struct LexError { message: str, span: Span }
 # spelled as strings (class membership via `contains`, a spelling matched
 # whole); none of them ever match empty input, so `lex` always makes progress.
 #
-# Tokens carry values (see `TokenValue`), computed by the claiming matcher:
-# `Delimited` a `StrVal` of the delimiter-stripped contents, *un-decoded* (the
-# rule's `emit` decodes — escape handling is the caller's, not the library's);
-# `Between`/`Nested` a verbatim `StrVal` of the contents (a raw string's
-# de-denting is the caller's post-pass). `Template` (its segments), `Int`/`Float`
-# (their digit text), and everything else — plus every trivia record — carry
-# `NoValue`, so an `Of` emit recovers the raw matched text and interprets it. The
-# library provides no string-escape decoder: what a `\X` means is a language's
-# own policy, so a consumer's `emit` decodes with its own (e.g. `lex_aipl.aipl`'s
-# `unescape`, mapping `\n`/`\t`/`\r` to control chars and any other `\X` to X
-# itself). A char literal is likewise not a matcher: a consumer lexes it as a
-# single-quoted `Delimited` string and enforces the one-char shape in a `Try`
-# emit (see `lex_aipl.aipl`'s `char_lit_emit`).
+# Every token has a *content string*, and that is what its rule's `emit` is
+# handed (see `token_content`): the raw matched text, except for the three
+# matchers that bracket their content, which strip their delimiters first.
+# `Delimited` strips to the contents *un-decoded* (the rule's `emit` decodes —
+# escape handling is the caller's, not the library's); `Between`/`Nested` strip
+# to the contents verbatim (a raw string's de-denting is the caller's
+# post-pass). Everything else — identifiers, punctuation, keywords, the
+# `Int`/`Float` digit runs, every trivia record — is its own text, which an `Of`
+# emit interprets. That is why a numeric literal's *parsing* is the rule's
+# `emit`'s job, via the `int_parse` builtin or its own. The library provides no
+# string-escape decoder: what a `\X` means is a language's own policy, so a
+# consumer's `emit` decodes with its own (e.g. `lex_aipl.aipl`'s `unescape`,
+# mapping `\n`/`\t`/`\r` to control chars and any other `\X` to X itself). A
+# char literal is likewise not a matcher: a consumer lexes it as a single-quoted
+# `Delimited` string and enforces the one-char shape in a `Try` emit (see
+# `lex_aipl.aipl`'s `char_lit_emit`).
 variant Matcher =
     # A maximal run of chars in `cont`. `first` restricts what may *open* the
     # run and defaults to `cont`, so the usual shape — one class for the whole
@@ -576,20 +565,20 @@ fn int_len(self: str) -> u64 {
     if (digits == 0) { 0 } else { start + digits }
 }
 
-# The value a token of matcher `m` carries, computed from its matched `text`
-# (`src[at..at+n]`, delimiters included) — see the value table on `Matcher`.
-# Only the string-valued matchers carry a computed value; everything a rule can
-# recover by slicing its span (`Int`/`Float` numeric runs, identifiers, …) is
-# `NoValue`, so the rule's `emit` interprets the text itself. `Template` returns
-# `NoValue` here only because its tokens are built inside `template_scan`, which
-# attaches each segment's value itself.
-fn token_value(m: Matcher, text: str) -> TokenValue {
+# The content string a token of matcher `m` is built from: its matched `text`
+# (`src[at..at+n]`, delimiters included), with the delimiters taken off by the
+# three matchers that bracket their content — see the table on `Matcher`.
+# Everything else is its own text, and its rule's `emit` interprets it.
+#
+# `Template` answers here for exhaustiveness only: a template's tokens are built
+# inside `template_scan`, which passes each segment's text to `seg_emit` itself
+# and never reaches this.
+fn token_content(m: Matcher, text: str) -> str {
     match (m) {
-        Delimited(..) => StrVal(text[1..text.len() - 1]),
+        Delimited(..) => text[1..text.len() - 1],
         // The two bracketing matchers strip the same way — their delimiters are
         // the only difference, and the arm reads both out of the case it matched.
-        Between(open, close)
-        | Nested(open, close) => StrVal(text[open.len()..text.len() - close.len()]),
+        Between(open, close) | Nested(open, close) => text[open.len()..text.len() - close.len()],
         CharRun(..)
         | OneChar(..)
         | Exact(..)
@@ -598,24 +587,16 @@ fn token_value(m: Matcher, text: str) -> TokenValue {
         | ToEol(..)
         | ToEolUnless(..)
         | Float
-        | Int => NoValue,
+        | Int => text,
     }
 }
 
-# Build a token's kind by applying the rule's `emit` to its content string —
-# the matcher-computed `value` (a delimited string, stripped) when there is one,
-# else the raw matched `text`. `Bare` ignores it; `Of` applies its constructor;
-# `Try` does too but may fail with a message (paired with the token `span` to
-# make a `LexError`). `OfSeg`/`TrySeg` belong to a `Template` rule and are a lex
-# error here.
-fn apply_emit<K>(e: Emit<K>, SpanStr { text, span }, value: TokenValue) -> K!LexError {
-    // A matcher either hands over a computed value (a delimited string, already
-    // stripped) or nothing; take the stripped string when present, else the raw
-    // matched text. One content string, so `Of`/`Try` serve every matcher.
-    let content = match (value) {
-        StrVal(s) => s,
-        NoValue => text,
-    };
+# Build a token's kind by applying the rule's `emit` to its `content` string —
+# what `token_content` made of the matched text. `Bare` ignores it; `Of` applies
+# its constructor; `Try` does too but may fail with a message (paired with the
+# token `span` to make a `LexError`). `OfSeg`/`TrySeg` belong to a `Template`
+# rule and are a lex error here.
+fn apply_emit<K>(e: Emit<K>, span: Span, content: str) -> K!LexError {
     match (e) {
         Bare(k) => ok(k),
         Of(f) => ok(f(content)),
@@ -644,14 +625,13 @@ struct StepResult<K> { tokens: Token<K>[], trivia: Token<K>[], end: u64 }
 # length `n` is 0, otherwise `n` chars consumed producing the rule's one
 # token — recorded as trivia for a `trivia` rule, or nothing at all for a
 # `skip` rule. The token's kind comes from the rule's `emit` applied to the
-# matcher-computed value, which can fail on an emit/value-shape mismatch.
+# matcher's content string, which can fail on an emit/matcher mismatch.
 fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!LexError {
     if (n == 0 || r.skip) {
         return ok(StepResult { tokens: [], trivia: [], end: at + n });
     };
     let text = span_str(src, at..at + n);
-    let v = token_value(r.matcher, text.text);
-    let kind = apply_emit(r.emit, text, v)?;
+    let kind = apply_emit(r.emit, text.span, token_content(r.matcher, text.text))?;
     let t = Token { kind, text };
     if (r.trivia) {
         return ok(StepResult { tokens: [], trivia: [t], end: at + n });
@@ -1510,11 +1490,11 @@ allocations: 415
 deallocations: 415
 reallocations: 90
 bytes allocated: 67144
-instructions executed: 418015
-binary size: 2463216
-  code: 1677416
-  data: 11628
-  metadata: 774172
+instructions executed: 413909
+binary size: 2461544
+  code: 1676220
+  data: 11596
+  metadata: 773728
 functions:
   __arr_drop_StepResult$Kind:
     calls: 8
@@ -1716,7 +1696,7 @@ functions:
     bytes: 1148
   step_result$Kind:
     calls: 477
-    bytes: 15048
+    bytes: 13852
   template_scan$Kind:
     calls: 20
     bytes: 2844

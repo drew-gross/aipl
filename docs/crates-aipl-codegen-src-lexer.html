@@ -22,34 +22,6 @@
         <h2 id="public">Public</h2>
 
 
-        <section class="item" id="item-TokenValue">
-          <h3>
-            <a class="anchor" href="#item-TokenValue">TokenValue</a>
-            <span class="kind kind-variant">variant</span>
-          </h3>
-          <pre class="signature"><code>variant TokenValue</code></pre>
-
-          <div class="doc"><p>What a token carries beyond its span: the processed <em>value</em> of the matched text, computed at lex time by the matcher that claimed it (see each matcher's doc). <code>StrVal</code> holds delimiter-stripped, <em>un-decoded</em> text (strings, raw strings, template segments) — the library strips the delimiters but leaves escapes verbatim for the rule's <code>emit</code> to decode with its own decoder (escape meaning is a language's policy, not the library's). Everything a rule can recover by slicing its span — identifiers, punctuation, keywords, comments, and the <code>Int</code>/<code>Float</code> numeric runs (whose <em>parsing</em> is the rule's <code>emit</code>'s job, via the <code>int_parse</code> builtin or its own) — carries <code>NoValue</code>. (A char literal is not a library concern: a consumer that wants one lexes it as a single-quoted <code>Delimited</code> string and validates the one-char shape in its <code>emit</code> — see <code>lex_aipl.aipl</code>.)</p></div>
-
-
-          <ul class="cases">
-
-            <li id="item-NoValue"><code>NoValue</code>
-
-
-            </li>
-
-            <li id="item-StrVal"><code>StrVal(str)</code>
-
-
-            </li>
-
-          </ul>
-
-        </section>
-
-
-
         <section class="item" id="item-SpanStr">
           <h3>
             <a class="anchor" href="#item-SpanStr">SpanStr</a>
@@ -204,7 +176,7 @@
           </h3>
           <pre class="signature"><code>variant Matcher</code></pre>
 
-          <div class="doc"><p>One token shape, as plain data. Char classes and fixed spellings are both spelled as strings (class membership via <code>contains</code>, a spelling matched whole); none of them ever match empty input, so <code>lex</code> always makes progress.</p><p>Tokens carry values (see <code>TokenValue</code>), computed by the claiming matcher: <code>Delimited</code> a <code>StrVal</code> of the delimiter-stripped contents, <em>un-decoded</em> (the rule's <code>emit</code> decodes — escape handling is the caller's, not the library's); <code>Between</code>/<code>Nested</code> a verbatim <code>StrVal</code> of the contents (a raw string's de-denting is the caller's post-pass). <code>Template</code> (its segments), <code>Int</code>/<code>Float</code> (their digit text), and everything else — plus every trivia record — carry <code>NoValue</code>, so an <code>Of</code> emit recovers the raw matched text and interprets it. The library provides no string-escape decoder: what a <code>\X</code> means is a language's own policy, so a consumer's <code>emit</code> decodes with its own (e.g. <code>lex_aipl.aipl</code>'s <code>unescape</code>, mapping <code>\n</code>/<code>\t</code>/<code>\r</code> to control chars and any other <code>\X</code> to X itself). A char literal is likewise not a matcher: a consumer lexes it as a single-quoted <code>Delimited</code> string and enforces the one-char shape in a <code>Try</code> emit (see <code>lex_aipl.aipl</code>'s <code>char_lit_emit</code>).</p></div>
+          <div class="doc"><p>One token shape, as plain data. Char classes and fixed spellings are both spelled as strings (class membership via <code>contains</code>, a spelling matched whole); none of them ever match empty input, so <code>lex</code> always makes progress.</p><p>Every token has a <em>content string</em>, and that is what its rule's <code>emit</code> is handed (see <code>token_content</code>): the raw matched text, except for the three matchers that bracket their content, which strip their delimiters first. <code>Delimited</code> strips to the contents <em>un-decoded</em> (the rule's <code>emit</code> decodes — escape handling is the caller's, not the library's); <code>Between</code>/<code>Nested</code> strip to the contents verbatim (a raw string's de-denting is the caller's post-pass). Everything else — identifiers, punctuation, keywords, the <code>Int</code>/<code>Float</code> digit runs, every trivia record — is its own text, which an <code>Of</code> emit interprets. That is why a numeric literal's <em>parsing</em> is the rule's <code>emit</code>'s job, via the <code>int_parse</code> builtin or its own. The library provides no string-escape decoder: what a <code>\X</code> means is a language's own policy, so a consumer's <code>emit</code> decodes with its own (e.g. <code>lex_aipl.aipl</code>'s <code>unescape</code>, mapping <code>\n</code>/<code>\t</code>/<code>\r</code> to control chars and any other <code>\X</code> to X itself). A char literal is likewise not a matcher: a consumer lexes it as a single-quoted <code>Delimited</code> string and enforces the one-char shape in a <code>Try</code> emit (see <code>lex_aipl.aipl</code>'s <code>char_lit_emit</code>).</p></div>
 
 
           <ul class="cases">
@@ -686,14 +658,14 @@
 
 
 
-        <section class="item" id="item-token_value">
+        <section class="item" id="item-token_content">
           <h3>
-            <a class="anchor" href="#item-token_value">token_value</a>
+            <a class="anchor" href="#item-token_content">token_content</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn token_value(m: Matcher, text: str) -&#62; TokenValue</code></pre>
+          <pre class="signature"><code>fn token_content(m: Matcher, text: str) -&#62; str</code></pre>
 
-          <div class="doc"><p>The value a token of matcher <code>m</code> carries, computed from its matched <code>text</code> (<code>src[at..at+n]</code>, delimiters included) — see the value table on <code>Matcher</code>. Only the string-valued matchers carry a computed value; everything a rule can recover by slicing its span (<code>Int</code>/<code>Float</code> numeric runs, identifiers, …) is <code>NoValue</code>, so the rule's <code>emit</code> interprets the text itself. <code>Template</code> returns <code>NoValue</code> here only because its tokens are built inside <code>template_scan</code>, which attaches each segment's value itself.</p></div>
+          <div class="doc"><p>The content string a token of matcher <code>m</code> is built from: its matched <code>text</code> (<code>src[at..at+n]</code>, delimiters included), with the delimiters taken off by the three matchers that bracket their content — see the table on <code>Matcher</code>. Everything else is its own text, and its rule's <code>emit</code> interprets it.</p><p><code>Template</code> answers here for exhaustiveness only: a template's tokens are built inside <code>template_scan</code>, which passes each segment's text to <code>seg_emit</code> itself and never reaches this.</p></div>
 
 
         </section>
@@ -705,9 +677,9 @@
             <a class="anchor" href="#item-apply_emit">apply_emit</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, __spat$31791: SpanStr, value: TokenValue) -&#62; K!LexError</code></pre>
+          <pre class="signature"><code>fn apply_emit&#60;K: any&#62;(e: Emit&#60;K&#62;, span: Span, content: str) -&#62; K!LexError</code></pre>
 
-          <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its content string — the matcher-computed <code>value</code> (a delimited string, stripped) when there is one, else the raw matched <code>text</code>. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
+          <div class="doc"><p>Build a token's kind by applying the rule's <code>emit</code> to its <code>content</code> string — what <code>token_content</code> made of the matched text. <code>Bare</code> ignores it; <code>Of</code> applies its constructor; <code>Try</code> does too but may fail with a message (paired with the token <code>span</code> to make a <code>LexError</code>). <code>OfSeg</code>/<code>TrySeg</code> belong to a <code>Template</code> rule and are a lex error here.</p></div>
 
 
         </section>
@@ -735,7 +707,7 @@
           </h3>
           <pre class="signature"><code>fn step_result&#60;K: any&#62;(r: TokenRule&#60;K&#62;, src: str, at: u64, n: u64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
 
-          <div class="doc"><p>A simple (single-token) matcher's outcome: a decline when the matched length <code>n</code> is 0, otherwise <code>n</code> chars consumed producing the rule's one token — recorded as trivia for a <code>trivia</code> rule, or nothing at all for a <code>skip</code> rule. The token's kind comes from the rule's <code>emit</code> applied to the matcher-computed value, which can fail on an emit/value-shape mismatch.</p></div>
+          <div class="doc"><p>A simple (single-token) matcher's outcome: a decline when the matched length <code>n</code> is 0, otherwise <code>n</code> chars consumed producing the rule's one token — recorded as trivia for a <code>trivia</code> rule, or nothing at all for a <code>skip</code> rule. The token's kind comes from the rule's <code>emit</code> applied to the matcher's content string, which can fail on an emit/matcher mismatch.</p></div>
 
 
         </section>

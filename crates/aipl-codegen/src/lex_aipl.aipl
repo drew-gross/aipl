@@ -932,11 +932,11 @@ allocations: 288
 deallocations: 288
 reallocations: 67
 bytes allocated: 439365
-instructions executed: 1601617
-binary size: 620448
-  code: 424896
+instructions executed: 1598842
+binary size: 618784
+  code: 423680
   data: 10460
-  metadata: 185092
+  metadata: 184644
 functions:
   __arr_drop___m1__StepResult$AiplTok:
     calls: 2
@@ -1045,7 +1045,7 @@ functions:
     bytes: 1148
   __m1__step_result$AiplTok:
     calls: 2858
-    bytes: 13024
+    bytes: 11808
   __m1__template_scan$AiplTok:
     calls: 6
     bytes: 2844
