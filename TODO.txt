@@ -669,6 +669,7 @@ figure out / fix why template literals are peforming worse than concat chains
 make try_left_fold and try_right_fold for use when the lambda returns an error
 
 lexer:
+  we probably don't need Int (and maybe float) since I think we can use CharRun with first or "minus or digit" and cont of "digit"
   "No push" is now a negative sentinel <--- don't do this, sentinels are bad. use optionals
   if Keyword boundary defaults to empty set I think we don't need a separate Exact
   maybe instead of keep_skipped that modifies a ruleset we should have lex_lossless that lexes with trivia. Maybe then we don't even need a trivia/skip split?
@@ -728,6 +729,7 @@ the arg contract being different for builtins caused problems for retain elision
 - should retain elision elide only the top of a structure? Is is already doing that?
 
 docs:
+  docs on struct fields
   docs for top-level lets
   hide privates by default so you have to expand a thing to show them
   don't need to say callable as a method for self: it's inferrable from the signature
@@ -743,7 +745,35 @@ docs:
   the docs are showing a mangled name for tm_json, please fix
 
 highlighting:
-  template highlighting shouldn't need to be hand-written.
+  template highlighting shouldn't need to be hand-written. Currently it does because:
+    (b) Why the mode stack doesn't translate to begin/end
+    The surprise is that TextMate does have a stack — begin/end regions nest, and a region's patterns are the rules that apply inside it. That looks like a mode stack. Three things break the correspondence.
+
+    1. "Return to the mode below" and "include another context" are different operations.
+
+    This is the core of it. In the lexer, a template's { does push: M_BASE — resume the base rules, and when the matching } pops, the stack uncovers M_TEMPLATE again, which was never left. The stack remembers where to go back to.
+
+    TextMate has no "go back to". Inside the template region, the interpolation is a nested region whose patterns are Include("main") — it descends into the language rather than resuming it. The enclosing template region is still on the stack underneath, and its end (the closing backtick) is still live. So the outer context isn't suspended the way a mode is; it's a parent whose end condition competes with the child's.
+
+    2. Consequently, brace balancing has to be rebuilt by hand — and only works because someone did.
+
+    Inside the interpolation region (begin: \{, end: \}), Include("main") brings in the whole language, where { and } are plain Match patterns for punctuation — not regions. So a { from a set literal or a struct literal is just painted, and the next } matches the interpolation region's end. `{P { x: 1 }}` would close the interpolation at the inner }, and everything after it would be painted as string.
+
+    That is exactly what brace_group_entry exists to prevent (highlight.aipl:391): a repository entry that is a { .. } region whose inner patterns include itself plus main, listed before main inside the interpolation, so a nested brace group is consumed as a region and balances. Self-recursive regions are the model's only depth counter.
+
+    The lexer needs none of that. { pushes, } pops, and the arbitrary nesting falls out — which is precisely the machinery I deleted from interp_scan, with its special case for telling a brace lexed as its own token from one buried inside a string. So the two models both handle nesting, but by different mechanisms, and the translation is a rewrite rather than a mapping.
+
+    3. Scopes attach to character ranges, not tokens — and there's no end capture.
+
+    A lexer rule says "this token has this kind". A TextMate region says "these bytes have this scope", inherited by everything inside unless an inner pattern paints over. So the template region's string scope covers the interpolated expression too, and the braces with it.
+
+    That is why template_inner's interpolation region needs its own punctuation scope: it's the only way to paint the closing }, since the model has no capture for an end match. brace_group_entry's comment says this outright. Both braces get punctuation from the region, and every token between them is painted over by main. This is the direct cause of the 836 highlighter mismatches earlier — once the braces became real tokens, the test demanded they read as punctuation, and the region scope was the only lever.
+
+    And a fourth, smaller one: the matchers don't have faithful regexes.
+
+    UpToAny(["```", "{"], ..) means "run until the first of these spellings, escapes respected". The faithful pattern is a negative lookahead, and the repo can't use lookaround — tests/highlighting.rs validates the output with Rust's regex, which has none (highlight.aipl:32). So matcher_pat approximates it with a negated class over the stops' *first* characters, which is exact only when every stop is one character. Under a ``` stop it ends the painted run at a lone backtick — content, in a raw template.
+
+    What that adds up to in practice. Had I let the six template rules auto-derive patterns, the grammar would have been wrong in specific ways: a bare backtick anywhere opens a string region, and a raw template's painted text stops at its first inner backtick. So those rules carry scope: "" — the existing "not highlighted" convention — and highlight_aipl.aipl states the region in TextMate's own terms. It's one of the few places where the "one rule set describes the language once, for the lexer and the highlighter both" idea has to give: the lexer gained a nesting model the target doesn't share.
 
 optional:
   value_or can't unwrap struct optionals — needs match. <--- fix this

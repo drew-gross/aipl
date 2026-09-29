@@ -941,20 +941,17 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     fn tok(src: str, kind: Kind, span: Span) -> Token<Kind> { kind, text: span_str(src, span) }
 
     // Character classes shared across the rule sets below.
-    let alpha: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
-    let alnum: char[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789";
-    let num: char[] = "0123456789";
+    let alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".to_set();
+    let alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789".to_set();
+    let num = "0123456789".to_set();
 
     // Reusable rules. Each pairs a matcher with an `emit` that builds a `Kind`:
     // `Of` applies a constructor to the token's content (stripped for a delimited
     // matcher, raw text otherwise); `Bare` is a fixed kind; a skip rule's emit is
     // never applied.
     let ws = TokenRule { matcher: CharRun(" \t\n\r".to_set()), emit: Bare(Ws), skip: true };
-    let ident = TokenRule {
-        matcher: CharRun(alnum.to_set(), first=alpha.to_set()),
-        emit: Of(Ident),
-    };
-    let digits = TokenRule { matcher: CharRun(num.to_set()), emit: Bare(Digits) };
+    let ident = TokenRule { matcher: CharRun(alnum, first=alpha), emit: Of(Ident) };
+    let digits = TokenRule { matcher: CharRun(num), emit: Bare(Digits) };
     let base = [ws, ident, digits];
 
     // Empty / all-whitespace input produces no tokens.
@@ -975,7 +972,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex("x1", [ws, ident])? == toks([tok("x1", Ident("x1"), 0..2)]));
     assert(lex("1x", [ws, ident]) == err(lex_err("unexpected character", 0..1)));
     // Naming `first` explicitly as the same class is the default spelled out.
-    let d2 = TokenRule { matcher: CharRun(num.to_set(), first=num.to_set()), emit: Bare(Digits) };
+    let d2 = TokenRule { matcher: CharRun(num, first=num), emit: Bare(Digits) };
     assert(lex("42", [ws, d2])? == lex("42", [ws, digits])?);
 
     // A byte no rule matches is a lex error carrying that byte's span.
@@ -1006,8 +1003,8 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // Keyword: a spelling matches only at an identifier boundary. One spelling
     // per rule, as with `Exact`; order among keyword rules is immaterial (the
     // boundary check, not order, keeps `if` out of `iffy`).
-    let kw_if = TokenRule { matcher: Keyword("if", alnum.to_set()), emit: Bare(Kw) };
-    let kw_let = TokenRule { matcher: Keyword("let", alnum.to_set()), emit: Bare(Kw) };
+    let kw_if = TokenRule { matcher: Keyword("if", alnum), emit: Bare(Kw) };
+    let kw_let = TokenRule { matcher: Keyword("let", alnum), emit: Bare(Kw) };
     let kws = [ws, kw_if, kw_let, ident];
     assert(lex("iffy", kws)? == toks([tok("iffy", Ident("iffy"), 0..4)]));
     assert(lex("if fy", kws)? == toks([tok("if fy", Kw, 0..2), tok("if fy", Ident("fy"), 3..5)]));
@@ -1339,9 +1336,9 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         },
         TokenRule { matcher: Float, emit: Bare(FloatTok) },
         TokenRule { matcher: Int, emit: Try(int_tok) },
-        TokenRule { matcher: Keyword("true", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("false", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("null", alnum.to_set()), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("true", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("false", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("null", alnum), emit: Bare(Kw) },
         TokenRule { matcher: Exact("{"), emit: Bare(Punct) },
         TokenRule { matcher: Exact("}"), emit: Bare(Punct) },
         TokenRule { matcher: Exact("["), emit: Bare(Punct) },
@@ -1372,10 +1369,10 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     let aipl = [
         ws,
         TokenRule { matcher: ToEol("//"), emit: Bare(Comment), skip: true },
-        TokenRule { matcher: Keyword("fn", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("let", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("mut", alnum.to_set()), emit: Bare(Kw) },
-        TokenRule { matcher: Keyword("set", alnum.to_set()), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("fn", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("let", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("mut", alnum), emit: Bare(Kw) },
+        TokenRule { matcher: Keyword("set", alnum), emit: Bare(Kw) },
         ident,
         TokenRule { matcher: Int, emit: Try(int_tok) },
         TokenRule { matcher: Delimited(`"`.to_set(), escaped=`ntr\\"`.to_set()), emit: Of(Str) },
@@ -1402,11 +1399,11 @@ allocations: 481
 deallocations: 481
 reallocations: 111
 bytes allocated: 69208
-instructions executed: 555593
-binary size: 1384656
-  code: 936440
-  data: 10268
-  metadata: 437948
+instructions executed: 520853
+binary size: 1358520
+  code: 911016
+  data: 10116
+  metadata: 437388
 functions:
   __arr_drop_ModeFrame:
     calls: 34
@@ -1494,7 +1491,7 @@ functions:
     bytes: 17212
   __test$lex:
     calls: 1
-    bytes: 862180
+    bytes: 836756
   __test$lex$esc_str:
     calls: 2
     bytes: 140
