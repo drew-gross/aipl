@@ -115,7 +115,6 @@ misc cleanup:
   only should be named one and use a nested_in kwarg (i.e. thinner wrapper over Many)
   parser rules for destructuring in for loops should be DRYer with destructuring in let bindings
   lex doc comments as one big token, not one per line
-  section filling cleanup: lots of single-use functions, ffi is weird, could probably fill multiple at once
   a function value may be *called* through a parameter but not stored into a field or a constructor from one, so `Mk` has to be written at the call site where the name is still a name
   In group_styles, rs.map(group_styles) is refused
   p.name == "self" and p.name.starts_with("__") should be stored vars, not derived from string matching
@@ -194,6 +193,8 @@ bugs:
       `xs.filter(keep).map(f)`; restructured around it rather than fixing.
 
 errors:
+  report multiple errors when one call site has multiple type errors
+  report multiple errors when there is a badly typed let
   assert should print the mixed values when there is an
   "assert failed at" should show the actual file name, not input:xxx
   .one_char_len(wrong_type_value) is showing mangled names in it's type errors, and also isn't giving the full file path

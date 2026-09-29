@@ -1,0 +1,78 @@
+import { len, wrapping_add as + } from builtins;
+
+// The checker recovers *within* a function body, not only at each item, so one
+// run reports every independent finding in a body instead of only the earliest.
+// That is what makes a type change a single fix-them-all pass rather than one
+// `check` per broken call site.
+//
+// Recovery happens where the failing expression's type isn't needed by what
+// follows — see `Cx::recover`. Two such positions, each with two errors below:
+// sibling elements of an array or set literal, and a statement whose value is
+// discarded. A binding's initializer is deliberately *not* one (its body is
+// checked against the type that just failed), so `err_one_per_binding` holds
+// that side.
+
+struct Rule { pat: str }
+
+// Sibling array elements: both bad entries report, and so does the third, which
+// is fine. The shape a signature change hits — N call sites as N list entries.
+fn rules() -> Rule[] { [Rule { pat: 1 }, Rule { pat: "ok" }, Rule { pat: 2 }] }
+
+// Sibling set elements.
+fn tags() -> #{str} { #{"a", 1, 2} }
+
+// Discarded statements: a body is a chain of these, so one bad line used to
+// hide every later one.
+fn drive(v: str[]) {
+    len(1);
+    len(true);
+    len(v);
+}
+
+// And the function's own first *unrecoverable* error still lands, after the
+// recovered ones — the return type here can't be recovered from.
+fn tally(v: str[]) -> bool { len(v) + 1 }
+
+fn main() {}
+--- errors ---
+error: struct "Rule" field "pat": expected str, got i64
+  --> ./tests/cases/errors/err_several_per_function.aipl:19:37
+   |
+19 | fn rules() -> Rule[] { [Rule { pat: 1 }, Rule { pat: "ok" }, Rule { pat: 2 }] }
+   |                                     ^
+
+error: struct "Rule" field "pat": expected str, got i64
+  --> ./tests/cases/errors/err_several_per_function.aipl:19:74
+   |
+19 | fn rules() -> Rule[] { [Rule { pat: 1 }, Rule { pat: "ok" }, Rule { pat: 2 }] }
+   |                                                                          ^
+
+error: set element: expected str, got i64
+  --> ./tests/cases/errors/err_several_per_function.aipl:22:30
+   |
+22 | fn tags() -> #{str} { #{"a", 1, 2} }
+   |                              ^
+
+error: set element: expected str, got i64
+  --> ./tests/cases/errors/err_several_per_function.aipl:22:33
+   |
+22 | fn tags() -> #{str} { #{"a", 1, 2} }
+   |                                 ^
+
+error: len expects an array, got i64
+  --> ./tests/cases/errors/err_several_per_function.aipl:27:9
+   |
+27 |     len(1);
+   |         ^
+
+error: len expects an array, got bool
+  --> ./tests/cases/errors/err_several_per_function.aipl:28:9
+   |
+28 |     len(true);
+   |         ^^^^
+
+error: fn "tally": body returns u64, but the declared return type is bool
+  --> ./tests/cases/errors/err_several_per_function.aipl:34:30
+   |
+34 | fn tally(v: str[]) -> bool { len(v) + 1 }
+   |                              ^^^^^^^^^^

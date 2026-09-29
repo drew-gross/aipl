@@ -353,9 +353,48 @@ struct Cx<'a> {
     /// in progress — see [`err_side_from_tries`], which reads the entries a
     /// lambda body pushed.
     try_errs: std::cell::RefCell<Vec<Type>>,
+    /// Errors found at a *recovery point* and set aside so the walk could carry
+    /// on to the failing expression's siblings — see [`Cx::recover`]. Each is
+    /// paired with the name of the function it was found in, because attribution
+    /// to a source file needs the program's source map, which only [`check`]
+    /// holds (its item loop attributes the same way).
+    ///
+    /// Drained into [`check`]'s errors, so one of these still rejects the
+    /// program. They only ever *add* findings: a program that checks clean never
+    /// reaches a recovery point, so nothing here changes what compiles.
+    recovered: std::cell::RefCell<Vec<(String, Error)>>,
 }
 
 impl<'a> Cx<'a> {
+    /// Set aside a failed check and hand back `None`, so the caller can carry on
+    /// to the failing expression's *siblings* and report them in the same run —
+    /// the difference between one `cargo check` per broken call site and one for
+    /// all of them. `Ok` passes straight through, so a clean program never
+    /// notices this exists.
+    ///
+    /// **Only valid where what follows does not need the failed expression's
+    /// type.** An element of an array or set literal qualifies (its siblings are
+    /// typed independently) and so does a statement whose value is discarded. A
+    /// binding's initializer does *not*: its body is checked against the type
+    /// that just failed to exist.
+    ///
+    /// That distinction is why this is applied site by site rather than swapped
+    /// in for `?` wholesale. Past a position that does need the type, the
+    /// follow-on errors are cascades rather than findings — and a cascade is
+    /// worse than a single error, which is the whole reason the checker stops at
+    /// a function's first error to begin with.
+    fn recover<T>(&self, r: Result<T, Error>) -> Option<T> {
+        match r {
+            Ok(v) => Some(v),
+            Err(e) => {
+                self.recovered
+                    .borrow_mut()
+                    .push((self.current_fn.borrow().clone(), e));
+                None
+            }
+        }
+    }
+
     fn struct_fields(&self, name: &str) -> Option<Vec<(String, Type, bool)>> {
         self.structs
             .get(name)
@@ -1274,6 +1313,7 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
         current_type_bounds: std::cell::RefCell::new(std::collections::HashMap::new()),
         resolving: std::cell::RefCell::new(HashSet::new()),
         try_errs: std::cell::RefCell::new(Vec::new()),
+        recovered: std::cell::RefCell::new(Vec::new()),
     };
     // Type-check struct field defaults in an empty environment (defaults are
     // evaluated at construction time with no local variables in scope).
@@ -1378,11 +1418,20 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
     }
     for item in &program.items {
         if let Item::Fn(f) = item {
-            if let Err(e) = cx.check_fn(f) {
+            let checked = cx.check_fn(f);
+            // Drained per function, before that function's own error: everything
+            // in the sink was found while checking *this* body, and a function
+            // that recovers still reaches its own first unrecoverable error, so
+            // this is what keeps the report in source order.
+            drain_recovered(&cx, &program.sources, &mut errors);
+            if let Err(e) = checked {
                 errors.push(attribute(e, &f.name, &program.sources));
             }
         }
     }
+    // The struct/variant default loops above check expressions too, so anything
+    // they recovered is still waiting.
+    drain_recovered(&cx, &program.sources, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -1428,6 +1477,15 @@ fn attribute(e: Error, name: &str, sources: &[aipl_syntax::ast::FileSource]) -> 
     match sources.get(idx as usize) {
         Some(f) if !f.source.is_empty() => e.in_file(&f.label, &f.source),
         _ => e,
+    }
+}
+
+/// Move everything [`Cx::recover`] set aside into `errors`, each attributed to
+/// the file it was found in — the same attribution the item loop applies, done
+/// here because a recovered error never passes through it.
+fn drain_recovered(cx: &Cx, sources: &[aipl_syntax::ast::FileSource], errors: &mut Vec<Error>) {
+    for (fname, e) in cx.recovered.borrow_mut().drain(..) {
+        errors.push(attribute(e, &fname, sources));
     }
 }
 
@@ -3037,12 +3095,16 @@ impl Cx<'_> {
                         ));
                     }
                 }
-                let ft = self.check_expr_at(first, env, effects, Pos::Discard)?;
+                // A statement's value is discarded, so nothing after it needs
+                // its type: a broken statement is set aside (see [`Cx::recover`])
+                // and the rest of the body still reports. A body is a chain of
+                // these, which is why one bad line used to hide every later one.
+                let ft = self.recover(self.check_expr_at(first, env, effects, Pos::Discard));
                 // A discarded statement whose value is a result would silently
                 // drop its error — forbid it. The error must be handled: match on
                 // it, or propagate with `?`. (Binding it with `let` and then never
                 // reading the binding is rejected too — see `Let`/`LetMut`.)
-                if matches!(ft, Type::Result(_, _)) {
+                if matches!(ft, Some(Type::Result(_, _))) {
                     return Err(Error::at(
                         "this result is discarded, ignoring its possible error; handle it \
                          with `match` or propagate it with `?`",
@@ -3261,19 +3323,30 @@ impl Cx<'_> {
                 Type::Primitive(Primitive::I64)
             }
             ExprKind::ArrayLit(elems) => {
-                let mut elem_ty = Type::NoneInner;
-                for (i, e) in elems.iter().enumerate() {
+                // Elements are siblings, typed independently, so a bad one is set
+                // aside (see [`Cx::recover`]) and the rest are still reported.
+                // This is the shape a type change most often breaks: N call sites
+                // as N entries of one list.
+                let mut elem_ty: Option<Type> = None;
+                let mut recovered_any = false;
+                for e in elems {
                     // The element type the first element established is every
                     // later element's context — the only place a bare `none` or
                     // an empty `#{}` at index 1+ learns what it is. Recording it
                     // is what [`Cx::lock`] is for; on the first element there is
                     // nothing to record yet and the placeholder is discarded.
-                    self.lock(e, &elem_ty);
-                    let t = self.check_expr(e, env, effects)?;
-                    if i == 0 {
-                        elem_ty = t;
+                    self.lock(e, elem_ty.as_ref().unwrap_or(&Type::NoneInner));
+                    match self.recover(self.check_expr(e, env, effects)) {
+                        // The first element that *checks* sets the context, not
+                        // element 0 unconditionally: when 0 is the broken one,
+                        // taking the type from its next surviving sibling keeps
+                        // the later elements checkable instead of measuring them
+                        // all against a placeholder.
+                        Some(t) => elem_ty = elem_ty.or(Some(t)),
+                        None => recovered_any = true,
                     }
                 }
+                let elem_ty = elem_ty.unwrap_or(Type::NoneInner);
                 // A struct or variant element is valid too (must be declared); so
                 // is an (abstract) generic-struct/variant application `Token<K>`.
                 // `has_variant`, not `self.variants`: a *synthesized* generic
@@ -3283,7 +3356,11 @@ impl Cx<'_> {
                     || matches!(&elem_ty, Type::Named(n)
                         if self.has_struct(n) || self.has_variant(n))
                     || matches!(&elem_ty, Type::Generic(..));
-                if !elems.is_empty() && !elem_ok {
+                // Skipped when an element was recovered: the element type is
+                // then whatever the *survivors* said, or a placeholder if none
+                // survived, and complaining about that would bury the real
+                // errors under one invented from their absence.
+                if !elems.is_empty() && !elem_ok && !recovered_any {
                     return Err(Error::at(
                         format!(
                             "array elements must be an integer (i8..i64, u8..u64), bool, char, \
@@ -3301,16 +3378,29 @@ impl Cx<'_> {
                 // an empty brace pair does not say which it is, so `coerce`
                 // decides from the use site. Dups dropped at runtime. An ordered
                 // literal wants an `ord` element, since it sorts them.
-                let mut elem_ty = Type::NoneInner;
-                for (i, e) in elems.iter().enumerate() {
-                    let t = self.check_expr(e, env, effects)?;
-                    if i == 0 {
-                        elem_ty = t;
-                    } else {
-                        expect(&t, &elem_ty, "set element", e.span.clone())?;
+                // Siblings again, so a bad element is set aside and the rest
+                // still report — see the `ArrayLit` arm above.
+                let mut elem_ty: Option<Type> = None;
+                let mut recovered_any = false;
+                for e in elems {
+                    let Some(t) = self.recover(self.check_expr(e, env, effects)) else {
+                        recovered_any = true;
+                        continue;
+                    };
+                    match &elem_ty {
+                        None => elem_ty = Some(t),
+                        Some(want) => {
+                            if self
+                                .recover(expect(&t, want, "set element", e.span.clone()))
+                                .is_none()
+                            {
+                                recovered_any = true;
+                            }
+                        }
                     }
                 }
-                if !elems.is_empty() && !is_set_elem(&elem_ty) {
+                let elem_ty = elem_ty.unwrap_or(Type::NoneInner);
+                if !elems.is_empty() && !recovered_any && !is_set_elem(&elem_ty) {
                     return Err(Error::at(
                         format!(
                             "set elements must be an integer (i8..i64, u8..u64), bool, char, or str, got {}",
@@ -3319,7 +3409,7 @@ impl Cx<'_> {
                         span.clone(),
                     ));
                 }
-                if !elems.is_empty() {
+                if !elems.is_empty() && !recovered_any {
                     check_ordered_elem(&elem_ty, *order, &[], "set literal")
                         .map_err(|e| Error::at(e.message, span.clone()))?;
                 }

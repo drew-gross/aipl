@@ -176,6 +176,8 @@ case_tests! {
     cases_equality_sets = "cases/equality/sets",
     cases_equality_structs = "cases/equality/structs",
     cases_equality_variants = "cases/equality/variants",
+    cases_errors_err_one_per_binding = "cases/errors/err_one_per_binding",
+    cases_errors_err_several_per_function = "cases/errors/err_several_per_function",
     cases_execute_program_err_args_positional = "cases/execute_program/err_args_positional",
     cases_execute_program_err_missing_effect = "cases/execute_program/err_missing_effect",
     cases_execute_program_not_found = "cases/execute_program/not_found",
