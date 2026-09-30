@@ -522,48 +522,6 @@
 
 
 
-        <section class="item" id="item-M_BASE">
-          <h3>
-            <a class="anchor" href="#item-M_BASE">M_BASE</a>
-            <span class="kind kind-const">let</span>
-          </h3>
-          <pre class="signature"><code>pub let M_BASE: i64 = 0</code></pre>
-
-          <div class="doc"><p>The lexer modes AIPL needs, as the <code>i64</code> tags <code>TokenRule.mode</code>/<code>push</code> take. <code>M_BASE</code> is the mode a lex starts in — ordinary AIPL — and is named rather than written as <code>0</code> because a template's <code>{</code> <em>pushes</em> it, which is how an interpolation gets the whole language back.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-M_TEMPLATE">
-          <h3>
-            <a class="anchor" href="#item-M_TEMPLATE">M_TEMPLATE</a>
-            <span class="kind kind-const">let</span>
-          </h3>
-          <pre class="signature"><code>pub let M_TEMPLATE: i64 = 1</code></pre>
-
-          <div class="doc"><p>Inside a <code>`...`</code> template, between its delimiters and around its interpolations.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-M_RAW_TEMPLATE">
-          <h3>
-            <a class="anchor" href="#item-M_RAW_TEMPLATE">M_RAW_TEMPLATE</a>
-            <span class="kind kind-const">let</span>
-          </h3>
-          <pre class="signature"><code>pub let M_RAW_TEMPLATE: i64 = 2</code></pre>
-
-          <div class="doc"><p>The same for a <code>```...```</code> template, whose text scans verbatim.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-S_STRING">
           <h3>
             <a class="anchor" href="#item-S_STRING">S_STRING</a>
@@ -620,20 +578,6 @@
 
 
 
-        <section class="item" id="item-lex_aipl_tokens">
-          <h3>
-            <a class="anchor" href="#item-lex_aipl_tokens">lex_aipl_tokens</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn lex_aipl_tokens(src: str) -&#62; Token&#60;AiplTok&#62;[]!LexError</code></pre>
-
-          <div class="doc"><p><code>lex_aipl_tokens</code> is the FFI entry the Rust <code>tests/lexer_dogfood.rs</code> calls to compare this AIPL lexer against the compiler's hand-written Rust lexer over the test corpus. It hands back the <em>actual</em> token array — <code>Token&lt;AiplTok&gt;[]</code>, each token carrying its typed <code>kind</code> and <code>span</code> — which crosses the embedding FFI directly (an array of structs whose fields are themselves a variant and a struct). The Rust side coarsens each <code>kind</code> to a category and diffs spans, building a burn-down list of the remaining divergences; nothing here is used to compile. <code>trivia</code> is dropped: the differential dump compares only the emitted token stream (the Rust lexer's dump has no comment/marker lines to compare the side-channel against).</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-aipl_token_scopes">
           <h3>
             <a class="anchor" href="#item-aipl_token_scopes">aipl_token_scopes</a>
@@ -642,20 +586,6 @@
           <pre class="signature"><code>pub fn aipl_token_scopes(src: str) -&#62; ScopeSpan[]!LexError</code></pre>
 
           <div class="doc"><p>Every token's span paired with the scope AIPL's own rule set declares for it, with the trailing <code>--- section ---</code> harness blocks stripped first — the oracle the generated TextMate grammar is checked against.</p><p>The grammar is derived from <code>aipl_rules()</code> (see <code>highlight_aipl.aipl</code>), so this asks the <em>same</em> table what each token should be painted, rather than restating the mapping a second time somewhere else. A test that compares the two is checking the generator, which is the only thing that can be wrong.</p></div>
-
-
-        </section>
-
-
-
-        <section class="item" id="item-lex_aipl_stripped">
-          <h3>
-            <a class="anchor" href="#item-lex_aipl_stripped">lex_aipl_stripped</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>pub fn lex_aipl_stripped(src: str) -&#62; LexResult&#60;AiplTok&#62;!LexError</code></pre>
-
-          <div class="doc"><p>Strip trailing <code>--- section ---</code> cases-harness blocks, then lex. The highlighter and the parser both want AIPL source with those blocks removed, and both <code>strip_test_sections</code> and <code>lex_aipl</code> are dogfooded — composing them here keeps the whole strip-then-lex a single FFI crossing instead of one per step. Spans are unchanged: <code>strip_test_sections</code> returns a byte-prefix of <code>src</code>, so every kept token's span still indexes the original source.</p></div>
 
 
         </section>
@@ -831,6 +761,48 @@
           <pre class="signature"><code>let S_NUMBER = &#34;constant.numeric.integer.aipl&#34;</code></pre>
 
           <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-M_BASE">
+          <h3>
+            <a class="anchor" href="#item-M_BASE">M_BASE</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let M_BASE: i64 = 0</code></pre>
+
+          <div class="doc"><p>The lexer modes AIPL needs, as the <code>i64</code> tags <code>TokenRule.mode</code>/<code>push</code> take. <code>M_BASE</code> is the mode a lex starts in — ordinary AIPL — and is named rather than written as <code>0</code> because a template's <code>{</code> <em>pushes</em> it, which is how an interpolation gets the whole language back.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-M_TEMPLATE">
+          <h3>
+            <a class="anchor" href="#item-M_TEMPLATE">M_TEMPLATE</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let M_TEMPLATE: i64 = 1</code></pre>
+
+          <div class="doc"><p>Inside a <code>`...`</code> template, between its delimiters and around its interpolations.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-M_RAW_TEMPLATE">
+          <h3>
+            <a class="anchor" href="#item-M_RAW_TEMPLATE">M_RAW_TEMPLATE</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>let M_RAW_TEMPLATE: i64 = 2</code></pre>
+
+          <div class="doc"><p>The same for a <code>```...```</code> template, whose text scans verbatim.</p></div>
 
 
         </section>

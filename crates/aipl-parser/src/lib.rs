@@ -18,21 +18,6 @@ use std::path::Path;
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, Program};
 use aipl_syntax::{Error, Span};
 
-/// The delimiter a [`LexedTokenKind::StrLit`] was written with — the mirror of
-/// `lex_aipl.aipl`'s `StrStyle`. Lets a consumer (the autoformatter) recover the
-/// original spelling from the decoded value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LexedStrStyle {
-    /// `"..."`
-    Quoted,
-    /// `"""..."""` (de-dented)
-    TripleQuoted,
-    /// `` `...` `` (interpolation-free template)
-    Backtick,
-    /// ```` ```...``` ```` (interpolation-free raw template, de-dented)
-    TripleBacktick,
-}
-
 /// One token's span and the TextMate scope AIPL's own rule set declares for it —
 /// the Rust twin of `lexer.aipl`'s `ScopeSpan`.
 ///

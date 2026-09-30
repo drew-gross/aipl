@@ -3700,11 +3700,15 @@ fn marshal_token_scopes(src: &str) -> Result<Vec<aipl_parser::ScopeSpan>, aipl_p
 /// assertion-location formatter at [`assert_loc`], the error-renderer's
 /// caret-block formatter at [`caret_block`], the checker's flexible-literal
 /// range check at [`int_fits`], the loader's operator-import gate at
-/// [`is_operator_name`], and the lexer at [`lex_aipl_stripped`] (which de-dents
-/// `"""` raw strings itself, in its emit, so there is no separate raw-string
-/// hook).
-/// (The formatter needs no hook: it is dogfooded end to end through
-/// [`format_source`], and its printer imports `reindent_block.aipl` directly.)
+/// [`is_operator_name`], and the highlighting oracle's scope spans at
+/// [`marshal_token_scopes`].
+///
+/// There is no lexer hook. Nothing on this side lexes any more: the parser
+/// reaches the dogfooded `aipl_parse_file`, the formatter the dogfooded
+/// [`format_source`], and the only Rust consumer that wanted tokens — the test
+/// checking the generated TextMate grammar — wants the *scope* each token's rule
+/// declares, not its kind. That retired a mirror of the whole token-kind variant
+/// along with the hook.
 /// Idempotent (first install wins). The compiler's entry points (the CLI and the
 /// embedding [`Compilation`] API's callers) install them; there are **no native
 /// fallbacks**, so any in-process parse (or error render, literal

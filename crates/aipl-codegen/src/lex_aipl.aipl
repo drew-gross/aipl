@@ -408,14 +408,14 @@ let S_NUMBER = "constant.numeric.integer.aipl";
 # `M_BASE` is the mode a lex starts in — ordinary AIPL — and is named rather than
 # written as `0` because a template's `{` *pushes* it, which is how an
 # interpolation gets the whole language back.
-pub let M_BASE: i64 = 0;
+let M_BASE: i64 = 0;
 
 # Inside a `` `...` `` template, between its delimiters and around its
 # interpolations.
-pub let M_TEMPLATE: i64 = 1;
+let M_TEMPLATE: i64 = 1;
 
 # The same for a ```` ```...``` ```` template, whose text scans verbatim.
-pub let M_RAW_TEMPLATE: i64 = 2;
+let M_RAW_TEMPLATE: i64 = 2;
 
 pub let S_STRING = "string.quoted.double.aipl";
 
@@ -905,30 +905,6 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     }));
 })
 
-// --- Differential-testing bridge (dogfooding) ------------------------------
-//
-# `lex_aipl_tokens` is the FFI entry the Rust `tests/lexer_dogfood.rs` calls to
-# compare this AIPL lexer against the compiler's hand-written Rust lexer over the
-# test corpus. It hands back the *actual* token array — `Token<AiplTok>[]`, each
-# token carrying its typed `kind` and `span` — which crosses the embedding FFI
-# directly (an array of structs whose fields are themselves a variant and a
-# struct). The Rust side coarsens each `kind` to a category and diffs spans,
-# building a burn-down list of the remaining divergences; nothing here is used to
-# compile. `trivia` is dropped: the differential dump compares only the emitted
-# token stream (the Rust lexer's dump has no comment/marker lines to compare the
-# side-channel against).
-pub fn lex_aipl_tokens(src: str) -> Token<AiplTok>[]!LexError { ok(lex_aipl(src)?.tokens) }.test({
-    assert(lex_aipl_tokens("let x = 42;")? == [
-        atok("let x = 42;", Let, 0..3),
-        atok("let x = 42;", Name("x"), 4..5),
-        atok("let x = 42;", Eq, 6..7),
-        atok("let x = 42;", IntLit(42), 8..10),
-        atok("let x = 42;", Semi, 10..11),
-    ]);
-    // A byte no rule matches makes the whole lex an error, carrying its span.
-    assert(lex_aipl_tokens("@") == err(LexError { message: "unexpected character", span: 0..1 }));
-})
-
 # Every token's span paired with the scope AIPL's own rule set declares for it,
 # with the trailing `--- section ---` harness blocks stripped first — the oracle
 # the generated TextMate grammar is checked against.
@@ -954,64 +930,37 @@ pub fn aipl_token_scopes(src: str) -> ScopeSpan[]!LexError {
         ScopeSpan { span: 0..2, scope: S_KEYWORD },
     ]);
 })
-
-# Strip trailing `--- section ---` cases-harness blocks, then lex. The
-# highlighter and the parser both want AIPL source with those blocks removed,
-# and both `strip_test_sections` and `lex_aipl` are dogfooded — composing them
-# here keeps the whole strip-then-lex a single FFI crossing instead of one per
-# step. Spans are unchanged: `strip_test_sections` returns a byte-prefix of
-# `src`, so every kept token's span still indexes the original source.
-pub fn lex_aipl_stripped(src: str) -> LexResult<AiplTok>!LexError {
-    lex_aipl(strip_test_sections(src))
-}.test({
-    // The `--- stdout ---` marker and everything after it is dropped before
-    // lexing; the tokens before it keep their original spans.
-    assert(lex_aipl_stripped("let x = 1\n--- stdout ---\nfoo")? == LexResult {
-        tokens: [
-            atok("let x = 1\n--- stdout ---\nfoo", Let, 0..3),
-            atok("let x = 1\n--- stdout ---\nfoo", Name("x"), 4..5),
-            atok("let x = 1\n--- stdout ---\nfoo", Eq, 6..7),
-            atok("let x = 1\n--- stdout ---\nfoo", IntLit(1), 8..9),
-        ],
-        trivia: [],
-    });
-    // No marker: identical to lexing `src` directly (comments still trivia).
-    assert(lex_aipl_stripped("y // c")? == LexResult {
-        tokens: [atok("y // c", Name("y"), 0..1)],
-        trivia: [atok("y // c", LineComment, 2..6)],
-    });
-})
 --- performance ---
-allocations: 430
-deallocations: 430
-reallocations: 129
-bytes allocated: 558840
-instructions executed: 2386886
-binary size: 463064
-  code: 325852
-  data: 11036
-  metadata: 126176
+allocations: 391
+deallocations: 391
+reallocations: 116
+bytes allocated: 489952
+instructions executed: 2116954
+binary size: 449504
+  code: 316828
+  data: 9988
+  metadata: 122688
 functions:
   __arr_drop___m1__ModeFrame:
     calls: 14
     bytes: 120
   __arr_drop___m1__ScopeSpan:
-    calls: 31
+    calls: 28
     bytes: 120
   __arr_drop___m1__Token$AiplTok:
-    calls: 187
+    calls: 166
     bytes: 248
   __arr_drop___m1__TokenRule$AiplTok:
-    calls: 32
+    calls: 28
     bytes: 536
   __arr_retain___m1__ModeFrame:
     calls: 13
     bytes: 120
   __arr_retain___m1__ScopeSpan:
-    calls: 100
+    calls: 89
     bytes: 120
   __arr_retain___m1__Token$AiplTok:
-    calls: 100
+    calls: 89
     bytes: 248
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
@@ -1023,19 +972,19 @@ functions:
     calls: 14
     bytes: 324
   __builtin_count_while$char$lam$__m1__lex_step$AiplTok$lambda1:
-    calls: 65
+    calls: 54
     bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
-    calls: 5
+    calls: 3
     bytes: 268
   __builtin_count_while$char$s0$lam$__builtin_is_digit:
-    calls: 51
+    calls: 45
     bytes: 280
   __builtin_count_while$char$s0$lam$__m1__to_eol_len$lambda0:
     calls: 0
     bytes: 40
   __builtin_count_while$char$s0$lam$__m1__to_eol_len$lambda0$tail:
-    calls: 8
+    calls: 7
     bytes: 356
   __builtin_count_while$char$s0$lam$__m4__dedent$lambda1:
     calls: 0
@@ -1044,28 +993,28 @@ functions:
     calls: 13
     bytes: 268
   __builtin_int_parse:
-    calls: 5
+    calls: 3
     bytes: 1096
   __builtin_int_parse$lambda1:
-    calls: 6
+    calls: 3
     bytes: 140
   __ctor$AiplTok$Name:
-    calls: 21
+    calls: 18
     bytes: 104
   __eq_AiplTok:
-    calls: 82
+    calls: 71
     bytes: 416
   __eq_StrStyle:
     calls: 8
     bytes: 64
   __eq___builtin_Span:
-    calls: 92
+    calls: 80
     bytes: 104
   __eq___m1__LexError:
-    calls: 5
+    calls: 4
     bytes: 128
   __eq___m1__LexResult$AiplTok:
-    calls: 23
+    calls: 21
     bytes: 120
   __eq___m1__ScopeSpan:
     calls: 5
@@ -1074,55 +1023,55 @@ functions:
     calls: 2
     bytes: 284
   __eq___m1__SpanStr:
-    calls: 82
+    calls: 71
     bytes: 128
   __eq___m1__Token$AiplTok:
-    calls: 82
+    calls: 71
     bytes: 120
   __eq___m1__Token$AiplTok$arr:
-    calls: 47
+    calls: 42
     bytes: 284
   __eq_str$arr:
     calls: 7
     bytes: 364
   __m10__parse_test_section_header:
-    calls: 6
+    calls: 3
     bytes: 744
   __m1__between_len:
-    calls: 46
+    calls: 42
     bytes: 800
   __m1__delimited_len:
-    calls: 84
+    calls: 76
     bytes: 1952
   __m1__float_len:
     calls: 0
     bytes: 824
   __m1__lex$AiplTok:
-    calls: 30
+    calls: 26
     bytes: 364
   __m1__lex_all$AiplTok:
-    calls: 32
+    calls: 28
     bytes: 4996
   __m1__lex_scoped$AiplTok:
     calls: 2
     bytes: 288
   __m1__lex_step$AiplTok:
-    calls: 149
+    calls: 129
     bytes: 21796
   __m1__nested_len:
-    calls: 90
+    calls: 79
     bytes: 1148
   __m1__step_result$AiplTok:
-    calls: 3471
+    calls: 3067
     bytes: 8796
   __m1__to_eol_len:
     calls: 0
     bytes: 52
   __m1__to_eol_len$tail:
-    calls: 178
+    calls: 155
     bytes: 268
   __m1__to_eol_unless_len:
-    calls: 85
+    calls: 74
     bytes: 360
   __m1__up_to_any_len:
     calls: 6
@@ -1143,7 +1092,7 @@ functions:
     calls: 2
     bytes: 356
   __m9__strip_test_sections:
-    calls: 4
+    calls: 2
     bytes: 788
   __test$aipl_token_scopes:
     calls: 1
@@ -1157,12 +1106,6 @@ functions:
   __test$lex_aipl:
     calls: 1
     bytes: 151052
-  __test$lex_aipl_stripped:
-    calls: 1
-    bytes: 4928
-  __test$lex_aipl_tokens:
-    calls: 1
-    bytes: 3584
   __test$str_lit_value:
     calls: 1
     bytes: 3456
@@ -1179,37 +1122,37 @@ functions:
     calls: 6
     bytes: (external)
   aipl_arr_extend:
-    calls: 288
+    calls: 250
     bytes: (external)
   aipl_arr_inc:
-    calls: 23967
+    calls: 21262
     bytes: (external)
   aipl_arr_reserve:
-    calls: 303
+    calls: 265
     bytes: (external)
   aipl_arr_slice:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 32740
+    calls: 29121
     bytes: (external)
   aipl_array_new:
-    calls: 254
+    calls: 227
     bytes: (external)
   aipl_array_push:
-    calls: 29
+    calls: 26
     bytes: (external)
   aipl_array_push_mut:
-    calls: 135
+    calls: 124
     bytes: (external)
   aipl_array_with_cap:
-    calls: 42
+    calls: 39
     bytes: (external)
   aipl_assert:
-    calls: 56
+    calls: 52
     bytes: (external)
   aipl_rules:
-    calls: 32
+    calls: 28
     bytes: 88776
   aipl_rules$lambda0:
     calls: 0
@@ -1224,10 +1167,10 @@ functions:
     calls: 2
     bytes: 164
   aipl_test_begin:
-    calls: 8
+    calls: 6
     bytes: (external)
   aipl_test_end:
-    calls: 8
+    calls: 6
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -1242,14 +1185,11 @@ functions:
     calls: 1
     bytes: 196
   int_lit:
-    calls: 5
+    calls: 3
     bytes: 624
-  lex_aipl_tokens:
-    calls: 2
-    bytes: 348
   main:
     calls: 1
-    bytes: 668
+    bytes: 504
   raw_tpl_text:
     calls: 1
     bytes: 148
