@@ -634,6 +634,20 @@
 
 
 
+        <section class="item" id="item-aipl_token_scopes">
+          <h3>
+            <a class="anchor" href="#item-aipl_token_scopes">aipl_token_scopes</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn aipl_token_scopes(src: str) -&#62; ScopeSpan[]!LexError</code></pre>
+
+          <div class="doc"><p>Every token's span paired with the scope AIPL's own rule set declares for it, with the trailing <code>--- section ---</code> harness blocks stripped first — the oracle the generated TextMate grammar is checked against.</p><p>The grammar is derived from <code>aipl_rules()</code> (see <code>highlight_aipl.aipl</code>), so this asks the <em>same</em> table what each token should be painted, rather than restating the mapping a second time somewhere else. A test that compares the two is checking the generator, which is the only thing that can be wrong.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lex_aipl_stripped">
           <h3>
             <a class="anchor" href="#item-lex_aipl_stripped">lex_aipl_stripped</a>

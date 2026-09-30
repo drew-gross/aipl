@@ -719,6 +719,11 @@ struct StepResult<K> {
     push: i64 = -1,
     pop: bool = false,
     unterminated: str = "",
+    // The winning rule's `scope`, for the highlighting side-channel — see
+    // `lex_scoped`. On `StepResult` rather than on `Token` because a token is
+    // compared whole all over this file's tests, and what a *highlighter* wants
+    // painted is no part of what a token *is*.
+    scope: str = "",
 }
 
 # A simple (single-token) matcher's outcome: a decline when the matched
@@ -739,6 +744,7 @@ fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!L
         push: r.push,
         pop: r.pop,
         unterminated: r.unterminated,
+        scope: r.scope,
     };
     if (r.skip) {
         return ok(moved);
@@ -871,9 +877,33 @@ fn toks(tokens: Token<Kind>[]) -> LexResult<Kind> { tokens, trivia: [] }
 # an `err` — a `LexError` carrying a message and the offending span — when
 # a byte matches no rule or a matcher sees invalid input outright (an
 # unterminated `Delimited` token).
+# One token's span and the scope its rule declares — the highlighting
+# side-channel. `TokenRule.scope` exists so that one rule set describes a
+# language's lexical structure *once*, for the lexer and the highlighter both;
+# this is that hint read per token rather than per rule.
+struct ScopeSpan { span: Span, scope: str }
+
+# Everything one lex produces: the tokens and trivia a consumer wants, and the
+# scope of every token for a consumer that paints. Two views of one drive loop,
+# so neither can disagree with the other about what matched where.
+struct LexAll<K> { result: LexResult<K>, scopes: ScopeSpan[] }
+
+# `lex`, plus the scope each token's rule declares — see `ScopeSpan`. The
+# highlighter's oracle reads this: the grammar it generates has to paint every
+# token with the scope the rule set already names for it, and asking the rule set
+# beats restating the mapping somewhere else.
+pub fn lex_scoped<K>(self: str, rules: TokenRule<K>[]) -> ScopeSpan[]!LexError {
+    ok(self.lex_all(rules)?.scopes)
+}
+
 pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
+    ok(self.lex_all(rules)?.result)
+}
+
+fn lex_all<K>(self: str, rules: TokenRule<K>[]) -> LexAll<K>!LexError {
     mut tokens = [];
     mut trivia = [];
+    mut scopes: ScopeSpan[] = [];
     mut pos: u64 = 0;
 
     // The mode stack, innermost last; empty *is* the base mode, so a rule set
@@ -888,6 +918,15 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
         };
         set tokens.extend(step.tokens);
         set trivia.extend(step.trivia);
+
+        // A skipped rule contributes no token and so nothing to paint; a trivia
+        // rule does, since a comment is painted like anything else.
+        for (let t : step.tokens) {
+            set scopes.push(ScopeSpan { span: t.text.span, scope: step.scope });
+        }
+        for (let t : step.trivia) {
+            set scopes.push(ScopeSpan { span: t.text.span, scope: step.scope });
+        }
         set modes = modes.stepped(step, pos);
         set pos = step.end;
     }
@@ -905,7 +944,7 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // one is the one to name.
     match (modes.filter(|f| f.mode != 0).last()) {
         some(f) => err(LexError { message: unterminated_msg(f.unterminated), span: f.open }),
-        none => ok(LexResult { tokens, trivia }),
+        none => ok(LexAll { result: LexResult { tokens, trivia }, scopes }),
     }
 }.test({
     fn lex_err(message: str, span: Span) -> LexError { message, span }
@@ -1230,6 +1269,21 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     // bottom: a stray closer is a token, and a parser's problem.
     assert(lex("}", tpl_rules)? == toks([tok("}", Punct, 0..1)]));
 
+    // --- the scope side-channel ---------------------------------------------
+    // Every token's span paired with the scope its own rule declares, which is
+    // what a highlighter's oracle compares a generated grammar against. A
+    // `skip` rule contributes nothing — there is no token to paint — and a rule
+    // with no scope reports the empty one it declares.
+    let kw_scoped = TokenRule {
+        matcher: Keyword("let", "abcdefghijklmnopqrstuvwxyz_0123456789".to_set()),
+        emit: Bare(Kw),
+        scope: "kw",
+    };
+    assert(lex_scoped("let x", [ws, kw_scoped, ident])? == [
+        ScopeSpan { span: 0..3, scope: "kw" },
+        ScopeSpan { span: 4..5, scope: "" },
+    ]);
+
     // `UpToAny` on its own, in the base mode. It stops at a *spelling*, so a
     // multi-character terminator is not confused with its first character: under
     // a ``` stop, a lone backtick is content.
@@ -1395,30 +1449,36 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 481
-deallocations: 481
-reallocations: 111
-bytes allocated: 69208
-instructions executed: 520853
-binary size: 1358520
-  code: 911016
-  data: 10116
-  metadata: 437388
+allocations: 549
+deallocations: 549
+reallocations: 182
+bytes allocated: 74792
+instructions executed: 605084
+binary size: 1397912
+  code: 937264
+  data: 10300
+  metadata: 450348
 functions:
   __arr_drop_ModeFrame:
     calls: 34
     bytes: 120
+  __arr_drop_ScopeSpan:
+    calls: 62
+    bytes: 120
   __arr_drop_Token$Kind:
-    calls: 335
+    calls: 339
     bytes: 276
   __arr_drop_TokenRule$Kind:
-    calls: 35
+    calls: 36
     bytes: 564
   __arr_retain_ModeFrame:
     calls: 37
     bytes: 120
+  __arr_retain_ScopeSpan:
+    calls: 169
+    bytes: 120
   __arr_retain_Token$Kind:
-    calls: 167
+    calls: 169
     bytes: 276
   __arr_retain_TokenRule$Kind:
     calls: 7
@@ -1427,7 +1487,7 @@ functions:
     calls: 47
     bytes: 324
   __builtin_count_while$char$lam$lex_step$Kind$lambda1:
-    calls: 86
+    calls: 88
     bytes: 308
   __builtin_count_while$char$s0$lam$__builtin_int_parse$lambda0:
     calls: 12
@@ -1451,7 +1511,7 @@ functions:
     calls: 2
     bytes: 96
   __ctor$Kind$Ident:
-    calls: 42
+    calls: 43
     bytes: 96
   __ctor$Kind$Raw:
     calls: 3
@@ -1471,6 +1531,12 @@ functions:
   __eq_LexResult$Kind:
     calls: 46
     bytes: 120
+  __eq_ScopeSpan:
+    calls: 2
+    bytes: 128
+  __eq_ScopeSpan$arr:
+    calls: 1
+    bytes: 284
   __eq_SpanStr:
     calls: 104
     bytes: 128
@@ -1481,7 +1547,7 @@ functions:
     calls: 92
     bytes: 284
   __eq___builtin_Span:
-    calls: 122
+    calls: 124
     bytes: 104
   __m1__unescape:
     calls: 4
@@ -1489,16 +1555,16 @@ functions:
   __test$keep_skipped:
     calls: 1
     bytes: 17212
-  __test$lex:
+  __test$lex_all:
     calls: 1
-    bytes: 836756
-  __test$lex$esc_str:
+    bytes: 858280
+  __test$lex_all$esc_str:
     calls: 2
     bytes: 140
-  __test$lex$int_tok:
+  __test$lex_all$int_tok:
     calls: 12
     bytes: 656
-  __test$lex$nonempty_str:
+  __test$lex_all$nonempty_str:
     calls: 2
     bytes: 1052
   __test$span_str:
@@ -1514,31 +1580,34 @@ functions:
     calls: 19
     bytes: (external)
   aipl_arr_extend:
-    calls: 413
+    calls: 419
     bytes: (external)
   aipl_arr_inc:
-    calls: 6573
+    calls: 7467
     bytes: (external)
   aipl_arr_reserve:
-    calls: 436
+    calls: 442
     bytes: (external)
   aipl_arr_slice:
     calls: 20
     bytes: (external)
   aipl_array_dec:
-    calls: 9069
+    calls: 10122
     bytes: (external)
   aipl_array_new:
-    calls: 247
+    calls: 251
+    bytes: (external)
+  aipl_array_push:
+    calls: 61
     bytes: (external)
   aipl_array_push_mut:
-    calls: 31
+    calls: 200
     bytes: (external)
   aipl_array_with_cap:
-    calls: 63
+    calls: 64
     bytes: (external)
   aipl_assert:
-    calls: 89
+    calls: 90
     bytes: (external)
   aipl_test_begin:
     calls: 3
@@ -1563,19 +1632,25 @@ functions:
     bytes: 3516
   lex$Kind:
     calls: 75
-    bytes: 3552
+    bytes: 364
+  lex_all$Kind:
+    calls: 76
+    bytes: 5116
+  lex_scoped$Kind:
+    calls: 1
+    bytes: 288
   lex_step$Kind:
-    calls: 221
-    bytes: 20840
+    calls: 224
+    bytes: 22272
   main:
     calls: 1
-    bytes: 240
+    bytes: 248
   nested_len:
     calls: 3
     bytes: 1148
   step_result$Kind:
-    calls: 655
-    bytes: 8912
+    calls: 661
+    bytes: 9328
   to_eol_len:
     calls: 0
     bytes: 52

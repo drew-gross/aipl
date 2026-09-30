@@ -33,145 +33,47 @@ pub enum LexedStrStyle {
     TripleBacktick,
 }
 
-/// A token kind produced by the dogfooded AIPL lexer (`lex_aipl.aipl`),
-/// mirrored arm-for-arm from its `AiplTok` variant so the FFI marshaling is a
-/// direct name match. Value-carrying arms hold the decoded value: a `StrLit`'s
-/// escape-decoded (and, for a `Triple`/`TripleBacktick` style, de-dented)
-/// contents plus its delimiter style, an int literal's value, a char literal's
-/// byte.
+/// One token's span and the TextMate scope AIPL's own rule set declares for it —
+/// the Rust twin of `lexer.aipl`'s `ScopeSpan`.
 ///
-/// A template is a *run* of tokens — `TplOpen`, its text runs, the `LBrace`
-/// / `RBrace` pairs of its interpolations, and `TplClose` — rather than one
-/// token per segment. A `TplText` carries its escape-decoded value, except that
-/// a raw template's is left as written: de-denting is a whole-literal operation
-/// and the parser's lowering does it once it holds every segment.
-/// `Space`/comments/`AllowMarker` only ever appear in [`LexedOutput::trivia`].
+/// This is the whole of what Rust asks the lexer for. The token *kinds* used to
+/// be mirrored here too, arm for arm with `AiplTok` — 80 of them plus a coarse
+/// classifier — for one consumer: the test that checks the generated TextMate
+/// grammar paints every token sensibly. That test wants the scope, and the rule
+/// set already names it per rule, so it asks for that directly and the mirror is
+/// gone.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LexedTokenKind {
-    Space,
-    LineComment,
-    BlockComment,
-    AllowMarker,
-    /// `# text` — one line of a doc comment, carrying the line's text with the
-    /// `#` and one optional separating space removed. A token, not trivia; see
-    /// the `DOC` terminal.
-    DocComment(String),
-    Name(String),
-    IntLit(i64),
-    StrLit(String, LexedStrStyle),
-    CharTok(u8),
-    /// A template's opening delimiter, carrying which one it was written with.
-    TplOpen(LexedStrStyle),
-    /// One run of literal text inside a template.
-    TplText(String),
-    TplClose,
-    True,
-    False,
-    None,
-    Fn,
-    Let,
-    Mut,
-    Set,
-    Pub,
-    Import,
-    From,
-    As,
-    For,
-    While,
-    Match,
-    Return,
-    Shim,
-    Struct,
-    Variant,
-    If,
-    Else,
-    Builtins,
-    Without,
-    EqEq,
-    Ne,
-    Arrow,
-    FatArrow,
-    AndAnd,
-    OrOr,
-    Pipe,
-    DotDot,
-    PlusPlusPlus,
-    PlusPlus,
-    MinusMinus,
-    PlusEq,
-    MinusEq,
-    StarEq,
-    SlashEq,
-    Eq,
-    Lt,
-    Le,
-    Gt,
-    Ge,
-    Bang,
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Percent,
-    Period,
-    Comma,
-    Colon,
-    Semi,
-    Question,
-    Hash,
-    LParen,
-    RParen,
-    LBrace,
-    RBrace,
-    LBracket,
-    RBracket,
-}
-
-/// One token from the dogfooded AIPL lexer: its [`LexedTokenKind`] and source
-/// byte span.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LexedToken {
-    pub kind: LexedTokenKind,
+pub struct ScopeSpan {
     pub span: Span,
+    pub scope: String,
 }
 
-/// What the dogfooded AIPL lexer returns for a whole source: the emitted
-/// token stream, and the trivia side-channel (comments and `#[allow]`
-/// markers, in source order — whitespace is skipped outright and appears in
-/// neither).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LexedOutput {
-    pub tokens: Vec<LexedToken>,
-    pub trivia: Vec<LexedToken>,
-}
-
-/// A hard lex error from the dogfooded AIPL lexer, with the source byte span
-/// it points at.
+/// Anything that stopped a lex. Mirrors `lexer.aipl`'s `LexError`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LexedError {
     pub message: String,
     pub span: Span,
 }
 
-/// The dogfooded strip-then-lex lexer, installed via [`set_lex_stripped_hook`].
-static LEX_STRIPPED_HOOK: std::sync::OnceLock<fn(&str) -> Result<LexedOutput, LexedError>> =
+/// The dogfooded scope-span lexer, installed via [`set_token_scopes_hook`].
+static TOKEN_SCOPES_HOOK: std::sync::OnceLock<fn(&str) -> Result<Vec<ScopeSpan>, LexedError>> =
     std::sync::OnceLock::new();
 
-/// Install the strip-then-lex hook. The compiler points this at the dogfooded
-/// AIPL `lex_aipl_stripped` (which strips trailing `--- section ---` blocks
-/// then lexes, both dogfooded steps in one FFI crossing). First install wins.
-pub fn set_lex_stripped_hook(f: fn(&str) -> Result<LexedOutput, LexedError>) {
-    let _ = LEX_STRIPPED_HOOK.set(f);
+/// Install the scope-span hook. The compiler points this at the dogfooded AIPL
+/// `aipl_token_scopes`. First install wins (the hook is process-global).
+pub fn set_token_scopes_hook(f: fn(&str) -> Result<Vec<ScopeSpan>, LexedError>) {
+    let _ = TOKEN_SCOPES_HOOK.set(f);
 }
 
-/// Strip trailing `--- section ---` test blocks from `src`, then lex — through
-/// the installed dogfooded AIPL `lex_aipl_stripped`. No native fallback: panics
-/// if the hook isn't installed (call `install_parser_hooks` first).
-pub fn lex_aipl_stripped(src: &str) -> Result<LexedOutput, LexedError> {
-    let hook = LEX_STRIPPED_HOOK
+/// Every token's span and declared scope, with trailing `--- section ---`
+/// harness blocks stripped first — through the dogfooded AIPL
+/// `aipl_token_scopes`. No native fallback: panics if the hook isn't installed
+/// (call `install_parser_hooks` first).
+pub fn token_scopes(input: &str) -> Result<Vec<ScopeSpan>, Error> {
+    let hook = TOKEN_SCOPES_HOOK
         .get()
-        .expect("strip-lex hook not installed before lexing (call install_parser_hooks)");
-    hook(src)
+        .expect("token-scopes hook not installed before lexing (call install_parser_hooks)");
+    hook(input).map_err(|e| Error::at(e.message, e.span))
 }
 
 /// If `line` is a `--- name ---` test-section marker, return the trimmed
@@ -328,137 +230,6 @@ static SPLIT_TEST_SECTIONS_HOOK: std::sync::OnceLock<fn(&str) -> (String, String
 /// hook is process-global).
 pub fn set_split_test_sections_hook(f: fn(&str) -> (String, String)) {
     let _ = SPLIT_TEST_SECTIONS_HOOK.set(f);
-}
-
-/// Coarse classification of a lexed token, used by the syntax-highlighting
-/// test to verify the TextMate grammar at `assets/aipl.tmLanguage.json`
-/// assigns sensible scopes. Comments and whitespace are not represented —
-/// the lexer skips them — and are verified separately.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TokenKind {
-    /// Reserved word: `fn`, `if`, `else`, `struct`, `import`, `from`,
-    /// `let`, `for`, `mut`, `set`, `match`, `builtins`.
-    Keyword,
-    /// `true`, `false`, `none`.
-    Constant,
-    /// Built-in type names — lexically identifiers (`i64`, `bool`, `char`,
-    /// `str`, `any`) but the highlighter scopes them as types.
-    BuiltinType,
-    /// User-defined identifier (function/struct/var/etc.).
-    Identifier,
-    /// Integer literal.
-    Number,
-    /// `"..."` literal.
-    Str,
-    /// `'.'` literal.
-    Char,
-    /// Operators: `+ - * / % == != < > <= >= && || ! -> =>`.
-    Operator,
-    /// Brackets, separators, sigils: `( ) { } [ ] , ; : . ? =`.
-    Punctuation,
-    /// A `# text` doc comment. Unlike `//` and `/* */`, which are trivia and
-    /// never reach a token stream, this one is a token — so a consumer that
-    /// walks tokens (the highlighter's oracle) has to expect it.
-    Comment,
-}
-
-/// Tokenize `input` and classify each token for syntax-highlighter
-/// verification. Strips test-section markers first (the lexer doesn't
-/// understand them), so the caller only sees AIPL source tokens.
-///
-/// Lexing is dogfooded: the section stripping *and* the lexing both happen in
-/// the AIPL [`lex_aipl_stripped`] via one hook crossing (no native fallback).
-/// A [`LexedError`] becomes an [`Error`] at its span.
-pub fn lex_tokens(input: &str) -> Result<Vec<(TokenKind, Span)>, Error> {
-    let out = lex_aipl_stripped(input).map_err(|e| Error::at(e.message, e.span))?;
-    Ok(out
-        .tokens
-        .into_iter()
-        .map(|t| (classify_lexed(&t.kind), t.span))
-        .collect())
-}
-
-/// Coarse-classify a dogfooded-lexer token kind, exactly as [`classify`] does
-/// for the native `Terminal` — including the identifier-text refinement that
-/// scopes the built-in type names (`i64`/`bool`/`char`/…) as `BuiltinType`.
-/// The trivia kinds (`Space`/comments/`AllowMarker`) never appear in the token
-/// stream (they ride the trivia side-channel), so reaching one is a bug.
-fn classify_lexed(k: &LexedTokenKind) -> TokenKind {
-    use LexedTokenKind as K;
-    match k {
-        K::Fn
-        | K::If
-        | K::Else
-        | K::Struct
-        | K::Variant
-        | K::Import
-        | K::From
-        | K::As
-        | K::Pub
-        | K::Let
-        | K::For
-        | K::While
-        | K::Mut
-        | K::Set
-        | K::Match
-        | K::Return
-        | K::Shim
-        | K::Builtins
-        | K::Without => TokenKind::Keyword,
-        K::True | K::False | K::None => TokenKind::Constant,
-        K::Name(s) => match s.as_str() {
-            "bool" | "char" | "str" | "any" => TokenKind::BuiltinType,
-            _ if aipl_syntax::int_bits(s).is_some() => TokenKind::BuiltinType,
-            _ => TokenKind::Identifier,
-        },
-        K::IntLit(_) => TokenKind::Number,
-        K::StrLit(_, _) | K::TplOpen(_) | K::TplText(_) | K::TplClose => TokenKind::Str,
-        K::CharTok(_) => TokenKind::Char,
-        K::EqEq
-        | K::Ne
-        | K::Arrow
-        | K::FatArrow
-        | K::AndAnd
-        | K::OrOr
-        | K::Pipe
-        | K::DotDot
-        | K::PlusPlusPlus
-        | K::PlusPlus
-        | K::MinusMinus
-        | K::PlusEq
-        | K::MinusEq
-        | K::StarEq
-        | K::SlashEq
-        | K::Eq
-        | K::Lt
-        | K::Le
-        | K::Gt
-        | K::Ge
-        | K::Bang
-        | K::Plus
-        | K::Minus
-        | K::Star
-        | K::Slash
-        | K::Percent => TokenKind::Operator,
-        K::Period
-        | K::Comma
-        | K::Colon
-        | K::Semi
-        | K::Question
-        | K::Hash
-        | K::LParen
-        | K::RParen
-        | K::LBrace
-        | K::RBrace
-        | K::LBracket
-        | K::RBracket => TokenKind::Punctuation,
-        // A doc comment *is* in the token stream (see the `DOC` terminal), and
-        // to a highlighter it is a comment like any other.
-        K::DocComment(_) => TokenKind::Comment,
-        K::Space | K::LineComment | K::BlockComment | K::AllowMarker => {
-            unreachable!("trivia kind {k:?} in the token stream")
-        }
-    }
 }
 
 /// The dogfooded AIPL parser, installed by the compiler (via [`set_parse_hook`]):

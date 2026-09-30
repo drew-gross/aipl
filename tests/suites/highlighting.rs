@@ -9,17 +9,21 @@
 //! tmLanguage our grammar uses (`match`, `begin`/`end` with `patterns`,
 //! `captures`, `contentName`, `include` into `repository`).
 //!
-//! For each source file we strip the `--- section ---` blocks the case
-//! harness uses, lex the remaining AIPL with `aipl::lex_tokens`, then
-//! highlight the *whole* file (markers and all) and check the scope the
-//! grammar assigned to each lexed token's first byte matches the token's
-//! kind. Section-marker lines are checked separately.
+//! For each source file we ask the lexer, through `aipl::token_scopes`, for
+//! every token's span and the scope AIPL's own rule set declares for it — then
+//! highlight the *whole* file (markers and all) and check the grammar painted
+//! that token with that scope. Section-marker lines are checked separately.
+//!
+//! Asking the rule set is the point. The grammar under test is *generated* from
+//! those same rules (`highlight_aipl.aipl`), so the only thing that can be wrong
+//! is the generator; a hand-written table of expected scopes here would be a
+//! second, weaker statement of the same facts, and used to be exactly that.
 
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use aipl::{lex_tokens, parse_test_section_header, TokenKind};
+use aipl::{parse_test_section_header, token_scopes};
 use regex::Regex;
 use serde_json::Value;
 
@@ -504,22 +508,49 @@ fn declares_errors(contents: &str) -> bool {
         .any(|h| h == "errors")
 }
 
-fn expected_category(kind: TokenKind) -> &'static [&'static str] {
-    match kind {
-        TokenKind::Keyword => &["keyword"],
-        TokenKind::Constant => &["constant.language"],
-        TokenKind::BuiltinType => &["support.type"],
-        TokenKind::Identifier => &["variable", "entity"],
-        TokenKind::Number => &["constant.numeric"],
-        TokenKind::Str => &["string.quoted.double"],
-        TokenKind::Char => &["string.quoted.single"],
-        TokenKind::Operator => &["keyword.operator"],
-        TokenKind::Punctuation => &["punctuation"],
-        // A `# ..` doc comment. It is a token rather than trivia, so unlike
-        // `//` and `/* */` it reaches this check, and a theme should paint it
-        // as the comment it is.
-        TokenKind::Comment => &["comment"],
+/// The scopes a *contextual* pattern may paint over a token's declared one.
+///
+/// `highlight_aipl.aipl` puts four hand-written patterns ahead of the lexical
+/// ones — the `fn`/`struct` declaration forms, the effect marker, and the
+/// built-in type names — precisely because a lexer cannot describe them: `i64`
+/// lexes as an identifier, and the name after `fn` is an entity rather than a
+/// variable. So a token may be painted more specifically than its rule declares,
+/// but only into one of these, and only from the scope listed against it.
+///
+/// Enumerating the exceptions is the point. The old oracle compared a *class*
+/// prefix for every token, which accepted these four and blurred every other
+/// scope along with them; this accepts exactly these and demands the declared
+/// scope everywhere else.
+fn contextual_refinements(declared: &str) -> &'static [&'static str] {
+    match declared {
+        // An identifier: a built-in type name, a declared `fn`/`struct` name, or
+        // the name half of an effect marker.
+        "variable.other.aipl" => &[
+            "support.type.builtin.aipl",
+            "entity.name.function.aipl",
+            "entity.name.type.struct.aipl",
+            "entity.name.tag.effect.aipl",
+        ],
+        // `fn`/`struct` leading a declaration.
+        "keyword.control.aipl" => &[
+            "keyword.declaration.function.aipl",
+            "keyword.declaration.struct.aipl",
+        ],
+        // The `!` of an effect marker — one token to the lexer, two to a reader.
+        "keyword.operator.aipl" => &["keyword.operator.effect.aipl"],
+        _ => &[],
     }
+}
+
+/// Whether `hl` painted the token at `span` with the scope its rule declares, or
+/// with one of the contextual refinements allowed over it.
+fn painted_as_declared(hl: &Highlight, span: &std::ops::Range<usize>, declared: &str) -> bool {
+    if hl.any_in_range_contains(span.start..span.end, declared) {
+        return true;
+    }
+    contextual_refinements(declared)
+        .iter()
+        .any(|s| hl.any_in_range_contains(span.start..span.end, s))
 }
 
 #[test]
@@ -547,24 +578,25 @@ fn grammar_highlights_every_lexed_token() {
         checked += 1;
 
         let hl = highlight(&grammar, &src);
-        let tokens = match lex_tokens(&src) {
+        let tokens = match token_scopes(&src) {
             Ok(t) => t,
             Err(e) => {
                 failures.push(format!("{display}: lex failed: {e}"));
                 continue;
             }
         };
-        for (kind, span) in tokens {
-            let categories = expected_category(kind);
-            let ok = categories
-                .iter()
-                .any(|c| hl.any_in_range_contains(span.start..span.end, c));
+        for aipl::ScopeSpan { span, scope } in tokens {
+            // A rule with no scope declares nothing to paint.
+            if scope.is_empty() {
+                continue;
+            }
+            let ok = painted_as_declared(&hl, &span, &scope);
             if !ok {
                 let snippet = &src[span.start..span.end];
                 let scopes_here = hl.at(span.start).join(" ");
                 failures.push(format!(
-                    "{display}: token {kind:?} {snippet:?} at {}..{} got scopes [{scopes_here}], \
-                     expected one of {categories:?}",
+                    "{display}: token {snippet:?} at {}..{} declares scope {scope:?} but got \
+                     [{scopes_here}]",
                     span.start, span.end
                 ));
             }
@@ -640,14 +672,14 @@ fn grammar_handles_plain_files_without_section_markers() {
     let grammar = load_grammar();
     let src = "fn main() -> i64 {\n    let x = 42;\n    x\n}\n";
     let hl = highlight(&grammar, src);
-    for (kind, span) in lex_tokens(src).expect("lex") {
-        let categories = expected_category(kind);
-        let ok = categories
-            .iter()
-            .any(|c| hl.any_in_range_contains(span.start..span.end, c));
+    for aipl::ScopeSpan { span, scope } in token_scopes(src).expect("lex") {
+        if scope.is_empty() {
+            continue;
+        }
+        let ok = painted_as_declared(&hl, &span, &scope);
         assert!(
             ok,
-            "token {kind:?} {:?} got scopes {:?}, expected one of {categories:?}",
+            "token {:?} declares scope {scope:?} but got {:?}",
             &src[span.start..span.end],
             hl.at(span.start)
         );

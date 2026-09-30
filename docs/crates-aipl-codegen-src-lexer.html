@@ -433,6 +433,48 @@
 
 
 
+        <section class="item" id="item-ScopeSpan">
+          <h3>
+            <a class="anchor" href="#item-ScopeSpan">ScopeSpan</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct ScopeSpan</code></pre>
+
+          <div class="doc"><p>Lexes <code>self</code> into a <code>LexResult</code>: the flat token list, plus the trivia side-channel, as described by the ordered <code>rules</code>. At each position the first rule whose matcher matches claims the token (so order is priority — keywords before identifiers, floats before ints); a <code>skip: true</code> rule consumes its match without producing anything (whitespace), and a <code>trivia: true</code> rule records its matches in the side-channel instead of the token stream (comments, lint markers). Lexing fails with an <code>err</code> — a <code>LexError</code> carrying a message and the offending span — when a byte matches no rule or a matcher sees invalid input outright (an unterminated <code>Delimited</code> token). One token's span and the scope its rule declares — the highlighting side-channel. <code>TokenRule.scope</code> exists so that one rule set describes a language's lexical structure <em>once</em>, for the lexer and the highlighter both; this is that hint read per token rather than per rule.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-LexAll">
+          <h3>
+            <a class="anchor" href="#item-LexAll">LexAll</a>
+            <span class="kind kind-struct">struct</span>
+          </h3>
+          <pre class="signature"><code>struct LexAll&#60;K: any&#62;</code></pre>
+
+          <div class="doc"><p>Everything one lex produces: the tokens and trivia a consumer wants, and the scope of every token for a consumer that paints. Two views of one drive loop, so neither can disagree with the other about what matched where.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lex_scoped">
+          <h3>
+            <a class="anchor" href="#item-lex_scoped">lex_scoped</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lex_scoped&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; ScopeSpan[]!LexError</code></pre>
+
+          <div class="doc"><p><code>lex</code>, plus the scope each token's rule declares — see <code>ScopeSpan</code>. The highlighter's oracle reads this: the grammar it generates has to paint every token with the scope the rule set already names for it, and asking the rule set beats restating the mapping somewhere else.</p></div>
+
+
+        </section>
+
+
+
         <section class="item" id="item-lex">
           <h3>
             <a class="anchor" href="#item-lex">lex</a>
@@ -440,7 +482,7 @@
           </h3>
           <pre class="signature"><code>pub fn lex&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; LexResult&#60;K&#62;!LexError</code></pre>
 
-          <div class="doc"><p>Lexes <code>self</code> into a <code>LexResult</code>: the flat token list, plus the trivia side-channel, as described by the ordered <code>rules</code>. At each position the first rule whose matcher matches claims the token (so order is priority — keywords before identifiers, floats before ints); a <code>skip: true</code> rule consumes its match without producing anything (whitespace), and a <code>trivia: true</code> rule records its matches in the side-channel instead of the token stream (comments, lint markers). Lexing fails with an <code>err</code> — a <code>LexError</code> carrying a message and the offending span — when a byte matches no rule or a matcher sees invalid input outright (an unterminated <code>Delimited</code> token).</p></div>
+          <p class="undocumented">Undocumented.</p>
 
 
         </section>
@@ -754,6 +796,20 @@
             <span class="kind kind-fn">fn</span>
           </h3>
           <pre class="signature"><code>fn toks(tokens: Token&#60;Kind&#62;[]) -&#62; LexResult&#60;Kind&#62;</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lex_all">
+          <h3>
+            <a class="anchor" href="#item-lex_all">lex_all</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lex_all&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; LexAll&#60;K&#62;!LexError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 

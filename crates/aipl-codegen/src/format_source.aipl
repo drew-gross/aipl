@@ -423,15 +423,15 @@ fn is_layout(self: AiplTok) -> bool {
     assert(!StrLit(",", Quoted).is_layout());
 })
 --- performance ---
-allocations: 21434
-deallocations: 21434
-reallocations: 3186
-bytes allocated: 4817438
-instructions executed: 11031427
-binary size: 7639640
-  code: 5087280
+allocations: 21476
+deallocations: 21476
+reallocations: 3315
+bytes allocated: 4820462
+instructions executed: 11810027
+binary size: 7645584
+  code: 5091288
   data: 13498
-  metadata: 2538862
+  metadata: 2540798
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -477,6 +477,9 @@ functions:
     bytes: 208
   __arr_drop___m15__ModeFrame:
     calls: 59
+    bytes: 120
+  __arr_drop___m15__ScopeSpan:
+    calls: 42
     bytes: 120
   __arr_drop___m15__Token$__m25__AiplTok:
     calls: 376
@@ -576,6 +579,9 @@ functions:
     bytes: 208
   __arr_retain___m15__ModeFrame:
     calls: 30
+    bytes: 120
+  __arr_retain___m15__ScopeSpan:
+    calls: 290
     bytes: 120
   __arr_retain___m15__Token$__m25__AiplTok:
     calls: 290
@@ -942,16 +948,19 @@ functions:
     bytes: 824
   __m15__lex$__m25__AiplTok:
     calls: 47
-    bytes: 3552
+    bytes: 364
+  __m15__lex_all$__m25__AiplTok:
+    calls: 47
+    bytes: 4996
   __m15__lex_step$__m25__AiplTok:
     calls: 445
-    bytes: 20308
+    bytes: 21796
   __m15__nested_len:
     calls: 274
     bytes: 1148
   __m15__step_result$__m25__AiplTok:
     calls: 12360
-    bytes: 8324
+    bytes: 8796
   __m15__to_eol_len:
     calls: 0
     bytes: 52
@@ -2087,7 +2096,7 @@ functions:
     calls: 12561
     bytes: (external)
   aipl_arr_inc:
-    calls: 119735
+    calls: 120954
     bytes: (external)
   aipl_arr_reserve:
     calls: 12512
@@ -2102,16 +2111,16 @@ functions:
     calls: 84
     bytes: (external)
   aipl_array_dec:
-    calls: 173356
+    calls: 174664
     bytes: (external)
   aipl_array_new:
     calls: 2390
     bytes: (external)
   aipl_array_push:
-    calls: 1611
+    calls: 1653
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6527
+    calls: 6817
     bytes: (external)
   aipl_array_with_cap:
     calls: 134

@@ -564,56 +564,35 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
         .unwrap();
     assert_eq!(not_op, FfiValue::Int(0));
 
-    // Lexes AIPL source into `LexResult<AiplTok>`: the typed token stream plus
-    // the trivia side-channel (comments and `#[allow]` markers). This is the
-    // richest entry the artifact serves — a result of a generic struct of
-    // arrays of structs whose `kind` field is a variant.
-    // A `Token<AiplTok>`: its kind, plus the `SpanStr` carrying the matched text
-    // and the span it covers. The text is sliced out of `src` rather than
-    // written as a literal, so an expectation cannot claim text the source does
-    // not hold at that span — the invariant `span_str` establishes in
-    // `lexer.aipl` is the one this mirrors.
-    let tok = |src: &str, case: &str, payload: Vec<FfiValue>, s: usize, e: usize| {
+    // Every token's span plus the scope AIPL's rule set declares for it — the one
+    // thing Rust asks the lexer for, marshaled as a result of an array of
+    // structs. Trailing `--- section ---` blocks are dropped first (strip + lex
+    // in one FFI crossing) and kept tokens keep their original spans.
+    let scope_span = |scope: &str, s: i64, e: i64| {
         FfiValue::Struct(vec![
-            (
-                "kind".to_string(),
-                FfiValue::Variant(case.to_string(), payload),
-            ),
-            (
-                "text".to_string(),
-                FfiValue::Struct(vec![
-                    ("text".to_string(), FfiValue::Str(src[s..e].to_string())),
-                    ("span".to_string(), span(s as i64, e as i64)),
-                ]),
-            ),
+            ("span".to_string(), span(s, e)),
+            ("scope".to_string(), FfiValue::Str(scope.to_string())),
         ])
     };
-    let lex_src = "let x = 42; // note";
-    let lexed = comp
-        .call_values("lex_aipl_stripped", &[FfiValue::Str(lex_src.to_string())])
+    let scoped = comp
+        .call_values(
+            "aipl_token_scopes",
+            &[FfiValue::Str("let x = 1\n--- stdout ---\nfoo".to_string())],
+        )
         .unwrap();
     assert_eq!(
-        lexed,
-        FfiValue::Res(Ok(Box::new(FfiValue::Struct(vec![
-            (
-                "tokens".to_string(),
-                FfiValue::Array(vec![
-                    tok(lex_src, "Let", vec![], 0, 3),
-                    tok(lex_src, "Name", vec![FfiValue::Str("x".to_string())], 4, 5),
-                    tok(lex_src, "Eq", vec![], 6, 7),
-                    tok(lex_src, "IntLit", vec![FfiValue::Int(42)], 8, 10),
-                    tok(lex_src, "Semi", vec![], 10, 11),
-                ]),
-            ),
-            (
-                "trivia".to_string(),
-                FfiValue::Array(vec![tok(lex_src, "LineComment", vec![], 12, 19)]),
-            ),
+        scoped,
+        FfiValue::Res(Ok(Box::new(FfiValue::Array(vec![
+            scope_span("keyword.control.aipl", 0, 3),
+            scope_span("variable.other.aipl", 4, 5),
+            scope_span("keyword.operator.aipl", 6, 7),
+            scope_span("constant.numeric.integer.aipl", 8, 9),
         ]))))
     );
+
     // A byte no rule matches is a hard `LexError` with its span.
     let lex_err = comp
-        .call_values("lex_aipl_stripped", &[FfiValue::Str("@".to_string())])
+        .call_values("aipl_token_scopes", &[FfiValue::Str("@".to_string())])
         .unwrap();
     assert_eq!(
         lex_err,
@@ -623,35 +602,6 @@ fn sanity_check_entries(_a: &Artifact, comp: &Compilation) {
                 FfiValue::Str("unexpected character".to_string()),
             ),
             ("span".to_string(), span(0, 1)),
-        ]))))
-    );
-
-    // `lex_aipl_stripped` drops trailing `--- section ---` blocks before lexing
-    // (one FFI crossing for strip + lex), and kept tokens keep their original
-    // spans.
-    let strip_src = "let x = 1\n--- stdout ---\nfoo";
-    let stripped = comp
-        .call_values("lex_aipl_stripped", &[FfiValue::Str(strip_src.to_string())])
-        .unwrap();
-    assert_eq!(
-        stripped,
-        FfiValue::Res(Ok(Box::new(FfiValue::Struct(vec![
-            (
-                "tokens".to_string(),
-                FfiValue::Array(vec![
-                    tok(strip_src, "Let", vec![], 0, 3),
-                    tok(
-                        strip_src,
-                        "Name",
-                        vec![FfiValue::Str("x".to_string())],
-                        4,
-                        5
-                    ),
-                    tok(strip_src, "Eq", vec![], 6, 7),
-                    tok(strip_src, "IntLit", vec![FfiValue::Int(1)], 8, 9),
-                ]),
-            ),
-            ("trivia".to_string(), FfiValue::Array(vec![])),
         ]))))
     );
 

@@ -4968,18 +4968,21 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2106450
-deallocations: 2106450
-reallocations: 304661
-bytes allocated: 403579394
-instructions executed: 600542984
-binary size: 7008776
-  code: 4636568
+allocations: 2106815
+deallocations: 2106815
+reallocations: 306035
+bytes allocated: 403605674
+instructions executed: 611623994
+binary size: 7014720
+  code: 4640576
   data: 59172
-  metadata: 2313036
+  metadata: 2314972
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 537
+    bytes: 120
+  __arr_drop___m11__ScopeSpan:
+    calls: 365
     bytes: 120
   __arr_drop___m11__Token$__m23__AiplTok:
     calls: 6229
@@ -5073,6 +5076,9 @@ functions:
     bytes: 140
   __arr_retain___m11__ModeFrame:
     calls: 349
+    bytes: 120
+  __arr_retain___m11__ScopeSpan:
+    calls: 5499
     bytes: 120
   __arr_retain___m11__Token$__m23__AiplTok:
     calls: 5499
@@ -5421,16 +5427,19 @@ functions:
     bytes: 824
   __m11__lex$__m23__AiplTok:
     calls: 365
-    bytes: 3552
+    bytes: 364
+  __m11__lex_all$__m23__AiplTok:
+    calls: 365
+    bytes: 4996
   __m11__lex_step$__m23__AiplTok:
     calls: 5499
-    bytes: 20308
+    bytes: 21796
   __m11__nested_len:
     calls: 3647
     bytes: 1148
   __m11__step_result$__m23__AiplTok:
     calls: 174356
-    bytes: 8324
+    bytes: 8796
   __m11__to_eol_len:
     calls: 0
     bytes: 52
@@ -5993,7 +6002,7 @@ functions:
     calls: 1203799
     bytes: (external)
   aipl_arr_inc:
-    calls: 6804106
+    calls: 6817659
     bytes: (external)
   aipl_arr_reserve:
     calls: 1213308
@@ -6008,16 +6017,16 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 9964561
+    calls: 9978844
     bytes: (external)
   aipl_array_new:
     calls: 194093
     bytes: (external)
   aipl_array_push:
-    calls: 170675
+    calls: 171040
     bytes: (external)
   aipl_array_push_mut:
-    calls: 750600
+    calls: 756099
     bytes: (external)
   aipl_array_with_cap:
     calls: 40553

@@ -2,29 +2,25 @@
 ; Checked-in Cranelift IR for AIPL the compiler dogfoods (see from_artifact).
 ; DO NOT EDIT BY HAND. Regenerate:
 ;   cargo test --test dogfood -- --ignored dogfood_ir::fill_dogfood_ir
-; entry parse_test_section_header 470 str -> str?
-; entry strip_test_sections 511 str -> str
-; entry split_test_sections 510 str -> __tuple$str$str
+; entry parse_test_section_header 471 str -> str?
+; entry strip_test_sections 512 str -> str
+; entry split_test_sections 511 str -> __tuple$str$str
 ; entry assert_loc 61 str __builtin_Span -> str
 ; entry caret_block 68 str __builtin_Span str -> str
 ; entry fill_or_add_sections_file 149 str __m13__Fill[] -> unit!Error
-; entry normalize_output 442 str -> str
+; entry normalize_output 443 str -> str
 ; entry int_fits 381 i64 str -> bool
 ; entry is_operator_name 382 str -> bool
-; entry lex_aipl_stripped 415 str -> __m19__LexResult$__m20__AiplTok!__m19__LexError
+; entry aipl_token_scopes 415 str -> __m19__ScopeSpan[]!__m19__LexError
 ; entry find_files 150 str str -> str[]!Error
 ; entry companion_files 70 str -> __m25__Companion[]!str
-; entry parse_spec 467 str -> __m26__Spec!str
+; entry parse_spec 468 str -> __m26__Spec!str
 ; entry aipl_parse_file 342 str -> __m27__ParsedFile!__m39__ParseError
 ; entry format_source 174 str u64 -> str!__m46__FmtError
 ; struct __tuple$str$str 48 _0@0:str _1@24:str
 ; struct __builtin_Span 16 start@0:u64 end@8:u64
 ; struct __m13__Fill 48 section@0:str body@24:str
-; struct __m19__LexResult$__m20__AiplTok 16 tokens@0:__m19__Token$__m20__AiplTok[] trivia@8:__m19__Token$__m20__AiplTok[]
-; struct __m19__Token$__m20__AiplTok 80 kind@0:__m20__AiplTok text@40:__m19__SpanStr
-; variant __m20__AiplTok 40 Space LineComment BlockComment AllowMarker DocComment(8:str) Name(8:str) IntLit(8:i64) StrLit(8:str,32:__m20__StrStyle) CharTok(8:char) TplOpen(8:__m20__StrStyle) TplText(8:str) TplClose True False None Fn Let Mut Set Pub Import From As For While Match Return Shim Struct Variant If Else Builtins Without EqEq Ne Arrow FatArrow AndAnd OrOr Pipe DotDot PlusPlusPlus PlusPlus MinusMinus PlusEq MinusEq StarEq SlashEq Eq Lt Le Gt Ge Bang Plus Minus Star Slash Percent Period Comma Colon Semi Question Hash LParen RParen LBrace RBrace LBracket RBracket
-; variant __m20__StrStyle 8 Quoted TripleQuoted Backtick TripleBacktick
-; struct __m19__SpanStr 40 text@0:str span@24:__builtin_Span
+; struct __m19__ScopeSpan 40 span@0:__builtin_Span scope@16:str
 ; struct __m19__LexError 40 message@0:str span@24:__builtin_Span
 ; struct __m25__Companion 48 path@0:str contents@24:str
 ; struct __m26__Spec 224 source@0:str extra_files@24:__m26__Entry[] expect_files@32:__m26__Entry[] stdout@40:str? stderr@72:str? exit_code@104:i64? errors@120:str? performance@152:str? cli@184:str[] check@192:str?
@@ -33,6 +29,7 @@
 ; struct __m36__Program 40 items@0:__m36__Item[] doc@8:str?
 ; variant __m36__Item 112 Fn(8:__m36__Function) Struct(8:__m36__StructDecl) Variant(8:__m36__VariantDecl) Import(8:__m36__ImportDecl) Const(8:__m36__ConstDecl)
 ; struct __m36__Function 152 boxed name@0:__m19__SpanStr is_pub@40:bool sig@48:__m36__Signature body@88:__m31__Expr test_body@96:__m31__Expr? test_fns@112:__m36__Function[] doc@120:str?
+; struct __m19__SpanStr 40 text@0:str span@24:__builtin_Span
 ; struct __m36__Signature 40 type_vars@0:__m36__TypeParam[] params@8:__m36__Param[] effects@16:str[] return_ty@24:__m30__Ty?
 ; struct __m36__TypeParam 32 name@0:str bound@24:__m35__Bound
 ; variant __m35__Bound 8 Any Ord Variant
@@ -311,4 +308,4 @@
 ; data 187 __tostr_lit_94 0800000000000000ffffffffffffff7f52427261636b657400
 
 ; __m10__assert_loc
-; source-fingerprint 9547303657810242280
+; source-fingerprint 11310673036860189559

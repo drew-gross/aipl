@@ -76,6 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  StepResult looks like you stopped fixing it partway though (from the header docs)
   Symbol and Import should use SpanStr
   Tpl and Tok should not be abbreviated
   re_escape_set should use a map of some sort probably

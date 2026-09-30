@@ -1762,15 +1762,15 @@ fn parsed(src: str, g: Grammar<Tok, Node>, start: str) -> Node!ParseError {
     parse(src, lexed, g, start)
 }
 --- performance ---
-allocations: 6098
-deallocations: 6098
-reallocations: 1430
-bytes allocated: 716908
-instructions executed: 1917858
-binary size: 744552
-  code: 451668
+allocations: 6196
+deallocations: 6196
+reallocations: 1559
+bytes allocated: 723964
+instructions executed: 2033828
+binary size: 750112
+  code: 455432
   data: 12644
-  metadata: 280240
+  metadata: 282036
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1795,6 +1795,9 @@ functions:
     bytes: 116
   __arr_drop___m4__ModeFrame:
     calls: 0
+    bytes: 120
+  __arr_drop___m4__ScopeSpan:
+    calls: 98
     bytes: 120
   __arr_drop___m4__Token$Tok:
     calls: 497
@@ -1825,6 +1828,9 @@ functions:
     bytes: 116
   __arr_retain___m4__ModeFrame:
     calls: 0
+    bytes: 120
+  __arr_retain___m4__ScopeSpan:
+    calls: 295
     bytes: 120
   __arr_retain___m4__Token$Tok:
     calls: 295
@@ -2053,16 +2059,19 @@ functions:
     bytes: 824
   __m4__lex$Tok:
     calls: 103
-    bytes: 3552
+    bytes: 364
+  __m4__lex_all$Tok:
+    calls: 103
+    bytes: 4764
   __m4__lex_step$Tok:
     calls: 371
-    bytes: 19224
+    bytes: 20656
   __m4__nested_len:
     calls: 0
     bytes: 1148
   __m4__step_result$Tok:
     calls: 998
-    bytes: 6828
+    bytes: 7344
   __m4__to_eol_len:
     calls: 0
     bytes: 52
@@ -2130,7 +2139,7 @@ functions:
     calls: 1984
     bytes: (external)
   aipl_arr_inc:
-    calls: 36204
+    calls: 37667
     bytes: (external)
   aipl_arr_reserve:
     calls: 2199
@@ -2145,16 +2154,16 @@ functions:
     calls: 42
     bytes: (external)
   aipl_array_dec:
-    calls: 46291
+    calls: 47955
     bytes: (external)
   aipl_array_new:
     calls: 762
     bytes: (external)
   aipl_array_push:
-    calls: 954
+    calls: 1052
     bytes: (external)
   aipl_array_push_mut:
-    calls: 2337
+    calls: 2632
     bytes: (external)
   aipl_array_with_cap:
     calls: 769
