@@ -18,8 +18,7 @@ variant Rule<K: any> = Literal(str) | Named(str) | Term(K)
 //
 // Deliberately larger than the inliner's size limit, and called more than once,
 // so the body stays in the function it was written in. Inlining relocates a body
-// into a caller with a different return type and discards exactly this context
-// — see PARSER_LIBRARY.md 1.9.
+// into a caller with a different return type and discards exactly this context.
 fn paren(open: bool) -> Rule<Tok> {
     let o = "(";
     let c = ")";

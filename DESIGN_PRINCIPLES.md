@@ -146,9 +146,8 @@ order:
    pure sequencing.
 2. **A parse error should cost only what it actually broke.** With a recovering
    parser, a file with one bad function still yields the others, and their tests
-   still run. This is what the parser library work (`PARSER_LIBRARY.md`) makes
-   possible — error recovery is named there as the thing `NestedIn` gives the
-   driver a place to hang.
+   still run. This is what the parser library makes possible: `NestedIn` gives
+   the driver a place to hang error recovery.
 3. **A type error should cost only the function it is in.** If `f` does not type
    check, `g`'s tests should still run. This needs failure to be per-definition
    rather than per-file, which reaches into how the checker reports and how

@@ -510,11 +510,11 @@ pub fn empty() -> Bag { Empty }";
 #[test]
 fn call_values_marshals_a_recursive_variant() {
     // A variant whose payload is an array of itself — the shape every syntax
-    // tree is, and the one the AIPL-side AST in `PARSER_LIBRARY.md`'s stage 5
-    // rests on. `check_ffi_return` walks a variant's case payloads to decide
-    // marshalability, so a case that mentions its own type is where that walk
-    // would recurse forever if nothing stopped it; and the reader has to follow
-    // the same cycle at run time without a static depth to work from.
+    // tree is, and the one the AIPL-side AST rests on. `check_ffi_return` walks
+    // a variant's case payloads to decide marshalability, so a case that
+    // mentions its own type is where that walk would recurse forever if nothing
+    // stopped it; and the reader has to follow the same cycle at run time
+    // without a static depth to work from.
     let src = "\
 variant Tree = Leaf(i64) | Node(Tree[])
 pub fn leaf() -> Tree { Leaf(7) }
@@ -538,11 +538,11 @@ pub fn deep() -> Tree { Node([Leaf(1), Node([Leaf(2), Leaf(3)]), Node([])]) }";
 
 #[test]
 fn call_values_marshals_a_mutually_recursive_ast() {
-    // The shape an AST actually is, and the one `PARSER_LIBRARY.md`'s
-    // "lower in AIPL, marshal the result" bridge stands or falls on: a struct
-    // and a variant that reach each other, so *both* are boxed, carrying a
-    // non-boxed struct (`Span`) inline, an optional boxed field, and an array of
-    // boxed values. Every edge here is one the reader has to follow differently.
+    // The shape an AST actually is, and the one the "lower in AIPL, marshal the
+    // result" bridge stands or falls on: a struct and a variant that reach each
+    // other, so *both* are boxed, carrying a non-boxed struct (`Span`) inline,
+    // an optional boxed field, and an array of boxed values. Every edge here is
+    // one the reader has to follow differently.
     let src = "\
 struct Span { start: i64, end: i64 }
 struct Expr { kind: Kind, span: Span }

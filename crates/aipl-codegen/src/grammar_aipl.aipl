@@ -4622,8 +4622,7 @@ pub fn aipl_parses(src: str) -> bool {
 # One production, laid out `Inline`. `build` takes the wrapped `Build`, not the
 # function — a function value may be *called* through a parameter but not
 # stored into a field or a constructor from one, so `Mk` has to be written at
-# the call site where the name is still a name. See the constraint list in
-# `PARSER_LIBRARY.md`.
+# the call site where the name is still a name.
 #
 # `Inline` is the default in the same sense `expect_as: ""` is: it is what a
 # production says when it has nothing particular to say. A production whose

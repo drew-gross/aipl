@@ -195,8 +195,8 @@ variant Rule<K: variant> =
         # The shape that needs stating is a group holding a list that lives one
         # production down, and inlining the list into the group removes it — at
         # which point this argument, and the disagreement it admits, both go
-        # away. Which of those wrapper productions can fold is what the lowering
-        # decides; `PARSER_LIBRARY.md`'s 5d carries the plan.
+        # away. Which of those wrapper productions can fold is what the
+        # lowering decides.
         style?: ListStyle = none,
         # The index of this bracket pair's style in the grammar's `groups`,
         # stamped by `link` (see `Grammar`). No grammar file writes it, and a
@@ -1082,8 +1082,7 @@ pub fn link<K: variant, A: any>(g: Grammar<K, A>) -> Grammar<K, A>!ParseError {
 # A token-kind type and an AST type for the `.test` block above. A real consumer
 # declares its own pair; these exist because a `Grammar<K, A>` cannot be written
 # down without both. (`Kind` rather than a `Kind` *constructor*: a constructor
-# colliding with another top-level name in the same file is silently dropped —
-# see the naming note in `PARSER_LIBRARY.md`.)
+# colliding with another top-level name in the same file is silently dropped.)
 variant Kind = Atom(str) | Open | Close
 
 variant Node = Leaf(str) | List(Node[])

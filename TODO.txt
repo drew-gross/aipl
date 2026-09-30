@@ -76,11 +76,10 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  go through and remove all comments that talk about how the code used to work.
   Symbol and Import should use SpanStr
   Tpl and Tok should not be abbreviated
   re_escape_set should use a map of some sort probably
-  delimited should use a char set
-  remove PARSER_LIBRARY.md references since that project is complete
   get rid of convention of using 0..0 span as a substitute for none
   Fill[] should probably be a dict
   unordered set needs some way to convert to array
@@ -232,6 +231,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  add units to the language
   support defaults for struct fields that are variants, structs, or optionals of variants or structs
   link_rule does some weird stuff to prevent the formatter from breaking the tuples. Also it should match on the tuple probably
   str without "" should work
@@ -351,6 +351,7 @@ grammar:
   make an ebnf loader as well as dumper
 
 utilities:
+  int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
   map on a set is a bit of a weird operation, I feel like I should come up with a name for it (what if the pred isn't injective?)
   (T, U)[] -> (T[], U[]) function
   generic sum function with int bound
@@ -454,6 +455,8 @@ design:
   apis should express intent
 
 optimizations:
+  figure out / fix why template literals are peforming worse than concat chains
+  make large array-literal construction table-driven rather than unrolled.
   template literals should constant fold in their parts if constant
   string interning? replaing let tq = `"""`; f(tq, tq) with f(`"""`, `"""`); was slower, which I wouldn't expect
   for move-in detection:
@@ -639,11 +642,6 @@ Cache monomorphizations of the same lambda
 
 Unicode support
 
-int_parse improvements: https://kholdstare.github.io/technical/2020/05/26/faster-integer-parsing.html
-
-line numbers on test assertion failures, err/none propagations, etc.
-get claude to reorganize my todos
-
 error improvements:
   tests/cases/kwargs/err_generic_default_conflicts.aipl is showing a mangled name in it's error. This should type check against the bound and see that T (any) isn't compatible with 0 (num)
   import suggestions when missing an import
@@ -656,6 +654,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  figure out why listing takes so long in nextest
   instead of having unfillable(), we should have fillable() since we have better control over the test output and can thus influence fillable() better
   should be able to regenerate syntax highlighter
   display the number of test excluded from handoff
@@ -676,8 +675,6 @@ optimize enumerate/reverse/right_fold with streams
 "AIPL-implemented builtin sources are valid AIPL" error should include more info
 make it so functions can call functions defined later in the file
 
-figure out / fix why template literals are peforming worse than concat chains
-
 make try_left_fold and try_right_fold for use when the lambda returns an error
 
 lexer:
@@ -695,16 +692,15 @@ lexer:
 
 check if flat vec is more performant for cons list in doc.aipl (use runtime perf numbers) NOTE: probably should make a perf test to format entire codebase for this
 
-Nested matching e.g.
+match:
+  Nested matching e.g.
     match (opt_of_array) {
         some([]) => ...,
         some([var]) => ...,
         some(multi) => ...,
         none => ...,
     }
-
-implement is_ok_and and is_err
-instead of err_message use x == err(...)
+  rest/spread in match
 
 use template literals more than concat
 
@@ -713,21 +709,16 @@ make a function composition operator
 errors should contain stack traces
 first we need some actual infra for stack traces
 
-indent.aipl optimization: pre-reserve target*lines + self.len() space
+indent.aipl:
+  pre-reserve target*lines + self.len() space
 
-rest/spread in match
-
-raw strings in aipl to make tests of unescape look nicer
-
-make a debugger
+debugging:
+  make a debugger
+  line numbers on test assertion failures, err/none propagations, etc.
+  tools for debugging infinite loops
+  add optional inc/dec instrumentation. I'ts been useful before, might as well keep it around.
 
 some sort of with_capacity option? Use in unescape
-
-split the test cases into more shards (since some take > 60s)
-
-integate the formatting test into the cases harness
-
-the size is driven by inline construction of large literal values and the lexer's inlined rule table — not by error rendering. If you want to shrink it, the levers are: make large array-literal construction table-driven rather than unrolled.
 
 Make synthesized functions show up in monomorphizations. Ideally by having their creating be driven by the monomorphization process.
 
@@ -829,10 +820,6 @@ Allow int literals to flex to the type they are being assinged to / passed as
 
 narrower ints should take up less space
 
-add units to the language
-
-make repeat and indent accept unsigned int
-
 dead code elimination
 the lexer still wants a real dispatch structure — a first-char jump table over rules rather than a linear scan — since it's the thing every parse in the corpus pays for.
 
@@ -850,10 +837,6 @@ I built and measured three fixes, cumulatively:
 │ + first-char can_start gate so a rule declines without building a StepResult │ 0.23s │
 └──────────────────────────────────────────────────────────────────────────────┴───────┘
 
-debugging:
-  tools for debugging infinite loops
-  add optional inc/dec instrumentation. I'ts been useful before, might as well keep it around.
-
 walker.aipl:
   If we allow the formtter to canonicalize strings (i.e. switch betwtten "" and `` based on which one result in fewer internal escapes) we should be able to have the formatter operator on the token (or ast) directly and not need spans into the source. Or more generally, don't lose information in parsing that is used in formatting (primarily by deciding we don't acutally need that info in formatting)
   replace is_binop with is_operator_name
@@ -866,10 +849,7 @@ sort:
   the sibling limitation sort_by documents in a comment — "a function-typed parameter cannot be captured into a nested lambda" — is a different restriction and still stands. It's what forces sort_by's hand-rolled insertion scan instead of a count_while, and it's the next thing in this area that would pay for itself.
   Lets make some sort of sort_by_keys_with_tiebreakers thing that does the sorting in walker.aipl
 
-test procedure improvements:
-  figureout why listing takes so long in nextest
-
-Reasons dec.aipl uses a cons list:
+Reasons doc.aipl uses a cons list:
     1. fits borrows the stack in Rust; AIPL has no references.
 
     This is the real driver. The Rust fits takes the outer work stack by reference (doc.rs:241):

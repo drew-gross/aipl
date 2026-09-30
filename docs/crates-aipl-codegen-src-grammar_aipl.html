@@ -2207,7 +2207,7 @@
           </h3>
           <pre class="signature"><code>fn p(name: str, rule: Rule&#60;AiplTok&#62;, build: Build&#60;Ast&#62;) -&#62; Production&#60;AiplTok, Ast&#62;</code></pre>
 
-          <div class="doc"><p>One production, laid out <code>Inline</code>. <code>build</code> takes the wrapped <code>Build</code>, not the function — a function value may be <em>called</em> through a parameter but not stored into a field or a constructor from one, so <code>Mk</code> has to be written at the call site where the name is still a name. See the constraint list in <code>PARSER_LIBRARY.md</code>.</p><p><code>Inline</code> is the default in the same sense <code>expect_as: &quot;&quot;</code> is: it is what a production says when it has nothing particular to say. A production whose layout matters names it through <code>pt</code> below.</p></div>
+          <div class="doc"><p>One production, laid out <code>Inline</code>. <code>build</code> takes the wrapped <code>Build</code>, not the function — a function value may be <em>called</em> through a parameter but not stored into a field or a constructor from one, so <code>Mk</code> has to be written at the call site where the name is still a name.</p><p><code>Inline</code> is the default in the same sense <code>expect_as: &quot;&quot;</code> is: it is what a production says when it has nothing particular to say. A production whose layout matters names it through <code>pt</code> below.</p></div>
 
 
         </section>

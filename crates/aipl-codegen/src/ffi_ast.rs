@@ -1,11 +1,10 @@
 //! Rebuild an [`aipl_syntax::ast::Program`] from the [`FfiValue`] the AIPL
 //! parser hands back.
 //!
-//! This is the far side of the bridge stage 5a of `PARSER_LIBRARY.md` chose:
-//! `grammar_aipl.aipl` lowers a parse to the AST declared in `ast.aipl` and the
-//! files beside it, that
-//! value crosses the FFI, and this reconstructs the `Program` the compiler's
-//! passes actually run on.
+//! This is the far side of the parser library's bridge: `grammar_aipl.aipl`
+//! lowers a parse to the AST declared in `ast.aipl` and the files beside it,
+//! that value crosses the FFI, and this reconstructs the `Program` the
+//! compiler's passes actually run on.
 //!
 //! **It is a mapping, not a translation.** Every name here is the one the AIPL
 //! declaration uses, and the AIPL declaration's names are the Rust ones, bare —

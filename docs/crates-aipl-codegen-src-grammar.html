@@ -167,7 +167,7 @@
 
                 <li><code>style?: ListStyle = none</code>
 
-                  <div class="doc"><p>The group's layout stated outright instead of derived, which is what lets a bracket pair hold something whose list lives one production down: <code>(args)</code> is a group that wraps like a comma list, but the <code>Many</code> holding it has no separator of its own to read one off — <code>args</code> does. Given, it replaces the derivation entirely, <code>spaced</code> included.</p><p>The freedom is real and so is the hazard: nothing checks a stated <code>sep</code> against the one the rule actually matches, so a style that disagrees makes the printer write a separator the parser will not accept. Derive where you can, state it where the list is not this rule's.</p><p>The shape that needs stating is a group holding a list that lives one production down, and inlining the list into the group removes it — at which point this argument, and the disagreement it admits, both go away. Which of those wrapper productions can fold is what the lowering decides; <code>PARSER_LIBRARY.md</code>'s 5d carries the plan.</p></div>
+                  <div class="doc"><p>The group's layout stated outright instead of derived, which is what lets a bracket pair hold something whose list lives one production down: <code>(args)</code> is a group that wraps like a comma list, but the <code>Many</code> holding it has no separator of its own to read one off — <code>args</code> does. Given, it replaces the derivation entirely, <code>spaced</code> included.</p><p>The freedom is real and so is the hazard: nothing checks a stated <code>sep</code> against the one the rule actually matches, so a style that disagrees makes the printer write a separator the parser will not accept. Derive where you can, state it where the list is not this rule's.</p><p>The shape that needs stating is a group holding a list that lives one production down, and inlining the list into the group removes it — at which point this argument, and the disagreement it admits, both go away. Which of those wrapper productions can fold is what the lowering decides.</p></div>
 
                 </li>
 
@@ -427,7 +427,7 @@
             <a class="anchor" href="#item-show_style">show_style</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>pub fn show_style(__spat$26782: ListStyle) -&#62; str</code></pre>
+          <pre class="signature"><code>pub fn show_style(__spat$26739: ListStyle) -&#62; str</code></pre>
 
           <div class="doc"><p>A <code>ListStyle</code> as the literal that builds it, defaults left out — <code>ListStyle {}</code> for the default style.</p></div>
 
@@ -471,7 +471,7 @@
           </h3>
           <pre class="signature"><code>variant Kind</code></pre>
 
-          <div class="doc"><p>A token-kind type and an AST type for the <code>.test</code> block above. A real consumer declares its own pair; these exist because a <code>Grammar&lt;K, A&gt;</code> cannot be written down without both. (<code>Kind</code> rather than a <code>Kind</code> <em>constructor</em>: a constructor colliding with another top-level name in the same file is silently dropped — see the naming note in <code>PARSER_LIBRARY.md</code>.)</p></div>
+          <div class="doc"><p>A token-kind type and an AST type for the <code>.test</code> block above. A real consumer declares its own pair; these exist because a <code>Grammar&lt;K, A&gt;</code> cannot be written down without both. (<code>Kind</code> rather than a <code>Kind</code> <em>constructor</em>: a constructor colliding with another top-level name in the same file is silently dropped.)</p></div>
 
 
           <ul class="cases">
