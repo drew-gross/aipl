@@ -166,22 +166,38 @@ impl Run {
     }
 
     /// Failures a refill can't fix — there is no section to record actual output
-    /// into. A case that won't build/link/spawn, a crash, or a failed in-language
-    /// `.test`. Returns the offending lines, or empty when there are none.
+    /// into. A case that won't build/link/spawn, a crash, a failed in-language
+    /// `.test`, or a leaked allocation. Returns the offending lines, or empty when
+    /// there are none.
     ///
     /// Checked before anything else: burning a full-corpus refill on one of these
     /// costs a corpus run and fixes nothing.
+    ///
+    /// `memory leak` is here despite its message *naming* `fill_expected` ("re-run
+    /// `…` to refresh the expected counts"), which is what makes it read as
+    /// fillable staleness. It isn't: the harness runs the leak gate even in fill
+    /// mode, precisely so a refill cannot bake a leak into a `--- performance ---`
+    /// section, so a refill fails on it too. Without this alternative the failure
+    /// fell through every net — `hard_failures` excludes each `cases_*` test by
+    /// name, and [`Run::plan`]'s case regex wants `` `section` mismatch `` or
+    /// `missing required` — and the gate printed HANDOFF OK over a case that
+    /// failed deterministically on every run.
     pub fn unfillable(&self) -> Vec<String> {
         static RE: OnceLock<Regex> = OnceLock::new();
         // Assembled with `concat!` rather than one string with `\` continuations:
         // these are *raw* strings, where a trailing backslash is a literal
         // character and would silently turn the alternative it ends into
         // "…followed by a newline" — which never matches a single line.
+        //
+        // `memory leak` alone, not the whole sentence: the counts vary and the
+        // dash in "memory leak — allocations (3) != deallocations (2)" is an em
+        // dash, which is not worth spelling in a pattern.
         let re = re(
             &RE,
             concat!(
                 r"(load|compile|emit|link|spawn|instrumented compile) failed:",
                 r"|\(in-language tests\) failed:|Abort trap|SIGSEGV|SIGABRT",
+                r"|memory leak",
             ),
         );
         // The crash lines first — they are the reason to stop, and a segfault may
@@ -708,6 +724,31 @@ mod tests {
         assert!(run(&[("cases_x_y", "[cases/x/y]: `stdout` mismatch")])
             .unfillable()
             .is_empty());
+    }
+
+    /// A leaked allocation stops the run, and is *not* mistaken for staleness.
+    ///
+    /// Verbatim from `tests/cases.rs`, second line included: it points at
+    /// `fill_expected`, which is exactly why this used to read as fillable. The
+    /// harness runs the leak gate in fill mode too, so a refill fails on it as
+    /// well — and with the case excluded from `hard_failures` for being a
+    /// `cases_*` test, nothing else was left to catch it.
+    #[test]
+    fn a_leaked_allocation_is_unfillable() {
+        let output = "[cases/structs/x]: memory leak — allocations (3) != deallocations (2)\n\
+                      Fix the leak, then re-run `AIPL_CASE='cases/structs/x' cargo test \
+                      --test cases -- --ignored fill_expected` to refresh the expected counts.";
+        let run = run(&[("cases_structs_x", output)]);
+        assert_eq!(
+            run.unfillable(),
+            vec![
+                "cases_structs_x: [cases/structs/x]: memory leak — allocations (3) \
+                 != deallocations (2)"
+            ]
+        );
+        // And the `fill_expected` it names must not pull the case into a refill.
+        assert!(!run.plan().need_fill);
+        assert!(run.plan().fail_cases.is_empty());
     }
 
     #[test]
