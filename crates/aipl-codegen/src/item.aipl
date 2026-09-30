@@ -6,6 +6,7 @@
 import { Span, equal as ==, is_empty, join, map, value_or } from builtins;
 import { Bound, show_bound } from "./bound.aipl";
 import { Expr, FieldInit, show_expr } from "./expr.aipl";
+import { SpanStr, span_str } from "./lexer.aipl";
 import { I64 } from "./prim.aipl";
 import { Primitive, Ty, show_ty } from "./ty.aipl";
 
@@ -48,7 +49,7 @@ struct Signature { type_vars: TypeParam[], params: Param[], effects: str[], retu
 # Rust side hoists them to top-level items under a name only the test can
 # reach (`aipl_parser::post_parse`), so nothing past it sees the nesting.
 struct Function {
-    name: str,
+    name: SpanStr,
     is_pub: bool,
     sig: Signature,
     body: Expr,
@@ -59,22 +60,22 @@ struct Function {
 
 struct FieldDecl { name: str, ty: Ty, default: Expr? }
 
-struct StructDecl { name: str, doc: str?, type_vars: TypeParam[], fields: FieldDecl[] }
+struct StructDecl { name: SpanStr, doc: str?, type_vars: TypeParam[], fields: FieldDecl[] }
 
 # One payload slot of a variant case. A positional slot has no name; the three
 # named forms differ only in whether they carry a default and whether the `?`
 # moved onto the name.
 struct CaseParam { name: str?, ty: Ty, default: Expr?, implicit_some: bool, doc: str? }
 
-struct VariantCase { name: str, doc: str?, payload: CaseParam[] }
+struct VariantCase { name: SpanStr, doc: str?, payload: CaseParam[] }
 
-struct VariantDecl { name: str, doc: str?, type_vars: TypeParam[], cases: VariantCase[] }
+struct VariantDecl { name: SpanStr, doc: str?, type_vars: TypeParam[], cases: VariantCase[] }
 
 # A top-level `pub let NAME: T = <literal>;`. The loader substitutes each use
 # with the literal and drops the declaration, so nothing past it sees a
-# constant; `span` is the name's, for the diagnostics that check the two rules
-# a constant has — ALL_CAPS, and a literal value.
-struct ConstDecl { name: str, is_pub: bool, ty: Ty?, value: Expr, doc: str?, span: Span }
+# constant. `name` carries its own span, which is what the diagnostics checking
+# a constant's two rules point at — ALL_CAPS, and a literal value.
+struct ConstDecl { name: SpanStr, is_pub: bool, ty: Ty?, value: Expr, doc: str? }
 
 variant Item =
     | Fn(Function)
@@ -116,10 +117,10 @@ pub fn show_program(self: Program) -> str { self.items.map(show_item).join(sep="
 pub fn show_item(self: Item) -> str {
     match (self) {
         Fn(f) => show_fn(f),
-        Struct(s) => `{show_doc(s.doc)}struct {s.name}{show_type_params(s.type_vars)}({s.fields.map(show_field_decl).join(sep=", ")})`,
-        Variant(v) => `{show_doc(v.doc)}variant {v.name}{show_type_params(v.type_vars)}({v.cases.map(show_case).join(sep=" | ")})`,
+        Struct(s) => `{show_doc(s.doc)}struct {s.name.text}{show_type_params(s.type_vars)}({s.fields.map(show_field_decl).join(sep=", ")})`,
+        Variant(v) => `{show_doc(v.doc)}variant {v.name.text}{show_type_params(v.type_vars)}({v.cases.map(show_case).join(sep=" | ")})`,
         Import(d) => `import [{d.names.map(show_import_name).join(sep=", ")}] from {show_import_source(d.source)}`,
-        Const(c) => `{show_doc(c.doc)}let {c.name}{show_const_ty(c.ty)} = {show_expr(c.value)}`,
+        Const(c) => `{show_doc(c.doc)}let {c.name.text}{show_const_ty(c.ty)} = {show_expr(c.value)}`,
     }
 }.test({
     let d = ImportDecl {
@@ -129,7 +130,7 @@ pub fn show_item(self: Item) -> str {
     assert(Import(d).show_item() == "import [a as b] from builtins");
     let no_params: TypeParam[] = [];
     let s = StructDecl {
-        name: "P",
+        name: span_str("struct P { x: i64 }", 7..8),
         doc: none,
         type_vars: no_params,
         fields: [FieldDecl { name: "x", ty: Primitive(I64), default: none }],
@@ -144,7 +145,7 @@ fn show_fn(self: Function) -> str {
     let effects = sig.effects.map(effect_marker).join();
     let helpers = self.test_fns.map(|h| ` {h.show_fn()}`).join();
     let test = self.test_body.map(|b| ` .test({b.show_expr()}{helpers})`).value_or("");
-    `{show_doc(self.doc)}{vis}fn {self.name}{show_type_params(sig.type_vars)}({sig.params.map(show_param).join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}`
+    `{show_doc(self.doc)}{vis}fn {self.name.text}{show_type_params(sig.type_vars)}({sig.params.map(show_param).join(sep=", ")}){effects}{ret} = {self.body.show_expr()}{test}`
 }
 
 fn effect_marker(self: str) -> str { ` !{self}` }
@@ -176,7 +177,7 @@ fn show_field_decl(self: FieldDecl) -> str {
 }
 
 fn show_case(self: VariantCase) -> str {
-    let head = `{show_doc(self.doc)}{self.name}`;
+    let head = `{show_doc(self.doc)}{self.name.text}`;
     if (self.payload.is_empty()) {
         return head;
     };
@@ -213,11 +214,11 @@ allocations: 18
 deallocations: 18
 reallocations: 2
 bytes allocated: 1338
-instructions executed: 1545
-binary size: 97024
-  code: 68012
+instructions executed: 1595
+binary size: 97712
+  code: 68496
   data: 423
-  metadata: 28589
+  metadata: 28793
 functions:
   __arr_drop_FieldDecl:
     calls: 1
@@ -275,7 +276,7 @@ functions:
     bytes: 364
   __test$show_item:
     calls: 1
-    bytes: 2236
+    bytes: 2388
   __to_str_i64:
     calls: 0
     bytes: 204
@@ -317,7 +318,7 @@ functions:
     bytes: 188
   show_case:
     calls: 0
-    bytes: 3920
+    bytes: 4004
   show_default:
     calls: 1
     bytes: 420
@@ -326,10 +327,10 @@ functions:
     bytes: 384
   show_fn:
     calls: 0
-    bytes: 8768
+    bytes: 8816
   show_item:
     calls: 2
-    bytes: 10104
+    bytes: 10304
   show_type_params:
     calls: 1
     bytes: 2164

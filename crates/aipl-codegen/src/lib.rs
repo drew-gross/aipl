@@ -2826,7 +2826,7 @@ pub fn build_test_program(program: &Program) -> Program {
                 orig.test_body = None;
                 items.push(Item::Fn(orig));
                 items.push(Item::Fn(AstFn {
-                    name: test_fn.clone(),
+                    name: f.name.renamed(test_fn.clone()),
                     is_pub: true,
                     sig: AstSignature {
                         type_vars: Vec::new(),
@@ -2839,7 +2839,7 @@ pub fn build_test_program(program: &Program) -> Program {
                     test_fns: Vec::new(),
                     doc: None,
                 }));
-                tests.push((f.name.clone(), test_fn));
+                tests.push((f.name.text.clone(), test_fn));
             }
             other => items.push(other.clone()),
         }
@@ -2854,7 +2854,7 @@ pub fn build_test_program(program: &Program) -> Program {
         body = seq(call(Callee::TestBegin, vec![name_lit]), body);
     }
     items.push(Item::Fn(AstFn {
-        name: "__test_main".to_string(),
+        name: aipl_syntax::SpanStr::synthetic("__test_main"),
         is_pub: true,
         sig: AstSignature {
             type_vars: Vec::new(),

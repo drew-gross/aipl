@@ -258,7 +258,7 @@
           </h3>
           <pre class="signature"><code>struct ConstDecl</code></pre>
 
-          <div class="doc"><p>A top-level <code>pub let NAME: T = &lt;literal&gt;;</code>. The loader substitutes each use with the literal and drops the declaration, so nothing past it sees a constant; <code>span</code> is the name's, for the diagnostics that check the two rules a constant has — ALL_CAPS, and a literal value.</p></div>
+          <div class="doc"><p>A top-level <code>pub let NAME: T = &lt;literal&gt;;</code>. The loader substitutes each use with the literal and drops the declaration, so nothing past it sees a constant. <code>name</code> carries its own span, which is what the diagnostics checking a constant's two rules point at — ALL_CAPS, and a literal value.</p></div>
 
 
         </section>

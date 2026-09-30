@@ -570,7 +570,7 @@ impl<'a> Cx<'a> {
                         .iter()
                         .map(|c| {
                             (
-                                c.name.clone(),
+                                c.name.text.clone(),
                                 c.payload
                                     .iter()
                                     .map(|p| crate::subst_type_params(&p.ty, &map))
@@ -730,7 +730,9 @@ impl<'a> Cx<'a> {
                         tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
                     let mut map = HashMap::new();
                     for c in &tmpl.cases {
-                        if let Some((_, ipayload)) = inst_cases.iter().find(|(n, _)| *n == c.name) {
+                        if let Some((_, ipayload)) =
+                            inst_cases.iter().find(|(n, _)| *n == c.name.text)
+                        {
                             for (pt, it) in c.payload.iter().zip(ipayload) {
                                 self.bind_field(&pt.ty, it, &vars, &mut map);
                             }
@@ -828,7 +830,7 @@ impl<'a> Cx<'a> {
                     .iter()
                     .map(|p| self.resolve_generic_ty(&crate::subst_type_params(&p.ty, &map)))
                     .collect::<Result<_, _>>()?;
-                cases.push((c.name.clone(), payload));
+                cases.push((c.name.text.clone(), payload));
             }
             self.syn_variants.borrow_mut().insert(name.clone(), cases);
         } else {
@@ -1236,11 +1238,11 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
     for item in &program.items {
         match item {
             Item::Struct(s) if s.is_generic() => {
-                generic_structs.insert(s.name.clone(), s.clone());
+                generic_structs.insert(s.name.text.clone(), s.clone());
             }
             Item::Struct(s) => {
                 structs.insert(
-                    s.name.clone(),
+                    s.name.text.clone(),
                     s.fields
                         .iter()
                         .map(|f| (f.name.clone(), f.ty.clone(), f.default.is_some()))
@@ -1248,19 +1250,19 @@ pub fn check(program: &Program) -> Result<Program, Vec<Error>> {
                 );
             }
             Item::Variant(v) if v.is_generic() => {
-                generic_variants.insert(v.name.clone(), v.clone());
+                generic_variants.insert(v.name.text.clone(), v.clone());
             }
             Item::Variant(v) => {
                 variants.insert(
-                    v.name.clone(),
+                    v.name.text.clone(),
                     v.cases
                         .iter()
-                        .map(|c| (c.name.clone(), c.payload_tys()))
+                        .map(|c| (c.name.text.clone(), c.payload_tys()))
                         .collect(),
                 );
             }
             Item::Fn(f) => {
-                sigs.insert(f.name.clone(), f.sig.clone());
+                sigs.insert(f.name.text.clone(), f.sig.clone());
             }
             Item::Const(_) => unreachable!("constants are substituted and dropped during load"),
             Item::Import(_) => {}
@@ -1664,7 +1666,7 @@ impl Cx<'_> {
         // body (functions are top-level, so this single slot can't nest), and
         // likewise the name/type params for any `let x: T = ..` annotation.
         *self.current_ret.borrow_mut() = declared.clone();
-        *self.current_fn.borrow_mut() = f.name.clone();
+        *self.current_fn.borrow_mut() = f.name.text.clone();
         *self.current_type_params.borrow_mut() = type_var_names.clone();
         *self.current_type_bounds.borrow_mut() = f
             .sig

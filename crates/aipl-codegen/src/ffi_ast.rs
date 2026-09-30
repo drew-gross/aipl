@@ -118,19 +118,18 @@ fn item(v: &FfiValue) -> R<ast::Item> {
 
 fn const_decl(v: &FfiValue) -> R<ast::ConstDecl> {
     Ok(ast::ConstDecl {
-        name: text(field(v, "name")?)?,
+        name: span_str(field(v, "name")?)?,
         is_pub: flag(field(v, "is_pub")?)?,
         ty: maybe(field(v, "ty")?, ty)?,
         value: expr(field(v, "value")?)?,
         doc: maybe(field(v, "doc")?, text)?,
-        span: span(field(v, "span")?)?,
     })
 }
 
 fn function(v: &FfiValue) -> R<ast::Function> {
     let sig = field(v, "sig")?;
     Ok(ast::Function {
-        name: text(field(v, "name")?)?,
+        name: span_str(field(v, "name")?)?,
         is_pub: flag(field(v, "is_pub")?)?,
         sig: ast::Signature {
             type_vars: each(field(sig, "type_vars")?, type_param)?,
@@ -195,7 +194,7 @@ fn set_order(v: &FfiValue) -> R<ast::SetOrder> {
 
 fn struct_decl(v: &FfiValue) -> R<ast::StructDecl> {
     Ok(ast::StructDecl {
-        name: text(field(v, "name")?)?,
+        name: span_str(field(v, "name")?)?,
         doc: maybe(field(v, "doc")?, text)?,
         type_vars: each(field(v, "type_vars")?, type_param)?,
         fields: each(field(v, "fields")?, field_decl)?,
@@ -212,7 +211,7 @@ fn field_decl(v: &FfiValue) -> R<ast::FieldDecl> {
 
 fn variant_decl(v: &FfiValue) -> R<ast::VariantDecl> {
     Ok(ast::VariantDecl {
-        name: text(field(v, "name")?)?,
+        name: span_str(field(v, "name")?)?,
         doc: maybe(field(v, "doc")?, text)?,
         type_vars: each(field(v, "type_vars")?, type_param)?,
         cases: each(field(v, "cases")?, variant_case)?,
@@ -221,7 +220,7 @@ fn variant_decl(v: &FfiValue) -> R<ast::VariantDecl> {
 
 fn variant_case(v: &FfiValue) -> R<ast::VariantCase> {
     Ok(ast::VariantCase {
-        name: text(field(v, "name")?)?,
+        name: span_str(field(v, "name")?)?,
         doc: maybe(field(v, "doc")?, text)?,
         payload: each(field(v, "payload")?, case_param)?,
     })
@@ -526,6 +525,15 @@ fn flag(v: &FfiValue) -> R<bool> {
 fn byte(v: &FfiValue) -> R<u8> {
     let n = int(v)?;
     u8::try_from(n).map_err(|_| format!("char literal {n} is not a byte"))
+}
+
+/// The AIPL `SpanStr { text, span }` a declaration carries for its name — the
+/// text and where it was written.
+fn span_str(v: &FfiValue) -> R<ast::SpanStr> {
+    Ok(ast::SpanStr {
+        text: text(field(v, "text")?)?,
+        span: span(field(v, "span")?)?,
+    })
 }
 
 fn span(v: &FfiValue) -> R<Span> {

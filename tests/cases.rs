@@ -958,7 +958,7 @@ fn measured_program(program: &Program) -> Program {
         for it in &mut tp.items {
             if let aipl::ast::Item::Fn(f) = it {
                 if f.name == "__test_main" {
-                    f.name = "main".to_string();
+                    f.name.text = "main".to_string();
                 }
             }
         }

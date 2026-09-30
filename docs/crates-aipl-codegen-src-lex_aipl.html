@@ -452,6 +452,34 @@
 
 
 
+        <section class="item" id="item-IDENT_START">
+          <h3>
+            <a class="anchor" href="#item-IDENT_START">IDENT_START</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>pub let IDENT_START: #{char} = &#34;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_&#34;.to_set()</code></pre>
+
+          <div class="doc"><p>The identifier character classes. Constants rather than functions: a literal <code>to_set()</code> folds to the four words of the <code>#{char}</code> bitfield, and a constant is spliced into each use already built — so asking for one costs four immediate stores wherever it appears, and the class is built once per program rather than once per <code>lex</code> (let alone once per keyword rule, which is what it cost when <code>kw</code> asked for its own).</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-IDENT_CONT">
+          <h3>
+            <a class="anchor" href="#item-IDENT_CONT">IDENT_CONT</a>
+            <span class="kind kind-const">let</span>
+          </h3>
+          <pre class="signature"><code>pub let IDENT_CONT: #{char} = &#34;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789&#34;.to_set()</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+        </section>
+
+
+
         <section class="item" id="item-str_lit_value">
           <h3>
             <a class="anchor" href="#item-str_lit_value">str_lit_value</a>

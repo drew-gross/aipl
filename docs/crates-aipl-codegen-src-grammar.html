@@ -463,6 +463,67 @@
         </section>
 
 
+
+        <section class="item" id="item-Kind">
+          <h3>
+            <a class="anchor" href="#item-Kind">Kind</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Kind</code></pre>
+
+          <div class="doc"><p>A token-kind type and an AST type for the <code>.test</code> block above. A real consumer declares its own pair; these exist because a <code>Grammar&lt;K, A&gt;</code> cannot be written down without both. (<code>Kind</code> rather than a <code>Kind</code> <em>constructor</em>: a constructor colliding with another top-level name in the same file is silently dropped — see the naming note in <code>PARSER_LIBRARY.md</code>.)</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Atom"><code>Atom(str)</code>
+
+
+            </li>
+
+            <li id="item-Open"><code>Open</code>
+
+
+            </li>
+
+            <li id="item-Close"><code>Close</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
+        <section class="item" id="item-Node">
+          <h3>
+            <a class="anchor" href="#item-Node">Node</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Node</code></pre>
+
+          <p class="undocumented">Undocumented.</p>
+
+
+          <ul class="cases">
+
+            <li id="item-Leaf"><code>Leaf(str)</code>
+
+
+            </li>
+
+            <li id="item-List"><code>List(Node[])</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
       </section>
 
 

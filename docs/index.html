@@ -13,7 +13,7 @@
     <main>
 
       <h1>AIPL</h1>
-      <p class="summary">107 files, 1297 items.</p>
+      <p class="summary">107 files, 1315 items.</p>
 
       <ul class="files">
 
@@ -405,6 +405,16 @@
               <span class="kind kind-fn">fn</span>
             </li>
 
+            <li>
+              <a href="crates-aipl-codegen-src-ebnf.html#item-Tok"><code>Tok</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-ebnf.html#item-Node"><code>Node</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
           </ul>
 
         </li>
@@ -725,6 +735,16 @@
             <li>
               <a href="crates-aipl-codegen-src-grammar.html#item-link"><code>link</code></a>
               <span class="kind kind-fn">fn</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-grammar.html#item-Kind"><code>Kind</code></a>
+              <span class="kind kind-variant">variant</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-grammar.html#item-Node"><code>Node</code></a>
+              <span class="kind kind-variant">variant</span>
             </li>
 
           </ul>
@@ -1308,6 +1328,16 @@
             </li>
 
             <li>
+              <a href="crates-aipl-codegen-src-lex_aipl.html#item-IDENT_START"><code>IDENT_START</code></a>
+              <span class="kind kind-const">let</span>
+            </li>
+
+            <li>
+              <a href="crates-aipl-codegen-src-lex_aipl.html#item-IDENT_CONT"><code>IDENT_CONT</code></a>
+              <span class="kind kind-const">let</span>
+            </li>
+
+            <li>
               <a href="crates-aipl-codegen-src-lex_aipl.html#item-str_lit_value"><code>str_lit_value</code></a>
               <span class="kind kind-fn">fn</span>
             </li>
@@ -1377,7 +1407,7 @@
           <p class="file-summary">A small library for building lexers. <code>lex</code> turns source text into a flat <code>Token[]</code>, driven by an ordered <code>TokenRule[]</code> describing the language being lexed. Each rule pairs a caller-chosen <code>kind</code> label with a <code>Matcher</code> — a data-only description of one token shape (a char-class run, a list of fixed spellings, a delimited literal, ...) — so a rule set is plain data and one <code>lex</code> serves many languages; see the JSON and AIPL-flavored rule sets in the tests. At each position the <em>first</em> rule whose matcher matches wins, so order is priority: put keywords before identifiers, floats before ints. Whitespace is an ordinary rule marked <code>skip: true</code> — matched and consumed, but producing nothing. Rules marked <code>trivia: true</code> (comments, lint markers) are consumed the same way but recorded in the result's trivia side-channel, so a formatter or lint pass can find them without them cluttering the token stream. Lexing can fail: a byte no rule matches, or a matcher that matches invalid input outright (an unterminated <code>Delimited</code> token), aborts the lex with a <code>LexError</code> — a message plus the span of the offending source.</p>
 
 
-          <span class="private-count"><a href="crates-aipl-codegen-src-lexer.html#private">21 private</a></span>
+          <span class="private-count"><a href="crates-aipl-codegen-src-lexer.html#private">22 private</a></span>
 
 
           <ul class="items">
@@ -2183,6 +2213,15 @@
           <p class="file-summary">The AIPL implementation of the <code>any</code> builtin — the dual of <code>all</code> (see <code>builtin_all.aipl</code>). Monomorphization registers this function under the canonical name <code>__builtin_any</code> (see <code>AIPL_BUILTIN_SOURCES</code> in <code>lib.rs</code>), so a user's <code>xs.any(pred)</code> specializes through the ordinary generic / higher-order machinery — the in-file name <code>any</code> is only for this file's own tests, which read exactly like user code.</p>
 
 
+
+          <ul class="items">
+
+            <li>
+              <a href="crates-aipl-mono-src-builtin_any.html#item-any"><code>any</code></a>
+              <span class="kind kind-fn">fn</span>
+            </li>
+
+          </ul>
 
         </li>
 

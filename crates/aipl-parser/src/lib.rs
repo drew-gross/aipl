@@ -564,7 +564,7 @@ fn hoist_test_fns(program: &mut Program) {
             .iter()
             .map(|h| {
                 (
-                    h.name.clone(),
+                    h.name.text.clone(),
                     aipl_syntax::test_helper_name(&f.name, &h.name),
                 )
             })
@@ -574,7 +574,10 @@ fn hoist_test_fns(program: &mut Program) {
         }
         items.push(Item::Fn(f));
         for mut h in helpers {
-            h.name = renames[&h.name].clone();
+            // The hoisted name is one this pass invented, so it keeps the span
+            // of the name the author *did* write — the helper's own, which is
+            // where a diagnostic about it should point.
+            h.name.text = renames[&h.name.text].clone();
             rename_uses(&mut h.body, &renames);
             items.push(Item::Fn(h));
         }

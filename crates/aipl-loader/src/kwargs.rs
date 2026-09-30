@@ -60,7 +60,7 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
     for item in &program.items {
         match item {
             Item::Fn(f) => {
-                fns.insert(f.name.clone(), FnKwInfo::from_sig(&f.name, &f.sig)?);
+                fns.insert(f.name.text.clone(), FnKwInfo::from_sig(&f.name, &f.sig)?);
             }
             // A variant case's constructor is a callee like any other: by now
             // every construction of it — bare `Circle(..)`, qualified
@@ -83,7 +83,7 @@ pub(crate) fn expand_keyword_args(program: &Program) -> Result<Program, Error> {
         .iter()
         .filter_map(|item| match item {
             Item::Struct(s) => Some((
-                s.name.clone(),
+                s.name.text.clone(),
                 (
                     s.fields.iter().map(|f| f.name.clone()).collect(),
                     s.is_generic(),
@@ -363,7 +363,7 @@ fn builtin_kw_infos() -> Result<HashMap<String, FnKwInfo>, Error> {
     for item in &program.items {
         let Item::Fn(f) = item else { continue };
         if f.sig.params.iter().any(|p| p.default.is_some()) {
-            map.insert(f.name.clone(), FnKwInfo::from_sig(&f.name, &f.sig)?);
+            map.insert(f.name.text.clone(), FnKwInfo::from_sig(&f.name, &f.sig)?);
         }
     }
     Ok(map)

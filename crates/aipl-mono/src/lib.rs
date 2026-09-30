@@ -140,7 +140,7 @@ pub fn lower_ctor_refs(program: &Program) -> Program {
                     CtorWrapper {
                         fn_name: aipl_syntax::ctor_wrapper_name(&v.name, &c.name),
                         payload: c.payload_tys(),
-                        variant: v.name.clone(),
+                        variant: v.name.text.clone(),
                     },
                 );
             }
@@ -270,7 +270,7 @@ fn ctor_wrapper_fn(w: &CtorWrapper, ctor: &str) -> Function {
         .map(|i| Expr::new(ExprKind::Ident(format!("__ctor{i}")), 0..0))
         .collect();
     Function {
-        name: w.fn_name.clone(),
+        name: aipl_syntax::SpanStr::synthetic(w.fn_name.clone()),
         is_pub: false,
         sig: Signature {
             type_vars: Vec::new(),
@@ -585,7 +585,7 @@ pub fn lower_tuples(program: &Program) -> Program {
                 doc: None,
                 type_vars: tuple_template_vars(&name),
                 fields: fields_map.remove(&name).unwrap(),
-                name,
+                name: aipl_syntax::SpanStr::synthetic(name),
             })
         })
         .collect();
@@ -1135,10 +1135,10 @@ impl GenericLowerer {
         for item in &program.items {
             match item {
                 Item::Struct(s) if s.is_generic() => {
-                    struct_templates.insert(s.name.clone(), s.clone());
+                    struct_templates.insert(s.name.text.clone(), s.clone());
                 }
                 Item::Variant(v) if v.is_generic() => {
-                    variant_templates.insert(v.name.clone(), v.clone());
+                    variant_templates.insert(v.name.text.clone(), v.clone());
                 }
                 _ => {}
             }
@@ -1221,7 +1221,7 @@ impl GenericLowerer {
             }
             self.synth.push(Item::Struct(StructDecl {
                 doc: None,
-                name: name.clone(),
+                name: aipl_syntax::SpanStr::synthetic(name.clone()),
                 type_vars: Vec::new(),
                 fields,
             }));
@@ -1247,7 +1247,7 @@ impl GenericLowerer {
             }
             self.synth.push(Item::Variant(VariantDecl {
                 doc: None,
-                name: name.clone(),
+                name: aipl_syntax::SpanStr::synthetic(name.clone()),
                 type_vars: Vec::new(),
                 cases,
             }));
@@ -1529,11 +1529,11 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
     for item in &program.items {
         match item {
             Item::Struct(s) if s.is_generic() => {
-                generic_structs.insert(s.name.clone(), s.clone());
+                generic_structs.insert(s.name.text.clone(), s.clone());
             }
             Item::Struct(s) => {
                 structs.insert(
-                    s.name.clone(),
+                    s.name.text.clone(),
                     s.fields
                         .iter()
                         .map(|f| (f.name.clone(), f.ty.clone(), f.default.clone()))
@@ -1542,17 +1542,17 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                 passthrough.push(item.clone());
             }
             Item::Variant(v) if v.is_generic() => {
-                generic_variants.insert(v.name.clone(), v.clone());
+                generic_variants.insert(v.name.text.clone(), v.clone());
             }
             Item::Variant(v) => {
                 // Constructor registration is deferred below: a generic-variant
                 // instance shares its constructor names across every instance, so
                 // those are resolved by type rather than the unique `ctors` map.
                 variants.insert(
-                    v.name.clone(),
+                    v.name.text.clone(),
                     v.cases
                         .iter()
-                        .map(|c| (c.name.clone(), c.payload_tys()))
+                        .map(|c| (c.name.text.clone(), c.payload_tys()))
                         .collect(),
                 );
                 passthrough.push(item.clone());
@@ -1561,10 +1561,10 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
             Item::Import(_) => passthrough.push(item.clone()),
             Item::Fn(f) => {
                 if f.sig.is_mutating() {
-                    mutating.insert(f.name.clone());
+                    mutating.insert(f.name.text.clone());
                 }
                 if is_generic(f) {
-                    generics.insert(f.name.clone(), normalize(f)?);
+                    generics.insert(f.name.text.clone(), normalize(f)?);
                 } else {
                     // A non-generic fn must not mention `any` in its return.
                     if f.sig
@@ -1579,7 +1579,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                         )));
                     }
                     fn_returns.insert(
-                        f.name.clone(),
+                        f.name.text.clone(),
                         f.sig
                             .return_ty
                             .clone()
@@ -1639,7 +1639,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         // is the same declaration, so an existing one is left alone.
         for t in &b.templates {
             generic_structs
-                .entry(t.name.clone())
+                .entry(t.name.text.clone())
                 .or_insert_with(|| t.clone());
         }
     }
@@ -1654,7 +1654,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         .iter()
         .map(|f| {
             (
-                f.name.clone(),
+                f.name.text.clone(),
                 ConcreteTemplate {
                     params: f.sig.params.clone(),
                     effects: f.sig.effects.clone(),
@@ -1713,7 +1713,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         concrete_fns
             .iter()
             .filter(|f| !f.sig.params.iter().any(|p| matches!(p.ty, Type::Fn(_, _))))
-            .map(|f| f.name.clone())
+            .map(|f| f.name.text.clone())
             .collect()
     };
     // The `check` command synthesizes a `__test_main` driver (calling each
@@ -1867,7 +1867,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         .drain()
         .map(|(name, fields)| StructDecl {
             doc: None,
-            name,
+            name: aipl_syntax::SpanStr::synthetic(name),
             type_vars: Vec::new(),
             fields: fields
                 .into_iter()
@@ -1884,13 +1884,13 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
         .drain()
         .map(|(name, cases)| VariantDecl {
             doc: None,
-            name,
+            name: aipl_syntax::SpanStr::synthetic(name),
             type_vars: Vec::new(),
             cases: cases
                 .into_iter()
                 .map(|(name, payload)| VariantCase {
                     doc: None,
-                    name,
+                    name: aipl_syntax::SpanStr::synthetic(name),
                     // A synthesized instance is downstream of every default
                     // (the loader filled them at each construction site), so
                     // its slots are plain types again.
@@ -1941,7 +1941,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                 // Settled here, where the tuple naming scheme lives: past this
                 // boundary a tuple is told apart by this flag, not by its name.
                 is_tuple: tuple_instance_arity(&s.name).is_some(),
-                name: s.name,
+                name: s.name.text,
             })
             .collect(),
         variants: variants_out
@@ -1951,7 +1951,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                     .cases
                     .iter()
                     .map(|c| ConcreteVariantCase {
-                        name: c.name.clone(),
+                        name: c.name.text.clone(),
                         payload: c
                             .payload
                             .iter()
@@ -1961,7 +1961,7 @@ pub fn monomorphize(program: &Program, dbg: DebugOptions) -> Result<MonoProgram,
                             .collect(),
                     })
                     .collect(),
-                name: v.name,
+                name: v.name.text,
             })
             .collect(),
         fns: out_fns,
@@ -5014,7 +5014,7 @@ impl Mono<'_> {
                         .iter()
                         .map(|c| {
                             (
-                                c.name.clone(),
+                                c.name.text.clone(),
                                 c.payload
                                     .iter()
                                     .map(|p| subst_type_params(&p.ty, &map))
@@ -5357,7 +5357,7 @@ impl Mono<'_> {
                     .iter()
                     .map(|p| self.resolve_generic_ty(&subst_type_params(&p.ty, &map)))
                     .collect::<Result<_, _>>()?;
-                cases.push((c.name.clone(), payload));
+                cases.push((c.name.text.clone(), payload));
             }
             self.syn_variants.insert(name.clone(), cases);
         } else {
@@ -5526,7 +5526,7 @@ impl Mono<'_> {
                         tmpl.type_vars.iter().map(|t| t.name.as_str()).collect();
                     let mut map = HashMap::new();
                     for c in &tmpl.cases {
-                        if let Some((_, ipayload)) = cases.iter().find(|(n, _)| *n == c.name) {
+                        if let Some((_, ipayload)) = cases.iter().find(|(n, _)| *n == c.name.text) {
                             for (pt, it) in c.payload.iter().zip(ipayload) {
                                 self.bind_field(&pt.ty, it, &vars, &mut map);
                             }
@@ -7494,7 +7494,7 @@ fn aipl_builtin(canonical: &str) -> Option<&'static AiplBuiltin> {
         let generic = normalize(&fuse_builtin_body(erased_fn(&f)))
             .expect("AIPL-implemented builtin signatures normalize");
         let mut decl = f;
-        decl.name = canonical.to_string();
+        decl.name.text = canonical.to_string();
         decl.test_body = None;
         decl.doc = None;
         AiplBuiltin {
@@ -7577,7 +7577,7 @@ pub fn aipl_builtin_sig_decls(needed: &BTreeSet<&'static str>) -> Vec<Item> {
         // function that returns one. One arity is one declaration, however many
         // builtins mention it.
         for t in &b.templates {
-            if seen_templates.insert(t.name.clone()) {
+            if seen_templates.insert(t.name.text.clone()) {
                 out.push(Item::Struct(t.clone()));
             }
         }
@@ -7605,7 +7605,7 @@ fn builtin_sigs() -> &'static HashMap<String, Signature> {
             .into_iter()
             .filter_map(|item| match item {
                 Item::Fn(f) => {
-                    let name = f.name.clone();
+                    let name = f.name.text.clone();
                     let g = normalize(&f).expect("builtin signatures are valid AIPL");
                     Some((name, g.sig))
                 }
@@ -8611,7 +8611,7 @@ pub fn use_counts(program: &Program) -> HashMap<String, usize> {
         .items
         .iter()
         .filter_map(|it| match it {
-            Item::Fn(f) => Some((f.name.clone(), 0)),
+            Item::Fn(f) => Some((f.name.text.clone(), 0)),
             _ => None,
         })
         .collect();
@@ -8861,7 +8861,7 @@ pub fn inline_single_use(program: &Program) -> Program {
                 .retain(|it| !matches!(it, Item::Fn(g) if g.name == f.name));
         } else {
             // The single use was an `Ident` (function value), not a call.
-            skip.insert(f.name.clone());
+            skip.insert(f.name.text.clone());
         }
     }
     program
@@ -9072,7 +9072,7 @@ pub fn inline_small(program: &Program, max_exprs: usize) -> Program {
                     && f.sig.type_vars.is_empty()
                     && !f.sig.params.iter().any(|p| mentions_abstract_type(&p.ty))
                     && !f.sig.return_ty.as_ref().is_some_and(mentions_abstract_type)
-                    && !binders.contains(&f.name)
+                    && !binders.contains(f.name.as_str())
                     && is_inline_shape(
                         f.sig
                             .params
@@ -9178,7 +9178,7 @@ pub fn inline_small_post_mono(
                 // A `.test` body's name changes what `?` means inside it — see
                 // `is_inline_candidate_mono`.
                 && !aipl_syntax::is_test_body(&f.name)
-                && !binders.contains(&f.name)
+                && !binders.contains(f.name.as_str())
                 && is_inline_shape(
                     f.params
                         .iter()
@@ -9243,15 +9243,15 @@ fn is_inline_candidate(
     binders: &HashSet<String>,
     skip: &HashSet<String>,
 ) -> bool {
-    counts.get(&f.name) == Some(&1)
+    counts.get(f.name.as_str()) == Some(&1)
         // A `pub` fn may be imported by another file, so its in-program use
         // count understates its references.
         && !f.is_pub
         && f.name != "main"
-        && !skip.contains(&f.name)
+        && !skip.contains(f.name.as_str())
         // Never shadowed by a local anywhere, so the single counted use is the
         // only `Call`/`Ident` of this name in the whole program.
-        && !binders.contains(&f.name)
+        && !binders.contains(f.name.as_str())
         && f.sig.type_vars.is_empty()
         // An `any`-bearing parameter (or return) is *specialized* by
         // monomorphization, at the call site. Inlining removes the call, so the
@@ -9315,7 +9315,7 @@ fn is_inline_candidate_mono(
     binders: &HashSet<String>,
     skip: &HashSet<String>,
 ) -> bool {
-    counts.get(&f.name) == Some(&1)
+    counts.get(f.name.as_str()) == Some(&1)
         && f.name != "main"
         // A `.test` body is not an ordinary function: codegen dispatches on the
         // *name* `__test$<fn>` to make `?` fail the current test rather than
@@ -9323,8 +9323,8 @@ fn is_inline_candidate_mono(
         // would silently change what `?` means inside it.
         && !aipl_syntax::is_test_body(&f.name)
         && f.name != "__test_main"
-        && !skip.contains(&f.name)
-        && !binders.contains(&f.name)
+        && !skip.contains(f.name.as_str())
+        && !binders.contains(f.name.as_str())
         && is_inline_shape(
             f.params
                 .iter()

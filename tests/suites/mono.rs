@@ -22,7 +22,7 @@ fn fn_names(p: &Program) -> Vec<String> {
         .items
         .iter()
         .filter_map(|it| match it {
-            Item::Fn(f) => Some(f.name.clone()),
+            Item::Fn(f) => Some(f.name.text.clone()),
             _ => None,
         })
         .collect();

@@ -233,7 +233,7 @@ pub fn effectful_fns(items: &[Item]) -> HashSet<String> {
     items
         .iter()
         .filter_map(|it| match it {
-            Item::Fn(f) if !f.sig.effects.is_empty() => Some(f.name.clone()),
+            Item::Fn(f) if !f.sig.effects.is_empty() => Some(f.name.text.clone()),
             _ => None,
         })
         .collect()

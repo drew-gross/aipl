@@ -64,20 +64,6 @@ pub enum SymbolKind {
     Constant,
 }
 
-impl SymbolKind {
-    /// The keyword that introduces this kind of declaration, or `None` for a
-    /// variant case, which is introduced by `=` or `|` rather than a keyword.
-    fn keyword(self) -> Option<&'static str> {
-        match self {
-            SymbolKind::Function => Some("fn"),
-            SymbolKind::Struct => Some("struct"),
-            SymbolKind::Variant => Some("variant"),
-            SymbolKind::Case => None,
-            SymbolKind::Constant => Some("let"),
-        }
-    }
-}
-
 /// One top-level declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Symbol {
@@ -129,15 +115,6 @@ pub struct Import {
     pub span: Span,
 }
 
-/// One identifier occurrence. Every identifier token in the file, declarations
-/// included — an editor asks "what is under the cursor" without knowing whether
-/// the cursor is on a use or on the definition.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Reference {
-    pub name: String,
-    pub span: Span,
-}
-
 /// Everything one file says.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileIndex {
@@ -152,7 +129,6 @@ pub struct FileIndex {
     pub module_doc: Option<String>,
     pub symbols: Vec<Symbol>,
     pub imports: Vec<Import>,
-    pub references: Vec<Reference>,
 }
 
 impl FileIndex {
@@ -173,27 +149,17 @@ impl FileIndex {
         let path = path.into();
         let stripped = aipl_parser::strip_test_sections(src);
         let program = aipl_parser::parse(stripped)?;
-        let tokens = aipl_parser::lex_tokens(stripped)?;
         Ok(FileIndex {
             path,
             module_doc: program.doc.clone(),
-            symbols: symbols(&program, &tokens, stripped),
+            symbols: symbols(&program, stripped),
             imports: imports(&program),
-            references: references(&tokens, stripped),
         })
     }
 
     /// The declaration named `name`, if this file has one.
     pub fn define(&self, name: &str) -> Option<&Symbol> {
         self.symbols.iter().find(|s| s.name == name)
-    }
-
-    /// The identifier at byte `offset`, if the offset is inside one. The
-    /// question an editor actually asks: it has a cursor, not a name.
-    pub fn reference_at(&self, offset: usize) -> Option<&Reference> {
-        self.references
-            .iter()
-            .find(|r| r.span.start <= offset && offset < r.span.end)
     }
 
     /// The import that binds `name` in this file, if any.
@@ -236,21 +202,18 @@ impl Index {
         self.files.values()
     }
 
-    /// Go to definition: the declaration of whatever identifier sits at byte
-    /// `offset` of `path`, and the file that declares it.
+    /// The declaration of `name` as `file` sees it, and the file that declares
+    /// it — go-to-definition, given a name.
     ///
     /// Resolution order is the one the loader uses: a name declared in this file
     /// wins, and otherwise an `import` says which file to look in. A name
     /// imported `from builtins`, or from a file this index has not been given,
     /// resolves to nothing — the caller is told "no definition", which is the
     /// honest answer rather than a guess.
-    pub fn definition_at(&self, path: impl AsRef<Path>, offset: usize) -> Option<(&Path, &Symbol)> {
-        let file = self.file(path)?;
-        let name = &file.reference_at(offset)?.name;
-        self.definition_of(file, name)
-    }
-
-    /// The declaration of `name` as `file` sees it.
+    ///
+    /// Takes a *name* rather than a cursor offset. Turning an offset into a name
+    /// wants every identifier occurrence in the file, which is a token-stream
+    /// question and no longer asked here; an editor that needs it can lex.
     pub fn definition_of<'a>(
         &'a self,
         file: &'a FileIndex,
@@ -270,27 +233,28 @@ impl Index {
     }
 }
 
-/// Every declaration in `program`, in source order, with its name's span taken
-/// from `tokens`.
-fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &str) -> Vec<Symbol> {
-    let mut spans = NameSpans::new(tokens, src);
+/// Every declaration in `program`, in source order.
+///
+/// Each name's span comes straight off the AST: a declaration carries its name
+/// as a [`SpanStr`](aipl_syntax::SpanStr), so there is nothing to recover. This
+/// used to walk the token stream alongside the items, zipping the two by
+/// position — which cost this crate a second lex of every file and could
+/// desynchronize, in which case a symbol was dropped rather than given a wrong
+/// position. Neither hazard exists now.
+fn symbols(program: &Program, src: &str) -> Vec<Symbol> {
     let mut out = Vec::new();
     for item in &program.items {
         match item {
             Item::Fn(f) => {
-                // A function declared inside a `.test` block is hoisted here
-                // under a name the source never spells. Step the token cursor
-                // past its `fn <name>` so the streams stay in sync, and index
-                // nothing: it is private to its test.
-                if let Some(helper) = aipl_syntax::test_helper_source_name(&f.name) {
-                    spans.next_named(SymbolKind::Function, helper);
+                // A function declared inside a `.test` block is hoisted to the
+                // top level under a name the source never spells. It is private
+                // to its test, so it is not indexed.
+                if aipl_syntax::test_helper_source_name(&f.name).is_some() {
                     continue;
                 }
-                let Some(name_span) = spans.next_named(SymbolKind::Function, &f.name) else {
-                    continue;
-                };
+                let name_span = f.name.span.clone();
                 out.push(Symbol {
-                    name: f.name.clone(),
+                    name: f.name.text.clone(),
                     kind: SymbolKind::Function,
                     detail: fn_detail(f, src),
                     doc: f.doc.clone(),
@@ -301,38 +265,29 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                 });
             }
             Item::Struct(s) => {
-                let Some(name_span) = spans.next_named(SymbolKind::Struct, &s.name) else {
-                    continue;
-                };
                 out.push(Symbol {
-                    name: s.name.clone(),
+                    name: s.name.text.clone(),
                     kind: SymbolKind::Struct,
                     detail: format!("struct {}{}", s.name, type_vars(&s.type_vars)),
                     doc: s.doc.clone(),
                     is_pub: true,
-                    name_span,
+                    name_span: s.name.span.clone(),
                     parent: None,
                     slots: Vec::new(),
                 });
             }
             Item::Variant(v) => {
-                let Some(name_span) = spans.next_named(SymbolKind::Variant, &v.name) else {
-                    continue;
-                };
                 out.push(Symbol {
-                    name: v.name.clone(),
+                    name: v.name.text.clone(),
                     kind: SymbolKind::Variant,
                     detail: format!("variant {}{}", v.name, type_vars(&v.type_vars)),
                     doc: v.doc.clone(),
                     is_pub: true,
-                    name_span,
+                    name_span: v.name.span.clone(),
                     parent: None,
                     slots: Vec::new(),
                 });
                 for case in &v.cases {
-                    let Some(case_span) = spans.next_case(&case.name) else {
-                        continue;
-                    };
                     // A named slot shows its name, and a keyword slot its
                     // default — `Many(Rule<K>, min: u64 = 0)` says far more
                     // about how the case is constructed than three bare types
@@ -351,7 +306,7 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                         })
                         .collect::<Vec<_>>();
                     let detail = if payload.is_empty() {
-                        case.name.clone()
+                        case.name.text.clone()
                     } else {
                         format!("{}({})", case.name, payload.join(", "))
                     };
@@ -370,28 +325,25 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
                         Vec::new()
                     };
                     out.push(Symbol {
-                        name: case.name.clone(),
+                        name: case.name.text.clone(),
                         kind: SymbolKind::Case,
                         detail,
                         doc: case.doc.clone(),
                         is_pub: true,
-                        name_span: case_span,
-                        parent: Some(v.name.clone()),
+                        name_span: case.name.span.clone(),
+                        parent: Some(v.name.text.clone()),
                         slots,
                     });
                 }
             }
             Item::Const(c) => {
-                let Some(name_span) = spans.next_named(SymbolKind::Constant, &c.name) else {
-                    continue;
-                };
                 out.push(Symbol {
-                    name: c.name.clone(),
+                    name: c.name.text.clone(),
                     kind: SymbolKind::Constant,
                     detail: const_detail(c, src),
                     doc: c.doc.clone(),
                     is_pub: c.is_pub,
-                    name_span,
+                    name_span: c.name.span.clone(),
                     parent: None,
                     slots: Vec::new(),
                 });
@@ -400,71 +352,6 @@ fn symbols(program: &Program, tokens: &[(aipl_parser::TokenKind, Span)], src: &s
         }
     }
     out
-}
-
-/// Walks the token stream handing out declared-name spans in source order.
-///
-/// It is a cursor rather than a lookup table because the AST and the token
-/// stream are both in source order, so the *n*th introducer is the *n*th item —
-/// matching by name would instead have to decide what to do about two
-/// declarations sharing one.
-struct NameSpans<'a> {
-    tokens: &'a [(aipl_parser::TokenKind, Span)],
-    src: &'a str,
-    at: usize,
-}
-
-impl<'a> NameSpans<'a> {
-    fn new(tokens: &'a [(aipl_parser::TokenKind, Span)], src: &'a str) -> NameSpans<'a> {
-        NameSpans { tokens, src, at: 0 }
-    }
-
-    /// The span of the next name introduced by `kind`'s keyword. `expected` is
-    /// the name the AST says is there; a mismatch means the two streams have
-    /// desynchronized, and the symbol is dropped rather than given a wrong
-    /// position.
-    fn next_named(&mut self, kind: SymbolKind, expected: &str) -> Option<Span> {
-        let keyword = kind.keyword()?;
-        while self.at < self.tokens.len() {
-            let (k, span) = &self.tokens[self.at];
-            self.at += 1;
-            if *k != aipl_parser::TokenKind::Keyword || self.text(span) != keyword {
-                continue;
-            }
-            let (nk, nspan) = self.tokens.get(self.at)?;
-            if *nk == aipl_parser::TokenKind::Identifier && self.text(nspan) == expected {
-                self.at += 1;
-                return Some(nspan.clone());
-            }
-            return None;
-        }
-        None
-    }
-
-    /// The span of the next variant case name: the identifier right after the
-    /// `=` opening the case list or a `|` separating cases. Those are the only
-    /// two tokens a case name can follow, and neither can occur inside a case's
-    /// payload — a type holds no `|`, and `||` lexes as one token.
-    fn next_case(&mut self, expected: &str) -> Option<Span> {
-        while self.at < self.tokens.len() {
-            let (k, span) = &self.tokens[self.at];
-            self.at += 1;
-            let text = self.text(span);
-            if *k != aipl_parser::TokenKind::Operator || (text != "=" && text != "|") {
-                continue;
-            }
-            let (nk, nspan) = self.tokens.get(self.at)?;
-            if *nk == aipl_parser::TokenKind::Identifier && self.text(nspan) == expected {
-                self.at += 1;
-                return Some(nspan.clone());
-            }
-        }
-        None
-    }
-
-    fn text(&self, span: &Span) -> &str {
-        self.src.get(span.start..span.end).unwrap_or("")
-    }
 }
 
 fn type_vars(vars: &[aipl_syntax::ast::TypeParam]) -> String {
@@ -587,17 +474,6 @@ fn imports(program: &Program) -> Vec<Import> {
     out
 }
 
-fn references(tokens: &[(aipl_parser::TokenKind, Span)], src: &str) -> Vec<Reference> {
-    tokens
-        .iter()
-        .filter(|(k, _)| *k == aipl_parser::TokenKind::Identifier)
-        .map(|(_, span)| Reference {
-            name: src[span.start..span.end].to_string(),
-            span: span.clone(),
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -629,12 +505,6 @@ fn helper(n: i64) !prints -> i64 {
     /// being a thing to remember.
     fn hosted() {
         aipl_codegen::install_parser_hooks();
-    }
-
-    /// An empty [`Index`], with the hooks installed.
-    fn hosted_index() -> Index {
-        hosted();
-        Index::new()
     }
 
     fn index() -> FileIndex {
@@ -830,69 +700,6 @@ fn helper(n: i64) !prints -> i64 {
         assert_eq!(render.from.as_deref(), Some("./cst.aipl"));
     }
 
-    #[test]
-    fn turns_a_cursor_offset_into_a_name() {
-        let idx = index();
-        let call = nth("add", 1); // the call inside `helper`
-        assert_eq!(idx.reference_at(call).expect("ref").name, "add");
-        // Anywhere inside the identifier, not just its first byte.
-        assert_eq!(idx.reference_at(call + 2).expect("ref").name, "add");
-        // Just past it is not inside it.
-        assert!(idx.reference_at(call + 3).is_none_or(|r| r.name != "add"));
-        // A cursor in whitespace is on no identifier at all — here the newline
-        // just before `struct`.
-        assert!(idx.reference_at(nth("struct", 0) - 1).is_none());
-        // Nor is a keyword one, even though it is spelled like a word.
-        assert!(idx.reference_at(nth("struct", 0)).is_none());
-    }
-
-    #[test]
-    fn go_to_definition_within_a_file() {
-        let mut index = hosted_index();
-        index.add("src/demo.aipl", SRC).expect("indexes");
-        let call = nth("add", 1);
-        let (path, sym) = index
-            .definition_at("src/demo.aipl", call)
-            .expect("definition");
-        assert_eq!(path, Path::new("src/demo.aipl"));
-        assert_eq!(sym.name, "add");
-        assert_eq!(sym.name_span.start, nth("add", 0));
-    }
-
-    #[test]
-    fn go_to_definition_follows_an_import_across_files() {
-        let cst = "# Renders.\npub fn show(n: i64) -> str { \"x\" }\n";
-        let mut index = hosted_index();
-        index.add("src/demo.aipl", SRC).expect("demo");
-        index.add("src/cst.aipl", cst).expect("cst");
-
-        // `render` here is `show` over there — the alias is followed, and the
-        // answer names the other file.
-        let at = nth("render", 0);
-        let (path, sym) = index
-            .definition_at("src/demo.aipl", at)
-            .expect("cross-file definition");
-        assert_eq!(path, Path::new("src/cst.aipl"));
-        assert_eq!(sym.name, "show");
-        assert_eq!(sym.doc.as_deref(), Some("Renders."));
-    }
-
-    #[test]
-    fn an_unresolvable_name_is_no_definition_rather_than_a_guess() {
-        let mut index = hosted_index();
-        index.add("src/demo.aipl", SRC).expect("demo");
-        // A builtin: imported, but this index holds no file that declares it.
-        assert!(index
-            .definition_at("src/demo.aipl", nth("print", 1))
-            .is_none());
-        // An import whose file was never added.
-        assert!(index
-            .definition_at("src/demo.aipl", nth("Cst", 0))
-            .is_none());
-    }
-
-    /// A file that does not compile still indexes: nothing here type-checks, so
-    /// an editor keeps working on source that is mid-edit.
     #[test]
     fn indexes_source_that_would_not_compile() {
         hosted();

@@ -383,10 +383,10 @@ impl Loader {
             let mut exports = HashSet::new();
             for item in &file.items {
                 let (name, importable) = match item {
-                    Item::Fn(f) => (f.name.clone(), f.is_pub),
-                    Item::Struct(s) => (s.name.clone(), true),
-                    Item::Variant(v) => (v.name.clone(), true),
-                    Item::Const(c) => (c.name.clone(), c.is_pub),
+                    Item::Fn(f) => (f.name.text.clone(), f.is_pub),
+                    Item::Struct(s) => (s.name.text.clone(), true),
+                    Item::Variant(v) => (v.name.text.clone(), true),
+                    Item::Const(c) => (c.name.text.clone(), c.is_pub),
                     Item::Import(_) => unreachable!("imports stripped during load"),
                 };
                 // Loaded as the builtin it implements (`load_builtin_impl_str`),
@@ -428,7 +428,7 @@ impl Loader {
                     // by import; for a generic variant the qualified `Case@Template`
                     // is later re-qualified to the chosen instance by the monomorphizer.
                     let vglobal = mangle(is_root, file.index, &v.name);
-                    let cases: Vec<String> = v.cases.iter().map(|c| c.name.clone()).collect();
+                    let cases: Vec<String> = v.cases.iter().map(|c| c.name.text.clone()).collect();
                     for c in &cases {
                         if view.contains_key(c) || case_target.contains_key(c) {
                             ambiguous.insert(c.clone());
@@ -669,7 +669,7 @@ fn check_const_name(c: &aipl_syntax::ast::ConstDecl) -> Result<(), Error> {
                 c.name,
                 to_screaming_snake_case(&c.name)
             ),
-            c.span.clone(),
+            c.name.span.clone(),
         ));
     }
     Ok(())
@@ -756,7 +756,7 @@ fn substitute_constants(items: Vec<Item>) -> Vec<Item> {
     let values: HashMap<String, Expr> = items
         .iter()
         .filter_map(|i| match i {
-            Item::Const(c) => Some((c.name.clone(), c.value.clone())),
+            Item::Const(c) => Some((c.name.text.clone(), c.value.clone())),
             _ => None,
         })
         .collect();
@@ -1037,7 +1037,11 @@ fn rewrite_item(
     let sc = &Scope { ctor_cases };
     Ok(match item {
         Item::Fn(f) => Item::Fn(Function {
-            name: view.get(&f.name).cloned().unwrap_or_else(|| f.name.clone()),
+            name: f.name.renamed(
+                view.get(&*f.name)
+                    .cloned()
+                    .unwrap_or_else(|| f.name.text.clone()),
+            ),
             is_pub: f.is_pub,
             sig: Signature {
                 // Generic type-var names are local type variables, not global
@@ -1104,7 +1108,11 @@ fn rewrite_item(
             doc: f.doc.clone(),
         }),
         Item::Struct(s) => Item::Struct(StructDecl {
-            name: view.get(&s.name).cloned().unwrap_or_else(|| s.name.clone()),
+            name: s.name.renamed(
+                view.get(&*s.name)
+                    .cloned()
+                    .unwrap_or_else(|| s.name.text.clone()),
+            ),
             // Documentation is plain text — no global references to rewrite.
             doc: s.doc.clone(),
             type_vars: s.type_vars.clone(),
@@ -1121,7 +1129,11 @@ fn rewrite_item(
                 .collect(),
         }),
         Item::Variant(v) => Item::Variant(aipl_syntax::ast::VariantDecl {
-            name: view.get(&v.name).cloned().unwrap_or_else(|| v.name.clone()),
+            name: v.name.renamed(
+                view.get(&*v.name)
+                    .cloned()
+                    .unwrap_or_else(|| v.name.text.clone()),
+            ),
             doc: v.doc.clone(),
             type_vars: v.type_vars.clone(),
             cases: v
@@ -1166,7 +1178,11 @@ fn rewrite_item(
         // after this pass, so anything left unresolved would reach the use site
         // as an unknown function.
         Item::Const(c) => Item::Const(aipl_syntax::ast::ConstDecl {
-            name: view.get(&c.name).cloned().unwrap_or_else(|| c.name.clone()),
+            name: c.name.renamed(
+                view.get(&*c.name)
+                    .cloned()
+                    .unwrap_or_else(|| c.name.text.clone()),
+            ),
             ty: c.ty.as_ref().map(|t| rewrite_type(t, view, &[])),
             value: rewrite_expr(&c.value, view, sc, &std::collections::HashSet::new()),
             ..c.clone()

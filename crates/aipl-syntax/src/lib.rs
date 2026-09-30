@@ -7,6 +7,115 @@
 /// Byte-offset range in the source string.
 pub type Span = std::ops::Range<usize>;
 
+/// Matched text together with where it was matched — the Rust twin of
+/// `lexer.aipl`'s `SpanStr`, and what a declaration carries for its own name.
+///
+/// The two halves are one value because every consumer of a name wants both and
+/// neither is derivable on its own: a diagnostic renders `span` against the
+/// source it already holds, and everything else reads `text` without needing the
+/// source at all. Keeping them together is also what retired the token-stream
+/// walk `aipl-index` used to do to recover a declared name's position — the AST
+/// simply carries it now.
+///
+/// **Its invariant is `text == src[span]`** for the source it was built from.
+/// Nothing enforces that here, because the AST is built by the dogfooded parser
+/// (which builds every one through `lexer.aipl`'s `span_str`, the only
+/// constructor there); this side only mirrors the result across the FFI.
+///
+/// A hand-written twin rather than a marshaled foreign type on purpose: when
+/// codegen self-hosts, the AST *becomes* the AIPL one and this goes away.
+/// `Deref<Target = str>` is what keeps the change from rippling: a name reads as
+/// a `&str` wherever it always did.
+#[derive(Clone, Default)]
+pub struct SpanStr {
+    pub text: String,
+    pub span: Span,
+}
+
+/// Formats as the *text* would, quotes included — so a diagnostic that writes a
+/// name with `{:?}` reads as it always did (`fn "add": body returns ..`) rather
+/// than printing the struct around it. Dozens of messages across the checker,
+/// mono and the lints do exactly that.
+///
+/// Hiding a field from `Debug` is usually a trap, and it is safe here only
+/// because [`PartialEq`](SpanStr#impl-PartialEq) ignores the span too: two
+/// `SpanStr`s that compare unequal differ in their text, which is what this
+/// prints. Reach for `.span` when the position is what you want.
+impl std::fmt::Debug for SpanStr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.text, f)
+    }
+}
+
+/// Compares the *text* and ignores the span, exactly as [`ast::Expr`]'s does and
+/// for the same reason: a span says where a name sits, not what it says, and
+/// reformatting a source moves every span in it without changing the program.
+/// Tests that parse two spellings of one program and compare the trees rely on
+/// that — `parser::whitespace_is_irrelevant` is the one that names it.
+impl PartialEq for SpanStr {
+    fn eq(&self, other: &SpanStr) -> bool {
+        self.text == other.text
+    }
+}
+
+impl Eq for SpanStr {}
+
+impl SpanStr {
+    pub fn new(text: impl Into<String>, span: Span) -> SpanStr {
+        SpanStr {
+            text: text.into(),
+            span,
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.text
+    }
+
+    /// The same name spelled differently, keeping its span: what a rename gives.
+    ///
+    /// The loader mangles every top-level name to a global one, and the mangled
+    /// spelling is written nowhere — so the span it keeps is the one the author
+    /// *did* write, which is where a diagnostic about the declaration belongs.
+    pub fn renamed(&self, text: impl Into<String>) -> SpanStr {
+        SpanStr::new(text, self.span.clone())
+    }
+
+    /// A name with no position — for a declaration a *pass* synthesized, which
+    /// was never written anywhere and so has no source to point at. An empty
+    /// span is the codebase's "no location" placeholder; see [`join_spans`],
+    /// which deliberately ignores one.
+    pub fn synthetic(text: impl Into<String>) -> SpanStr {
+        SpanStr::new(text, 0..0)
+    }
+}
+
+impl std::ops::Deref for SpanStr {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.text
+    }
+}
+
+impl std::fmt::Display for SpanStr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.text)
+    }
+}
+
+impl PartialEq<str> for SpanStr {
+    fn eq(&self, other: &str) -> bool {
+        self.text == other
+    }
+}
+
+impl PartialEq<&str> for SpanStr {
+    fn eq(&self, other: &&str) -> bool {
+        self.text == *other
+    }
+}
+
 /// Smallest span covering both `a` and `b`.
 pub fn join_spans(a: &Span, b: &Span) -> Span {
     // An *empty* span is the "no location" placeholder — an empty block body
@@ -227,6 +336,7 @@ pub mod callee;
 
 pub mod ast {
     pub use crate::callee::{Callee, SeqShape};
+    pub use crate::SpanStr;
 
     use crate::Span;
 
@@ -293,7 +403,9 @@ pub mod ast {
     /// distinguishable from an ordinary binding at the site that reads it.
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct ConstDecl {
-        pub name: String,
+        /// The name, with its own span — what the diagnostics checking a
+        /// constant's two rules point at (ALL_CAPS, and a literal value).
+        pub name: SpanStr,
         /// Declared `pub`: importable by other files, like a `pub fn`.
         pub is_pub: bool,
         /// The written annotation, if any. A literal types itself, so this is
@@ -303,8 +415,6 @@ pub mod ast {
         pub value: Expr,
         /// The `# ..` doc comment above the declaration.
         pub doc: Option<String>,
-        /// The name's own span, for diagnostics about the declaration.
-        pub span: Span,
     }
 
     /// `import { foo, bar as baz } from "./util.aipl";` — a request to pull a
@@ -517,7 +627,7 @@ pub mod ast {
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Function {
-        pub name: String,
+        pub name: SpanStr,
         /// Declared `pub`: the function may be imported by other files. A
         /// non-`pub` (private) function is usable only within its own file —
         /// importing it is a loader error. Always treated as public for the
@@ -548,7 +658,7 @@ pub mod ast {
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct StructDecl {
-        pub name: String,
+        pub name: SpanStr,
         /// The `# ..` doc comment above the declaration, lines joined with
         /// newlines. `None` when it carries none.
         pub doc: Option<String>,
@@ -584,7 +694,7 @@ pub mod ast {
     /// struct), addressed by pointer.
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct VariantDecl {
-        pub name: String,
+        pub name: SpanStr,
         /// The `# ..` doc comment above the declaration, lines joined with
         /// newlines. `None` when it carries none.
         pub doc: Option<String>,
@@ -605,7 +715,7 @@ pub mod ast {
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct VariantCase {
-        pub name: String,
+        pub name: SpanStr,
         /// The `# ..` doc comment above the declaration, lines joined with
         /// newlines. `None` when it carries none.
         pub doc: Option<String>,
