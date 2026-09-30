@@ -333,7 +333,7 @@
           </h3>
           <pre class="signature"><code>struct StepResult&#60;K: any&#62;</code></pre>
 
-          <div class="doc"><p>One lexing step's outcome: the token(s) the winning rule produced — one usually, none for a <code>skip</code> rule, a whole head/expr/middle/tail run for a — any trivia recorded along the way, and the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p></div>
+          <div class="doc"><p>One lexing step's outcome: the token the winning rule produced, or the trivia it recorded instead, plus the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p><p><strong>At most one of each, and never both.</strong> A rule is a token rule or a <code>trivia</code> rule, and a <code>skip</code> rule is neither — so exactly one of these arrays holds a token, or neither does. They are arrays rather than optionals because a struct field cannot <em>be</em> an optional struct: the checker admits an optional only of a scalar, a <code>str</code>, an array or a recursive type. An array of nought-or-one is how the language spells &quot;maybe a token&quot; here.</p><p>They were arrays for a stronger reason until recently: <code>Matcher::Template</code> emitted a whole head/interpolation/tail run from a single step, and it was the only matcher that ever emitted more than one token. Modes replaced it, and each piece of a template is now its own step.</p></div>
 
 
         </section>
@@ -587,7 +587,7 @@
           </h3>
           <pre class="signature"><code>let INCOMPLETE_ESCAPE = &#34;&#34;&#34;incomplete escape sequence: \ at end of input&#34;&#34;&#34;</code></pre>
 
-          <div class="doc"><p>The message for a backslash the end of the source cut off. Shared by the <code>Delimited</code> scan and the template scan, which decode the same escapes.</p></div>
+          <div class="doc"><p>The message for a backslash the end of the source cut off. Shared by the <code>Delimited</code> and <code>UpToAny</code> scans, which handle escapes the same way.</p></div>
 
 
         </section>

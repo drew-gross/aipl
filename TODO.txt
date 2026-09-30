@@ -76,7 +76,6 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
-  StepResult looks like you stopped fixing it partway though (from the header docs)
   Symbol and Import should use SpanStr
   Tpl and Tok should not be abbreviated
   re_escape_set should use a map of some sort probably
@@ -269,6 +268,7 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
+  an optional of a struct isn't legal as a field, we should fix that, then StepResult can contain Token<K>? instead o Token<K>[]
   "str_literal".to_set() should work, also should be const folded and fix the current users
   Variant without Case should work
   i64 without 0 should work

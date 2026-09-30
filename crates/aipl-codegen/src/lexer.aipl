@@ -495,7 +495,7 @@ fn delimited_len(self: str, at: u64, delims: #{char}, escapes: #{char}, msg: str
 }
 
 # The message for a backslash the end of the source cut off. Shared by the
-# `Delimited` scan and the template scan, which decode the same escapes.
+# `Delimited` and `UpToAny` scans, which handle escapes the same way.
 let INCOMPLETE_ESCAPE = """incomplete escape sequence: \ at end of input""";
 
 # The message for an unterminated scan: a rule's own `unterminated` override, or
@@ -704,25 +704,35 @@ fn apply_emit<K>(e: Emit<K>, span: Span, content: str) -> K!LexError {
     }
 }
 
-# One lexing step's outcome: the token(s) the winning rule produced — one
-# usually, none for a `skip` rule, a whole head/expr/middle/tail run for a
-# — any trivia recorded along the way, and the position just past the consumed
-# text. `end` staying at the step's start means no rule matched.
+# One lexing step's outcome: the token the winning rule produced, or the trivia
+# it recorded instead, plus the position just past the consumed text. `end`
+# staying at the step's start means no rule matched.
+#
+# **At most one of each, and never both.** A rule is a token rule or a `trivia`
+# rule, and a `skip` rule is neither — so exactly one of these arrays holds a
+# token, or neither does. They are arrays rather than optionals because a struct
+# field cannot *be* an optional struct: the checker admits an optional only of a
+# scalar, a `str`, an array or a recursive type. An array of nought-or-one is how
+# the language spells "maybe a token" here.
+#
+# They were arrays for a stronger reason until recently: `Matcher::Template`
+# emitted a whole head/interpolation/tail run from a single step, and it was the
+# only matcher that ever emitted more than one token. Modes replaced it, and each
+# piece of a template is now its own step.
 struct StepResult<K> {
     tokens: Token<K>[],
     trivia: Token<K>[],
     end: u64,
     // The winning rule's `push`/`pop` and the message it names an unclosed mode
-    // with, carried out to `lex`, which owns the stack. Defaulted, so the places
-    // that build a `StepResult` for "nothing matched" or for a template's run
-    // say nothing about modes.
+    // with, carried out to `lex`, which owns the stack. Defaulted, so a
+    // `StepResult` built for "nothing matched" says nothing about modes.
     push: i64 = -1,
     pop: bool = false,
     unterminated: str = "",
     // The winning rule's `scope`, for the highlighting side-channel — see
-    // `lex_scoped`. On `StepResult` rather than on `Token` because a token is
-    // compared whole all over this file's tests, and what a *highlighter* wants
-    // painted is no part of what a token *is*.
+    // `lex_scoped`. Here rather than on `Token` because a token is compared
+    // whole all over this file's tests, and what a *highlighter* wants painted
+    // is no part of what a token *is*.
     scope: str = "",
 }
 
