@@ -265,7 +265,7 @@
           </h3>
           <pre class="signature"><code>fn first_token(kids: Cst[]) -&#62; Span[]</code></pre>
 
-          <div class="doc"><p>The span of the first token in <code>kids</code> — where a group's opening bracket was written, for the message when it is never closed. Empty when there is none.</p><p>A one-element array rather than a <code>Span?</code> because that is what <code>Far</code> can hold: a struct field may be an optional of an integer or an array, but not of another struct, and <code>Span</code> is one.</p></div>
+          <div class="doc"><p>The span of the first token in <code>kids</code> — where a group's opening bracket was written, for the message when it is never closed. Empty when there is none.</p><p>A one-element array rather than a <code>Span?</code> because that is what <code>Far</code> held when this was written: a struct field could then be an optional of an integer or an array, but not of another struct, and <code>Span</code> is one. A field may be an optional of a struct now, so <code>Far</code> could carry a <code>Span?</code> and this could return one — nought-or-one array and optional mean the same thing here.</p></div>
 
 
         </section>
@@ -795,7 +795,7 @@
             <a class="anchor" href="#item-build_node">build_node</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn build_node(src: str, __spat$76469: Parts, kids: Node[]) -&#62; Node</code></pre>
+          <pre class="signature"><code>fn build_node(src: str, __spat$76662: Parts, kids: Node[]) -&#62; Node</code></pre>
 
           <div class="doc"><p>The lowering every fixture production uses: a node with no interior children is a leaf carrying its text, anything else a branch carrying its children.</p></div>
 

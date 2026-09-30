@@ -1,0 +1,76 @@
+import { concat as +++, equal as ==, greater_than as > } from builtins;
+
+// A variant payload slot holding an optional of a struct. This was silently
+// miscompiled: the payload walked the optional without resolving the nested
+// struct's layout, so `Zzz` was sized as one word and the `i64` after it landed
+// inside the payload. It only reproduced when the variant sorted *before* the
+// struct, since layouts resolve alphabetically — and only when the case had a
+// slot after the optional for the undersizing to displace.
+struct Zzz { p: i64, q: i64, r: str }
+
+variant Aaa = Nothing | Has(Zzz?, i64, str)
+
+// Opaque so the constructor survives known-constructor elimination and the
+// payload is really read back out of the variant's storage.
+fn build(n: i64) -> Aaa {
+    if (n > 0) { Has(some(Zzz { p: 22, q: 33, r: "in" +++ "ner" }), 99, "tl") } else { Nothing }
+}.test({
+    match (build(1)) {
+        Nothing => assert(false),
+        Has(z, n, s) => {
+            // `q` read `99` — the slot after it — before the layout was fixed.
+            assert(z == some(Zzz { p: 22, q: 33, r: "inner" }));
+            assert(n == 99);
+            assert(s == "tl");
+        },
+    };
+
+    match (build(0)) {
+        Nothing => assert(true),
+        Has(..) => assert(false),
+    };
+
+    // Whole-variant equality walks the payload with the same layout.
+    assert(build(1) == build(1));
+})
+--- performance ---
+allocations: 3
+deallocations: 3
+reallocations: 0
+bytes allocated: 264
+instructions executed: 903
+binary size: 4480
+  code: 2612
+  data: 119
+  metadata: 1749
+functions:
+  __eq_Aaa:
+    calls: 1
+    bytes: 192
+  __eq_Zzz:
+    calls: 2
+    bytes: 136
+  __eq_Zzz$opt:
+    calls: 1
+    bytes: 92
+  __test$build:
+    calls: 1
+    bytes: 1316
+  aipl_assert:
+    calls: 5
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  build:
+    calls: 4
+    bytes: 772
+  main:
+    calls: 1
+    bytes: 104

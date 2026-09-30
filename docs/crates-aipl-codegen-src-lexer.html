@@ -333,7 +333,7 @@
           </h3>
           <pre class="signature"><code>struct StepResult&#60;K: any&#62;</code></pre>
 
-          <div class="doc"><p>One lexing step's outcome: the token the winning rule produced, or the trivia it recorded instead, plus the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p><p><strong>At most one of each, and never both.</strong> A rule is a token rule or a <code>trivia</code> rule, and a <code>skip</code> rule is neither — so exactly one of these arrays holds a token, or neither does. They are arrays rather than optionals because a struct field cannot <em>be</em> an optional struct: the checker admits an optional only of a scalar, a <code>str</code>, an array or a recursive type. An array of nought-or-one is how the language spells &quot;maybe a token&quot; here.</p><p>They were arrays for a stronger reason until recently: <code>Matcher::Template</code> emitted a whole head/interpolation/tail run from a single step, and it was the only matcher that ever emitted more than one token. Modes replaced it, and each piece of a template is now its own step.</p></div>
+          <div class="doc"><p>One lexing step's outcome: the token the winning rule produced, or the trivia it recorded instead, plus the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p><p><strong>At most one of each, and never both.</strong> A rule is a token rule or a <code>trivia</code> rule, and a <code>skip</code> rule is neither — so exactly one of these arrays holds a token, or neither does. They are arrays rather than optionals because a struct field could not <em>be</em> an optional struct when this was written: the checker admitted an optional only of a scalar, a <code>str</code>, an array or a recursive type. An array of nought-or-one was how the language spelled &quot;maybe a token&quot;. <code>Token&lt;K&gt;?</code> is a legal field type now, and would say this directly.</p><p>They were arrays for a stronger reason until recently: <code>Matcher::Template</code> emitted a whole head/interpolation/tail run from a single step, and it was the only matcher that ever emitted more than one token. Modes replaced it, and each piece of a template is now its own step.</p></div>
 
 
         </section>
@@ -550,7 +550,7 @@
           </h3>
           <pre class="signature"><code>fn transition(push: i64, pop: bool) -&#62; Transition</code></pre>
 
-          <div class="doc"><p>A rule's <code>push</code>/<code>pop</code> pair read as the one decision it is. The flags are a pair because a struct field's default must be a literal, so neither a constructor nor an optional variant can sit on <code>TokenRule</code>; classifying them here means the stack is driven by an exhaustive <code>match</code> on three cases rather than by two booleans checked in the right order at each site.</p></div>
+          <div class="doc"><p>A rule's <code>push</code>/<code>pop</code> pair read as the one decision it is. The flags are a pair because a struct field's default must be a literal, so a <code>Transition</code> constructor cannot sit on <code>TokenRule</code>; classifying them here means the stack is driven by an exhaustive <code>match</code> on three cases rather than by two booleans checked in the right order at each site. (<code>Transition? = none</code> would be legal now that a field may be an optional of a variant — <code>none</code> is a literal — at the cost of an unwrap at each use.)</p></div>
 
 
         </section>

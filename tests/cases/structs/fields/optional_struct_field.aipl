@@ -1,0 +1,115 @@
+import { concat as +++, equal as ==, map, not_equal as !=, value_or } from builtins;
+
+// A struct field may be an optional of another *struct* or *variant*, not only
+// of a scalar, a `str` or an array. Like every optional it is stored inline and
+// flat — `{ tag, Core }` — so `Inner?` is a tag plus `Inner`'s own layout, and
+// `Inner??` is no wider than `Inner?`.
+struct Inner { a: i64, b: str }
+
+variant Tag = Red | Blue(i64)
+
+// `none` is a literal, which is all a struct-field default may be.
+struct Holder { lead: i64, mid: Inner?, tag: Tag? = none, deep: Inner?? = none }
+
+fn absent(n: i64) -> Holder { lead: n, mid: none }
+
+fn present(n: i64) -> Holder {
+    lead: n,
+    mid: some(Inner { a: n, b: "he" +++ "re" }),
+    tag: some(Blue(n)),
+}.test({
+    let p = present(7);
+    let e = absent(7);
+
+    // Read the field back, whole and by its own fields.
+    assert(p.mid == some(Inner { a: 7, b: "here" }));
+    assert(e.mid == none);
+    assert(p.mid.value_or(Inner { a: 0, b: "" }).b == "here");
+
+    // An optional of a variant is a field the same way.
+    assert(p.tag == some(Blue(7)));
+    assert(e.tag == none);
+
+    // A doubly-nested optional shares the one value field, so `some(none)` and
+    // `none` stay distinct.
+    assert(Holder { ..e, deep: some(none) }.deep == some(none));
+    assert(e.deep == none);
+
+    // Whole-struct equality compares the optional field like any other.
+    assert(p == present(7));
+    assert(p != e);
+
+    // The fields around it are untouched — a mis-sized optional slot would
+    // place `tag` and `deep` on top of `mid`'s payload.
+    assert(p.lead == 7);
+
+    // Mutation through `set`, in both directions.
+    mut m = e;
+    set m.mid = some(Inner { a: 1, b: "x" });
+    assert(m.mid == some(Inner { a: 1, b: "x" }));
+    set m.mid = none;
+    assert(m.mid == none);
+
+    // A spread copies the optional field along with the rest.
+    assert(Holder { ..p, lead: 9 }.mid == p.mid);
+
+    // Unwrapping reaches the inner struct's own fields.
+    assert(p.mid.map(|i| i.a) == some(7));
+    assert(e.mid.map(|i| i.a) == none);
+
+    // A statement `match` sees the payload as an ordinary inline struct.
+    match (p.mid) {
+        some(i) => assert(i == Inner { a: 7, b: "here" }),
+        none => assert(false),
+    };
+})
+--- performance ---
+allocations: 2
+deallocations: 2
+reallocations: 0
+bytes allocated: 176
+instructions executed: 1733
+binary size: 10928
+  code: 6608
+  data: 785
+  metadata: 3535
+functions:
+  __eq_Holder:
+    calls: 2
+    bytes: 184
+  __eq_Inner:
+    calls: 5
+    bytes: 104
+  __eq_Inner$opt:
+    calls: 3
+    bytes: 92
+  __eq_Inner$opt$opt:
+    calls: 2
+    bytes: 92
+  __eq_Tag:
+    calls: 1
+    bytes: 104
+  __eq_Tag$opt:
+    calls: 2
+    bytes: 92
+  __test$present:
+    calls: 1
+    bytes: 5292
+  aipl_assert:
+    calls: 16
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 108
+  present:
+    calls: 2
+    bytes: 540

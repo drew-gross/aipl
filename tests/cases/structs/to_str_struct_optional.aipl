@@ -17,8 +17,8 @@ fn main() !prints {
     print(to_str(some('z'))); // some('z')
     print(to_str(""[0])); // none
 
-    // Nesting: an optional inside a struct field, an array of structs is not
-    // allowed, but an array inside `to_str` and a struct holding a str work.
+    // Nesting: an optional renders its inner value whatever that value is,
+    // including an array.
     print(to_str(some([1, 2]))); // some([1, 2])
 }
 --- stdout ---

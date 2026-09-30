@@ -21,10 +21,10 @@ import { Desc, Primitive, SetOrder, Ty, Unordered, show_order, show_ty } from ".
 #
 # Rust spells it `Option<Box<Span>>`; here it is a plain `Span` with the *empty*
 # one meaning "none", which is the convention already in force for a location
-# that does not exist (see `join_spans`). A struct field cannot be an optional
-# struct anyway — see the constraint list in `PARSER_LIBRARY.md` — and the two
-# spellings mean the same thing, since a recorded value span is never empty: the
-# repair that fills it in runs first.
+# that does not exist (see `join_spans`). A struct field could not be an optional
+# struct when this was written, so there was no choice; it can be one now, and
+# the two spellings mean the same thing either way, since a recorded value span
+# is never empty: the repair that fills it in runs first.
 #
 # The `ty` field `Expr` carries in Rust is absent — nothing the parser sets it.
 struct Expr { kind: ExprKind, span: Span, value_span: Span }

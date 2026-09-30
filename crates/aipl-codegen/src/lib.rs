@@ -7275,6 +7275,80 @@ fn resolve_type_layout(
     Ok(())
 }
 
+/// Whether `ty` may occupy an *inline slot* — a `struct` field or a `variant`
+/// case's payload. The two used to ask this with a list each, and the lists
+/// disagreed about optionals in both directions: a struct field refused
+/// `Point?` while a variant payload accepted it, and neither's reasoning was
+/// written down. They are one question, for the same reason [`field_size`] is
+/// just [`elem_size_of`] — a field, a payload slot and an array element are all
+/// "one value stored inline".
+///
+/// An optional is judged by its **core** ([`opt_core`]), because that is how it
+/// is stored: the chain is flat (`{ tag, Core }`), so `Point?` asks exactly what
+/// a bare `Point` field asks and `Point??` asks nothing more. A `Result` core is
+/// absent on purpose — the checker refuses a result as an optional's core before
+/// codegen sees it ("a result cannot be an array, optional, or dict element").
+fn is_inline_slot(ty: &ConcreteType, decls: &HashMap<&str, TypeDeclRef>) -> bool {
+    match ty {
+        // Every scalar: any integer width, `bool`, `char`, `str` — and a
+        // `Case<V>`, which is its tag alone, one word wide and owning nothing.
+        _ if is_set_elem(ty) => true,
+        // Another declared struct or variant, stored inline — unless it is boxed
+        // (recursive), when the slot is an 8-byte pointer instead.
+        ConcreteType::Named(n) => decls.contains_key(n.as_str()),
+        // A set or a dict *is* an array block (see `is_heap`), so all three are
+        // one 8-byte refcounted pointer, held and released alike.
+        ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => true,
+        // A function value is stored as its 8-byte code address (an i64); it owns
+        // nothing, so like a scalar it needs no drop.
+        ConcreteType::Fn(_, _) => true,
+        ConcreteType::Optional(_) => is_inline_slot(opt_core(ty), decls),
+        _ => false,
+    }
+}
+
+/// Resolve the layout of every declared type that an inline slot of type `ty`
+/// needs the **size** of, before [`field_size`] is asked for it.
+///
+/// That set is exactly [`contained_named_types`]: a slot's size is
+/// `abi_elem_size`, which reads a `Named` type's size out of `layouts` and
+/// reaches it through precisely the layers that walk covers — optionals and
+/// results, which store their core inline — stopping at arrays, sets and dicts,
+/// which are pointers to a separate block and so need no size.
+///
+/// Getting this wrong is silent: a missing layout makes `abi_elem_size` fall
+/// back to one word, and the *next* slot is then placed on top of the value.
+/// That was a live miscompilation for `variant V = .. | Has(Point?, i64)`, whose
+/// payload walked `Optional` without resolving `Point` — `Has`'s `i64` landed
+/// inside the `Point`, and reading the struct back gave `99` for a field set to
+/// `22`. It only reproduced when the nested type sorted *after* the container,
+/// since resolution order is alphabetical.
+///
+/// A boxed (recursive) type is skipped: its slot is an 8-byte pointer, so its
+/// size is not wanted — and resolving it here would not terminate.
+fn resolve_inline_sizes(
+    ty: &ConcreteType,
+    decls: &HashMap<&str, TypeDeclRef>,
+    layouts: &mut HashMap<String, TypeDef>,
+    on_stack: &mut HashSet<String>,
+    rec: &HashMap<String, u32>,
+) -> Result<(), Error> {
+    let mut named = Vec::new();
+    contained_named_types(ty, &mut named);
+    for n in named {
+        if decls.contains_key(n) && !rec.contains_key(n) {
+            resolve_type_layout(n, decls, layouts, on_stack, rec)?;
+        }
+    }
+    Ok(())
+}
+
+/// The inline-slot types, spelled for a diagnostic. Shared by the `struct` field
+/// and `variant` payload messages so one list cannot drift from the other or
+/// from [`is_inline_slot`].
+const INLINE_SLOT_TYPES: &str = "an integer (i8..i64, u8..u64), bool, char, str, \
+     a function, a struct, a variant, an array, a set, a dict, or an optional of any of those";
+
 /// Lay out a `struct`: fields are stored sequentially (no padding — every
 /// field size is a multiple of 8), nested composites inline.
 fn build_struct_layout(
@@ -7287,52 +7361,24 @@ fn build_struct_layout(
     let mut fields = Vec::with_capacity(decl.fields.len());
     let mut offset: u32 = 0;
     for f in &decl.fields {
-        // Allowed field types: i64/bool/char (by value), `str` or an array
-        // (8-byte refcounted heap pointers), another declared struct or a
-        // variant (stored inline — resolve it here so its size is known —
-        // unless it's boxed, in which case the field is an 8-byte pointer and
-        // needs no size), or an optional of a scalar/str/array (a 16-byte
-        // inline `{tag, value}` composite).
-        match &f.ty {
-            // Every scalar: any integer width, `bool`, `char`, `str`.
-            _ if is_set_elem(&f.ty) => {}
-            ConcreteType::Named(n) if decls.contains_key(n.as_str()) => {
-                if !rec.contains_key(n.as_str()) {
-                    resolve_type_layout(n, decls, layouts, on_stack, rec)?;
-                }
-            }
-            // A set or a dict is an array block (see `is_heap`), held and
-            // released exactly as an array field is.
-            ConcreteType::Array(_) | ConcreteType::Set(..) | ConcreteType::Dict(_, _) => {}
-            // A function value is stored as its 8-byte code address (an i64);
-            // it owns nothing, so like a scalar it needs no drop.
-            ConcreteType::Fn(_, _) => {}
-            // An optional of a scalar/str/array, or of a *boxed* (recursive)
-            // type — the latter is an 8-byte pointer core, so `Tree?` is a
-            // 16-byte `{tag, ptr}` inline composite (this is how a recursive
-            // struct spells "maybe a child": `left: Tree?`).
-            ConcreteType::Optional(inner)
-                if is_set_elem(inner)
-                    || matches!(inner.as_ref(), ConcreteType::Array(_))
-                    || matches!(inner.as_ref(), ConcreteType::Named(n) if rec.contains_key(n.as_str())) =>
-                {}
-            _ => {
-                return Err(Error::msg(format!(
-                    "{}: field {} has type {}, but struct fields must be an integer (i8..i64, u8..u64), bool, char, str, a function, a struct, a variant, an array, a set, a dict, or an optional of (an integer, bool, char, str, an array, or a recursive type)",
-                    // A tuple's struct is the compiler's, so it is named as the
-                    // tuple the user wrote.
-                    if decl.is_tuple {
-                        format!("tuple {}", aipl_syntax::demangle_named(&decl.name))
-                    } else {
-                        format!("struct {}", aipl_syntax::demangle_named(&decl.name))
-                    },
-                    f.name,
-                    type_name(&f.ty),
-                )));
-            }
+        if !is_inline_slot(&f.ty, decls) {
+            return Err(Error::msg(format!(
+                "{}: field {} has type {}, but struct fields must be {}",
+                // A tuple's struct is the compiler's, so it is named as the
+                // tuple the user wrote.
+                if decl.is_tuple {
+                    format!("tuple {}", aipl_syntax::demangle_named(&decl.name))
+                } else {
+                    format!("struct {}", aipl_syntax::demangle_named(&decl.name))
+                },
+                f.name,
+                type_name(&f.ty),
+                INLINE_SLOT_TYPES,
+            )));
         }
-        // The nested struct/variant (if any) is now resolved, so its size is
-        // in `layouts`.
+        resolve_inline_sizes(&f.ty, decls, layouts, on_stack, rec)?;
+        // Every nested struct/variant is now resolved, so its size is in
+        // `layouts`.
         let size = field_size(&f.ty, layouts);
         fields.push(FieldLayout {
             name: f.name.clone(),
@@ -7367,41 +7413,19 @@ fn build_variant_layout(
         let mut fields = Vec::with_capacity(c.payload.len());
         let mut offset = VARIANT_PAYLOAD_OFFSET;
         for ty in &c.payload {
-            // A payload field is an array element / inline composite: a scalar,
-            // `str`, an array, an optional, or a struct/variant (resolved here
-            // so its size is known — unless boxed, in which case the field is
-            // an 8-byte pointer; that's how a recursive sum type like a list
-            // gets its indirection).
-            let ty = ty;
-            let ok = match ty {
-                _ if is_set_elem(ty) => true, // i64/bool/char/str
-                ConcreteType::Array(_)
-                | ConcreteType::Set(..)
-                | ConcreteType::Dict(_, _)
-                | ConcreteType::Optional(_) => true,
-                // A function value is an 8-byte code address, stored inline like
-                // a scalar; it owns no heap, so it needs no drop. A `Case<V>` is
-                // the same shape for the same reason — a tag in one word, owning
-                // nothing — which is what lets `Rule`'s `Term(Case<K>)` carry one.
-                ConcreteType::Fn(_, _) | ConcreteType::Case(_) => true,
-                ConcreteType::Named(n) if decls.contains_key(n.as_str()) => {
-                    if !rec.contains_key(n.as_str()) {
-                        resolve_type_layout(n, decls, layouts, on_stack, rec)?;
-                    }
-                    true
-                }
-                _ => false,
-            };
-            if !ok {
+            // A payload slot is an inline slot, exactly as a struct field is —
+            // one shared answer, since a case's payload is laid out like a
+            // struct from `VARIANT_PAYLOAD_OFFSET`.
+            if !is_inline_slot(ty, decls) {
                 return Err(Error::msg(format!(
-                    "variant {} case {}: payload type {} is not supported (use an integer \
-                     (i8..i64, u8..u64), bool, char, str, a function, an array, an optional, a \
-                     struct, or a variant)",
+                    "variant {} case {}: payload type {} is not supported (use {})",
                     v.name,
                     c.name,
                     type_name(ty),
+                    INLINE_SLOT_TYPES,
                 )));
             }
+            resolve_inline_sizes(ty, decls, layouts, on_stack, rec)?;
             fields.push(FieldLayout {
                 name: String::new(),
                 ty: ty.clone(),
@@ -19114,7 +19138,8 @@ fn compile_expr_inner<M: Module>(
             // be wrong because compiling a later field pushes tracking of its own
             // on top. The moved entries are batch-removed after the stores
             // instead.
-            let mut vals: Vec<(u32, ConcreteType, Value, bool)> =
+            // (offset, field type, value, is-an-owned-temp, source type)
+            let mut vals: Vec<(u32, ConcreteType, Value, bool, ConcreteType)> =
                 Vec::with_capacity(field_inits.len());
             for init in field_inits {
                 let field = layout.field(&init.name).ok_or_else(|| {
@@ -19145,7 +19170,26 @@ fn compile_expr_inner<M: Module>(
                     expect_type(&actual, &fty, &ctx, init.value.span.clone())?;
                 }
                 let owned_temp = owned_temp_since(scopes, before, v);
-                vals.push((offset, fty, v, owned_temp));
+                // The narrower of the two types, which is how many bytes the
+                // store may read from `v`. They are the same type except for the
+                // widening coercions `expect_type` just allowed: a bare `none`
+                // (or `[]`) is compiled before the field's type is known, so its
+                // slot is sized for `__none__?` — 16 bytes — while the field may
+                // be an optional of an arbitrarily large struct. Copying the
+                // *field's* size from such a slot reads past it, by 16KB for a
+                // `Big? = none` whose `Big` has 2000 fields.
+                //
+                // Copying the source's size instead leaves the rest of the field
+                // uninitialized, which is what `copy_composite` already relies on
+                // and for the same reason: the slack is a `none`'s payload, and a
+                // `none` is only ever rendered, compared and dropped through its
+                // tag.
+                let src_ty = if field_size(&actual, structs) < field_size(&fty, structs) {
+                    actual
+                } else {
+                    fty.clone()
+                };
+                vals.push((offset, fty, v, owned_temp, src_ty));
             }
 
             // Phase 2: no field expression runs from here on, so nothing below
@@ -19166,19 +19210,19 @@ fn compile_expr_inner<M: Module>(
                 builtins.call(module, builder, "aipl_rec_alloc", &[size_v, drop_fn])
             });
             let mut moved: Vec<Value> = Vec::new();
-            for (offset, fty, v, owned_temp) in vals {
+            for (offset, fty, v, owned_temp, src_ty) in vals {
                 match (slot, heap) {
                     // Boxed: store into the heap payload via the block pointer.
                     (_, Some(base)) => {
                         let dst = builder.ins().iadd_imm_s(base, offset as i64);
-                        store_array_elem(builder, dst, v, &fty, structs);
+                        store_array_elem(builder, dst, v, &src_ty, structs);
                     }
                     // Non-boxed: store into the stack slot. A scalar/heap field is
                     // an 8-byte value; an optional field is a 16-byte inline
                     // composite, so copy its bytes from the source slot.
                     (Some(slot), _) => {
                         if is_composite(&fty, structs) {
-                            let size = field_size(&fty, structs);
+                            let size = field_size(&src_ty, structs);
                             let mut o = 0u32;
                             while o < size {
                                 let chunk = builder.ins().load(

@@ -311,11 +311,13 @@ variant Matcher =
 # lexical one — the lexer's job is to hand over the tokens.
 variant Transition = Stay | Push(i64) | Pop
 
-# A rule's `push`/`pop` pair read as the one decision it is. The flags are a
-# pair because a struct field's default must be a literal, so neither a
-# constructor nor an optional variant can sit on `TokenRule`; classifying them
-# here means the stack is driven by an exhaustive `match` on three cases rather
-# than by two booleans checked in the right order at each site.
+# A rule's `push`/`pop` pair read as the one decision it is. The flags are a pair
+# because a struct field's default must be a literal, so a `Transition`
+# constructor cannot sit on `TokenRule`; classifying them here means the stack is
+# driven by an exhaustive `match` on three cases rather than by two booleans
+# checked in the right order at each site. (`Transition? = none` would be legal
+# now that a field may be an optional of a variant — `none` is a literal — at the
+# cost of an unwrap at each use.)
 fn transition(push: i64, pop: bool) -> Transition {
     if (0 <= push) { Push(push) } else { if (pop) { Pop } else { Stay } }
 }
@@ -711,9 +713,10 @@ fn apply_emit<K>(e: Emit<K>, span: Span, content: str) -> K!LexError {
 # **At most one of each, and never both.** A rule is a token rule or a `trivia`
 # rule, and a `skip` rule is neither — so exactly one of these arrays holds a
 # token, or neither does. They are arrays rather than optionals because a struct
-# field cannot *be* an optional struct: the checker admits an optional only of a
-# scalar, a `str`, an array or a recursive type. An array of nought-or-one is how
-# the language spells "maybe a token" here.
+# field could not *be* an optional struct when this was written: the checker
+# admitted an optional only of a scalar, a `str`, an array or a recursive type.
+# An array of nought-or-one was how the language spelled "maybe a token".
+# `Token<K>?` is a legal field type now, and would say this directly.
 #
 # They were arrays for a stronger reason until recently: `Matcher::Template`
 # emitted a whole head/interpolation/tail run from a single step, and it was the

@@ -1,0 +1,121 @@
+import {
+    concat as +++,
+    equal as ==,
+    greater_than as >,
+    len,
+    push,
+    wrapping_add_assign as +=,
+} from builtins;
+
+// An optional-of-struct field is sized `8 (tag) + sizeof(Core)`, so every field
+// *after* it depends on the nested type's layout already being known. Layouts
+// resolve in alphabetical order, so `Aaa` is laid out before the `Zzz` it holds
+// — the order in which a missing resolution goes unnoticed, because the size
+// falls back to one word and the next field is then placed on top of the
+// payload rather than after it.
+struct Zzz { p: i64, q: i64, r: str }
+
+struct Aaa { lead: i64, mid: Zzz?, tail: str, last: i64 }
+
+// The opaque `n` keeps the constructor out of reach of known-constructor
+// elimination, so the value really does round-trip through the field's storage.
+fn build(n: i64) -> Aaa {
+    lead: 11,
+    mid: if (n > 0) { some(Zzz { p: 22, q: 33, r: "in" +++ "ner" }) } else { none },
+    tail: "t" +++ "ail",
+    last: 44,
+}.test({
+    let full = build(1);
+    let empty = build(0);
+
+    // Every field around the optional reads back as written.
+    assert(full.lead == 11);
+    assert(full.tail == "tail");
+    assert(full.last == 44);
+    assert(full.mid == some(Zzz { p: 22, q: 33, r: "inner" }));
+
+    assert(empty.lead == 11);
+    assert(empty.tail == "tail");
+    assert(empty.last == 44);
+    assert(empty.mid == none);
+
+    // The inner struct's own trailing field is intact too — an undersized slot
+    // truncates the payload rather than the fields after it.
+    match (full.mid) {
+        some(z) => assert(z.r == "inner"),
+        none => assert(false),
+    };
+
+    // Held in an array, so the whole struct is copied element-wise.
+    mut xs = [full];
+    set xs.push(empty);
+    set xs.push(build(1));
+    assert(xs.len() == 3);
+    assert(xs[2] == some(full));
+
+    // Built and dropped repeatedly: the `str` inside the optional payload is
+    // retained and released through the optional's tag, so the case's
+    // `allocations`/`deallocations` counts below are what prove it balances.
+    mut seen = 0;
+    for (let i : [0, 1, 0, 1, 1]) {
+        let h = build(i);
+        set seen += h.last;
+    }
+    assert(seen == 220);
+})
+--- performance ---
+allocations: 14
+deallocations: 14
+reallocations: 2
+bytes allocated: 1264
+instructions executed: 2010
+binary size: 8072
+  code: 4404
+  data: 617
+  metadata: 3051
+functions:
+  __arr_drop_Aaa:
+    calls: 1
+    bytes: 168
+  __arr_retain_Aaa:
+    calls: 2
+    bytes: 168
+  __eq_Aaa:
+    calls: 1
+    bytes: 208
+  __eq_Zzz:
+    calls: 2
+    bytes: 136
+  __eq_Zzz$opt:
+    calls: 1
+    bytes: 92
+  __test$build:
+    calls: 1
+    bytes: 2916
+  aipl_array_dec:
+    calls: 1
+    bytes: (external)
+  aipl_array_new:
+    calls: 1
+    bytes: (external)
+  aipl_array_push_mut:
+    calls: 2
+    bytes: (external)
+  aipl_assert:
+    calls: 12
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  build:
+    calls: 8
+    bytes: 612
+  main:
+    calls: 1
+    bytes: 104

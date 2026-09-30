@@ -76,6 +76,7 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  StepResult can contain Token<K>? instead o Token<K>[]
   Symbol and Import should use SpanStr
   Tpl and Tok should not be abbreviated
   re_escape_set should use a map of some sort probably
@@ -176,7 +177,6 @@ char:
 
 bugs:
   map over a generic struct's field trips the checker
-  A struct field default must be a literal, so go: Transition = Stay is impossible; an optional-of-variant field is also rejected outright.
   Struct-field defaults don't widen an integer literal to u64
   aipl_arr_ensure_heap for a reversed view appears to dec the inner array twice
   binding_is_exclusive treats a later slice of a mut array as an alias for the whole body, so a push loop before the slice copies per iteration
@@ -194,6 +194,16 @@ bugs:
       type `_` doesn't unify with the parameter's concrete i64.
       Found while writing lambdas/two_lambda_args, whose first draft was
       `xs.filter(keep).map(f)`; restructured around it rather than fixing.
+  A pre-existing leak in recursive structs. Reproduces on unmodified HEAD, nothing to do with this change:
+    struct Node { val: i64, next: Node? }
+
+    fn chain() -> Node { val: 1, next: some(Node { val: 2, next: none }) }.test({
+        let n = chain();
+        assert(n.val == 1);
+        assert(n.next.map(|c| c.val) == some(2));
+    })
+    // allocations: 2, deallocations: 1
+    It needs the binding held while both a scalar field and the boxed-optional field are read — reading only .next allocates 1 and balances, reading only .val elides the allocation entirely. That's presumably why recursive_struct.aipl and recursive_list.aipl never tripped it. My boxed case is reshaped to cover the boxed store path without hitting it
 
 errors:
   report multiple errors when one call site has multiple type errors
@@ -223,6 +233,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
+  support defaults for struct fields that are variants, structs, or optionals of variants or structs. Then
   link_rule does some weird stuff to prevent the formatter from breaking the tuples. Also it should match on the tuple probably
   str without "" should work
   field mutation for structs (lint let nullable: First<Tok> = First { ..f, nullable: true };) to set f.nullable = true;
@@ -245,7 +256,7 @@ syntax:
   add match (v) val if expr => r syntax
   destructuring with renames (let Foo { field as f, .. } = ...)
   module level constants
-  for (let i, c : dct) syntax for dicts
+  for (let k, v : dct) syntax for dicts
   allow match arm grouping to bind vars with the same type and name, or ignore bindings
   allow types to be defined in scopes (e.g. in tests to avoid leaking the test utilities)
   implement T+ for intersperse
@@ -269,7 +280,6 @@ shim:
   whole program optimization: if an effect is never shimmed, don't install the shimming code
 
 types:
-  an optional of a struct isn't legal as a field, we should fix that, then StepResult can contain Token<K>? instead o Token<K>[]
   Variant without Case should work
   i64 without 0 should work
   none.value_or_err doesn't type check. Maybe it should? Unclear.
@@ -647,6 +657,7 @@ expression matcher:
   use it for operation fusion
 
 handoff:
+  instead of having unfillable(), we should have fillable() since we have better control over the test output and can thus influence fillable() better
   should be able to regenerate syntax highlighter
   display the number of test excluded from handoff
   merge tests of similar things into the same file for less process overhead

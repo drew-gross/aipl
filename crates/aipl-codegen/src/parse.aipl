@@ -225,9 +225,11 @@ fn no(far: Far, pos: u64) -> Step { hit: false, pos, kids: [], far }
 # The span of the first token in `kids` — where a group's opening bracket was
 # written, for the message when it is never closed. Empty when there is none.
 #
-# A one-element array rather than a `Span?` because that is what `Far` can hold:
-# a struct field may be an optional of an integer or an array, but not of another
-# struct, and `Span` is one.
+# A one-element array rather than a `Span?` because that is what `Far` held when
+# this was written: a struct field could then be an optional of an integer or an
+# array, but not of another struct, and `Span` is one. A field may be an optional
+# of a struct now, so `Far` could carry a `Span?` and this could return one —
+# nought-or-one array and optional mean the same thing here.
 fn first_token(kids: Cst[]) -> Span[] {
     kids.map(token_leaves).join().first().map(|sp| [sp]).value_or([])
 }

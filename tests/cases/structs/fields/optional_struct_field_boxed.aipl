@@ -1,0 +1,74 @@
+import { equal as ==, map } from builtins;
+
+// A *recursive* struct is boxed — its value is a pointer to a refcounted heap
+// payload — so its fields are stored through that pointer rather than into a
+// stack slot. An optional-of-struct field has to work down that path too.
+struct Wide { p: i64, q: i64, r: i64, s: str }
+
+// `next: Node?` is what makes `Node` recursive, and so boxed: that optional's
+// core is the 8-byte pointer. `extra` is an optional of an ordinary *inline*
+// struct, so one `Node` carries both kinds of optional at once — a pointer core
+// beside a 32-byte struct core.
+struct Node { val: i64, next: Node?, extra: Wide? = none }
+
+// `n` is opaque, so the struct is really built on the heap and read back out of
+// it rather than folded away.
+fn make(n: i64) -> Node { val: n, next: none, extra: some(Wide { p: n, q: 5, r: 6, s: "z" }) }.test({
+    let w = make(3); #[allow]
+    assert(w.val == 3);
+
+    // The inline-struct payload, read back field by field through the box.
+    assert(w.extra.map(|x| x.p) == some(3));
+    assert(w.extra.map(|x| x.s) == some("z"));
+
+    // The boxed-pointer optional beside it is unaffected.
+    assert(w.next == none);
+
+    // The `= none` default writes a 16-byte `none` into the wider field, and
+    // only the tag is ever read back out of it.
+    assert(Node { val: 5, next: none }.extra == none);
+})
+--- performance ---
+allocations: 1
+deallocations: 1
+reallocations: 0
+bytes allocated: 112
+instructions executed: 275
+binary size: 3600
+  code: 1636
+  data: 236
+  metadata: 1728
+functions:
+  __eq_Wide:
+    calls: 0
+    bytes: 168
+  __eq_Wide$opt:
+    calls: 1
+    bytes: 92
+  __rec_drop_Node:
+    calls: 1
+    bytes: 112
+  __test$make:
+    calls: 1
+    bytes: 1164
+  aipl_assert:
+    calls: 5
+    bytes: (external)
+  aipl_rec_alloc:
+    calls: 1
+    bytes: (external)
+  aipl_rec_dec_strong:
+    calls: 1
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 100
