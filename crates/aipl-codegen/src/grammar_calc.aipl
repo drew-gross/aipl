@@ -466,15 +466,15 @@ fn is_calc_op(self: str) -> bool {
     self == "+" || self == "-" || self == "*" || self == "/" || self == "%" || self == "^"
 }
 --- performance ---
-allocations: 10819
-deallocations: 10819
-reallocations: 2023
-bytes allocated: 1177911
-instructions executed: 2798883
-binary size: 411136
-  code: 271712
+allocations: 10767
+deallocations: 10767
+reallocations: 1853
+bytes allocated: 1174167
+instructions executed: 2754077
+binary size: 411896
+  code: 272216
   data: 5852
-  metadata: 133572
+  metadata: 133828
 functions:
   __arr_drop_Calc:
     calls: 337
@@ -483,7 +483,7 @@ functions:
     calls: 0
     bytes: 120
   __arr_drop___m11__ScopeSpan:
-    calls: 52
+    calls: 0
     bytes: 120
   __arr_drop___m11__Token$CalcTok:
     calls: 547
@@ -525,7 +525,7 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain___m11__ScopeSpan:
-    calls: 443
+    calls: 0
     bytes: 120
   __arr_retain___m11__Token$CalcTok:
     calls: 443
@@ -691,10 +691,10 @@ functions:
     bytes: 824
   __m11__lex$CalcTok:
     calls: 54
-    bytes: 364
+    bytes: 392
   __m11__lex_all$CalcTok:
     calls: 54
-    bytes: 4540
+    bytes: 5016
   __m11__lex_step$CalcTok:
     calls: 444
     bytes: 19212
@@ -1029,7 +1029,7 @@ functions:
     calls: 3309
     bytes: (external)
   aipl_arr_inc:
-    calls: 58985
+    calls: 58258
     bytes: (external)
   aipl_arr_reserve:
     calls: 4145
@@ -1041,16 +1041,16 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 76156
+    calls: 75431
     bytes: (external)
   aipl_array_new:
     calls: 2041
     bytes: (external)
   aipl_array_push:
-    calls: 2361
+    calls: 2309
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3411
+    calls: 2968
     bytes: (external)
   aipl_array_with_cap:
     calls: 236

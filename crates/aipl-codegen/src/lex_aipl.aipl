@@ -36,6 +36,7 @@ import {
     Try,
     UpToAny,
     lex,
+    lex_kinds,
     lex_scoped,
     span_str,
 } from "./lexer.aipl";
@@ -169,10 +170,7 @@ pub fn doc_line_value(line: str) -> str { line.trim_prefix('#').trim_prefix(' ')
     assert(doc_line_value("#   indented") == "  indented");
     // And it is the answer the lexer's own rule gives.
     let src = "# hi";
-    assert(lex_aipl(src)? == LexResult {
-        tokens: [atok(src, DocComment(doc_line_value(src)), 0..4)],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds(src)? == [DocComment(doc_line_value(src))]);
 })
 
 # The identifier character classes. Constants rather than functions: a literal
@@ -277,18 +275,12 @@ pub fn str_lit_value(text: str) -> str {
     // A `"..."` literal: escapes decoded, nothing else.
     let q = `"a\\nb"`;
     assert(str_lit_value(q) == "a\nb");
-    assert(lex_aipl(q)? == LexResult {
-        tokens: [atok(q, StrLit(str_lit_value(q), Quoted), 0..q.len())],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds(q)? == [StrLit(str_lit_value(q), Quoted)]);
 
     // A `"""..."""` literal: verbatim contents, de-dented as a block.
     let raw = `"""a"b"""`;
     assert(str_lit_value(raw) == `a"b`);
-    assert(lex_aipl(raw)? == LexResult {
-        tokens: [atok(raw, StrLit(str_lit_value(raw), TripleQuoted), 0..raw.len())],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds(raw)? == [StrLit(str_lit_value(raw), TripleQuoted)]);
 
     // A backtick literal, whose value this still answers for — the *whole*
     // literal, delimiters and all, which is what a parser holds when it has a
@@ -325,10 +317,7 @@ pub fn char_lit_value(text: str) -> char? {
     assert(char_lit_value("""'\n'""") == some('\n'));
     assert(char_lit_value("""'\''""") == some('\''));
     let c = "'q'";
-    assert(lex_aipl(c)? == LexResult {
-        tokens: [atok(c, CharTok(char_lit_value(c).value_or('?')), 0..c.len())],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds(c)? == [CharTok(char_lit_value(c).value_or('?'))]);
 
     // The shapes the lexer refuses, which is why this returns an optional.
     assert(char_lit_value("''") == none);
@@ -663,6 +652,15 @@ pub fn aipl_rules() -> TokenRule<AiplTok>[] {
 # expectation cannot claim text the source does not hold at that span.
 fn atok(src: str, kind: AiplTok, span: Span) -> Token<AiplTok> { kind, text: span_str(src, span) }
 
+# `lex_aipl` without the spans or the trivia — every token's kind, and a bare
+# message on failure. Most of this file's assertions are about *which tokens* a
+# snippet lexes to, and this is that question asked directly; the ones that are
+# about spans, or about the trivia side-channel, still use `lex_aipl`.
+#
+# Not `pub`: a consumer wanting it writes `lex_kinds(src, aipl_rules())`, which
+# is what this is. It exists so the tests below read as what they check.
+fn lex_aipl_kinds(src: str) -> AiplTok[]!str { lex_kinds(src, aipl_rules()) }
+
 pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()) }.test({
     // A small snippet exercising several kinds; a fuller suite comes with the
     // real grammar. `let x = 42;` plus a trailing line comment (trivia).
@@ -697,62 +695,45 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // Keywords beyond the starter set. `builtins` is a keyword everywhere (as in
     // the Rust lexer), not just in a `from builtins;` import; `iffy` still lexes
     // as a `Name`, since the `Keyword` matcher stops at an identifier boundary.
-    assert(lex_aipl("if else builtins iffy")? == LexResult {
-        tokens: [
-            atok("if else builtins iffy", If, 0..2),
-            atok("if else builtins iffy", Else, 3..7),
-            atok("if else builtins iffy", Builtins, 8..16),
-            atok("if else builtins iffy", Name("iffy"), 17..21),
-        ],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds("if else builtins iffy")? == [If, Else, Builtins, Name("iffy")]);
 
     // `without` is the type-refinement keyword (`T[] without []`); like the
     // rest it stops at an identifier boundary.
-    assert(lex_aipl("i64[] without [] withoutx")? == LexResult {
-        tokens: [
-            atok("i64[] without [] withoutx", Name("i64"), 0..3),
-            atok("i64[] without [] withoutx", LBracket, 3..4),
-            atok("i64[] without [] withoutx", RBracket, 4..5),
-            atok("i64[] without [] withoutx", Without, 6..13),
-            atok("i64[] without [] withoutx", LBracket, 14..15),
-            atok("i64[] without [] withoutx", RBracket, 15..16),
-            atok("i64[] without [] withoutx", Name("withoutx"), 17..25),
-        ],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds("i64[] without [] withoutx")? == [
+        Name("i64"),
+        LBracket,
+        RBracket,
+        Without,
+        LBracket,
+        RBracket,
+        Name("withoutx"),
+    ]);
 
     // The constant literals get their own kinds, distinct from keywords and from
     // identifiers. `some`/`ok`/`err` are ordinary `Name`s (constructors, not
     // constants); `noneish` stays a `Name` (identifier-boundary matched).
-    assert(lex_aipl("true false none some noneish")? == LexResult {
-        tokens: [
-            atok("true false none some noneish", True, 0..4),
-            atok("true false none some noneish", False, 5..10),
-            atok("true false none some noneish", None, 11..15),
-            atok("true false none some noneish", Name("some"), 16..20),
-            atok("true false none some noneish", Name("noneish"), 21..28),
-        ],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds("true false none some noneish")? == [
+        True,
+        False,
+        None,
+        Name("some"),
+        Name("noneish"),
+    ]);
 
     // The rest of the operator/punctuation table: `<=`/`>=` beat `<`/`>`, `++`
     // beats `+` (but not `+++`), and `|` is the lambda delimiter. `Exact` always
     // takes the longest spelling, so the two-char forms win over their one-char
     // prefixes.
-    assert(lex_aipl("a <= b >= |x| ++")? == LexResult {
-        tokens: [
-            atok("a <= b >= |x| ++", Name("a"), 0..1),
-            atok("a <= b >= |x| ++", Le, 2..4),
-            atok("a <= b >= |x| ++", Name("b"), 5..6),
-            atok("a <= b >= |x| ++", Ge, 7..9),
-            atok("a <= b >= |x| ++", Pipe, 10..11),
-            atok("a <= b >= |x| ++", Name("x"), 11..12),
-            atok("a <= b >= |x| ++", Pipe, 12..13),
-            atok("a <= b >= |x| ++", PlusPlus, 14..16),
-        ],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds("a <= b >= |x| ++")? == [
+        Name("a"),
+        Le,
+        Name("b"),
+        Ge,
+        Pipe,
+        Name("x"),
+        Pipe,
+        PlusPlus,
+    ]);
 
     // `#` disambiguation: a bare `#` (the `#{...}` dict prefix) is a `Hash` token,
     // but `#[allow]` is the lint-squelch marker — recorded as trivia and kept out
@@ -762,14 +743,8 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
         trivia: [atok("#{ #[allow]", AllowMarker, 3..11)],
     });
     // The ordered-set brackets are three tokens each, not a doc comment.
-    assert(lex_aipl("#>{")? == LexResult {
-        tokens: [atok("#>{", Hash, 0..1), atok("#>{", Gt, 1..2), atok("#>{", LBrace, 2..3)],
-        trivia: [],
-    });
-    assert(lex_aipl("#<{")? == LexResult {
-        tokens: [atok("#<{", Hash, 0..1), atok("#<{", Lt, 1..2), atok("#<{", LBrace, 2..3)],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds("#>{")? == [Hash, Gt, LBrace]);
+    assert(lex_aipl_kinds("#<{")? == [Hash, Lt, LBrace]);
 
     // Block comments are trivia, and `Nested` depth-tracks them, so the inner
     // `/* */` doesn't close the outer — the whole `/* a /* b */ c */` is one
@@ -795,14 +770,7 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // value carries an actual newline — escape handling lives in `str_lit`, not in
     // the lexer library.
     let esc = `s = "a\\nb"`;
-    assert(lex_aipl(esc)? == LexResult {
-        tokens: [
-            atok(esc, Name("s"), 0..1),
-            atok(esc, Eq, 2..3),
-            atok(esc, StrLit("a\nb", Quoted), 4..10),
-        ],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds(esc)? == [Name("s"), Eq, StrLit("a\nb", Quoted)]);
 
     // A raw string `"""a"b"""` (the AIPL source here is written with escaped
     // quotes). `Between` scans to the balancing `"""`, so the lone `"` inside is
@@ -818,20 +786,11 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // not a `""` and a stray `""""`. (The formatter respells it `""`, so no
     // formatted source keeps this spelling — it is covered here.)
     let empty_raw = `""""""`;
-    assert(lex_aipl(empty_raw)? == LexResult {
-        tokens: [atok(empty_raw, StrLit("", TripleQuoted), 0..6)],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds(empty_raw)? == [StrLit("", TripleQuoted)]);
 
     // Char literals: an ordinary `'x'` and an escaped `'\n'` (the AIPL source
     // writes the escape as a literal backslash-`n`), each decoded to its byte.
-    assert(lex_aipl("""'x' '\n'""")? == LexResult {
-        tokens: [
-            atok("""'x' '\n'""", CharTok('x'), 0..3),
-            atok("""'x' '\n'""", CharTok('\n'), 4..8),
-        ],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds("""'x' '\n'""")? == [CharTok('x'), CharTok('\n')]);
 
     // The one-char shape is enforced: an empty `''` is a hard error whose span
     // (the two quotes) matches the Rust lexer's `empty char literal` error.
@@ -852,44 +811,27 @@ pub fn lex_aipl(src: str) -> LexResult<AiplTok>!LexError { lex(src, aipl_rules()
     // same tokens a block is made of — and inside them the base rules apply, so
     // `x` is an ordinary `Name`.
     let interp = "`a{x}b`";
-    assert(lex_aipl(interp)? == LexResult {
-        tokens: [
-            atok(interp, TplOpen(Backtick), 0..1),
-            atok(interp, TplText("a"), 1..2),
-            atok(interp, LBrace, 2..3),
-            atok(interp, Name("x"), 3..4),
-            atok(interp, RBrace, 4..5),
-            atok(interp, TplText("b"), 5..6),
-            atok(interp, TplClose, 6..7),
-        ],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds(interp)? == [
+        TplOpen(Backtick),
+        TplText("a"),
+        LBrace,
+        Name("x"),
+        RBrace,
+        TplText("b"),
+        TplClose,
+    ]);
 
     // A template with no interpolation is the same shape with nothing between
     // the braces to have — one text token. Folding it into a `StrLit` would take
     // a matcher that declines on a `{` it has not reached yet; the parser folds
     // it instead, where the whole literal is in hand.
     let bare = "`hi`";
-    assert(lex_aipl(bare)? == LexResult {
-        tokens: [
-            atok(bare, TplOpen(Backtick), 0..1),
-            atok(bare, TplText("hi"), 1..3),
-            atok(bare, TplClose, 3..4),
-        ],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds(bare)? == [TplOpen(Backtick), TplText("hi"), TplClose]);
 
     // A triple-backtick raw template scans verbatim, and wins over the
     // single-backtick rule (longest delimiter first).
     let raw = "```hi```";
-    assert(lex_aipl(raw)? == LexResult {
-        tokens: [
-            atok(raw, TplOpen(TripleBacktick), 0..3),
-            atok(raw, TplText("hi"), 3..5),
-            atok(raw, TplClose, 5..8),
-        ],
-        trivia: [],
-    });
+    assert(lex_aipl_kinds(raw)? == [TplOpen(TripleBacktick), TplText("hi"), TplClose]);
 
     // A brace inside an interpolation closes itself, not the interpolation: its
     // `{` pushed the base mode and its `}` pops that, leaving the template mode
@@ -931,36 +873,42 @@ pub fn aipl_token_scopes(src: str) -> ScopeSpan[]!LexError {
     ]);
 })
 --- performance ---
-allocations: 391
-deallocations: 391
-reallocations: 116
-bytes allocated: 489952
-instructions executed: 2116954
-binary size: 449504
-  code: 316828
-  data: 9988
-  metadata: 122688
+allocations: 347
+deallocations: 347
+reallocations: 61
+bytes allocated: 483224
+instructions executed: 2100634
+binary size: 321984
+  code: 230636
+  data: 7332
+  metadata: 84016
 functions:
+  __arr_drop_AiplTok:
+    calls: 32
+    bytes: 224
   __arr_drop___m1__ModeFrame:
     calls: 14
     bytes: 120
   __arr_drop___m1__ScopeSpan:
-    calls: 28
+    calls: 4
     bytes: 120
   __arr_drop___m1__Token$AiplTok:
-    calls: 166
+    calls: 114
     bytes: 248
   __arr_drop___m1__TokenRule$AiplTok:
     calls: 28
     bytes: 536
+  __arr_retain_AiplTok:
+    calls: 53
+    bytes: 224
   __arr_retain___m1__ModeFrame:
     calls: 13
     bytes: 120
   __arr_retain___m1__ScopeSpan:
-    calls: 89
+    calls: 5
     bytes: 120
   __arr_retain___m1__Token$AiplTok:
-    calls: 89
+    calls: 31
     bytes: 248
   __arr_retain___m1__TokenRule$AiplTok:
     calls: 0
@@ -1004,17 +952,20 @@ functions:
   __eq_AiplTok:
     calls: 71
     bytes: 416
+  __eq_AiplTok$arr:
+    calls: 16
+    bytes: 284
   __eq_StrStyle:
     calls: 8
     bytes: 64
   __eq___builtin_Span:
-    calls: 80
+    calls: 27
     bytes: 104
   __eq___m1__LexError:
     calls: 4
     bytes: 128
   __eq___m1__LexResult$AiplTok:
-    calls: 21
+    calls: 5
     bytes: 120
   __eq___m1__ScopeSpan:
     calls: 5
@@ -1023,13 +974,13 @@ functions:
     calls: 2
     bytes: 284
   __eq___m1__SpanStr:
-    calls: 71
+    calls: 18
     bytes: 128
   __eq___m1__Token$AiplTok:
-    calls: 71
+    calls: 18
     bytes: 120
   __eq___m1__Token$AiplTok$arr:
-    calls: 42
+    calls: 10
     bytes: 284
   __eq_str$arr:
     calls: 7
@@ -1047,14 +998,17 @@ functions:
     calls: 0
     bytes: 824
   __m1__lex$AiplTok:
-    calls: 26
-    bytes: 364
+    calls: 10
+    bytes: 392
   __m1__lex_all$AiplTok:
     calls: 28
-    bytes: 4996
+    bytes: 5948
+  __m1__lex_kinds$AiplTok:
+    calls: 16
+    bytes: 772
   __m1__lex_scoped$AiplTok:
     calls: 2
-    bytes: 288
+    bytes: 316
   __m1__lex_step$AiplTok:
     calls: 129
     bytes: 21796
@@ -1099,51 +1053,57 @@ functions:
     bytes: 1796
   __test$char_lit_value:
     calls: 1
-    bytes: 1568
+    bytes: 1016
   __test$doc_line_value:
     calls: 1
-    bytes: 1964
+    bytes: 1448
   __test$lex_aipl:
     calls: 1
-    bytes: 151052
+    bytes: 64248
   __test$str_lit_value:
     calls: 1
-    bytes: 3456
+    bytes: 2240
   __test$template_segments:
     calls: 1
     bytes: 3408
   __test_try_fail___m1__LexError:
     calls: 0
     bytes: 84
+  __test_try_fail_str:
+    calls: 0
+    bytes: 84
   __to_str___m1__LexError:
     calls: 0
     bytes: 836
+  __to_str_str:
+    calls: 0
+    bytes: 300
   aipl_arr_elem_ptr:
     calls: 6
     bytes: (external)
   aipl_arr_extend:
-    calls: 250
+    calls: 94
     bytes: (external)
   aipl_arr_inc:
-    calls: 21262
+    calls: 21061
     bytes: (external)
   aipl_arr_reserve:
-    calls: 265
+    calls: 109
     bytes: (external)
   aipl_arr_slice:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 29121
+    calls: 28888
     bytes: (external)
   aipl_array_new:
     calls: 227
     bytes: (external)
   aipl_array_push:
-    calls: 26
+    calls: 18
     bytes: (external)
   aipl_array_push_mut:
-    calls: 124
+    calls: 93
     bytes: (external)
   aipl_array_with_cap:
     calls: 39

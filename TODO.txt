@@ -175,6 +175,7 @@ char:
   make non-ascii lits e.g. VT and 0xFF spellable (for is_whitespace)
 
 bugs:
+  map over a generic struct's field trips the checker
   A struct field default must be a literal, so go: Transition = Stay is impossible; an optional-of-variant field is also rejected outright.
   Struct-field defaults don't widen an integer literal to u64
   aipl_arr_ensure_heap for a reversed view appears to dec the inner array twice
@@ -269,7 +270,6 @@ shim:
 
 types:
   an optional of a struct isn't legal as a field, we should fix that, then StepResult can contain Token<K>? instead o Token<K>[]
-  "str_literal".to_set() should work, also should be const folded and fix the current users
   Variant without Case should work
   i64 without 0 should work
   none.value_or_err doesn't type check. Maybe it should? Unclear.
@@ -671,7 +671,6 @@ figure out / fix why template literals are peforming worse than concat chains
 make try_left_fold and try_right_fold for use when the lambda returns an error
 
 lexer:
-  spanless lexer for simpler tests and faster lexing for users that don't need spans
   we probably don't need Int (and maybe float) since I think we can use CharRun with first or "minus or digit" and cont of "digit"
   "No push" is now a negative sentinel <--- don't do this, sentinels are bad. use optionals
   if Keyword boundary defaults to empty set I think we don't need a separate Exact

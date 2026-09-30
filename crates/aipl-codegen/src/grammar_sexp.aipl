@@ -273,21 +273,24 @@ pub fn format_sexp(src: str, width: u64) -> str!ParseError {
 # and answering "never" is the honest answer here.
 fn sexp_space(l: str, r: str) -> bool { false }
 --- performance ---
-allocations: 6570
-deallocations: 6570
-reallocations: 994
-bytes allocated: 640622
-instructions executed: 1790392
-binary size: 393584
-  code: 261080
+allocations: 6539
+deallocations: 6539
+reallocations: 911
+bytes allocated: 638390
+instructions executed: 1762548
+binary size: 394952
+  code: 261992
   data: 4692
-  metadata: 127812
+  metadata: 128268
 functions:
+  __arr_drop_SexpKind:
+    calls: 0
+    bytes: 136
   __arr_drop___m11__ModeFrame:
     calls: 0
     bytes: 120
   __arr_drop___m11__ScopeSpan:
-    calls: 31
+    calls: 0
     bytes: 120
   __arr_drop___m11__Token$SexpKind:
     calls: 301
@@ -325,11 +328,14 @@ functions:
   __arr_drop___m5__Doc:
     calls: 234
     bytes: 116
+  __arr_retain_SexpKind:
+    calls: 0
+    bytes: 136
   __arr_retain___m11__ModeFrame:
     calls: 0
     bytes: 120
   __arr_retain___m11__ScopeSpan:
-    calls: 239
+    calls: 0
     bytes: 120
   __arr_retain___m11__Token$SexpKind:
     calls: 239
@@ -498,10 +504,10 @@ functions:
     bytes: 824
   __m11__lex$SexpKind:
     calls: 32
-    bytes: 364
+    bytes: 392
   __m11__lex_all$SexpKind:
     calls: 32
-    bytes: 4640
+    bytes: 5252
   __m11__lex_step$SexpKind:
     calls: 240
     bytes: 20068
@@ -818,7 +824,7 @@ functions:
     calls: 2964
     bytes: (external)
   aipl_arr_inc:
-    calls: 31055
+    calls: 30670
     bytes: (external)
   aipl_arr_reserve:
     calls: 3766
@@ -830,16 +836,16 @@ functions:
     calls: 4
     bytes: (external)
   aipl_array_dec:
-    calls: 42409
+    calls: 42025
     bytes: (external)
   aipl_array_new:
     calls: 1370
     bytes: (external)
   aipl_array_push:
-    calls: 1064
+    calls: 1033
     bytes: (external)
   aipl_array_push_mut:
-    calls: 1562
+    calls: 1323
     bytes: (external)
   aipl_array_with_cap:
     calls: 159

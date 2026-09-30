@@ -4968,21 +4968,21 @@ fn why(src: str) -> str {
     }
 }
 --- performance ---
-allocations: 2106815
-deallocations: 2106815
-reallocations: 306035
-bytes allocated: 403605674
-instructions executed: 611623994
-binary size: 7014720
-  code: 4640576
+allocations: 2106450
+deallocations: 2106450
+reallocations: 304661
+bytes allocated: 403579394
+instructions executed: 610888431
+binary size: 7016912
+  code: 4642004
   data: 59172
-  metadata: 2314972
+  metadata: 2315736
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 537
     bytes: 120
   __arr_drop___m11__ScopeSpan:
-    calls: 365
+    calls: 0
     bytes: 120
   __arr_drop___m11__Token$__m23__AiplTok:
     calls: 6229
@@ -5005,6 +5005,9 @@ functions:
   __arr_drop___m22__Piece:
     calls: 330
     bytes: 228
+  __arr_drop___m23__AiplTok:
+    calls: 0
+    bytes: 224
   __arr_drop___m2__BraceEntry:
     calls: 5
     bytes: 184
@@ -5078,7 +5081,7 @@ functions:
     calls: 349
     bytes: 120
   __arr_retain___m11__ScopeSpan:
-    calls: 5499
+    calls: 0
     bytes: 120
   __arr_retain___m11__Token$__m23__AiplTok:
     calls: 5499
@@ -5101,6 +5104,9 @@ functions:
   __arr_retain___m22__Piece:
     calls: 445
     bytes: 228
+  __arr_retain___m23__AiplTok:
+    calls: 0
+    bytes: 224
   __arr_retain___m2__BraceEntry:
     calls: 9
     bytes: 184
@@ -5427,10 +5433,10 @@ functions:
     bytes: 824
   __m11__lex$__m23__AiplTok:
     calls: 365
-    bytes: 364
+    bytes: 392
   __m11__lex_all$__m23__AiplTok:
     calls: 365
-    bytes: 4996
+    bytes: 5948
   __m11__lex_step$__m23__AiplTok:
     calls: 5499
     bytes: 21796
@@ -6002,7 +6008,7 @@ functions:
     calls: 1203799
     bytes: (external)
   aipl_arr_inc:
-    calls: 6817659
+    calls: 6807756
     bytes: (external)
   aipl_arr_reserve:
     calls: 1213308
@@ -6017,16 +6023,16 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 9978844
+    calls: 9968941
     bytes: (external)
   aipl_array_new:
     calls: 194093
     bytes: (external)
   aipl_array_push:
-    calls: 171040
+    calls: 170675
     bytes: (external)
   aipl_array_push_mut:
-    calls: 756099
+    calls: 750600
     bytes: (external)
   aipl_array_with_cap:
     calls: 40553

@@ -864,6 +864,20 @@
         </section>
 
 
+
+        <section class="item" id="item-lex_aipl_kinds">
+          <h3>
+            <a class="anchor" href="#item-lex_aipl_kinds">lex_aipl_kinds</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>fn lex_aipl_kinds(src: str) -&#62; AiplTok[]!str</code></pre>
+
+          <div class="doc"><p><code>lex_aipl</code> without the spans or the trivia — every token's kind, and a bare message on failure. Most of this file's assertions are about <em>which tokens</em> a snippet lexes to, and this is that question asked directly; the ones that are about spans, or about the trivia side-channel, still use <code>lex_aipl</code>.</p><p>Not <code>pub</code>: a consumer wanting it writes <code>lex_kinds(src, aipl_rules())</code>, which is what this is. It exists so the tests below read as what they check.</p></div>
+
+
+        </section>
+
+
       </section>
 
 

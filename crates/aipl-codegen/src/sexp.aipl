@@ -69,15 +69,15 @@ fn depth(self: Sexp) -> u64 {
     }
 }
 --- performance ---
-allocations: 12968
-deallocations: 12968
-reallocations: 1379
-bytes allocated: 873682
-instructions executed: 6093929
-binary size: 236960
-  code: 157728
+allocations: 12962
+deallocations: 12962
+reallocations: 1344
+bytes allocated: 873250
+instructions executed: 5992637
+binary size: 238344
+  code: 158640
   data: 1716
-  metadata: 77516
+  metadata: 77988
 functions:
   __arr_drop_Sexp:
     calls: 818
@@ -86,7 +86,7 @@ functions:
     calls: 0
     bytes: 120
   __arr_drop___m12__ScopeSpan:
-    calls: 6
+    calls: 0
     bytes: 120
   __arr_drop___m12__Token$__m1__SexpKind:
     calls: 864
@@ -94,6 +94,9 @@ functions:
   __arr_drop___m12__TokenRule$__m1__SexpKind:
     calls: 6
     bytes: 448
+  __arr_drop___m1__SexpKind:
+    calls: 0
+    bytes: 136
   __arr_drop___m2__Cst:
     calls: 3342
     bytes: 116
@@ -113,7 +116,7 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain___m12__ScopeSpan:
-    calls: 852
+    calls: 0
     bytes: 120
   __arr_retain___m12__Token$__m1__SexpKind:
     calls: 852
@@ -121,6 +124,9 @@ functions:
   __arr_retain___m12__TokenRule$__m1__SexpKind:
     calls: 0
     bytes: 448
+  __arr_retain___m1__SexpKind:
+    calls: 0
+    bytes: 136
   __arr_retain___m2__Cst:
     calls: 2136
     bytes: 116
@@ -213,10 +219,10 @@ functions:
     bytes: 824
   __m12__lex$__m1__SexpKind:
     calls: 6
-    bytes: 364
+    bytes: 392
   __m12__lex_all$__m1__SexpKind:
     calls: 6
-    bytes: 4640
+    bytes: 5252
   __m12__lex_step$__m1__SexpKind:
     calls: 852
     bytes: 20068
@@ -407,7 +413,7 @@ functions:
     calls: 2634
     bytes: (external)
   aipl_arr_inc:
-    calls: 173091
+    calls: 171405
     bytes: (external)
   aipl_arr_reserve:
     calls: 3054
@@ -416,16 +422,16 @@ functions:
     calls: 836
     bytes: (external)
   aipl_array_dec:
-    calls: 197044
+    calls: 195358
     bytes: (external)
   aipl_array_new:
     calls: 3362
     bytes: (external)
   aipl_array_push:
-    calls: 3366
+    calls: 3360
     bytes: (external)
   aipl_array_push_mut:
-    calls: 3193
+    calls: 2341
     bytes: (external)
   aipl_array_with_cap:
     calls: 218

@@ -507,24 +507,27 @@ pub fn format_json(src: str, width: u64) -> str!ParseError {
 # braces — is a list breaking or not breaking, which the layouts decide.
 fn json_space(l: str, r: str) -> bool { l == ":" }
 --- performance ---
-allocations: 21559
-deallocations: 21559
-reallocations: 3374
-bytes allocated: 2816675
-instructions executed: 6517911
-binary size: 447440
-  code: 295056
+allocations: 21503
+deallocations: 21503
+reallocations: 3218
+bytes allocated: 2812643
+instructions executed: 6461750
+binary size: 448816
+  code: 295968
   data: 8348
-  metadata: 144036
+  metadata: 144500
 functions:
   __arr_drop_Json:
     calls: 125
     bytes: 116
+  __arr_drop_JsonTok:
+    calls: 0
+    bytes: 136
   __arr_drop___m11__ModeFrame:
     calls: 0
     bytes: 120
   __arr_drop___m11__ScopeSpan:
-    calls: 56
+    calls: 0
     bytes: 120
   __arr_drop___m11__Token$JsonTok:
     calls: 596
@@ -562,11 +565,14 @@ functions:
   __arr_retain_Json:
     calls: 139
     bytes: 116
+  __arr_retain_JsonTok:
+    calls: 0
+    bytes: 136
   __arr_retain___m11__ModeFrame:
     calls: 0
     bytes: 120
   __arr_retain___m11__ScopeSpan:
-    calls: 484
+    calls: 0
     bytes: 120
   __arr_retain___m11__Token$JsonTok:
     calls: 484
@@ -741,10 +747,10 @@ functions:
     bytes: 824
   __m11__lex$JsonTok:
     calls: 58
-    bytes: 364
+    bytes: 392
   __m11__lex_all$JsonTok:
     calls: 58
-    bytes: 4640
+    bytes: 5252
   __m11__lex_step$JsonTok:
     calls: 485
     bytes: 20068
@@ -1067,7 +1073,7 @@ functions:
     calls: 8743
     bytes: (external)
   aipl_arr_inc:
-    calls: 97542
+    calls: 96745
     bytes: (external)
   aipl_arr_reserve:
     calls: 10952
@@ -1082,16 +1088,16 @@ functions:
     calls: 7
     bytes: (external)
   aipl_array_dec:
-    calls: 131191
+    calls: 130396
     bytes: (external)
   aipl_array_new:
     calls: 3410
     bytes: (external)
   aipl_array_push:
-    calls: 2618
+    calls: 2562
     bytes: (external)
   aipl_array_push_mut:
-    calls: 6268
+    calls: 5784
     bytes: (external)
   aipl_array_with_cap:
     calls: 301

@@ -447,6 +447,39 @@
 
 
 
+        <section class="item" id="item-Collect">
+          <h3>
+            <a class="anchor" href="#item-Collect">Collect</a>
+            <span class="kind kind-variant">variant</span>
+          </h3>
+          <pre class="signature"><code>variant Collect</code></pre>
+
+          <div class="doc"><p>What a drive of the rule set should gather. One loop serves every consumer, and this is what keeps each from paying for the others: a parse wants tokens and does not care what colour they are, the highlighter's oracle wants the reverse, and <code>lex_kinds</code> wants neither span nor trivia.</p></div>
+
+
+          <ul class="cases">
+
+            <li id="item-Tokens"><code>Tokens</code>
+
+
+            </li>
+
+            <li id="item-Scopes"><code>Scopes</code>
+
+
+            </li>
+
+            <li id="item-Kinds"><code>Kinds</code>
+
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+
         <section class="item" id="item-LexAll">
           <h3>
             <a class="anchor" href="#item-LexAll">LexAll</a>
@@ -454,7 +487,7 @@
           </h3>
           <pre class="signature"><code>struct LexAll&#60;K: any&#62;</code></pre>
 
-          <div class="doc"><p>Everything one lex produces: the tokens and trivia a consumer wants, and the scope of every token for a consumer that paints. Two views of one drive loop, so neither can disagree with the other about what matched where.</p></div>
+          <div class="doc"><p>Everything a drive can produce. Whichever arrays the <code>Collect</code> did not ask for stay empty, and each entry point takes the one it wanted — so the three views can never disagree about what matched where, because there is one loop behind all of them.</p></div>
 
 
         </section>
@@ -469,6 +502,20 @@
           <pre class="signature"><code>pub fn lex_scoped&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; ScopeSpan[]!LexError</code></pre>
 
           <div class="doc"><p><code>lex</code>, plus the scope each token's rule declares — see <code>ScopeSpan</code>. The highlighter's oracle reads this: the grammar it generates has to paint every token with the scope the rule set already names for it, and asking the rule set beats restating the mapping somewhere else.</p></div>
+
+
+        </section>
+
+
+
+        <section class="item" id="item-lex_kinds">
+          <h3>
+            <a class="anchor" href="#item-lex_kinds">lex_kinds</a>
+            <span class="kind kind-fn">fn</span>
+          </h3>
+          <pre class="signature"><code>pub fn lex_kinds&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; K[]!str</code></pre>
+
+          <div class="doc"><p>Every token's <em>kind</em>, and nothing else: no spans, no trivia, and an error that is a bare message.</p><p>The <em>plain</em> path. A consumer that only asks &quot;what tokens are these&quot; reads the answer without walking into a token to find it — <code>lex_kinds(src, rules)? == [Let, Name(&quot;x&quot;)]</code> against <code>lex</code>'s <code>toks([tok(src, Let, 0..3), tok(src, Name(&quot;x&quot;), 4..5)])</code> — which is most of this file's own tests, and why they use it.</p><p><strong>It is not meaningfully faster, and it was written expecting to be.</strong> Measured over 460k tokens: <code>lex</code> spent 1.85s, this 1.82s, and a throwaway build that emitted kinds while constructing <em>no</em> token at all spent 1.79s. So the whole token-and-span apparatus is ~3% of a lex and this saves half of that: the other ~97% is matching a rule, slicing its content and running its <code>emit</code>, which both paths must do and neither can skip. A spanless lexer here buys a plainer call site, not throughput — look to the matchers if that is what you need.</p><p><strong>The errors are worse on purpose.</strong> A <code>str</code> carries no span, so a caller that wants to <em>report</em> one re-lexes with <code>lex</code> — the slow path only on the way to failing. Nothing is lost by refusing first and locating second: the two drive the same rules in the same order, so whatever this refuses <code>lex</code> refuses at the same byte.</p></div>
 
 
         </section>
@@ -809,7 +856,7 @@
             <a class="anchor" href="#item-lex_all">lex_all</a>
             <span class="kind kind-fn">fn</span>
           </h3>
-          <pre class="signature"><code>fn lex_all&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[]) -&#62; LexAll&#60;K&#62;!LexError</code></pre>
+          <pre class="signature"><code>fn lex_all&#60;K: any&#62;(self: str, rules: TokenRule&#60;K&#62;[], want: Collect) -&#62; LexAll&#60;K&#62;!LexError</code></pre>
 
           <p class="undocumented">Undocumented.</p>
 
