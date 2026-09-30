@@ -21,7 +21,6 @@ import {
     drop_first,
     drop_last,
     equal as ==,
-    extend,
     filter,
     first,
     has,
@@ -711,20 +710,19 @@ fn apply_emit<K>(e: Emit<K>, span: Span, content: str) -> K!LexError {
 # staying at the step's start means no rule matched.
 #
 # **At most one of each, and never both.** A rule is a token rule or a `trivia`
-# rule, and a `skip` rule is neither — so exactly one of these arrays holds a
-# token, or neither does. They are arrays rather than optionals because a struct
-# field could not *be* an optional struct when this was written: the checker
-# admitted an optional only of a scalar, a `str`, an array or a recursive type.
-# An array of nought-or-one was how the language spelled "maybe a token".
-# `Token<K>?` is a legal field type now, and would say this directly.
+# rule, and a `skip` rule is neither — so exactly one of these is `some`, or
+# neither is. Both default to `none`, which is what a step that matched nothing
+# says by omitting them.
 #
-# They were arrays for a stronger reason until recently: `Matcher::Template`
-# emitted a whole head/interpolation/tail run from a single step, and it was the
-# only matcher that ever emitted more than one token. Modes replaced it, and each
+# They were `Token<K>[]` until struct fields could be optionals of structs, when
+# an array of nought-or-one was the only way to spell "maybe a token". Before
+# that they were arrays for a stronger reason: `Matcher::Template` emitted a
+# whole head/interpolation/tail run from a single step, and it was the only
+# matcher that ever emitted more than one token. Modes replaced it, and each
 # piece of a template is now its own step.
 struct StepResult<K> {
-    tokens: Token<K>[],
-    trivia: Token<K>[],
+    tokens: Token<K>? = none,
+    trivia: Token<K>? = none,
     end: u64,
     // The winning rule's `push`/`pop` and the message it names an unclosed mode
     // with, carried out to `lex`, which owns the stack. Defaulted, so a
@@ -748,11 +746,9 @@ fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!L
     // A decline transitions nothing: the rule did not match, so the mode stack
     // is no more its business than the token stream is.
     if (n == 0) {
-        return ok(StepResult { tokens: [], trivia: [], end: at });
+        return ok(StepResult { end: at });
     };
     let moved = StepResult {
-        tokens: [],
-        trivia: [],
         end: at + n,
         push: r.push,
         pop: r.pop,
@@ -766,9 +762,9 @@ fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!L
     let kind = apply_emit(r.emit, text.span, token_content(r.matcher, text.text))?;
     let t = Token { kind, text };
     if (r.trivia) {
-        return ok(StepResult { ..moved, trivia: [t] });
+        return ok(StepResult { ..moved, trivia: some(t) });
     };
-    ok(StepResult { ..moved, tokens: [t] })
+    ok(StepResult { ..moved, tokens: some(t) })
 }
 
 # The mode stack after a step that consumed `at..step.end`: unchanged, one frame
@@ -797,7 +793,7 @@ fn stepped<K>(self: ModeFrame[], step: StepResult<K>, at: u64) -> ModeFrame[] {
 fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[], mode: i64) -> StepResult<K>!LexError {
     for (let r : rules) {
         let res = if (r.mode != mode) {
-            StepResult { tokens: [], trivia: [], end: at }
+            StepResult { end: at }
         } else {
             match (r.matcher) {
                 CharRun(cont, first) => step_result(
@@ -853,7 +849,7 @@ fn lex_step<K>(src: str, at: u64, rules: TokenRule<K>[], mode: i64) -> StepResul
             return ok(res);
         };
     }
-    ok(StepResult { tokens: [], trivia: [], end: at })
+    ok(StepResult { end: at })
 }
 
 # A concrete token-kind variant for the `.test` block below — one example of
@@ -949,9 +945,77 @@ pub fn lex<K>(self: str, rules: TokenRule<K>[]) -> LexResult<K>!LexError {
     ok(self.lex_all(rules, Tokens)?.result)
 }
 
+# Append what `t` holds, if it holds anything. A step carries *at most* one token
+# (see `StepResult`), so every array `lex_all` accumulates grows by nought or one
+# per step — and spelling that as a `match` at each site buried the loop in empty
+# `none` arms. `mut self`, so this appends in place like the `push` it wraps
+# rather than rebuilding the array at every position of every lex.
+fn push_optional<T: any>(mut self: T[], t: T?) {
+    match (t) {
+        some(v) => {
+            set self.push(v);
+        },
+        none => {},
+    };
+}.test({
+    // A `none` leaves the array alone, which is the whole point: a `skip` rule
+    // and a rule that declined both reach this with nothing to add.
+    mut xs: i64[] = [];
+    set xs.push_optional(some(1));
+    set xs.push_optional(none);
+    set xs.push_optional(some(2));
+    assert(xs == [1, 2]);
+
+    // The shape `lex_all` uses it in — a token optional off a `StepResult`.
+    mut ts: Token<Kind>[] = [];
+    let t = Token { kind: Ident("hi"), text: span_str("hi", 0..2) };
+    set ts.push_optional(some(t));
+    set ts.push_optional(none);
+    assert(ts == [t]);
+})
+
+# The kind of the token this step produced, if it produced one. A `trivia` rule's
+# token is not part of the kind stream, so it contributes nothing here.
+#
+# The three functions below are hand-rolled `map`s over an optional, which is not
+# a style choice: `map` over a *generic* struct's field mis-infers the field in
+# monomorphization — it reports `i64` for this `Token<K>?` — so
+# `self.tokens.map(|t| t.kind)` does not compile. Written as a `match`, which
+# resolves the same field correctly.
+fn kind_of<K>(self: StepResult<K>) -> K? {
+    match (self.tokens) {
+        some(t) => some(t.kind),
+        none => none, #[allow]
+    }
+}
+
+# The token this step produced, whichever channel carried it: `tokens` for an
+# ordinary rule, `trivia` for a `trivia` rule, `none` for a `skip` rule or for a
+# rule that declined. Never both — see `StepResult`.
+fn token_of<K>(self: StepResult<K>) -> Token<K>? {
+    match (self.tokens) {
+        some(t) => some(t),
+        none => self.trivia, #[allow]
+    }
+}
+
+# What the highlighter paints for this step: the span of whichever token it
+# produced, under the winning rule's scope. A skipped rule produces no token and
+# so paints nothing; a trivia rule paints, since a comment is painted like
+# anything else — which is why this reads `token_of` rather than `tokens`.
+fn scope_span<K>(self: StepResult<K>) -> ScopeSpan? {
+    match (self.token_of()) {
+        some(t) => some(ScopeSpan { span: t.text.span, scope: self.scope }),
+        none => none, #[allow]
+    }
+}
+
 fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexError {
-    mut tokens = [];
-    mut trivia = [];
+    // Annotated like `scopes` and `kinds` below: a bare `[]` carries only a
+    // placeholder element type, which `push_optional` would bind its `T` to
+    // ahead of the `Token<K>?` it is handed.
+    mut tokens: Token<K>[] = [];
+    mut trivia: Token<K>[] = [];
     mut scopes: ScopeSpan[] = [];
     mut kinds: K[] = [];
     mut pos: u64 = 0;
@@ -968,23 +1032,14 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
         };
         match (want) {
             Tokens => {
-                set tokens.extend(step.tokens);
-                set trivia.extend(step.trivia);
+                set tokens.push_optional(step.tokens);
+                set trivia.push_optional(step.trivia);
             },
             Kinds => {
-                for (let t : step.tokens) {
-                    set kinds.push(t.kind);
-                }
+                set kinds.push_optional(step.kind_of());
             },
-            // A skipped rule contributes no token and so nothing to paint; a
-            // trivia rule does, since a comment is painted like anything else.
             Scopes => {
-                for (let t : step.tokens) {
-                    set scopes.push(ScopeSpan { span: t.text.span, scope: step.scope });
-                }
-                for (let t : step.trivia) {
-                    set scopes.push(ScopeSpan { span: t.text.span, scope: step.scope });
-                }
+                set scopes.push_optional(step.scope_span());
             },
         };
         set modes = modes.stepped(step, pos);
@@ -1469,42 +1524,42 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
     assert(lex(asrc, aipl)? == toks(atoks));
 })
 --- performance ---
-allocations: 450
-deallocations: 450
-reallocations: 111
-bytes allocated: 62896
-instructions executed: 577733
-binary size: 818544
-  code: 546448
-  data: 8916
-  metadata: 263180
+allocations: 368
+deallocations: 368
+reallocations: 10
+bytes allocated: 76736
+instructions executed: 804256
+binary size: 864368
+  code: 579844
+  data: 9004
+  metadata: 275520
 functions:
   __arr_drop_Kind:
-    calls: 66
+    calls: 88
     bytes: 252
   __arr_drop_ModeFrame:
     calls: 34
     bytes: 120
   __arr_drop_ScopeSpan:
-    calls: 2
+    calls: 3
     bytes: 120
   __arr_drop_Token$Kind:
-    calls: 234
+    calls: 126
     bytes: 276
   __arr_drop_TokenRule$Kind:
     calls: 36
     bytes: 564
   __arr_retain_Kind:
-    calls: 55
+    calls: 77
     bytes: 252
   __arr_retain_ModeFrame:
     calls: 37
     bytes: 120
   __arr_retain_ScopeSpan:
-    calls: 2
+    calls: 3
     bytes: 120
   __arr_retain_Token$Kind:
-    calls: 112
+    calls: 194
     bytes: 276
   __arr_retain_TokenRule$Kind:
     calls: 7
@@ -1549,7 +1604,7 @@ functions:
     calls: 18
     bytes: 96
   __eq_Kind:
-    calls: 103
+    calls: 104
     bytes: 324
   __eq_Kind$arr:
     calls: 36
@@ -1567,17 +1622,20 @@ functions:
     calls: 1
     bytes: 284
   __eq_SpanStr:
-    calls: 49
+    calls: 50
     bytes: 128
   __eq_Token$Kind:
-    calls: 48
+    calls: 49
     bytes: 120
   __eq_Token$Kind$arr:
-    calls: 20
+    calls: 21
     bytes: 284
   __eq___builtin_Span:
-    calls: 69
+    calls: 70
     bytes: 104
+  __eq_i64$arr:
+    calls: 1
+    bytes: 296
   __m1__unescape:
     calls: 4
     bytes: 1628
@@ -1596,6 +1654,9 @@ functions:
   __test$lex_all$nonempty_str:
     calls: 2
     bytes: 1052
+  __test$push_optional:
+    calls: 1
+    bytes: 3316
   __test$span_str:
     calls: 1
     bytes: 2248
@@ -1615,40 +1676,40 @@ functions:
     calls: 19
     bytes: (external)
   aipl_arr_extend:
-    calls: 269
+    calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 7229
+    calls: 2770
     bytes: (external)
   aipl_arr_reserve:
-    calls: 292
+    calls: 27
     bytes: (external)
   aipl_arr_slice:
     calls: 20
     bytes: (external)
   aipl_array_dec:
-    calls: 9822
+    calls: 3528
     bytes: (external)
   aipl_array_new:
-    calls: 251
+    calls: 83
     bytes: (external)
   aipl_array_push:
-    calls: 34
+    calls: 171
     bytes: (external)
   aipl_array_push_mut:
-    calls: 88
+    calls: 34
     bytes: (external)
   aipl_array_with_cap:
     calls: 64
     bytes: (external)
   aipl_assert:
-    calls: 90
+    calls: 92
     bytes: (external)
   aipl_test_begin:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_test_end:
-    calls: 3
+    calls: 4
     bytes: (external)
   aipl_test_summary:
     calls: 1
@@ -1670,7 +1731,7 @@ functions:
     bytes: 392
   lex_all$Kind:
     calls: 76
-    bytes: 6180
+    bytes: 12008
   lex_kinds$Kind:
     calls: 36
     bytes: 772
@@ -1679,16 +1740,16 @@ functions:
     bytes: 316
   lex_step$Kind:
     calls: 224
-    bytes: 22272
+    bytes: 39428
   main:
     calls: 1
-    bytes: 248
+    bytes: 324
   nested_len:
     calls: 3
     bytes: 1148
   step_result$Kind:
     calls: 661
-    bytes: 9328
+    bytes: 16052
   to_eol_len:
     calls: 0
     bytes: 52

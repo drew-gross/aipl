@@ -3510,15 +3510,15 @@ fn rendered(self: WDoc!FmtError, width: u64) -> str!FmtError { ok(self?.doc.prin
 # something other than a plain `WDoc`.
 fn at(self: Doc, width: u64) -> str { self.print(width) }
 --- performance ---
-allocations: 119026
-deallocations: 119026
-reallocations: 19567
-bytes allocated: 24684676
-instructions executed: 68897539
-binary size: 19396424
-  code: 12501396
+allocations: 118636
+deallocations: 118636
+reallocations: 18136
+bytes allocated: 25272436
+instructions executed: 84375947
+binary size: 19431680
+  code: 12528128
   data: 39532
-  metadata: 6855496
+  metadata: 6864020
 functions:
   __arr_drop_ImportEntry:
     calls: 31
@@ -3593,7 +3593,7 @@ functions:
     calls: 0
     bytes: 120
   __arr_drop___m18__Token$__m24__AiplTok:
-    calls: 2032
+    calls: 1642
     bytes: 248
   __arr_drop___m18__TokenRule$__m24__AiplTok:
     calls: 211
@@ -3698,7 +3698,7 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain___m18__Token$__m24__AiplTok:
-    calls: 1642
+    calls: 3073
     bytes: 248
   __arr_retain___m18__TokenRule$__m24__AiplTok:
     calls: 1014
@@ -4083,16 +4083,16 @@ functions:
     bytes: 392
   __m18__lex_all$__m24__AiplTok:
     calls: 198
-    bytes: 5948
+    bytes: 11004
   __m18__lex_step$__m24__AiplTok:
     calls: 2776
-    bytes: 21796
+    bytes: 37460
   __m18__nested_len:
     calls: 1549
     bytes: 1148
   __m18__step_result$__m24__AiplTok:
     calls: 73459
-    bytes: 8796
+    bytes: 14808
   __m18__to_eol_len:
     calls: 0
     bytes: 52
@@ -4796,13 +4796,13 @@ functions:
     calls: 46
     bytes: (external)
   aipl_arr_extend:
-    calls: 78963
+    calls: 73413
     bytes: (external)
   aipl_arr_inc:
-    calls: 718189
+    calls: 266599
     bytes: (external)
   aipl_arr_reserve:
-    calls: 78381
+    calls: 72831
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 100
@@ -4814,13 +4814,13 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 1038977
+    calls: 429243
     bytes: (external)
   aipl_array_new:
-    calls: 12612
+    calls: 10970
     bytes: (external)
   aipl_array_push:
-    calls: 11325
+    calls: 12967
     bytes: (external)
   aipl_array_push_mut:
     calls: 39087

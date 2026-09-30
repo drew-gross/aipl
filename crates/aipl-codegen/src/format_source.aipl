@@ -423,15 +423,15 @@ fn is_layout(self: AiplTok) -> bool {
     assert(!StrLit(",", Quoted).is_layout());
 })
 --- performance ---
-allocations: 21434
-deallocations: 21434
-reallocations: 3186
-bytes allocated: 4817438
-instructions executed: 11768423
-binary size: 7647776
-  code: 5092716
+allocations: 21348
+deallocations: 21348
+reallocations: 2942
+bytes allocated: 4881166
+instructions executed: 14380162
+binary size: 7683032
+  code: 5119448
   data: 13498
-  metadata: 2541562
+  metadata: 2550086
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -482,7 +482,7 @@ functions:
     calls: 0
     bytes: 120
   __arr_drop___m15__Token$__m25__AiplTok:
-    calls: 376
+    calls: 290
     bytes: 248
   __arr_drop___m15__TokenRule$__m25__AiplTok:
     calls: 51
@@ -587,7 +587,7 @@ functions:
     calls: 0
     bytes: 120
   __arr_retain___m15__Token$__m25__AiplTok:
-    calls: 290
+    calls: 534
     bytes: 248
   __arr_retain___m15__TokenRule$__m25__AiplTok:
     calls: 312
@@ -957,16 +957,16 @@ functions:
     bytes: 392
   __m15__lex_all$__m25__AiplTok:
     calls: 47
-    bytes: 5948
+    bytes: 11004
   __m15__lex_step$__m25__AiplTok:
     calls: 445
-    bytes: 21796
+    bytes: 37460
   __m15__nested_len:
     calls: 274
     bytes: 1148
   __m15__step_result$__m25__AiplTok:
     calls: 12360
-    bytes: 8796
+    bytes: 14808
   __m15__to_eol_len:
     calls: 0
     bytes: 52
@@ -2099,13 +2099,13 @@ functions:
     calls: 3
     bytes: (external)
   aipl_arr_extend:
-    calls: 12561
+    calls: 11671
     bytes: (external)
   aipl_arr_inc:
-    calls: 120205
+    calls: 44033
     bytes: (external)
   aipl_arr_reserve:
-    calls: 12512
+    calls: 11622
     bytes: (external)
   aipl_arr_retain_ptr:
     calls: 16
@@ -2117,13 +2117,13 @@ functions:
     calls: 84
     bytes: (external)
   aipl_array_dec:
-    calls: 173920
+    calls: 70930
     bytes: (external)
   aipl_array_new:
-    calls: 2390
+    calls: 2100
     bytes: (external)
   aipl_array_push:
-    calls: 1611
+    calls: 1901
     bytes: (external)
   aipl_array_push_mut:
     calls: 6527
