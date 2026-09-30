@@ -1,0 +1,73 @@
+import { equal as ==, map } from builtins;
+
+// A generic struct whose field is an *application of another generic* — the
+// field type mentions the outer struct's own type variable.
+struct Tok<K> { kind: K, text: str }
+
+variant Kind = Word | Num
+
+// `Step<K>` reaches monomorphization as a `Generic` application, not a named
+// type. Reading a field off one used to fall through to a default of `i64`, so
+// `s.tok` inferred as `i64` however it was declared — and the failure surfaced
+// at the *use*, as "map expects an array or an optional, got i64", rather than
+// at the field. The checker resolves the same field correctly, so only code
+// past type-checking saw it.
+struct Step<K> { tok: Tok<K>?, plain: Tok<K>, label: str }
+
+// Instantiated through a generic *function*: that is what leaves the return
+// type an unresolved application. Constructing `Step { .. }` directly always
+// worked, because the construction infers a concrete instance.
+fn step<K: any>(k: K, text: str) -> Step<K> {
+    tok: some(Tok { kind: k, text }),
+    plain: Tok { kind: k, text: "plain" },
+    label: "L",
+}.test({
+    let s = step(Word, "hi"); #[allow]
+
+    // `map` over an optional field — the shape that failed.
+    assert(s.tok.map(|t| t.text) == some("hi"));
+    assert(s.tok.map(|t| t.kind) == some(Word));
+
+    // The non-optional application resolves too, as do the ordinary fields.
+    assert(s.plain.text == "plain");
+    assert(s.label == "L");
+
+    // Nested through another generic instance, and at a second instantiation
+    // so the two do not share a synthesized type.
+    let n = step(7, "num"); #[allow]
+    assert(n.tok.map(|t| t.kind) == some(7));
+    assert(n.tok.map(|t| t.text) == some("num"));
+
+    // An absent one still maps to `none` rather than to the default's type.
+    let e: Step<Kind> = Step { tok: none, plain: Tok { kind: Num, text: "p" }, label: "L" };
+    assert(e.tok.map(|t| t.text) == none);
+})
+--- performance ---
+allocations: 0
+deallocations: 0
+reallocations: 0
+bytes allocated: 0
+instructions executed: 668
+binary size: 5832
+  code: 3156
+  data: 408
+  metadata: 2268
+functions:
+  __test$step:
+    calls: 1
+    bytes: 3056
+  aipl_assert:
+    calls: 7
+    bytes: (external)
+  aipl_test_begin:
+    calls: 1
+    bytes: (external)
+  aipl_test_end:
+    calls: 1
+    bytes: (external)
+  aipl_test_summary:
+    calls: 1
+    bytes: (external)
+  main:
+    calls: 1
+    bytes: 100

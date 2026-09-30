@@ -238,6 +238,7 @@ case_tests! {
     cases_generics_is_len_greater_than_5 = "cases/generics/is_len_greater_than_5",
     cases_generics_is_present_any_optional = "cases/generics/is_present_any_optional",
     cases_generics_let_annotation_type_param = "cases/generics/let_annotation_type_param",
+    cases_generics_map_over_generic_struct_field = "cases/generics/map_over_generic_struct_field",
     cases_generics_none_literal_arg = "cases/generics/none_literal_arg",
     cases_generics_nullary_ctor_from_context = "cases/generics/nullary_ctor_from_context",
     cases_generics_ord_bound = "cases/generics/ord_bound",

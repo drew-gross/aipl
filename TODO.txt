@@ -232,7 +232,7 @@ grammer ideas:
   6. The lexer's char classes are where the string-comparison time actually is. ident_cont() is a 63-character string, and char_run_len asks cont.contains(c) per source character — a linear substring scan. In a sample of aipl check grammar_aipl.aipl, _platform_memcmp was the single largest non-idle leaf (~590 samples + 136 more via the dyld stub, out of ~4056), essentially all of it under aipl_str_contains beneath the lexer. A 128-entry bitmap or a #{char} set built once per rule set turns each of those into an index. Relatedly, can_start's texts.has(text) (ebnf.aipl:620) hashes the token's text on every production attempt; a literal id on the token would make it an integer probe.
 
 syntax:
-  support defaults for struct fields that are variants, structs, or optionals of variants or structs. Then
+  support defaults for struct fields that are variants, structs, or optionals of variants or structs
   link_rule does some weird stuff to prevent the formatter from breaking the tuples. Also it should match on the tuple probably
   str without "" should work
   field mutation for structs (lint let nullable: First<Tok> = First { ..f, nullable: true };) to set f.nullable = true;

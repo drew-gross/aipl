@@ -974,24 +974,13 @@ fn push_optional<T: any>(mut self: T[], t: T?) {
     assert(ts == [t]);
 })
 
-# The kind of the token this step produced, if it produced one. A `trivia` rule's
-# token is not part of the kind stream, so it contributes nothing here.
-#
-# The three functions below are hand-rolled `map`s over an optional, which is not
-# a style choice: `map` over a *generic* struct's field mis-infers the field in
-# monomorphization — it reports `i64` for this `Token<K>?` — so
-# `self.tokens.map(|t| t.kind)` does not compile. Written as a `match`, which
-# resolves the same field correctly.
-fn kind_of<K>(self: StepResult<K>) -> K? {
-    match (self.tokens) {
-        some(t) => some(t.kind),
-        none => none, #[allow]
-    }
-}
-
 # The token this step produced, whichever channel carried it: `tokens` for an
 # ordinary rule, `trivia` for a `trivia` rule, `none` for a `skip` rule or for a
 # rule that declined. Never both — see `StepResult`.
+#
+# An "or", not a `map`, which is why it stays a `match`: the lint's suggested
+# `.map(..).value_or(..)` would have to wrap and unwrap an optional of an
+# optional to say the same thing.
 fn token_of<K>(self: StepResult<K>) -> Token<K>? {
     match (self.tokens) {
         some(t) => some(t),
@@ -1004,10 +993,7 @@ fn token_of<K>(self: StepResult<K>) -> Token<K>? {
 # so paints nothing; a trivia rule paints, since a comment is painted like
 # anything else — which is why this reads `token_of` rather than `tokens`.
 fn scope_span<K>(self: StepResult<K>) -> ScopeSpan? {
-    match (self.token_of()) {
-        some(t) => some(ScopeSpan { span: t.text.span, scope: self.scope }),
-        none => none, #[allow]
-    }
+    self.token_of().map(|t| ScopeSpan { span: t.text.span, scope: self.scope })
 }
 
 fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexError {
@@ -1036,7 +1022,7 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
                 set trivia.push_optional(step.trivia);
             },
             Kinds => {
-                set kinds.push_optional(step.kind_of());
+                set kinds.push_optional(step.tokens.map(|t| t.kind));
             },
             Scopes => {
                 set scopes.push_optional(step.scope_span());

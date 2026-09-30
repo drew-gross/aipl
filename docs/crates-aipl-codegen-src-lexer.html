@@ -865,20 +865,6 @@
 
 
 
-        <section class="item" id="item-kind_of">
-          <h3>
-            <a class="anchor" href="#item-kind_of">kind_of</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn kind_of&#60;K: any&#62;(self: StepResult&#60;K&#62;) -&#62; K?</code></pre>
-
-          <div class="doc"><p>The kind of the token this step produced, if it produced one. A <code>trivia</code> rule's token is not part of the kind stream, so it contributes nothing here.</p><p>The three functions below are hand-rolled <code>map</code>s over an optional, which is not a style choice: <code>map</code> over a <em>generic</em> struct's field mis-infers the field in monomorphization — it reports <code>i64</code> for this <code>Token&lt;K&gt;?</code> — so <code>self.tokens.map(|t| t.kind)</code> does not compile. Written as a <code>match</code>, which resolves the same field correctly.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-token_of">
           <h3>
             <a class="anchor" href="#item-token_of">token_of</a>
@@ -886,7 +872,7 @@
           </h3>
           <pre class="signature"><code>fn token_of&#60;K: any&#62;(self: StepResult&#60;K&#62;) -&#62; Token&#60;K&#62;?</code></pre>
 
-          <div class="doc"><p>The token this step produced, whichever channel carried it: <code>tokens</code> for an ordinary rule, <code>trivia</code> for a <code>trivia</code> rule, <code>none</code> for a <code>skip</code> rule or for a rule that declined. Never both — see <code>StepResult</code>.</p></div>
+          <div class="doc"><p>The token this step produced, whichever channel carried it: <code>tokens</code> for an ordinary rule, <code>trivia</code> for a <code>trivia</code> rule, <code>none</code> for a <code>skip</code> rule or for a rule that declined. Never both — see <code>StepResult</code>.</p><p>An &quot;or&quot;, not a <code>map</code>, which is why it stays a <code>match</code>: the lint's suggested <code>.map(..).value_or(..)</code> would have to wrap and unwrap an optional of an optional to say the same thing.</p></div>
 
 
         </section>

@@ -6204,6 +6204,33 @@ impl Mono<'_> {
             }
             ExprKind::Field(obj, fname) => {
                 let (ro, ot) = self.infer(obj, env)?;
+                // A generic application names a *template*, not a type, so it has
+                // no fields of its own — the instance does. Register it (or reuse
+                // one already registered) and read the field off that, which is
+                // the same lookup the concrete path below does, against field
+                // types `instantiate_generic` has already substituted and
+                // resolved.
+                //
+                // Without this, a receiver typed `Step<Kind>` fell through to the
+                // `i64` default and every field of it inferred as `i64` — which
+                // surfaced as `map expects an array or an optional, got i64` on a
+                // field declared `Token<K>?`. The checker resolves the same field
+                // correctly (`fields_of`), so this only ever went wrong after the
+                // program had been type-checked.
+                let ot = match ot {
+                    Type::Generic(base, args) => {
+                        Type::Named(self.instantiate_generic(&base, &args)?)
+                    }
+                    other => other,
+                };
+                // Both arms used to fall back to `i64` for a field they could
+                // not resolve. That is a silent wrong answer rather than a
+                // missing one, and it travels: the field's *users* are then
+                // typed against `i64`, so the failure surfaces somewhere else
+                // entirely (`map expects an array or an optional, got i64`) and
+                // reads like a bug in the user's program. The checker has
+                // already established that this access is valid, so anything
+                // unresolved here is a fault in this pass and says so.
                 let fty = match &ot {
                     Type::Named(sn) => self
                         .structs
@@ -6211,8 +6238,25 @@ impl Mono<'_> {
                         .or_else(|| self.syn_structs.get(sn))
                         .and_then(|fs| fs.iter().find(|(n, _, _)| n == fname))
                         .map(|(_, t, _)| t.clone())
-                        .unwrap_or_else(|| Type::Primitive(Primitive::I64)),
-                    _ => Type::Primitive(Primitive::I64),
+                        .ok_or_else(|| {
+                            Error::at(
+                                format!(
+                                    "monomorphization: struct {sn:?} has no field {fname:?} \
+                                     (the checker accepted this access)"
+                                ),
+                                span.clone(),
+                            )
+                        })?,
+                    _ => {
+                        return Err(Error::at(
+                            format!(
+                                "monomorphization: field access {fname:?} on non-struct type {} \
+                                 (the checker accepted this access)",
+                                type_name(&ot)
+                            ),
+                            span.clone(),
+                        ));
+                    }
                 };
                 (node(ExprKind::Field(Box::new(ro), fname.clone())), fty)
             }
