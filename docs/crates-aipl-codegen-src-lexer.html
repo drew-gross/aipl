@@ -333,7 +333,7 @@
           </h3>
           <pre class="signature"><code>struct StepResult&#60;K: any&#62;</code></pre>
 
-          <div class="doc"><p>One lexing step's outcome: the token the winning rule produced, or the trivia it recorded instead, plus the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p><p><strong>At most one of each, and never both.</strong> A rule is a token rule or a <code>trivia</code> rule, and a <code>skip</code> rule is neither — so exactly one of these is <code>some</code>, or neither is. Both default to <code>none</code>, which is what a step that matched nothing says by omitting them.</p><p>They were <code>Token&lt;K&gt;[]</code> until struct fields could be optionals of structs, when an array of nought-or-one was the only way to spell &quot;maybe a token&quot;. Before that they were arrays for a stronger reason: <code>Matcher::Template</code> emitted a whole head/interpolation/tail run from a single step, and it was the only matcher that ever emitted more than one token. Modes replaced it, and each piece of a template is now its own step.</p></div>
+          <div class="doc"><p>One lexing step's outcome: the one token the winning rule produced, whether that token is trivia, and the position just past the consumed text. <code>end</code> staying at the step's start means no rule matched.</p><p><strong>One token, or none — never two.</strong> A rule is a token rule or a <code>trivia</code> rule, and a <code>skip</code> rule is neither, so a step yields at most one token either way. That is why <code>trivia</code> is a flag on the token rather than a second token field: two optionals could represent &quot;both at once&quot;, which no step can produce, and the invariant then lived in this comment instead of in the type.</p><p>It cost real bytes, too. <code>Token&lt;AiplTok&gt;</code> is 80 wide, so a second <code>Token&lt;K&gt;?</code> field put 88 more bytes inline in a struct that is built and returned at every position of every lex — 248 bytes against 168 for this shape.</p><p>Both fields were <code>Token&lt;K&gt;[]</code> before struct fields could be optionals of structs, when an array of nought-or-one was the only way to spell &quot;maybe a token&quot;. Before that they were arrays for a stronger reason: <code>Matcher::Template</code> emitted a whole head/interpolation/tail run from a single step, and it was the only matcher that ever emitted more than one token. Modes replaced it, and each piece of a template is now its own step.</p></div>
 
 
         </section>
@@ -802,7 +802,7 @@
           </h3>
           <pre class="signature"><code>fn step_result&#60;K: any&#62;(r: TokenRule&#60;K&#62;, src: str, at: u64, n: u64) -&#62; StepResult&#60;K&#62;!LexError</code></pre>
 
-          <div class="doc"><p>A simple (single-token) matcher's outcome: a decline when the matched length <code>n</code> is 0, otherwise <code>n</code> chars consumed producing the rule's one token — recorded as trivia for a <code>trivia</code> rule, or nothing at all for a <code>skip</code> rule. The token's kind comes from the rule's <code>emit</code> applied to the matcher's content string, which can fail on an emit/matcher mismatch.</p></div>
+          <div class="doc"><p>A simple (single-token) matcher's outcome: a decline when the matched length <code>n</code> is 0, otherwise <code>n</code> chars consumed producing the rule's one token — flagged as trivia for a <code>trivia</code> rule, or absent for a <code>skip</code> rule. The token's kind comes from the rule's <code>emit</code> applied to the matcher's content string, which can fail on an emit/matcher mismatch.</p></div>
 
 
         </section>
@@ -865,20 +865,6 @@
 
 
 
-        <section class="item" id="item-token_of">
-          <h3>
-            <a class="anchor" href="#item-token_of">token_of</a>
-            <span class="kind kind-fn">fn</span>
-          </h3>
-          <pre class="signature"><code>fn token_of&#60;K: any&#62;(self: StepResult&#60;K&#62;) -&#62; Token&#60;K&#62;?</code></pre>
-
-          <div class="doc"><p>The token this step produced, whichever channel carried it: <code>tokens</code> for an ordinary rule, <code>trivia</code> for a <code>trivia</code> rule, <code>none</code> for a <code>skip</code> rule or for a rule that declined. Never both — see <code>StepResult</code>.</p><p>An &quot;or&quot;, not a <code>map</code>, which is why it stays a <code>match</code>: the lint's suggested <code>.map(..).value_or(..)</code> would have to wrap and unwrap an optional of an optional to say the same thing.</p></div>
-
-
-        </section>
-
-
-
         <section class="item" id="item-scope_span">
           <h3>
             <a class="anchor" href="#item-scope_span">scope_span</a>
@@ -886,7 +872,7 @@
           </h3>
           <pre class="signature"><code>fn scope_span&#60;K: any&#62;(self: StepResult&#60;K&#62;) -&#62; ScopeSpan?</code></pre>
 
-          <div class="doc"><p>What the highlighter paints for this step: the span of whichever token it produced, under the winning rule's scope. A skipped rule produces no token and so paints nothing; a trivia rule paints, since a comment is painted like anything else — which is why this reads <code>token_of</code> rather than <code>tokens</code>.</p></div>
+          <div class="doc"><p>What the highlighter paints for this step: the span of the token it produced, under the winning rule's scope. A skipped rule produces no token and so paints nothing; a trivia rule paints, since a comment is painted like anything else — which is why this does not consult <code>trivia</code>.</p></div>
 
 
         </section>

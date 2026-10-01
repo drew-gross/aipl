@@ -705,24 +705,32 @@ fn apply_emit<K>(e: Emit<K>, span: Span, content: str) -> K!LexError {
     }
 }
 
-# One lexing step's outcome: the token the winning rule produced, or the trivia
-# it recorded instead, plus the position just past the consumed text. `end`
+# One lexing step's outcome: the one token the winning rule produced, whether
+# that token is trivia, and the position just past the consumed text. `end`
 # staying at the step's start means no rule matched.
 #
-# **At most one of each, and never both.** A rule is a token rule or a `trivia`
-# rule, and a `skip` rule is neither — so exactly one of these is `some`, or
-# neither is. Both default to `none`, which is what a step that matched nothing
-# says by omitting them.
+# **One token, or none — never two.** A rule is a token rule or a `trivia` rule,
+# and a `skip` rule is neither, so a step yields at most one token either way.
+# That is why `trivia` is a flag on the token rather than a second token field:
+# two optionals could represent "both at once", which no step can produce, and
+# the invariant then lived in this comment instead of in the type.
 #
-# They were `Token<K>[]` until struct fields could be optionals of structs, when
-# an array of nought-or-one was the only way to spell "maybe a token". Before
-# that they were arrays for a stronger reason: `Matcher::Template` emitted a
-# whole head/interpolation/tail run from a single step, and it was the only
-# matcher that ever emitted more than one token. Modes replaced it, and each
+# It cost real bytes, too. `Token<AiplTok>` is 80 wide, so a second
+# `Token<K>?` field put 88 more bytes inline in a struct that is built and
+# returned at every position of every lex — 248 bytes against 168 for this
+# shape.
+#
+# Both fields were `Token<K>[]` before struct fields could be optionals of
+# structs, when an array of nought-or-one was the only way to spell "maybe a
+# token". Before that they were arrays for a stronger reason: `Matcher::Template`
+# emitted a whole head/interpolation/tail run from a single step, and it was the
+# only matcher that ever emitted more than one token. Modes replaced it, and each
 # piece of a template is now its own step.
 struct StepResult<K> {
-    tokens: Token<K>? = none,
-    trivia: Token<K>? = none,
+    token: Token<K>? = none,
+    // Whether `token` is trivia — the winning rule's own `trivia` flag, carried
+    // out so the collectors can route it without re-reading the rule.
+    trivia: bool = false,
     end: u64,
     // The winning rule's `push`/`pop` and the message it names an unclosed mode
     // with, carried out to `lex`, which owns the stack. Defaulted, so a
@@ -739,9 +747,9 @@ struct StepResult<K> {
 
 # A simple (single-token) matcher's outcome: a decline when the matched
 # length `n` is 0, otherwise `n` chars consumed producing the rule's one
-# token — recorded as trivia for a `trivia` rule, or nothing at all for a
-# `skip` rule. The token's kind comes from the rule's `emit` applied to the
-# matcher's content string, which can fail on an emit/matcher mismatch.
+# token — flagged as trivia for a `trivia` rule, or absent for a `skip` rule.
+# The token's kind comes from the rule's `emit` applied to the matcher's content
+# string, which can fail on an emit/matcher mismatch.
 fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!LexError {
     // A decline transitions nothing: the rule did not match, so the mode stack
     // is no more its business than the token stream is.
@@ -749,6 +757,7 @@ fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!L
         return ok(StepResult { end: at });
     };
     let moved = StepResult {
+        trivia: r.trivia,
         end: at + n,
         push: r.push,
         pop: r.pop,
@@ -760,11 +769,7 @@ fn step_result<K>(r: TokenRule<K>, src: str, at: u64, n: u64) -> StepResult<K>!L
     };
     let text = span_str(src, at..at + n);
     let kind = apply_emit(r.emit, text.span, token_content(r.matcher, text.text))?;
-    let t = Token { kind, text };
-    if (r.trivia) {
-        return ok(StepResult { ..moved, trivia: some(t) });
-    };
-    ok(StepResult { ..moved, tokens: some(t) })
+    ok(StepResult { ..moved, token: some(Token { kind, text }) })
 }
 
 # The mode stack after a step that consumed `at..step.end`: unchanged, one frame
@@ -974,26 +979,12 @@ fn push_optional<T: any>(mut self: T[], t: T?) {
     assert(ts == [t]);
 })
 
-# The token this step produced, whichever channel carried it: `tokens` for an
-# ordinary rule, `trivia` for a `trivia` rule, `none` for a `skip` rule or for a
-# rule that declined. Never both — see `StepResult`.
-#
-# An "or", not a `map`, which is why it stays a `match`: the lint's suggested
-# `.map(..).value_or(..)` would have to wrap and unwrap an optional of an
-# optional to say the same thing.
-fn token_of<K>(self: StepResult<K>) -> Token<K>? {
-    match (self.tokens) {
-        some(t) => some(t),
-        none => self.trivia, #[allow]
-    }
-}
-
-# What the highlighter paints for this step: the span of whichever token it
-# produced, under the winning rule's scope. A skipped rule produces no token and
-# so paints nothing; a trivia rule paints, since a comment is painted like
-# anything else — which is why this reads `token_of` rather than `tokens`.
+# What the highlighter paints for this step: the span of the token it produced,
+# under the winning rule's scope. A skipped rule produces no token and so paints
+# nothing; a trivia rule paints, since a comment is painted like anything else —
+# which is why this does not consult `trivia`.
 fn scope_span<K>(self: StepResult<K>) -> ScopeSpan? {
-    self.token_of().map(|t| ScopeSpan { span: t.text.span, scope: self.scope })
+    self.token.map(|t| ScopeSpan { span: t.text.span, scope: self.scope })
 }
 
 fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexError {
@@ -1018,11 +1009,18 @@ fn lex_all<K>(self: str, rules: TokenRule<K>[], want: Collect) -> LexAll<K>!LexE
         };
         match (want) {
             Tokens => {
-                set tokens.push_optional(step.tokens);
-                set trivia.push_optional(step.trivia);
+                if (step.trivia) {
+                    set trivia.push_optional(step.token);
+                } else {
+                    set tokens.push_optional(step.token);
+                };
             },
+            // Trivia is no part of a kind stream: a parser driven by kinds alone
+            // never sees a comment.
             Kinds => {
-                set kinds.push_optional(step.tokens.map(|t| t.kind));
+                if (!step.trivia) {
+                    set kinds.push_optional(step.token.map(|t| t.kind));
+                };
             },
             Scopes => {
                 set scopes.push_optional(step.scope_span());
@@ -1514,11 +1512,11 @@ allocations: 368
 deallocations: 368
 reallocations: 10
 bytes allocated: 76736
-instructions executed: 804256
-binary size: 864368
-  code: 579844
+instructions executed: 705863
+binary size: 839864
+  code: 562160
   data: 9004
-  metadata: 275520
+  metadata: 268700
 functions:
   __arr_drop_Kind:
     calls: 88
@@ -1665,7 +1663,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_arr_inc:
-    calls: 2770
+    calls: 2502
     bytes: (external)
   aipl_arr_reserve:
     calls: 27
@@ -1674,7 +1672,7 @@ functions:
     calls: 20
     bytes: (external)
   aipl_array_dec:
-    calls: 3528
+    calls: 3260
     bytes: (external)
   aipl_array_new:
     calls: 83
@@ -1717,7 +1715,7 @@ functions:
     bytes: 392
   lex_all$Kind:
     calls: 76
-    bytes: 12008
+    bytes: 9592
   lex_kinds$Kind:
     calls: 36
     bytes: 772
@@ -1726,7 +1724,7 @@ functions:
     bytes: 316
   lex_step$Kind:
     calls: 224
-    bytes: 39428
+    bytes: 30360
   main:
     calls: 1
     bytes: 324
@@ -1735,7 +1733,7 @@ functions:
     bytes: 1148
   step_result$Kind:
     calls: 661
-    bytes: 16052
+    bytes: 9852
   to_eol_len:
     calls: 0
     bytes: 52

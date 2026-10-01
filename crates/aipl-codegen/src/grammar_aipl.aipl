@@ -4971,11 +4971,11 @@ allocations: 2105720
 deallocations: 2105720
 reallocations: 299814
 bytes allocated: 406408034
-instructions executed: 648146326
-binary size: 7052168
-  code: 4668736
+instructions executed: 627360209
+binary size: 7030408
+  code: 4652700
   data: 59172
-  metadata: 2324260
+  metadata: 2318536
 functions:
   __arr_drop___m11__ModeFrame:
     calls: 537
@@ -5435,16 +5435,16 @@ functions:
     bytes: 392
   __m11__lex_all$__m23__AiplTok:
     calls: 365
-    bytes: 11004
+    bytes: 8884
   __m11__lex_step$__m23__AiplTok:
     calls: 5499
-    bytes: 37460
+    bytes: 29112
   __m11__nested_len:
     calls: 3647
     bytes: 1148
   __m11__step_result$__m23__AiplTok:
     calls: 174356
-    bytes: 14808
+    bytes: 9240
   __m11__to_eol_len:
     calls: 0
     bytes: 52
@@ -6007,7 +6007,7 @@ functions:
     calls: 1192801
     bytes: (external)
   aipl_arr_inc:
-    calls: 5734780
+    calls: 5723782
     bytes: (external)
   aipl_arr_reserve:
     calls: 1202310
@@ -6022,7 +6022,7 @@ functions:
     calls: 36
     bytes: (external)
   aipl_array_dec:
-    calls: 8519683
+    calls: 8508685
     bytes: (external)
   aipl_array_new:
     calls: 188594
