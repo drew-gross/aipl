@@ -61,6 +61,7 @@ fn cli() -> ExitCode {
         // `check` owns its exit code (0 = all tests passed, 1 = a failure) and
         // prints its own report, so it returns an `ExitCode` directly.
         Some("check") => return check_cmd(&args[2..]),
+        Some("lsp") => lsp_cmd(&args[2..]),
         Some("--help") | Some("-h") | Some("help") | None => {
             println!("{}", usage(&prog));
             return ExitCode::SUCCESS;
@@ -87,6 +88,7 @@ fn usage(prog: &str) -> String {
   {prog} build <file.aipl> [-o <output>]    link a native binary executable
   {prog} fmt   <file.aipl> [--check]        rewrite the file in canonical format
   {prog} check [path...]                    run every fn's `.test({{ .. }})` block
+  {prog} lsp                                serve the Language Server Protocol on stdin/stdout
 
 `docs` is `doc`'s whole-project counterpart: where `doc` prints one file's
 documentation to stdout, `docs` walks a tree and writes a static HTML site —
@@ -99,6 +101,12 @@ process, so the engine links once); pass a file to check just that one, or a
 directory to check the tree under it. It also reports any file that isn't in
 canonical format (`aipl fmt`). It reports every failure rather than stopping at
 the first, and exits 0 only if all of them were formatted, compiled, and passed.
+
+`lsp` is for an editor to spawn, not for a person to run: it speaks the
+Language Server Protocol over stdin/stdout and answers go-to-definition, hover,
+the document outline, formatting, and diagnostics. An editor should spawn the
+`aipl` sitting in the project (see DESIGN_PRINCIPLES.md §4) so that what it
+reports is what `aipl check` reports.
 
 args to `run` are parsed as i64. Functions of arity 0, 1, or 2 are supported.
 `build` requires `clang` on PATH (used as linker driver).
@@ -451,6 +459,34 @@ fn check_cmd(args: &[String]) -> ExitCode {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+/// Serve the Language Server Protocol on stdin/stdout.
+///
+/// Everything a server needs to know it is told by the client in `initialize`,
+/// so the only argument accepted is `--stdio`, and it is accepted because
+/// clients send it rather than because it decides anything: it is how a client
+/// announces which transport it is using, and `vscode-languageclient` appends
+/// it unprompted for `TransportKind.stdio`. Stdio is the only transport here,
+/// so the flag is a no-op — and refusing it means refusing to start for a
+/// client that did nothing wrong.
+///
+/// Anything else is reported. A stray argument is almost always a person
+/// running this by hand expecting output.
+fn lsp_cmd(args: &[String]) -> Result<(), String> {
+    if let Some(arg) = args.iter().find(|arg| *arg != "--stdio") {
+        return Err(format!(
+            "`lsp` takes no arguments other than `--stdio` (got {arg:?}); it is spawned by an \
+             editor and speaks the Language Server Protocol on stdin/stdout"
+        ));
+    }
+    // An editor that goes away closes the pipe, which `serve_stdio` reports as
+    // a broken pipe rather than as an error worth printing.
+    match aipl::lsp::serve_stdio() {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+        Err(e) => Err(format!("language server: {e}")),
     }
 }
 

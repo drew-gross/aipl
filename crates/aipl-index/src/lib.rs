@@ -3,7 +3,7 @@
 //! and where else it is mentioned.
 //!
 //! A docs site generator, an editor extension with go-to-definition, and a
-//! language server all want the same three things, and none of them wants to
+//! language server all want the same two things, and none of them wants to
 //! parse AIPL to get them. So they are gathered once here:
 //!
 //! - [`Symbol`] — every top-level declaration: its kind, its rendered
@@ -11,8 +11,12 @@
 //!   the *name* (what an editor jumps to).
 //! - [`Import`] — every imported name, its local spelling when aliased, and
 //!   where it came from. This is what makes go-to-definition cross files.
-//! - [`Reference`] — every identifier occurrence in the file, so a cursor
-//!   offset can be turned into a name.
+//!
+//! What is *not* here is the third thing an editor needs: which name a cursor
+//! offset is sitting on. That is a question about tokens rather than about
+//! declarations, and the token stream already answers it — `aipl_lsp` asks
+//! `aipl_parser::token_scopes` for the identifier at the offset, then asks
+//! this crate about the name. Keeping it out means nothing here has to lex.
 //!
 //! and one thing that is about no symbol at all: [`FileIndex::module_doc`], the
 //! `# ..` block at the top of the file, which documents the file itself.

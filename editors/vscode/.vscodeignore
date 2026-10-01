@@ -1,0 +1,8 @@
+# The extension ships the compiled `out/`, not the sources it was built from.
+src/**
+tsconfig.json
+.vscode/**
+**/*.map
+
+# `vsce` bundles `dependencies` (vscode-languageclient) and skips
+# `devDependencies`, so nothing here excludes node_modules.

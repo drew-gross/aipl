@@ -1,0 +1,21 @@
+[package]
+name = "aipl-lsp"
+version = "0.1.0"
+edition = "2021"
+description = "AIPL language server — the Language Server Protocol over `aipl-index`"
+license = "MIT"
+
+[dependencies]
+aipl-syntax = { workspace = true }
+aipl-parser = { workspace = true }
+aipl-index = { workspace = true }
+aipl-fmt = { workspace = true }
+aipl-loader = { workspace = true }
+aipl-codegen = { workspace = true }
+serde_json = { workspace = true }
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true

@@ -27,6 +27,7 @@ dependencies = [
  "aipl-index",
  "aipl-linker",
  "aipl-loader",
+ "aipl-lsp",
  "aipl-mono",
  "aipl-parser",
  "aipl-syntax",
@@ -104,6 +105,19 @@ version = "0.1.0"
 dependencies = [
  "aipl-parser",
  "aipl-syntax",
+]
+
+[[package]]
+name = "aipl-lsp"
+version = "0.1.0"
+dependencies = [
+ "aipl-codegen",
+ "aipl-fmt",
+ "aipl-index",
+ "aipl-loader",
+ "aipl-parser",
+ "aipl-syntax",
+ "serde_json",
 ]
 
 [[package]]

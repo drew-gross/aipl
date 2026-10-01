@@ -44,6 +44,35 @@ pub fn load_program(root: &Path, dbg: DebugOptions) -> Result<Program, Vec<Error
     Ok(loader.flatten(&root_canon)?)
 }
 
+/// [`load_program`] with the root file's source supplied in memory rather than
+/// read from disk, while its imports still resolve from disk relative to
+/// `root`'s directory.
+///
+/// This is what an editor needs: the buffer being typed into has not been
+/// saved, so the file on disk is the wrong source for it, but every file it
+/// imports is on disk and current. Only the root is overlaid — an unsaved
+/// *imported* file still loads as it was last written, which is the honest
+/// limitation of a one-file overlay rather than a surprise, since the error
+/// lands with its own file's name on it either way.
+///
+/// `root` must exist on disk: it is canonicalized, so that the same file
+/// reached again through an import of its own is recognized as already loaded
+/// rather than read a second time from under the overlay.
+pub fn load_program_overlay(
+    root: &Path,
+    source: &str,
+    dbg: DebugOptions,
+) -> Result<Program, Vec<Error>> {
+    let root_canon = canonicalize(root)?;
+    let mut loader = Loader {
+        dbg,
+        entry: Some(root_canon.clone()),
+        ..Loader::default()
+    };
+    loader.load_source(&root_canon, source)?;
+    Ok(loader.flatten(&root_canon)?)
+}
+
 /// Like [`load_program`] but with the root file's source supplied in memory
 /// (used by the embedding FFI). Any `from "..."` path imports resolve relative
 /// to the current directory; `from builtins` works as usual.

@@ -13,9 +13,14 @@ projects:
   Implement https://raytracing.github.io/books/RayTracingInOneWeekend.html
 
 vscode extension:
-  LSP
-  go to definition
-  make the extension also auto-format
+  one language server per workspace folder, so a multi-root workspace uses each
+    project's own compiler (today: one server, from the first folder carrying an
+    `aipl`; `aipl.serverPath` is the override)
+  find references / rename — wants every identifier occurrence resolved, which
+    aipl-index deliberately does not do yet
+  completion — wants the same, plus the builtins' signatures
+  diagnostics are slow on a big file (the frontend over walker.aipl is ~11s);
+    they run debounced on a worker so nothing blocks, but the lag is real
 
 type checker:
   separate types for concrete and generic - concrete loses Generic arm
@@ -653,7 +658,13 @@ expression matcher:
   use it for lint
   use it for operation fusion
 
+vscode:
+  discoverServer is a terrible idea. The vscode extension should operator on the principle of aipl projects are expected to check in the compiler (this is awkward for this project, for now just have it get the one from the wc project I guess?)
+
 handoff:
+  add what JS verification we can to handoff
+  make handoff compile and install the vscode extension
+  fix cargo doc --workspace
   figure out why listing takes so long in nextest
   instead of having unfillable(), we should have fillable() since we have better control over the test output and can thus influence fillable() better
   should be able to regenerate syntax highlighter

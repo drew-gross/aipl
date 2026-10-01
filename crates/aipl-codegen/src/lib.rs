@@ -3727,21 +3727,35 @@ pub fn install_parser_hooks() {
     aipl_loader::set_aipl_builtin_sig_hook(aipl_mono::aipl_builtin_sig);
 }
 
-/// Compile every function in `program` into `module`. When `main_export_name`
-/// is set, the user's `main` function is exported under that name instead
-/// (used by the binary-builder path so a C-style `main()` wrapper in the
-/// runtime can call it).
-fn compile_program<M: Module>(
-    module: &mut M,
-    program: &Program,
-    main_export_name: Option<&str>,
-    dbg: DebugOptions,
-    // When set, instrument each function to tally executed instructions (the
-    // `instructions executed` perf counter). Off for JIT and production binary
-    // builds — it adds a per-block call — and on only for the test harness's
-    // separate measurement object.
-    instrument: bool,
-) -> Result<(HashMap<String, FuncInfo>, HashMap<String, TypeDef>, String), Vec<Error>> {
+/// What [`frontend`] produces: a program that has passed the type checker, plus
+/// the two things the rest of the pipeline needs from how it was checked.
+pub struct Frontend {
+    /// The program as the checker left it, with the types of
+    /// context-dependent expressions stamped in and `without` refinements
+    /// erased. Everything after the frontend runs on this.
+    pub program: Program,
+    /// The view the checker actually saw: the synthesized builtin declarations
+    /// followed by [`Frontend::program`]'s items. Kept because the effect sets
+    /// the optimizer asks for (`aipl_mono::effectful_fns`) must be computed
+    /// over the builtins too.
+    pub check_program: Program,
+    /// The AIPL-implemented builtins this program can reach, computed once so
+    /// nothing re-derives it.
+    pub builtin_demand: std::collections::BTreeSet<&'static str>,
+}
+
+/// Everything from a loaded [`Program`] up to and including the type check:
+/// generic resolution, tuple lowering, constructor-reference lowering, the
+/// builtin declarations the checker resolves calls through, and
+/// [`aipl_mono::check`] itself. No monomorphization, no optimization, no
+/// Cranelift.
+///
+/// [`compile_program`] runs this first and then compiles what comes back, so a
+/// caller that only wants to know whether a program is well-typed — a language
+/// server recomputing diagnostics on a keystroke, say — can stop here and pay
+/// for the frontend alone. It reports every finding the checker collected, not
+/// just the first.
+pub fn frontend(program: &Program) -> Result<Frontend, Vec<Error>> {
     // Builtin *types* (e.g. `__builtin_Span`) are real struct declarations,
     // unlike builtin functions: a call to a builtin function is intercepted by
     // reserved name in codegen and never needs to reach monomorphization as a
@@ -3836,7 +3850,37 @@ fn compile_program<M: Module>(
     // it has verified every value entering one, and from here on a
     // `T[] without []` is the `T[]` it is at runtime (see `Type::Without`).
     aipl_syntax::erase_refinements(&mut program);
-    let program = &program;
+    Ok(Frontend {
+        program,
+        check_program,
+        builtin_demand: needed,
+    })
+}
+
+/// Compile every function in `program` into `module`. When `main_export_name`
+/// is set, the user's `main` function is exported under that name instead
+/// (used by the binary-builder path so a C-style `main()` wrapper in the
+/// runtime can call it).
+fn compile_program<M: Module>(
+    module: &mut M,
+    program: &Program,
+    main_export_name: Option<&str>,
+    dbg: DebugOptions,
+    // When set, instrument each function to tally executed instructions (the
+    // `instructions executed` perf counter). Off for JIT and production binary
+    // builds — it adds a per-block call — and on only for the test harness's
+    // separate measurement object.
+    instrument: bool,
+) -> Result<(HashMap<String, FuncInfo>, HashMap<String, TypeDef>, String), Vec<Error>> {
+    // The frontend — resolve, lower and type-check — then compile what it
+    // hands back. Split out so a caller that only wants the diagnostics can
+    // run it without paying for codegen; see `frontend`.
+    let Frontend {
+        program: checked,
+        check_program,
+        builtin_demand: needed,
+    } = frontend(program)?;
+    let program = &checked;
 
     // Optimization: inline single-use private functions (a no-op unless the
     // program has a `main` — see `inline_single_use`). Runs on the checked source

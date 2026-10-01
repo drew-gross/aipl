@@ -41,6 +41,7 @@ aipl-loader = { path = "crates/aipl-loader" }
 aipl-linker = { path = "crates/aipl-linker" }
 aipl-fmt = { path = "crates/aipl-fmt" }
 aipl-index = { path = "crates/aipl-index" }
+aipl-lsp = { path = "crates/aipl-lsp" }
 aipl-docs = { path = "crates/aipl-docs" }
 # External crates.
 cranelift = "0.134.2"
@@ -65,6 +66,7 @@ aipl-loader = { workspace = true }
 aipl-linker = { workspace = true }
 aipl-fmt = { workspace = true }
 aipl-index = { workspace = true }
+aipl-lsp = { workspace = true }
 aipl-docs = { workspace = true }
 
 [dev-dependencies]

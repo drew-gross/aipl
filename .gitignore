@@ -10,3 +10,9 @@
 # leaves these behind, and neither belongs in a commit.
 /crates/aipl-codegen/src/*.clif
 /crates/aipl-codegen/src/*.clif.staged
+
+# The VS Code extension's npm dependencies: `package-lock.json` pins them,
+# and `npm install` in `editors/vscode` restores them.
+/editors/vscode/node_modules
+/editors/vscode/out
+/editors/vscode/*.vsix

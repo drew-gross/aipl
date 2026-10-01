@@ -33,6 +33,11 @@ pub use aipl_fmt as fmt;
 pub use aipl_index as index;
 pub use aipl_linker as binary;
 pub use aipl_loader as loader;
+/// The language server behind `aipl lsp`: go-to-definition, hover, the
+/// document outline, formatting and diagnostics over the Language Server
+/// Protocol, answered from [`index`] and the compiler's own frontend. Exposed
+/// so an editor integration can embed the server rather than spawn it.
+pub use aipl_lsp as lsp;
 pub use aipl_mono as mono;
 
 use std::path::Path;

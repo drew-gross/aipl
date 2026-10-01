@@ -1,15 +1,19 @@
 {
   "name": "aipl",
   "displayName": "AIPL",
-  "description": "Syntax highlighting and language configuration for AIPL.",
-  "version": "0.1.0",
+  "description": "Language support for AIPL: syntax highlighting, go-to-definition, hover, outline, formatting and diagnostics.",
+  "version": "0.2.0",
   "publisher": "aipl",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.60.0"
+    "vscode": "^1.82.0"
   },
   "categories": [
     "Programming Languages"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:aipl"
   ],
   "contributes": {
     "languages": [
@@ -31,6 +35,44 @@
         "scopeName": "source.aipl",
         "path": "./syntaxes/aipl.tmLanguage.json"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "AIPL",
+      "properties": {
+        "aipl.serverPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the `aipl` compiler to run the language server from. `${workspaceFolder}` and `${userHome}` are expanded. Leave empty to search the workspace folder — `./aipl` (the compiler a project carries), then `./target/debug/aipl` and `./target/release/aipl` (a checkout of the compiler itself) — taking the first that has an `lsp` subcommand, and falling back to `aipl` on `PATH`."
+        },
+        "aipl.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Log the traffic between VS Code and the AIPL language server to its output channel."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "[aipl]": {
+        "editor.formatOnSave": true
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.82.0",
+    "typescript": "^5.4.0"
   }
 }

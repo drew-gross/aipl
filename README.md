@@ -20,6 +20,7 @@ cargo build
 ./target/debug/aipl check [path...]          # run every fn's `.test({ .. })` block
 ./target/debug/aipl fmt   file.aipl          # rewrite in canonical format (`--check` to report)
 ./target/debug/aipl docs  [path...] -o dir   # write the HTML documentation site
+./target/debug/aipl lsp                      # serve the Language Server Protocol (editors spawn this)
 ```
 
 `aipl check` is the test runner: a function carries its tests in a
@@ -93,6 +94,16 @@ Where this lives: the string rules are declared once in
 `crates/aipl-codegen/src/lex_aipl.aipl` (escape sets, delimiters, dedent),
 decoding in `unescape.aipl`, dedent in `process_raw_string.aipl`. The VS Code
 grammar under `editors/` is generated from the same rule table.
+
+## Editor support
+
+`editors/vscode/` is a VS Code extension: highlighting from the generated
+TextMate grammar, and everything else — go to definition (across files),
+hover with the declaration's `# ..` docs, the outline, format-on-save, and
+diagnostics — from `aipl lsp`, the language server built into the compiler
+(`crates/aipl-lsp`). The editor spawns the `aipl` the project carries, so what
+it reports is what `aipl check` reports. Any LSP-speaking editor can use the
+same server.
 
 ## Pattern matching
 

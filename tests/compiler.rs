@@ -22,6 +22,8 @@ mod docs_site;
 mod fmt;
 #[path = "suites/highlighting.rs"]
 mod highlighting;
+#[path = "suites/lsp.rs"]
+mod lsp;
 #[path = "suites/mono.rs"]
 mod mono;
 #[path = "suites/parser.rs"]
