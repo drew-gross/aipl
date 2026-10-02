@@ -69,6 +69,7 @@
 //! annotation this pass refuses to drop, and it needs that annotation — so a
 //! post-mono run of this pass would buy nothing there either.
 
+use crate::passes::Scope;
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Expr, ExprKind, Item, Program};
@@ -80,7 +81,15 @@ use crate::sink::{can_defer, undeferrable_fns};
 /// `effectful` is the set of functions whose signature declares an effect — the
 /// same set [`crate::fuse_operations`] and [`crate::sink_bindings`] take, so
 /// pass the checker's declarations and builtin `!prints` is included.
-pub fn inline_single_use_bindings(program: &Program, effectful: &HashSet<String>) -> Program {
+/// `scope` names the functions to rewrite: the pass is body-local, so a
+/// function the scope leaves out would come back unchanged anyway (see
+/// [`crate::passes`]), and skipping it saves the walk rather than changing the
+/// answer.
+pub fn inline_single_use_bindings(
+    program: &Program,
+    effectful: &HashSet<String>,
+    scope: &Scope,
+) -> Program {
     let blocked = undeferrable_fns(program, effectful);
     Program {
         // Rewrites bodies/items only; the file map and the file's own
@@ -91,7 +100,7 @@ pub fn inline_single_use_bindings(program: &Program, effectful: &HashSet<String>
             .items
             .iter()
             .map(|item| match item {
-                Item::Fn(f) => {
+                Item::Fn(f) if scope.covers(&f.name) => {
                     let mut f = f.clone();
                     f.body = subst_expr(&f.body, &blocked);
                     f.test_body = f.test_body.as_ref().map(|x| subst_expr(x, &blocked));

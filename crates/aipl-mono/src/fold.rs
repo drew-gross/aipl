@@ -23,6 +23,7 @@
 //! String concat, constant branch elimination, and propagation through
 //! bindings are out of scope for now.
 
+use crate::passes::Scope;
 use std::collections::HashMap;
 
 use aipl_syntax::ast::{
@@ -32,7 +33,11 @@ use aipl_syntax::ast::{
 
 /// Fold constant subexpressions throughout `program`: every function body and
 /// test body, and every struct field default.
-pub fn fold_constants(program: &Program) -> Program {
+/// `scope` names the functions to rewrite: the pass is body-local, so a
+/// function the scope leaves out would come back unchanged anyway (see
+/// [`crate::passes`]), and skipping it saves the walk rather than changing the
+/// answer.
+pub fn fold_constants(program: &Program, scope: &Scope) -> Program {
     Program {
         // Rewrites bodies/items only; the file map and the file's own
         // documentation carry through unchanged.
@@ -42,7 +47,7 @@ pub fn fold_constants(program: &Program) -> Program {
             .items
             .iter()
             .map(|item| match item {
-                Item::Fn(f) => {
+                Item::Fn(f) if scope.covers(&f.name) => {
                     let mut f = f.clone();
                     f.body = fold_expr(&f.body, &HashMap::new());
                     f.test_body = f.test_body.as_ref().map(|x| fold_expr(x, &HashMap::new()));

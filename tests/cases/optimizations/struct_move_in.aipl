@@ -78,9 +78,9 @@ reallocations: 3
 bytes allocated: 2930
 instructions executed: 6459
 binary size: 18760
-  code: 11252
+  code: 11248
   data: 604
-  metadata: 6904
+  metadata: 6908
 functions:
   __arr_drop_First:
     calls: 2
@@ -147,4 +147,4 @@ functions:
     bytes: 1228
   main:
     calls: 1
-    bytes: 6560
+    bytes: 6556

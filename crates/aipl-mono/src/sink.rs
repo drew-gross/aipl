@@ -52,6 +52,7 @@
 //! `mut` bindings don't sink either — a later `set` from outside the branch
 //! would be left referring to a binding that no longer exists there.
 
+use crate::passes::Scope;
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, MatchArm, Program};
@@ -73,7 +74,11 @@ const ABORTING_BUILTINS: &[Callee] = &[Callee::Assert];
 /// `if`/`match` uses. `effectful` is the set of functions whose signature
 /// declares an effect — the same set [`crate::fuse_operations`] takes, so pass
 /// the checker's declarations and builtin `!prints` is included.
-pub fn sink_bindings(program: &Program, effectful: &HashSet<String>) -> Program {
+/// `scope` names the functions to rewrite: the pass is body-local, so a
+/// function the scope leaves out would come back unchanged anyway (see
+/// [`crate::passes`]), and skipping it saves the walk rather than changing the
+/// answer.
+pub fn sink_bindings(program: &Program, effectful: &HashSet<String>, scope: &Scope) -> Program {
     let blocked = undeferrable_fns(program, effectful);
     Program {
         // Rewrites bodies/items only; the file map and the file's own
@@ -84,7 +89,7 @@ pub fn sink_bindings(program: &Program, effectful: &HashSet<String>) -> Program 
             .items
             .iter()
             .map(|item| match item {
-                Item::Fn(f) => {
+                Item::Fn(f) if scope.covers(&f.name) => {
                     let mut f = f.clone();
                     f.body = sink_expr(&f.body, &blocked);
                     f.test_body = f.test_body.as_ref().map(|x| sink_expr(x, &blocked));
@@ -310,13 +315,27 @@ fn sink_here(e: Expr, blocked: &HashSet<String>) -> Expr {
         // and `x` is one binding closer to the branch that reads it. The swap
         // is the reordering `Seq` avoids, which is why it asks the sinker's
         // own question of `w` too.
+        //
+        // Only if `x` gets somewhere, though. The swap is a means and not an
+        // end: when `rest` holds no branch for `x` to reach, the recursive
+        // step below hands back the binding exactly as it was re-formed, and
+        // swapping two bindings that are both going nowhere is a change with
+        // no improvement in it. Worse, the result is just as eligible as the
+        // input, so the next run swaps them back — two sibling bindings
+        // trading places forever, which is how this was found: the pass
+        // manager (`crate::passes`) runs this pass until it stops changing
+        // anything, and without this check it never stopped.
         ExprKind::Let(other, other_ty, other_value, rest)
             if other != name
                 && !mentions_free(other_value, name)
                 && !mentions_free(value, other)
                 && can_defer(other_value, blocked) =>
         {
-            let sunk = sink_here(rebind(rest), blocked);
+            let moved = rebind(rest);
+            let sunk = sink_here(moved.clone(), blocked);
+            if sunk == moved {
+                return e;
+            }
             Expr::rebuilt(
                 ExprKind::Let(
                     other.clone(),
@@ -373,18 +392,26 @@ pub(crate) fn mentions_free(e: &Expr, name: &str) -> bool {
 /// names, which is how `__builtin_print` is still recognized as effectful here:
 /// mono mangles user instances but leaves builtin call names alone, so neither
 /// set alone covers both.
+/// `scope` names the functions to rewrite: the pass is body-local, so a
+/// function the scope leaves out would come back unchanged anyway (see
+/// [`crate::passes`]), and skipping it saves the walk rather than changing the
+/// answer.
 pub fn sink_bindings_post_mono(
     program: &MonoProgram,
     builtin_effects: &HashSet<String>,
+    scope: &Scope,
 ) -> MonoProgram {
     let blocked = undeferrable_fns_post_mono(program, builtin_effects);
     MonoProgram {
         fns: program
             .fns
             .iter()
-            .map(|f| ConcreteFn {
-                body: sink_expr(&f.body, &blocked),
-                ..f.clone()
+            .map(|f| match scope.covers(&f.name) {
+                true => ConcreteFn {
+                    body: sink_expr(&f.body, &blocked),
+                    ..f.clone()
+                },
+                false => f.clone(),
             })
             .collect(),
         ..program.clone()

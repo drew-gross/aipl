@@ -745,10 +745,10 @@ deallocations: 2325
 reallocations: 217
 bytes allocated: 186475
 instructions executed: 296811
-binary size: 256512
-  code: 165056
+binary size: 256456
+  code: 164996
   data: 6076
-  metadata: 85380
+  metadata: 85384
 functions:
   __arr_drop_Item:
     calls: 69
@@ -1124,10 +1124,10 @@ functions:
     bytes: 288
   wrapped$lam$__test$fmt_node$spaced_unless_punct:
     calls: 3
-    bytes: 6072
+    bytes: 6048
   wrapped$lam$__test$render_cst$always_space:
     calls: 0
-    bytes: 6072
+    bytes: 6048
   wrapped$lam$never_space:
     calls: 15
-    bytes: 2568
+    bytes: 2556

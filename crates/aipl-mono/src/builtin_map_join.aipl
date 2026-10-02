@@ -116,8 +116,8 @@ deallocations: 31
 reallocations: 2
 bytes allocated: 1241
 instructions executed: 5187
-binary size: 17824
-  code: 11084
+binary size: 17832
+  code: 11092
   data: 1257
   metadata: 5483
 functions:
@@ -126,7 +126,7 @@ functions:
     bytes: 296
   __test$map_join:
     calls: 1
-    bytes: 7840
+    bytes: 7848
   __to_str_i64:
     calls: 6
     bytes: 204

@@ -100,6 +100,7 @@
 //! `f(x)?` where `f`'s body ends in `ok(..)` and was inlined pre-mono is caught
 //! at the same time, since one walk sees the whole program.
 
+use crate::passes::Scope;
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Callee, Expr, ExprKind, FieldInit, MatchArm, Pattern, Type};
@@ -114,10 +115,15 @@ use crate::{body_size, next_inline_id, ConcreteFn, MonoProgram};
 /// [`crate::sink_bindings_post_mono`] takes), which decides whether a field a
 /// projection discards can be dropped or must be kept for what it does. See
 /// the module docs.
+/// `scope` names the functions to rewrite: the pass is body-local, so a
+/// function the scope leaves out would come back unchanged anyway (see
+/// [`crate::passes`]), and skipping it saves the walk rather than changing the
+/// answer.
 pub fn eliminate_known_constructors_post_mono(
     program: &MonoProgram,
     max_duplicated: usize,
     builtin_effects: &HashSet<String>,
+    scope: &Scope,
 ) -> MonoProgram {
     let limits = Limits {
         max_duplicated,
@@ -127,9 +133,12 @@ pub fn eliminate_known_constructors_post_mono(
         fns: program
             .fns
             .iter()
-            .map(|f| ConcreteFn {
-                body: rewrite(&f.body, &limits),
-                ..f.clone()
+            .map(|f| match scope.covers(&f.name) {
+                true => ConcreteFn {
+                    body: rewrite(&f.body, &limits),
+                    ..f.clone()
+                },
+                false => f.clone(),
             })
             .collect(),
         ..program.clone()

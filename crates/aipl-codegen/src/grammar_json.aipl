@@ -511,11 +511,11 @@ allocations: 21391
 deallocations: 21391
 reallocations: 2814
 bytes allocated: 2980995
-instructions executed: 6810944
-binary size: 453920
-  code: 301100
+instructions executed: 6800108
+binary size: 452896
+  code: 300316
   data: 8348
-  metadata: 144472
+  metadata: 144232
 functions:
   __arr_drop_Json:
     calls: 125
@@ -700,9 +700,6 @@ functions:
   __builtin_try_map$__m3__Rule$JsonTok$__m3__Rule$JsonTok$__m3__ParseError$lam$__m3__desugar_rule$JsonTok:
     calls: 308
     bytes: 508
-  __builtin_value_or$bool:
-    calls: 774
-    bytes: 24
   __ctor$Json$Array:
     calls: 13
     bytes: 112
@@ -750,7 +747,7 @@ functions:
     bytes: 392
   __m11__lex_all$JsonTok:
     calls: 58
-    bytes: 6580
+    bytes: 5884
   __m11__lex_step$JsonTok:
     calls: 485
     bytes: 24100
@@ -816,7 +813,7 @@ functions:
     bytes: 1492
   __m13__match_prod$JsonTok$Json:
     calls: 781
-    bytes: 6632
+    bytes: 6576
   __m13__match_reps$JsonTok$Json:
     calls: 62
     bytes: 4144
@@ -870,7 +867,7 @@ functions:
     bytes: 1236
   __m1__show:
     calls: 34
-    bytes: 2968
+    bytes: 2960
   __m1__split_kids:
     calls: 247
     bytes: 2284
@@ -882,7 +879,7 @@ functions:
     bytes: 1160
   __m1__token_text:
     calls: 37
-    bytes: 1460
+    bytes: 1464
   __m2__can_start$JsonTok:
     calls: 0
     bytes: 256
@@ -912,7 +909,7 @@ functions:
     bytes: 5572
   __m2__render_rule$JsonTok:
     calls: 30
-    bytes: 12848
+    bytes: 12856
   __m2__rep_suffix:
     calls: 2
     bytes: 1708
@@ -993,7 +990,7 @@ functions:
     bytes: 4608
   __m4__wrapped$lam$json_space:
     calls: 26
-    bytes: 6072
+    bytes: 6048
   __m5__col_after:
     calls: 203
     bytes: 628
@@ -1044,7 +1041,7 @@ functions:
     bytes: 8036
   __test$json_cst:
     calls: 1
-    bytes: 2884
+    bytes: 2896
   __test$json_cst$shown:
     calls: 4
     bytes: 392

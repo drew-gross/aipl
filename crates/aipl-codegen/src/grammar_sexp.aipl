@@ -277,11 +277,11 @@ allocations: 6477
 deallocations: 6477
 reallocations: 725
 bytes allocated: 676870
-instructions executed: 1878529
-binary size: 400056
-  code: 267124
+instructions executed: 1875477
+binary size: 399008
+  code: 266320
   data: 4692
-  metadata: 128240
+  metadata: 127996
 functions:
   __arr_drop_SexpKind:
     calls: 0
@@ -463,9 +463,6 @@ functions:
   __builtin_try_map$__m3__Rule$SexpKind$__m3__Rule$SexpKind$__m3__ParseError$lam$__m3__desugar_rule$SexpKind:
     calls: 45
     bytes: 508
-  __builtin_value_or$bool:
-    calls: 218
-    bytes: 24
   __ctor$SexpKind$Atom:
     calls: 68
     bytes: 96
@@ -507,7 +504,7 @@ functions:
     bytes: 392
   __m11__lex_all$SexpKind:
     calls: 32
-    bytes: 6580
+    bytes: 5884
   __m11__lex_step$SexpKind:
     calls: 240
     bytes: 24100
@@ -570,7 +567,7 @@ functions:
     bytes: 1492
   __m13__match_prod$SexpKind$__m15__Sexp:
     calls: 222
-    bytes: 6632
+    bytes: 6576
   __m13__match_reps$SexpKind$__m15__Sexp:
     calls: 38
     bytes: 4144
@@ -627,7 +624,7 @@ functions:
     bytes: 1236
   __m1__show:
     calls: 41
-    bytes: 2968
+    bytes: 2960
   __m1__split_kids:
     calls: 86
     bytes: 2284
@@ -639,7 +636,7 @@ functions:
     bytes: 1160
   __m1__token_text:
     calls: 21
-    bytes: 1460
+    bytes: 1464
   __m2__can_start$SexpKind:
     calls: 0
     bytes: 256
@@ -750,7 +747,7 @@ functions:
     bytes: 4608
   __m4__wrapped$lam$sexp_space:
     calls: 18
-    bytes: 6072
+    bytes: 6048
   __m5__col_after:
     calls: 77
     bytes: 628

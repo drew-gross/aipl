@@ -201,8 +201,8 @@ deallocations: 3960
 reallocations: 329
 bytes allocated: 347879
 instructions executed: 1362629
-binary size: 208440
-  code: 162756
+binary size: 208184
+  code: 162500
   data: 3240
   metadata: 42444
 functions:
@@ -349,7 +349,7 @@ functions:
     bytes: 268
   __test$aipl_tmlanguage:
     calls: 1
-    bytes: 119140
+    bytes: 118880
   __to_str_u64:
     calls: 7
     bytes: 204
@@ -415,4 +415,4 @@ functions:
     bytes: 120
   template_pat:
     calls: 2
-    bytes: 1352
+    bytes: 1356

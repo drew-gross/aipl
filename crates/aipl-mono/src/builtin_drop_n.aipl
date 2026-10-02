@@ -23,14 +23,14 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 312
 instructions executed: 297
-binary size: 4000
-  code: 1636
+binary size: 3992
+  code: 1632
   data: 421
-  metadata: 1943
+  metadata: 1939
 functions:
   __test$drop_n:
     calls: 1
-    bytes: 1532
+    bytes: 1528
   aipl_arr_elem_ptr:
     calls: 2
     bytes: (external)

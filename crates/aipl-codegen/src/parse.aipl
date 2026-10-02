@@ -1768,11 +1768,11 @@ allocations: 5902
 deallocations: 5902
 reallocations: 1236
 bytes allocated: 732308
-instructions executed: 2172205
-binary size: 759368
-  code: 463232
+instructions executed: 2169363
+binary size: 758056
+  code: 462252
   data: 12644
-  metadata: 283492
+  metadata: 283160
 functions:
   __arr_drop_Node:
     calls: 18
@@ -1924,9 +1924,6 @@ functions:
   __builtin_try_map$__m3__Rule$Tok$__m3__Rule$Tok$__m3__ParseError$lam$__m3__desugar_rule$Tok:
     calls: 123
     bytes: 508
-  __builtin_value_or$bool:
-    calls: 195
-    bytes: 24
   __ctor$Tok$Num:
     calls: 55
     bytes: 96
@@ -1992,13 +1989,13 @@ functions:
     bytes: 1236
   __m1__show:
     calls: 228
-    bytes: 2968
+    bytes: 2960
   __m1__split_kids:
     calls: 33
     bytes: 2284
   __m1__text:
     calls: 15
-    bytes: 1460
+    bytes: 1464
   __m1__token_leaves:
     calls: 0
     bytes: 32
@@ -2007,7 +2004,7 @@ functions:
     bytes: 1160
   __m1__token_text:
     calls: 0
-    bytes: 1460
+    bytes: 1464
   __m2__can_start$Tok:
     calls: 28
     bytes: 256
@@ -2070,7 +2067,7 @@ functions:
     bytes: 392
   __m4__lex_all$Tok:
     calls: 103
-    bytes: 7308
+    bytes: 6444
   __m4__lex_step$Tok:
     calls: 371
     bytes: 25608
@@ -2274,7 +2271,7 @@ functions:
     bytes: 1492
   match_prod$Tok$Node:
     calls: 202
-    bytes: 6932
+    bytes: 6840
   match_reps$Tok$Node:
     calls: 57
     bytes: 4144

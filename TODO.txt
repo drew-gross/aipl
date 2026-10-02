@@ -81,6 +81,8 @@ highlighter:
   fold regions and bracket pair coloring
 
 misc cleanup:
+  optimizations don't need internal fixpointing, since we now have pass manager. inline_small probably needs a guard against inline itself if recursive and small though.
+  figure out why vscode thinks TODO.txt is indented with tabs
   go through and remove all comments that talk about how the code used to work.
   Symbol and Import should use SpanStr
   Tpl and Tok should not be abbreviated
@@ -313,6 +315,7 @@ companion_files.aipl:
   With split_with_predicate, implement this more functionally.
 
 formatter:
+  some way to allow really long string literals to wrap
   my new pattern walker laid out a constructor's payload with comma_list_docs, which breaks long lists across lines with a trailing comma — and the pattern grammar takes no trailing comma, so aipl fmt rewrote three compiler sources (Let(\n name,\n …,\n) =>) into something that no longer parsed. <--- the formatter should decide whether to output a trailing comma based on the grammer definition. Why isn't it doing that?
   variant_case_docs.aipl is weird: having the leading | should force splitting each onto own line
   wrap comments
@@ -460,6 +463,7 @@ design:
   apis should express intent
 
 optimizations:
+  pass manager should be a bit smarter about inline small and inline single use. Inlining is powerful, we should work hard to inline more.
   figure out / fix why template literals are peforming worse than concat chains
   make large array-literal construction table-driven rather than unrolled.
   template literals should constant fold in their parts if constant
@@ -485,7 +489,6 @@ optimizations:
   nextest --no-run (build) took 639s which is unusual. Can you investigate why the build is taking so long? use cargo build --timings
   intern static struct literals into the binary too
   extend should create a rope when the value doesn't fit in the existing capacity
-  after fusion there should be more inlining opportunities. Make a pass manager that re-enqueues functions for optimization after they are optimized
   owned spread: { ..var, field: f } should edit var if it's uniquely owned
   loop invariant/match invariant/branch invariant code motion
   unused variant elimination

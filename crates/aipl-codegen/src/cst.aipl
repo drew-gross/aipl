@@ -623,8 +623,8 @@ deallocations: 291
 reallocations: 19
 bytes allocated: 19101
 instructions executed: 46194
-binary size: 67120
-  code: 40348
+binary size: 67112
+  code: 40340
   data: 3573
   metadata: 23199
 functions:
@@ -759,13 +759,13 @@ functions:
     bytes: 168
   own_token_text:
     calls: 3
-    bytes: 1464
+    bytes: 1456
   parts:
     calls: 15
     bytes: 956
   show:
     calls: 23
-    bytes: 2968
+    bytes: 2960
   slot_walk:
     calls: 3
     bytes: 728
@@ -780,7 +780,7 @@ functions:
     bytes: 2284
   text:
     calls: 5
-    bytes: 1460
+    bytes: 1464
   tok_span:
     calls: 2
     bytes: 236
@@ -795,4 +795,4 @@ functions:
     bytes: 288
   token_text:
     calls: 5
-    bytes: 1460
+    bytes: 1464

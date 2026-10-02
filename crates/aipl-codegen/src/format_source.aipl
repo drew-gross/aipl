@@ -427,11 +427,11 @@ allocations: 21348
 deallocations: 21348
 reallocations: 2942
 bytes allocated: 4881166
-instructions executed: 12904947
-binary size: 7661272
-  code: 5103412
+instructions executed: 12904189
+binary size: 7658768
+  code: 5101440
   data: 13498
-  metadata: 2544362
+  metadata: 2543830
 functions:
   __arr_drop___m10__Ty:
     calls: 0
@@ -847,9 +847,6 @@ functions:
   __builtin_try_map$__m5__Ast$__tuple$str$str$__m11__ParseError$lam$__m4__shim_expr$lambda0:
     calls: 0
     bytes: 10868
-  __builtin_value_or$bool:
-    calls: 53
-    bytes: 24
   __ctor$__m25__AiplTok$Name:
     calls: 59
     bytes: 104
@@ -915,7 +912,7 @@ functions:
     bytes: 760
   __m12__own_token_text:
     calls: 0
-    bytes: 1464
+    bytes: 1456
   __m12__slot_walk:
     calls: 0
     bytes: 728
@@ -942,7 +939,7 @@ functions:
     bytes: 288
   __m12__token_text:
     calls: 0
-    bytes: 1460
+    bytes: 1464
   __m15__between_len:
     calls: 153
     bytes: 800
@@ -957,7 +954,7 @@ functions:
     bytes: 392
   __m15__lex_all$__m25__AiplTok:
     calls: 47
-    bytes: 8884
+    bytes: 7636
   __m15__lex_step$__m25__AiplTok:
     calls: 445
     bytes: 29112
@@ -966,7 +963,7 @@ functions:
     bytes: 1148
   __m15__step_result$__m25__AiplTok:
     calls: 12360
-    bytes: 9240
+    bytes: 9264
   __m15__to_eol_len:
     calls: 0
     bytes: 52
@@ -1053,7 +1050,7 @@ functions:
     bytes: 3144
   __m24__wrapped$lam$__m4__aipl_space:
     calls: 0
-    bytes: 6072
+    bytes: 6048
   __m25__aipl_rules:
     calls: 47
     bytes: 88776
@@ -1149,7 +1146,7 @@ functions:
     bytes: 1492
   __m32__match_prod$__m25__AiplTok$__m5__Ast:
     calls: 74
-    bytes: 63300
+    bytes: 63208
   __m32__match_reps$__m25__AiplTok$__m5__Ast:
     calls: 21
     bytes: 4144
@@ -1737,16 +1734,16 @@ functions:
     bytes: 7912
   __m4__lower_assign_stmt:
     calls: 0
-    bytes: 55032
+    bytes: 55040
   __m4__lower_atom:
     calls: 0
-    bytes: 178064
+    bytes: 178068
   __m4__lower_base_ty:
     calls: 0
     bytes: 16184
   __m4__lower_binding:
     calls: 0
-    bytes: 61288
+    bytes: 61292
   __m4__lower_block:
     calls: 2
     bytes: 8380
@@ -1761,13 +1758,13 @@ functions:
     bytes: 7912
   __m4__lower_case_param:
     calls: 0
-    bytes: 33908
+    bytes: 33880
   __m4__lower_const_decl:
     calls: 0
-    bytes: 17540
+    bytes: 17544
   __m4__lower_construct_fields:
     calls: 0
-    bytes: 29920
+    bytes: 29928
   __m4__lower_ctor_payload:
     calls: 0
     bytes: 16280
@@ -1797,7 +1794,7 @@ functions:
     bytes: 47228
   __m4__lower_fn_attr:
     calls: 0
-    bytes: 23788
+    bytes: 23796
   __m4__lower_fn_body:
     calls: 2
     bytes: 34172
@@ -1812,19 +1809,19 @@ functions:
     bytes: 21760
   __m4__lower_import_decl:
     calls: 0
-    bytes: 17008
+    bytes: 17020
   __m4__lower_import_name:
     calls: 0
-    bytes: 33968
+    bytes: 33988
   __m4__lower_item:
     calls: 2
-    bytes: 65392
+    bytes: 64788
   __m4__lower_lambda:
     calls: 0
     bytes: 16820
   __m4__lower_lambda_param:
     calls: 0
-    bytes: 24752
+    bytes: 24740
   __m4__lower_let_stmt:
     calls: 0
     bytes: 272
@@ -1845,10 +1842,10 @@ functions:
     bytes: 214936
   __m4__lower_pattern:
     calls: 0
-    bytes: 90252
+    bytes: 90232
   __m4__lower_postfix:
     calls: 0
-    bytes: 22508
+    bytes: 22512
   __m4__lower_program:
     calls: 3
     bytes: 174888
@@ -1863,10 +1860,10 @@ functions:
     bytes: 20196
   __m4__lower_suffix:
     calls: 0
-    bytes: 222208
+    bytes: 222200
   __m4__lower_template:
     calls: 0
-    bytes: 12016
+    bytes: 12020
   __m4__lower_test_block:
     calls: 0
     bytes: 16532
@@ -1902,7 +1899,7 @@ functions:
     bytes: 8456
   __m4__lower_variant_decl:
     calls: 0
-    bytes: 28536
+    bytes: 28528
   __m4__lower_variant_decl$filter5$own0:
     calls: 0
     bytes: 448
@@ -1944,10 +1941,10 @@ functions:
     bytes: 2616
   __m4__same_bindings:
     calls: 0
-    bytes: 2492
+    bytes: 2484
   __m4__shim_expr:
     calls: 0
-    bytes: 2204
+    bytes: 2212
   __m4__slot_expr:
     calls: 0
     bytes: 3892

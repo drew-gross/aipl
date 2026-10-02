@@ -47,11 +47,11 @@ allocations: 16
 deallocations: 16
 reallocations: 2
 bytes allocated: 670
-instructions executed: 3364
-binary size: 15168
-  code: 8720
+instructions executed: 3328
+binary size: 14672
+  code: 8444
   data: 707
-  metadata: 5741
+  metadata: 5521
 functions:
   __arr_drop___tuple$i64$str:
     calls: 1
@@ -59,9 +59,6 @@ functions:
   __arr_retain___tuple$i64$str:
     calls: 2
     bytes: 120
-  __builtin_try_map$i64$i64$str$lam$checked$i64:
-    calls: 1
-    bytes: 308
   __to_str___tuple$i64$str$arr:
     calls: 1
     bytes: 968
@@ -77,14 +74,11 @@ functions:
   __to_str_str$arr$arr:
     calls: 1
     bytes: 1300
-  add_one:
-    calls: 1
-    bytes: 8
   aipl_arr_drop_arr:
     calls: 3
     bytes: (external)
   aipl_arr_inc:
-    calls: 10
+    calls: 8
     bytes: (external)
   aipl_arr_reserve:
     calls: 2
@@ -93,7 +87,7 @@ functions:
     calls: 1
     bytes: (external)
   aipl_array_dec:
-    calls: 26
+    calls: 25
     bytes: (external)
   aipl_array_new:
     calls: 6
@@ -118,7 +112,7 @@ functions:
     bytes: (external)
   main:
     calls: 1
-    bytes: 3068
+    bytes: 3108
   main$filter2$own0:
     calls: 1
     bytes: 380

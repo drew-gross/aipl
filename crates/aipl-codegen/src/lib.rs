@@ -5,6 +5,7 @@
 //!   - `bool` (encoded 0/1 in an i64 at the ABI level).
 //!   - Declared struct names — stack-allocated, passed by pointer.
 
+use aipl_mono::passes::Pass;
 use std::{
     cell::{Cell, RefCell},
     collections::{BTreeSet, HashMap, HashSet},
@@ -3083,6 +3084,33 @@ fn inline_max_exprs() -> usize {
         .unwrap_or(aipl_mono::DEFAULT_INLINE_MAX_EXPRS)
 }
 
+/// Env var capping how many rounds the optimization pass manager runs (see
+/// [`aipl_mono::passes`]). `AIPL_OPT_ROUNDS=1` reproduces the single linear
+/// sweep the pipeline used to be, which is what makes the iteration's effect
+/// on compile time and on generated code measurable without rebuilding.
+pub const OPT_ROUNDS_ENV: &str = "AIPL_OPT_ROUNDS";
+
+/// The round cap for the pass manager.
+///
+/// Eight is a ceiling rather than a target: the passes converge in two or
+/// three on everything in the corpus (the third is usually the round that
+/// finds nothing and stops). It is here so that two passes undoing each other
+/// cost a bounded amount of compile time instead of hanging the compiler, and
+/// so the result stays deterministic — the cap is a constant, not a deadline.
+pub const DEFAULT_OPT_ROUNDS: usize = 8;
+
+/// How many rounds to let the pass manager run: [`OPT_ROUNDS_ENV`] if it
+/// parses, else [`DEFAULT_OPT_ROUNDS`]. Zero is raised to one, since running
+/// no passes at all is not something a compile should be able to ask for by
+/// typo.
+fn optimization_rounds() -> usize {
+    std::env::var(OPT_ROUNDS_ENV)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_OPT_ROUNDS)
+        .max(1)
+}
+
 /// Env var naming an alternate dogfood-IR artifact to run the compiler against
 /// (see [`dogfood_artifact_text`]). Set it to a `.clif` path — typically
 /// `dogfood.clif.staged` — to validate *candidate* IR: every parse the compiler
@@ -3880,52 +3908,77 @@ fn compile_program<M: Module>(
         check_program,
         builtin_demand: needed,
     } = frontend(program)?;
-    let program = &checked;
+    // Everything a deferral decision is made against: the functions that have
+    // effects or can abort. Computed once from `check_program`, which is where
+    // the builtin signatures (and their `!prints`) live, and shared by every
+    // pass that needs it rather than recomputed per pass per round.
+    let effectful = aipl_mono::effectful_fns(&check_program.items);
+    let max_exprs = inline_max_exprs();
 
-    // Optimization: inline single-use private functions (a no-op unless the
-    // program has a `main` — see `inline_single_use`). Runs on the checked source
-    // before monomorphization; mono's reachability then drops the inlined-away
-    // definitions.
-    let inlined = aipl_mono::inline_single_use(program);
-
-    // Optimization: inline every function small enough to be worth duplicating,
-    // at all of its call sites. After `inline_single_use` (which is strictly
-    // cheaper — it moves a body rather than copying it) so a single-use function
-    // is never duplicated here first.
-    let inlined = aipl_mono::inline_small(&inlined, inline_max_exprs());
-
-    // Optimization: substitute a binding read exactly once into its use site.
-    // This removes no work by itself — codegen emits the same instructions
-    // either way — but the passes below match on the *shape* of an expression,
-    // and a binding hides the shape from them: `let ys = xs.filter(p);
-    // ys.map(f)` is the same computation as `xs.filter(p).map(f)`, and only the
-    // second is a chain the fusion pass can see. So it runs first, and after
-    // inlining, which is what creates most single-use bindings.
-    let inlined = aipl_mono::inline_single_use_bindings(
-        &inlined,
-        &aipl_mono::effectful_fns(&check_program.items),
-    );
-
-    // Optimization: fuse a composite expression into one builtin that computes
-    // the same answer with less work (`xs.count(x) < 4` stops at the fourth
-    // match). After inlining, so a comparison that only became visible by
-    // inlining is fused too; before folding, so a fused call's constant
-    // arguments still fold. The effect set comes from `check_program`, which is
-    // where the builtin signatures (and their `!prints`) live.
-    let inlined =
-        aipl_mono::fuse_operations(&inlined, &aipl_mono::effectful_fns(&check_program.items));
-
-    // Optimization: fold constant subexpressions (`2 + 3` → `5`). Runs after
-    // `check` so diagnostics always report against the unfolded source, and
-    // after inlining so bodies folded here are the ones actually emitted.
-    let folded = aipl_mono::fold_constants(&inlined);
-
-    // Optimization: sink a binding only one branch uses into that branch, so the
-    // arms that ignore its value stop computing it. After inlining, which is
-    // what creates most of them (a call's arguments become bindings ahead of the
-    // inlined body, and that body often branches), and after folding, so a
-    // binding folded down to a literal is already gone rather than sunk.
-    let folded = aipl_mono::sink_bindings(&folded, &aipl_mono::effectful_fns(&check_program.items));
+    // The pre-monomorphization optimization pipeline. The order is the
+    // dependency order and is load-bearing; what is new is that the manager
+    // runs the list *again* whenever a round rewrote something, because these
+    // passes feed each other — see `aipl_mono::passes`.
+    let pre_mono: Vec<Pass<Program>> = vec![
+        // Inline single-use private functions (a no-op unless the program has
+        // a `main` — see `inline_single_use`). Runs on the checked source
+        // before monomorphization; mono's reachability then drops the
+        // inlined-away definitions. Whole-program: it picks its candidate by
+        // use count across the program and deletes the definition it inlined,
+        // neither of which a scope naming callers can answer.
+        Pass::whole_program("inline_single_use", aipl_mono::inline_single_use),
+        // Inline every function small enough to be worth duplicating, at all
+        // of its call sites. After `inline_single_use` (which is strictly
+        // cheaper — it moves a body rather than copying it) so a single-use
+        // function is never duplicated here first.
+        //
+        // First round only. It duplicates, so a later round would inline into
+        // the copies this one made — the ping-pong between two small
+        // mutually-calling functions that its own comment refuses, once per
+        // round. Its candidate set can only shrink as bodies grow, so a later
+        // round could not find anything that was not already its own work.
+        Pass::whole_program("inline_small", move |program| {
+            aipl_mono::inline_small(program, max_exprs)
+        })
+        .once(),
+        // Substitute a binding read exactly once into its use site. This
+        // removes no work by itself — codegen emits the same instructions
+        // either way — but the passes below match on the *shape* of an
+        // expression, and a binding hides the shape from them: `let ys =
+        // xs.filter(p); ys.map(f)` is the same computation as
+        // `xs.filter(p).map(f)`, and only the second is a chain the fusion
+        // pass can see. So it runs before them, and after inlining, which is
+        // what creates most single-use bindings.
+        Pass::scoped("inline_single_use_bindings", {
+            let effectful = effectful.clone();
+            move |program, scope| aipl_mono::inline_single_use_bindings(program, &effectful, scope)
+        }),
+        // Fuse a composite expression into one builtin that computes the same
+        // answer with less work (`xs.count(x) < 4` stops at the fourth match).
+        // After inlining, so a comparison that only became visible by inlining
+        // is fused too; before folding, so a fused call's constant arguments
+        // still fold.
+        Pass::scoped("fuse_operations", {
+            let effectful = effectful.clone();
+            move |program, scope| aipl_mono::fuse_operations(program, &effectful, scope)
+        }),
+        // Fold constant subexpressions (`2 + 3` → `5`). After `check` so
+        // diagnostics always report against the unfolded source, and after
+        // inlining so bodies folded here are the ones actually emitted.
+        Pass::scoped("fold_constants", aipl_mono::fold_constants),
+        // Sink a binding only one branch uses into that branch, so the arms
+        // that ignore its value stop computing it. After inlining, which is
+        // what creates most of them (a call's arguments become bindings ahead
+        // of the inlined body, and that body often branches), and after
+        // folding, so a binding folded down to a literal is already gone
+        // rather than sunk.
+        Pass::scoped("sink_bindings", {
+            let effectful = effectful.clone();
+            move |program, scope| aipl_mono::sink_bindings(program, &effectful, scope)
+        }),
+    ];
+    let rounds = optimization_rounds();
+    let folded = aipl_mono::passes::optimize(checked, &pre_mono, rounds, dbg);
 
     // Resolve generic `any[]` functions into concrete instances first, so the
     // rest of codegen only ever sees concrete types.
@@ -3946,37 +3999,61 @@ fn compile_program<M: Module>(
         .map(|s| (*s).to_string())
         .chain(["main".to_string(), "__test_main".to_string()])
         .collect();
-    let program = aipl_mono::inline_single_use_post_mono(&monomorphized, &externally_called);
-    // Then the small bodies, at *every* call site. This is what the sinking pass
-    // below needs to see through a call: `value_or`'s `match` has to be in the
-    // caller before a binding can be moved into one of its arms.
-    let program =
-        aipl_mono::inline_small_post_mono(&program, inline_max_exprs(), &externally_called);
-    // Push each `?`, each `match` on an optional/result/variant, and each
-    // field access on a struct into the constructor-ending branches under it,
-    // so an inlined `value_or_err`/`value_or`/`map_ok`/… — or a small function
-    // that builds what its caller immediately takes apart — hands its payload
-    // straight out instead of building a value the eliminator undoes; and turn
-    // `x == some(e)` (any constructor, either side) into a `match` that asks
-    // the tag instead of building the value to compare with. After inlining,
-    // which is what puts the constructors under the eliminator; before
-    // sinking, so the error a `none` arm now builds itself — and the operand
-    // an unwrapped comparison binds ahead of its `match` — is what the sinker
-    // moves in.
-    let program = aipl_mono::eliminate_known_constructors_post_mono(
-        &program,
-        inline_max_exprs(),
-        &aipl_mono::effectful_fns(&check_program.items),
-    );
-    // Sink again over the monomorphized program: mono instantiates the
-    // AIPL-implemented builtins the pre-mono run could not see, and post-mono
-    // inlining folds each lifted lambda and single-use instance into its caller
-    // — so bindings that only one branch reads become visible here that were not
-    // visible there. `value_or`'s default is the motivating case.
-    let program = &aipl_mono::sink_bindings_post_mono(
-        &program,
-        &aipl_mono::effectful_fns(&check_program.items),
-    );
+    // The post-monomorphization pipeline, iterated the same way. Mono has
+    // lifted each lambda to its own function and instantiated the
+    // AIPL-implemented builtins, so there is a second crop of single-use
+    // instances and a second crop of bindings only one branch reads — and the
+    // passes feed each other here exactly as they do before mono.
+    let post_mono: Vec<Pass<aipl_mono::MonoProgram>> = vec![
+        // Inline single-use instances: the lifted lambdas (each called from
+        // exactly one specialization) and any other now-single-use instance,
+        // folded back into their one caller. Only possible post-mono — the
+        // lambdas don't exist until mono creates them.
+        Pass::whole_program("inline_single_use_post_mono", {
+            let externally_called = externally_called.clone();
+            move |program| aipl_mono::inline_single_use_post_mono(program, &externally_called)
+        }),
+        // Then the small bodies, at *every* call site. This is what the
+        // sinking pass below needs to see through a call: `value_or`'s `match`
+        // has to be in the caller before a binding can be moved into one of
+        // its arms. First round only, for the same reason as its pre-mono
+        // counterpart.
+        Pass::whole_program("inline_small_post_mono", {
+            let externally_called = externally_called.clone();
+            move |program| aipl_mono::inline_small_post_mono(program, max_exprs, &externally_called)
+        })
+        .once(),
+        // Push each `?`, each `match` on an optional/result/variant, and each
+        // field access on a struct into the constructor-ending branches under
+        // it, so an inlined `value_or_err`/`value_or`/`map_ok`/… — or a small
+        // function that builds what its caller immediately takes apart —
+        // hands its payload straight out instead of building a value the
+        // eliminator undoes; and turn `x == some(e)` (any constructor, either
+        // side) into a `match` that asks the tag instead of building the value
+        // to compare with. After inlining, which is what puts the constructors
+        // under the eliminator; before sinking, so the error a `none` arm now
+        // builds itself — and the operand an unwrapped comparison binds ahead
+        // of its `match` — is what the sinker moves in.
+        Pass::scoped("eliminate_known_constructors_post_mono", {
+            let effectful = effectful.clone();
+            move |program, scope| {
+                aipl_mono::eliminate_known_constructors_post_mono(
+                    program, max_exprs, &effectful, scope,
+                )
+            }
+        }),
+        // Sink again over the monomorphized program: mono instantiates the
+        // AIPL-implemented builtins the pre-mono run could not see, and
+        // post-mono inlining folds each lifted lambda and single-use instance
+        // into its caller — so bindings that only one branch reads become
+        // visible here that were not visible there. `value_or`'s default is
+        // the motivating case.
+        Pass::scoped("sink_bindings_post_mono", {
+            let effectful = effectful.clone();
+            move |program, scope| aipl_mono::sink_bindings_post_mono(program, &effectful, scope)
+        }),
+    ];
+    let program = &aipl_mono::passes::optimize(monomorphized, &post_mono, rounds, dbg);
 
     // Last of all, mark each binding's last-use call arguments for moving —
     // after every pass that reorders pure reads, so a mark reflects the order

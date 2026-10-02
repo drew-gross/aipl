@@ -67,6 +67,7 @@ mod comparison_fusions;
 mod loop_fusions;
 mod slice_fusions;
 
+use crate::passes::Scope;
 use std::collections::HashSet;
 
 use aipl_syntax::ast::{Callee, Expr, ExprKind, Item, Program, Type};
@@ -78,7 +79,11 @@ use crate::sink::undeferrable_fns;
 /// `effectful` names the functions whose call carries an effect — the caller
 /// supplies it because the effect declarations live with the builtin signatures,
 /// which this crate does not parse.
-pub fn fuse_operations(program: &Program, effectful: &HashSet<String>) -> Program {
+/// `scope` names the functions to rewrite: the pass is body-local, so a
+/// function the scope leaves out would come back unchanged anyway (see
+/// [`crate::passes`]), and skipping it saves the walk rather than changing the
+/// answer.
+pub fn fuse_operations(program: &Program, effectful: &HashSet<String>, scope: &Scope) -> Program {
     // The loop family's bar: effects *and* aborts, closed over the call graph,
     // because a mapping function's calls move later rather than merely being
     // reordered among pure operands.
@@ -89,6 +94,9 @@ pub fn fuse_operations(program: &Program, effectful: &HashSet<String>) -> Progra
     let mut out = program.clone();
     for item in &mut out.items {
         if let Item::Fn(f) = item {
+            if !scope.covers(&f.name) {
+                continue;
+            }
             fuse_expr(&mut f.body, None, &guards);
             if let Some(t) = f.test_body.as_mut() {
                 fuse_expr(t, None, &guards);

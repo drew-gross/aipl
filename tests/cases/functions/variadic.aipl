@@ -40,17 +40,17 @@ deallocations: 6
 reallocations: 0
 bytes allocated: 290
 instructions executed: 1190
-binary size: 8216
-  code: 4284
+binary size: 8232
+  code: 4300
   data: 635
   metadata: 3297
 functions:
   __test$joined:
     calls: 1
-    bytes: 2012
+    bytes: 2020
   __test$sum:
     calls: 1
-    bytes: 688
+    bytes: 696
   aipl_arr_inc:
     calls: 2
     bytes: (external)

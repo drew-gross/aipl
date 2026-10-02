@@ -49,6 +49,11 @@ use move_last_use::{move_field_reads, move_last_uses};
 mod subst;
 pub use subst::inline_single_use_bindings;
 
+/// The optimization pass manager: the pass list, and the loop that runs it
+/// until the passes stop finding anything. See the module docs for the
+/// worklist and what a pass may assume about being run twice.
+pub mod passes;
+
 use aipl_syntax::{
     ast,
     ast::{
@@ -7446,7 +7451,7 @@ fn fuse_builtin_body(f: Function) -> Function {
         sources: Vec::new(),
         doc: None,
     };
-    let fused = fuse_operations(&program, &effectful_builtins());
+    let fused = fuse_operations(&program, &effectful_builtins(), &passes::Scope::Everything);
     match fused.items.into_iter().next() {
         Some(Item::Fn(f)) => f,
         _ => unreachable!("fusion rewrites bodies, not items"),
@@ -8678,7 +8683,11 @@ pub fn use_counts(program: &Program) -> HashMap<String, usize> {
 /// mirroring [`collect_free`]'s scope handling — so a bound name (a local) is not
 /// counted. In a valid program every other unbound name is a function (user or
 /// builtin), since AIPL has no global variables.
-fn count_uses(e: &Expr, bound: &mut HashSet<String>, counts: &mut HashMap<String, usize>) {
+pub(crate) fn count_uses(
+    e: &Expr,
+    bound: &mut HashSet<String>,
+    counts: &mut HashMap<String, usize>,
+) {
     match &e.kind {
         ExprKind::KwArg(..) => unreachable!("keyword arguments are expanded by the loader"),
         ExprKind::Spread(..) => unreachable!("array spreads are desugared by the loader"),

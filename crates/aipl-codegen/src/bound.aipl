@@ -39,15 +39,15 @@ allocations: 0
 deallocations: 0
 reallocations: 0
 bytes allocated: 0
-instructions executed: 198
-binary size: 2712
-  code: 1328
+instructions executed: 182
+binary size: 2608
+  code: 1224
   data: 245
   metadata: 1139
 functions:
   __test$bound_from_name:
     calls: 1
-    bytes: 1208
+    bytes: 1104
   aipl_assert:
     calls: 4
     bytes: (external)

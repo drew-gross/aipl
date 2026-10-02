@@ -110,11 +110,11 @@ allocations: 32
 deallocations: 32
 reallocations: 0
 bytes allocated: 1856
-instructions executed: 1561
-binary size: 13168
-  code: 8156
+instructions executed: 1501
+binary size: 12296
+  code: 7472
   data: 187
-  metadata: 4825
+  metadata: 4637
 functions:
   __to_str_Span$opt:
     calls: 2
@@ -145,7 +145,7 @@ functions:
     bytes: 1256
   main:
     calls: 1
-    bytes: 3852
+    bytes: 3168
   rep_suffix:
     calls: 6
     bytes: 1708
